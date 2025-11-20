@@ -1,11 +1,12 @@
 pub mod fs;
 
+#[derive(Debug)]
 pub enum Error {
     NotFound,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait WasmCodeProvider {
-    async fn get_wasm_code(&self, id: &str) -> Result<Vec<u8>>;
+pub trait WasmCodeProvider: Clone + Send + Sync + 'static {
+    fn get_wasm_code(&self, id: &str) -> impl Future<Output = Result<Vec<u8>>> + Send;
 }

@@ -1,3 +1,5 @@
+![](image.png)
+
 This project was inspired by Cloudflare Workers.
 
 Peko is a FaaS platform powered by [wasmtime](https://github.com/bytecodealliance/wasmtime) that executes users' Wasm.
