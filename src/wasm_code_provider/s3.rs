@@ -1,4 +1,4 @@
-use super::{Error, Result, WasmCodeProvider};
+use super::*;
 use anyhow::anyhow;
 use async_singleflight::Group;
 use aws_sdk_s3::{Client, operation::get_object::GetObjectError};
@@ -7,7 +7,8 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use wasmtime::Engine;
-use wasmtime::component::{Component, InstancePre, Linker};
+use wasmtime::component::{Component, Linker};
+use wasmtime_wasi_http::bindings::ProxyPre;
 
 #[derive(Clone)]
 pub struct S3CodeProvider {
@@ -17,7 +18,7 @@ pub struct S3CodeProvider {
     // front is new, back is old
     cache: Arc<Mutex<VecDeque<CacheEntry>>>,
     cache_size: usize,
-    singleflight: Arc<Group<String, InstancePre<()>, Error>>,
+    singleflight: Arc<Group<String, ProxyPre<ClientState>, Error>>,
 }
 
 impl S3CodeProvider {
@@ -72,35 +73,36 @@ impl S3CodeProvider {
         key: &str,
         if_none_match: Option<String>,
         engine: &Engine,
-        linker: &Linker<()>,
-    ) -> anyhow::Result<InstancePre<()>> {
+        linker: &Linker<ClientState>,
+    ) -> anyhow::Result<ProxyPre<ClientState>> {
         let (data, etag) = self.fetch_from_s3(key, if_none_match).await?;
         let byte_len = data.len();
         let component = Component::new(engine, data)?;
-        let instance_pre = linker.instantiate_pre(&component)?;
+        let proxy_pre = ProxyPre::new(linker.instantiate_pre(&component)?)?;
+
         self.put_to_cache(CacheEntry {
             key: key.to_string(),
-            instance_pre: instance_pre.clone(),
+            proxy_pre: proxy_pre.clone(),
             byte_len,
             etag,
         })
         .await;
 
-        Ok(instance_pre)
+        Ok(proxy_pre)
     }
 
     async fn on_local_cache_hit(
         &self,
         cached: CacheEntry,
         engine: &Engine,
-        linker: &Linker<()>,
-    ) -> Result<InstancePre<()>> {
+        linker: &Linker<ClientState>,
+    ) -> Result<ProxyPre<ClientState>> {
         match self.fetch_and_cache(&cached.key, Some(cached.etag), engine, linker).await {
             Ok(instance_pre) => Ok(instance_pre),
             Err(sdk_err) => match &sdk_err.downcast_ref::<aws_sdk_s3::error::SdkError<aws_sdk_s3::operation::get_object::GetObjectError>>() {
                 Some(aws_sdk_s3::error::SdkError::ServiceError(service_err)) => {
                     if service_err.raw().status().as_u16() == 304 {
-                        return Ok(cached.instance_pre);
+                        return Ok(cached.proxy_pre);
                     }
                     match service_err.err() {
                         GetObjectError::NoSuchKey(_) => Err(Error::NotFound),
@@ -116,8 +118,8 @@ impl S3CodeProvider {
         &self,
         key: &str,
         engine: &Engine,
-        linker: &Linker<()>,
-    ) -> Result<InstancePre<()>> {
+        linker: &Linker<ClientState>,
+    ) -> Result<ProxyPre<ClientState>> {
         match self.fetch_and_cache(key, None, engine, linker).await {
             Ok(instance_pre) => Ok(instance_pre),
             Err(sdk_err) => match &sdk_err.downcast_ref::<aws_sdk_s3::error::SdkError<aws_sdk_s3::operation::get_object::GetObjectError>>() {
@@ -151,12 +153,12 @@ impl S3CodeProvider {
 }
 
 impl WasmCodeProvider for S3CodeProvider {
-    async fn get_instance_pre(
+    async fn get_proxy_pre(
         &self,
         id: &str,
         engine: &Engine,
-        linker: &Linker<()>,
-    ) -> Result<InstancePre<()>> {
+        linker: &Linker<ClientState>,
+    ) -> Result<ProxyPre<ClientState>> {
         let key = self.build_key(id);
 
         let provider = self.clone();
@@ -179,7 +181,7 @@ impl WasmCodeProvider for S3CodeProvider {
 #[derive(Clone)]
 struct CacheEntry {
     key: String,
-    instance_pre: InstancePre<()>,
+    proxy_pre: ProxyPre<ClientState>,
     byte_len: usize,
     etag: String,
 }
@@ -191,7 +193,7 @@ mod tests {
     use aws_sdk_s3::primitives::ByteStream;
     use aws_smithy_mocks::{mock, mock_client};
 
-    fn create_test_engine_and_linker() -> (Engine, Linker<()>) {
+    fn create_test_engine_and_linker() -> (Engine, Linker<ClientState>) {
         let engine = Engine::default();
         let linker = Linker::new(&engine);
         (engine, linker)
@@ -237,7 +239,7 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
 
         let expected_component = Component::new(&engine, &data).unwrap();
@@ -247,7 +249,7 @@ mod tests {
         let cache = provider.cache.lock().await;
         assert_eq!(cache.len(), 1);
         assert_eq!(cache[0].key, "test.cwasm");
-        let cached_serialized = cache[0].instance_pre.component().serialize().unwrap();
+        let cached_serialized = cache[0].proxy_pre.component().serialize().unwrap();
         assert_eq!(cached_serialized, expected_serialized);
         assert_eq!(cache[0].etag, "etag-123".to_string());
     }
@@ -276,9 +278,12 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+        provider
+            .get_proxy_pre("test.cwasm", &engine, &linker)
+            .await
+            .unwrap();
 
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
     }
 
@@ -292,7 +297,9 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("missing.cwasm", &engine, &linker).await;
+        let result = provider
+            .get_proxy_pre("missing.cwasm", &engine, &linker)
+            .await;
         assert!(matches!(result, Err(Error::NotFound)));
     }
 
@@ -317,7 +324,7 @@ mod tests {
         let (engine, linker) = create_test_engine_and_linker();
         for i in 0..5 {
             provider
-                .get_instance_pre(&format!("file{}.cwasm", i), &engine, &linker)
+                .get_proxy_pre(&format!("file{}.cwasm", i), &engine, &linker)
                 .await
                 .unwrap();
         }
@@ -349,7 +356,7 @@ mod tests {
         );
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
 
         let cache = provider.cache.lock().await;
@@ -381,10 +388,10 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result1 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result1 = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result1.is_ok());
 
-        let result2 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result2 = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result2.is_ok());
 
         let expected_component2 = Component::new(&engine, &data2).unwrap();
@@ -393,7 +400,7 @@ mod tests {
 
         let cache = provider.cache.lock().await;
         assert_eq!(cache.len(), 1);
-        let cached_serialized = cache[0].instance_pre.component().serialize().unwrap();
+        let cached_serialized = cache[0].proxy_pre.component().serialize().unwrap();
         assert_eq!(cached_serialized, expected_serialized2);
         assert_eq!(cache[0].etag, "etag-v2".to_string());
     }
@@ -430,7 +437,9 @@ mod tests {
             let linker_clone = linker.clone();
             let handle = tokio::spawn(async move {
                 barrier_clone.wait().await;
-                provider_clone.get_instance_pre("test.cwasm", &engine_clone, &linker_clone).await
+                provider_clone
+                    .get_proxy_pre("test.cwasm", &engine_clone, &linker_clone)
+                    .await
             });
             handles.push(handle);
         }
@@ -465,9 +474,18 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        provider.get_instance_pre("file0.cwasm", &engine, &linker).await.unwrap();
-        provider.get_instance_pre("file1.cwasm", &engine, &linker).await.unwrap();
-        provider.get_instance_pre("file2.cwasm", &engine, &linker).await.unwrap();
+        provider
+            .get_proxy_pre("file0.cwasm", &engine, &linker)
+            .await
+            .unwrap();
+        provider
+            .get_proxy_pre("file1.cwasm", &engine, &linker)
+            .await
+            .unwrap();
+        provider
+            .get_proxy_pre("file2.cwasm", &engine, &linker)
+            .await
+            .unwrap();
 
         {
             let cache = provider.cache.lock().await;
@@ -476,7 +494,10 @@ mod tests {
             assert_eq!(cache[2].key, "file0.cwasm");
         }
 
-        provider.get_instance_pre("file0.cwasm", &engine, &linker).await.unwrap();
+        provider
+            .get_proxy_pre("file0.cwasm", &engine, &linker)
+            .await
+            .unwrap();
 
         let cache = provider.cache.lock().await;
         assert_eq!(cache[0].key, "file0.cwasm");
@@ -503,10 +524,10 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result1 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result1 = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result1.is_ok());
 
-        let result2 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result2 = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result2, Err(Error::NotFound)));
     }
 
@@ -535,8 +556,14 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
-        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+        provider
+            .get_proxy_pre("test.cwasm", &engine, &linker)
+            .await
+            .unwrap();
+        provider
+            .get_proxy_pre("test.cwasm", &engine, &linker)
+            .await
+            .unwrap();
 
         let expected_component2 = Component::new(&engine, &data2).unwrap();
         let expected_instance_pre2 = linker.instantiate_pre(&expected_component2).unwrap();
@@ -545,7 +572,7 @@ mod tests {
         let cache = provider.cache.lock().await;
         assert_eq!(cache.len(), 1);
         assert_eq!(cache[0].key, "test.cwasm");
-        let cached_serialized = cache[0].instance_pre.component().serialize().unwrap();
+        let cached_serialized = cache[0].proxy_pre.component().serialize().unwrap();
         assert_eq!(cached_serialized, expected_serialized2);
     }
 
@@ -561,7 +588,7 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -579,7 +606,7 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -598,7 +625,7 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 0);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
 
         let cache = provider.cache.lock().await;
@@ -621,7 +648,7 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, cache_size);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
 
         let cache = provider.cache.lock().await;
@@ -643,7 +670,9 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("empty.cwasm", &engine, &linker).await;
+        let result = provider
+            .get_proxy_pre("empty.cwasm", &engine, &linker)
+            .await;
         assert!(result.is_ok());
     }
 
@@ -680,8 +709,14 @@ mod tests {
         );
 
         let (engine, linker) = create_test_engine_and_linker();
-        provider_none.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
-        provider_empty.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+        provider_none
+            .get_proxy_pre("test.cwasm", &engine, &linker)
+            .await
+            .unwrap();
+        provider_empty
+            .get_proxy_pre("test.cwasm", &engine, &linker)
+            .await
+            .unwrap();
 
         let cache_none = provider_none.cache.lock().await;
         assert_eq!(cache_none[0].key, "test.cwasm");
@@ -716,7 +751,7 @@ mod tests {
             let linker_clone = linker.clone();
             let handle = tokio::spawn(async move {
                 provider_clone
-                    .get_instance_pre(&format!("file{}.cwasm", i), &engine_clone, &linker_clone)
+                    .get_proxy_pre(&format!("file{}.cwasm", i), &engine_clone, &linker_clone)
                     .await
             });
             handles.push(handle);
@@ -745,7 +780,7 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -772,9 +807,12 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+        provider
+            .get_proxy_pre("test.cwasm", &engine, &linker)
+            .await
+            .unwrap();
 
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -792,7 +830,7 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -819,9 +857,12 @@ mod tests {
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
         let (engine, linker) = create_test_engine_and_linker();
-        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+        provider
+            .get_proxy_pre("test.cwasm", &engine, &linker)
+            .await
+            .unwrap();
 
-        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        let result = provider.get_proxy_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 }

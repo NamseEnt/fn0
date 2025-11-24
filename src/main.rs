@@ -1,4 +1,3 @@
-mod conversion;
 mod execute;
 mod on_request;
 mod wasm_code_provider;

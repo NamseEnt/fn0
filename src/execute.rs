@@ -1,39 +1,48 @@
 use crate::wasm_code_provider::{self, WasmCodeProvider};
 use bytes::Bytes;
-use tokio::sync::{
-    mpsc::{Receiver, UnboundedReceiver, UnboundedSender, unbounded_channel},
-    oneshot,
-};
+use http_body_util::BodyExt;
+use tokio::sync::mpsc::{Receiver, UnboundedReceiver, UnboundedSender, unbounded_channel};
 use wasmtime::{
-    component::{Component, Instance, InstancePre, Val},
-    *,
+    Engine, Store,
+    component::{Instance, Linker, StreamReader, Val},
+};
+use wasmtime_wasi::*;
+use wasmtime_wasi_http::{
+    WasiHttpCtx, WasiHttpView,
+    bindings::{
+        ProxyPre,
+        http::types::{ErrorCode, Scheme},
+    },
+    body::HyperOutgoingBody,
 };
 
-pub struct Request {
-    code_id: String,
-    fn_name: String,
-    params: Vec<Val>,
-    response_tx: oneshot::Sender<Result<Vec<Val>, Error>>,
+pub struct Job {
+    pub req: hyper::Request<hyper::body::Incoming>,
+    pub res: hyper::Response<hyper::body::Incoming>,
+    pub code_id: String,
+    pub fn_name: String,
 }
 
 pub struct Executor<Wcp: WasmCodeProvider> {
     engine: Engine,
     wasm_code_provider: Wcp,
-    request_rx: Receiver<Request>,
-    linker: component::Linker<()>,
+    job_rx: Receiver<Job>,
+    linker: Linker<ClientState>,
     free_instances: Vec<MyInstance>,
     free_instance_tx: UnboundedSender<MyInstance>,
     free_instance_rx: UnboundedReceiver<MyInstance>,
 }
 
 impl<Wcp: WasmCodeProvider> Executor<Wcp> {
-    pub fn new(engine: Engine, wasm_code_provider: Wcp, request_rx: Receiver<Request>) -> Self {
-        let linker = component::Linker::new(&engine);
+    pub fn new(engine: Engine, wasm_code_provider: Wcp, job_rx: Receiver<Job>) -> Self {
+        let mut linker = component::Linker::new(&engine);
+        wasmtime_wasi::p2::add_to_linker_async(&mut linker).unwrap();
+        wasmtime_wasi_http::add_only_http_to_linker_async(&mut linker).unwrap();
         let (free_instance_tx, free_instance_rx) = unbounded_channel::<MyInstance>();
         Self {
             engine,
             wasm_code_provider,
-            request_rx,
+            job_rx,
             linker,
             free_instances: Vec::new(),
             free_instance_tx,
@@ -46,13 +55,13 @@ impl<Wcp: WasmCodeProvider> Executor<Wcp> {
             Some(instance) = self.free_instance_rx.recv() => {
                 self.free_instances.push(instance)
             }
-            Some(request) = self.request_rx.recv() => {
-                self.on_request(request);
+            Some(job) = self.job_rx.recv() => {
+                self.run_job(job);
             }
         }
     }
-    fn on_request(&mut self, request: Request) {
-        let free_instance = self.try_pop_free_instance(&request.code_id);
+    fn run_job(&mut self, job: Job) {
+        let free_instance = self.try_pop_free_instance(&job.code_id);
         let wasm_code_provider = self.wasm_code_provider.clone();
         let engine = self.engine.clone();
         let linker = self.linker.clone();
@@ -65,18 +74,18 @@ impl<Wcp: WasmCodeProvider> Executor<Wcp> {
                 free_instance
             } else {
                 let result =
-                    MyInstance::new(&request.code_id, &engine, &linker, wasm_code_provider).await;
+                    MyInstance::new(&job.code_id, &engine, &linker, wasm_code_provider).await;
                 match result {
                     Ok(instance) => instance,
                     Err(error) => {
-                        let _ = request.response_tx.send(Err(error));
+                        let _ = job.response_tx.send(Err(error));
                         return;
                     }
                 }
             };
 
-            let result = instance.execute(&request.fn_name, &request.params);
-            let _ = request.response_tx.send(result);
+            let result = instance.execute(job);
+            let _ = job.response_tx.send(result);
             let _ = free_instance_tx.send(instance);
         });
     }
@@ -93,45 +102,6 @@ impl<Wcp: WasmCodeProvider> Executor<Wcp> {
                 }
             })?;
         Some(self.free_instances.remove(index))
-    }
-}
-
-struct MyInstance {
-    code_id: String,
-    inner: Instance,
-    store: Store<()>,
-}
-
-impl MyInstance {
-    fn execute(&mut self, fn_name: &str, params: &[Val]) -> Result<Vec<Val>, Error> {
-        let Some(func) = self.inner.get_func(&mut self.store, fn_name) else {
-            return Err(Error::FuncNotFound);
-        };
-
-        let mut results = vec![Val::Bool(true); func.results(&self.store).len()];
-
-        func.call(&mut self.store, params, &mut results)?;
-
-        Ok(results)
-    }
-
-    async fn new<Wcp: WasmCodeProvider>(
-        code_id: &str,
-        engine: &Engine,
-        linker: &component::Linker<()>,
-        wasm_code_provider: Wcp,
-    ) -> Result<Self, Error> {
-        let instance_pre = wasm_code_provider
-            .get_instance_pre(code_id, engine, linker)
-            .await?;
-        let mut store = Store::new(&engine, ());
-        let instance = instance_pre.instantiate(&mut store)?;
-
-        Ok(MyInstance {
-            code_id: code_id.to_string(),
-            inner: instance,
-            store,
-        })
     }
 }
 
@@ -152,11 +122,126 @@ impl From<wasmtime::Error> for Error {
     }
 }
 
+struct MyInstance {
+    code_id: String,
+    pre: ProxyPre<ClientState>,
+}
+
+impl MyInstance {
+    async fn new<Wcp: WasmCodeProvider>(
+        code_id: &str,
+        engine: &Engine,
+        linker: &Linker<ClientState>,
+        wasm_code_provider: Wcp,
+    ) -> Result<Self> {
+        let proxy_pre = wasm_code_provider
+            .get_proxy_pre(code_id, engine, linker)
+            .await?;
+
+        Self {
+            code_id: code_id.to_string(),
+            pre,
+        }
+    }
+}
+
+async fn handle_request(
+    pre: ProxyPre<ClientState>,
+    req: hyper::Request<hyper::body::Incoming>,
+) -> Result<hyper::Response<HyperOutgoingBody>, Error> {
+    let mut store = Store::new(
+        pre.engine(),
+        ClientState {
+            table: ResourceTable::new(),
+            wasi: WasiCtx::builder().inherit_stdio().build(),
+            http: WasiHttpCtx::new(),
+        },
+    );
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let req = store.data_mut().new_incoming_request(Scheme::Http, req)?;
+    let out = store.data_mut().new_response_outparam(tx)?;
+    let pre = pre.clone();
+
+    // Run the http request itself in a separate task so the task can
+    // optionally continue to execute beyond after the initial
+    // headers/response code are sent.
+    let task = tokio::task::spawn(async move {
+        let proxy = pre.instantiate_async(&mut store).await?;
+
+        if let Err(e) = proxy
+            .wasi_http_incoming_handler()
+            .call_handle(store, req, out)
+            .await
+        {
+            return Err(e);
+        }
+
+        Ok(())
+    });
+
+    match rx.await {
+        Ok(Ok(resp)) => Ok(resp),
+        Ok(Err(_e)) => {
+            let body = http_body_util::Full::new(Bytes::from("Internal Server Error"))
+                .map_err(|_| ErrorCode::InternalError(None));
+            let mut res = hyper::Response::new(HyperOutgoingBody::new(body));
+            *res.status_mut() = hyper::StatusCode::INTERNAL_SERVER_ERROR;
+            Ok(res)
+        }
+
+        Err(_) => {
+            let e = match task.await {
+                Ok(Ok(())) => {
+                    let body = http_body_util::Full::new(Bytes::from(
+                        "guest never invoked `response-outparam::set` method",
+                    ))
+                    .map_err(|_| ErrorCode::InternalError(None));
+                    let mut res = hyper::Response::new(HyperOutgoingBody::new(body));
+                    *res.status_mut() = hyper::StatusCode::INTERNAL_SERVER_ERROR;
+                    return Ok(res);
+                }
+                Ok(Err(e)) => e,
+                Err(e) => e.into(),
+            };
+            Err(e
+                .context("guest never invoked `response-outparam::set` method")
+                .into())
+        }
+    }
+}
+
+pub struct ClientState {
+    wasi: WasiCtx,
+    http: WasiHttpCtx,
+    table: ResourceTable,
+}
+
+impl WasiView for ClientState {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.wasi,
+            table: &mut self.table,
+        }
+    }
+}
+
+impl WasiHttpView for ClientState {
+    fn ctx(&mut self) -> &mut WasiHttpCtx {
+        &mut self.http
+    }
+
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.table
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
+    use wasmtime::component::{Component, InstancePre, Linker};
 
     #[derive(Clone)]
     struct MockWasmCodeProvider {
@@ -177,11 +262,11 @@ mod tests {
     }
 
     impl WasmCodeProvider for MockWasmCodeProvider {
-        async fn get_instance_pre(
+        async fn get_proxy_pre(
             &self,
             id: &str,
             engine: &Engine,
-            linker: &component::Linker<()>,
+            linker: &Linker<ClientState>,
         ) -> wasm_code_provider::Result<InstancePre<()>> {
             let bytes = self
                 .codes
@@ -192,7 +277,8 @@ mod tests {
             let component = Component::new(engine, bytes)
                 .map_err(|e| wasm_code_provider::Error::ProviderError(e.into()))?;
 
-            let instance_pre = linker.instantiate_pre(&component)
+            let instance_pre = linker
+                .instantiate_pre(&component)
                 .map_err(|e| wasm_code_provider::Error::ProviderError(e.into()))?;
 
             Ok(instance_pre)
@@ -229,7 +315,7 @@ mod tests {
         wat.as_bytes().to_vec()
     }
 
-    fn setup_executor() -> (Executor<MockWasmCodeProvider>, mpsc::Sender<Request>) {
+    fn setup_executor() -> (Executor<MockWasmCodeProvider>, mpsc::Sender<Job>) {
         let engine = Engine::default();
         let (tx, rx) = mpsc::channel(100);
         let provider =
@@ -238,14 +324,14 @@ mod tests {
         (executor, tx)
     }
 
-    async fn send_request(
-        tx: &mpsc::Sender<Request>,
+    async fn send_job(
+        tx: &mpsc::Sender<Job>,
         code_id: String,
         fn_name: String,
         params: Vec<Val>,
     ) -> Result<Vec<Val>, Error> {
         let (response_tx, response_rx) = oneshot::channel();
-        tx.send(Request {
+        tx.send(Job {
             code_id,
             fn_name,
             params,
@@ -257,7 +343,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_executor_basic_request() {
+    async fn test_executor_basic_job() {
         let (mut executor, tx) = setup_executor();
 
         tokio::spawn(async move {
@@ -266,7 +352,7 @@ mod tests {
             }
         });
 
-        let result = send_request(
+        let result = send_job(
             &tx,
             "test-component".to_string(),
             "add".to_string(),
@@ -294,7 +380,7 @@ mod tests {
             }
         });
 
-        let add_result = send_request(
+        let add_result = send_job(
             &tx,
             "test-add".to_string(),
             "add".to_string(),
@@ -305,7 +391,7 @@ mod tests {
 
         assert_eq!(add_result, vec![Val::U32(8)]);
 
-        let mul_result = send_request(
+        let mul_result = send_job(
             &tx,
             "test-mul".to_string(),
             "mul".to_string(),
@@ -318,7 +404,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_executor_sequential_requests() {
+    async fn test_executor_sequential_jobs() {
         let engine = Engine::default();
         let (tx, rx) = mpsc::channel(100);
         let mut provider = MockWasmCodeProvider::new();
@@ -335,7 +421,7 @@ mod tests {
         });
 
         for i in 0..5 {
-            let result = send_request(
+            let result = send_job(
                 &tx,
                 format!("test-{}", i),
                 "add".to_string(),
@@ -349,7 +435,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_executor_concurrent_requests() {
+    async fn test_executor_concurrent_jobs() {
         let (mut executor, tx) = setup_executor();
 
         tokio::spawn(async move {
@@ -363,7 +449,7 @@ mod tests {
         for i in 0..10 {
             let tx_clone = tx.clone();
             let handle = tokio::spawn(async move {
-                send_request(
+                send_job(
                     &tx_clone,
                     "test-component".to_string(),
                     "add".to_string(),
@@ -390,7 +476,7 @@ mod tests {
             }
         });
 
-        let result = send_request(
+        let result = send_job(
             &tx,
             "test-component".to_string(),
             "nonexistent".to_string(),
@@ -411,7 +497,7 @@ mod tests {
             }
         });
 
-        let result = send_request(
+        let result = send_job(
             &tx,
             "nonexistent-component".to_string(),
             "add".to_string(),

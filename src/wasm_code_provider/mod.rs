@@ -1,20 +1,19 @@
 pub mod fs;
 pub mod s3;
 
+use crate::execute::ClientState;
 use std::future::Future;
-use wasmtime::{
-    Engine,
-    component::{InstancePre, Linker},
-};
+use wasmtime::{Engine, component::Linker};
+use wasmtime_wasi_http::bindings::ProxyPre;
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub trait WasmCodeProvider: Clone + Send + Sync + 'static {
-    fn get_instance_pre(
+    fn get_proxy_pre(
         &self,
         id: &str,
         engine: &Engine,
-        linker: &Linker<()>,
-    ) -> impl Future<Output = Result<InstancePre<()>>> + Send;
+        linker: &Linker<ClientState>,
+    ) -> impl Future<Output = Result<ProxyPre<ClientState>>> + Send;
 }
 
 #[derive(Debug)]

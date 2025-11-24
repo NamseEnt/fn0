@@ -1,5 +1,10 @@
-pub struct Req {}
-pub struct Res {}
+use hyper::body::Incoming;
+use tokio::sync::mpsc::Sender;
+
+use crate::*;
+
+type Req = hyper::Request<Incoming>;
+type Res = hyper::Response<Incoming>;
 
 pub enum Error {
     AllWorkerBusy,
@@ -7,10 +12,10 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub async fn on_request(req: &mut Req, res: &mut Res) -> Result<()> {
+pub async fn on_request(req: Req, res: Res, execute_tx: Sender<execute::Job>) -> Result<()> {
     for _ in 0..2 {
         match find_proper_worker().await? {
-            FindWorkerResult::Me => return execute_on_me(req, res).await,
+            FindWorkerResult::Me => return execute_on_me(req, res, execute_tx).await,
             FindWorkerResult::Other { address } => {
                 return execute_on_other(address, req, res).await;
             }
@@ -23,11 +28,20 @@ pub async fn on_request(req: &mut Req, res: &mut Res) -> Result<()> {
     Err(Error::AllWorkerBusy)
 }
 
-async fn execute_on_me(req: &mut Req, res: &mut Res) -> Result<()> {
+async fn execute_on_me(req: Req, res: Res, execute_tx: Sender<execute::Job>) -> Result<()> {
+    execute_tx
+        .send(execute::Job {
+            req,
+            res,
+            code_id: "todo".to_string(),
+            fn_name: "todo".to_string(),
+        })
+        .await
+        .unwrap();
     todo!()
 }
 
-async fn execute_on_other(address: Address, req: &mut Req, res: &mut Res) -> Result<()> {
+async fn execute_on_other(address: Address, req: Req, res: Res) -> Result<()> {
     todo!()
 }
 

@@ -14,17 +14,17 @@ impl FsCodeProvider {
 }
 
 impl WasmCodeProvider for FsCodeProvider {
-    async fn get_instance_pre(
+    async fn get_proxy_pre(
         &self,
         id: &str,
         engine: &Engine,
-        linker: &Linker<()>,
-    ) -> Result<InstancePre<()>> {
+        linker: &Linker<ClientState>,
+    ) -> Result<ProxyPre<ClientState>> {
         let path = self.base_path.join(id);
         match tokio::fs::read(path).await {
             Ok(code) => {
                 let component = Component::new(engine, code)?;
-                Ok(linker.instantiate_pre(&component)?)
+                Ok(ProxyPre::new(linker.instantiate_pre(&component)?)?)
             }
             Err(error) => {
                 if error.kind() == std::io::ErrorKind::NotFound {
