@@ -3263,6 +3263,7 @@ dependencies = [
  "sonic-rs",
  "tokio",
  "wasmtime",
+ "wat",
 ]
 
 [[package]]

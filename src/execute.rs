@@ -5,7 +5,7 @@ use tokio::sync::{
     oneshot,
 };
 use wasmtime::{
-    component::{Component, Instance, Val},
+    component::{Component, Instance, InstancePre, Val},
     *,
 };
 
@@ -183,10 +183,19 @@ mod tests {
             engine: &Engine,
             linker: &component::Linker<()>,
         ) -> wasm_code_provider::Result<InstancePre<()>> {
-            self.codes
+            let bytes = self
+                .codes
                 .get(id)
                 .cloned()
-                .ok_or(wasm_code_provider::Error::NotFound)
+                .ok_or(wasm_code_provider::Error::NotFound)?;
+
+            let component = Component::new(engine, bytes)
+                .map_err(|e| wasm_code_provider::Error::ProviderError(e.into()))?;
+
+            let instance_pre = linker.instantiate_pre(&component)
+                .map_err(|e| wasm_code_provider::Error::ProviderError(e.into()))?;
+
+            Ok(instance_pre)
         }
     }
 

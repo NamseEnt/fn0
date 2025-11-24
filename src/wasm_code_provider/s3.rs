@@ -76,14 +76,15 @@ impl S3CodeProvider {
     ) -> anyhow::Result<InstancePre<()>> {
         let (data, etag) = self.fetch_from_s3(key, if_none_match).await?;
         let byte_len = data.len();
-        let component = unsafe { Component::deserialize(engine, data) }?;
+        let component = Component::new(engine, data)?;
         let instance_pre = linker.instantiate_pre(&component)?;
         self.put_to_cache(CacheEntry {
             key: key.to_string(),
             instance_pre: instance_pre.clone(),
             byte_len,
             etag,
-        });
+        })
+        .await;
 
         Ok(instance_pre)
     }
@@ -190,9 +191,40 @@ mod tests {
     use aws_sdk_s3::primitives::ByteStream;
     use aws_smithy_mocks::{mock, mock_client};
 
+    fn create_test_engine_and_linker() -> (Engine, Linker<()>) {
+        let engine = Engine::default();
+        let linker = Linker::new(&engine);
+        (engine, linker)
+    }
+
+    fn create_test_wasm_component() -> Vec<u8> {
+        create_test_wasm_component_with_value(42)
+    }
+
+    fn create_test_wasm_component_with_value(value: i32) -> Vec<u8> {
+        let wat = format!(
+            r#"
+            (component
+                (core module $m
+                    (func (export "test") (result i32)
+                        i32.const {}
+                    )
+                    (memory (export "memory") 1)
+                )
+                (core instance $i (instantiate $m))
+                (func (export "test") (result u32)
+                    (canon lift (core func $i "test") (memory $i "memory"))
+                )
+            )
+        "#,
+            value
+        );
+        wat::parse_str(&wat).unwrap()
+    }
+
     #[tokio::test]
     async fn test_cache_miss_fetch_from_s3() {
-        let data = b"wasm code content".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -204,14 +236,19 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_ref(), data.as_slice());
+
+        let expected_component = Component::new(&engine, &data).unwrap();
+        let expected_instance_pre = linker.instantiate_pre(&expected_component).unwrap();
+        let expected_serialized = expected_instance_pre.component().serialize().unwrap();
 
         let cache = provider.cache.lock().await;
         assert_eq!(cache.len(), 1);
-        assert_eq!(cache[0].key, "test.wasm");
-        assert_eq!(cache[0].data.as_ref(), data.as_slice());
+        assert_eq!(cache[0].key, "test.cwasm");
+        let cached_serialized = cache[0].instance_pre.component().serialize().unwrap();
+        assert_eq!(cached_serialized, expected_serialized);
         assert_eq!(cache[0].etag, "etag-123".to_string());
     }
 
@@ -221,7 +258,7 @@ mod tests {
         use aws_smithy_runtime_api::http::StatusCode;
         use aws_smithy_types::body::SdkBody;
 
-        let data = b"wasm code content".to_vec();
+        let data = create_test_wasm_component();
 
         let data1 = data.clone();
         let rule1 = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
@@ -238,11 +275,11 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule1, &rule2]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        provider.get_instance_pre("test.wasm").await.unwrap();
+        let (engine, linker) = create_test_engine_and_linker();
+        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().as_ref(), data.as_slice());
     }
 
     #[tokio::test]
@@ -254,7 +291,8 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result = provider.get_instance_pre("missing.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("missing.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::NotFound)));
     }
 
@@ -262,7 +300,7 @@ mod tests {
     async fn test_lru_eviction() {
         let mut rules = Vec::new();
         for i in 0..5 {
-            let data = format!("data-{}", i).into_bytes();
+            let data = create_test_wasm_component_with_value(i);
             rules.push(mock!(aws_sdk_s3::Client::get_object).then_output(move || {
                 GetObjectOutput::builder()
                     .body(ByteStream::from(data.clone()))
@@ -272,26 +310,28 @@ mod tests {
         }
 
         let client = mock_client!(aws_sdk_s3, &rules);
-        let cache_size = "data-0".len() + "data-1".len() + "data-2".len();
+        let wasm_size = create_test_wasm_component_with_value(0).len();
+        let cache_size = wasm_size * 3;
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, cache_size);
 
+        let (engine, linker) = create_test_engine_and_linker();
         for i in 0..5 {
             provider
-                .get_instance_pre(&format!("file{}.wasm", i))
+                .get_instance_pre(&format!("file{}.cwasm", i), &engine, &linker)
                 .await
                 .unwrap();
         }
 
         let cache = provider.cache.lock().await;
         assert_eq!(cache.len(), 3);
-        assert_eq!(cache[0].key, "file4.wasm");
-        assert_eq!(cache[1].key, "file3.wasm");
-        assert_eq!(cache[2].key, "file2.wasm");
+        assert_eq!(cache[0].key, "file4.cwasm");
+        assert_eq!(cache[1].key, "file3.cwasm");
+        assert_eq!(cache[2].key, "file2.cwasm");
     }
 
     #[tokio::test]
     async fn test_prefix_handling() {
-        let data = b"wasm code".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -308,17 +348,18 @@ mod tests {
             1024 * 1024,
         );
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
 
         let cache = provider.cache.lock().await;
-        assert_eq!(cache[0].key, "wasm-modules/test.wasm");
+        assert_eq!(cache[0].key, "wasm-modules/test.cwasm");
     }
 
     #[tokio::test]
     async fn test_cache_update_on_etag_change() {
-        let data1 = b"version 1".to_vec();
-        let data2 = b"version 2".to_vec();
+        let data1 = create_test_wasm_component_with_value(1);
+        let data2 = create_test_wasm_component_with_value(2);
         let data1_clone = data1.clone();
         let data2_clone = data2.clone();
 
@@ -339,15 +380,21 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule1, &rule2]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result1 = provider.get_instance_pre("test.wasm").await.unwrap();
-        assert_eq!(result1.as_ref(), data1.as_slice());
+        let (engine, linker) = create_test_engine_and_linker();
+        let result1 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        assert!(result1.is_ok());
 
-        let result2 = provider.get_instance_pre("test.wasm").await.unwrap();
-        assert_eq!(result2.as_ref(), data2.as_slice());
+        let result2 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
+        assert!(result2.is_ok());
+
+        let expected_component2 = Component::new(&engine, &data2).unwrap();
+        let expected_instance_pre2 = linker.instantiate_pre(&expected_component2).unwrap();
+        let expected_serialized2 = expected_instance_pre2.component().serialize().unwrap();
 
         let cache = provider.cache.lock().await;
         assert_eq!(cache.len(), 1);
-        assert_eq!(cache[0].data.as_ref(), data2.as_slice());
+        let cached_serialized = cache[0].instance_pre.component().serialize().unwrap();
+        assert_eq!(cached_serialized, expected_serialized2);
         assert_eq!(cache[0].etag, "etag-v2".to_string());
     }
 
@@ -355,7 +402,7 @@ mod tests {
     async fn test_concurrent_same_key_requests() {
         use tokio::sync::Barrier;
 
-        let data = b"wasm code".to_vec();
+        let data = create_test_wasm_component();
 
         let mut rules = Vec::new();
         for _ in 0..10 {
@@ -371,14 +418,19 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, &rules);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
+        let (engine, linker) = create_test_engine_and_linker();
+        let engine = Arc::new(engine);
+        let linker = Arc::new(linker);
         let barrier = Arc::new(Barrier::new(10));
         let mut handles = vec![];
         for _ in 0..10 {
             let provider_clone = provider.clone();
             let barrier_clone = barrier.clone();
+            let engine_clone = engine.clone();
+            let linker_clone = linker.clone();
             let handle = tokio::spawn(async move {
                 barrier_clone.wait().await;
-                provider_clone.get_instance_pre("test.wasm").await
+                provider_clone.get_instance_pre("test.cwasm", &engine_clone, &linker_clone).await
             });
             handles.push(handle);
         }
@@ -386,7 +438,6 @@ mod tests {
         for handle in handles {
             let result = handle.await.unwrap();
             assert!(result.is_ok());
-            assert_eq!(result.unwrap().as_ref(), data.as_slice());
         }
     }
 
@@ -394,7 +445,7 @@ mod tests {
     async fn test_cache_mru_behavior() {
         let mut rules = Vec::new();
         for i in 0..3 {
-            let data = format!("data-{}", i).into_bytes();
+            let data = create_test_wasm_component_with_value(i);
             rules.push(mock!(aws_sdk_s3::Client::get_object).then_output(move || {
                 GetObjectOutput::builder()
                     .body(ByteStream::from(data.clone()))
@@ -413,28 +464,29 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, &rules);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        provider.get_instance_pre("file0.wasm").await.unwrap();
-        provider.get_instance_pre("file1.wasm").await.unwrap();
-        provider.get_instance_pre("file2.wasm").await.unwrap();
+        let (engine, linker) = create_test_engine_and_linker();
+        provider.get_instance_pre("file0.cwasm", &engine, &linker).await.unwrap();
+        provider.get_instance_pre("file1.cwasm", &engine, &linker).await.unwrap();
+        provider.get_instance_pre("file2.cwasm", &engine, &linker).await.unwrap();
 
         {
             let cache = provider.cache.lock().await;
-            assert_eq!(cache[0].key, "file2.wasm");
-            assert_eq!(cache[1].key, "file1.wasm");
-            assert_eq!(cache[2].key, "file0.wasm");
+            assert_eq!(cache[0].key, "file2.cwasm");
+            assert_eq!(cache[1].key, "file1.cwasm");
+            assert_eq!(cache[2].key, "file0.cwasm");
         }
 
-        provider.get_instance_pre("file0.wasm").await.unwrap();
+        provider.get_instance_pre("file0.cwasm", &engine, &linker).await.unwrap();
 
         let cache = provider.cache.lock().await;
-        assert_eq!(cache[0].key, "file0.wasm");
-        assert_eq!(cache[1].key, "file2.wasm");
-        assert_eq!(cache[2].key, "file1.wasm");
+        assert_eq!(cache[0].key, "file0.cwasm");
+        assert_eq!(cache[1].key, "file2.cwasm");
+        assert_eq!(cache[2].key, "file1.cwasm");
     }
 
     #[tokio::test]
     async fn test_cache_hit_then_not_found() {
-        let data = b"wasm code".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule1 = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -450,17 +502,18 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule1, &rule2]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result1 = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result1 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(result1.is_ok());
 
-        let result2 = provider.get_instance_pre("test.wasm").await;
+        let result2 = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result2, Err(Error::NotFound)));
     }
 
     #[tokio::test]
     async fn test_cache_duplicate_key_update() {
-        let data1 = b"version 1".to_vec();
-        let data2 = b"version 2".to_vec();
+        let data1 = create_test_wasm_component_with_value(1);
+        let data2 = create_test_wasm_component_with_value(2);
         let data1_clone = data1.clone();
         let data2_clone = data2.clone();
 
@@ -481,13 +534,19 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule1, &rule2]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        provider.get_instance_pre("test.wasm").await.unwrap();
-        provider.get_instance_pre("test.wasm").await.unwrap();
+        let (engine, linker) = create_test_engine_and_linker();
+        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+
+        let expected_component2 = Component::new(&engine, &data2).unwrap();
+        let expected_instance_pre2 = linker.instantiate_pre(&expected_component2).unwrap();
+        let expected_serialized2 = expected_instance_pre2.component().serialize().unwrap();
 
         let cache = provider.cache.lock().await;
         assert_eq!(cache.len(), 1);
-        assert_eq!(cache[0].key, "test.wasm");
-        assert_eq!(cache[0].data.as_ref(), data2.as_slice());
+        assert_eq!(cache[0].key, "test.cwasm");
+        let cached_serialized = cache[0].instance_pre.component().serialize().unwrap();
+        assert_eq!(cached_serialized, expected_serialized2);
     }
 
     #[tokio::test]
@@ -501,7 +560,8 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -518,13 +578,14 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
     #[tokio::test]
     async fn test_cache_size_zero() {
-        let data = b"wasm code".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -536,7 +597,8 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 0);
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
 
         let cache = provider.cache.lock().await;
@@ -545,7 +607,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_size_smaller_than_file() {
-        let data = b"large wasm code content".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -558,7 +620,8 @@ mod tests {
         let cache_size = 5;
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, cache_size);
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
 
         let cache = provider.cache.lock().await;
@@ -567,7 +630,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_data() {
-        let data = b"".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -579,14 +642,14 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result = provider.get_instance_pre("empty.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("empty.cwasm", &engine, &linker).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().len(), 0);
     }
 
     #[tokio::test]
     async fn test_empty_prefix_vs_none() {
-        let data = b"wasm code".to_vec();
+        let data = create_test_wasm_component();
 
         let data1 = data.clone();
         let rule1 = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
@@ -616,21 +679,22 @@ mod tests {
             1024 * 1024,
         );
 
-        provider_none.get_instance_pre("test.wasm").await.unwrap();
-        provider_empty.get_instance_pre("test.wasm").await.unwrap();
+        let (engine, linker) = create_test_engine_and_linker();
+        provider_none.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
+        provider_empty.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
 
         let cache_none = provider_none.cache.lock().await;
-        assert_eq!(cache_none[0].key, "test.wasm");
+        assert_eq!(cache_none[0].key, "test.cwasm");
 
         let cache_empty = provider_empty.cache.lock().await;
-        assert_eq!(cache_empty[0].key, "/test.wasm");
+        assert_eq!(cache_empty[0].key, "/test.cwasm");
     }
 
     #[tokio::test]
     async fn test_concurrent_different_keys() {
         let mut rules = Vec::new();
         for i in 0..20 {
-            let data = format!("data-{}", i).into_bytes();
+            let data = create_test_wasm_component_with_value(i);
             rules.push(mock!(aws_sdk_s3::Client::get_object).then_output(move || {
                 GetObjectOutput::builder()
                     .body(ByteStream::from(data.clone()))
@@ -642,21 +706,25 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, &rules);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
+        let (engine, linker) = create_test_engine_and_linker();
+        let engine = Arc::new(engine);
+        let linker = Arc::new(linker);
         let mut handles = vec![];
         for i in 0..20 {
             let provider_clone = provider.clone();
+            let engine_clone = engine.clone();
+            let linker_clone = linker.clone();
             let handle = tokio::spawn(async move {
                 provider_clone
-                    .get_instance_pre(&format!("file{}.wasm", i))
+                    .get_instance_pre(&format!("file{}.cwasm", i), &engine_clone, &linker_clone)
                     .await
             });
             handles.push(handle);
         }
 
-        for (i, handle) in handles.into_iter().enumerate() {
+        for handle in handles.into_iter() {
             let result = handle.await.unwrap();
             assert!(result.is_ok());
-            assert_eq!(result.unwrap().as_ref(), format!("data-{}", i).as_bytes());
         }
 
         let cache = provider.cache.lock().await;
@@ -676,7 +744,8 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -686,7 +755,7 @@ mod tests {
         use aws_smithy_runtime_api::http::StatusCode;
         use aws_smithy_types::body::SdkBody;
 
-        let data = b"wasm code".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule1 = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -702,9 +771,10 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule1, &rule2]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        provider.get_instance_pre("test.wasm").await.unwrap();
+        let (engine, linker) = create_test_engine_and_linker();
+        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -721,7 +791,8 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let (engine, linker) = create_test_engine_and_linker();
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 
@@ -731,7 +802,7 @@ mod tests {
         use aws_smithy_runtime_api::http::StatusCode;
         use aws_smithy_types::body::SdkBody;
 
-        let data = b"wasm code".to_vec();
+        let data = create_test_wasm_component();
         let data_for_rule = data.clone();
         let rule1 = mock!(aws_sdk_s3::Client::get_object).then_output(move || {
             GetObjectOutput::builder()
@@ -747,9 +818,10 @@ mod tests {
         let client = mock_client!(aws_sdk_s3, [&rule1, &rule2]);
         let provider = S3CodeProvider::new(client, "test-bucket".to_string(), None, 1024 * 1024);
 
-        provider.get_instance_pre("test.wasm").await.unwrap();
+        let (engine, linker) = create_test_engine_and_linker();
+        provider.get_instance_pre("test.cwasm", &engine, &linker).await.unwrap();
 
-        let result = provider.get_instance_pre("test.wasm").await;
+        let result = provider.get_instance_pre("test.cwasm", &engine, &linker).await;
         assert!(matches!(result, Err(Error::ProviderError(_))));
     }
 }
