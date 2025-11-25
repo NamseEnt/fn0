@@ -7,12 +7,22 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::Mutex;
 
-#[derive(Clone)]
 pub struct FsAdaptCache<T, E> {
     base_path: PathBuf,
     cache: Arc<Mutex<VecDeque<CacheEntry<T>>>>,
     cache_size: usize,
     singleflight: Arc<Group<String, T, Error<E>>>,
+}
+
+impl<T, E> Clone for FsAdaptCache<T, E> {
+    fn clone(&self) -> Self {
+        Self {
+            base_path: self.base_path.clone(),
+            cache: self.cache.clone(),
+            cache_size: self.cache_size,
+            singleflight: self.singleflight.clone(),
+        }
+    }
 }
 
 impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
@@ -47,10 +57,8 @@ impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
         path: &str,
         convert: impl FnOnce(Bytes) -> std::result::Result<(T, usize), E> + Send,
     ) -> Result<T, Error<E>> {
-        let (data, mtime, file_size) = self
-            .read_from_fs(path)
-            .await
-            .map_err(Error::StorageError)?;
+        let (data, mtime, file_size) =
+            self.read_from_fs(path).await.map_err(Error::StorageError)?;
         let (value, byte_len) = convert(data).map_err(Error::ConvertError)?;
 
         self.put_to_cache(CacheEntry {
@@ -77,7 +85,9 @@ impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
 
         match metadata_result {
             Ok(metadata) => {
-                let mtime = metadata.modified().map_err(|e| Error::StorageError(anyhow::anyhow!(e)))?;
+                let mtime = metadata
+                    .modified()
+                    .map_err(|e| Error::StorageError(anyhow::anyhow!(e)))?;
                 let file_size = metadata.len();
 
                 if let Some(cache_entry) = cached {
@@ -120,7 +130,7 @@ impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
 impl<T, E> AdaptCache<T, E> for FsAdaptCache<T, E>
 where
     T: Clone + Send + Sync + 'static,
-    E: std::error::Error + Send + Sync + 'static + Clone,
+    E: Send + 'static,
 {
     async fn get(
         &self,
@@ -227,8 +237,12 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         for i in 0..5 {
-            create_test_file(&temp_dir, &format!("file{}.txt", i), &format!("content-{}", i))
-                .await;
+            create_test_file(
+                &temp_dir,
+                &format!("file{}.txt", i),
+                &format!("content-{}", i),
+            )
+            .await;
         }
 
         let cache: FsAdaptCache<String, TestError> =
@@ -304,8 +318,12 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         for i in 0..10 {
-            create_test_file(&temp_dir, &format!("file{}.txt", i), &format!("content-{}", i))
-                .await;
+            create_test_file(
+                &temp_dir,
+                &format!("file{}.txt", i),
+                &format!("content-{}", i),
+            )
+            .await;
         }
 
         let cache: FsAdaptCache<String, TestError> =
@@ -348,8 +366,12 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         for i in 0..3 {
-            create_test_file(&temp_dir, &format!("file{}.txt", i), &format!("content-{}", i))
-                .await;
+            create_test_file(
+                &temp_dir,
+                &format!("file{}.txt", i),
+                &format!("content-{}", i),
+            )
+            .await;
         }
 
         let cache: FsAdaptCache<String, TestError> =

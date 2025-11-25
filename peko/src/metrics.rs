@@ -1,0 +1,56 @@
+use wasmtime_wasi_http::bindings::http::types::ErrorCode;
+
+#[derive(Clone)]
+pub struct MetricsTx {
+    inner: tokio::sync::mpsc::UnboundedSender<Metrics>,
+}
+
+impl MetricsTx {
+    pub fn new() -> Self {
+        todo!()
+    }
+    pub fn send(&self, metrics: Metrics) {
+        self.inner.send(metrics).unwrap();
+    }
+}
+
+pub enum Metrics {
+    Wasmtime {
+        func: &'static str,
+        code_id: String,
+        error: anyhow::Error,
+    },
+    OneshotDropBeforeResponse {
+        code_id: String,
+    },
+    ProxyReturnsErrorCode {
+        code_id: String,
+        error_code: ErrorCode,
+    },
+    RequestTaskJoinError {
+        code_id: String,
+        error: tokio::task::JoinError,
+    },
+    CpuTime {
+        code_id: String,
+        cpu_time: std::time::Duration,
+    },
+    Trapped {
+        code_id: String,
+        trap: wasmtime::Trap,
+    },
+    CanceledUnexpectedly {
+        code_id: String,
+        error: anyhow::Error,
+    },
+    ReuseInstance {
+        code_id: String,
+    },
+    CreateInstance {
+        code_id: String,
+    },
+    ProxyCacheError {
+        code_id: String,
+        error: adapt_cache::Error<anyhow::Error>,
+    },
+}
