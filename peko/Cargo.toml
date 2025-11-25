@@ -22,3 +22,8 @@ http-body-util = "0.1"
 hyper-util = "0.1.18"
 
 [dev-dependencies]
+wasmtime = { version = "39", features = [
+    "runtime",
+    "component-model",
+    "component-model-async",
+] }

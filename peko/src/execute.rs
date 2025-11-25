@@ -347,3 +347,462 @@ impl WasiHttpView for ClientState {
         &mut self.table
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    use tokio::sync::mpsc;
+
+    // ===== Test Infrastructure =====
+
+    /// Helper to create an Engine with async support enabled (matching production)
+    fn create_test_engine() -> Engine {
+        let mut config = wasmtime::Config::new();
+        config.async_support(true);
+        Engine::new(&config).unwrap()
+    }
+
+    /// Helper to create a test linker with WASI support
+    fn create_test_linker(engine: &Engine) -> Linker<ClientState> {
+        let mut linker = Linker::new(engine);
+        wasmtime_wasi::p2::add_to_linker_async(&mut linker).unwrap();
+        wasmtime_wasi_http::add_only_http_to_linker_async(&mut linker).unwrap();
+        linker
+    }
+
+    /// Mock AdaptCache for testing
+    #[derive(Clone)]
+    struct MockAdaptCache {
+        components: Arc<Mutex<HashMap<String, Bytes>>>,
+        should_fail: Arc<AtomicBool>,
+    }
+
+    impl MockAdaptCache {
+        fn new() -> Self {
+            Self {
+                components: Arc::new(Mutex::new(HashMap::new())),
+                should_fail: Arc::new(AtomicBool::new(false)),
+            }
+        }
+
+        fn insert(&self, id: String, bytes: Bytes) {
+            self.components.lock().unwrap().insert(id, bytes);
+        }
+
+        fn set_should_fail(&self, should_fail: bool) {
+            self.should_fail.store(should_fail, Ordering::SeqCst);
+        }
+    }
+
+    impl AdaptCache<MyInstance, wasmtime::Error> for MockAdaptCache {
+        async fn get(
+            &self,
+            id: &str,
+            convert: impl FnOnce(Bytes) -> std::result::Result<(MyInstance, usize), wasmtime::Error>
+            + Send,
+        ) -> Result<MyInstance, adapt_cache::Error<wasmtime::Error>> {
+            if self.should_fail.load(Ordering::SeqCst) {
+                return Err(adapt_cache::Error::StorageError(anyhow::anyhow!(
+                    "Mock storage error"
+                )));
+            }
+
+            let components = self.components.lock().unwrap();
+            let bytes = components
+                .get(id)
+                .ok_or(adapt_cache::Error::NotFound)?
+                .clone();
+            drop(components);
+
+            let (instance, _size) = convert(bytes).map_err(adapt_cache::Error::ConvertError)?;
+            Ok(instance)
+        }
+    }
+
+    /// Test MetricsTx that collects metrics for verification
+    #[derive(Clone)]
+    struct TestMetricsTx {
+        metrics: Arc<Mutex<Vec<Metrics>>>,
+    }
+
+    impl TestMetricsTx {
+        fn new() -> Self {
+            Self {
+                metrics: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn into_metrics_tx(self) -> MetricsTx {
+            let metrics = self.metrics.clone();
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
+            // Spawn a task to collect metrics
+            tokio::spawn(async move {
+                while let Some(metric) = rx.recv().await {
+                    metrics.lock().unwrap().push(metric);
+                }
+            });
+
+            MetricsTx::from_sender(tx)
+        }
+
+        async fn assert_contains(&self, predicate: impl Fn(&Metrics) -> bool) {
+            // Give the background task time to collect metrics
+            for _ in 0..10 {
+                tokio::task::yield_now().await;
+                let metrics = self.metrics.lock().unwrap();
+                if metrics.iter().any(&predicate) {
+                    return;
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            }
+            let metrics = self.metrics.lock().unwrap();
+            assert!(
+                metrics.iter().any(predicate),
+                "Expected metric not found. Metrics: {:?}",
+                metrics
+            );
+        }
+
+        fn count(&self, predicate: impl Fn(&Metrics) -> bool) -> usize {
+            self.metrics
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| predicate(m))
+                .count()
+        }
+    }
+
+    // ===== Unit Tests =====
+
+    mod unit {
+        use super::*;
+
+        #[test]
+        fn test_internal_error_response() {
+            let response = internal_error_response();
+
+            assert_eq!(response.status(), hyper::StatusCode::INTERNAL_SERVER_ERROR);
+
+            // Verify body content
+            let (parts, _body) = response.into_parts();
+            assert_eq!(parts.status, hyper::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+
+        #[tokio::test]
+        async fn test_try_pop_free_instance_empty() {
+            let engine = create_test_engine();
+            let proxy_cache = MockAdaptCache::new();
+            let (_job_tx, job_rx) = mpsc::channel(10);
+            let test_metrics = TestMetricsTx::new();
+
+            let mut executor =
+                Executor::new(engine, proxy_cache, job_rx, test_metrics.into_metrics_tx());
+
+            let result = executor.try_pop_free_instance("code-a");
+            assert!(
+                result.is_none(),
+                "Should return None when free_instances is empty"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_try_pop_free_instance_not_found() {
+            let engine = create_test_engine();
+            let proxy_cache = MockAdaptCache::new();
+            let (_job_tx, job_rx) = mpsc::channel(10);
+            let test_metrics = TestMetricsTx::new();
+
+            let mut executor = Executor::new(
+                engine.clone(),
+                proxy_cache,
+                job_rx,
+                test_metrics.into_metrics_tx(),
+            );
+
+            // Create a fake instance for different code_id
+            let serialized = load_precompiled_sample_component();
+            let component = deserialize_component(&engine, &serialized);
+            let linker = create_test_linker(&engine);
+            let instance_pre = linker.instantiate_pre(&component).unwrap();
+            let proxy_pre = ProxyPre::new(instance_pre).unwrap();
+
+            executor.free_instances.push(MyInstance {
+                code_id: "code-b".to_string(),
+                pre: proxy_pre,
+            });
+
+            let result = executor.try_pop_free_instance("code-a");
+            assert!(
+                result.is_none(),
+                "Should return None when code_id not found"
+            );
+            assert_eq!(
+                executor.free_instances.len(),
+                1,
+                "Should not remove instance"
+            );
+        }
+
+        #[tokio::test]
+
+        async fn test_try_pop_free_instance_found() {
+            let engine = create_test_engine();
+            let proxy_cache = MockAdaptCache::new();
+            let (_job_tx, job_rx) = mpsc::channel(10);
+            let test_metrics = TestMetricsTx::new();
+
+            let mut executor = Executor::new(
+                engine.clone(),
+                proxy_cache,
+                job_rx,
+                test_metrics.into_metrics_tx(),
+            );
+
+            // Add instance with matching code_id
+            let serialized = load_precompiled_sample_component();
+            let component = deserialize_component(&engine, &serialized);
+            let linker = create_test_linker(&engine);
+            let instance_pre = linker.instantiate_pre(&component).unwrap();
+            let proxy_pre = ProxyPre::new(instance_pre).unwrap();
+
+            executor.free_instances.push(MyInstance {
+                code_id: "code-a".to_string(),
+                pre: proxy_pre,
+            });
+
+            let result = executor.try_pop_free_instance("code-a");
+            assert!(result.is_some(), "Should find and return instance");
+            assert_eq!(result.unwrap().code_id, "code-a");
+            assert_eq!(
+                executor.free_instances.len(),
+                0,
+                "Should remove instance from pool"
+            );
+        }
+
+        #[tokio::test]
+
+        async fn test_try_pop_free_instance_multiple_same_code_id() {
+            let engine = create_test_engine();
+            let proxy_cache = MockAdaptCache::new();
+            let (_job_tx, job_rx) = mpsc::channel(10);
+            let test_metrics = TestMetricsTx::new();
+
+            let mut executor = Executor::new(
+                engine.clone(),
+                proxy_cache,
+                job_rx,
+                test_metrics.into_metrics_tx(),
+            );
+
+            // Add multiple instances with same code_id
+            let serialized = load_precompiled_sample_component();
+            for _ in 0..3 {
+                let component = deserialize_component(&engine, &serialized);
+                let linker = create_test_linker(&engine);
+                let instance_pre = linker.instantiate_pre(&component).unwrap();
+                let proxy_pre = ProxyPre::new(instance_pre).unwrap();
+
+                executor.free_instances.push(MyInstance {
+                    code_id: "code-a".to_string(),
+                    pre: proxy_pre,
+                });
+            }
+
+            let result = executor.try_pop_free_instance("code-a");
+            assert!(result.is_some(), "Should find instance");
+            assert_eq!(executor.free_instances.len(), 2, "Should have 2 remaining");
+        }
+
+        #[tokio::test]
+
+        async fn test_try_pop_free_instance_selects_correct_from_mixed() {
+            let engine = create_test_engine();
+            let proxy_cache = MockAdaptCache::new();
+            let (_job_tx, job_rx) = mpsc::channel(10);
+            let test_metrics = TestMetricsTx::new();
+
+            let mut executor = Executor::new(
+                engine.clone(),
+                proxy_cache,
+                job_rx,
+                test_metrics.into_metrics_tx(),
+            );
+
+            // Add instances: code-a, code-b, code-c, code-b
+            let serialized = load_precompiled_sample_component();
+            for code_id in ["code-a", "code-b", "code-c", "code-b"] {
+                let component = deserialize_component(&engine, &serialized);
+                let linker = create_test_linker(&engine);
+                let instance_pre = linker.instantiate_pre(&component).unwrap();
+                let proxy_pre = ProxyPre::new(instance_pre).unwrap();
+
+                executor.free_instances.push(MyInstance {
+                    code_id: code_id.to_string(),
+                    pre: proxy_pre,
+                });
+            }
+
+            // Pop code-b (should get first code-b at index 1)
+            let result = executor.try_pop_free_instance("code-b");
+            assert!(result.is_some());
+            assert_eq!(result.unwrap().code_id, "code-b");
+
+            // Remaining should be: code-a, code-c, code-b
+            assert_eq!(executor.free_instances.len(), 3);
+            assert_eq!(executor.free_instances[0].code_id, "code-a");
+            assert_eq!(executor.free_instances[1].code_id, "code-c");
+            assert_eq!(executor.free_instances[2].code_id, "code-b");
+        }
+    }
+
+    fn load_precompiled_sample_component() -> Vec<u8> {
+        const WASM: &[u8] =
+            include_bytes!("../../sample-wasi-http-rust/sample_wasi_http_rust.wasm");
+        static CWASM: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+        CWASM
+            .get_or_init(|| Engine::default().precompile_component(WASM).unwrap())
+            .to_vec()
+    }
+
+    // Helper function to deserialize a component from bytes
+    fn deserialize_component(engine: &Engine, bytes: &[u8]) -> Component {
+        unsafe { Component::deserialize(engine, bytes).expect("Failed to deserialize component") }
+    }
+
+    // ===== Integration Tests =====
+
+    mod integration {
+        use super::*;
+
+        #[tokio::test]
+
+        async fn test_pop_or_create_instance_creates_when_no_free() {
+            let engine = create_test_engine();
+            let cache = MockAdaptCache::new();
+            let linker = create_test_linker(&engine);
+            let test_metrics = TestMetricsTx::new();
+
+            // Prepare cache with a component
+            let serialized = load_precompiled_sample_component();
+            cache.insert("code-a".to_string(), Bytes::from(serialized));
+
+            let result = pop_or_create_instance(
+                None,
+                "code-a".to_string(),
+                cache,
+                engine,
+                linker,
+                test_metrics.clone().into_metrics_tx(),
+            )
+            .await;
+
+            assert!(result.is_ok(), "Should successfully create instance");
+
+            // Verify CreateInstance metric
+            test_metrics.assert_contains(
+                |m| matches!(m, Metrics::CreateInstance { code_id } if code_id == "code-a"),
+            ).await;
+        }
+
+        #[tokio::test]
+
+        async fn test_pop_or_create_instance_reuses_when_available() {
+            let engine = create_test_engine();
+            let cache = MockAdaptCache::new();
+            let linker = create_test_linker(&engine);
+            let test_metrics = TestMetricsTx::new();
+
+            // Create an existing instance
+            let serialized = load_precompiled_sample_component();
+            let component = deserialize_component(&engine, &serialized);
+            let instance_pre = linker.instantiate_pre(&component).unwrap();
+            let proxy_pre = ProxyPre::new(instance_pre).unwrap();
+            let existing = MyInstance {
+                code_id: "code-a".to_string(),
+                pre: proxy_pre,
+            };
+
+            let result = pop_or_create_instance(
+                Some(existing),
+                "code-a".to_string(),
+                cache,
+                engine,
+                linker,
+                test_metrics.clone().into_metrics_tx(),
+            )
+            .await;
+
+            assert!(result.is_ok(), "Should successfully reuse instance");
+
+            // Verify ReuseInstance metric
+            test_metrics.assert_contains(
+                |m| matches!(m, Metrics::ReuseInstance { code_id } if code_id == "code-a"),
+            ).await;
+
+            // Should NOT have CreateInstance metric
+            assert_eq!(
+                test_metrics.count(|m| matches!(m, Metrics::CreateInstance { .. })),
+                0
+            );
+        }
+
+        #[tokio::test]
+
+        async fn test_pop_or_create_instance_fails_when_cache_fails() {
+            let engine = create_test_engine();
+            let cache = MockAdaptCache::new();
+            cache.set_should_fail(true);
+            let linker = create_test_linker(&engine);
+            let test_metrics = TestMetricsTx::new();
+
+            let result = pop_or_create_instance(
+                None,
+                "code-a".to_string(),
+                cache,
+                engine,
+                linker,
+                test_metrics.clone().into_metrics_tx(),
+            )
+            .await;
+
+            assert!(result.is_err(), "Should fail when cache fails");
+
+            // Verify ProxyCacheError metric
+            test_metrics.assert_contains(
+                |m| matches!(m, Metrics::ProxyCacheError { code_id, .. } if code_id == "code-a"),
+            ).await;
+        }
+
+        #[tokio::test]
+
+        async fn test_pop_or_create_instance_fails_when_not_found() {
+            let engine = create_test_engine();
+            let cache = MockAdaptCache::new();
+            // Don't insert any component - should trigger NotFound
+            let linker = create_test_linker(&engine);
+            let test_metrics = TestMetricsTx::new();
+
+            let result = pop_or_create_instance(
+                None,
+                "nonexistent".to_string(),
+                cache,
+                engine,
+                linker,
+                test_metrics.clone().into_metrics_tx(),
+            )
+            .await;
+
+            assert!(result.is_err(), "Should fail when component not found");
+
+            // Verify ProxyCacheError metric
+            test_metrics.assert_contains(|m| matches!(m, Metrics::ProxyCacheError { code_id, .. } if code_id == "nonexistent")).await;
+        }
+    }
+}

@@ -9,11 +9,18 @@ impl MetricsTx {
     pub fn new() -> Self {
         todo!()
     }
+
+    #[cfg(test)]
+    pub fn from_sender(sender: tokio::sync::mpsc::UnboundedSender<Metrics>) -> Self {
+        Self { inner: sender }
+    }
+
     pub fn send(&self, metrics: Metrics) {
         self.inner.send(metrics).unwrap();
     }
 }
 
+#[derive(Debug)]
 pub enum Metrics {
     Wasmtime {
         func: &'static str,
