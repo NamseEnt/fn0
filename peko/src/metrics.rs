@@ -16,7 +16,9 @@ impl MetricsTx {
     }
 
     pub fn send(&self, metrics: Metrics) {
-        self.inner.send(metrics).unwrap();
+        // Gracefully handle metrics channel closure to prevent panics
+        // This can happen during shutdown or if the metrics receiver is dropped
+        let _ = self.inner.send(metrics);
     }
 }
 
