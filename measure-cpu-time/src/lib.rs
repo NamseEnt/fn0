@@ -1,22 +1,32 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 pub struct MeasureCpuTime<F> {
     future: F,
-    cpu_time: Duration,
+    cpu_time: CpuTime,
 }
 
 pub fn measure_cpu_time<F>(future: F) -> MeasureCpuTime<F> {
     MeasureCpuTime {
         future,
-        cpu_time: Duration::new(0, 0),
+        cpu_time: CpuTime {
+            inner: Default::default(),
+        },
+    }
+}
+
+impl<F> MeasureCpuTime<F> {
+    pub fn cpu_time(&self) -> CpuTime {
+        self.cpu_time.clone()
     }
 }
 
 impl<F: Future> Future for MeasureCpuTime<F> {
-    type Output = (F::Output, Duration);
+    type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let start = Instant::now();
@@ -27,12 +37,25 @@ impl<F: Future> Future for MeasureCpuTime<F> {
         let result = future.poll(cx);
 
         let elapsed = start.elapsed();
-        this.cpu_time += elapsed;
+        this.cpu_time
+            .inner
+            .fetch_add(elapsed.as_nanos() as usize, Ordering::Relaxed);
 
         match result {
-            Poll::Ready(val) => Poll::Ready((val, this.cpu_time)),
+            Poll::Ready(val) => Poll::Ready(val),
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct CpuTime {
+    inner: Arc<AtomicUsize>,
+}
+
+impl CpuTime {
+    pub fn duration(&self) -> Duration {
+        Duration::from_nanos(self.inner.load(Ordering::Relaxed) as u64)
     }
 }
 
@@ -99,7 +122,10 @@ mod tests {
             42
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, 42);
         // Should be at least a few milliseconds
@@ -109,18 +135,23 @@ mod tests {
     #[tokio::test]
     async fn test_measure_returns_correct_output_type() {
         let string_future = async { "hello".to_string() };
-        let (result, _) = measure_cpu_time(string_future).await;
+        let measured = measure_cpu_time(string_future);
+        let result = measured.await;
         assert_eq!(result, "hello");
 
         let vec_future = async { vec![1, 2, 3] };
-        let (result, _) = measure_cpu_time(vec_future).await;
+        let measured = measure_cpu_time(vec_future);
+        let result = measured.await;
         assert_eq!(result, vec![1, 2, 3]);
     }
 
     #[tokio::test]
     async fn test_measure_immediate_ready_future() {
         let future = async { 100 };
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, 100);
         assert!(elapsed.as_micros() < 10_000);
@@ -139,7 +170,10 @@ mod tests {
             100
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, 100);
         // Verify time accumulates across multiple polls
@@ -149,7 +183,10 @@ mod tests {
     #[tokio::test]
     async fn test_multiple_yields_with_custom_future() {
         let future = yielding_future(5, 42);
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, 42);
         assert!(elapsed.as_nanos() > 0);
@@ -172,7 +209,10 @@ mod tests {
             sum
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, 999000);
         // Verify that both computation and awaits are measured
@@ -197,7 +237,11 @@ mod tests {
                     i
                 };
 
-                measure_cpu_time(future).await
+                let measured = measure_cpu_time(future);
+                let cpu_time = measured.cpu_time();
+                let result = measured.await;
+                let elapsed = cpu_time.duration();
+                (result, elapsed)
             });
             handles.push(handle);
         }
@@ -220,7 +264,11 @@ mod tests {
                     sleep(Duration::from_millis(1)).await;
                     i
                 };
-                measure_cpu_time(future).await
+                let measured = measure_cpu_time(future);
+                let cpu_time = measured.cpu_time();
+                let result = measured.await;
+                let elapsed = cpu_time.duration();
+                (result, elapsed)
             });
             handles.push(handle);
         }
@@ -240,12 +288,18 @@ mod tests {
         };
 
         let outer_future = async {
-            let (inner_result, inner_time) = measure_cpu_time(inner_future).await;
+            let inner_measured = measure_cpu_time(inner_future);
+            let inner_cpu_time = inner_measured.cpu_time();
+            let inner_result = inner_measured.await;
+            let inner_time = inner_cpu_time.duration();
             sleep(Duration::from_millis(5)).await;
             (inner_result, inner_time)
         };
 
-        let ((result, inner_elapsed), outer_elapsed) = measure_cpu_time(outer_future).await;
+        let outer_measured = measure_cpu_time(outer_future);
+        let outer_cpu_time = outer_measured.cpu_time();
+        let (result, inner_elapsed) = outer_measured.await;
+        let outer_elapsed = outer_cpu_time.duration();
 
         assert_eq!(result, 42);
         assert!(inner_elapsed.as_micros() > 0);
@@ -263,7 +317,10 @@ mod tests {
             Ok::<i32, String>(42)
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, Ok(42));
         assert!(elapsed.as_micros() > 0);
@@ -276,7 +333,10 @@ mod tests {
             Err::<i32, String>("error occurred".to_string())
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, Err("error occurred".to_string()));
         assert!(elapsed.as_micros() > 0);
@@ -289,7 +349,10 @@ mod tests {
             None::<i32>
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, None);
         assert!(elapsed.as_micros() > 0);
@@ -302,7 +365,8 @@ mod tests {
             panic!("intentional panic");
         };
 
-        let _ = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let _ = measured.await;
     }
 
     // Category 5: Timing Validation Tests
@@ -323,9 +387,20 @@ mod tests {
             3
         };
 
-        let (result1, elapsed1) = measure_cpu_time(future1).await;
-        let (result2, elapsed2) = measure_cpu_time(future2).await;
-        let (result3, elapsed3) = measure_cpu_time(future3).await;
+        let measured1 = measure_cpu_time(future1);
+        let cpu_time1 = measured1.cpu_time();
+        let result1 = measured1.await;
+        let elapsed1 = cpu_time1.duration();
+
+        let measured2 = measure_cpu_time(future2);
+        let cpu_time2 = measured2.cpu_time();
+        let result2 = measured2.await;
+        let elapsed2 = cpu_time2.duration();
+
+        let measured3 = measure_cpu_time(future3);
+        let cpu_time3 = measured3.cpu_time();
+        let result3 = measured3.await;
+        let elapsed3 = cpu_time3.duration();
 
         assert_eq!(result1, 1);
         assert_eq!(result2, 2);
@@ -340,7 +415,10 @@ mod tests {
     #[tokio::test]
     async fn test_zero_duration_for_instant_completion() {
         let future = async { 1 + 1 };
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, 2);
         assert!(elapsed.as_micros() < 1000);
@@ -362,9 +440,20 @@ mod tests {
             sleep(Duration::from_millis(5)).await;
         };
 
-        let (_, elapsed1) = measure_cpu_time(future1).await;
-        let (_, elapsed2) = measure_cpu_time(future2).await;
-        let (_, elapsed3) = measure_cpu_time(future3).await;
+        let measured1 = measure_cpu_time(future1);
+        let cpu_time1 = measured1.cpu_time();
+        let _ = measured1.await;
+        let elapsed1 = cpu_time1.duration();
+
+        let measured2 = measure_cpu_time(future2);
+        let cpu_time2 = measured2.cpu_time();
+        let _ = measured2.await;
+        let elapsed2 = cpu_time2.duration();
+
+        let measured3 = measure_cpu_time(future3);
+        let cpu_time3 = measured3.cpu_time();
+        let _ = measured3.await;
+        let elapsed3 = cpu_time3.duration();
 
         // All should be non-zero
         assert!(elapsed1.as_micros() > 0);
@@ -382,7 +471,10 @@ mod tests {
             sleep(Duration::from_millis(5)).await;
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, ());
         assert!(elapsed.as_micros() > 0);
@@ -395,7 +487,10 @@ mod tests {
             vec![0u8; 1_000_000]
         };
 
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result.len(), 1_000_000);
         assert!(elapsed.as_micros() > 0);
@@ -404,7 +499,10 @@ mod tests {
     #[tokio::test]
     async fn test_measure_empty_async_block() {
         let future = async {};
-        let (result, elapsed) = measure_cpu_time(future).await;
+        let measured = measure_cpu_time(future);
+        let cpu_time = measured.cpu_time();
+        let result = measured.await;
+        let elapsed = cpu_time.duration();
 
         assert_eq!(result, ());
         // Even an empty block should have some measurement overhead
