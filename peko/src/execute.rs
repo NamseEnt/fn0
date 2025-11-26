@@ -2,11 +2,9 @@ use crate::metrics::{Metrics, MetricsTx};
 use adapt_cache::AdaptCache;
 use bytes::Bytes;
 use http_body_util::BodyExt;
-use measure_cpu_time::measure_cpu_time;
-use tokio::sync::{
-    mpsc::{Receiver, UnboundedReceiver, UnboundedSender, unbounded_channel},
-    oneshot,
-};
+use measure_cpu_time::{TimeTracker, measure_cpu_time};
+use std::time::Duration;
+use tokio::sync::{mpsc::Receiver, oneshot};
 use wasmtime::{
     Config, Engine, InstanceAllocationStrategy, PoolingAllocationConfig, Store,
     component::{Component, Linker},
@@ -29,20 +27,17 @@ pub struct Job {
     pub code_id: String,
 }
 
-pub struct Executor<A: AdaptCache<MyInstance, wasmtime::Error>> {
+pub struct Executor<A: AdaptCache<ProxyPre<ClientState>, wasmtime::Error>> {
     engine: Engine,
     proxy_cache: A,
     job_rx: Receiver<Job>,
     linker: Linker<ClientState>,
-    free_instances: Vec<MyInstance>,
-    free_instance_tx: UnboundedSender<MyInstance>,
-    free_instance_rx: UnboundedReceiver<MyInstance>,
     metrics_tx: MetricsTx,
 }
 
 impl<A> Executor<A>
 where
-    A: AdaptCache<MyInstance, wasmtime::Error>,
+    A: AdaptCache<ProxyPre<ClientState>, wasmtime::Error>,
 {
     pub fn new(proxy_cache: A, job_rx: Receiver<Job>, metrics_tx: MetricsTx) -> Self {
         let engine = Engine::new(&engine_config()).unwrap();
@@ -51,66 +46,42 @@ where
         wasmtime_wasi::p2::add_to_linker_async(&mut linker).unwrap();
         wasmtime_wasi_http::add_only_http_to_linker_async(&mut linker).unwrap();
 
-        let (free_instance_tx, free_instance_rx) = unbounded_channel::<MyInstance>();
-
         Self {
             engine,
             proxy_cache,
             job_rx,
             linker,
-            free_instances: Vec::new(),
-            free_instance_tx,
-            free_instance_rx,
             metrics_tx,
         }
     }
     pub async fn run(&mut self) {
-        tokio::select! {
-            biased;
-            Some(instance) = self.free_instance_rx.recv() => {
-                self.free_instances.push(instance)
-            }
-            Some(job) = self.job_rx.recv() => {
-                self.spawn_job_runner(job);
+        let mut interval = tokio::time::interval(Duration::from_millis(3));
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    self.engine.increment_epoch();
+                }
+
+                res = self.job_rx.recv() => {
+                    match res {
+                        Some(job) => self.spawn_job_runner(job),
+                        None => break,
+                    }
+                }
             }
         }
     }
     fn spawn_job_runner(&mut self, job: Job) {
-        let free_instance = self.try_pop_free_instance(&job.code_id);
         let proxy_cache = self.proxy_cache.clone();
         let engine = self.engine.clone();
         let linker = self.linker.clone();
-        let free_instance_tx = self.free_instance_tx.clone();
         let metrics_tx = self.metrics_tx.clone();
 
         // TODO: Throttle and hard limit for same code_id
 
         tokio::spawn(async move {
-            run_job(
-                job,
-                free_instance,
-                proxy_cache,
-                engine,
-                linker,
-                free_instance_tx,
-                metrics_tx,
-            )
-            .await;
+            run_job(job, proxy_cache, engine, linker, metrics_tx).await;
         });
-    }
-    fn try_pop_free_instance(&mut self, code_id: &str) -> Option<MyInstance> {
-        let index = self
-            .free_instances
-            .iter()
-            .enumerate()
-            .find_map(|(index, instance)| {
-                if instance.code_id == code_id {
-                    Some(index)
-                } else {
-                    None
-                }
-            })?;
-        Some(self.free_instances.remove(index))
     }
 }
 
@@ -150,17 +121,14 @@ fn engine_config() -> Config {
 
 async fn run_job<A>(
     job: Job,
-    free_instance: Option<MyInstance>,
     proxy_cache: A,
     engine: Engine,
     linker: Linker<ClientState>,
-    free_instance_tx: UnboundedSender<MyInstance>,
     metrics_tx: MetricsTx,
 ) where
-    A: AdaptCache<MyInstance, wasmtime::Error>,
+    A: AdaptCache<ProxyPre<ClientState>, wasmtime::Error>,
 {
-    let Ok(instance) = pop_or_create_instance(
-        free_instance,
+    let Ok(proxy_pre) = get_proxy_pre(
         job.code_id.clone(),
         proxy_cache,
         engine,
@@ -173,27 +141,21 @@ async fn run_job<A>(
         return;
     };
 
-    let response = handle_request(instance.pre.clone(), job.req, job.code_id, metrics_tx).await;
+    let response = handle_request(proxy_pre, job.req, job.code_id, metrics_tx).await;
 
     let _ = job.res_tx.send(response);
-    let _ = free_instance_tx.send(instance);
 }
 
-async fn pop_or_create_instance<A>(
-    free_instance: Option<MyInstance>,
+async fn get_proxy_pre<A>(
     code_id: String,
     proxy_cache: A,
     engine: Engine,
     linker: Linker<ClientState>,
     metrics_tx: MetricsTx,
-) -> Result<MyInstance, ()>
+) -> Result<ProxyPre<ClientState>, ()>
 where
-    A: AdaptCache<MyInstance, wasmtime::Error>,
+    A: AdaptCache<ProxyPre<ClientState>, wasmtime::Error>,
 {
-    if let Some(instance) = free_instance {
-        metrics_tx.send(Metrics::ReuseInstance { code_id });
-        return Ok(instance);
-    }
     match proxy_cache
         .get(&code_id.clone(), |bytes| {
             let component = unsafe { Component::deserialize(&engine, &bytes)? };
@@ -202,28 +164,16 @@ where
             metrics_tx.send(Metrics::CreateInstance {
                 code_id: code_id.clone(),
             });
-            Ok((
-                MyInstance {
-                    code_id: code_id.clone(),
-                    pre: proxy_pre,
-                },
-                bytes.len(),
-            ))
+            Ok((proxy_pre, bytes.len()))
         })
         .await
     {
-        Ok(instance) => Ok(instance),
+        Ok(proxy_pre) => Ok(proxy_pre),
         Err(error) => {
             metrics_tx.send(Metrics::ProxyCacheError { code_id, error });
             Err(())
         }
     }
-}
-
-#[derive(Clone)]
-pub struct MyInstance {
-    code_id: String,
-    pre: ProxyPre<ClientState>,
 }
 
 async fn handle_request(
@@ -232,26 +182,35 @@ async fn handle_request(
     code_id: String,
     metrics_tx: MetricsTx,
 ) -> Response {
-    /*
-    Rules or Features
-    - 최대 시간 15분
-    - task future를 감싸서 poll한 시간만 재서 cpu time을 측정
-    - 1 req 1 instance, drop after each job
-    - 모든 내부 에러는 500 에러로 사용자에게 전달
-    - 모든 내부 에러는 로그로 남김
-    - instance 재사용하지 않음.
-    */
+    let time_tracker = TimeTracker::default();
+
     let mut store = Store::new(
         pre.engine(),
         ClientState {
             table: ResourceTable::new(),
             wasi: WasiCtx::builder().inherit_stdio().build(),
             http: WasiHttpCtx::new(),
+            time_tracker: time_tracker.clone(),
+            metrics_tx: metrics_tx.clone(),
+            code_id: code_id.clone(),
         },
     );
     store.epoch_deadline_trap();
-    store.set_epoch_deadline(15 * 60);
-    store.epoch_deadline_async_yield_and_update(1);
+    store.set_epoch_deadline(3);
+    store.epoch_deadline_callback({
+        |context| {
+            let state = context.data();
+            let cpu_time = state.time_tracker.duration();
+            if cpu_time > Duration::from_millis(10) {
+                state.metrics_tx.send(Metrics::CpuTimeOvered {
+                    code_id: state.code_id.clone(),
+                    cpu_time,
+                });
+                return Ok(wasmtime::UpdateDeadline::Interrupt);
+            }
+            Ok(wasmtime::UpdateDeadline::Continue(3))
+        }
+    });
 
     let (tx, rx) = tokio::sync::oneshot::channel();
     let req = match store.data_mut().new_incoming_request(Scheme::Http, req) {
@@ -296,14 +255,18 @@ async fn handle_request(
         let code_id = code_id.clone();
         let metrics_tx = metrics_tx.clone();
         async move {
-            let (result, cpu_time) = measure_cpu_time(
+            let result = measure_cpu_time(
+                time_tracker.clone(),
                 proxy
                     .wasi_http_incoming_handler()
                     .call_handle(store, req, out),
             )
             .await;
 
-            metrics_tx.send(Metrics::CpuTime { code_id, cpu_time });
+            metrics_tx.send(Metrics::CpuTime {
+                code_id,
+                cpu_time: time_tracker.duration(),
+            });
 
             result
         }
@@ -360,6 +323,9 @@ pub struct ClientState {
     wasi: WasiCtx,
     http: WasiHttpCtx,
     table: ResourceTable,
+    time_tracker: TimeTracker,
+    metrics_tx: MetricsTx,
+    code_id: String,
 }
 
 impl WasiView for ClientState {
@@ -722,7 +688,7 @@ mod tests {
             let serialized = load_precompiled_sample_component();
             cache.insert("code-a".to_string(), Bytes::from(serialized));
 
-            let result = pop_or_create_instance(
+            let result = get_proxy_pre(
                 None,
                 "code-a".to_string(),
                 cache,
@@ -760,7 +726,7 @@ mod tests {
                 pre: proxy_pre,
             };
 
-            let result = pop_or_create_instance(
+            let result = get_proxy_pre(
                 Some(existing),
                 "code-a".to_string(),
                 cache,
@@ -795,7 +761,7 @@ mod tests {
             let linker = create_test_linker(&engine);
             let test_metrics = TestMetricsTx::new();
 
-            let result = pop_or_create_instance(
+            let result = get_proxy_pre(
                 None,
                 "code-a".to_string(),
                 cache,
@@ -822,7 +788,7 @@ mod tests {
             let linker = create_test_linker(&engine);
             let test_metrics = TestMetricsTx::new();
 
-            let result = pop_or_create_instance(
+            let result = get_proxy_pre(
                 None,
                 "nonexistent".to_string(),
                 cache,
@@ -906,7 +872,7 @@ mod tests {
             // Insert corrupt/invalid component data
             cache.insert("corrupt".to_string(), Bytes::from(vec![0x00, 0x01, 0x02]));
 
-            let result = pop_or_create_instance(
+            let result = get_proxy_pre(
                 None,
                 "corrupt".to_string(),
                 cache,
@@ -959,7 +925,7 @@ mod tests {
             cache.set_should_fail(true);
             let linker = create_test_linker(&engine);
 
-            let _ = pop_or_create_instance(
+            let _ = get_proxy_pre(
                 None,
                 "test".to_string(),
                 cache,
@@ -987,7 +953,7 @@ mod tests {
             let linker = create_test_linker(&engine);
 
             // Create instance once
-            let instance1 = pop_or_create_instance(
+            let instance1 = get_proxy_pre(
                 None,
                 "code-a".to_string(),
                 cache.clone(),
@@ -999,7 +965,7 @@ mod tests {
             .unwrap();
 
             // Reuse instance
-            let instance2 = pop_or_create_instance(
+            let instance2 = get_proxy_pre(
                 Some(instance1),
                 "code-a".to_string(),
                 cache.clone(),
@@ -1011,7 +977,7 @@ mod tests {
             .unwrap();
 
             // Reuse again
-            let _ = pop_or_create_instance(
+            let _ = get_proxy_pre(
                 Some(instance2),
                 "code-a".to_string(),
                 cache.clone(),
