@@ -44,6 +44,10 @@ pub enum Metrics {
         code_id: String,
         cpu_time: std::time::Duration,
     },
+    CpuTimeOvered {
+        code_id: String,
+        cpu_time: std::time::Duration,
+    },
     Trapped {
         code_id: String,
         trap: wasmtime::Trap,
