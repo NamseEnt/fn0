@@ -11,6 +11,22 @@ Peko is a FaaS platform powered by [wasmtime](https://github.com/bytecodeallianc
 - You can run the Peko platform on various cloud providers using Adapters.
 - Instead of managing the platform yourself, you can conveniently use Peko Cloud, a managed service.
 
+## Peko Cloud Limits
+
+This limits are for Peko Cloud. If you run Peko on your own, you can remove these limits.
+
+- Request
+  - Header: 128 KB
+  - Body: 100 MB
+- Response
+  - Header: 128 KB
+  - Body: Unlimited
+- Memory: 128 MB
+- CPU Time: 10 ms
+- Duration: 15 secs
+- Subrequests: 50 requests
+  - Subrequests are external internet requests.
+
 ## Supported Languages
 
 - Rust
