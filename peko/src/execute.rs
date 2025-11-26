@@ -8,7 +8,7 @@ use tokio::sync::{
     oneshot,
 };
 use wasmtime::{
-    Engine, Store,
+    Config, Engine, InstanceAllocationStrategy, PoolingAllocationConfig, Store,
     component::{Component, Linker},
 };
 use wasmtime_wasi::*;
@@ -44,16 +44,15 @@ impl<A> Executor<A>
 where
     A: AdaptCache<MyInstance, wasmtime::Error>,
 {
-    pub fn new(
-        engine: Engine,
-        proxy_cache: A,
-        job_rx: Receiver<Job>,
-        metrics_tx: MetricsTx,
-    ) -> Self {
+    pub fn new(proxy_cache: A, job_rx: Receiver<Job>, metrics_tx: MetricsTx) -> Self {
+        let engine = Engine::new(&engine_config()).unwrap();
+
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_async(&mut linker).unwrap();
         wasmtime_wasi_http::add_only_http_to_linker_async(&mut linker).unwrap();
+
         let (free_instance_tx, free_instance_rx) = unbounded_channel::<MyInstance>();
+
         Self {
             engine,
             proxy_cache,
@@ -113,6 +112,40 @@ where
             })?;
         Some(self.free_instances.remove(index))
     }
+}
+
+fn engine_config() -> Config {
+    let mut config = Config::new();
+    config.async_support(true);
+
+    const MB: usize = 1024 * 1024;
+
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_all();
+
+    let total_memory_bytes = sys.total_memory() as usize;
+    let total_memory_mb = total_memory_bytes / (1024 * 1024);
+    const MAX_MEMORY_MB: usize = 128;
+    let max_instance_count = total_memory_mb / MAX_MEMORY_MB;
+
+    let mut pooling_allocation_config = PoolingAllocationConfig::new();
+    pooling_allocation_config
+        .max_memory_size(MB * MAX_MEMORY_MB)
+        .linear_memory_keep_resident(MB * 16)
+        .table_keep_resident(MB)
+        .total_core_instances(max_instance_count as _)
+        .total_memories(max_instance_count as _)
+        .total_tables(max_instance_count as _)
+        .pagemap_scan(wasmtime::Enabled::Auto)
+        .memory_protection_keys(wasmtime::Enabled::Auto);
+
+    config
+        .async_support(true)
+        .allocation_strategy(InstanceAllocationStrategy::Pooling(
+            pooling_allocation_config,
+        ));
+
+    config
 }
 
 async fn run_job<A>(
@@ -498,13 +531,11 @@ mod tests {
 
         #[tokio::test]
         async fn test_try_pop_free_instance_empty() {
-            let engine = create_test_engine();
             let proxy_cache = MockAdaptCache::new();
             let (_job_tx, job_rx) = mpsc::channel(10);
             let test_metrics = TestMetricsTx::new();
 
-            let mut executor =
-                Executor::new(engine, proxy_cache, job_rx, test_metrics.into_metrics_tx());
+            let mut executor = Executor::new(proxy_cache, job_rx, test_metrics.into_metrics_tx());
 
             let result = executor.try_pop_free_instance("code-a");
             assert!(
@@ -520,12 +551,7 @@ mod tests {
             let (_job_tx, job_rx) = mpsc::channel(10);
             let test_metrics = TestMetricsTx::new();
 
-            let mut executor = Executor::new(
-                engine.clone(),
-                proxy_cache,
-                job_rx,
-                test_metrics.into_metrics_tx(),
-            );
+            let mut executor = Executor::new(proxy_cache, job_rx, test_metrics.into_metrics_tx());
 
             // Create a fake instance for different code_id
             let serialized = load_precompiled_sample_component();
@@ -559,12 +585,7 @@ mod tests {
             let (_job_tx, job_rx) = mpsc::channel(10);
             let test_metrics = TestMetricsTx::new();
 
-            let mut executor = Executor::new(
-                engine.clone(),
-                proxy_cache,
-                job_rx,
-                test_metrics.into_metrics_tx(),
-            );
+            let mut executor = Executor::new(proxy_cache, job_rx, test_metrics.into_metrics_tx());
 
             // Add instance with matching code_id
             let serialized = load_precompiled_sample_component();
@@ -596,12 +617,7 @@ mod tests {
             let (_job_tx, job_rx) = mpsc::channel(10);
             let test_metrics = TestMetricsTx::new();
 
-            let mut executor = Executor::new(
-                engine.clone(),
-                proxy_cache,
-                job_rx,
-                test_metrics.into_metrics_tx(),
-            );
+            let mut executor = Executor::new(proxy_cache, job_rx, test_metrics.into_metrics_tx());
 
             // Add multiple instances with same code_id
             let serialized = load_precompiled_sample_component();
@@ -630,12 +646,7 @@ mod tests {
             let (_job_tx, job_rx) = mpsc::channel(10);
             let test_metrics = TestMetricsTx::new();
 
-            let mut executor = Executor::new(
-                engine.clone(),
-                proxy_cache,
-                job_rx,
-                test_metrics.into_metrics_tx(),
-            );
+            let mut executor = Executor::new(proxy_cache, job_rx, test_metrics.into_metrics_tx());
 
             // Add instances: code-a, code-b, code-c, code-b
             let serialized = load_precompiled_sample_component();
@@ -679,7 +690,11 @@ mod tests {
     }
 
     // Helper function to create a test instance
-    fn create_test_instance(engine: &Engine, linker: &Linker<ClientState>, code_id: &str) -> MyInstance {
+    fn create_test_instance(
+        engine: &Engine,
+        linker: &Linker<ClientState>,
+        code_id: &str,
+    ) -> MyInstance {
         let serialized = load_precompiled_sample_component();
         let component = deserialize_component(engine, &serialized);
         let instance_pre = linker.instantiate_pre(&component).unwrap();
@@ -689,7 +704,6 @@ mod tests {
             pre: proxy_pre,
         }
     }
-
 
     // ===== Integration Tests =====
 
@@ -839,7 +853,6 @@ mod tests {
             // Setup: Create executor
             let (_job_tx, job_rx) = mpsc::channel(10);
             let mut executor = Executor::new(
-                engine.clone(),
                 cache.clone(),
                 job_rx,
                 test_metrics.clone().into_metrics_tx(),

@@ -29,7 +29,6 @@ async fn real_main() {
 
     tokio::spawn(async move {
         execute::Executor::new(
-            wasmtime::Engine::default(),
             adapt_cache::fs::FsAdaptCache::new("./tmp".into(), 1024 * 1024),
             job_rx,
             metrics::MetricsTx::new(),

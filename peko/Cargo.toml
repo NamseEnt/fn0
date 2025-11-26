@@ -10,6 +10,7 @@ wasmtime = { version = "39", default-features = false, features = [
     "runtime",
     "component-model",
     "component-model-async",
+    "memory-protection-keys",
 ] }
 wasmtime-wasi = { version = "39" }
 wasmtime-wasi-http = "39"
@@ -20,10 +21,12 @@ bytes = "1"
 anyhow = "1"
 http-body-util = "0.1"
 hyper-util = "0.1.18"
+sysinfo = "0.37.2"
 
 [dev-dependencies]
 wasmtime = { version = "39", features = [
     "runtime",
     "component-model",
     "component-model-async",
+    "memory-protection-keys",
 ] }
