@@ -1,8 +1,8 @@
 use std::future::Future;
 use std::ops::Sub;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
@@ -22,22 +22,13 @@ impl Clock for SystemClock {
     }
 }
 
-pub struct MeasureCpuTime<F, C = SystemClock> {
+pub struct MeasureCpuTime<F, C: Clock> {
     future: F,
-    tracker: TimeTracker,
+    tracker: TimeTracker<C>,
     clock: C,
 }
-
-pub fn measure_cpu_time<F>(tracker: TimeTracker, future: F) -> MeasureCpuTime<F> {
-    MeasureCpuTime {
-        future,
-        tracker,
-        clock: SystemClock,
-    }
-}
-
-pub fn measure_cpu_time_with_clock<F, C: Clock>(
-    tracker: TimeTracker,
+pub fn measure_cpu_time<F, C: Clock>(
+    tracker: TimeTracker<C>,
     clock: C,
     future: F,
 ) -> MeasureCpuTime<F, C> {
@@ -54,15 +45,21 @@ impl<F: Future, C: Clock> Future for MeasureCpuTime<F, C> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.get_unchecked_mut() };
         let start = this.clock.now();
+        {
+            this.tracker.last_start.lock().unwrap().replace(start);
+        }
 
         let future = unsafe { Pin::new_unchecked(&mut this.future) };
         let result = future.poll(cx);
 
         let end = this.clock.now();
         let elapsed = end - start;
-        this.tracker
-            .inner
-            .fetch_add(elapsed.as_nanos() as usize, Ordering::Relaxed);
+        {
+            this.tracker.last_start.lock().unwrap().take();
+            this.tracker
+                .acc
+                .fetch_add(elapsed.as_nanos() as usize, Ordering::Relaxed);
+        }
 
         match result {
             Poll::Ready(val) => Poll::Ready(val),
@@ -71,14 +68,30 @@ impl<F: Future, C: Clock> Future for MeasureCpuTime<F, C> {
     }
 }
 
-#[derive(Clone, Default)]
-pub struct TimeTracker {
-    inner: Arc<AtomicUsize>,
+#[derive(Clone)]
+pub struct TimeTracker<C: Clock> {
+    acc: Arc<AtomicUsize>,
+    last_start: Arc<Mutex<Option<C::Instant>>>,
+    clock: Arc<C>,
 }
 
-impl TimeTracker {
+impl<C: Clock> TimeTracker<C> {
+    pub fn new(clock: C) -> Self {
+        Self {
+            acc: Default::default(),
+            last_start: Arc::new(Mutex::new(None)),
+            clock: Arc::new(clock),
+        }
+    }
     pub fn duration(&self) -> Duration {
-        Duration::from_nanos(self.inner.load(Ordering::Relaxed) as u64)
+        Duration::from_nanos(self.acc.load(Ordering::Relaxed) as u64)
+            + self
+                .last_start
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|last_start| self.clock.now() - *last_start)
+                .unwrap_or_default()
     }
 }
 
