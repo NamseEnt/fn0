@@ -757,6 +757,87 @@ mod tests {
 
             epoch_handle.abort();
         }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+        async fn test_wstd_sleep_does_not_trigger_cpu_timeout() {
+            // Test scenario: Using wstd::task::sleep() for ~100ms should NOT trigger CPU timeout
+            // because wstd sleep does not consume CPU time
+            // Expected: Response should be OK (200), NOT Gateway Timeout (504)
+
+            let engine = create_test_engine();
+            let linker = create_test_linker(&engine);
+            let test_metrics = TestMetricsTx::new();
+
+            // Prepare WASM component
+            let serialized = load_precompiled_sample_component();
+            let component = unsafe { Component::deserialize(&engine, &serialized).unwrap() };
+            let instance_pre = linker.instantiate_pre(&component).unwrap();
+            let proxy_pre = ProxyPre::new(instance_pre).unwrap();
+
+            // Start epoch incrementer (simulating the Executor::run loop)
+            let epoch_handle = tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                    engine.increment_epoch();
+                }
+            });
+
+            struct MockBody;
+            impl Body for MockBody {
+                type Data = Bytes;
+                type Error = hyper::Error;
+                fn poll_frame(
+                    self: std::pin::Pin<&mut Self>,
+                    _cx: &mut std::task::Context<'_>,
+                ) -> std::task::Poll<Option<Result<hyper::body::Frame<Self::Data>, Self::Error>>>
+                {
+                    std::task::Poll::Ready(None)
+                }
+            }
+
+            // Create request for /slow endpoint with 100ms sleep
+            let req = hyper::Request::builder()
+                .uri("http://localhost/slow?ms=100")
+                .body(MockBody)
+                .unwrap();
+
+            let metrics_tx = test_metrics.clone().into_metrics_tx();
+
+            let response = handle_request(
+                proxy_pre,
+                req,
+                "wstd-sleep-test".to_string(),
+                metrics_tx,
+                SystemClock,
+            )
+            .await;
+
+            // Verify response is OK, not timeout
+            assert_eq!(
+                response.status(),
+                hyper::StatusCode::OK,
+                "wstd sleep should NOT trigger CPU timeout"
+            );
+
+            // Verify CpuTimeout metric was NOT recorded
+            // We need to wait a bit to ensure metrics are collected
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            {
+                let metrics = test_metrics.metrics.lock().unwrap();
+                let has_cpu_timeout = metrics.iter().any(|m| matches!(m, Metrics::CpuTimeout { .. }));
+                assert!(!has_cpu_timeout, "CpuTimeout should not be recorded for wstd sleep");
+            }
+
+            // Verify CpuTime metric was recorded with low CPU time
+            test_metrics
+                .assert_contains(|m| {
+                    matches!(m, Metrics::CpuTime { code_id, cpu_time }
+                        if code_id == "wstd-sleep-test" && *cpu_time < Duration::from_millis(10))
+                })
+                .await;
+
+            epoch_handle.abort();
+        }
     }
 
     // ===== Hyper Connection Termination Tests =====
