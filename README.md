@@ -1,19 +1,21 @@
-![](image.png)
+<img src="image.gif" alt="Description" height="80">
 
-This project was inspired by Cloudflare Workers.
+**fn0** was inspired by Cloudflare Workers. Thank you Cloudflare!
 
-Peko is a FaaS platform powered by [wasmtime](https://github.com/bytecodealliance/wasmtime) that executes users' Wasm.
+**fn0** is a FaaS platform powered by [wasmtime](https://github.com/bytecodealliance/wasmtime) that executes users' wasm-compiled code.
+
+**fn0** pronounced as `f-n-zero`.
 
 ## Features
 
-- Any program that can be built into Wasm (WASI 0.2 - Component Model) can run on Peko.
+- Any program that can be built into Wasm (WASI 0.2 - Component Model) can run on fn0.
 - You can easily run the server in a local development environment using the CLI.
-- You can run the Peko platform on various cloud providers using Adapters.
-- Instead of managing the platform yourself, you can conveniently use Peko Cloud, a managed service.
+- You can run the fn0 platform on various cloud providers using Adapters.
+- Instead of managing the platform yourself, you can conveniently use fn0 Cloud, a managed service.
 
-## Peko Cloud Limits
+## fn0 Cloud Limits
 
-This limits are for Peko Cloud. If you run Peko on your own, you can remove these limits.
+This limits are for fn0 Cloud. If you run fn0 on your own, you can remove these limits.
 
 - Request
   - Header: 128 KB
@@ -77,4 +79,6 @@ This limits are for Peko Cloud. If you run Peko on your own, you can remove thes
 
 # License
 
-agpl-3.0
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL v3).
+If you want to use this software for proprietary commercial purposes without the open-source obligations (e.g., keeping your source code closed), you can purchase a Commercial License.
+Please contact us at [projectluda@gmail.com](mailto:projectluda@gmail.com) for licensing inquiries.
