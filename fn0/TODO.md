@@ -88,7 +88,7 @@
   - [ ] toggle zombie killing
   - [ ] toggle auto scaling
 
-## client dashboard of peko cloud
+## client dashboard of fn0 cloud
 
 ## iaac
 
@@ -104,3 +104,7 @@
 
 - [ ] memberlist based, (birth time + id)'s oldest worker is master
 - [ ] in-memory database
+
+## outgoing http connection pool
+
+- [ ] hard limit for each wasm instance

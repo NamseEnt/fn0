@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>fn0 Logo Ideas</title>
+    <style>
+        /* 기본 설정 (Google Fonts에서 인기 있는 개발자 폰트 로드) */
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=JetBrains+Mono:wght@800&family=Roboto+Mono:wght@400;700&display=swap');
+
+
+        /* Design 3: The Terminal Block (커맨드 라인 스타일) */
+        .logo-3 {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 60px;
+            background-color: #000;
+            padding: 10px 20px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+        }
+        .logo-3 .prompt { color: #654FF0; margin-right: 10px; }
+        .logo-3 .text { color: #403434; }
+        .logo-3 .cursor {
+            display: inline-block;
+            width: 15px;
+            height: 50px;
+            background-color: #654FF0;
+            margin-left: 5px;
+            /* animation: blink 1s step-end infinite; */
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <div class="label">3. Interactive Terminal</div>
+        <div class="logo-3">
+            <span class="prompt">&gt;</span>
+            <span class="text">fn0</span>
+            <span class="cursor"></span>
+        </div>
+    </div>
+</body>
+</html>
