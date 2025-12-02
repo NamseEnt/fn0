@@ -1,4 +1,6 @@
 pub mod core;
+#[cfg(feature = "compute")]
+pub mod compute;
 #[cfg(feature = "os_management_hub")]
 pub mod os_management_hub;
 #[cfg(feature = "resource_search")]
@@ -11,6 +13,11 @@ pub use core::{
     error::{OciError, Result},
     retry::{Retrier, RetryConfiguration},
 };
+
+// Re-export compute types for convenience
+#[cfg(feature = "compute")]
+pub use compute::Compute;
+
 // Re-export os_management_hub types for convenience
 #[cfg(feature = "os_management_hub")]
 pub use os_management_hub::OsManagementHub;

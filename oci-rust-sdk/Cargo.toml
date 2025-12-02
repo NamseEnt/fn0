@@ -7,6 +7,7 @@ authors = ["OCI Rust SDK Contributors"]
 
 [features]
 default = []
+compute = []
 os_management_hub = []
 resource_search = []
 virtual_network = []

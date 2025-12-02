@@ -98,11 +98,11 @@ pub trait ResourceSearch: Send + Sync {
 /// # }
 /// ```
 pub fn client(
-    auth_provider: Arc<dyn crate::core::auth::AuthProvider>,
+    auth_provider: impl crate::core::auth::AuthProvider + 'static,
     region: crate::core::region::Region,
 ) -> Result<Arc<dyn ResourceSearch>> {
     let endpoint = region.query_endpoint();
-    let oci_client = crate::core::OciClient::new(auth_provider, endpoint)?;
+    let oci_client = crate::core::OciClient::new(Arc::new(auth_provider), endpoint)?;
     Ok(Arc::new(oci_client))
 }
 
@@ -136,7 +136,10 @@ impl ResourceSearch for crate::core::OciClient {
 
             // Make POST request with search_details as body
             let oci_response = self
-                .post::<SearchDetails, ResourceSummaryCollection>(&path, Some(&request.search_details))
+                .post::<SearchDetails, ResourceSummaryCollection>(
+                    &path,
+                    Some(&request.search_details),
+                )
                 .await?;
 
             // Extract response headers

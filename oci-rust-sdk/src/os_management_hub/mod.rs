@@ -138,11 +138,11 @@ pub trait OsManagementHub: Send + Sync {
 /// # }
 /// ```
 pub fn client(
-    auth_provider: Arc<dyn crate::core::auth::AuthProvider>,
+    auth_provider: impl crate::core::auth::AuthProvider + 'static,
     region: crate::core::region::Region,
 ) -> Result<Arc<dyn OsManagementHub>> {
     let endpoint = region.endpoint("osmh");
-    let oci_client = crate::core::OciClient::new(auth_provider, endpoint)?;
+    let oci_client = crate::core::OciClient::new(Arc::new(auth_provider), endpoint)?;
     Ok(Arc::new(oci_client))
 }
 
