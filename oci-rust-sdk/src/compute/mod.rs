@@ -1,0 +1,129 @@
+pub mod models;
+pub mod requests;
+
+pub use models::*;
+pub use requests::*;
+
+use crate::core::Result;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
+/// Trait defining operations for Compute service
+pub trait Compute: Send + Sync {
+    /// Launch a new compute instance
+    fn launch_instance(
+        &self,
+        request: LaunchInstanceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<LaunchInstanceResponse>> + Send + '_>>;
+
+    /// Terminate a compute instance
+    fn terminate_instance(
+        &self,
+        request: TerminateInstanceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<TerminateInstanceResponse>> + Send + '_>>;
+}
+
+/// Create a new Compute client for the specified region.
+///
+/// Returns an `Arc<dyn Compute>` that can be used to interact with the
+/// Compute API. This service handles compute instances.
+///
+/// # Arguments
+///
+/// * `auth_provider` - Authentication provider for signing requests
+/// * `region` - OCI region where the service will be accessed
+///
+/// # Example
+///
+/// ```no_run
+/// use oci_rust_sdk::compute;
+/// use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region};
+/// use std::sync::Arc;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
+/// let client = compute::client(auth, Region::ApSeoul1)?;
+///
+/// let request = compute::LaunchInstanceRequest::builder()
+///     .compartment_id("ocid1.compartment.oc1..xxxxx")
+///     .availability_domain("AD-1")
+///     .shape("VM.Standard2.1")
+///     .build();
+/// let response = client.launch_instance(request).await?;
+/// # Ok(())
+/// # }
+/// ```
+pub fn client(
+    auth_provider: impl crate::core::auth::AuthProvider + 'static,
+    region: crate::core::region::Region,
+) -> Result<Arc<dyn Compute>> {
+    let endpoint = region.endpoint("iaas");
+    let oci_client = crate::core::OciClient::new(Arc::new(auth_provider), endpoint)?;
+    Ok(Arc::new(oci_client))
+}
+
+/// Implementation of Compute trait for OciClient
+impl Compute for crate::core::OciClient {
+    fn launch_instance(
+        &self,
+        request: LaunchInstanceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<LaunchInstanceResponse>> + Send + '_>> {
+        Box::pin(async move {
+            // API version 20160918
+            let path = "/20160918/instances";
+
+            // Make POST request with LaunchInstanceDetails body
+            let oci_response = self
+                .post::<LaunchInstanceDetails, Instance>(path, Some(&request.launch_instance_details))
+                .await?;
+
+            // Extract request tracking headers
+            let opc_request_id = oci_response.get_header("opc-request-id");
+            let etag = oci_response.get_header("etag");
+
+            Ok(LaunchInstanceResponse {
+                instance: oci_response.body,
+                opc_request_id,
+                etag,
+            })
+        })
+    }
+
+    fn terminate_instance(
+        &self,
+        request: TerminateInstanceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<TerminateInstanceResponse>> + Send + '_>> {
+        Box::pin(async move {
+            // Build query string from request parameters
+            let query_params = request.to_query_params();
+            let query_string = if query_params.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "?{}",
+                    query_params
+                        .iter()
+                        .map(|(k, v)| format!(
+                            "{}={}",
+                            urlencoding::encode(k),
+                            urlencoding::encode(v)
+                        ))
+                        .collect::<Vec<_>>()
+                        .join("&")
+                )
+            };
+
+            // API version 20160918
+            let path = format!("/20160918/instances/{}{}", request.instance_id, query_string);
+
+            // Make DELETE request
+            let oci_response = self.delete::<()>(&path).await?;
+
+            // Extract request tracking headers
+            let opc_request_id = oci_response.get_header("opc-request-id");
+
+            Ok(TerminateInstanceResponse { opc_request_id })
+        })
+    }
+}
