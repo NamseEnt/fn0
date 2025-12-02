@@ -1,6 +1,6 @@
 use oci_rust_sdk::{
-    core::{auth::ConfigFileAuthProvider, region::Region, OciClient},
-    virtual_network::{Lifetime, ListPublicIpsRequest, Scope, VirtualNetwork},
+    core::{auth::ConfigFileAuthProvider, region::Region},
+    virtual_network::{self, Lifetime, ListPublicIpsRequest, Scope},
 };
 use std::sync::Arc;
 
@@ -9,10 +9,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up authentication from default OCI config file
     let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
 
-    // Virtual Network is part of Core Services
-    // Uses "iaas" service prefix for endpoints
-    let endpoint = Region::ApSeoul1.endpoint("iaas");
-    let client = OciClient::new(auth, endpoint)?;
+    // Create a Virtual Network (Core Services) client
+    let client = virtual_network::client(auth, Region::ApSeoul1)?;
 
     // IMPORTANT: Replace this with your actual compartment OCID
     let compartment_id = std::env::var("OCI_COMPARTMENT_ID")

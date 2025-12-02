@@ -1,8 +1,7 @@
 use oci_rust_sdk::{
-    core::{auth::ConfigFileAuthProvider, region::Region, OciClient},
+    core::{auth::ConfigFileAuthProvider, region::Region},
     resource_search::{
-        MatchingContextType, ResourceSearch, SearchDetails, SearchResourcesRequest,
-        StructuredSearchDetails,
+        self, MatchingContextType, SearchDetails, SearchResourcesRequest, StructuredSearchDetails,
     },
 };
 use std::sync::Arc;
@@ -12,9 +11,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up authentication using default config file
     let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
 
-    // Resource Search uses a different endpoint pattern (query.region)
-    let endpoint = Region::ApSeoul1.query_endpoint();
-    let client = OciClient::new(auth, endpoint)?;
+    // Create a Resource Search client for the region
+    let client = resource_search::client(auth, Region::ApSeoul1)?;
 
     // Example 1: Structured search query
     println!("=== Example 1: Structured Search ===");

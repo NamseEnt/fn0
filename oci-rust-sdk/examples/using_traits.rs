@@ -3,9 +3,9 @@
 //! This example shows how to use the OsManagementHub trait for
 //! dependency injection and testing.
 
-use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region, Result, OciClient};
+use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region, Result};
 use oci_rust_sdk::os_management_hub::{
-    ListManagedInstancesRequest, ListManagedInstancesResponse, ManagedInstanceCollection,
+    self, ListManagedInstancesRequest, ListManagedInstancesResponse, ManagedInstanceCollection,
     OsManagementHub,
 };
 use std::sync::Arc;
@@ -72,11 +72,10 @@ async fn main() -> Result<()> {
 
     match ConfigFileAuthProvider::from_default() {
         Ok(auth) => {
-            let endpoint = Region::ApSeoul1.endpoint("osmh");
-            let client = OciClient::new(Arc::new(auth), endpoint)?;
+            let client = os_management_hub::client(Arc::new(auth), Region::ApSeoul1)?;
 
-            // Use as trait - enables dependency injection
-            let _service: &dyn OsManagementHub = &client;
+            // Already returns Arc<dyn OsManagementHub> - ready for dependency injection
+            let _service: &dyn OsManagementHub = &*client;
 
             println!("Client created successfully");
             println!("Note: To actually fetch instances, provide a valid compartment_id\n");
