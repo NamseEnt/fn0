@@ -129,14 +129,20 @@ mod tests {
     #[tokio::test]
     async fn test_retry_success_after_failures() {
         let retrier = Retrier::new();
-        let mut call_count = 0;
+        let call_count = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
 
         let result = retrier
             .execute_with_retry(|| {
-                call_count += 1;
+                let count = call_count.clone();
                 async move {
-                    if call_count < 3 {
-                        Err(OciError::Other("test error".to_string()))
+                    let current = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                    if current < 3 {
+                        // Use a retryable error (ServiceError with 500 status)
+                        Err(OciError::ServiceError {
+                            status: 500,
+                            code: "InternalError".to_string(),
+                            message: "test error".to_string(),
+                        })
                     } else {
                         Ok(42)
                     }
@@ -146,7 +152,7 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
-        assert_eq!(call_count, 3);
+        assert_eq!(call_count.load(std::sync::atomic::Ordering::SeqCst), 3);
     }
 
     #[tokio::test]
