@@ -22,6 +22,12 @@ pub trait Compute: Send + Sync {
         &self,
         request: TerminateInstanceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<TerminateInstanceResponse>> + Send + '_>>;
+
+    /// List compute instances in a compartment
+    fn list_instances(
+        &self,
+        request: ListInstancesRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<ListInstancesResponse>> + Send + '_>>;
 }
 
 /// Create a new Compute client for the specified region.
@@ -124,6 +130,48 @@ impl Compute for crate::core::OciClient {
             let opc_request_id = oci_response.get_header("opc-request-id");
 
             Ok(TerminateInstanceResponse { opc_request_id })
+        })
+    }
+
+    fn list_instances(
+        &self,
+        request: ListInstancesRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<ListInstancesResponse>> + Send + '_>> {
+        Box::pin(async move {
+            // Build query string from request parameters
+            let query_params = request.to_query_params();
+            let query_string = if query_params.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "?{}",
+                    query_params
+                        .iter()
+                        .map(|(k, v)| format!(
+                            "{}={}",
+                            urlencoding::encode(k),
+                            urlencoding::encode(v)
+                        ))
+                        .collect::<Vec<_>>()
+                        .join("&")
+                )
+            };
+
+            // API version 20160918
+            let path = format!("/20160918/instances{}", query_string);
+
+            // Make GET request
+            let oci_response = self.get::<Vec<Instance>>(&path).await?;
+
+            // Extract request tracking headers
+            let opc_request_id = oci_response.get_header("opc-request-id");
+            let opc_next_page = oci_response.get_header("opc-next-page");
+
+            Ok(ListInstancesResponse {
+                items: oci_response.body,
+                opc_request_id,
+                opc_next_page,
+            })
         })
     }
 }

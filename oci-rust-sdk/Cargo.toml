@@ -42,13 +42,21 @@ tokio = { version = "1", features = ["test-util"] }
 mockito = "1"
 
 [[example]]
-name = "using_traits"
-required-features = ["os_management_hub"]
+name = "list_instances"
+required-features = ["compute"]
+
+[[example]]
+name = "list_public_ips"
+required-features = ["virtual_network"]
 
 [[example]]
 name = "resource_search"
 required-features = ["resource_search"]
 
 [[example]]
-name = "list_public_ips"
-required-features = ["virtual_network"]
+name = "test_lifecycle_state"
+required-features = ["compute"]
+
+[[example]]
+name = "using_traits"
+required-features = ["os_management_hub"]
