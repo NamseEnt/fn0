@@ -28,7 +28,7 @@ pub enum WorkerInstanceState {
 }
 
 pub type WorkerInfos = Vec<WorkerInfo>;
-pub type WorkerHealthResponseMap = BTreeMap<WorkerId, (WorkerInfo, Option<WorkerStatus>)>;
+pub type WorkerHealthResponseMap = BTreeMap<WorkerId, (WorkerInfo, Option<WorkerHealthResponse>)>;
 
 pub trait WorkerInfra: Send + Sync {
     fn get_worker_infos<'a>(
@@ -73,7 +73,7 @@ impl dyn WorkerInfra {
                     return (worker_info.id.clone(), (worker_info, None));
                 };
 
-                let Ok(worker_status) = body.parse::<WorkerStatus>() else {
+                let Ok(worker_status) = body.parse::<WorkerHealthResponse>() else {
                     panic!("Failed to parse health response: {body}");
                 };
 
@@ -83,21 +83,31 @@ impl dyn WorkerInfra {
             .collect()
             .await)
     }
+
+    pub async fn send_terminate_workers(&self, worker_ids: impl IntoIterator<Item = WorkerId>) {
+        futures::stream::iter(worker_ids)
+            .for_each_concurrent(16, |worker_id| async move {
+                if let Err(e) = self.terminate(&worker_id).await {
+                    println!("Failed to terminate worker {worker_id:?}: {e}");
+                }
+            })
+            .await
+    }
 }
 
 #[derive(Clone)]
-pub enum WorkerStatus {
+pub enum WorkerHealthResponse {
     Good,
-    ShuttingDown,
+    GracefulShuttingDown,
 }
 
-impl FromStr for WorkerStatus {
+impl FromStr for WorkerHealthResponse {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "good" => Ok(WorkerStatus::Good),
-            "shutting_down" => Ok(WorkerStatus::ShuttingDown),
+            "good" => Ok(WorkerHealthResponse::Good),
+            "graceful_shutting_down" => Ok(WorkerHealthResponse::GracefulShuttingDown),
             _ => anyhow::bail!("invalid health response: {}", s),
         }
     }
