@@ -42,9 +42,10 @@ mod lock;
 mod worker_infra;
 
 use crate::{
-    health_recorder::{HealthRecords, update_health_records},
+    health_recorder::{HealthRecords, get_workers_to_terminate, update_health_records},
     worker_infra::{WorkerHealthResponseMap, WorkerInstanceState},
 };
+use chrono::{DateTime, Duration, Utc};
 use futures::{FutureExt, StreamExt};
 use health_recorder::HealthRecorder;
 use lock::Lock;
@@ -60,6 +61,8 @@ struct WorkerId(String);
 
 fn main() {
     tokio::runtime::Runtime::new().unwrap().block_on(async {
+        let context = Context::new();
+
         let lock_at = env::var("LOCK_AT").expect("env var LOCK_AT is not set");
         let lock: Arc<dyn Lock> = match lock_at.as_str() {
             "dynamodb" => Arc::new(lock::dynamodb::DynamoDbLock::new().await),
@@ -80,85 +83,53 @@ fn main() {
             _ => panic!("unknown worker infra type {worker_infra_at}"),
         };
 
-        let _result = run_watchdog(lock, health_recorder, worker_infra).await;
+        let _result = run_watchdog(&context, lock, health_recorder, worker_infra).await;
     });
 }
 
 async fn run_watchdog(
+    context: &Context,
     lock: Arc<dyn Lock>,
     health_recorder: Arc<dyn HealthRecorder>,
     worker_infra: Arc<dyn WorkerInfra>,
 ) -> anyhow::Result<()> {
-    let domain = env::var("DOMAIN").expect("env var DOMAIN is not set");
-    let max_graceful_shutdown_wait_secs = env::var("MAX_GRACEFUL_SHUTDOWN_WAIT_SECS")
-        .expect("MAX_GRACEFUL_SHUTDOWN_WAIT_SECS must be set")
-        .parse::<u64>()
-        .unwrap();
-    let max_healthy_check_retrials = env::var("MAX_HEALTHY_CHECK_RETRIES")
-        .expect("MAX_HEALTHY_CHECK_RETRIES must be set")
-        .parse::<usize>()
-        .unwrap();
-    let max_start_timeout_secs = env::var("MAX_START_TIMEOUT_SECS")
-        .expect("MAX_START_TIMEOUT_SECS must be set")
-        .parse::<u64>()
-        .unwrap();
-    let max_starting_count = env::var("MAX_STARTING_COUNT")
-        .expect("MAX_STARTING_COUNT must be set")
-        .parse::<usize>()
-        .unwrap();
-
-    if !lock.try_lock().await? {
+    if !lock.try_lock(context).await? {
         println!("Failed to get lock");
         return Ok(());
     }
 
-    let (health_records, worker_health_response_map) = futures::try_join!(
+    let (mut health_records, worker_health_response_map) = futures::try_join!(
         health_recorder.read_all(),
-        worker_infra.get_worker_health_responses(&domain)
+        worker_infra.get_worker_health_responses(&context.domain)
     )?;
 
-    let now_secs = now_secs();
-
-    let (next_health_records, workers_to_terminate) = update_health_records(
-        now_secs,
-        health_records,
+    update_health_records(
+        context,
+        &mut health_records,
         worker_health_response_map.clone(),
-        max_graceful_shutdown_wait_secs,
-        max_healthy_check_retrials,
-    )
-    .await?;
+    )?;
 
-    let terminate_handles =
-        futures::stream::iter(workers_to_terminate).for_each_concurrent(16, |worker_info| {
-            let worker_infra = worker_infra.clone();
-            async move {
-                if let Err(e) = worker_infra.terminate(&worker_info.id).await {
-                    println!("Failed to terminate worker {:?}: {e}", worker_info.id);
-                }
-            }
-        });
+    let workers_to_terminate = get_workers_to_terminate(&health_records);
+
+    let terminate_handle = worker_infra.send_terminate_workers(workers_to_terminate);
 
     futures::try_join!(
-        health_recorder.write_all(next_health_records.clone()),
+        health_recorder.write_all(health_records.clone()),
         try_scale_out(
-            now_secs,
-            max_start_timeout_secs,
-            max_starting_count,
-            next_health_records,
+            context,
+            health_records,
             worker_health_response_map,
             worker_infra.clone(),
         ),
-        terminate_handles.then(|_| async { Ok(()) }),
+        terminate_handle.then(|_| async { Ok(()) }),
     )?;
 
     Ok(())
 }
 
 async fn try_scale_out(
-    now_secs: u64,
-    max_start_timeout_secs: u64,
-    max_starting_count: usize,
-    health_records: HealthRecords,
+    context: &Context,
+    _health_records: HealthRecords,
     worker_health_response_map: WorkerHealthResponseMap,
     worker_infra: Arc<dyn WorkerInfra>,
 ) -> anyhow::Result<()> {
@@ -168,9 +139,7 @@ async fn try_scale_out(
         .map(|(info, _status)| info);
 
     let (old_starting_workers, fresh_starting_workers): (Vec<_>, Vec<_>) = starting_workers
-        .partition(|info| {
-            now_secs as i64 - info.instance_created.timestamp() > max_start_timeout_secs as i64
-        });
+        .partition(|info| context.start_time - info.instance_created > context.max_start_timeout);
 
     let terminate_olds =
         futures::stream::iter(old_starting_workers).for_each_concurrent(16, |info| {
@@ -181,17 +150,16 @@ async fn try_scale_out(
         });
 
     let start_new = async move {
-        let Some(_left_starting_count) =
-            max_starting_count.checked_sub(fresh_starting_workers.len())
+        let Some(_left_starting_count) = context
+            .max_starting_count
+            .checked_sub(fresh_starting_workers.len())
         else {
             return;
         };
 
         // TODO: 정상인 워커가 1개도 없으면 1개 시작해라.
 
-        if !fresh_starting_workers.is_empty() {
-            return;
-        }
+        if !fresh_starting_workers.is_empty() {}
 
         // 그러러면 health_records 를 체크해서 정상인게 없는지 보면 되겠지.
     };
@@ -201,31 +169,36 @@ async fn try_scale_out(
     Ok(())
 }
 
-fn now_secs() -> u64 {
-    std::time::UNIX_EPOCH.elapsed().unwrap().as_secs()
-}
-
-struct GeneralEnv {
-    max_graceful_shutdown_wait_secs: u64,
+struct Context {
+    start_time: DateTime<Utc>,
+    domain: String,
+    max_graceful_shutdown_wait_time: Duration,
     max_healthy_check_retrials: usize,
-    max_start_timeout_secs: u64,
+    max_start_timeout: Duration,
     max_starting_count: usize,
 }
-impl GeneralEnv {
+impl Context {
     fn new() -> Self {
         Self {
-            max_graceful_shutdown_wait_secs: env::var("MAX_GRACEFUL_SHUTDOWN_WAIT_SECS")
-                .expect("MAX_GRACEFUL_SHUTDOWN_WAIT_SECS must be set")
-                .parse::<u64>()
-                .unwrap(),
+            start_time: Utc::now(),
+            domain: env::var("DOMAIN").expect("env var DOMAIN is not set"),
+            max_graceful_shutdown_wait_time: Duration::seconds(
+                env::var("MAX_GRACEFUL_SHUTDOWN_WAIT_SECS")
+                    .expect("MAX_GRACEFUL_SHUTDOWN_WAIT_SECS must be set")
+                    .parse::<u64>()
+                    .expect("Failed to parse MAX_GRACEFUL_SHUTDOWN_WAIT_SECS")
+                    as i64,
+            ),
             max_healthy_check_retrials: env::var("MAX_HEALTHY_CHECK_RETRIES")
                 .expect("MAX_HEALTHY_CHECK_RETRIES must be set")
                 .parse::<usize>()
                 .unwrap(),
-            max_start_timeout_secs: env::var("MAX_START_TIMEOUT_SECS")
-                .expect("MAX_START_TIMEOUT_SECS must be set")
-                .parse::<u64>()
-                .unwrap(),
+            max_start_timeout: Duration::seconds(
+                env::var("MAX_START_TIMEOUT_SECS")
+                    .expect("MAX_START_TIMEOUT_SECS must be set")
+                    .parse::<u64>()
+                    .unwrap() as i64,
+            ),
             max_starting_count: env::var("MAX_STARTING_COUNT")
                 .expect("MAX_STARTING_COUNT must be set")
                 .parse::<usize>()
