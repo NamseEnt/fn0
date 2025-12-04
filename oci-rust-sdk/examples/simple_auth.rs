@@ -1,4 +1,4 @@
-use oci_rust_sdk::core::auth::{AuthProvider, SimpleAuthProvider};
+use oci_rust_sdk::core::auth::{AuthProvider, SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 use oci_rust_sdk::core::region::Region;
 
 fn main() {
@@ -20,13 +20,14 @@ fn main() {
 
     // Example 2: Using the builder pattern (recommended)
     println!("=== Example 2: Using builder pattern ===");
-    let provider2 = SimpleAuthProvider::builder()
-        .tenancy("ocid1.tenancy.oc1..aaaaaaaexample")
-        .user("ocid1.user.oc1..aaaaaaaexample")
-        .fingerprint("aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99")
-        .private_key(
-            "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----",
-        )
+    let required = SimpleAuthProviderRequiredFields {
+        tenancy: "ocid1.tenancy.oc1..aaaaaaaexample".to_string(),
+        user: "ocid1.user.oc1..aaaaaaaexample".to_string(),
+        fingerprint: "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99".to_string(),
+        private_key: "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----".to_string(),
+    };
+
+    let provider2 = SimpleAuthProvider::builder(required)
         .passphrase("my-secret-passphrase")
         .region(Region::ApSeoul1)
         .auth_type("api_key")
@@ -69,27 +70,4 @@ fn main() {
     println!("Auth Type: {:?}", provider4.auth_type());
     println!("Delegation Token: {:?}", provider4.delegation_token());
     println!("Session Token: {:?}\n", provider4.session_token());
-
-    // Example 5: Error handling with try_build
-    println!("=== Example 5: Error handling with try_build ===");
-    match SimpleAuthProvider::builder()
-        .tenancy("ocid1.tenancy.oc1..aaaaaaaexample")
-        .user("ocid1.user.oc1..aaaaaaaexample")
-        // Missing fingerprint and private_key
-        .try_build()
-    {
-        Ok(_) => println!("Provider created successfully"),
-        Err(e) => println!("Error creating provider: {}", e),
-    }
-
-    match SimpleAuthProvider::builder()
-        .tenancy("ocid1.tenancy.oc1..aaaaaaaexample")
-        .user("ocid1.user.oc1..aaaaaaaexample")
-        .fingerprint("aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99")
-        .private_key("-----BEGIN RSA PRIVATE KEY-----\nkey\n-----END RSA PRIVATE KEY-----")
-        .try_build()
-    {
-        Ok(provider) => println!("Provider created successfully: {}", provider.get_key_id()),
-        Err(e) => println!("Error creating provider: {}", e),
-    }
 }

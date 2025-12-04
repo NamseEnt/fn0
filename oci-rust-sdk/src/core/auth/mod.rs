@@ -9,6 +9,6 @@ pub mod x509_utils;
 
 pub use provider::{AuthProvider, AuthProviderRef};
 pub use config::ConfigFileAuthProvider;
-pub use simple::{SimpleAuthProvider, SimpleAuthProviderBuilder};
+pub use simple::{SimpleAuthProvider, SimpleAuthProviderBuilder, SimpleAuthProviderRequiredFields};
 pub use signer::RequestSigner;
 pub use instance_principals::InstancePrincipalsAuthProvider;

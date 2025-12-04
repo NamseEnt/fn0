@@ -17,6 +17,12 @@ pub trait Compute: Send + Sync {
         request: LaunchInstanceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<LaunchInstanceResponse>> + Send + '_>>;
 
+    /// Launch an instance from an instance configuration
+    fn launch_instance_configuration(
+        &self,
+        request: LaunchInstanceConfigurationRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<LaunchInstanceConfigurationResponse>> + Send + '_>>;
+
     /// Terminate a compute instance
     fn terminate_instance(
         &self,
@@ -92,6 +98,39 @@ impl Compute for crate::core::OciClient {
                 instance: oci_response.body,
                 opc_request_id,
                 etag,
+            })
+        })
+    }
+
+    fn launch_instance_configuration(
+        &self,
+        request: LaunchInstanceConfigurationRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<LaunchInstanceConfigurationResponse>> + Send + '_>> {
+        Box::pin(async move {
+            // API version 20160918
+            let path = format!(
+                "/20160918/instanceConfigurations/{}/actions/launch",
+                request.instance_configuration_id
+            );
+
+            // Make POST request with InstanceConfigurationInstanceDetails body
+            let oci_response = self
+                .post::<InstanceConfigurationInstanceDetails, Instance>(
+                    &path,
+                    Some(&request.instance_configuration),
+                )
+                .await?;
+
+            // Extract request tracking headers
+            let opc_request_id = oci_response.get_header("opc-request-id");
+            let etag = oci_response.get_header("etag");
+            let opc_work_request_id = oci_response.get_header("opc-work-request-id");
+
+            Ok(LaunchInstanceConfigurationResponse {
+                instance: oci_response.body,
+                opc_request_id,
+                etag,
+                opc_work_request_id,
             })
         })
     }

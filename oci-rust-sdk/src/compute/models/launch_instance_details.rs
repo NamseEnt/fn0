@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::{CreateVnicDetails, InstanceSourceDetails};
+use super::{CreateVnicDetails, InstanceSourceDetails, LaunchInstanceShapeConfigDetails};
 
 /// Details for launching a new compute instance
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +44,10 @@ pub struct LaunchInstanceDetails {
     /// The shape of the instance (required)
     pub shape: String,
 
+    /// The shape configuration for the instance
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shape_config: Option<LaunchInstanceShapeConfigDetails>,
+
     /// Details for creating an instance from an image or boot volume
     pub source_details: InstanceSourceDetails,
 
@@ -60,18 +64,45 @@ pub struct LaunchInstanceDetails {
     pub is_pv_encryption_in_transit_enabled: Option<bool>,
 }
 
+/// Required fields for launching an instance
+pub struct LaunchInstanceRequiredFields {
+    /// The OCID of the compartment
+    pub compartment_id: String,
+    /// The availability domain to place the instance in
+    pub availability_domain: String,
+    /// The shape of the instance
+    pub shape: String,
+    /// Details for creating an instance from an image or boot volume
+    pub source_details: InstanceSourceDetails,
+}
+
 impl LaunchInstanceDetails {
-    /// Create a new instance launch details builder
-    pub fn builder() -> LaunchInstanceDetailsBuilder {
-        LaunchInstanceDetailsBuilder::default()
+    /// Create a new instance launch details builder with required fields
+    pub fn builder(required: LaunchInstanceRequiredFields) -> LaunchInstanceDetailsBuilder {
+        LaunchInstanceDetailsBuilder {
+            compartment_id: required.compartment_id,
+            availability_domain: required.availability_domain,
+            shape: required.shape,
+            source_details: required.source_details,
+            create_vnic_details: None,
+            dedicated_vm_host_id: None,
+            defined_tags: None,
+            display_name: None,
+            metadata: None,
+            extended_metadata: None,
+            freeform_tags: None,
+            shape_config: None,
+            fault_domain: None,
+            capacity_reservation_id: None,
+            is_pv_encryption_in_transit_enabled: None,
+        }
     }
 }
 
 /// Builder for LaunchInstanceDetails
-#[derive(Default)]
 pub struct LaunchInstanceDetailsBuilder {
-    compartment_id: Option<String>,
-    availability_domain: Option<String>,
+    compartment_id: String,
+    availability_domain: String,
     create_vnic_details: Option<CreateVnicDetails>,
     dedicated_vm_host_id: Option<String>,
     defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
@@ -79,38 +110,15 @@ pub struct LaunchInstanceDetailsBuilder {
     metadata: Option<HashMap<String, String>>,
     extended_metadata: Option<HashMap<String, serde_json::Value>>,
     freeform_tags: Option<HashMap<String, String>>,
-    shape: Option<String>,
-    source_details: Option<InstanceSourceDetails>,
+    shape: String,
+    shape_config: Option<LaunchInstanceShapeConfigDetails>,
+    source_details: InstanceSourceDetails,
     fault_domain: Option<String>,
     capacity_reservation_id: Option<String>,
     is_pv_encryption_in_transit_enabled: Option<bool>,
 }
 
 impl LaunchInstanceDetailsBuilder {
-    /// Set the compartment ID (required)
-    pub fn compartment_id(mut self, id: impl Into<String>) -> Self {
-        self.compartment_id = Some(id.into());
-        self
-    }
-
-    /// Set the availability domain (required)
-    pub fn availability_domain(mut self, ad: impl Into<String>) -> Self {
-        self.availability_domain = Some(ad.into());
-        self
-    }
-
-    /// Set the shape (required)
-    pub fn shape(mut self, shape: impl Into<String>) -> Self {
-        self.shape = Some(shape.into());
-        self
-    }
-
-    /// Set the source details (required)
-    pub fn source_details(mut self, details: InstanceSourceDetails) -> Self {
-        self.source_details = Some(details);
-        self
-    }
-
     /// Set the VNIC details
     pub fn create_vnic_details(mut self, details: CreateVnicDetails) -> Self {
         self.create_vnic_details = Some(details);
@@ -142,7 +150,10 @@ impl LaunchInstanceDetailsBuilder {
     }
 
     /// Set defined tags
-    pub fn defined_tags(mut self, tags: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn defined_tags(
+        mut self,
+        tags: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(tags);
         self
     }
@@ -171,13 +182,20 @@ impl LaunchInstanceDetailsBuilder {
         self
     }
 
+    /// Set the shape configuration
+    pub fn shape_config(mut self, config: LaunchInstanceShapeConfigDetails) -> Self {
+        self.shape_config = Some(config);
+        self
+    }
+
     /// Build the LaunchInstanceDetails
     pub fn build(self) -> LaunchInstanceDetails {
         LaunchInstanceDetails {
-            compartment_id: self.compartment_id.expect("compartment_id is required"),
-            availability_domain: self.availability_domain.expect("availability_domain is required"),
-            shape: self.shape.expect("shape is required"),
-            source_details: self.source_details.expect("source_details is required"),
+            compartment_id: self.compartment_id,
+            availability_domain: self.availability_domain,
+            shape: self.shape,
+            shape_config: self.shape_config,
+            source_details: self.source_details,
             create_vnic_details: self.create_vnic_details,
             dedicated_vm_host_id: self.dedicated_vm_host_id,
             defined_tags: self.defined_tags,

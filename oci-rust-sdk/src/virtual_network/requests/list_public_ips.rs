@@ -1,5 +1,13 @@
 use crate::virtual_network::models::*;
 
+/// Required fields for ListPublicIpsRequest
+pub struct ListPublicIpsRequestRequiredFields {
+    /// REGION or AVAILABILITY_DOMAIN
+    pub scope: Scope,
+    /// The OCID of the compartment
+    pub compartment_id: String,
+}
+
 /// Request to list public IPs
 #[derive(Debug, Clone)]
 pub struct ListPublicIpsRequest {
@@ -27,11 +35,11 @@ pub struct ListPublicIpsRequest {
 
 impl ListPublicIpsRequest {
     /// Create a new builder for ListPublicIpsRequest
-    pub fn builder(scope: Scope, compartment_id: impl Into<String>) -> ListPublicIpsRequestBuilder {
+    pub fn builder(required: ListPublicIpsRequestRequiredFields) -> ListPublicIpsRequestBuilder {
         ListPublicIpsRequestBuilder {
             request: ListPublicIpsRequest {
-                scope,
-                compartment_id: compartment_id.into(),
+                scope: required.scope,
+                compartment_id: required.compartment_id,
                 limit: None,
                 page: None,
                 availability_domain: None,

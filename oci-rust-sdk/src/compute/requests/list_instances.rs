@@ -1,5 +1,11 @@
 use crate::compute::models::*;
 
+/// Required fields for ListInstancesRequest
+pub struct ListInstancesRequestRequiredFields {
+    /// The OCID of the compartment
+    pub compartment_id: String,
+}
+
 /// Request to list compute instances
 #[derive(Debug, Clone)]
 pub struct ListInstancesRequest {
@@ -36,10 +42,10 @@ pub struct ListInstancesRequest {
 
 impl ListInstancesRequest {
     /// Create a new builder for ListInstancesRequest
-    pub fn builder(compartment_id: impl Into<String>) -> ListInstancesRequestBuilder {
+    pub fn builder(required: ListInstancesRequestRequiredFields) -> ListInstancesRequestBuilder {
         ListInstancesRequestBuilder {
             request: ListInstancesRequest {
-                compartment_id: compartment_id.into(),
+                compartment_id: required.compartment_id,
                 availability_domain: None,
                 capacity_reservation_id: None,
                 compute_cluster_id: None,

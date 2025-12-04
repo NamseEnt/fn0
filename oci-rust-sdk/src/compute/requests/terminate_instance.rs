@@ -1,3 +1,9 @@
+/// Required fields for TerminateInstanceRequest
+pub struct TerminateInstanceRequestRequiredFields {
+    /// The OCID of the instance
+    pub instance_id: String,
+}
+
 /// Request to terminate a compute instance
 #[derive(Debug, Clone)]
 pub struct TerminateInstanceRequest {
@@ -16,10 +22,10 @@ pub struct TerminateInstanceRequest {
 
 impl TerminateInstanceRequest {
     /// Create a new builder for TerminateInstanceRequest
-    pub fn builder(instance_id: impl Into<String>) -> TerminateInstanceRequestBuilder {
+    pub fn builder(required: TerminateInstanceRequestRequiredFields) -> TerminateInstanceRequestBuilder {
         TerminateInstanceRequestBuilder {
             request: TerminateInstanceRequest {
-                instance_id: instance_id.into(),
+                instance_id: required.instance_id,
                 if_match: None,
                 preserve_boot_volume: None,
                 preserve_data_volumes_created_at_launch: None,

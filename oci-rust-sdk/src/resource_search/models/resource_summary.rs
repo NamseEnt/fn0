@@ -4,6 +4,16 @@ use std::collections::HashMap;
 
 use super::search_context::SearchContext;
 
+/// Required fields for ResourceSummary
+pub struct ResourceSummaryRequiredFields {
+    /// The resource type name (e.g., "Instance", "VolumeAttachment")
+    pub resource_type: String,
+    /// The unique identifier for this particular resource, usually an OCID
+    pub identifier: String,
+    /// The OCID of the compartment that contains this resource
+    pub compartment_id: String,
+}
+
 /// A resource that exists in the cloud network that you're querying.
 ///
 /// Contains information about a single resource returned from a search query.
@@ -79,15 +89,11 @@ pub struct ResourceSummary {
 
 impl ResourceSummary {
     /// Create a new ResourceSummaryBuilder to construct a ResourceSummary.
-    pub fn builder(
-        resource_type: impl Into<String>,
-        identifier: impl Into<String>,
-        compartment_id: impl Into<String>,
-    ) -> ResourceSummaryBuilder {
+    pub fn builder(required: ResourceSummaryRequiredFields) -> ResourceSummaryBuilder {
         ResourceSummaryBuilder {
-            resource_type: resource_type.into(),
-            identifier: identifier.into(),
-            compartment_id: compartment_id.into(),
+            resource_type: required.resource_type,
+            identifier: required.identifier,
+            compartment_id: required.compartment_id,
             time_created: None,
             display_name: None,
             availability_domain: None,

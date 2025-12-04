@@ -1,6 +1,18 @@
 use crate::core::auth::provider::AuthProvider;
 use crate::core::region::Region;
 
+/// Required fields for SimpleAuthProvider
+pub struct SimpleAuthProviderRequiredFields {
+    /// Tenancy OCID
+    pub tenancy: String,
+    /// User OCID
+    pub user: String,
+    /// Public key fingerprint
+    pub fingerprint: String,
+    /// Private key in PEM format
+    pub private_key: String,
+}
+
 /// Simple authentication provider that holds credentials directly in memory
 ///
 /// This is the Rust equivalent of TypeScript SDK's SimpleAuthenticationDetailsProvider.
@@ -10,14 +22,17 @@ use crate::core::region::Region;
 /// # Example
 ///
 /// ```
-/// use oci_rust_sdk::core::auth::SimpleAuthProvider;
+/// use oci_rust_sdk::core::auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 /// use oci_rust_sdk::core::region::Region;
 ///
-/// let provider = SimpleAuthProvider::builder()
-///     .tenancy("ocid1.tenancy.oc1..aaa...")
-///     .user("ocid1.user.oc1..aaa...")
-///     .fingerprint("aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99")
-///     .private_key("-----BEGIN RSA PRIVATE KEY-----\n...")
+/// let required = SimpleAuthProviderRequiredFields {
+///     tenancy: "ocid1.tenancy.oc1..aaa...".to_string(),
+///     user: "ocid1.user.oc1..aaa...".to_string(),
+///     fingerprint: "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99".to_string(),
+///     private_key: "-----BEGIN RSA PRIVATE KEY-----\n...".to_string(),
+/// };
+///
+/// let provider = SimpleAuthProvider::builder(required)
 ///     .region(Region::ApSeoul1)
 ///     .build();
 /// ```
@@ -63,8 +78,18 @@ impl SimpleAuthProvider {
     }
 
     /// Create a builder for constructing a SimpleAuthProvider
-    pub fn builder() -> SimpleAuthProviderBuilder {
-        SimpleAuthProviderBuilder::default()
+    pub fn builder(required: SimpleAuthProviderRequiredFields) -> SimpleAuthProviderBuilder {
+        SimpleAuthProviderBuilder {
+            tenancy: required.tenancy,
+            user: required.user,
+            fingerprint: required.fingerprint,
+            private_key: required.private_key,
+            passphrase: None,
+            region: None,
+            auth_type: None,
+            delegation_token: None,
+            session_token: None,
+        }
     }
 
     /// Get the tenancy OCID
@@ -164,12 +189,12 @@ impl AuthProvider for SimpleAuthProvider {
 /// Builder for SimpleAuthProvider
 ///
 /// Provides a convenient way to construct a SimpleAuthProvider with optional fields.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct SimpleAuthProviderBuilder {
-    tenancy: Option<String>,
-    user: Option<String>,
-    fingerprint: Option<String>,
-    private_key: Option<String>,
+    tenancy: String,
+    user: String,
+    fingerprint: String,
+    private_key: String,
     passphrase: Option<String>,
     region: Option<Region>,
     auth_type: Option<String>,
@@ -178,30 +203,6 @@ pub struct SimpleAuthProviderBuilder {
 }
 
 impl SimpleAuthProviderBuilder {
-    /// Set the tenancy OCID
-    pub fn tenancy(mut self, tenancy: impl Into<String>) -> Self {
-        self.tenancy = Some(tenancy.into());
-        self
-    }
-
-    /// Set the user OCID
-    pub fn user(mut self, user: impl Into<String>) -> Self {
-        self.user = Some(user.into());
-        self
-    }
-
-    /// Set the fingerprint
-    pub fn fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
-        self.fingerprint = Some(fingerprint.into());
-        self
-    }
-
-    /// Set the private key
-    pub fn private_key(mut self, private_key: impl Into<String>) -> Self {
-        self.private_key = Some(private_key.into());
-        self
-    }
-
     /// Set the passphrase for the private key
     pub fn passphrase(mut self, passphrase: impl Into<String>) -> Self {
         self.passphrase = Some(passphrase.into());
@@ -233,47 +234,18 @@ impl SimpleAuthProviderBuilder {
     }
 
     /// Build the SimpleAuthProvider
-    ///
-    /// # Panics
-    ///
-    /// Panics if any required field (tenancy, user, fingerprint, private_key) is not set.
     pub fn build(self) -> SimpleAuthProvider {
         SimpleAuthProvider {
-            tenancy: self.tenancy.expect("tenancy is required"),
-            user: self.user.expect("user is required"),
-            fingerprint: self.fingerprint.expect("fingerprint is required"),
-            private_key: self.private_key.expect("private_key is required"),
+            tenancy: self.tenancy,
+            user: self.user,
+            fingerprint: self.fingerprint,
+            private_key: self.private_key,
             passphrase: self.passphrase,
             region: self.region,
             auth_type: self.auth_type,
             delegation_token: self.delegation_token,
             session_token: self.session_token,
         }
-    }
-
-    /// Build the SimpleAuthProvider, returning a Result
-    ///
-    /// Returns an error if any required field is missing.
-    pub fn try_build(self) -> crate::core::Result<SimpleAuthProvider> {
-        Ok(SimpleAuthProvider {
-            tenancy: self
-                .tenancy
-                .ok_or_else(|| crate::core::OciError::ConfigError("tenancy is required".into()))?,
-            user: self
-                .user
-                .ok_or_else(|| crate::core::OciError::ConfigError("user is required".into()))?,
-            fingerprint: self.fingerprint.ok_or_else(|| {
-                crate::core::OciError::ConfigError("fingerprint is required".into())
-            })?,
-            private_key: self.private_key.ok_or_else(|| {
-                crate::core::OciError::ConfigError("private_key is required".into())
-            })?,
-            passphrase: self.passphrase,
-            region: self.region,
-            auth_type: self.auth_type,
-            delegation_token: self.delegation_token,
-            session_token: self.session_token,
-        })
     }
 }
 
@@ -298,11 +270,14 @@ mod tests {
 
     #[test]
     fn test_simple_auth_provider_builder() {
-        let provider = SimpleAuthProvider::builder()
-            .tenancy("ocid1.tenancy.oc1..aaa")
-            .user("ocid1.user.oc1..bbb")
-            .fingerprint("aa:bb:cc:dd:ee:ff")
-            .private_key("-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----")
+        let required = SimpleAuthProviderRequiredFields {
+            tenancy: "ocid1.tenancy.oc1..aaa".to_string(),
+            user: "ocid1.user.oc1..bbb".to_string(),
+            fingerprint: "aa:bb:cc:dd:ee:ff".to_string(),
+            private_key: "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----".to_string(),
+        };
+
+        let provider = SimpleAuthProvider::builder(required)
             .passphrase("mypassphrase")
             .region(Region::ApSeoul1)
             .auth_type("api_key")
@@ -353,49 +328,19 @@ mod tests {
 
     #[test]
     fn test_token_management() {
-        let provider = SimpleAuthProvider::builder()
-            .tenancy("t")
-            .user("u")
-            .fingerprint("f")
-            .private_key("k")
+        let required = SimpleAuthProviderRequiredFields {
+            tenancy: "t".to_string(),
+            user: "u".to_string(),
+            fingerprint: "f".to_string(),
+            private_key: "k".to_string(),
+        };
+
+        let provider = SimpleAuthProvider::builder(required)
             .delegation_token("delegation123")
             .session_token("session456")
             .build();
 
         assert_eq!(provider.delegation_token(), Some("delegation123"));
         assert_eq!(provider.session_token(), Some("session456"));
-    }
-
-    #[test]
-    #[should_panic(expected = "tenancy is required")]
-    fn test_builder_missing_required_field() {
-        SimpleAuthProvider::builder()
-            .user("u")
-            .fingerprint("f")
-            .private_key("k")
-            .build();
-    }
-
-    #[test]
-    fn test_try_build_missing_field() {
-        let result = SimpleAuthProvider::builder()
-            .user("u")
-            .fingerprint("f")
-            .private_key("k")
-            .try_build();
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_try_build_success() {
-        let result = SimpleAuthProvider::builder()
-            .tenancy("t")
-            .user("u")
-            .fingerprint("f")
-            .private_key("k")
-            .try_build();
-
-        assert!(result.is_ok());
     }
 }

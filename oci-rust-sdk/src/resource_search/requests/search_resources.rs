@@ -1,5 +1,11 @@
 use crate::resource_search::models::{ResourceSummaryCollection, SearchDetails};
 
+/// Required fields for SearchResourcesRequest
+pub struct SearchResourcesRequestRequiredFields {
+    /// The search criteria (structured query or free text)
+    pub search_details: SearchDetails,
+}
+
 /// Request to search for resources.
 #[derive(Debug, Clone)]
 pub struct SearchResourcesRequest {
@@ -23,9 +29,9 @@ pub struct SearchResourcesRequest {
 
 impl SearchResourcesRequest {
     /// Create a new SearchResourcesRequestBuilder.
-    pub fn builder(search_details: SearchDetails) -> SearchResourcesRequestBuilder {
+    pub fn builder(required: SearchResourcesRequestRequiredFields) -> SearchResourcesRequestBuilder {
         SearchResourcesRequestBuilder {
-            search_details,
+            search_details: required.search_details,
             limit: None,
             page: None,
             tenant_id: None,
