@@ -8,3 +8,5 @@ config:
   pulumi:tags:
     value:
       pulumi:template: typescript
+packages:
+  fn0: ../pulumi/@0.0.0

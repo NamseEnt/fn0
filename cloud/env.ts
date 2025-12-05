@@ -10,6 +10,14 @@ export function envDomain() {
   return makeSureEnv("DOMAIN");
 }
 
+export function envAwsWatchdogRegion() {
+  return makeSureEnv("AWS_WATCHDOG_REGION");
+}
+
+export function envOciComputeWorkerRegion() {
+  return makeSureEnv("OCI_COMPUTE_WORKER_REGION");
+}
+
 function makeSureEnv(name: string) {
   const envVar = process.env[name];
   if (!envVar) {
