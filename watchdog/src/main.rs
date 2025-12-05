@@ -37,12 +37,17 @@
 //! ```
 //!
 
+mod dns;
 mod health_recorder;
 mod lock;
 mod worker_infra;
 
 use crate::{
-    health_recorder::{HealthRecords, get_workers_to_terminate, update_health_records},
+    dns::Dns,
+    health_recorder::{
+        HealthRecords, HealthState, get_healthy_ips, get_workers_to_terminate,
+        update_health_records,
+    },
     worker_infra::{WorkerHealthResponseMap, WorkerInstanceState},
 };
 use chrono::{DateTime, Duration, Utc};
@@ -83,7 +88,13 @@ fn main() {
             _ => panic!("unknown worker infra type {worker_infra_at}"),
         };
 
-        let _result = run_watchdog(&context, lock, health_recorder, worker_infra).await;
+        let dns_at = env::var("DNS_AT").expect("env var DNS_AT is not set");
+        let dns: Arc<dyn Dns> = match dns_at.as_str() {
+            "cloudflare" => Arc::new(dns::cloudflare::CloudflareDns::new().await),
+            _ => panic!("unknown dns type {dns_at}"),
+        };
+
+        let _result = run_watchdog(&context, lock, health_recorder, worker_infra, dns).await;
     });
 }
 
@@ -92,6 +103,7 @@ async fn run_watchdog(
     lock: Arc<dyn Lock>,
     health_recorder: Arc<dyn HealthRecorder>,
     worker_infra: Arc<dyn WorkerInfra>,
+    dns: Arc<dyn Dns>,
 ) -> anyhow::Result<()> {
     if !lock.try_lock(context).await? {
         println!("Failed to get lock");
@@ -110,28 +122,43 @@ async fn run_watchdog(
     )?;
 
     let workers_to_terminate = get_workers_to_terminate(&health_records);
+    let helathy_ips = get_healthy_ips(&health_records);
 
-    let terminate_handle = worker_infra.send_terminate_workers(workers_to_terminate);
-
-    futures::try_join!(
-        health_recorder.write_all(health_records.clone()),
+    futures::join!(
+        health_recorder
+            .write_all(health_records.clone())
+            .then(|result| async {
+                if let Err(err) = result {
+                    eprintln!("Failed to write health records: {err}");
+                }
+            }),
         try_scale_out(
             context,
             health_records,
             worker_health_response_map,
-            worker_infra.clone(),
-        ),
-        terminate_handle.then(|_| async { Ok(()) }),
-    )?;
+            worker_infra.as_ref(),
+        )
+        .then(|result| async {
+            if let Err(err) = result {
+                eprintln!("Failed to scale out: {err}");
+            }
+        }),
+        worker_infra.send_terminate_workers(workers_to_terminate),
+        dns.sync_ips(helathy_ips).then(|result| async {
+            if let Err(err) = result {
+                eprintln!("Failed to sync ips: {err}");
+            }
+        }),
+    );
 
     Ok(())
 }
 
 async fn try_scale_out(
     context: &Context,
-    _health_records: HealthRecords,
+    health_records: HealthRecords,
     worker_health_response_map: WorkerHealthResponseMap,
-    worker_infra: Arc<dyn WorkerInfra>,
+    worker_infra: &dyn WorkerInfra,
 ) -> anyhow::Result<()> {
     let starting_workers = worker_health_response_map
         .values()
@@ -142,11 +169,8 @@ async fn try_scale_out(
         .partition(|info| context.start_time - info.instance_created > context.max_start_timeout);
 
     let terminate_olds =
-        futures::stream::iter(old_starting_workers).for_each_concurrent(16, |info| {
-            let worker_infra = worker_infra.clone();
-            async move {
-                let _ = worker_infra.terminate(&info.id).await;
-            }
+        futures::stream::iter(old_starting_workers).for_each_concurrent(16, |info| async move {
+            let _ = worker_infra.terminate(&info.id).await;
         });
 
     let start_new = async move {
@@ -154,17 +178,27 @@ async fn try_scale_out(
             .max_starting_count
             .checked_sub(fresh_starting_workers.len())
         else {
-            return;
+            return anyhow::Ok(());
         };
 
-        // TODO: 정상인 워커가 1개도 없으면 1개 시작해라.
+        if !fresh_starting_workers.is_empty() {
+            return Ok(());
+        }
 
-        if !fresh_starting_workers.is_empty() {}
+        let helathy_count = health_records
+            .iter()
+            .filter(|(_, record)| matches!(record.state, HealthState::Healthy { .. }))
+            .count();
 
-        // 그러러면 health_records 를 체크해서 정상인게 없는지 보면 되겠지.
+        if helathy_count > 0 {
+            return Ok(());
+        }
+
+        worker_infra.launch_instances(1).await?;
+        Ok(())
     };
 
-    futures::join!(terminate_olds, start_new);
+    futures::try_join!(terminate_olds.map(|_| Ok(())), start_new)?;
 
     Ok(())
 }
