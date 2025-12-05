@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@pulumi/cloudflare": "^6.11.0",
+    "@pulumi/fn0": "file:sdks/fn0",
     "@pulumi/pulumi": "^3.113.0"
   }
 }

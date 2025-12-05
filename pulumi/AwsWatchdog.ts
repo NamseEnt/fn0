@@ -1,40 +1,48 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
+import { OciWorkerInfraEnvs } from "./OciComputeWorker";
 
-export interface AwsWatchdogWakerArgs {
-  region: pulumi.Input<aws.Region>;
+export interface AwsWatchdogArgs {
+  region: pulumi.Input<string>;
+  vpcId: pulumi.Input<string>;
+  subnetId: pulumi.Input<string>;
+  securityGroupId: pulumi.Input<string>;
   maxGracefulShutdownWaitSecs: pulumi.Input<number>;
   maxHealthyCheckRetries: pulumi.Input<number>;
+  maxStartTimeoutSecs: pulumi.Input<number>;
+  maxStartingCount: pulumi.Input<number>;
   domain: pulumi.Input<string>;
-  ociWorkerInfraEnvs: pulumi.Input<{
-    OCI_PRIVATE_KEY_BASE64: pulumi.Input<string>;
-    OCI_USER_ID: pulumi.Input<string>;
-    OCI_FINGERPRINT: pulumi.Input<string>;
-    OCI_TENANCY_ID: pulumi.Input<string>;
-    OCI_REGION: pulumi.Input<string>;
-    OCI_COMPARTMENT_ID: pulumi.Input<string>;
-  }>;
+  ociWorkerInfraEnvs: pulumi.Input<OciWorkerInfraEnvs>;
+  cloudflareEnvs: pulumi.Input<CloudflareEnvs>;
 }
 
-export class AwsWatchdogWaker extends pulumi.ComponentResource {
-  public readonly ipv6CiderBlock: pulumi.Output<string>;
+export interface CloudflareEnvs {
+  CLOUDFLARE_ZONE_ID: pulumi.Input<string>;
+  CLOUDFLARE_ASTERISK_DOMAIN: pulumi.Input<string>;
+  CLOUDFLARE_API_TOKEN: pulumi.Input<string>;
+}
 
+export class AwsWatchdog extends pulumi.ComponentResource {
   constructor(
     name: string,
-    args: AwsWatchdogWakerArgs,
+    args: AwsWatchdogArgs,
     opts: pulumi.ComponentResourceOptions
   ) {
     super("pkg:index:aws-watchdog-waker", name, args, opts);
 
     const {
       region,
+      vpcId,
+      subnetId,
+      securityGroupId,
       ociWorkerInfraEnvs,
       maxGracefulShutdownWaitSecs,
       maxHealthyCheckRetries,
+      maxStartTimeoutSecs,
+      maxStartingCount,
       domain,
+      cloudflareEnvs,
     } = args;
-
-    const { vpc, subnet, securityGroup } = setVpc(region);
 
     const eventRule = new aws.cloudwatch.EventRule("watchdog-waker", {
       region,
@@ -49,8 +57,9 @@ export class AwsWatchdogWaker extends pulumi.ComponentResource {
       region,
       timeout: 10,
       vpcConfig: {
-        subnetIds: [subnet.id],
-        securityGroupIds: [securityGroup.id],
+        vpcId,
+        subnetIds: [subnetId],
+        securityGroupIds: [securityGroupId],
       },
       role: new aws.iam.Role("watchdog-waker-role", {
         assumeRolePolicy: {
@@ -90,21 +99,26 @@ export class AwsWatchdogWaker extends pulumi.ComponentResource {
         ],
       }),
       environment: {
-        variables: {
-          LOCK_AT: "dynamodb",
-          HEALTH_RECORDER_AT: "s3",
-          WORKER_INFRA_AT: "oci",
-          DOMAIN: domain,
-          MAX_GRACEFUL_SHUTDOWN_WAIT_SECS: pulumi.jsonStringify(
-            maxGracefulShutdownWaitSecs
-          ),
-          MAX_HEALTHY_CHECK_RETRIES: pulumi.jsonStringify(
-            maxHealthyCheckRetries
-          ),
-          HEALTH_RECORD_BUCKET_NAME: healthRecordBucket.bucket,
-          LOCK_TABLE_NAME: lockDdb.name,
-          ...ociWorkerInfraEnvs,
-        },
+        variables: pulumi
+          .all([ociWorkerInfraEnvs, cloudflareEnvs])
+          .apply(([ociWorkerInfraEnvs, cloudflareEnvs]) => ({
+            LOCK_AT: "dynamodb",
+            HEALTH_RECORDER_AT: "s3",
+            WORKER_INFRA_AT: "oci",
+            DOMAIN: domain,
+            MAX_GRACEFUL_SHUTDOWN_WAIT_SECS: pulumi.jsonStringify(
+              maxGracefulShutdownWaitSecs
+            ),
+            MAX_HEALTHY_CHECK_RETRIES: pulumi.jsonStringify(
+              maxHealthyCheckRetries
+            ),
+            MAX_START_TIMEOUT_SECS: pulumi.jsonStringify(maxStartTimeoutSecs),
+            MAX_STARTING_COUNT: pulumi.jsonStringify(maxStartingCount),
+            HEALTH_RECORD_BUCKET_NAME: healthRecordBucket.bucket,
+            LOCK_TABLE_NAME: lockDdb.name,
+            ...ociWorkerInfraEnvs,
+            ...cloudflareEnvs,
+          })),
       },
       callback: async () => {},
     });
@@ -114,77 +128,10 @@ export class AwsWatchdogWaker extends pulumi.ComponentResource {
       rule: eventRule.name,
       arn: lambdaFunction.arn,
     });
-
-    this.ipv6CiderBlock = vpc.ipv6CidrBlock;
   }
 }
 
-function setVpc(region: pulumi.Input<aws.Region>) {
-  const vpc = new aws.ec2.Vpc("ipv6-vpc", {
-    region,
-    assignGeneratedIpv6CidrBlock: true,
-    enableDnsHostnames: true,
-  });
-
-  const eigw = new aws.ec2.EgressOnlyInternetGateway("ipv6-eigw", {
-    region,
-    vpcId: vpc.id,
-  });
-
-  const subnet = new aws.ec2.Subnet("ipv6-native-subnet", {
-    vpcId: vpc.id,
-    ipv6CidrBlock: vpc.ipv6CidrBlock.apply((cidr) => {
-      if (!cidr) return "";
-      const prefix = cidr.split("::/")[0];
-      return `${prefix}00::/64`;
-    }),
-    assignIpv6AddressOnCreation: true,
-    ipv6Native: true,
-    mapPublicIpOnLaunch: false,
-  });
-
-  const routeTable = new aws.ec2.RouteTable("ipv6-rt", {
-    region,
-    vpcId: vpc.id,
-  });
-
-  new aws.ec2.Route("ipv6-route", {
-    region,
-    routeTableId: routeTable.id,
-    destinationIpv6CidrBlock: "::/0",
-    egressOnlyGatewayId: eigw.id,
-  });
-
-  new aws.ec2.RouteTableAssociation("rt-assoc", {
-    region,
-    subnetId: subnet.id,
-    routeTableId: routeTable.id,
-  });
-
-  const securityGroup = new aws.ec2.SecurityGroup("ipv6-lambda-sg", {
-    region,
-    vpcId: vpc.id,
-    description: "Allow outbound IPv6 traffic only",
-    egress: [
-      {
-        protocol: "-1",
-        fromPort: 0,
-        toPort: 0,
-        ipv6CidrBlocks: ["::/0"],
-      },
-    ],
-  });
-
-  return {
-    vpc,
-    eigw,
-    subnet,
-    routeTable,
-    securityGroup,
-  };
-}
-
-function setLockDdb(region: pulumi.Input<aws.Region>) {
+function setLockDdb(region: pulumi.Input<string>) {
   const lockDdb = new aws.dynamodb.Table("lock-ddb", {
     region,
     hashKey: "master_lock",
@@ -201,7 +148,7 @@ function setLockDdb(region: pulumi.Input<aws.Region>) {
   return lockDdb;
 }
 
-function setHealthRecordBucket(region: pulumi.Input<aws.Region>) {
+function setHealthRecordBucket(region: pulumi.Input<string>) {
   const healthRecordBucket = new aws.s3.Bucket("health-record-bucket", {
     region,
   });
