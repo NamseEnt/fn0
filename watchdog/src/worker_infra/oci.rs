@@ -1,11 +1,19 @@
 use super::*;
 use base64::Engine;
-use oci_rust_sdk::compute::*;
+use futures::TryStreamExt;
+use oci_rust_sdk::{
+    compute::*,
+    core::{
+        auth::{SimpleAuthProvider, simple::SimpleAuthProviderRequiredFields},
+        region::Region,
+    },
+};
 use std::{env, net::IpAddr, str::FromStr, sync::Arc};
 
 pub struct OciWorkerInfra {
     compute: Arc<dyn Compute>,
     compartment_id: String,
+    instance_configuration_id: String,
 }
 
 impl OciWorkerInfra {
@@ -18,6 +26,8 @@ impl OciWorkerInfra {
         let region = env::var("OCI_REGION").expect("env var OCI_REGION is not set");
         let compartment_id =
             env::var("OCI_COMPARTMENT_ID").expect("env var OCI_COMPARTMENT_ID is not set");
+        let instance_configuration_id = env::var("OCI_INSTANCE_CONFIGURATION_ID")
+            .expect("env var OCI_INSTANCE_CONFIGURATION_ID is not set");
 
         let private_key = std::str::from_utf8(
             &base64::engine::general_purpose::STANDARD_NO_PAD
@@ -27,22 +37,24 @@ impl OciWorkerInfra {
         .unwrap()
         .to_string();
 
-        let region = oci_rust_sdk::core::region::Region::from_str(&region).unwrap_or_else(|_| {
+        let region = Region::from_str(&region).unwrap_or_else(|_| {
             panic!("invalid region {region}");
         });
 
-        let auth_provider = oci_rust_sdk::core::auth::SimpleAuthProvider::builder()
-            .user(user_id)
-            .fingerprint(fingerprint)
-            .private_key(private_key)
-            .tenancy(tenancy_id)
-            .region(region)
-            .build();
+        let auth_provider = SimpleAuthProvider::builder(SimpleAuthProviderRequiredFields {
+            tenancy: tenancy_id,
+            user: user_id,
+            fingerprint,
+            private_key,
+        })
+        .region(region)
+        .build();
 
         let compute = oci_rust_sdk::compute::client(auth_provider, region).unwrap();
         Self {
             compute,
             compartment_id,
+            instance_configuration_id,
         }
     }
 }
@@ -118,6 +130,35 @@ impl WorkerInfra for OciWorkerInfra {
                     preserve_data_volumes_created_at_launch: Some(false),
                 })
                 .await?;
+            Ok(())
+        })
+    }
+
+    fn launch_instances<'a>(
+        &'a self,
+        count: usize,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>> {
+        Box::pin(async move {
+            futures::stream::iter(0..count)
+                .map(|_| async move {
+                    self.compute
+                        .launch_instance_configuration(LaunchInstanceConfigurationRequest {
+                            instance_configuration_id: self.instance_configuration_id.clone(),
+                            instance_configuration: InstanceConfigurationInstanceDetails::Compute(
+                                ComputeInstanceDetails {
+                                    ..Default::default()
+                                },
+                            ),
+                            opc_retry_token: None,
+                        })
+                        .await?;
+
+                    anyhow::Ok(())
+                })
+                .buffer_unordered(4)
+                .try_collect::<Vec<()>>()
+                .await?;
+
             Ok(())
         })
     }

@@ -39,6 +39,11 @@ pub trait WorkerInfra: Send + Sync {
         &'a self,
         worker_id: &'a WorkerId,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>>;
+
+    fn launch_instances<'a>(
+        &'a self,
+        count: usize,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>>;
 }
 
 impl dyn WorkerInfra {
@@ -73,11 +78,14 @@ impl dyn WorkerInfra {
                     return (worker_info.id.clone(), (worker_info, None));
                 };
 
-                let Ok(worker_status) = body.parse::<WorkerHealthResponse>() else {
+                let Ok(kind) = body.parse::<WorkerHealthKind>() else {
                     panic!("Failed to parse health response: {body}");
                 };
 
-                (worker_info.id.clone(), (worker_info, Some(worker_status)))
+                (
+                    worker_info.id.clone(),
+                    (worker_info, Some(WorkerHealthResponse { kind, ip })),
+                )
             })
             .buffer_unordered(32)
             .collect()
@@ -96,18 +104,24 @@ impl dyn WorkerInfra {
 }
 
 #[derive(Clone)]
-pub enum WorkerHealthResponse {
+pub struct WorkerHealthResponse {
+    pub kind: WorkerHealthKind,
+    pub ip: IpAddr,
+}
+
+#[derive(Clone)]
+pub enum WorkerHealthKind {
     Good,
     GracefulShuttingDown,
 }
 
-impl FromStr for WorkerHealthResponse {
+impl FromStr for WorkerHealthKind {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "good" => Ok(WorkerHealthResponse::Good),
-            "graceful_shutting_down" => Ok(WorkerHealthResponse::GracefulShuttingDown),
+            "good" => Ok(WorkerHealthKind::Good),
+            "graceful_shutting_down" => Ok(WorkerHealthKind::GracefulShuttingDown),
             _ => anyhow::bail!("invalid health response: {}", s),
         }
     }
