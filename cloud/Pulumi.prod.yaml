@@ -1,0 +1,8 @@
+config:
+  cloudflare:apiToken:
+    secure: AAABAB1686F4p2c0ekGSwwRhT+FLjUIUrQQ/SxRnP6IiMUcEg63QmtP4/DJp0JSpHIjqrRJ26tt56ZHB2fize1fjUH3hBGze
+  fn0Cloud:CLOUDFLARE_ACCOUNT_ID: b62235f721637e4dcfb89754c44e3486
+  fn0Cloud:CLOUDFLARE_ZONE_ID: 35b3cf9096f0074cf95bb2d1a5b2f8ae
+  fn0Cloud:DOMAIN: fn0.dev
+  fn0Cloud:AWS_WATCHDOG_REGION: ap-northeast-1
+  fn0Cloud:OCI_COMPUTE_WORKER_REGION: ap-osaka-1
