@@ -59,11 +59,11 @@ impl dyn WorkerInfra {
                 };
                 let addr = SocketAddr::new(ip, 443);
                 let Ok(res) = reqwest::Client::builder()
-                    .resolve(domain, addr)
+                    .resolve(&format!("a.{domain}"), addr)
                     .timeout(Duration::from_secs(2))
                     .build()
                     .unwrap()
-                    .get(format!("https://{domain}/health"))
+                    .get(format!("https://a.{domain}/health"))
                     .send()
                     .await
                 else {
