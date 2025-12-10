@@ -8,6 +8,7 @@ pub struct OciLambdaProxyWorkerInfra {
     proxy: ::oci_lambda_proxy::OciLambdaProxy,
     compartment_id: String,
     instance_configuration_id: String,
+    availability_domain: String,
 }
 
 impl OciLambdaProxyWorkerInfra {
@@ -16,6 +17,8 @@ impl OciLambdaProxyWorkerInfra {
             env::var("OCI_COMPARTMENT_ID").expect("env var OCI_COMPARTMENT_ID is not set");
         let instance_configuration_id = env::var("OCI_INSTANCE_CONFIGURATION_ID")
             .expect("env var OCI_INSTANCE_CONFIGURATION_ID is not set");
+        let availability_domain = env::var("OCI_AVAILABILITY_DOMAIN")
+            .expect("env var OCI_AVAILABILITY_DOMAIN is not set");
         let fn_name = env::var("OCI_LAMBDA_PROXY_FN_NAME")
             .expect("env var OCI_LAMBDA_PROXY_FN_NAME is not set");
         let proxy = ::oci_lambda_proxy::OciLambdaProxy::new(fn_name).await;
@@ -23,6 +26,7 @@ impl OciLambdaProxyWorkerInfra {
             proxy,
             compartment_id,
             instance_configuration_id,
+            availability_domain,
         }
     }
 }
@@ -117,6 +121,11 @@ impl WorkerInfra for OciLambdaProxyWorkerInfra {
                             instance_configuration_id: self.instance_configuration_id.clone(),
                             instance_configuration: InstanceConfigurationInstanceDetails::Compute(
                                 ComputeInstanceDetails {
+                                    launch_details: Some(InstanceConfigurationLaunchInstanceDetails {
+                                        availability_domain: Some(self.availability_domain.clone()),
+                                        compartment_id: Some(self.compartment_id.clone()),
+                                        ..Default::default()
+                                    }),
                                     ..Default::default()
                                 },
                             ),

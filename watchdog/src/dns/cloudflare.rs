@@ -13,7 +13,10 @@ pub struct CloudflareDns {
 impl CloudflareDns {
     pub async fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .local_address("[::]:0".parse().ok())
+                .build()
+                .unwrap(),
             zone_id: env::var("CLOUDFLARE_ZONE_ID").expect("env var CLOUDFLARE_ZONE_ID is not set"),
             asterisk_domain: env::var("CLOUDFLARE_ASTERISK_DOMAIN")
                 .expect("env var CLOUDFLARE_ASTERISK_DOMAIN is not set"),
