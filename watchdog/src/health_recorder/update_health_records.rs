@@ -5,7 +5,7 @@ pub fn update_health_records(
     context: &Context,
     health_records: &mut HealthRecords,
     worker_health_response_map: WorkerHealthResponseMap,
-) -> anyhow::Result<()> {
+) -> color_eyre::Result<()> {
     let &Context {
         start_time,
         max_graceful_shutdown_wait_time,

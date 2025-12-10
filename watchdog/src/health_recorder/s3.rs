@@ -1,8 +1,8 @@
-use aws_config::BehaviorVersion;
+use super::*;
+use crate::*;
+use aws_config::{BehaviorVersion, timeout::TimeoutConfig};
 use aws_sdk_s3::primitives::ByteStream;
 use std::collections::BTreeMap;
-
-use super::*;
 
 pub struct S3HealthRecorder {
     client: aws_sdk_s3::Client,
@@ -12,7 +12,16 @@ pub struct S3HealthRecorder {
 
 impl S3HealthRecorder {
     pub async fn new() -> Self {
-        let sdk_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+        let sdk_config = aws_config::defaults(BehaviorVersion::latest())
+            .timeout_config(
+                TimeoutConfig::builder()
+                    .operation_timeout(DEFAULT_TIMEOUT)
+                    .operation_attempt_timeout(DEFAULT_TIMEOUT)
+                    .read_timeout(DEFAULT_TIMEOUT)
+                    .build(),
+            )
+            .load()
+            .await;
         Self {
             client: aws_sdk_s3::Client::new(&sdk_config),
             bucket_name: std::env::var("HEALTH_RECORD_BUCKET_NAME")
@@ -25,7 +34,7 @@ impl S3HealthRecorder {
 impl HealthRecorder for S3HealthRecorder {
     fn read_all<'a>(
         &'a self,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<HealthRecords>> + 'a + Send>> {
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<HealthRecords>> + 'a + Send>> {
         Box::pin(async move {
             let result = self
                 .client
@@ -59,7 +68,7 @@ impl HealthRecorder for S3HealthRecorder {
     fn write_all<'a>(
         &'a self,
         records: HealthRecords,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>> {
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<()>> + 'a + Send>> {
         Box::pin(async move {
             let json_data = serde_json::to_string(&records)?;
 

@@ -32,11 +32,11 @@ pub type HealthRecords = BTreeMap<WorkerId, HealthRecord>;
 pub trait HealthRecorder: Send + Sync {
     fn read_all<'a>(
         &'a self,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<HealthRecords>> + 'a + Send>>;
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<HealthRecords>> + 'a + Send>>;
     fn write_all<'a>(
         &'a self,
         records: HealthRecords,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>>;
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<()>> + 'a + Send>>;
 }
 
 pub fn get_workers_to_terminate(health_records: &HealthRecords) -> Vec<WorkerId> {
