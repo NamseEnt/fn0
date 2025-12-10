@@ -1040,7 +1040,195 @@ mod tests {
     }
 
     // ========================================
-    // 8. Edge Cases
+    // 8. Terminating State Handling
+    // ========================================
+
+    #[test]
+    fn test_new_worker_in_terminating_state_is_ignored() {
+        // Case 8.1: New worker in Terminating state is not added to records
+        let start_time = Utc::now();
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+        let mut health_records = HealthRecords::new();
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        assert_eq!(health_records.len(), 0);
+    }
+
+    #[test]
+    fn test_healthy_worker_transitions_to_terminated_confirm() {
+        // Case 8.2: Healthy worker transitions to TerminatedConfirm when infrastructure reports Terminating
+        let start_time = Utc::now();
+        let previous_time = start_time - TimeDelta::minutes(1);
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+
+        let mut health_records = HealthRecords::new();
+        health_records.insert(
+            worker_id("worker1"),
+            create_health_record(HealthState::Healthy { ip: test_ip() }, previous_time),
+        );
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        let record = health_records.get(&worker_id("worker1")).unwrap();
+        assert!(matches!(record.state, HealthState::TerminatedConfirm));
+        assert_eq!(record.state_transited_at, start_time);
+    }
+
+    #[test]
+    fn test_starting_worker_transitions_to_terminated_confirm() {
+        // Case 8.3: Starting worker transitions to TerminatedConfirm when Terminating
+        let start_time = Utc::now();
+        let previous_time = start_time - TimeDelta::minutes(1);
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+
+        let mut health_records = HealthRecords::new();
+        health_records.insert(
+            worker_id("worker1"),
+            create_health_record(HealthState::Starting, previous_time),
+        );
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        let record = health_records.get(&worker_id("worker1")).unwrap();
+        assert!(matches!(record.state, HealthState::TerminatedConfirm));
+        assert_eq!(record.state_transited_at, start_time);
+    }
+
+    #[test]
+    fn test_retrying_check_worker_transitions_to_terminated_confirm() {
+        // Case 8.4: RetryingCheck worker transitions to TerminatedConfirm when Terminating
+        let start_time = Utc::now();
+        let previous_time = start_time - TimeDelta::minutes(1);
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+
+        let mut health_records = HealthRecords::new();
+        health_records.insert(
+            worker_id("worker1"),
+            create_health_record(HealthState::RetryingCheck { retrials: 2 }, previous_time),
+        );
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        let record = health_records.get(&worker_id("worker1")).unwrap();
+        assert!(matches!(record.state, HealthState::TerminatedConfirm));
+        assert_eq!(record.state_transited_at, start_time);
+    }
+
+    #[test]
+    fn test_graceful_shutting_down_worker_transitions_to_terminated_confirm() {
+        // Case 8.5: GracefulShuttingDown worker transitions to TerminatedConfirm when Terminating
+        let start_time = Utc::now();
+        let previous_time = start_time - TimeDelta::minutes(1);
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+
+        let mut health_records = HealthRecords::new();
+        health_records.insert(
+            worker_id("worker1"),
+            create_health_record(HealthState::GracefulShuttingDown, previous_time),
+        );
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        let record = health_records.get(&worker_id("worker1")).unwrap();
+        assert!(matches!(record.state, HealthState::TerminatedConfirm));
+        assert_eq!(record.state_transited_at, start_time);
+    }
+
+    #[test]
+    fn test_marked_for_termination_worker_transitions_to_terminated_confirm() {
+        // Case 8.6: MarkedForTermination worker transitions to TerminatedConfirm when Terminating
+        let start_time = Utc::now();
+        let previous_time = start_time - TimeDelta::minutes(1);
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+
+        let mut health_records = HealthRecords::new();
+        health_records.insert(
+            worker_id("worker1"),
+            create_health_record(HealthState::MarkedForTermination, previous_time),
+        );
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        let record = health_records.get(&worker_id("worker1")).unwrap();
+        assert!(matches!(record.state, HealthState::TerminatedConfirm));
+        assert_eq!(record.state_transited_at, start_time);
+    }
+
+    #[test]
+    fn test_terminated_confirm_stays_unchanged_when_terminating() {
+        // Case 8.7: Already TerminatedConfirm worker stays unchanged when Terminating
+        let start_time = Utc::now();
+        let previous_time = start_time - TimeDelta::minutes(1);
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+
+        let mut health_records = HealthRecords::new();
+        health_records.insert(
+            worker_id("worker1"),
+            create_health_record(HealthState::TerminatedConfirm, previous_time),
+        );
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        let record = health_records.get(&worker_id("worker1")).unwrap();
+        assert!(matches!(record.state, HealthState::TerminatedConfirm));
+        assert_eq!(record.state_transited_at, previous_time); // No change
+    }
+
+    #[test]
+    fn test_invisible_on_infra_worker_transitions_to_terminated_confirm() {
+        // Case 8.8: InvisibleOnInfra worker transitions to TerminatedConfirm when reappears as Terminating
+        let start_time = Utc::now();
+        let previous_time = start_time - TimeDelta::minutes(1);
+        let context = create_test_context(start_time, TimeDelta::minutes(5), 3);
+
+        let mut health_records = HealthRecords::new();
+        health_records.insert(
+            worker_id("worker1"),
+            create_health_record(HealthState::InvisibleOnInfra, previous_time),
+        );
+
+        let worker_info = create_worker_info("worker1", WorkerInstanceState::Terminating);
+        let mut response_map = WorkerHealthResponseMap::new();
+        response_map.insert(worker_id("worker1"), (worker_info, None));
+
+        update_health_records(&context, &mut health_records, response_map).unwrap();
+
+        let record = health_records.get(&worker_id("worker1")).unwrap();
+        assert!(matches!(record.state, HealthState::TerminatedConfirm));
+        assert_eq!(record.state_transited_at, start_time);
+    }
+
+    // ========================================
+    // 9. Edge Cases
     // ========================================
 
     #[test]

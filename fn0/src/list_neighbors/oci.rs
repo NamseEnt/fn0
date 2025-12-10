@@ -5,11 +5,14 @@ use std::{str::FromStr, sync::Arc};
 
 pub struct OciListNeighbors {
     worker_port: u16,
-    oci_client: Arc<dyn oci_rust_sdk::VirtualNetwork>,
+    oci_client: Arc<dyn oci_rust_sdk::virtual_network::VirtualNetwork>,
 }
 
 impl OciListNeighbors {
-    pub fn new(worker_port: u16, oci_client: Arc<dyn oci_rust_sdk::VirtualNetwork>) -> Self {
+    pub fn new(
+        worker_port: u16,
+        oci_client: Arc<dyn oci_rust_sdk::virtual_network::VirtualNetwork>,
+    ) -> Self {
         Self {
             worker_port,
             oci_client,
