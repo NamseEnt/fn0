@@ -204,7 +204,7 @@ impl RequestSigner {
 
         // Sign with RSA PKCS#1 v1.5
         // Use unpadded signing since we already hashed the data
-        let padding = Pkcs1v15Sign::new_unprefixed();
+        let padding = Pkcs1v15Sign::new::<Sha256>();
         let signature = self
             .private_key
             .sign(padding, &hashed)
