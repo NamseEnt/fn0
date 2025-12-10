@@ -40,8 +40,12 @@ pub fn client<A: crate::core::auth::AuthProvider + 'static>(
     config: crate::core::ClientConfig<A>,
 ) -> Result<Arc<dyn Compute>> {
     let endpoint = config.region.endpoint("iaas");
-    let oci_client =
-        crate::core::OciClient::new(Arc::new(config.auth_provider), endpoint, config.timeout)?;
+    let oci_client = crate::core::OciClient::new(
+        Arc::new(config.auth_provider),
+        endpoint,
+        config.timeout,
+        config.retry,
+    )?;
     Ok(Arc::new(oci_client))
 }
 

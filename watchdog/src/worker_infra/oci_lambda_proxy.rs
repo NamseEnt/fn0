@@ -1,75 +1,44 @@
 use super::*;
-use base64::Engine;
+use crate::*;
 use futures::TryStreamExt;
-use oci_rust_sdk::{
-    compute::*,
-    core::{
-        auth::{SimpleAuthProvider, simple::SimpleAuthProviderRequiredFields},
-        region::Region,
-    },
-};
-use std::{env, net::IpAddr, str::FromStr, sync::Arc};
+use oci_rust_sdk::compute::*;
+use std::{env, net::IpAddr, str::FromStr};
 
-pub struct OciWorkerInfra {
-    compute: Arc<dyn Compute>,
+pub struct OciLambdaProxyWorkerInfra {
+    proxy: ::oci_lambda_proxy::OciLambdaProxy,
     compartment_id: String,
     instance_configuration_id: String,
 }
 
-impl OciWorkerInfra {
-    pub fn new() -> Self {
-        let private_key_base64 =
-            env::var("OCI_PRIVATE_KEY_BASE64").expect("env var OCI_PRIVATE_KEY_BASE64 is not set");
-        let user_id = env::var("OCI_USER_ID").expect("env var OCI_USER_ID is not set");
-        let fingerprint = env::var("OCI_FINGERPRINT").expect("env var OCI_FINGERPRINT is not set");
-        let tenancy_id = env::var("OCI_TENANCY_ID").expect("env var OCI_TENANCY_ID is not set");
-        let region = env::var("OCI_REGION").expect("env var OCI_REGION is not set");
+impl OciLambdaProxyWorkerInfra {
+    pub async fn new() -> Self {
         let compartment_id =
             env::var("OCI_COMPARTMENT_ID").expect("env var OCI_COMPARTMENT_ID is not set");
         let instance_configuration_id = env::var("OCI_INSTANCE_CONFIGURATION_ID")
             .expect("env var OCI_INSTANCE_CONFIGURATION_ID is not set");
-
-        let private_key = std::str::from_utf8(
-            &base64::engine::general_purpose::STANDARD_NO_PAD
-                .decode(private_key_base64)
-                .unwrap(),
-        )
-        .unwrap()
-        .to_string();
-
-        let region = Region::from_str(&region).unwrap_or_else(|_| {
-            panic!("invalid region {region}");
-        });
-
-        let auth_provider = SimpleAuthProvider::builder(SimpleAuthProviderRequiredFields {
-            tenancy: tenancy_id,
-            user: user_id,
-            fingerprint,
-            private_key,
-        })
-        .region(region)
-        .build();
-
-        let compute = oci_rust_sdk::compute::client(auth_provider, region).unwrap();
+        let fn_name = env::var("OCI_LAMBDA_PROXY_FN_NAME")
+            .expect("env var OCI_LAMBDA_PROXY_FN_NAME is not set");
+        let proxy = ::oci_lambda_proxy::OciLambdaProxy::new(fn_name).await;
         Self {
-            compute,
+            proxy,
             compartment_id,
             instance_configuration_id,
         }
     }
 }
 
-impl WorkerInfra for OciWorkerInfra {
+impl WorkerInfra for OciLambdaProxyWorkerInfra {
     fn get_worker_infos<'a>(
         &'a self,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<WorkerInfos>> + 'a + Send>> {
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<WorkerInfos>> + 'a + Send>> {
         Box::pin(async move {
             let mut infos = vec![];
             let mut page = None;
 
             loop {
+                println!("on loop top");
                 let response = self
-                    .compute
+                    .proxy
                     .list_instances(ListInstancesRequest {
                         compartment_id: self.compartment_id.clone(),
                         limit: None,
@@ -84,6 +53,7 @@ impl WorkerInfra for OciWorkerInfra {
                     })
                     .await?;
 
+                println!("got response with {} items", response.items.len());
                 infos.extend(response.items.into_iter().map(|instance| WorkerInfo {
                     id: WorkerId(instance.id),
                     ip: instance.freeform_tags.and_then(|tags| {
@@ -107,6 +77,7 @@ impl WorkerInfra for OciWorkerInfra {
                     instance_created: instance.time_created,
                 }));
 
+                println!("processed items, next page: {:?}", response.opc_next_page);
                 if let Some(next_page) = response.opc_next_page {
                     page = Some(next_page);
                 } else {
@@ -120,9 +91,9 @@ impl WorkerInfra for OciWorkerInfra {
     fn terminate<'a>(
         &'a self,
         worker_id: &'a WorkerId,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>> {
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<()>> + 'a + Send>> {
         Box::pin(async move {
-            self.compute
+            self.proxy
                 .terminate_instance(TerminateInstanceRequest {
                     instance_id: worker_id.0.clone(),
                     if_match: None,
@@ -137,11 +108,11 @@ impl WorkerInfra for OciWorkerInfra {
     fn launch_instances<'a>(
         &'a self,
         count: usize,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>> {
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<()>> + 'a + Send>> {
         Box::pin(async move {
             futures::stream::iter(0..count)
                 .map(|_| async move {
-                    self.compute
+                    self.proxy
                         .launch_instance_configuration(LaunchInstanceConfigurationRequest {
                             instance_configuration_id: self.instance_configuration_id.clone(),
                             instance_configuration: InstanceConfigurationInstanceDetails::Compute(
@@ -153,7 +124,7 @@ impl WorkerInfra for OciWorkerInfra {
                         })
                         .await?;
 
-                    anyhow::Ok(())
+                    color_eyre::eyre::Ok(())
                 })
                 .buffer_unordered(4)
                 .try_collect::<Vec<()>>()

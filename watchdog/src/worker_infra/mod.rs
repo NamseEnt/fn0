@@ -1,4 +1,4 @@
-pub mod oci;
+pub mod oci_lambda_proxy;
 
 use crate::WorkerId;
 use chrono::{DateTime, Utc};
@@ -12,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct WorkerInfo {
     pub id: WorkerId,
     pub ip: Option<IpAddr>,
@@ -20,7 +20,7 @@ pub struct WorkerInfo {
     pub instance_created: DateTime<Utc>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum WorkerInstanceState {
     Starting,
     Running,
@@ -33,25 +33,26 @@ pub type WorkerHealthResponseMap = BTreeMap<WorkerId, (WorkerInfo, Option<Worker
 pub trait WorkerInfra: Send + Sync {
     fn get_worker_infos<'a>(
         &'a self,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<WorkerInfos>> + 'a + Send>>;
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<WorkerInfos>> + 'a + Send>>;
 
     fn terminate<'a>(
         &'a self,
         worker_id: &'a WorkerId,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>>;
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<()>> + 'a + Send>>;
 
     fn launch_instances<'a>(
         &'a self,
         count: usize,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>>;
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<()>> + 'a + Send>>;
 }
 
 impl dyn WorkerInfra {
     pub async fn get_worker_health_responses(
         &self,
         domain: &str,
-    ) -> anyhow::Result<WorkerHealthResponseMap> {
+    ) -> color_eyre::Result<WorkerHealthResponseMap> {
         let workers_infos = self.get_worker_infos().await?;
+        println!("workers_infos: {workers_infos:?}");
         Ok(futures::stream::iter(workers_infos)
             .map(|worker_info| async move {
                 let Some(ip) = worker_info.ip else {
@@ -116,13 +117,13 @@ pub enum WorkerHealthKind {
 }
 
 impl FromStr for WorkerHealthKind {
-    type Err = anyhow::Error;
+    type Err = color_eyre::Report;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "good" => Ok(WorkerHealthKind::Good),
             "graceful_shutting_down" => Ok(WorkerHealthKind::GracefulShuttingDown),
-            _ => anyhow::bail!("invalid health response: {}", s),
+            _ => color_eyre::eyre::bail!("invalid health response: {}", s),
         }
     }
 }

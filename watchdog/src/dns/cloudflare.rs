@@ -1,4 +1,5 @@
 use super::*;
+use crate::*;
 use std::{env, net::IpAddr};
 
 pub struct CloudflareDns {
@@ -20,7 +21,7 @@ impl CloudflareDns {
                 .expect("env var CLOUDFLARE_API_TOKEN is not set"),
         }
     }
-    async fn list_records(&self) -> anyhow::Result<Vec<Record>> {
+    async fn list_records(&self) -> color_eyre::Result<Vec<Record>> {
         let url = format!(
             "https://api.cloudflare.com/client/v4/zones/{}/dns_records",
             self.zone_id
@@ -48,6 +49,7 @@ impl CloudflareDns {
             .get(url)
             .header("Authorization", format!("Bearer {}", self.api_token))
             .query(&params)
+            .timeout(DEFAULT_TIMEOUT)
             .send()
             .await?
             .text()
@@ -57,7 +59,7 @@ impl CloudflareDns {
 
         if !response.success {
             eprintln!("Failed to list records: {response:?}");
-            return Err(anyhow::anyhow!("Failed to list records"));
+            return Err(color_eyre::eyre::eyre!("Failed to list records"));
         }
 
         Ok(response
@@ -76,7 +78,7 @@ impl Dns for CloudflareDns {
     fn sync_ips<'a>(
         &'a self,
         ips: Vec<IpAddr>,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a + Send>> {
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<()>> + 'a + Send>> {
         Box::pin(async move {
             let old_records = self.list_records().await?;
 
@@ -125,6 +127,7 @@ impl Dns for CloudflareDns {
                         })
                         .collect(),
                 })?)
+                .timeout(DEFAULT_TIMEOUT)
                 .send()
                 .await?
                 .text()
@@ -144,8 +147,8 @@ mod tests {
     use super::*;
     use std::net::{Ipv4Addr, Ipv6Addr};
     use wiremock::{
-        matchers::{header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
+        matchers::{header, method, path, query_param},
     };
 
     fn setup_env() {
@@ -258,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_diff_logic_no_changes() {
-        let old_records = vec![
+        let old_records = [
             Record {
                 ip: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
                 id: "rec1".to_string(),
@@ -269,7 +272,7 @@ mod tests {
             },
         ];
 
-        let ips = vec![
+        let ips = [
             IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
         ];
@@ -291,12 +294,18 @@ mod tests {
 
     #[test]
     fn test_diff_logic_add_only() {
-        let old_records = vec![Record {
-            ip: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
-            id: "rec1".to_string(),
-        }];
+        let old_records = [
+            Record {
+                ip: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+                id: "rec1".to_string(),
+            },
+            Record {
+                ip: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+                id: "rec2".to_string(),
+            },
+        ];
 
-        let ips = vec![
+        let ips = [
             IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
         ];
@@ -318,7 +327,7 @@ mod tests {
 
     #[test]
     fn test_diff_logic_delete_only() {
-        let old_records = vec![
+        let old_records = [
             Record {
                 ip: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
                 id: "rec1".to_string(),
@@ -329,7 +338,7 @@ mod tests {
             },
         ];
 
-        let ips = vec![IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))];
+        let ips = [IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))];
 
         let new_ips: Vec<_> = ips
             .iter()
@@ -343,21 +352,18 @@ mod tests {
 
         assert_eq!(new_ips.len(), 0, "Delete only: no IPs to add");
         assert_eq!(deleted_ips.len(), 1, "Delete only: 1 record deleted");
-        assert_eq!(
-            deleted_ips[0].ip,
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))
-        );
+        assert_eq!(deleted_ips[0].ip, IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)));
         assert_eq!(deleted_ips[0].id, "rec2");
     }
 
     #[test]
     fn test_diff_logic_replace() {
-        let old_records = vec![Record {
+        let old_records = [Record {
             ip: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
             id: "rec1".to_string(),
         }];
 
-        let ips = vec![IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))];
+        let ips = [IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))];
 
         let new_ips: Vec<_> = ips
             .iter()
@@ -372,15 +378,12 @@ mod tests {
         assert_eq!(new_ips.len(), 1, "Replace: 1 IP added");
         assert_eq!(*new_ips[0], IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)));
         assert_eq!(deleted_ips.len(), 1, "Replace: 1 record deleted");
-        assert_eq!(
-            deleted_ips[0].ip,
-            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))
-        );
+        assert_eq!(deleted_ips[0].ip, IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
     }
 
     #[test]
     fn test_diff_logic_complex() {
-        let old_records = vec![
+        let old_records = [
             Record {
                 ip: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
                 id: "rec1".to_string(),
@@ -391,9 +394,9 @@ mod tests {
             },
         ];
 
-        let ips = vec![
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),       // Keep
-            IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1)),     // Add
+        let ips = [
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),   // Keep
+            IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1)), // Add
         ];
 
         let new_ips: Vec<_> = ips
@@ -409,10 +412,7 @@ mod tests {
         assert_eq!(new_ips.len(), 1, "Complex: 1 IP added");
         assert_eq!(*new_ips[0], IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1)));
         assert_eq!(deleted_ips.len(), 1, "Complex: 1 record deleted");
-        assert_eq!(
-            deleted_ips[0].ip,
-            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))
-        );
+        assert_eq!(deleted_ips[0].ip, IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
     }
 
     // ========================================

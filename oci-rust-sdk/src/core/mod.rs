@@ -6,7 +6,7 @@ pub mod client;
 
 pub use error::{OciError, Result};
 pub use client::OciClient;
-pub use retry::{Retrier, RetryConfiguration};
+pub use retry::{Retrier, RetryConfig};
 
 use std::time::Duration;
 
@@ -14,4 +14,5 @@ pub struct ClientConfig<A: auth::AuthProvider + 'static> {
     pub auth_provider: A,
     pub region: region::Region,
     pub timeout: Duration,
+    pub retry: RetryConfig,
 }

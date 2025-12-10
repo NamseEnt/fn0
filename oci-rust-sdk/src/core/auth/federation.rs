@@ -64,11 +64,9 @@ pub fn generate_session_keypair() -> crate::core::Result<SessionKeyPair> {
         })?
         .to_string();
 
-    let public_key_pem = public_key
-        .to_public_key_pem(LineEnding::LF)
-        .map_err(|e| {
-            crate::core::OciError::AuthError(format!("Failed to encode public key: {}", e))
-        })?;
+    let public_key_pem = public_key.to_public_key_pem(LineEnding::LF).map_err(|e| {
+        crate::core::OciError::AuthError(format!("Failed to encode public key: {}", e))
+    })?;
 
     Ok(SessionKeyPair {
         private_key_pem,
@@ -86,7 +84,7 @@ pub async fn request_security_token(
     intermediate_certs_pem: &[String],
     session_public_key_pem: &str,
 ) -> crate::core::Result<SecurityToken> {
-    let endpoint = format!("https://auth.{}.oraclecloud.com/v1/x509", region.id());
+    let endpoint = format!("https://auth.{region}.oraclecloud.com/v1/x509");
 
     // Parse leaf private key for signing
     let leaf_private_key = RsaPrivateKey::from_pkcs8_pem(leaf_key_pem).map_err(|e| {
@@ -104,10 +102,9 @@ pub async fn request_security_token(
         purpose: "DEFAULT".to_string(),
     };
 
-    let body_json =
-        serde_json::to_string(&request_body).map_err(|e| {
-            crate::core::OciError::AuthError(format!("Failed to serialize request: {}", e))
-        })?;
+    let body_json = serde_json::to_string(&request_body).map_err(|e| {
+        crate::core::OciError::AuthError(format!("Failed to serialize request: {}", e))
+    })?;
 
     // Retry logic
     let client = Client::builder()
@@ -186,17 +183,16 @@ async fn make_federation_request(
 
     headers.insert(
         "content-type",
-        "application/json"
-            .parse()
-            .map_err(|e| crate::core::OciError::AuthError(format!("Invalid content-type: {}", e)))?,
+        "application/json".parse().map_err(|e| {
+            crate::core::OciError::AuthError(format!("Invalid content-type: {}", e))
+        })?,
     );
 
     headers.insert(
         "content-length",
-        body_json.len()
-            .to_string()
-            .parse()
-            .map_err(|e| crate::core::OciError::AuthError(format!("Invalid content-length: {}", e)))?,
+        body_json.len().to_string().parse().map_err(|e| {
+            crate::core::OciError::AuthError(format!("Invalid content-length: {}", e))
+        })?,
     );
 
     // Calculate SHA256 of body
@@ -207,9 +203,9 @@ async fn make_federation_request(
 
     headers.insert(
         "x-content-sha256",
-        b64_hash
-            .parse()
-            .map_err(|e| crate::core::OciError::AuthError(format!("Invalid sha256 header: {}", e)))?,
+        b64_hash.parse().map_err(|e| {
+            crate::core::OciError::AuthError(format!("Invalid sha256 header: {}", e))
+        })?,
     );
 
     // Sign the request
@@ -313,9 +309,9 @@ fn sign_federation_request(
 
     headers.insert(
         "authorization",
-        auth_header
-            .parse()
-            .map_err(|e| crate::core::OciError::SigningError(format!("Invalid authorization header: {}", e)))?,
+        auth_header.parse().map_err(|e| {
+            crate::core::OciError::SigningError(format!("Invalid authorization header: {}", e))
+        })?,
     );
 
     Ok(())
@@ -393,15 +389,13 @@ MIIC...
     #[test]
     fn test_parse_jwt_token() {
         // Sample JWT with exp claim (not a real token, just for testing structure)
-        let token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDQwNjcyMDAsInN1YiI6InRlc3QifQ.test";
+        let token =
+            "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDQwNjcyMDAsInN1YiI6InRlc3QifQ.test";
 
         let result = parse_security_token(token.to_string()).unwrap();
         assert_eq!(result.token, token);
         // exp: 1704067200 = 2024-01-01 00:00:00 UTC
-        assert_eq!(
-            result.expires_at.to_rfc3339(),
-            "2024-01-01T00:00:00+00:00"
-        );
+        assert_eq!(result.expires_at.to_rfc3339(), "2024-01-01T00:00:00+00:00");
     }
 
     #[test]

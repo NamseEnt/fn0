@@ -1,4 +1,5 @@
 use crate::compute::models::*;
+use serde::{Deserialize, Serialize};
 
 /// Required fields for ListInstancesRequest
 pub struct ListInstancesRequestRequiredFields {
@@ -7,7 +8,8 @@ pub struct ListInstancesRequestRequiredFields {
 }
 
 /// Request to list compute instances
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ListInstancesRequest {
     /// Required: The OCID of the compartment
     pub compartment_id: String,
@@ -157,7 +159,8 @@ impl ListInstancesRequestBuilder {
 }
 
 /// Response from listing instances
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ListInstancesResponse {
     /// The list of instances
     pub items: Vec<Instance>,

@@ -1,7 +1,9 @@
 use crate::compute::models::{Instance, InstanceConfigurationInstanceDetails};
+use serde::{Deserialize, Serialize};
 
 /// Request for launching an instance from an instance configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LaunchInstanceConfigurationRequest {
     /// The OCID of the instance configuration.
     pub instance_configuration_id: String,
@@ -59,7 +61,8 @@ impl LaunchInstanceConfigurationRequestBuilder {
 }
 
 /// Response from launching an instance configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LaunchInstanceConfigurationResponse {
     /// The launched instance.
     pub instance: Instance,
