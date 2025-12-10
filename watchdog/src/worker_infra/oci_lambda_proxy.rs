@@ -121,11 +121,15 @@ impl WorkerInfra for OciLambdaProxyWorkerInfra {
                             instance_configuration_id: self.instance_configuration_id.clone(),
                             instance_configuration: InstanceConfigurationInstanceDetails::Compute(
                                 ComputeInstanceDetails {
-                                    launch_details: Some(InstanceConfigurationLaunchInstanceDetails {
-                                        availability_domain: Some(self.availability_domain.clone()),
-                                        compartment_id: Some(self.compartment_id.clone()),
-                                        ..Default::default()
-                                    }),
+                                    launch_details: Some(
+                                        InstanceConfigurationLaunchInstanceDetails {
+                                            availability_domain: Some(
+                                                self.availability_domain.clone(),
+                                            ),
+                                            compartment_id: Some(self.compartment_id.clone()),
+                                            ..Default::default()
+                                        },
+                                    ),
                                     ..Default::default()
                                 },
                             ),
