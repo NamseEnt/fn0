@@ -48,7 +48,7 @@ use crate::{
         HealthRecords, HealthState, get_healthy_ips, get_workers_to_terminate,
         update_health_records,
     },
-    worker_infra::{WorkerHealthResponseMap, WorkerInstanceState},
+    worker_infra::WorkerHealthResponseMap,
 };
 use chrono::{DateTime, Duration, Utc};
 use color_eyre::config::Theme;
@@ -227,25 +227,44 @@ async fn try_scale_out(
     worker_health_response_map: WorkerHealthResponseMap,
     worker_infra: &dyn WorkerInfra,
 ) -> color_eyre::Result<()> {
-    let starting_workers = worker_health_response_map
-        .values()
-        .filter(|(info, _status)| matches!(info.instance_state, WorkerInstanceState::Starting))
-        .map(|(info, _status)| info);
+    let starting_workers = health_records.iter().filter_map(|(worker_id, record)| {
+        if let HealthState::Starting = record.state {
+            Some(worker_id.clone())
+        } else {
+            None
+        }
+    });
 
     let (old_starting_workers, fresh_starting_workers): (Vec<_>, Vec<_>) = starting_workers
-        .partition(|info| context.start_time - info.instance_created > context.max_start_timeout);
-
-    let terminate_olds =
-        futures::stream::iter(old_starting_workers).for_each_concurrent(16, |info| async move {
-            let _ = worker_infra.terminate(&info.id).await;
+        .partition(|worker_id| {
+            let (info, _response) = worker_health_response_map.get(worker_id).unwrap();
+            context.start_time - info.instance_created > context.max_start_timeout
         });
 
-    let start_new = async move {
-        println!(
-            "Still have {} fresh starting workers",
-            fresh_starting_workers.len()
-        );
+    let alive_worker_len = health_records
+        .iter()
+        .filter(|(_, record)| match record.state {
+            HealthState::Starting
+            | HealthState::Healthy { .. }
+            | HealthState::RetryingCheck { .. }
+            | HealthState::MarkedForTermination
+            | HealthState::GracefulShuttingDown => true,
+            HealthState::TerminatedConfirm | HealthState::InvisibleOnInfra => false,
+        })
+        .count();
 
+    println!("alive_worker_len: {alive_worker_len}");
+    println!("old_starting_workers: {old_starting_workers:?}");
+    println!("fresh_starting_workers: {fresh_starting_workers:?}");
+
+    let terminate_olds = futures::stream::iter(old_starting_workers).for_each_concurrent(
+        16,
+        |worker_id| async move {
+            let _ = worker_infra.terminate(&worker_id).await;
+        },
+    );
+
+    let start_new = async move {
         let Some(left_starting_count) = context
             .max_starting_count
             .checked_sub(fresh_starting_workers.len())
@@ -256,16 +275,12 @@ async fn try_scale_out(
         println!("left_starting_count: {left_starting_count}");
 
         if left_starting_count == 0 {
-            println!("No more starting workers allowed");
+            println!("left_starting_count == 0. No more starting workers allowed");
             return Ok(());
         }
 
-        let helathy_count = health_records
-            .iter()
-            .filter(|(_, record)| matches!(record.state, HealthState::Healthy { .. }))
-            .count();
-
-        if helathy_count > 0 {
+        if alive_worker_len >= 1 {
+            println!("alive_worker_len >= 1. No space to launch new worker instance");
             return Ok(());
         }
 
