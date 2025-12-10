@@ -48,7 +48,7 @@ impl<T: Clone + Send + Sync + 'static, E> S3AdaptCache<T, E> {
         &self,
         key: &str,
         if_none_match: Option<String>,
-    ) -> color_eyre::Result<(Bytes, String)> {
+    ) -> anyhow::Result<(Bytes, String)> {
         let mut req = self.client.get_object().bucket(&self.bucket).key(key);
 
         if let Some(etag) = if_none_match {

@@ -1,16 +1,15 @@
 use super::*;
-use color_eyre::eyre::{self, Context};
-use oci_rust_sdk::virtual_network::{Lifetime, ListPublicIpsRequest, Scope, VirtualNetwork};
+use oci_rust_sdk::virtual_network::{Lifetime, ListPublicIpsRequest, Scope};
 use sonic_rs::JsonValueTrait;
 use std::{str::FromStr, sync::Arc};
 
 pub struct OciListNeighbors {
     worker_port: u16,
-    oci_client: Arc<dyn VirtualNetwork>,
+    oci_client: Arc<dyn oci_rust_sdk::VirtualNetwork>,
 }
 
 impl OciListNeighbors {
-    pub fn new(worker_port: u16, oci_client: Arc<dyn VirtualNetwork>) -> Self {
+    pub fn new(worker_port: u16, oci_client: Arc<dyn oci_rust_sdk::VirtualNetwork>) -> Self {
         Self {
             worker_port,
             oci_client,
@@ -20,7 +19,7 @@ impl OciListNeighbors {
     async fn list_public_ips(
         &self,
         compartment_id: String,
-    ) -> Result<Vec<std::net::IpAddr>, eyre::Error> {
+    ) -> Result<Vec<std::net::IpAddr>, anyhow::Error> {
         let mut ips = vec![];
         let mut next_page = None;
 
@@ -55,14 +54,9 @@ impl OciListNeighbors {
 }
 
 impl ListNeighbors for OciListNeighbors {
-    async fn list_neighbors(&self) -> Result<Vec<std::net::IpAddr>, eyre::Error> {
-        let compartment_id = get_compartment_id()
-            .await
-            .context("failed to retrieve compartment ID from OCI metadata service")?;
-        let public_ips = self
-            .list_public_ips(compartment_id)
-            .await
-            .context("failed to list public IPs from OCI")?;
+    async fn list_neighbors(&self) -> Result<Vec<std::net::IpAddr>, anyhow::Error> {
+        let compartment_id = get_compartment_id().await?;
+        let public_ips = self.list_public_ips(compartment_id).await?;
 
         let worker_port = self.worker_port;
         let futures = public_ips.into_iter().map(move |ip| async move {
@@ -71,11 +65,10 @@ impl ListNeighbors for OciListNeighbors {
                 .text()
                 .await?
                 == "worker";
-            Ok::<Option<IpAddr>, eyre::Error>(is_worker.then_some(ip))
+            Ok::<Option<IpAddr>, anyhow::Error>(is_worker.then_some(ip))
         });
         let neighbors = futures::future::try_join_all(futures)
-            .await
-            .context("failed to check worker roles for neighbor IPs")?
+            .await?
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
@@ -84,28 +77,20 @@ impl ListNeighbors for OciListNeighbors {
     }
 }
 
-async fn check_role_worker(ip: IpAddr, worker_port: u16) -> Result<bool, eyre::Error> {
+async fn check_role_worker(ip: IpAddr, worker_port: u16) -> Result<bool, anyhow::Error> {
     Ok(reqwest::get(format!("http://{}:{}/role", ip, worker_port))
-        .await
-        .context("failed to send HTTP request to worker role endpoint")?
+        .await?
         .text()
-        .await
-        .context("failed to read response body from worker role endpoint")?
+        .await?
         == "worker")
 }
 
-async fn get_compartment_id() -> Result<String, eyre::Error> {
+async fn get_compartment_id() -> Result<String, anyhow::Error> {
     let text = reqwest::get("http://169.254.169.254/opc/v2/instance/")
-        .await
-        .context("failed to fetch OCI instance metadata")?
+        .await?
         .text()
-        .await
-        .context("failed to read OCI metadata response body")?;
-    let object: sonic_rs::Object =
-        sonic_rs::from_str(&text).context("failed to parse OCI metadata JSON")?;
-    let compartment_id = object
-        .get(&"compartmentId")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| eyre::eyre!("compartmentId not found in OCI metadata"))?;
+        .await?;
+    let object: sonic_rs::Object = sonic_rs::from_str(&text)?;
+    let compartment_id = object.get(&"compartmentId").unwrap().as_str().unwrap();
     Ok(compartment_id.to_string())
 }

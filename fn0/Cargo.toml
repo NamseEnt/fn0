@@ -21,6 +21,7 @@ hyper-util = { version = "0.1", features = ["service"] }
 tower = { version = "0.5.2", features = ["timeout", "util"] }
 tower-http = { version = "0.6.7", features = ["timeout"] }
 bytes = "1"
+anyhow = "1"
 http-body-util = "0.1"
 sysinfo = "0.37.2"
 oci-rust-sdk = { path = "../oci-rust-sdk", features = ["virtual_network"] }
@@ -30,8 +31,6 @@ reqwest = { version = "0.12.24", default-features = false, features = [
 ] }
 sonic-rs = "0.5.6"
 futures = "0.3.31"
-clap = "4.5.53"
-color-eyre = "0.6.5"
 
 [dev-dependencies]
 wasmtime = { version = "39", features = [

@@ -5,7 +5,6 @@ mod on_fn_call;
 mod warm_up_map;
 
 use crate::execute::Response;
-use color_eyre::eyre;
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::server::conn::http1;
@@ -22,12 +21,10 @@ use tower_http::timeout::TimeoutLayer;
 use wasmtime_wasi_http::bindings::http::types::ErrorCode;
 use wasmtime_wasi_http::body::HyperOutgoingBody;
 
-fn main() -> eyre::Result<()> {
-    color_eyre::install()?;
+fn main() {
     tokio::runtime::Runtime::new()
         .unwrap()
         .block_on(real_main());
-    Ok(())
 }
 
 async fn real_main() {
