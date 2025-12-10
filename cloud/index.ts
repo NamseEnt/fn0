@@ -61,3 +61,5 @@ const awsWatchdog = new fn0.AwsWatchdog("awsWatchdog", {
     CLOUDFLARE_ZONE_ID: zoneId,
   },
 });
+
+export const watchdogLambdaFunctionName = awsWatchdog.lambdaFunctionName;

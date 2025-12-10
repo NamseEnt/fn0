@@ -23,10 +23,12 @@ export interface CloudflareEnvs {
 }
 
 export class AwsWatchdog extends pulumi.ComponentResource {
+  public readonly lambdaFunctionName: pulumi.Output<string>;
+
   constructor(
     name: string,
     args: AwsWatchdogArgs,
-    opts: pulumi.ComponentResourceOptions
+    opts?: pulumi.ComponentResourceOptions
   ) {
     super("pkg:index:aws-watchdog", name, args, opts);
 
@@ -154,6 +156,11 @@ export class AwsWatchdog extends pulumi.ComponentResource {
     //   rule: eventRule.name,
     //   arn: lambdaFunction.arn,
     // });
+
+    this.lambdaFunctionName = lambdaFunction.name;
+    this.registerOutputs({
+      lambdaFunctionName: this.lambdaFunctionName,
+    });
   }
 }
 
