@@ -9,10 +9,6 @@ const zoneId = config.require("CLOUDFLARE_ZONE_ID");
 const domain = config.require("DOMAIN");
 const awsWatchdogRegion = config.require("AWS_WATCHDOG_REGION");
 
-const zone = cloudflare.getZone({
-  zoneId,
-});
-
 const apiTokenPermissionGroups =
   cloudflare.getAccountApiTokenPermissionGroupsList({
     accountId,
@@ -62,6 +58,6 @@ const awsWatchdog = new fn0.AwsWatchdog("awsWatchdog", {
   cloudflareEnvs: {
     CLOUDFLARE_API_TOKEN: cloudflareApiToken.value,
     CLOUDFLARE_ASTERISK_DOMAIN: `*.${domain}`,
-    CLOUDFLARE_ZONE_ID: zone.then((x) => x.id),
+    CLOUDFLARE_ZONE_ID: zoneId,
   },
 });

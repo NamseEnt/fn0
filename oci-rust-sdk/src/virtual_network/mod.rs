@@ -26,6 +26,7 @@ pub fn client<A: crate::core::auth::AuthProvider + 'static>(
         Arc::new(config.auth_provider),
         endpoint,
         config.timeout,
+        config.retry,
     )?;
     Ok(Arc::new(oci_client))
 }

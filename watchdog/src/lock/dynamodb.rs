@@ -1,5 +1,6 @@
 use super::*;
-use aws_config::BehaviorVersion;
+use crate::*;
+use aws_config::{BehaviorVersion, timeout::TimeoutConfig};
 use aws_sdk_dynamodb::{
     operation::put_item::{PutItemError, builders::PutItemFluentBuilder},
     types::AttributeValue,
@@ -13,14 +14,23 @@ pub struct DynamoDbLock {
 
 impl DynamoDbLock {
     pub async fn new() -> Self {
-        let sdk_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+        let sdk_config = aws_config::defaults(BehaviorVersion::latest())
+            .timeout_config(
+                TimeoutConfig::builder()
+                    .operation_timeout(DEFAULT_TIMEOUT)
+                    .operation_attempt_timeout(DEFAULT_TIMEOUT)
+                    .read_timeout(DEFAULT_TIMEOUT)
+                    .build(),
+            )
+            .load()
+            .await;
         Self {
             client: aws_sdk_dynamodb::Client::new(&sdk_config),
             table_name: std::env::var("LOCK_TABLE_NAME")
                 .expect("env var LOCK_TABLE_NAME is not set"),
         }
     }
-    async fn on_no_item(&self, start_time: &DateTime<Utc>) -> Result<bool, anyhow::Error> {
+    async fn on_no_item(&self, start_time: &DateTime<Utc>) -> Result<bool, color_eyre::Report> {
         match self
             .put_item_builder(start_time)
             .condition_expression("attribute_not_exists(master_lock)")
@@ -43,7 +53,10 @@ impl DynamoDbLock {
             .put_item()
             .table_name(&self.table_name)
             .item("master_lock", AttributeValue::S("_".to_string()))
-            .item("last_start_time", AttributeValue::N(start_time.timestamp().to_string()))
+            .item(
+                "last_start_time",
+                AttributeValue::N(start_time.timestamp().to_string()),
+            )
     }
 }
 
@@ -51,7 +64,7 @@ impl Lock for DynamoDbLock {
     fn try_lock<'a>(
         &'a self,
         context: &'a crate::Context,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<bool>> + 'a + Send>> {
+    ) -> Pin<Box<dyn Future<Output = color_eyre::Result<bool>> + 'a + Send>> {
         Box::pin(async move {
             let response = self
                 .client

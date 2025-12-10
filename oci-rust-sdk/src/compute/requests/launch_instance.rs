@@ -1,4 +1,5 @@
 use crate::compute::models::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Required fields for LaunchInstanceRequest
@@ -8,7 +9,8 @@ pub struct LaunchInstanceRequestRequiredFields {
 }
 
 /// Request to launch a new compute instance
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LaunchInstanceRequest {
     /// Details for launching the instance
     pub launch_instance_details: LaunchInstanceDetails,
@@ -104,7 +106,8 @@ impl LaunchInstanceDetailsBuilderWrapper {
 }
 
 /// Response from launching an instance
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LaunchInstanceResponse {
     /// The launched instance
     pub instance: Instance,

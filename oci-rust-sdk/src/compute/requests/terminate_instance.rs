@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 /// Required fields for TerminateInstanceRequest
 pub struct TerminateInstanceRequestRequiredFields {
     /// The OCID of the instance
@@ -5,7 +7,8 @@ pub struct TerminateInstanceRequestRequiredFields {
 }
 
 /// Request to terminate a compute instance
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TerminateInstanceRequest {
     /// The OCID of the instance (required)
     pub instance_id: String,
@@ -22,7 +25,9 @@ pub struct TerminateInstanceRequest {
 
 impl TerminateInstanceRequest {
     /// Create a new builder for TerminateInstanceRequest
-    pub fn builder(required: TerminateInstanceRequestRequiredFields) -> TerminateInstanceRequestBuilder {
+    pub fn builder(
+        required: TerminateInstanceRequestRequiredFields,
+    ) -> TerminateInstanceRequestBuilder {
         TerminateInstanceRequestBuilder {
             request: TerminateInstanceRequest {
                 instance_id: required.instance_id,
@@ -94,7 +99,8 @@ impl TerminateInstanceRequestBuilder {
 }
 
 /// Response from terminating an instance
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TerminateInstanceResponse {
     /// Unique Oracle-assigned identifier for the request
     pub opc_request_id: Option<String>,

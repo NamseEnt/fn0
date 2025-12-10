@@ -46,6 +46,31 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       description: "fn0 watchdog user",
     });
 
+    const apiKey = new oci.identity.ApiKey("watchdog-api-key", {
+      userId: oci_user.id,
+      keyValue: privateKey.publicKeyPem,
+    });
+
+    const group = new oci.identity.Group("watchdog-group", {
+      description: "fn0 watchdog group",
+    });
+
+    new oci.identity.UserGroupMembership("watchdog-user-group-membership", {
+      userId: oci_user.id,
+      groupId: group.id,
+    });
+
+    new oci.identity.Policy("watchdog-policy", {
+      compartmentId: compartment.id,
+      description: "Policy for fn0 watchdog",
+      statements: [
+        pulumi.interpolate`Allow group ${group.name} to manage instance-family in compartment id ${compartment.id}`,
+        pulumi.interpolate`Allow group ${group.name} to use instance-configurations in compartment id ${compartment.id}`,
+        pulumi.interpolate`Allow group ${group.name} to read virtual-network-family in compartment id ${compartment.id}`,
+        pulumi.interpolate`Allow group ${group.name} to read app-catalog-listing in compartment id ${compartment.id}`,
+      ],
+    });
+
     const vcn = new oci.core.Vcn("vcn", {
       compartmentId: compartment.id,
       isIpv6enabled: true,
@@ -99,7 +124,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       ],
     });
 
-    new oci.core.Subnet("subnet", {
+    const subnet = new oci.core.Subnet("subnet", {
       compartmentId: compartment.id,
       vcnId: vcn.id,
       ipv4cidrBlocks: ["10.0.0.0/24"],
@@ -149,6 +174,11 @@ export class OciComputeWorker extends pulumi.ComponentResource {
               sourceType: "image",
               imageId,
             },
+            createVnicDetails: {
+              subnetId: subnet.id,
+              assignIpv6ip: true,
+              assignPublicIp: true,
+            },
           },
         },
       }
@@ -157,16 +187,26 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     this.instanceConfigurationId = instanceConfiguration.id;
 
     this.infraEnvs = pulumi
-      .all([privateKey, oci_user, compartment, instanceConfiguration])
-      .apply(([privateKey, oci_user, compartment, instanceConfiguration]) => ({
-        OCI_PRIVATE_KEY_BASE64: privateKey.privateKeyPem,
-        OCI_USER_ID: oci_user.id,
-        OCI_FINGERPRINT: privateKey.publicKeyFingerprintMd5,
-        OCI_TENANCY_ID: oci_user.compartmentId,
-        OCI_REGION: pulumi.output(args.region),
-        OCI_COMPARTMENT_ID: compartment.id,
-        OCI_INSTANCE_CONFIGURATION_ID: instanceConfiguration.id,
-      }));
+      .all([privateKey, oci_user, compartment, instanceConfiguration, apiKey])
+      .apply(
+        ([
+          privateKey,
+          oci_user,
+          compartment,
+          instanceConfiguration,
+          apiKey,
+        ]) => ({
+          OCI_PRIVATE_KEY_BASE64: privateKey.privateKeyPemPkcs8.apply((x) =>
+            Buffer.from(x).toString("base64")
+          ),
+          OCI_USER_ID: oci_user.id,
+          OCI_FINGERPRINT: apiKey.fingerprint,
+          OCI_TENANCY_ID: oci_user.compartmentId,
+          OCI_REGION: pulumi.output(args.region),
+          OCI_COMPARTMENT_ID: compartment.id,
+          OCI_INSTANCE_CONFIGURATION_ID: instanceConfiguration.id,
+        })
+      );
   }
 }
 

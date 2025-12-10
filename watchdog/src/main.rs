@@ -51,11 +51,13 @@ use crate::{
     worker_infra::{WorkerHealthResponseMap, WorkerInstanceState},
 };
 use chrono::{DateTime, Duration, Utc};
+use color_eyre::config::Theme;
 use futures::{FutureExt, StreamExt};
 use health_recorder::HealthRecorder;
+use lambda_runtime::{LambdaEvent, service_fn, tracing};
 use lock::Lock;
 use std::{env, sync::Arc};
-use worker_infra::{WorkerInfra, oci::OciWorkerInfra};
+use worker_infra::{WorkerInfra, oci_lambda_proxy::OciLambdaProxyWorkerInfra};
 
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -64,37 +66,65 @@ use worker_infra::{WorkerInfra, oci::OciWorkerInfra};
 #[serde(transparent)]
 struct WorkerId(String);
 
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
 fn main() {
+    color_eyre::config::HookBuilder::new()
+        .theme(Theme::new())
+        .capture_span_trace_by_default(false)
+        .add_default_filters()
+        .add_frame_filter(Box::new(|frames| {
+            frames.retain(|frame| {
+                let Some(path) = &frame.filename else {
+                    return false;
+                };
+                !path.to_string_lossy().contains(".cargo")
+                    && !path.to_string_lossy().contains(".rustup")
+            });
+        }))
+        .install()
+        .unwrap();
+    tracing::init_default_subscriber();
+
     tokio::runtime::Runtime::new().unwrap().block_on(async {
-        let context = Context::new();
+        let func = service_fn(|event: LambdaEvent<serde_json::Value>| async move {
+            tracing::info!(?event);
+            let context = Context::new();
 
-        let lock_at = env::var("LOCK_AT").expect("env var LOCK_AT is not set");
-        let lock: Arc<dyn Lock> = match lock_at.as_str() {
-            "dynamodb" => Arc::new(lock::dynamodb::DynamoDbLock::new().await),
-            _ => panic!("unknown lock type {lock_at}"),
-        };
+            let lock_at = env::var("LOCK_AT").expect("env var LOCK_AT is not set");
+            let lock: Arc<dyn Lock> = match lock_at.as_str() {
+                "dynamodb" => Arc::new(lock::dynamodb::DynamoDbLock::new().await),
+                _ => panic!("unknown lock type {lock_at}"),
+            };
 
-        let health_recorder_at =
-            env::var("HEALTH_RECORDER_AT").expect("env var HEALTH_RECORDER_AT is not set");
-        let health_recorder: Arc<dyn HealthRecorder> = match health_recorder_at.as_str() {
-            "s3" => Arc::new(health_recorder::s3::S3HealthRecorder::new().await),
-            _ => panic!("unknown health recorder type {health_recorder_at}"),
-        };
+            let health_recorder_at =
+                env::var("HEALTH_RECORDER_AT").expect("env var HEALTH_RECORDER_AT is not set");
+            let health_recorder: Arc<dyn HealthRecorder> = match health_recorder_at.as_str() {
+                "s3" => Arc::new(health_recorder::s3::S3HealthRecorder::new().await),
+                _ => panic!("unknown health recorder type {health_recorder_at}"),
+            };
 
-        let worker_infra_at =
-            env::var("WORKER_INFRA_AT").expect("env var WORKER_INFRA_AT is not set");
-        let worker_infra: Arc<dyn WorkerInfra> = match worker_infra_at.as_str() {
-            "oci" => Arc::new(OciWorkerInfra::new()),
-            _ => panic!("unknown worker infra type {worker_infra_at}"),
-        };
+            let worker_infra_at =
+                env::var("WORKER_INFRA_AT").expect("env var WORKER_INFRA_AT is not set");
+            println!("worker_infra_at: {worker_infra_at}");
+            let worker_infra: Arc<dyn WorkerInfra> = match worker_infra_at.as_str() {
+                "oci" => Arc::new(OciLambdaProxyWorkerInfra::new().await),
+                _ => panic!("unknown worker infra type {worker_infra_at}"),
+            };
 
-        let dns_at = env::var("DNS_AT").expect("env var DNS_AT is not set");
-        let dns: Arc<dyn Dns> = match dns_at.as_str() {
-            "cloudflare" => Arc::new(dns::cloudflare::CloudflareDns::new().await),
-            _ => panic!("unknown dns type {dns_at}"),
-        };
-
-        let _result = run_watchdog(&context, lock, health_recorder, worker_infra, dns).await;
+            let dns_at = env::var("DNS_AT").expect("env var DNS_AT is not set");
+            let dns: Arc<dyn Dns> = match dns_at.as_str() {
+                "cloudflare" => Arc::new(dns::cloudflare::CloudflareDns::new().await),
+                _ => panic!("unknown dns type {dns_at}"),
+            };
+            run_watchdog(&context, lock, health_recorder, worker_infra, dns)
+                .await
+                .map_err(|err| {
+                    tracing::error!(?err);
+                    lambda_runtime::Error::from(err)
+                })
+        });
+        lambda_runtime::run(func).await.unwrap();
     });
 }
 
@@ -104,52 +134,82 @@ async fn run_watchdog(
     health_recorder: Arc<dyn HealthRecorder>,
     worker_infra: Arc<dyn WorkerInfra>,
     dns: Arc<dyn Dns>,
-) -> anyhow::Result<()> {
+) -> color_eyre::Result<()> {
     if !lock.try_lock(context).await? {
         println!("Failed to get lock");
         return Ok(());
     }
+    println!("lock acquired");
 
     let (mut health_records, worker_health_response_map) = futures::try_join!(
-        health_recorder.read_all(),
-        worker_infra.get_worker_health_responses(&context.domain)
+        health_recorder.read_all().then(|result| async {
+            if result.is_ok() {
+                println!("health_recorder.read_all() completed");
+            }
+            result
+        }),
+        worker_infra
+            .get_worker_health_responses(&context.domain)
+            .then(|result| async {
+                if result.is_ok() {
+                    println!("worker_infra.get_worker_health_responses() completed");
+                }
+                result
+            })
     )?;
 
-    update_health_records(
+    match update_health_records(
         context,
         &mut health_records,
         worker_health_response_map.clone(),
-    )?;
+    ) {
+        Ok(_) => {
+            println!("Successfully updated health records");
+        }
+        Err(e) => {
+            eprintln!("Failed to update health records: {e}");
+            return Ok(());
+        }
+    };
 
     let workers_to_terminate = get_workers_to_terminate(&health_records);
+    println!("workers to terminate: {:?}", workers_to_terminate);
     let helathy_ips = get_healthy_ips(&health_records);
+    println!("healthy ips: {:?}", helathy_ips);
 
     futures::join!(
         health_recorder
             .write_all(health_records.clone())
             .then(|result| async {
-                if let Err(err) = result {
-                    eprintln!("Failed to write health records: {err}");
+                match result {
+                    Ok(_) => println!("Successfully wrote health records"),
+                    Err(err) => eprintln!("Failed to write health records: {err}"),
                 }
             }),
         try_scale_out(
             context,
-            health_records,
+            health_records.clone(),
             worker_health_response_map,
             worker_infra.as_ref(),
         )
         .then(|result| async {
-            if let Err(err) = result {
-                eprintln!("Failed to scale out: {err}");
+            match result {
+                Ok(_) => println!("Successfully scaled out"),
+                Err(err) => eprintln!("Failed to scale out: {err}"),
             }
         }),
-        worker_infra.send_terminate_workers(workers_to_terminate),
+        worker_infra
+            .send_terminate_workers(workers_to_terminate)
+            .then(|_| async { println!("sent terminate workers") }),
         dns.sync_ips(helathy_ips).then(|result| async {
-            if let Err(err) = result {
-                eprintln!("Failed to sync ips: {err}");
+            match result {
+                Ok(_) => println!("Successfully synced ips"),
+                Err(err) => eprintln!("Failed to sync ips: {err}"),
             }
         }),
     );
+
+    println!("{:?}", health_records);
 
     Ok(())
 }
@@ -159,7 +219,7 @@ async fn try_scale_out(
     health_records: HealthRecords,
     worker_health_response_map: WorkerHealthResponseMap,
     worker_infra: &dyn WorkerInfra,
-) -> anyhow::Result<()> {
+) -> color_eyre::Result<()> {
     let starting_workers = worker_health_response_map
         .values()
         .filter(|(info, _status)| matches!(info.instance_state, WorkerInstanceState::Starting))
@@ -178,7 +238,7 @@ async fn try_scale_out(
             .max_starting_count
             .checked_sub(fresh_starting_workers.len())
         else {
-            return anyhow::Ok(());
+            return color_eyre::eyre::Ok(());
         };
 
         if !fresh_starting_workers.is_empty() {

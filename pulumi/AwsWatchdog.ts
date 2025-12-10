@@ -1,6 +1,7 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import { OciWorkerInfraEnvs } from "./OciComputeWorker";
+import { FileArchive } from "@pulumi/pulumi/asset";
 
 export interface AwsWatchdogArgs {
   region: pulumi.Input<string>;
@@ -50,13 +51,44 @@ export class AwsWatchdog extends pulumi.ComponentResource {
 
     const lockDdb = setLockDdb(region);
     const healthRecordBucket = setHealthRecordBucket(region);
+    const ociLambdaProxy = setOciLambdaProxy(region, ociWorkerInfraEnvs);
 
-    const lambdaFunction = new aws.lambda.CallbackFunction("watchdog", {
+    const lambdaFunction = new aws.lambda.Function("watchdog", {
       region,
-      timeout: 10,
+      timeout: 30,
+      architectures: ["arm64"],
       vpcConfig: {
         subnetIds: [subnetId],
         securityGroupIds: [securityGroupId],
+      },
+      code: new FileArchive("../watchdog/target/lambda/watchdog/bootstrap.zip"),
+      handler: "bootstrap",
+      packageType: "Zip",
+      runtime: "provided.al2023",
+      environment: {
+        variables: pulumi
+          .all([ociWorkerInfraEnvs, cloudflareEnvs])
+          .apply(([ociWorkerInfraEnvs, cloudflareEnvs]) => ({
+            LOCK_AT: "dynamodb",
+            HEALTH_RECORDER_AT: "s3",
+            WORKER_INFRA_AT: "oci",
+            DNS_AT: "cloudflare",
+            DOMAIN: domain,
+            RUST_BACKTRACE: "1",
+            MAX_GRACEFUL_SHUTDOWN_WAIT_SECS: pulumi.jsonStringify(
+              maxGracefulShutdownWaitSecs
+            ),
+            MAX_HEALTHY_CHECK_RETRIES: pulumi.jsonStringify(
+              maxHealthyCheckRetries
+            ),
+            MAX_START_TIMEOUT_SECS: pulumi.jsonStringify(maxStartTimeoutSecs),
+            MAX_STARTING_COUNT: pulumi.jsonStringify(maxStartingCount),
+            HEALTH_RECORD_BUCKET_NAME: healthRecordBucket.bucket,
+            LOCK_TABLE_NAME: lockDdb.name,
+            OCI_LAMBDA_PROXY_FN_NAME: ociLambdaProxy.lambdaFunction.name,
+            ...ociWorkerInfraEnvs,
+            ...cloudflareEnvs,
+          })),
       },
       role: new aws.iam.Role("watchdog-role", {
         assumeRolePolicy: {
@@ -86,7 +118,17 @@ export class AwsWatchdog extends pulumi.ComponentResource {
                   {
                     Effect: "Allow",
                     Action: ["s3:PutObject", "s3:GetObject"],
+                    Resource: healthRecordBucket.arn.apply((arn) => `${arn}/*`),
+                  },
+                  {
+                    Effect: "Allow",
+                    Action: ["s3:ListBucket"],
                     Resource: healthRecordBucket.arn,
+                  },
+                  {
+                    Effect: "Allow",
+                    Action: ["lambda:InvokeFunction"],
+                    Resource: ociLambdaProxy.lambdaFunction.arn,
                   },
                 ],
               } satisfies aws.iam.PolicyDocument)
@@ -97,38 +139,64 @@ export class AwsWatchdog extends pulumi.ComponentResource {
           aws.iam.ManagedPolicy.AWSLambdaVPCAccessExecutionRole,
           aws.iam.ManagedPolicy.AWSLambdaBasicExecutionRole,
         ],
-      }),
-      environment: {
-        variables: pulumi
-          .all([ociWorkerInfraEnvs, cloudflareEnvs])
-          .apply(([ociWorkerInfraEnvs, cloudflareEnvs]) => ({
-            LOCK_AT: "dynamodb",
-            HEALTH_RECORDER_AT: "s3",
-            WORKER_INFRA_AT: "oci",
-            DOMAIN: domain,
-            MAX_GRACEFUL_SHUTDOWN_WAIT_SECS: pulumi.jsonStringify(
-              maxGracefulShutdownWaitSecs
-            ),
-            MAX_HEALTHY_CHECK_RETRIES: pulumi.jsonStringify(
-              maxHealthyCheckRetries
-            ),
-            MAX_START_TIMEOUT_SECS: pulumi.jsonStringify(maxStartTimeoutSecs),
-            MAX_STARTING_COUNT: pulumi.jsonStringify(maxStartingCount),
-            HEALTH_RECORD_BUCKET_NAME: healthRecordBucket.bucket,
-            LOCK_TABLE_NAME: lockDdb.name,
-            ...ociWorkerInfraEnvs,
-            ...cloudflareEnvs,
-          })),
-      },
-      callback: async () => {},
+      }).arn,
     });
 
-    new aws.cloudwatch.EventTarget("watchdog-target", {
-      region,
-      rule: eventRule.name,
-      arn: lambdaFunction.arn,
-    });
+    // new aws.lambda.Permission("watchdog-permission", {
+    //   action: "lambda:InvokeFunction",
+    //   function: lambdaFunction.arn,
+    //   principal: "events.amazonaws.com",
+    //   sourceArn: eventRule.arn,
+    // });
+
+    // new aws.cloudwatch.EventTarget("watchdog-target", {
+    //   region,
+    //   rule: eventRule.name,
+    //   arn: lambdaFunction.arn,
+    // });
   }
+}
+
+function setOciLambdaProxy(
+  region: pulumi.Input<string>,
+  ociWorkerInfraEnvs: pulumi.Input<OciWorkerInfraEnvs>
+) {
+  const lambdaFunction = new aws.lambda.Function("oci-lambda-proxy", {
+    region,
+    timeout: 30,
+    architectures: ["arm64"],
+    code: new FileArchive(
+      "../oci-lambda-proxy/target/lambda/oci-lambda-proxy/bootstrap.zip"
+    ),
+    handler: "bootstrap",
+    packageType: "Zip",
+    runtime: "provided.al2023",
+    environment: {
+      variables: pulumi
+        .output(ociWorkerInfraEnvs)
+        .apply((ociWorkerInfraEnvs) => ({
+          RUST_BACKTRACE: "1",
+          ...ociWorkerInfraEnvs,
+        })),
+    },
+    role: new aws.iam.Role("oci-lambda-proxy-role", {
+      assumeRolePolicy: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: {
+              Service: "lambda.amazonaws.com",
+            },
+            Action: "sts:AssumeRole",
+          },
+        ],
+      },
+      managedPolicyArns: [aws.iam.ManagedPolicy.AWSLambdaBasicExecutionRole],
+    }).arn,
+  });
+
+  return { lambdaFunction };
 }
 
 function setLockDdb(region: pulumi.Input<string>) {

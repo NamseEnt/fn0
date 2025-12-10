@@ -42,7 +42,8 @@ pub enum SourceType {
 }
 
 /// Sort field for listing instances
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum SortBy {
     /// Sort by time created
     TimeCreated,
@@ -51,7 +52,8 @@ pub enum SortBy {
 }
 
 /// Sort order for listing instances
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum SortOrder {
     /// Ascending order
     Asc,
