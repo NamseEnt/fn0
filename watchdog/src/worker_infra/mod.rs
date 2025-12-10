@@ -104,13 +104,13 @@ impl dyn WorkerInfra {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct WorkerHealthResponse {
     pub kind: WorkerHealthKind,
     pub ip: IpAddr,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum WorkerHealthKind {
     Good,
     GracefulShuttingDown,
