@@ -14,7 +14,7 @@ pub trait AdaptCache<T, E>: Clone + Send + Sync + 'static {
 #[derive(Debug)]
 pub enum Error<ConvertError> {
     NotFound,
-    StorageError(color_eyre::Report),
+    StorageError(anyhow::Error),
     ConvertError(ConvertError),
     SingleflightLeaderFailed,
 }

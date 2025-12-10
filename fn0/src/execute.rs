@@ -443,7 +443,7 @@ mod tests {
         ) -> Result<ProxyPre<ClientState<SystemClock>>, adapt_cache::Error<wasmtime::Error>>
         {
             if self.should_fail.load(Ordering::SeqCst) {
-                return Err(adapt_cache::Error::StorageError(eyre::anyhow!(
+                return Err(adapt_cache::Error::StorageError(anyhow::anyhow!(
                     "Mock storage error"
                 )));
             }
