@@ -15,6 +15,7 @@ export interface OciWorkerInfraEnvs {
   OCI_REGION: pulumi.Output<string>;
   OCI_COMPARTMENT_ID: pulumi.Output<string>;
   OCI_INSTANCE_CONFIGURATION_ID: pulumi.Output<string>;
+  OCI_AVAILABILITY_DOMAIN: pulumi.Output<string>;
 }
 
 export class OciComputeWorker extends pulumi.ComponentResource {
@@ -61,13 +62,14 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     });
 
     new oci.identity.Policy("watchdog-policy", {
-      compartmentId: compartment.id,
+      compartmentId: oci_user.compartmentId,
       description: "Policy for fn0 watchdog",
       statements: [
         pulumi.interpolate`Allow group ${group.name} to manage instance-family in compartment id ${compartment.id}`,
-        pulumi.interpolate`Allow group ${group.name} to use instance-configurations in compartment id ${compartment.id}`,
-        pulumi.interpolate`Allow group ${group.name} to read virtual-network-family in compartment id ${compartment.id}`,
+        pulumi.interpolate`Allow group ${group.name} to manage instance-configurations in compartment id ${compartment.id}`,
+        pulumi.interpolate`Allow group ${group.name} to use virtual-network-family in compartment id ${compartment.id}`,
         pulumi.interpolate`Allow group ${group.name} to read app-catalog-listing in compartment id ${compartment.id}`,
+        pulumi.interpolate`Allow group ${group.name} to use tag-namespaces in tenancy`,
       ],
     });
 
@@ -137,6 +139,20 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       routeTableId: routeTable.id,
     });
 
+    const availabilityDomain = compartment.id.apply((compartmentId) =>
+      oci.identity
+        .getAvailabilityDomains({
+          compartmentId,
+        })
+        .then((x) => {
+          const ad = x.availabilityDomains[0]?.name;
+          if (!ad) {
+            throw new Error("can not find availability domain");
+          }
+          return ad;
+        })
+    );
+
     const imageId = compartment.id.apply((compartmentId) =>
       oci.core
         .getImages({
@@ -187,7 +203,14 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     this.instanceConfigurationId = instanceConfiguration.id;
 
     this.infraEnvs = pulumi
-      .all([privateKey, oci_user, compartment, instanceConfiguration, apiKey])
+      .all([
+        privateKey,
+        oci_user,
+        compartment,
+        instanceConfiguration,
+        apiKey,
+        availabilityDomain,
+      ])
       .apply(
         ([
           privateKey,
@@ -195,6 +218,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
           compartment,
           instanceConfiguration,
           apiKey,
+          availabilityDomain,
         ]) => ({
           OCI_PRIVATE_KEY_BASE64: privateKey.privateKeyPemPkcs8.apply((x) =>
             Buffer.from(x).toString("base64")
@@ -205,6 +229,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
           OCI_REGION: pulumi.output(args.region),
           OCI_COMPARTMENT_ID: compartment.id,
           OCI_INSTANCE_CONFIGURATION_ID: instanceConfiguration.id,
+          OCI_AVAILABILITY_DOMAIN: pulumi.output(availabilityDomain),
         })
       );
   }
