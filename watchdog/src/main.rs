@@ -158,6 +158,12 @@ async fn run_watchdog(
             })
     )?;
 
+    println!("health_records: {:?}", health_records);
+    println!(
+        "worker_health_response_map: {:?}",
+        worker_health_response_map
+    );
+
     match update_health_records(
         context,
         &mut health_records,
@@ -172,6 +178,7 @@ async fn run_watchdog(
         }
     };
 
+    println!("health_records after update: {:?}", health_records);
     let workers_to_terminate = get_workers_to_terminate(&health_records);
     println!("workers to terminate: {:?}", workers_to_terminate);
     let helathy_ips = get_healthy_ips(&health_records);
@@ -234,14 +241,22 @@ async fn try_scale_out(
         });
 
     let start_new = async move {
-        let Some(_left_starting_count) = context
+        println!(
+            "Still have {} fresh starting workers",
+            fresh_starting_workers.len()
+        );
+
+        let Some(left_starting_count) = context
             .max_starting_count
             .checked_sub(fresh_starting_workers.len())
         else {
             return color_eyre::eyre::Ok(());
         };
 
-        if !fresh_starting_workers.is_empty() {
+        println!("left_starting_count: {left_starting_count}");
+
+        if left_starting_count == 0 {
+            println!("No more starting workers allowed");
             return Ok(());
         }
 
@@ -254,6 +269,7 @@ async fn try_scale_out(
             return Ok(());
         }
 
+        println!("Launching new worker instance");
         worker_infra.launch_instances(1).await?;
         Ok(())
     };
