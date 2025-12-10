@@ -47,8 +47,7 @@ pub fn update_health_records(
     }
 
     health_records.retain(|worker_id, record| {
-        let Some((_worker_info, health_response)) = worker_health_response_map.get(worker_id)
-        else {
+        let Some((worker_info, health_response)) = worker_health_response_map.get(worker_id) else {
             match record.state {
                 HealthState::Starting
                 | HealthState::Healthy { .. }
@@ -65,6 +64,14 @@ pub fn update_health_records(
                 }
             }
         };
+
+        if let WorkerInstanceState::Terminating = worker_info.instance_state
+            && !matches!(record.state, HealthState::TerminatedConfirm)
+        {
+            record.state = HealthState::TerminatedConfirm;
+            record.state_transited_at = start_time;
+            return true;
+        }
 
         match health_response {
             Some(worker_health_response) => match worker_health_response.kind {
@@ -135,7 +142,9 @@ pub fn update_health_records(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::worker_infra::{WorkerHealthKind, WorkerHealthResponse, WorkerInfo, WorkerInstanceState};
+    use crate::worker_infra::{
+        WorkerHealthKind, WorkerHealthResponse, WorkerInfo, WorkerInstanceState,
+    };
     use chrono::{TimeDelta, Utc};
 
     // Helper function to create a test Context
@@ -278,10 +287,7 @@ mod tests {
         let mut health_records = HealthRecords::new();
         health_records.insert(
             worker_id("worker1"),
-            create_health_record(
-                HealthState::Healthy { ip: test_ip() },
-                previous_time,
-            ),
+            create_health_record(HealthState::Healthy { ip: test_ip() }, previous_time),
         );
 
         let worker_info = create_worker_info("worker1", WorkerInstanceState::Running);
@@ -347,10 +353,7 @@ mod tests {
         let mut health_records = HealthRecords::new();
         health_records.insert(
             worker_id("worker1"),
-            create_health_record(
-                HealthState::Healthy { ip: test_ip() },
-                previous_time,
-            ),
+            create_health_record(HealthState::Healthy { ip: test_ip() }, previous_time),
         );
 
         let worker_info = create_worker_info("worker1", WorkerInstanceState::Running);
@@ -387,10 +390,7 @@ mod tests {
         let mut health_records = HealthRecords::new();
         health_records.insert(
             worker_id("worker1"),
-            create_health_record(
-                HealthState::Healthy { ip: test_ip() },
-                previous_time,
-            ),
+            create_health_record(HealthState::Healthy { ip: test_ip() }, previous_time),
         );
 
         let worker_info = create_worker_info("worker1", WorkerInstanceState::Running);
@@ -545,10 +545,7 @@ mod tests {
         let mut health_records = HealthRecords::new();
         health_records.insert(
             worker_id("worker1"),
-            create_health_record(
-                HealthState::Healthy { ip: test_ip() },
-                previous_time,
-            ),
+            create_health_record(HealthState::Healthy { ip: test_ip() }, previous_time),
         );
 
         let response_map = WorkerHealthResponseMap::new(); // Empty map
@@ -800,10 +797,7 @@ mod tests {
         let mut health_records = HealthRecords::new();
         health_records.insert(
             worker_id("worker1"),
-            create_health_record(
-                HealthState::Healthy { ip: test_ip() },
-                previous_time,
-            ),
+            create_health_record(HealthState::Healthy { ip: test_ip() }, previous_time),
         );
 
         let response_map = WorkerHealthResponseMap::new(); // Empty map

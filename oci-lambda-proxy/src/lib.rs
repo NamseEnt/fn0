@@ -28,11 +28,14 @@ impl OciLambdaProxy {
         &self,
         request: Request,
     ) -> oci_rust_sdk::core::Result<Res> {
+        let request = serde_json::to_string(&request).unwrap();
+        println!("request: {request}");
+
         let response = self
             .client
             .invoke()
             .function_name(&self.fn_name)
-            .payload(Blob::new(serde_json::to_string(&request).unwrap()))
+            .payload(Blob::new(request))
             .send()
             .await
             .map_err(|err| oci_rust_sdk::core::OciError::Other(err.to_string()))?;

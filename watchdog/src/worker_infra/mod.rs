@@ -15,9 +15,9 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct WorkerInfo {
     pub id: WorkerId,
+    pub instance_created: DateTime<Utc>,
     pub ip: Option<IpAddr>,
     pub instance_state: WorkerInstanceState,
-    pub instance_created: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
