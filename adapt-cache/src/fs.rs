@@ -43,7 +43,7 @@ impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
         Some(entry)
     }
 
-    async fn read_from_fs(&self, path: &str) -> anyhow::Result<(Bytes, SystemTime, u64)> {
+    async fn read_from_fs(&self, path: &str) -> color_eyre::Result<(Bytes, SystemTime, u64)> {
         let full_path = self.base_path.join(path);
         let metadata = tokio::fs::metadata(&full_path).await?;
         let mtime = metadata.modified()?;
@@ -87,13 +87,14 @@ impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
             Ok(metadata) => {
                 let mtime = metadata
                     .modified()
-                    .map_err(|e| Error::StorageError(anyhow::anyhow!(e)))?;
+                    .map_err(|e| Error::StorageError(color_eyre::eyre::anyhow!(e)))?;
                 let file_size = metadata.len();
 
-                if let Some(cache_entry) = cached {
-                    if cache_entry.mtime == mtime && cache_entry.file_size == file_size {
-                        return Ok(cache_entry.value);
-                    }
+                if let Some(cache_entry) = cached
+                    && cache_entry.mtime == mtime
+                    && cache_entry.file_size == file_size
+                {
+                    return Ok(cache_entry.value);
                 }
 
                 self.fetch_and_cache(path, convert).await
@@ -102,7 +103,7 @@ impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
                 if error.kind() == std::io::ErrorKind::NotFound {
                     return Err(Error::NotFound);
                 }
-                Err(Error::StorageError(anyhow::anyhow!(error)))
+                Err(Error::StorageError(color_eyre::eyre::anyhow!(error)))
             }
         }
     }
