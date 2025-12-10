@@ -1,3 +1,4 @@
+use color_eyre::eyre;
 use wasmtime_wasi_http::bindings::http::types::ErrorCode;
 
 #[derive(Clone)]
@@ -27,7 +28,7 @@ pub enum Metrics {
     Wasmtime {
         func: &'static str,
         code_id: String,
-        error: anyhow::Error,
+        error: wasmtime::Error,
     },
     OneshotDropBeforeResponse {
         code_id: String,
@@ -54,7 +55,7 @@ pub enum Metrics {
     },
     CanceledUnexpectedly {
         code_id: String,
-        error: anyhow::Error,
+        error: wasmtime::Error,
     },
     ReuseInstance {
         code_id: String,
@@ -64,7 +65,7 @@ pub enum Metrics {
     },
     ProxyCacheError {
         code_id: String,
-        error: adapt_cache::Error<anyhow::Error>,
+        error: adapt_cache::Error<wasmtime::Error>,
     },
     CodeIdParseError,
 }
