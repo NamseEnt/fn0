@@ -90,10 +90,11 @@ impl<T: Clone + Send + Sync + 'static, E> FsAdaptCache<T, E> {
                     .map_err(|e| Error::StorageError(anyhow::anyhow!(e)))?;
                 let file_size = metadata.len();
 
-                if let Some(cache_entry) = cached {
-                    if cache_entry.mtime == mtime && cache_entry.file_size == file_size {
-                        return Ok(cache_entry.value);
-                    }
+                if let Some(cache_entry) = cached
+                    && cache_entry.mtime == mtime
+                    && cache_entry.file_size == file_size
+                {
+                    return Ok(cache_entry.value);
                 }
 
                 self.fetch_and_cache(path, convert).await

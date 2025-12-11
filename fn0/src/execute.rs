@@ -43,6 +43,7 @@ pub struct Executor<A, B, C: Clock> {
     linker: Linker<ClientState<C>>,
     metrics_tx: MetricsTx,
     clock: C,
+    precompiled: bool,
 }
 
 impl<A, B, C> Executor<A, B, C>
@@ -51,7 +52,13 @@ where
     B: Body<Data = Bytes, Error = hyper::Error> + Send + Sync + 'static,
     C: Clock,
 {
-    pub fn new(proxy_cache: A, job_rx: Receiver<Job<B>>, metrics_tx: MetricsTx, clock: C) -> Self {
+    pub fn new(
+        proxy_cache: A,
+        job_rx: Receiver<Job<B>>,
+        metrics_tx: MetricsTx,
+        clock: C,
+        precompiled: bool,
+    ) -> Self {
         let engine = Engine::new(&engine_config()).unwrap();
 
         let mut linker = Linker::new(&engine);
@@ -65,6 +72,7 @@ where
             linker,
             metrics_tx,
             clock,
+            precompiled,
         }
     }
     pub async fn run(&mut self) {
@@ -90,11 +98,21 @@ where
         let linker = self.linker.clone();
         let metrics_tx = self.metrics_tx.clone();
         let clock = self.clock.clone();
+        let precompiled = self.precompiled;
 
         // TODO: Throttle and hard limit for same code_id
 
         tokio::spawn(async move {
-            run_job(job, proxy_cache, engine, linker, metrics_tx, clock).await;
+            run_job(
+                job,
+                proxy_cache,
+                engine,
+                linker,
+                metrics_tx,
+                clock,
+                precompiled,
+            )
+            .await;
         });
     }
 }
@@ -129,7 +147,12 @@ fn engine_config() -> Config {
             pooling_allocation_config,
         ))
         .epoch_interruption(true)
-        .wasm_component_model(true);
+        .wasm_component_model(true)
+        .cranelift_opt_level(wasmtime::OptLevel::None)
+        .cache(Some(
+            wasmtime::Cache::new(wasmtime::CacheConfig::new()).unwrap(),
+        ))
+        .parallel_compilation(true);
 
     config
 }
@@ -141,6 +164,7 @@ async fn run_job<A, B, C>(
     linker: Linker<ClientState<C>>,
     metrics_tx: MetricsTx,
     clock: C,
+    precompiled: bool,
 ) where
     A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
     B: Body<Data = Bytes, Error = hyper::Error> + Send + Sync + 'static,
@@ -152,6 +176,7 @@ async fn run_job<A, B, C>(
         engine,
         linker,
         metrics_tx.clone(),
+        precompiled,
     )
     .await
     else {
@@ -170,6 +195,7 @@ async fn get_proxy_pre<A, C>(
     engine: Engine,
     linker: Linker<ClientState<C>>,
     metrics_tx: MetricsTx,
+    precompiled: bool,
 ) -> Result<ProxyPre<ClientState<C>>, ()>
 where
     A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
@@ -177,9 +203,14 @@ where
 {
     match proxy_cache
         .get(&code_id.clone(), |bytes| {
-            let component = unsafe { Component::deserialize(&engine, &bytes)? };
+            let component = if precompiled {
+                unsafe { Component::deserialize(&engine, &bytes)? }
+            } else {
+                Component::new(&engine, &bytes)?
+            };
             let instance_pre = linker.instantiate_pre(&component)?;
             let proxy_pre = ProxyPre::new(instance_pre)?;
+
             metrics_tx.send(Metrics::CreateInstance {
                 code_id: code_id.clone(),
             });
@@ -346,10 +377,24 @@ where
     internal_error_response()
 }
 
+fn response(status: hyper::StatusCode, body: Bytes) -> Response {
+    let body = http_body_util::Full::new(body).map_err(|_| ErrorCode::InternalError(None));
+    let mut res = hyper::Response::new(HyperOutgoingBody::new(body));
+    *res.status_mut() = status;
+    res
+}
+
 fn timeout_response() -> Response {
     response(
         hyper::StatusCode::GATEWAY_TIMEOUT,
         Bytes::from("Gateway Timeout"),
+    )
+}
+
+fn internal_error_response() -> Response {
+    response(
+        hyper::StatusCode::INTERNAL_SERVER_ERROR,
+        Bytes::from("Internal Server Error"),
     )
 }
 
@@ -556,6 +601,7 @@ mod tests {
                 engine,
                 linker,
                 test_metrics.clone().into_metrics_tx(),
+                true,
             )
             .await;
 
@@ -583,6 +629,7 @@ mod tests {
                 engine,
                 linker,
                 test_metrics.clone().into_metrics_tx(),
+                true,
             )
             .await;
 
@@ -608,6 +655,7 @@ mod tests {
                 engine,
                 linker,
                 test_metrics.clone().into_metrics_tx(),
+                true,
             )
             .await;
 
@@ -633,6 +681,7 @@ mod tests {
                 engine,
                 linker,
                 test_metrics.clone().into_metrics_tx(),
+                true,
             )
             .await;
 
@@ -669,6 +718,7 @@ mod tests {
                 engine,
                 linker,
                 test_metrics.clone().into_metrics_tx(),
+                true,
             )
             .await;
 

@@ -1,5 +1,5 @@
 use crate::{
-    config::{Language, ProjectConfig},
+    config::{Config, Language, ProjectConfig},
     generators::typescript::TypeScriptGenerator,
     prompts::init::InitPrompts,
 };
@@ -50,6 +50,10 @@ pub async fn execute(name: Option<String>) -> Result<()> {
             TypeScriptGenerator::generate(&project_path, &config).await?;
         }
     }
+
+    let fn0_config = Config::from_project_config(&config);
+    let config_path = project_path.join("fn0.toml");
+    fn0_config.save(&config_path)?;
 
     println!("✅ Project '{}' created successfully!\n", project_name);
     println!("To get started:");

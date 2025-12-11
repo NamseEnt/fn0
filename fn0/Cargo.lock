@@ -1817,6 +1817,7 @@ dependencies = [
  "memberlist",
  "oci-rust-sdk",
  "reqwest",
+ "socket2 0.6.1",
  "sonic-rs",
  "sysinfo",
  "tokio",

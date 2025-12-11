@@ -14,4 +14,9 @@ pub enum Commands {
         #[arg(short, long)]
         name: Option<String>,
     },
+    Build,
+    Local {
+        #[arg(short, long)]
+        port: Option<u16>,
+    },
 }

@@ -19,6 +19,12 @@ async fn main() -> Result<()> {
         Commands::Init { name } => {
             commands::init::execute(name).await?;
         }
+        Commands::Build => {
+            commands::build::execute().await?;
+        }
+        Commands::Local { port } => {
+            commands::local::execute(port).await?;
+        }
     }
 
     Ok(())

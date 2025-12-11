@@ -7,7 +7,13 @@ pub struct MetricsTx {
 
 impl MetricsTx {
     pub fn new() -> Self {
-        todo!()
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            while let Some(metrics) = rx.recv().await {
+                println!("{:?}", metrics);
+            }
+        });
+        Self { inner: tx }
     }
 
     #[cfg(test)]
