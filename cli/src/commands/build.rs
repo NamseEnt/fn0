@@ -16,7 +16,7 @@ pub async fn execute() -> Result<()> {
         LanguageEnvironment::TypescriptBunHono => {
             println!("Running bun run build...");
             let status = Command::new("bun")
-                .args(&["run", "build"])
+                .args(["run", "build"])
                 .status()
                 .map_err(|e| eyre!("Failed to execute 'bun run build': {}", e))?;
 

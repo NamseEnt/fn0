@@ -29,6 +29,7 @@ impl MetricsTx {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum Metrics {
     Wasmtime {
         func: &'static str,
@@ -61,9 +62,6 @@ pub enum Metrics {
     CanceledUnexpectedly {
         code_id: String,
         error: anyhow::Error,
-    },
-    ReuseInstance {
-        code_id: String,
     },
     CreateInstance {
         code_id: String,
