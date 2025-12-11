@@ -84,17 +84,17 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                             metrics_tx.send(Metrics::CodeIdParseError);
                             return internal_error();
                         };
-                        println!("code_id: {code_id}");
 
                         let (res_tx, res_rx) = tokio::sync::oneshot::channel();
                         let Ok(_) = job_tx
                             .send(Job {
                                 req,
                                 res_tx,
-                                code_id,
+                                code_id: code_id.clone(),
                             })
                             .await
                         else {
+                            metrics_tx.send(Metrics::OneshotDropBeforeResponse { code_id });
                             return internal_error();
                         };
 
