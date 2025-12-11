@@ -1,0 +1,150 @@
+mod execute;
+mod metrics;
+mod tcp_listener;
+
+use crate::metrics::Metrics;
+use bytes::Bytes;
+use execute::Job;
+use http_body_util::BodyExt;
+use hyper::{Request, StatusCode, server::conn::http1};
+use hyper_util::{rt::TokioIo, service::TowerToHyperService};
+use measure_cpu_time::SystemClock;
+use std::{convert::Infallible, path::PathBuf, time::Duration};
+use tower::ServiceBuilder;
+use tower_http::timeout::TimeoutLayer;
+use wasmtime_wasi_http::{bindings::http::types::ErrorCode, body::HyperOutgoingBody};
+
+pub struct Config {
+    pub port: Option<u16>,
+    pub wasm_path: Option<PathBuf>,
+}
+
+pub async fn run(config: Config) -> anyhow::Result<()> {
+    let listener = {
+        let port = config.port.unwrap_or(3000);
+        let increment_on_fail = config.port.is_none();
+        tcp_listener::open_tcp_listener(port, increment_on_fail)?
+    };
+
+    println!(
+        "Server on http://localhost:{}",
+        listener.local_addr().unwrap().port()
+    );
+
+    let code_id_parser = match &config.wasm_path {
+        Some(wasm_path) => CodeIdParser::Local {
+            wasm_path: wasm_path.clone(),
+        },
+        None => CodeIdParser::Url,
+    };
+
+    let proxy_cache = match config.wasm_path {
+        Some(wasm_path) => adapt_cache::fs::FsAdaptCache::new(
+            wasm_path
+                .parent()
+                .ok_or(anyhow::anyhow!("cannot find wasm_path's parent"))?
+                .to_path_buf(),
+            1024 * 1024,
+        ),
+        None => todo!(),
+    };
+
+    let (job_tx, job_rx) = tokio::sync::mpsc::channel(10 * 1024);
+    let metrics_tx = metrics::MetricsTx::new();
+
+    tokio::spawn({
+        let metrics_tx = metrics_tx.clone();
+        async move {
+            execute::Executor::new(proxy_cache, job_rx, metrics_tx.clone(), SystemClock, false)
+                .run()
+                .await;
+        }
+    });
+
+    loop {
+        let (stream, _) = listener.accept().await?;
+
+        let tower_service = ServiceBuilder::new()
+            .layer(TimeoutLayer::with_status_code(
+                StatusCode::GATEWAY_TIMEOUT,
+                Duration::from_secs(60),
+            ))
+            .service(tower::util::service_fn({
+                let code_id_parser = code_id_parser.clone();
+                let metrics_tx = metrics_tx.clone();
+                let job_tx = job_tx.clone();
+
+                move |req: Request<hyper::body::Incoming>| {
+                    let code_id_parser = code_id_parser.clone();
+                    let metrics_tx = metrics_tx.clone();
+                    let job_tx = job_tx.clone();
+
+                    async move {
+                        let Some(code_id) = code_id_parser.parse(&req) else {
+                            metrics_tx.send(Metrics::CodeIdParseError);
+                            return internal_error();
+                        };
+                        println!("code_id: {code_id}");
+
+                        let (res_tx, res_rx) = tokio::sync::oneshot::channel();
+                        let Ok(_) = job_tx
+                            .send(Job {
+                                req,
+                                res_tx,
+                                code_id,
+                            })
+                            .await
+                        else {
+                            return internal_error();
+                        };
+
+                        match res_rx.await {
+                            Ok(res) => Ok(res),
+                            Err(_err) => internal_error(),
+                        }
+                    }
+                }
+            }));
+
+        tokio::task::spawn(async move {
+            if let Err(err) = http1::Builder::new()
+                .serve_connection(
+                    TokioIo::new(stream),
+                    TowerToHyperService::new(tower_service),
+                )
+                .await
+            {
+                eprintln!("Error serving connection: {:?}", err);
+            }
+        });
+    }
+}
+
+fn internal_error()
+-> Result<hyper::Response<http_body_util::combinators::BoxBody<Bytes, ErrorCode>>, Infallible> {
+    let body = http_body_util::Full::new(Bytes::from("Internal Server Error"))
+        .map_err(|_| ErrorCode::InternalError(None));
+    let mut res = hyper::Response::new(HyperOutgoingBody::new(body));
+    *res.status_mut() = hyper::StatusCode::INTERNAL_SERVER_ERROR;
+    Ok(res)
+}
+
+#[derive(Debug, Clone)]
+enum CodeIdParser {
+    Local { wasm_path: PathBuf },
+    Url,
+}
+
+impl CodeIdParser {
+    fn parse(&self, request: &Request<hyper::body::Incoming>) -> Option<String> {
+        match self {
+            CodeIdParser::Local { wasm_path } => wasm_path
+                .file_name()
+                .map(|x| x.to_string_lossy().to_string()),
+            CodeIdParser::Url => request
+                .uri()
+                .host()
+                .and_then(|host| host.split_once('.').map(|(code_id, _)| code_id.to_string())),
+        }
+    }
+}
