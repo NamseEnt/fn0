@@ -1,0 +1,34 @@
+배포 헤드쿼터는 한 aws 리전에.
+배포 시작 하면
+1. wasm 업로드 대기
+  - 유저가 init했고, 서버가 제공한 presigned url로 업로드하고 서버에게 알려야함.
+2. wasm 컴파일
+  - lambda가 wasm을 cwasm.zst로 만들기 시작함
+3. cwasm.zst 버킷 전파
+  - 지정된 버킷들에 cwasm.zst를 저장함
+4. host에 function version 업데이트
+  - 모든 host에 function version을 업데이트함
+
+
+R2CwasmUploader
+
+cwasm.zst가 저장될 버킷을 만들어야한다.
+그 버킷에 cwasm.zst가 저장되면, 
+    128mb 람다가 호출되는데,
+        128mb 람다는 cloudfront presigned url을 통해 cwasm.zst를 가져갈 수 있는 url를 만들고
+        cloudflare workers를 호출하고 그 url를 전달한다.
+cloudflare workers는
+    주어진 url를 통해 cwasm.zst를 가져온다.
+    cwasm.zst를 r2에 저장한다.
+    OK롤 보낸다.
+람다는 cloudflare workers로부터 OK를 받으면 cwasm.zst를 삭제하고 종료한다.
+
+input
+- awsS3Region
+
+output
+- cwasmZstBucket
+- r2Endpoint
+- r2BucketName
+- r2AccessKeyId
+- r2AccessSecretKey

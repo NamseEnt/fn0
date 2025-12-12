@@ -99,6 +99,9 @@ fn main() {
                 env::var("HEALTH_RECORDER_AT").expect("env var HEALTH_RECORDER_AT is not set");
             let health_recorder: Arc<dyn HealthRecorder> = match health_recorder_at.as_str() {
                 "s3" => Arc::new(health_recorder::s3::S3HealthRecorder::new().await),
+                "sqlite" => {
+                    Arc::new(health_recorder::sqlite_doc_db::SqliteDocDbHealthRecorder::new().await)
+                }
                 _ => panic!("unknown health recorder type {health_recorder_at}"),
             };
 

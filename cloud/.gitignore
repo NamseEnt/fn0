@@ -3,3 +3,6 @@ test.sh
 /sdks/
 /bin/
 /node_modules/
+
+# Kubeconfig files (contain sensitive credentials)
+kubeconfig*.yaml
