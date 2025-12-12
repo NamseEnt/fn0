@@ -20,45 +20,61 @@ export class B2CloudflareStaticCdn extends pulumi.ComponentResource {
     const b2AppKey = b2Config.requireSecret("applicationKey");
 
     const bucketName = pulumi.interpolate`fn0-${
-      new random.RandomString("b2-bucket-name", {
-        length: 32,
-        special: false,
-        upper: false,
-      }).result
+      new random.RandomString(
+        "b2-bucket-name",
+        {
+          length: 32,
+          special: false,
+          upper: false,
+        },
+        { parent: this }
+      ).result
     }`;
 
-    new b2.Bucket("b2-bucket", {
-      bucketName,
-      bucketType: "allPublic",
-      defaultServerSideEncryption: {
-        algorithm: "AES256",
+    new b2.Bucket(
+      "b2-bucket",
+      {
+        bucketName,
+        bucketType: "allPublic",
+        defaultServerSideEncryption: {
+          algorithm: "AES256",
+        },
       },
-    });
+      { parent: this }
+    );
 
-    const accountInfo = b2.getAccountInfo({});
+    const accountInfo = b2.getAccountInfo({}, { parent: this });
 
     const s3Endpoint = accountInfo.then((info) => info.s3ApiUrl);
 
     const logBucketName = pulumi.interpolate`log-${bucketName}`;
 
-    new b2.Bucket("b2-log-bucket", {
-      bucketName: logBucketName,
-      bucketType: "allPrivate",
-    });
+    new b2.Bucket(
+      "b2-log-bucket",
+      {
+        bucketName: logBucketName,
+        bucketType: "allPrivate",
+      },
+      { parent: this }
+    );
 
-    const b2AwsProvider = new aws.Provider("b2-aws-provider", {
-      accessKey: b2KeyId,
-      secretKey: b2AppKey,
-      skipCredentialsValidation: true,
-      skipRequestingAccountId: true,
-      skipMetadataApiCheck: true,
-      s3UsePathStyle: true,
-      endpoints: [
-        {
-          s3: s3Endpoint,
-        },
-      ],
-    });
+    const b2AwsProvider = new aws.Provider(
+      "b2-aws-provider",
+      {
+        accessKey: b2KeyId,
+        secretKey: b2AppKey,
+        skipCredentialsValidation: true,
+        skipRequestingAccountId: true,
+        skipMetadataApiCheck: true,
+        s3UsePathStyle: true,
+        endpoints: [
+          {
+            s3: s3Endpoint,
+          },
+        ],
+      },
+      { parent: this }
+    );
 
     new aws.s3.BucketLogging(
       "b2-bucket-logging",
@@ -69,6 +85,7 @@ export class B2CloudflareStaticCdn extends pulumi.ComponentResource {
       },
       {
         provider: b2AwsProvider,
+        parent: this,
       }
     );
 
@@ -101,38 +118,47 @@ export class B2CloudflareStaticCdn extends pulumi.ComponentResource {
       },
       {
         deleteBeforeReplace: true,
+        parent: this,
       }
     );
 
-    new cloudflare.Ruleset("b2-rewrite-rule", {
-      zoneId: zone.id,
-      name: "b2-rewrite-rule",
-      kind: "zone",
-      phase: "http_request_transform",
-      rules: [
-        {
-          action: "rewrite",
-          actionParameters: {
-            uri: {
-              path: {
-                expression: pulumi.interpolate`concat("/file/${bucketName}", http.request.uri.path)`,
+    new cloudflare.Ruleset(
+      "b2-rewrite-rule",
+      {
+        zoneId: zone.id,
+        name: "b2-rewrite-rule",
+        kind: "zone",
+        phase: "http_request_transform",
+        rules: [
+          {
+            action: "rewrite",
+            actionParameters: {
+              uri: {
+                path: {
+                  expression: pulumi.interpolate`concat("/file/${bucketName}", http.request.uri.path)`,
+                },
               },
             },
+            expression: pulumi.interpolate`http.host eq "cdn.${zone.name}" and not starts_with(http.request.uri.path, "/file/")`,
           },
-          expression: pulumi.interpolate`http.host eq "cdn.${zone.name}" and not starts_with(http.request.uri.path, "/file/")`,
-        },
-      ],
-    });
+        ],
+      },
+      { parent: this }
+    );
 
-    new cloudflare.DnsRecord("cdn-dns-record", {
-      zoneId: zone.id,
-      name: "cdn",
-      type: "CNAME",
-      content: accountInfo.then((info) =>
-        info.downloadUrl.replace("https://", "")
-      ),
-      ttl: 1,
-      proxied: true,
-    });
+    new cloudflare.DnsRecord(
+      "cdn-dns-record",
+      {
+        zoneId: zone.id,
+        name: "cdn",
+        type: "CNAME",
+        content: accountInfo.then((info) =>
+          info.downloadUrl.replace("https://", "")
+        ),
+        ttl: 1,
+        proxied: true,
+      },
+      { parent: this }
+    );
   }
 }
