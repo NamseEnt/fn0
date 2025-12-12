@@ -1,10 +1,11 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
+import * as random from "@pulumi/random";
 
 export interface OciComputeWorkerArgs {
   region: pulumi.Input<string>;
-  watchdogIpv6CidrBlock: pulumi.Input<string>;
+  hqIpv6CidrBlocks: pulumi.Input<string[]>;
 }
 
 export interface OciWorkerInfraEnvs {
@@ -30,114 +31,177 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   ) {
     super("pkg:index:oci-compute-worker", name, args, opts);
 
-    const compartment = new oci.identity.Compartment("compartment", {
-      description: "Compartment for fn0 OCI Compute Worker",
-      name: `fn0-${name}`,
-      enableDelete: true,
-    });
+    const compartmentSuffix = new random.RandomString(
+      "compartment-suffix",
+      {
+        length: 8,
+        special: false,
+        upper: false,
+      },
+      { parent: this }
+    ).result;
+
+    const compartment = new oci.identity.Compartment(
+      "compartment",
+      {
+        description: "Compartment for fn0 OCI Compute Worker",
+        name: pulumi.interpolate`fn0-host-${compartmentSuffix}`,
+        enableDelete: true,
+      },
+      { parent: this }
+    );
 
     this.compartmentId = compartment.id;
 
-    const privateKey = new tls.PrivateKey("oci-api-key-pair", {
-      algorithm: "RSA",
-      rsaBits: 2048,
-    });
+    const privateKey = new tls.PrivateKey(
+      "oci-api-key-pair",
+      {
+        algorithm: "RSA",
+        rsaBits: 2048,
+      },
+      { parent: this }
+    );
 
-    const oci_user = new oci.identity.User("watchdog-user", {
-      description: "fn0 watchdog user",
-    });
+    const workerManager = new oci.identity.User(
+      "worker-manager",
+      {
+        description: "fn0 worker manager",
+      },
+      { parent: this }
+    );
 
-    const apiKey = new oci.identity.ApiKey("watchdog-api-key", {
-      userId: oci_user.id,
-      keyValue: privateKey.publicKeyPem,
-    });
+    const apiKey = new oci.identity.ApiKey(
+      "worker-api-key",
+      {
+        userId: workerManager.id,
+        keyValue: privateKey.publicKeyPem,
+      },
+      { parent: this }
+    );
 
-    const group = new oci.identity.Group("watchdog-group", {
-      description: "fn0 watchdog group",
-    });
+    const group = new oci.identity.Group(
+      "worker-manager-group",
+      {
+        description: "fn0 worker manager group",
+      },
+      { parent: this }
+    );
 
-    new oci.identity.UserGroupMembership("watchdog-user-group-membership", {
-      userId: oci_user.id,
-      groupId: group.id,
-    });
+    new oci.identity.UserGroupMembership(
+      "worker-manager-group-membership",
+      {
+        userId: workerManager.id,
+        groupId: group.id,
+      },
+      { parent: this }
+    );
 
-    new oci.identity.Policy("watchdog-policy", {
-      compartmentId: oci_user.compartmentId,
-      description: "Policy for fn0 watchdog",
-      statements: [
-        pulumi.interpolate`Allow group ${group.name} to manage instance-family in compartment id ${compartment.id}`,
-        pulumi.interpolate`Allow group ${group.name} to manage instance-configurations in compartment id ${compartment.id}`,
-        pulumi.interpolate`Allow group ${group.name} to use virtual-network-family in compartment id ${compartment.id}`,
-        pulumi.interpolate`Allow group ${group.name} to read app-catalog-listing in compartment id ${compartment.id}`,
-        pulumi.interpolate`Allow group ${group.name} to use tag-namespaces in tenancy`,
-      ],
-    });
+    new oci.identity.Policy(
+      "worker-manager-policy",
+      {
+        compartmentId: workerManager.compartmentId,
+        description: "Policy for fn0 worker manager",
+        statements: [
+          pulumi.interpolate`Allow group ${group.name} to manage instance-family in compartment id ${compartment.id}`,
+          pulumi.interpolate`Allow group ${group.name} to manage instance-configurations in compartment id ${compartment.id}`,
+          pulumi.interpolate`Allow group ${group.name} to use virtual-network-family in compartment id ${compartment.id}`,
+          pulumi.interpolate`Allow group ${group.name} to read app-catalog-listing in compartment id ${compartment.id}`,
+          pulumi.interpolate`Allow group ${group.name} to use tag-namespaces in tenancy`,
+        ],
+      },
+      { parent: this }
+    );
 
-    const vcn = new oci.core.Vcn("vcn", {
-      compartmentId: compartment.id,
-      isIpv6enabled: true,
-      isOracleGuaAllocationEnabled: true,
-      cidrBlocks: ["10.0.0.0/16"],
-    });
+    const vcn = new oci.core.Vcn(
+      "vcn",
+      {
+        compartmentId: compartment.id,
+        isIpv6enabled: true,
+        isOracleGuaAllocationEnabled: true,
+        cidrBlocks: ["10.0.0.0/16"],
+      },
+      { parent: this }
+    );
 
-    const securityList = new oci.core.SecurityList("security-list", {
-      compartmentId: compartment.id,
-      vcnId: vcn.id,
-      ingressSecurityRules: [
-        ...cloudflareIpv4Ranges,
-        ...clareflareIpv6Ranges,
-        args.watchdogIpv6CidrBlock,
-      ].map((source) => ({
-        protocol: "6",
-        source,
-        tcpOptions: { min: 443, max: 443 },
-      })),
-      egressSecurityRules: [
-        {
-          destination: "0.0.0.0/0",
-          protocol: "all",
-        },
-        {
-          destination: "::/0",
-          protocol: "all",
-        },
-      ],
-    });
+    const securityList = new oci.core.SecurityList(
+      "security-list",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+        ingressSecurityRules: pulumi
+          .all([args.hqIpv6CidrBlocks])
+          .apply(([hqIpv6CidrBlocks]) => [
+            ...cloudflareIpv4Ranges,
+            ...clareflareIpv6Ranges,
+            ...hqIpv6CidrBlocks,
+          ])
+          .apply((rules) =>
+            rules.map((source) => ({
+              protocol: "6",
+              source,
+              tcpOptions: { min: 443, max: 443 },
+            }))
+          ),
+        egressSecurityRules: [
+          {
+            destination: "0.0.0.0/0",
+            protocol: "all",
+          },
+          {
+            destination: "::/0",
+            protocol: "all",
+          },
+        ],
+      },
+      { parent: this }
+    );
 
-    const internetGateway = new oci.core.InternetGateway("igw", {
-      compartmentId: compartment.id,
-      vcnId: vcn.id,
-    });
+    const internetGateway = new oci.core.InternetGateway(
+      "igw",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+      },
+      { parent: this }
+    );
 
-    const routeTable = new oci.core.RouteTable("route-table", {
-      compartmentId: compartment.id,
-      vcnId: vcn.id,
-      routeRules: [
-        {
-          destination: "::/0",
-          destinationType: "CIDR_BLOCK",
-          networkEntityId: internetGateway.id,
-        },
-        {
-          destination: "0.0.0.0/0",
-          destinationType: "CIDR_BLOCK",
-          networkEntityId: internetGateway.id,
-        },
-      ],
-    });
+    const routeTable = new oci.core.RouteTable(
+      "route-table",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+        routeRules: [
+          {
+            destination: "::/0",
+            destinationType: "CIDR_BLOCK",
+            networkEntityId: internetGateway.id,
+          },
+          {
+            destination: "0.0.0.0/0",
+            destinationType: "CIDR_BLOCK",
+            networkEntityId: internetGateway.id,
+          },
+        ],
+      },
+      { parent: this }
+    );
 
-    const subnet = new oci.core.Subnet("subnet", {
-      compartmentId: compartment.id,
-      vcnId: vcn.id,
-      ipv4cidrBlocks: ["10.0.0.0/24"],
-      ipv6cidrBlocks: vcn.ipv6cidrBlocks.apply((x) =>
-        x.map((x) => x.replace("/56", "/64"))
-      ),
-      prohibitInternetIngress: false,
-      prohibitPublicIpOnVnic: false,
-      securityListIds: [securityList.id],
-      routeTableId: routeTable.id,
-    });
+    const subnet = new oci.core.Subnet(
+      "subnet",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+        ipv4cidrBlocks: ["10.0.0.0/24"],
+        ipv6cidrBlocks: vcn.ipv6cidrBlocks.apply((x) =>
+          x.map((x) => x.replace("/56", "/64"))
+        ),
+        prohibitInternetIngress: false,
+        prohibitPublicIpOnVnic: false,
+        securityListIds: [securityList.id],
+        routeTableId: routeTable.id,
+      },
+      { parent: this }
+    );
 
     const availabilityDomain = compartment.id.apply((compartmentId) =>
       oci.identity
@@ -197,7 +261,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
             },
           },
         },
-      }
+      },
+      { parent: this }
     );
 
     this.instanceConfigurationId = instanceConfiguration.id;
@@ -205,7 +270,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     this.infraEnvs = pulumi
       .all([
         privateKey,
-        oci_user,
+        workerManager,
         compartment,
         instanceConfiguration,
         apiKey,

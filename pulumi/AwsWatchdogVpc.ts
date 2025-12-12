@@ -20,19 +20,27 @@ export class AwsWatchdogVpc extends pulumi.ComponentResource {
 
     const { region } = args;
 
-    const vpc = new aws.ec2.Vpc("ipv6-vpc", {
-      region,
-      cidrBlock: "10.0.0.0/16",
-      assignGeneratedIpv6CidrBlock: true,
-      enableDnsHostnames: true,
-    });
+    const vpc = new aws.ec2.Vpc(
+      "ipv6-vpc",
+      {
+        region,
+        cidrBlock: "10.0.0.0/16",
+        assignGeneratedIpv6CidrBlock: true,
+        enableDnsHostnames: true,
+      },
+      { parent: this }
+    );
     this.vpcId = vpc.id;
     this.ipv6CidrBlock = vpc.ipv6CidrBlock;
 
-    const eigw = new aws.ec2.EgressOnlyInternetGateway("ipv6-eigw", {
-      region,
-      vpcId: vpc.id,
-    });
+    const eigw = new aws.ec2.EgressOnlyInternetGateway(
+      "ipv6-eigw",
+      {
+        region,
+        vpcId: vpc.id,
+      },
+      { parent: this }
+    );
 
     const subnet = new aws.ec2.Subnet(
       "ipv6-native-subnet",
@@ -47,55 +55,72 @@ export class AwsWatchdogVpc extends pulumi.ComponentResource {
         enableResourceNameDnsAaaaRecordOnLaunch: true,
       },
       {
+        parent: this,
         deleteBeforeReplace: true,
       }
     );
     this.subnetId = subnet.id;
 
-    const routeTable = new aws.ec2.RouteTable("ipv6-rt", {
-      region,
-      vpcId: vpc.id,
-    });
+    const routeTable = new aws.ec2.RouteTable(
+      "ipv6-rt",
+      {
+        region,
+        vpcId: vpc.id,
+      },
+      { parent: this }
+    );
 
-    new aws.ec2.Route("ipv6-route", {
-      region,
-      routeTableId: routeTable.id,
-      destinationIpv6CidrBlock: "::/0",
-      egressOnlyGatewayId: eigw.id,
-    });
+    new aws.ec2.Route(
+      "ipv6-route",
+      {
+        region,
+        routeTableId: routeTable.id,
+        destinationIpv6CidrBlock: "::/0",
+        egressOnlyGatewayId: eigw.id,
+      },
+      { parent: this }
+    );
 
-    new aws.ec2.RouteTableAssociation("rt-assoc", {
-      region,
-      subnetId: subnet.id,
-      routeTableId: routeTable.id,
-    });
+    new aws.ec2.RouteTableAssociation(
+      "rt-assoc",
+      {
+        region,
+        subnetId: subnet.id,
+        routeTableId: routeTable.id,
+      },
+      { parent: this }
+    );
 
-    const securityGroup = new aws.ec2.SecurityGroup("ipv6-lambda-sg", {
-      region,
-      vpcId: vpc.id,
-      ingress: [
-        {
-          protocol: "-1",
-          fromPort: 0,
-          toPort: 0,
-          self: true,
-        },
-      ],
-      egress: [
-        {
-          protocol: "-1",
-          fromPort: 0,
-          toPort: 0,
-          ipv6CidrBlocks: ["::/0"],
-        },
-        {
-          protocol: "-1",
-          fromPort: 0,
-          toPort: 0,
-          cidrBlocks: ["0.0.0.0/0"],
-        },
-      ],
-    });
+    const securityGroup = new aws.ec2.SecurityGroup(
+      "ipv6-lambda-sg",
+      {
+        region,
+        vpcId: vpc.id,
+        ingress: [
+          {
+            protocol: "-1",
+            fromPort: 0,
+            toPort: 0,
+            self: true,
+          },
+        ],
+        egress: [
+          {
+            protocol: "-1",
+            fromPort: 0,
+            toPort: 0,
+            ipv6CidrBlocks: ["::/0"],
+          },
+          {
+            protocol: "-1",
+            fromPort: 0,
+            toPort: 0,
+            cidrBlocks: ["0.0.0.0/0"],
+          },
+        ],
+      },
+      { parent: this }
+    );
     this.securityGroupId = securityGroup.id;
   }
 }

@@ -1,4 +1,5 @@
 pub mod s3;
+pub mod sqlite_doc_db;
 mod update_health_records;
 
 use crate::{

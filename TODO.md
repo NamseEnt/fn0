@@ -122,3 +122,7 @@
 - [ ] count GetObject by cloudflare graphql httpRequests1dGroups
 - [ ] count CreateObject by deployment system
 - [ ] deploy static files on cli
+
+## customizable code locating
+
+- [ ] user can choose multiple regions to store code to reduce cold-time on regional compute resources

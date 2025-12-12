@@ -1,11 +1,13 @@
 config:
+  fn0Cloud:cloudflareAccountId: b62235f721637e4dcfb89754c44e3486
+  fn0Cloud:cloudflareZoneId: 35b3cf9096f0074cf95bb2d1a5b2f8ae
+  fn0Cloud:domain: fn0.dev
+  fn0Cloud:ociComputeWorkerRegion: ap-osaka-1
+  fn0Cloud:ociHeadQuarterRegion: ap-osaka-1
+  fn0Cloud:grafanaSlug: fn0
+  fn0Cloud:grafanaRegion: prod-ap-northeast-0
   cloudflare:apiToken:
     secure: AAABAB1686F4p2c0ekGSwwRhT+FLjUIUrQQ/SxRnP6IiMUcEg63QmtP4/DJp0JSpHIjqrRJ26tt56ZHB2fize1fjUH3hBGze
-  fn0Cloud:CLOUDFLARE_ACCOUNT_ID: b62235f721637e4dcfb89754c44e3486
-  fn0Cloud:CLOUDFLARE_ZONE_ID: 35b3cf9096f0074cf95bb2d1a5b2f8ae
-  fn0Cloud:DOMAIN: fn0.dev
-  fn0Cloud:AWS_WATCHDOG_REGION: ap-northeast-1
-  fn0Cloud:OCI_COMPUTE_WORKER_REGION: ap-osaka-1
   aws:region: ap-northeast-1
   aws:accessKey:
     secure: AAABANYKJJlI5paWj29+JE4VPfm/vu66suHHh98qFQNYWW7LflXma6qdmKMiDdSfaYqFMQ==
@@ -24,3 +26,7 @@ config:
     secure: AAABAH+9qDSUiFA4aXn3hkOOIAaytFrtxvk5D3PNXptGpnel5e+mPpV0UxJMjUshhnUN8y6NzqqU
   b2:applicationKey:
     secure: AAABAJ/M6R3tjt5RbKoE5mEPdATkjC1AjoE/avqbKXeRL0lvBsK9XL+qljRvvaQFAVnJkeumx4LJt5HOHE7u
+  turso:apiToken:
+    secure: AAABALMatUmTNTcwMj2qfCeDPm0EVwK9V4Lc6MqR85lPFNdFYCb69q7kgu3+0TxQe9xv4QKdbMyPeTIk4ydHkgK8rTWKiV+XDKtHS4SzSiF/BnvHYli/jPE0duCBsmVdw0JMF9j50IoeRnRYiAIINtWMrB0qjZHAJkxO6MVJKTfqB7nmAxkjiqE3Z5Czm+VCYlp1/vkiGOmVDRUz5AnxgsfbzTmQ+KytqVxTovhESWEBszk08pQoRO+gr9AxGfY0j+5KMCDetQwR0xQIkJOMHzsDOqPi/9KJyj6NYJVwRtp2lTYjwYaUVdYZNWnikJ5D53ilBHhtLQnOoCw7qXWStbfhuj7adpBTlTt++2ZfVg7Fizds9PJ4LlI01ANZcNhxI+zbEDoNlxiYW6j5IUVrAP+tsHl6X52QbTanyrtODKfLoydLpik5s7iIzYIg+EBvhghUSdg7j339nMRjKPE67px03T6q9QulqrduEqsLfooULIYkzi+a7nC+zXBrb93vrxBsWrRKIqlZlgrNcWQx+wIdK+pw861ut7ejTO2PwIiX+zX1xzltKnv7JvnzVKGTpV6jqpYlVkl5KgFX93wjIphcpc2N0Ly9ujrAjR0W6fK+IDAUBv+E0aMSmM0EZNevmgzayKZn5/Ittdk8XHtOreD1Mv8/NaxqaG4DDni0X2VVpQyzim/Qnl8q6S01kChkax5htuHlVpAgLhmLto/FIegnGxeCXZytKhTec8QnFYaQgex8WXeXjfS1eCN2GSRxaIpBPH0uIUGUlj6mjgvsc8IxhM/lOIHZMbHsVXCzGfY6A3aHvTx4oqPcLjfENTr8mS4h3Xiy1RwxgSO7uj/H1fUTTMWW0N/2rqcJOk7WY11CSzmG44rYWOwKyD4J5ISvtzoP4Q9Qx7FkOaQQ9JneVO5K98YtHZ7WIkCy4G57wxf0
+  grafana:cloudAccessPolicyToken:
+    secure: AAABAHmQJ2JqVpvl8ZARr9MsNgR19oNhmKdxfFsuVvQ0TFJsHGF1QEPXT7h0YcHADrQppVirvCTJevVy7DPbJwwEzCGBhmVrzIZYZhsnNLCmY0KNvdEUfiumaNNN/9CwJyo/ZazXJlNXrR3LtC4D83cG7VdWdUFms61V5svc0jevg0AD2fg3hpD7AkJ+Vb7lXhmW/cGOM5X9tPszIxLaeOlfhYPU0J2y

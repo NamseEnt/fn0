@@ -6,15 +6,15 @@ use execute::Job;
 use http_body_util::BodyExt;
 pub use http_body_util::Full;
 use hyper::Request;
-use measure_cpu_time::SystemClock;
-use std::path::PathBuf;
-pub use wasmtime_wasi_http::{bindings::http::types::ErrorCode, body::HyperOutgoingBody};
 use hyper::server::conn::http1;
 use hyper_util::{rt::TokioIo, service::TowerToHyperService};
+use measure_cpu_time::SystemClock;
 use socket2::{Domain, Protocol, Socket, Type};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
+pub use wasmtime_wasi_http::{bindings::http::types::ErrorCode, body::HyperOutgoingBody};
 
 pub struct Config {
     pub port: Option<u16>,
@@ -40,7 +40,8 @@ where
 
     let (job_tx, job_rx) = tokio::sync::mpsc::channel(10 * 1024);
 
-    let _telemetry_providers = telemetry::setup_telemetry(config.otlp_endpoint)?;
+    // Setup telemetry
+    let telemetry_providers = telemetry::setup_telemetry(config.otlp_endpoint)?;
 
     tokio::spawn({
         async move {
@@ -119,6 +120,9 @@ where
             }
         });
     }
+
+    telemetry::shutdown_telemetry(telemetry_providers)?;
+    Ok(())
 }
 
 fn internal_error_response() -> execute::Response {
