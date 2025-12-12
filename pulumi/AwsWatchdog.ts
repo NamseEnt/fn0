@@ -87,7 +87,8 @@ export class AwsWatchdog extends pulumi.ComponentResource {
             MAX_STARTING_COUNT: pulumi.jsonStringify(maxStartingCount),
             HEALTH_RECORD_BUCKET_NAME: healthRecordBucket.bucket,
             LOCK_TABLE_NAME: lockDdb.name,
-            WORKER_HEALTH_CHECKER_FN_NAME: workerHealthChecker.lambdaFunction.name,
+            WORKER_HEALTH_CHECKER_FN_NAME:
+              workerHealthChecker.lambdaFunction.name,
             ...ociWorkerInfraEnvs,
             ...cloudflareEnvs,
           })),
@@ -137,11 +138,10 @@ export class AwsWatchdog extends pulumi.ComponentResource {
               .apply((policyDoc) => JSON.stringify(policyDoc)),
           },
         ],
-        managedPolicyArns: [
-          aws.iam.ManagedPolicy.AWSLambdaBasicExecutionRole,
-        ],
+        managedPolicyArns: [aws.iam.ManagedPolicy.AWSLambdaBasicExecutionRole],
       }).arn,
     });
+    this.lambdaFunctionName = lambdaFunction.name;
 
     // new aws.lambda.Permission("watchdog-permission", {
     //   action: "lambda:InvokeFunction",
@@ -155,11 +155,6 @@ export class AwsWatchdog extends pulumi.ComponentResource {
     //   rule: eventRule.name,
     //   arn: lambdaFunction.arn,
     // });
-
-    this.lambdaFunctionName = lambdaFunction.name;
-    this.registerOutputs({
-      lambdaFunctionName: this.lambdaFunctionName,
-    });
   }
 }
 
