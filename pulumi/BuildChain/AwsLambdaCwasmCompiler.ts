@@ -1,6 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
-import path = require("node:path");
+import * as path from "node:path";
 
 export interface AwsLambdaCwasmCompilerArgs {
   region: pulumi.Input<string>;
@@ -64,7 +64,6 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
           const { execSync } = await import("node:child_process");
           const { readFileSync, createWriteStream } = await import("node:fs");
           const { rm } = await import("node:fs/promises");
-
           const { pipeline } = await import("node:stream/promises");
           const path = await import("node:path");
 
