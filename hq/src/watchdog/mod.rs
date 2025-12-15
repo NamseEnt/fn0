@@ -4,14 +4,16 @@ pub mod host_id;
 pub mod host_infra;
 pub mod host_registry;
 pub mod scaling;
+pub mod task_orchestrator;
 
 pub use context::Context;
 pub use host_id::HostId;
+pub use task_orchestrator::SharedState;
 
 use chrono::Duration;
 use host_infra::{HostHealthKind, HostHealthResponse, HostInfo};
 
-const DEFAULT_HEALTH_CHECK_TIMEOUT: Duration = Duration::seconds(2);
+const DEFAULT_HEALTH_CHECK_TIMEOUT: Duration = Duration::seconds(5);
 
 pub async fn check_health_single(
     host_info: &HostInfo,

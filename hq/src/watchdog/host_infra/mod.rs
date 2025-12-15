@@ -12,7 +12,7 @@ pub struct HostInfo {
     pub instance_state: HostInstanceState,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum HostInstanceState {
     Starting,
     Running,

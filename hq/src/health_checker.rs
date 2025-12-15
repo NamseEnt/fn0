@@ -1,231 +1,322 @@
+use chrono::{Duration, Utc};
 use color_eyre::eyre::Result;
-use dashmap::DashMap;
-use std::collections::HashSet;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::collections::{BTreeSet, HashSet};
+use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
+use std::time::Duration as StdDuration;
+use tokio::time::sleep;
 
-use crate::watchdog::{self, host_infra::HostHealthResponse, Context, HostId};
+use crate::watchdog::{
+    self,
+    host_infra::{HostInfo, HostInstanceState},
+    task_orchestrator::{HealthCheckEntry, HostInfoEntry, SharedState},
+    Context, HostId,
+};
 
-const HEARTBEAT_TIMEOUT_SECS: u64 = 10;
+// 타임아웃 및 간격 상수
+const HOST_INFRA_INTERVAL: StdDuration = StdDuration::from_secs(10);
+const HEALTH_CHECK_INTERVAL: StdDuration = StdDuration::from_secs(5);
+const REAPER_INTERVAL: StdDuration = StdDuration::from_secs(10);
+const DNS_SYNCER_INTERVAL: StdDuration = StdDuration::from_secs(5);
 
-enum HealthCheckMessage {
-    CheckResult {
-        host_id: HostId,
-        health_response: Option<HostHealthResponse>,
-    },
-}
-
-struct TaskInfo {
-    _join_handle: JoinHandle<()>,
-    heartbeat: Arc<AtomicU64>,
-    cancel_token: CancellationToken,
-}
+const HEALTH_CHECK_ELAPSED_THRESHOLD: Duration = Duration::seconds(15);
+const REGISTER_ELAPSED_THRESHOLD: Duration = Duration::seconds(60);
+const HEALTHY_IP_THRESHOLD: Duration = Duration::milliseconds(7500);
 
 pub async fn run() -> Result<()> {
     let host_infra = Arc::new(watchdog::host_infra::oci::OciHostInfra::new().await);
-    let host_registry = Arc::new(watchdog::host_registry::InMemoryHostRegistry::new());
+    let dns = Arc::new(watchdog::dns::cloudflare::CloudflareDns::new(None).await);
     let context = Arc::new(Context::new());
+    let shared_state = Arc::new(SharedState::new());
 
-    let (tx, mut rx) = mpsc::unbounded_channel();
-    let tasks: Arc<DashMap<HostId, TaskInfo>> = Arc::new(DashMap::new());
+    let task1 = host_infra_task(host_infra.clone(), shared_state.clone());
+    let task2 = health_checker_task(shared_state.clone(), context.clone());
+    let task3 = reaper_task(host_infra.clone(), shared_state.clone());
+    let task4 = dns_syncer_task(dns.clone(), shared_state.clone());
 
-    let mut discovery_interval = tokio::time::interval(Duration::from_secs(10));
-    discovery_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-    loop {
-        tokio::select! {
-            _ = tokio::signal::ctrl_c() => {
-                break;
-            }
-            _ = discovery_interval.tick() => {
-                manage_host_tasks(
-                    &tasks,
-                    host_infra.as_ref(),
-                    &host_registry,
-                    &tx,
-                    &context
-                ).await;
-            }
-            Some(msg) = rx.recv() => {
-                handle_health_check_result(
-                    msg,
-                    &host_registry,
-                    host_infra.as_ref(),
-                    &tasks,
-                    &context
-                ).await;
-            }
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            println!("Shutdown signal received");
         }
-    }
-
-    // Graceful shutdown
-    for entry in tasks.iter() {
-        entry.value().cancel_token.cancel();
+        result = task1 => {
+            eprintln!("host_infra_task exited: {:?}", result);
+        }
+        result = task2 => {
+            eprintln!("health_checker_task exited: {:?}", result);
+        }
+        result = task3 => {
+            eprintln!("reaper_task exited: {:?}", result);
+        }
+        result = task4 => {
+            eprintln!("dns_syncer_task exited: {:?}", result);
+        }
     }
 
     Ok(())
 }
 
-async fn health_check_task(
-    host_info: watchdog::host_infra::HostInfo,
-    domain: String,
-    tx: mpsc::UnboundedSender<HealthCheckMessage>,
-    heartbeat: Arc<AtomicU64>,
-    cancel_token: CancellationToken,
-) {
-    let mut interval = tokio::time::interval(Duration::from_secs(3));
+async fn host_infra_task(
+    host_infra: Arc<dyn watchdog::host_infra::HostInfra>,
+    shared_state: Arc<SharedState>,
+) -> Result<()> {
+    let mut interval = tokio::time::interval(HOST_INFRA_INTERVAL);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
-        tokio::select! {
-            _ = cancel_token.cancelled() => {
-                break;
+        interval.tick().await;
+
+        let host_infos = match host_infra.get_host_infos().await {
+            Ok(infos) => infos,
+            Err(e) => {
+                eprintln!("Failed to get host infos: {:?}", e);
+                continue;
             }
-            _ = interval.tick() => {
-                // Heartbeat 갱신
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-                heartbeat.store(now, Ordering::Relaxed);
-
-                // Health check 수행
-                let health_response = watchdog::check_health_single(&host_info, &domain).await;
-
-                // 결과 전송
-                let _ = tx.send(HealthCheckMessage::CheckResult {
-                    host_id: host_info.id.clone(),
-                    health_response,
-                });
-            }
-        }
-    }
-}
-
-async fn manage_host_tasks(
-    tasks: &DashMap<HostId, TaskInfo>,
-    host_infra: &dyn watchdog::host_infra::HostInfra,
-    host_registry: &watchdog::host_registry::InMemoryHostRegistry,
-    tx: &mpsc::UnboundedSender<HealthCheckMessage>,
-    context: &Context,
-) {
-    // 1. 현재 인프라의 호스트 목록 가져오기
-    let host_infos = match host_infra.get_host_infos().await {
-        Ok(infos) => infos,
-        Err(e) => {
-            eprintln!("Failed to get host infos: {e:?}");
-            return;
-        }
-    };
-
-    let current_hosts: HashSet<HostId> = host_infos.iter().map(|h| h.id.clone()).collect();
-
-    // 2. 인프라에서 제거된 호스트의 태스크 정리
-    let removed_hosts: Vec<HostId> = tasks
-        .iter()
-        .filter_map(|entry| {
-            if !current_hosts.contains(entry.key()) {
-                Some(entry.key().clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    for host_id in removed_hosts {
-        if let Some((_, task_info)) = tasks.remove(&host_id) {
-            task_info.cancel_token.cancel();
-            host_registry.mark_as_removed(&host_id).await;
-        }
-    }
-
-    // 3. 각 호스트에 대해 태스크 확인 및 생성
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    for host_info in host_infos {
-        let should_spawn = if let Some(task_info) = tasks.get(&host_info.id) {
-            // 태스크가 존재하면 heartbeat 확인
-            let last_heartbeat = task_info.heartbeat.load(Ordering::Relaxed);
-            let elapsed = now.saturating_sub(last_heartbeat);
-
-            if elapsed > HEARTBEAT_TIMEOUT_SECS {
-                // Heartbeat가 오래됨 → 기존 태스크 취소하고 새로 생성
-                task_info.cancel_token.cancel();
-                true
-            } else {
-                // Heartbeat 정상 → 유지
-                false
-            }
-        } else {
-            // 태스크가 없음 → 생성 필요
-            true
         };
 
-        if should_spawn {
-            let heartbeat = Arc::new(AtomicU64::new(now));
-            let cancel_token = CancellationToken::new();
+        let current_hosts: HashSet<HostId> = host_infos.iter().map(|h| h.id.clone()).collect();
 
-            let join_handle = tokio::spawn(health_check_task(
-                host_info.clone(),
-                context.domain.clone(),
-                tx.clone(),
-                heartbeat.clone(),
-                cancel_token.clone(),
-            ));
+        let removed_hosts: Vec<HostId> = shared_state
+            .host_info_map
+            .iter()
+            .filter_map(|entry| {
+                if !current_hosts.contains(entry.key()) {
+                    Some(entry.key().clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-            tasks.insert(
-                host_info.id.clone(),
-                TaskInfo {
-                    _join_handle: join_handle,
-                    heartbeat,
-                    cancel_token,
-                },
-            );
+        for host_id in &removed_hosts {
+            shared_state.host_info_map.remove(host_id);
+            shared_state.health_map.remove(host_id);
+            let mut last_terminate_set = shared_state.last_terminate_set.lock().await;
+            last_terminate_set.remove(host_id);
+            println!("Host {:?} removed from infrastructure", host_id);
+        }
+
+        let now = Utc::now();
+        for host_info in host_infos {
+            shared_state
+                .host_info_map
+                .entry(host_info.id.clone())
+                .and_modify(|entry| {
+                    entry.info = host_info.clone();
+                })
+                .or_insert_with(|| {
+                    println!("Host {:?} discovered", host_info.id);
+                    HostInfoEntry {
+                        info: host_info.clone(),
+                        registered_at: now,
+                    }
+                });
+        }
+
+        println!(
+            "Host info map updated: {} hosts, {} removed",
+            shared_state.host_info_map.len(),
+            removed_hosts.len()
+        );
+    }
+}
+
+async fn health_checker_task(
+    shared_state: Arc<SharedState>,
+    context: Arc<Context>,
+) -> Result<()> {
+    let mut interval = tokio::time::interval(HEALTH_CHECK_INTERVAL);
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        interval.tick().await;
+
+        let to_remove: Vec<HostId> = shared_state
+            .health_map
+            .iter()
+            .filter_map(|entry| {
+                let host_id = entry.key().clone();
+                if let Some(host_entry) = shared_state.host_info_map.get(&host_id) {
+                    if host_entry.info.instance_state == HostInstanceState::Terminating {
+                        return Some(host_id);
+                    }
+                    None
+                } else {
+                    Some(host_id)
+                }
+            })
+            .collect();
+
+        for host_id in &to_remove {
+            shared_state.health_map.remove(host_id);
+            println!("Removed {:?} from health_map (not in host_info_map or terminating)", host_id);
+        }
+
+        let hosts: Vec<(HostId, HostInfo)> = shared_state
+            .host_info_map
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().info.clone()))
+            .collect();
+
+        let mut tasks = Vec::new();
+        for (host_id, host_info) in hosts {
+            let shared_state = shared_state.clone();
+            let domain = context.domain.clone();
+            let task = tokio::spawn(async move {
+                let sleep_ms = rand::random::<u64>() % 1000;
+                sleep(StdDuration::from_millis(sleep_ms)).await;
+
+                let health_response = watchdog::check_health_single(&host_info, &domain).await;
+
+                if health_response.is_some() {
+                    shared_state.health_map.insert(
+                        host_id.clone(),
+                        HealthCheckEntry {
+                            last_check_time: Utc::now(),
+                        },
+                    );
+                    println!("Health check passed for {:?}", host_id);
+                } else {
+                    println!("Health check failed/timeout for {:?}", host_id);
+                }
+            });
+            tasks.push(task);
+        }
+
+        for task in tasks {
+            let _ = task.await;
         }
     }
 }
 
-async fn handle_health_check_result(
-    msg: HealthCheckMessage,
-    host_registry: &watchdog::host_registry::InMemoryHostRegistry,
-    host_infra: &dyn watchdog::host_infra::HostInfra,
-    tasks: &DashMap<HostId, TaskInfo>,
-    context: &Context,
-) {
-    match msg {
-        HealthCheckMessage::CheckResult {
-            host_id,
-            health_response,
-        } => {
-            match host_registry
-                .update_health_check(context, &host_id, health_response)
-                .await
-            {
-                Ok(watchdog::host_registry::HostAction::Terminate) => {
-                    // 호스트 종료 요청
-                    if let Err(e) = host_infra.terminate(&host_id).await {
-                        eprintln!("Failed to terminate host {host_id:?}: {e:?}");
-                    }
+async fn reaper_task(
+    host_infra: Arc<dyn watchdog::host_infra::HostInfra>,
+    shared_state: Arc<SharedState>,
+) -> Result<()> {
+    let mut interval = tokio::time::interval(REAPER_INTERVAL);
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-                    // 태스크도 즉시 종료
-                    if let Some(task_info) = tasks.get(&host_id) {
-                        task_info.cancel_token.cancel();
-                    }
-                    tasks.remove(&host_id);
+    loop {
+        interval.tick().await;
+
+        let now = Utc::now();
+        let last_terminate_set = shared_state.last_terminate_set.lock().await.clone();
+
+        let terminate_targets: Vec<(HostId, HostInfo)> = shared_state
+            .host_info_map
+            .iter()
+            .filter_map(|entry| {
+                let host_id = entry.key();
+                let host_entry = entry.value();
+
+                if last_terminate_set.contains(host_id) {
+                    return None;
                 }
-                Ok(watchdog::host_registry::HostAction::None) => {
-                    // 정상 - 아무 작업 없음
+
+                if host_entry.info.instance_state == HostInstanceState::Terminating {
+                    return None;
                 }
-                Err(e) => {
-                    eprintln!("Failed to update health check for {host_id:?}: {e:?}");
+
+                let register_elapsed = now - host_entry.registered_at;
+                if register_elapsed < REGISTER_ELAPSED_THRESHOLD {
+                    return None;
                 }
+
+                let health_check_elapsed = if let Some(health_entry) = shared_state.health_map.get(host_id) {
+                    now - health_entry.last_check_time
+                } else {
+                    Duration::days(10000)
+                };
+
+                if health_check_elapsed > HEALTH_CHECK_ELAPSED_THRESHOLD {
+                    Some((host_id.clone(), host_entry.info.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !terminate_targets.is_empty() {
+            println!("Reaper found {} hosts to terminate", terminate_targets.len());
+        }
+
+        let mut tasks = Vec::new();
+        for (host_id, _host_info) in &terminate_targets {
+            let host_infra = host_infra.clone();
+            let host_id = host_id.clone();
+            let task = tokio::spawn(async move {
+                let sleep_ms = rand::random::<u64>() % 1000;
+                sleep(StdDuration::from_millis(sleep_ms)).await;
+
+                if let Err(e) = host_infra.terminate(&host_id).await {
+                    eprintln!("Failed to terminate host {:?}: {:?}", host_id, e);
+                } else {
+                    println!("Terminated host {:?}", host_id);
+                }
+            });
+            tasks.push(task);
+        }
+
+        for task in tasks {
+            let _ = task.await;
+        }
+
+        let mut new_terminate_set = HashSet::new();
+        for (host_id, _) in terminate_targets {
+            new_terminate_set.insert(host_id);
+        }
+        *shared_state.last_terminate_set.lock().await = new_terminate_set;
+    }
+}
+
+async fn dns_syncer_task(
+    dns: Arc<dyn watchdog::dns::Dns>,
+    shared_state: Arc<SharedState>,
+) -> Result<()> {
+    let mut interval = tokio::time::interval(DNS_SYNCER_INTERVAL);
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        interval.tick().await;
+
+        let now = Utc::now();
+
+        let healthy_ips: BTreeSet<IpAddr> = shared_state
+            .health_map
+            .iter()
+            .filter_map(|entry| {
+                let host_id = entry.key();
+                let health_entry = entry.value();
+
+                let elapsed = now - health_entry.last_check_time;
+                if elapsed > HEALTHY_IP_THRESHOLD {
+                    return None;
+                }
+
+                shared_state
+                    .host_info_map
+                    .get(host_id)
+                    .and_then(|host_entry| host_entry.info.ip)
+            })
+            .collect();
+
+        let cached_ips = shared_state.dns_cache.lock().await.clone();
+
+        if healthy_ips == cached_ips {
+            continue;
+        }
+
+        let healthy_ips_vec: Vec<IpAddr> = healthy_ips.iter().copied().collect();
+        match dns.sync_ips(healthy_ips_vec).await {
+            Ok(_) => {
+                println!(
+                    "DNS synced. Previous: {}, Current: {}",
+                    cached_ips.len(),
+                    healthy_ips.len()
+                );
+                *shared_state.dns_cache.lock().await = healthy_ips;
+            }
+            Err(e) => {
+                eprintln!("Failed to sync DNS: {:?}", e);
             }
         }
     }
