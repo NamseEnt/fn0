@@ -24,6 +24,8 @@ hyper = { version = "1", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["full"] }
+oci-rust-sdk = { path = "../oci-rust-sdk", features = ["compute"] }
+base64 = "0.22.1"
 
 [dev-dependencies]
 wiremock = "0.6"
