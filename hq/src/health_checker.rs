@@ -1,5 +1,5 @@
 use crate::*;
-use color_eyre::eyre::{Ok, Result};
+use color_eyre::eyre::Result;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -63,11 +63,15 @@ fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMa
         tokio::spawn(async move {
             sleep(Duration::from_millis(rand::random::<u64>() % 1000)).await;
 
-            client
+            if let Err(err) = client
                 .get(format!("https://health.{DOMAIN}/health"))
                 .send()
-                .await?
-                .error_for_status()?;
+                .await
+                .map(|r| r.error_for_status())
+            {
+                println!("Failed to send health check: {ip} {err}");
+                return;
+            }
 
             health_check_map
                 .entry(host_id.clone())
@@ -79,8 +83,6 @@ fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMa
                     ip,
                     client,
                 });
-
-            Ok(())
         });
     }
 }

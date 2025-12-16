@@ -1,13 +1,19 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as oci from "@pulumi/oci";
+import * as random from "@pulumi/random";
+import * as command from "@pulumi/command";
+import * as k8s from "@pulumi/kubernetes";
+import * as docker from "@pulumi/docker";
+import * as yaml from "js-yaml";
 
 export interface OciHeadQuarterArgs {
   region: pulumi.Input<string>;
+  compartmentId: pulumi.Input<string>;
+  vcnId: pulumi.Input<string>;
+  ipv6cidrBlocks: pulumi.Input<string[]>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
-  ipv6cidrBlocks: pulumi.Output<string[]>;
-
   constructor(
     name: string,
     args: OciHeadQuarterArgs,
@@ -15,218 +21,342 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
   ) {
     super("pkg:index:oci-head-quarter", name, args, opts);
 
-    const compartment = new oci.identity.Compartment(
-      "compartment",
+    const { region, compartmentId, vcnId } = args;
+
+    const nameSuffix8 = new random.RandomString(
+      "name-suffix-8",
       {
-        description: "Compartment for fn0 OCI Head Quarter",
-        name: `fn0-head-quater-${name}`,
+        length: 8,
+        special: false,
+        upper: false,
+      },
+      { parent: this }
+    ).result;
+
+    const internetGateway = new oci.core.InternetGateway(
+      "igw",
+      {
+        compartmentId,
+        vcnId,
       },
       { parent: this }
     );
 
-    const { nlb, vcn, subnet } = setVcn(this, compartment);
-
-    this.ipv6cidrBlocks = vcn.ipv6cidrBlocks;
-
-    const imageId = compartment.id.apply((compartmentId) =>
-      oci.core
-        .getImages({
-          compartmentId,
-          operatingSystem: "Oracle Linux",
-          operatingSystemVersion: "10",
-          sortOrder: "DESC",
-        })
-        .then((x) => {
-          const imageId = x.images.find(
-            (x) => x.createImageAllowed && x.displayName.includes("-aarch64-")
-          )?.id;
-
-          if (!imageId) {
-            throw new Error("can not find image");
-          }
-
-          return imageId;
-        })
+    const routeTable = new oci.core.RouteTable(
+      "route-table",
+      {
+        compartmentId,
+        vcnId,
+        routeRules: [
+          {
+            destination: "::/0",
+            destinationType: "CIDR_BLOCK",
+            networkEntityId: internetGateway.id,
+          },
+          {
+            destination: "0.0.0.0/0",
+            destinationType: "CIDR_BLOCK",
+            networkEntityId: internetGateway.id,
+          },
+        ],
+      },
+      { parent: this }
     );
 
-    const instanceConfiguration = new oci.core.InstanceConfiguration(
-      "instance-configuration",
+    const myIp = new command.local.Command(
+      "my-ip",
       {
-        compartmentId: compartment.id,
-        instanceDetails: {
-          instanceType: "compute",
-          launchDetails: {
-            shape: "VM.Standard.A1.Flex",
-            shapeConfig: {
-              ocpus: 1,
-              memoryInGbs: 6,
-            },
-            sourceDetails: {
-              sourceType: "image",
-              imageId,
-            },
-            createVnicDetails: {
+        create: "curl -s ifconfig.co",
+      },
+      { parent: this }
+    ).stdout;
+
+    const securityList = new oci.core.SecurityList(
+      "security-list",
+      {
+        compartmentId,
+        vcnId,
+        egressSecurityRules: [
+          {
+            destination: "0.0.0.0/0",
+            destinationType: "CIDR_BLOCK",
+            protocol: "all",
+            stateless: false,
+          },
+          {
+            destination: "::/0",
+            destinationType: "CIDR_BLOCK",
+            protocol: "all",
+            stateless: false,
+          },
+        ],
+        ingressSecurityRules: [
+          {
+            source: myIp.apply((ip) => `${ip}/32`),
+            protocol: "all",
+            stateless: false,
+          },
+        ],
+      },
+      { parent: this }
+    );
+
+    const subnet = new oci.core.Subnet(
+      "subnet",
+      {
+        compartmentId,
+        availabilityDomain: pulumi
+          .all([compartmentId])
+          .apply(([compartmentId]) =>
+            oci.identity
+              .getAvailabilityDomain({
+                adNumber: 1,
+                compartmentId,
+              })
+              .then((x) => x.name)
+          ),
+        vcnId,
+        ipv4cidrBlocks: ["10.0.0.0/24"],
+        ipv6cidrBlocks: pulumi
+          .all([args.ipv6cidrBlocks])
+          .apply(([ipv6cidrBlocks]) =>
+            ipv6cidrBlocks.map((x) => x.replace("/56", "/64"))
+          ),
+        routeTableId: routeTable.id,
+        securityListIds: [securityList.id],
+      },
+      { parent: this }
+    );
+
+    const clusterOptions = pulumi
+      .all([compartmentId])
+      .apply(([compartmentId]) => {
+        return oci.containerengine.getClusterOption({
+          clusterOptionId: "all",
+          compartmentId,
+        });
+      });
+
+    const kubernetesVersion = clusterOptions.apply((options) => {
+      return options.kubernetesVersions.sort().pop()!;
+    });
+
+    const cluster = new oci.containerengine.Cluster(
+      "cluster",
+      {
+        compartmentId,
+        kubernetesVersion,
+        vcnId,
+        name: pulumi.interpolate`fn0-${nameSuffix8}`,
+      },
+      { parent: this }
+    );
+
+    const poolOptions = pulumi
+      .all([compartmentId, kubernetesVersion])
+      .apply(([compartmentId, kubernetesVersion]) => {
+        return oci.containerengine.getNodePoolOption({
+          compartmentId,
+          nodePoolOptionId: "all",
+          nodePoolK8sVersion: kubernetesVersion,
+        });
+      });
+
+    const imageId = poolOptions.apply(
+      (options) =>
+        options.sources
+          .filter((x) => x.sourceName.includes("-aarch64-"))
+          .sort((a, b) => b.sourceName.localeCompare(a.sourceName))
+          .pop()!.imageId
+    );
+
+    const nodePool = new oci.containerengine.NodePool(
+      "node-pool",
+      {
+        compartmentId,
+        clusterId: cluster.id,
+        kubernetesVersion,
+        name: pulumi.interpolate`fn0-nodepool-${nameSuffix8}`,
+        nodeShape: "VM.Standard.A1.Flex",
+        nodeShapeConfig: {
+          ocpus: 1,
+          memoryInGbs: 6,
+        },
+        nodeConfigDetails: {
+          size: 1,
+          placementConfigs: [
+            {
+              availabilityDomain: subnet.availabilityDomain,
               subnetId: subnet.id,
-              assignIpv6ip: true,
-              assignPublicIp: true,
             },
+          ],
+        },
+        nodeSourceDetails: {
+          imageId,
+          sourceType: "IMAGE",
+        },
+      },
+      { parent: this }
+    );
+
+    const { hqImage } = deployDocker(this);
+
+    // const config = new pulumi.Config("oci");
+    // const tenancyOcid = config.require("tenancyOcid");
+    // const userOcid = config.require("userOcid");
+    // const fingerprint = config.require("fingerprint");
+    // const privateKey = config.require("privateKey");
+
+    // const kubeconfig = pulumi
+    //   .all([cluster.id, region])
+    //   .apply(([clusterId, region]) =>
+    //     oci.containerengine
+    //       .getClusterKubeConfig({
+    //         clusterId,
+    //       })
+    //       .then((kc) => {
+    //         const content = yaml.load(kc.content) as {
+    //           users: {
+    //             exec: {
+    //               env: { name: string; value: string }[];
+    //             };
+    //           }[];
+    //         };
+    //         pulumi.log.info("after load");
+    //         const { env } = content.users[0].exec;
+    //         env.push(
+    //           { name: "OCI_CLI_AUTH", value: "api_key" },
+    //           { name: "OCI_CLI_REGION", value: region },
+    //           { name: "OCI_CLI_USER", value: userOcid },
+    //           { name: "OCI_CLI_TENANCY", value: tenancyOcid },
+    //           { name: "OCI_CLI_FINGERPRINT", value: fingerprint },
+    //           { name: "OCI_CLI_KEY_CONTENT", value: privateKey }
+    //         );
+    //         const result = yaml.dump(content);
+    //         return result;
+    //       })
+    //   );
+
+    // const k8sProvider = new k8s.Provider(
+    //   "oke-k8s-provider",
+    //   {
+    //     kubeconfig,
+    //   },
+    //   { parent: this, dependsOn: [nodePool] }
+    // );
+
+    // const appLabels = { app: "hq" };
+
+    // const deployment = new k8s.apps.v1.Deployment(
+    //   "hq-deployment",
+    //   {
+    //     metadata: { labels: appLabels },
+    //     spec: {
+    //       replicas: 1,
+    //       selector: { matchLabels: appLabels },
+    //       template: {
+    //         metadata: { labels: appLabels },
+    //         spec: {
+    //           containers: [
+    //             {
+    //               name: appLabels.app,
+    //               image: hqImage.imageName,
+    //               ports: [{ containerPort: 80 }],
+    //               livenessProbe: {
+    //                 httpGet: {
+    //                   path: "/health",
+    //                   port: 80,
+    //                 },
+    //                 initialDelaySeconds: 15,
+    //                 periodSeconds: 5,
+    //                 timeoutSeconds: 5,
+    //                 failureThreshold: 3,
+    //               },
+    //             },
+    //           ],
+    //         },
+    //       },
+    //     },
+    //   },
+    //   { provider: k8sProvider, parent: this }
+    // );
+
+    function deployDocker(parent: pulumi.Resource) {
+      const repo = new oci.artifacts.ContainerRepository(
+        "hq-repo",
+        {
+          compartmentId,
+          displayName: pulumi.interpolate`hq-repo-${nameSuffix8}`,
+          isPublic: false,
+        },
+        { parent, retainOnDelete: false }
+      );
+
+      const user = new oci.identity.User(
+        "hq-user",
+        {
+          name: pulumi.interpolate`hq-user-${nameSuffix8}`,
+          description: "User for HQ deployment",
+        },
+        { parent }
+      );
+      const dockerGroup = new oci.identity.Group(
+        "hq-docker-pusher-group",
+        {
+          name: pulumi.interpolate`hq-docker-pushers-${nameSuffix8}`,
+          description: "Group allowed to push to OCIR",
+        },
+        { parent }
+      );
+      new oci.identity.UserGroupMembership(
+        "hq-membership",
+        {
+          userId: user.id,
+          groupId: dockerGroup.id,
+        },
+        { parent }
+      );
+      new oci.identity.Policy(
+        "ocir-push-policy",
+        {
+          compartmentId,
+          name: pulumi.interpolate`allow-docker-push-${nameSuffix8}`,
+          description: "Policy to allow docker pushers to manage repos",
+          statements: [
+            pulumi.interpolate`Allow group ${dockerGroup.name} to manage repos in compartment id ${compartmentId}`,
+          ],
+        },
+        { dependsOn: [dockerGroup], parent }
+      );
+      const authToken = new oci.identity.AuthToken(
+        "hq-auth-token",
+        {
+          userId: user.id,
+          description: "AuthToken for HQ deployment",
+        },
+        { parent }
+      );
+
+      const registryUrl = pulumi.interpolate`ocir.${region}.oci.oraclecloud.com`;
+
+      const hqImage = new docker.Image(
+        "hq-image",
+        {
+          imageName: pulumi.interpolate`${registryUrl}/${repo.namespace}/${repo.displayName}:v1`,
+          build: {
+            context: "../hq",
+            platform: "linux/arm64",
+          },
+          registry: {
+            server: registryUrl,
+            username: pulumi.interpolate`${repo.namespace}/${user.name}`,
+            password: authToken.token,
           },
         },
-      },
-      { parent: this }
-    );
+        { parent }
+      );
 
-    const backendSet = new oci.networkloadbalancer.BackendSet(
-      "nlb-backend-set",
-      {
-        networkLoadBalancerId: nlb.id,
-        healthChecker: {
-          protocol: "HTTP",
-          intervalInMillis: 10000,
-          port: 8080,
-          retries: 3,
-          returnCode: 200,
-          timeoutInMillis: 3000,
-        },
-        policy: "FIVE_TUPLE",
-      }
-    );
-
-    new oci.core.InstancePool("instance-pool", {
-      compartmentId: compartment.id,
-      instanceConfigurationId: instanceConfiguration.id,
-      placementConfigurations: [
-        {
-          availabilityDomain: subnet.availabilityDomain,
-          primarySubnetId: subnet.id,
-        },
-      ],
-      loadBalancers: [
-        {
-          backendSetName: backendSet.name,
-          loadBalancerId: backendSet.networkLoadBalancerId,
-          port: 8080,
-          vnicSelection: "PrimaryVnic",
-        },
-      ],
-      size: 1,
-    });
+      return { hqImage };
+    }
   }
-}
-
-function setVcn(self: pulumi.Resource, compartment: oci.identity.Compartment) {
-  const vcn = new oci.core.Vcn(
-    "vcn",
-    {
-      compartmentId: compartment.id,
-      isIpv6enabled: true,
-      isOracleGuaAllocationEnabled: true,
-      cidrBlocks: ["10.0.0.0/16"],
-    },
-    { parent: self }
-  );
-
-  const internetGateway = new oci.core.InternetGateway(
-    "igw",
-    {
-      compartmentId: compartment.id,
-      vcnId: vcn.id,
-    },
-    { parent: self }
-  );
-
-  const routeTable = new oci.core.RouteTable(
-    "route-table",
-    {
-      compartmentId: compartment.id,
-      vcnId: vcn.id,
-      routeRules: [
-        {
-          destination: "::/0",
-          destinationType: "CIDR_BLOCK",
-          networkEntityId: internetGateway.id,
-        },
-        {
-          destination: "0.0.0.0/0",
-          destinationType: "CIDR_BLOCK",
-          networkEntityId: internetGateway.id,
-        },
-      ],
-    },
-    { parent: self }
-  );
-
-  const subnet = new oci.core.Subnet(
-    "subnet",
-    {
-      compartmentId: compartment.id,
-      availabilityDomain: compartment.id.apply((compartmentId) =>
-        oci.identity
-          .getAvailabilityDomain({
-            adNumber: 1,
-            compartmentId,
-          })
-          .then((x) => x.name)
-      ),
-      vcnId: vcn.id,
-      ipv4cidrBlocks: ["10.0.0.0/24"],
-      ipv6cidrBlocks: vcn.ipv6cidrBlocks.apply((x) =>
-        x.map((x) => x.replace("/56", "/64"))
-      ),
-      prohibitInternetIngress: true,
-      prohibitPublicIpOnVnic: false,
-      routeTableId: routeTable.id,
-    },
-    { parent: self, deleteBeforeReplace: true }
-  );
-
-  const nlb = new oci.networkloadbalancer.NetworkLoadBalancer(
-    "nlb",
-    {
-      compartmentId: compartment.id,
-      displayName: "fn0-hq",
-      subnetId: subnet.id,
-    },
-    { parent: self }
-  );
-
-  return {
-    vcn,
-    nlb,
-    subnet,
-  };
-}
-
-function setHqBinaryObject(
-  self: pulumi.Resource,
-  compartment: oci.identity.Compartment
-) {
-  const bucket = new oci.objectstorage.Bucket("app-bucket", {
-    compartmentId: compartment.id,
-    namespace: compartment.id.apply((compartmentId) =>
-      oci.objectstorage
-        .getNamespace({ compartmentId })
-        .then((ns) => ns.namespace)
-    ),
-    name: "fn0-hq-binary-object",
-    accessType: "NoPublicAccess",
-  });
-
-  const appObject = new oci.objectstorage.StorageObject(
-    "app-binary",
-    {
-      bucket: bucket.name,
-      namespace: bucket.namespace,
-      object: "hq",
-      source: new pulumi.asset.FileAsset(binaryPath),
-      contentType: "application/octet-stream",
-    },
-    { dependsOn: [buildCommand] }
-  ); // 중요: 빌드가 끝난 후 업로드
-
-  return {
-    vcn,
-    nlb,
-    subnet,
-  };
 }

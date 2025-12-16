@@ -20,11 +20,15 @@ export class B2CloudflareStaticCdn extends pulumi.ComponentResource {
     const b2AppKey = b2Config.requireSecret("applicationKey");
 
     const bucketName = pulumi.interpolate`fn0-${
-      new random.RandomString("b2-bucket-name", {
-        length: 32,
-        special: false,
-        upper: false,
-      }).result
+      new random.RandomString(
+        "b2-bucket-name",
+        {
+          length: 32,
+          special: false,
+          upper: false,
+        },
+        { parent: this }
+      ).result
     }`;
 
     new b2.Bucket(
