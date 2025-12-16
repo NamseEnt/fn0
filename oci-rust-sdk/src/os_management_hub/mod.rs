@@ -21,7 +21,7 @@ use std::sync::Arc;
 ///
 /// ```no_run
 /// use std::time::Duration;
-/// use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig};
+/// use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig};
 /// use oci_rust_sdk::os_management_hub;
 ///
 /// # async fn example() -> oci_rust_sdk::core::Result<()> {
@@ -30,6 +30,7 @@ use std::sync::Arc;
 ///     auth_provider: auth,
 ///     region: Region::ApSeoul1,
 ///     timeout: Duration::from_secs(30),
+///     retry: RetryConfig::no_retry(),
 /// })?;
 ///
 /// let request = os_management_hub::ListManagedInstancesRequest::builder().build();
