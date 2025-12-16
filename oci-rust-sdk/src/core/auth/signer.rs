@@ -1,6 +1,6 @@
 use crate::core::auth::provider::AuthProvider;
-use base64::{engine::general_purpose, Engine as _};
-use rsa::{pkcs8::DecodePrivateKey, Pkcs1v15Sign, RsaPrivateKey};
+use base64::{Engine as _, engine::general_purpose};
+use rsa::{Pkcs1v15Sign, RsaPrivateKey, pkcs8::DecodePrivateKey};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
@@ -64,20 +64,20 @@ impl RequestSigner {
         }
 
         // 2. Add host header if not present
-        if !headers.contains_key("host") {
-            if let Some(host) = url.host_str() {
-                let host_value = if let Some(port) = url.port() {
-                    format!("{}:{}", host, port)
-                } else {
-                    host.to_string()
-                };
-                headers.insert(
-                    "host",
-                    host_value.parse().map_err(|e| {
-                        crate::core::OciError::SigningError(format!("Invalid host header: {}", e))
-                    })?,
-                );
-            }
+        if !headers.contains_key("host")
+            && let Some(host) = url.host_str()
+        {
+            let host_value = if let Some(port) = url.port() {
+                format!("{}:{}", host, port)
+            } else {
+                host.to_string()
+            };
+            headers.insert(
+                "host",
+                host_value.parse().map_err(|e| {
+                    crate::core::OciError::SigningError(format!("Invalid host header: {}", e))
+                })?,
+            );
         }
 
         // 3. Collect headers to sign

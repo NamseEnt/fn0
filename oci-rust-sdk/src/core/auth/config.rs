@@ -111,10 +111,10 @@ impl AuthProvider for ConfigFileAuthProvider {
 
 /// Expand tilde (~) in paths to home directory
 fn expand_tilde(path: &Path) -> PathBuf {
-    if let Ok(p) = path.strip_prefix("~") {
-        if let Some(home) = dirs::home_dir() {
-            return home.join(p);
-        }
+    if let Ok(p) = path.strip_prefix("~")
+        && let Some(home) = dirs::home_dir()
+    {
+        return home.join(p);
     }
     path.to_path_buf()
 }

@@ -73,7 +73,7 @@ pub trait ResourceSearch: Send + Sync {
 pub fn client<A: crate::core::auth::AuthProvider + 'static>(
     config: crate::core::ClientConfig<A>,
 ) -> Result<Arc<dyn ResourceSearch>> {
-    let endpoint = config.region.query_endpoint();
+    let endpoint = config.region.endpoint("query");
     let oci_client = crate::core::OciClient::new(
         Arc::new(config.auth_provider),
         endpoint,

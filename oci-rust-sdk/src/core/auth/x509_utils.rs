@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use x509_parser::prelude::*;
 
 /// Extract tenant OCID from X.509 certificate subject DN
@@ -15,10 +15,10 @@ pub fn extract_tenant_id(cert_pem: &str) -> crate::core::Result<String> {
     // Search through subject DN components
     for rdn in cert.subject().iter() {
         for attr in rdn.iter() {
-            if let Ok(value_str) = attr.as_str() {
-                if let Some(tenant_id) = extract_tenant_from_value(value_str) {
-                    return Ok(tenant_id);
-                }
+            if let Ok(value_str) = attr.as_str()
+                && let Some(tenant_id) = extract_tenant_from_value(value_str)
+            {
+                return Ok(tenant_id);
             }
         }
     }
