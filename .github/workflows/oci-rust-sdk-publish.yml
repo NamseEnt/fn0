@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'oci-rust-sdk/**'
+      - '.github/workflows/oci-rust-sdk-publish.yml'
 
 jobs:
   publish:
