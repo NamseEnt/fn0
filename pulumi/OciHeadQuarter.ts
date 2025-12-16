@@ -13,6 +13,7 @@ export interface OciHeadQuarterArgs {
   vcnId: pulumi.Input<string>;
   ipv6cidrBlocks: pulumi.Input<string[]>;
   ociWorkerInfraEnvs: pulumi.Input<OciWorkerInfraEnvs>;
+  grafanaAlloyHelmValues: pulumi.Input<string>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
@@ -23,7 +24,13 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
   ) {
     super("pkg:index:oci-head-quarter", name, args, opts);
 
-    const { region, compartmentId, vcnId, ociWorkerInfraEnvs } = args;
+    const {
+      region,
+      compartmentId,
+      vcnId,
+      ociWorkerInfraEnvs,
+      grafanaAlloyHelmValues,
+    } = args;
 
     const nameSuffix8 = new random.RandomString(
       "name-suffix-8",
@@ -246,6 +253,24 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
         kubeconfig,
       },
       { parent: this, dependsOn: [nodePool] }
+    );
+
+    const grafanaMonitoring = new k8s.helm.v3.Release(
+      "grafana-k8s-monitoring",
+      {
+        chart: "k8s-monitoring",
+        repositoryOpts: {
+          repo: "https://grafana.github.io/helm-charts",
+        },
+        namespace: "monitoring",
+        createNamespace: true,
+        values: pulumi
+          .all([grafanaAlloyHelmValues])
+          .apply(([grafanaAlloyHelmValues]) =>
+            yaml.load(grafanaAlloyHelmValues)
+          ),
+      },
+      { provider: k8sProvider, parent: this, dependsOn: [nodePool] }
     );
 
     const appLabels = { app: "hq" };

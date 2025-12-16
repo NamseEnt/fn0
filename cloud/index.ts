@@ -44,6 +44,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("ociHeadQuarter", {
   vcnId: ociHeadQuarterVcn.vcnId,
   ipv6cidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
   ociWorkerInfraEnvs: ociComputeWorker.infraEnvs,
+  grafanaAlloyHelmValues: config.require("GRAFANA_ALLOY_HELM_VALUES"),
 });
 
 // const awsWatchdog = new fn0.AwsWatchdog("awsWatchdog", {
