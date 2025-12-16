@@ -17,6 +17,12 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: oci-rust-sdk/target
+          key: ${{ runner.os }}-oci-rust-sdk
+
       - name: Run tests
         working-directory: oci-rust-sdk
         run: cargo test --all-features
