@@ -1,9 +1,11 @@
 [package]
 name = "oci-rust-sdk"
 version = "0.1.0"
-edition = "2021"
-license = "MIT OR Apache-2.0"
-authors = ["OCI Rust SDK Contributors"]
+edition = "2024"
+description = "Unofficial Oracle OCI SDK for Rust"
+authors = ["namse"]
+license = "AGPL-3.0"
+repository = "https://github.com/namseent/fn0/oci-rust-sdk"
 
 [features]
 default = []
@@ -55,6 +57,10 @@ required-features = ["resource_search"]
 
 [[example]]
 name = "test_lifecycle_state"
+required-features = ["compute"]
+
+[[example]]
+name = "launch_instance_configuration"
 required-features = ["compute"]
 
 [[example]]

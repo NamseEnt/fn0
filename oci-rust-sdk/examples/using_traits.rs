@@ -3,7 +3,7 @@
 //! This example shows how to use the OsManagementHub trait for
 //! dependency injection and testing.
 
-use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, Result};
+use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig, Result};
 use oci_rust_sdk::os_management_hub::{
     self, ListManagedInstancesRequest, ListManagedInstancesResponse, ManagedInstanceCollection,
     OsManagementHub,
@@ -76,6 +76,7 @@ async fn main() -> Result<()> {
                 auth_provider: auth,
                 region: Region::ApSeoul1,
                 timeout: Duration::from_secs(30),
+                retry: RetryConfig::no_retry(),
             })?;
 
             // Already returns Arc<dyn OsManagementHub> - ready for dependency injection
