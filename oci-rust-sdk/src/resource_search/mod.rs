@@ -19,7 +19,7 @@ pub use requests::*;
 /// ```no_run
 /// use std::time::Duration;
 /// use oci_rust_sdk::{
-///     core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig},
+///     core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig},
 ///     resource_search::{
 ///         self, SearchResourcesRequest, SearchResourcesRequestRequiredFields, SearchDetails,
 ///         StructuredSearchDetails, MatchingContextType,
@@ -32,6 +32,7 @@ pub use requests::*;
 ///     auth_provider: auth,
 ///     region: Region::ApSeoul1,
 ///     timeout: Duration::from_secs(30),
+///     retry: RetryConfig::no_retry(),
 /// })?;
 ///
 /// let search_details = SearchDetails::Structured(StructuredSearchDetails {
