@@ -10,11 +10,14 @@ const REAPER_INTERVAL: Duration = Duration::from_secs(10);
 const REGISTER_ELAPSED_THRESHOLD: Duration = Duration::from_secs(60);
 const HEALTH_CHECK_ELAPSED_THRESHOLD: Duration = Duration::from_secs(15);
 
+#[instrument(skip_all, name = "reaper_loop")]
 pub async fn run(
     host_infra: Arc<dyn HostInfra>,
     host_info_map: HostInfoMap,
     health_check_map: HealthCheckMap,
 ) -> Result<()> {
+    info!("Starting reaper loop");
+
     let mut interval = interval(REAPER_INTERVAL);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -22,6 +25,7 @@ pub async fn run(
 
     loop {
         interval.tick().await;
+        info!("reaper tick");
 
         let mut terminate_set = BTreeSet::new();
 
@@ -32,19 +36,31 @@ pub async fn run(
                 && host_info.instance_state != HostInstanceState::Terminating
                 && !last_terminate_set.contains(health_check.key())
             {
+                info!(host_id = %health_check.key(), "Host identified for termination");
                 terminate_set.insert(health_check.key().clone());
             }
         }
 
+        telemetry::ReaperTerminateCandidates {
+            count: terminate_set.len() as f64,
+        }.send();
+
         for host_id in terminate_set.clone() {
+            telemetry::ReaperTerminateAttempts.send();
             let host_infra = host_infra.clone();
-            tokio::spawn(async move {
-                sleep(Duration::from_millis(rand::random::<u64>() % 1000)).await;
-                let Err(err) = host_infra.terminate(&host_id).await else {
-                    return;
-                };
-                eprintln!("Failed to terminate host {:?}: {:?}", host_id, err);
-            });
+            let span = tracing::info_span!("reaper_terminate_host", host_id = %host_id);
+
+            tokio::spawn(
+                async move {
+                    sleep(Duration::from_millis(rand::random::<u64>() % 1000)).await;
+                    let Err(err) = host_infra.terminate(&host_id).await else {
+                        info!("Host terminated successfully");
+                        return;
+                    };
+                    error!(%err, "Failed to terminate host");
+                }
+                .instrument(span),
+            );
         }
 
         last_terminate_set = terminate_set;

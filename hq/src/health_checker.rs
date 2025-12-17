@@ -50,7 +50,9 @@ fn remove_terminated_hosts(host_info_map: HostInfoMap, health_check_map: HealthC
     });
 
     let after = health_check_map.len();
-    gauge!("health_check_removed").set(before as f64 - after as f64);
+    telemetry::HealthCheckRemoved {
+        count: (before - after) as f64,
+    }.send();
 }
 
 fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMap) {
@@ -91,15 +93,24 @@ fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMa
                     .map(|r| r.error_for_status())
                 {
                     error!(%err, "Failed to send health check");
-                    counter!("health_check_status", "result" => "failure", "host_id" => host_id.to_string()).increment(1);
+                    telemetry::HealthCheckStatus {
+                        success: false,
+                        host_id: &host_id,
+                    }.send();
                     return;
                 }
 
                 let duration = start.elapsed();
 
                 info!("Health check successful");
-                counter!("health_check_status", "result" => "success", "host_id" => host_id.to_string()).increment(1);
-                histogram!("health_check_duration_seconds", "host_id" => host_id.to_string()).record(duration.as_secs_f64());
+                telemetry::HealthCheckStatus {
+                    success: true,
+                    host_id: &host_id,
+                }.send();
+                telemetry::HealthCheckDuration {
+                    duration,
+                    host_id: &host_id,
+                }.send();
 
                 health_check_map
                     .entry(host_id.clone())

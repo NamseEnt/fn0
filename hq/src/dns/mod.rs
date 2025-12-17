@@ -18,7 +18,10 @@ pub trait Dns: Send + Sync {
 const SYNC_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 const HEALTHY_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(7500);
 
+#[instrument(skip_all, name = "dns_sync_loop")]
 pub async fn sync_ips(health_check_map: HealthCheckMap) -> Result<()> {
+    info!("Starting DNS sync loop");
+
     let dns = cloudflare::CloudflareDns::new(None);
 
     let mut interval = tokio::time::interval(SYNC_INTERVAL);
@@ -26,8 +29,9 @@ pub async fn sync_ips(health_check_map: HealthCheckMap) -> Result<()> {
 
     loop {
         interval.tick().await;
+        info!("dns sync tick");
 
-        let ips = health_check_map
+        let ips: Vec<_> = health_check_map
             .iter()
             .filter_map(|health_check| {
                 if health_check.last_check_time.elapsed() > HEALTHY_THRESHOLD {
@@ -37,9 +41,15 @@ pub async fn sync_ips(health_check_map: HealthCheckMap) -> Result<()> {
             })
             .collect();
 
-        let Err(err) = dns.sync_ips(ips).await else {
-            continue;
-        };
-        println!("Failed to sync ips: {err}");
+        telemetry::DnsHealthyIps {
+            count: ips.len() as f64,
+        }.send();
+
+        if let Err(err) = dns.sync_ips(ips).await {
+            error!(%err, "Failed to sync ips");
+            telemetry::DnsSyncStatus { success: false }.send();
+        } else {
+            telemetry::DnsSyncStatus { success: true }.send();
+        }
     }
 }

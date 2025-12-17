@@ -10,17 +10,25 @@ const SYNC_HOST_INFO_INTERVAL: Duration = Duration::from_secs(10);
 
 pub type HostInfoMap = Arc<DashMap<HostId, HostInfo>>;
 
+#[instrument(skip_all, name = "sync_host_info_loop")]
 pub async fn run_sync_host_info_map(
     host_infra: Arc<dyn HostInfra>,
     host_info_map: HostInfoMap,
 ) -> Result<()> {
+    info!("Starting sync host info loop");
+
     let mut interval = interval(SYNC_HOST_INFO_INTERVAL);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     loop {
         interval.tick().await;
+        info!("sync host info tick");
+
         if let Err(err) = host_infra.sync_host_info_map(host_info_map.clone()).await {
-            println!("Failed to sync host info map: {err}");
+            error!(%err, "Failed to sync host info map");
+            telemetry::SyncHostInfoStatus { success: false }.send();
+        } else {
+            telemetry::SyncHostInfoStatus { success: true }.send();
         }
     }
 }
