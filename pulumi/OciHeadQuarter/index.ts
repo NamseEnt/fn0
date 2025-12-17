@@ -6,6 +6,7 @@ import { createNetworking } from "./networking";
 import { createOkeCluster } from "./oke-cluster";
 import { createDockerRegistry } from "./docker-registry";
 import { deployHqApplication } from "./hq-deployment";
+import { deployK8sDashboard } from "./k8s-dashboard";
 
 export interface OciHeadQuarterArgs {
   region: pulumi.Input<string>;
@@ -18,6 +19,7 @@ export interface OciHeadQuarterArgs {
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
+  kubeconfig: pulumi.Output<string>;
   constructor(
     name: string,
     args: OciHeadQuarterArgs,
@@ -42,6 +44,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
     const { regionalSubnet } = createNetworking(this, {
       compartmentId,
       vcnId,
+      ipv6cidrBlocks: args.ipv6cidrBlocks,
     });
 
     const config = new pulumi.Config("oci");
@@ -50,7 +53,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
     const fingerprint = config.require("fingerprint");
     const privateKey = config.require("privateKey");
 
-    const { k8sProvider } = createOkeCluster(this, {
+    const { k8sProvider, kubeconfig } = createOkeCluster(this, {
       compartmentId,
       vcnId,
       regionalSubnetId: regionalSubnet.id,
@@ -61,12 +64,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       fingerprint,
       privateKey,
     });
-
-    const { hqImage } = createDockerRegistry(this, {
-      compartmentId,
-      nameSuffix: nameSuffix8,
-      region,
-    });
+    this.kubeconfig = kubeconfig;
 
     hqGrafana(this, {
       regionSlug: args.grafanaRegion,
@@ -75,10 +73,20 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       suffix: nameSuffix8,
     });
 
-    deployHqApplication(this, {
+    deployK8sDashboard(this, {
       k8sProvider,
-      hqImage,
-      ociWorkerInfraEnvs,
     });
+
+    // const { hqImage } = createDockerRegistry(this, {
+    //   compartmentId,
+    //   nameSuffix: nameSuffix8,
+    //   region,
+    // });
+
+    // deployHqApplication(this, {
+    //   k8sProvider,
+    //   hqImage,
+    //   ociWorkerInfraEnvs,
+    // });
   }
 }

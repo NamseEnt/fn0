@@ -7,9 +7,11 @@ export function createNetworking(
   {
     compartmentId,
     vcnId,
+    ipv6cidrBlocks,
   }: {
     compartmentId: pulumi.Input<string>;
     vcnId: pulumi.Input<string>;
+    ipv6cidrBlocks: pulumi.Input<string[]>;
   }
 ): {
   regionalSubnet: oci.core.Subnet;
@@ -88,8 +90,6 @@ export function createNetworking(
     { parent }
   );
 
-  myIp.apply((x) => pulumi.log.info(`ip: ${x}`));
-
   const regionalSubnet = new oci.core.Subnet(
     "regional-subnet",
     {
@@ -97,6 +97,13 @@ export function createNetworking(
       compartmentId,
       vcnId,
       ipv4cidrBlocks: ["10.0.2.0/24"],
+      ipv6cidrBlocks: pulumi.output(ipv6cidrBlocks).apply((blocks) =>
+        blocks.map((block) => {
+          const prefix = block.split("/")[0];
+          return `${prefix}2:0/64`;
+        })
+      ),
+      prohibitPublicIpOnVnic: false,
       routeTableId: routeTable.id,
       securityListIds: [securityList.id],
     },

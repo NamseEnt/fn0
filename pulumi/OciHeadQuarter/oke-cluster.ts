@@ -33,7 +33,6 @@ export function createOkeCluster(
   kubeconfig: pulumi.Output<string>;
   k8sProvider: k8s.Provider;
 } {
-
   const ad1 = pulumi.all([compartmentId]).apply(([compartmentId]) =>
     oci.identity
       .getAvailabilityDomain({
@@ -124,7 +123,7 @@ export function createOkeCluster(
         sourceType: "IMAGE",
       },
     },
-    { parent }
+    { parent, deleteBeforeReplace: true }
   );
 
   const kubeconfig = pulumi

@@ -21,11 +21,12 @@ use tokio::net::TcpListener;
 use tracing::*;
 
 fn main() -> Result<()> {
+    println!("start main");
     let rt = tokio::runtime::Runtime::new()?;
 
     rt.block_on(async move {
-        let telemetry_providers = telemetry::setup_otlp()?;
-        let hq_params = HqParams::load()?;
+        // let telemetry_providers = telemetry::setup_otlp()?;
+        // let hq_params = HqParams::load()?;
 
         // let host_info_map = Arc::new(DashMap::new());
         // let health_check_map = Arc::new(DashMap::new());
@@ -55,7 +56,7 @@ fn main() -> Result<()> {
             // result = dns_sync_ips_future => { result }
         };
 
-        telemetry::on_shutdown(telemetry_providers)?;
+        // telemetry::on_shutdown(telemetry_providers)?;
 
         result
     })?;
