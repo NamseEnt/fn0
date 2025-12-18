@@ -1,6 +1,6 @@
 use crate::{
-    config::{Config, Language, ProjectConfig},
-    generators::typescript::TypeScriptGenerator,
+    config::{Config, Framework, Language, ProjectConfig},
+    generators::{astro::AstroGenerator, typescript::TypeScriptGenerator},
     prompts::init::InitPrompts,
 };
 use color_eyre::{eyre::eyre, Result};
@@ -45,9 +45,12 @@ pub async fn execute(name: Option<String>) -> Result<()> {
     println!("  Framework: {}", config.framework);
     println!();
 
-    match language {
-        Language::TypeScript => {
+    match config.framework {
+        Framework::Hono => {
             TypeScriptGenerator::generate(&project_path, &config).await?;
+        }
+        Framework::Astro => {
+            AstroGenerator::generate(&project_path, &config).await?;
         }
     }
 

@@ -27,6 +27,7 @@ pub struct Config {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LanguageEnvironment {
     TypescriptBunHono,
+    TypescriptBunAstro,
 }
 
 impl From<&ProjectConfig> for LanguageEnvironment {
@@ -34,6 +35,9 @@ impl From<&ProjectConfig> for LanguageEnvironment {
         match (config.language, config.package_manager, config.framework) {
             (Language::TypeScript, PackageManager::Bun, Framework::Hono) => {
                 LanguageEnvironment::TypescriptBunHono
+            }
+            (Language::TypeScript, PackageManager::Bun, Framework::Astro) => {
+                LanguageEnvironment::TypescriptBunAstro
             }
         }
     }

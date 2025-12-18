@@ -26,6 +26,19 @@ pub async fn execute() -> Result<()> {
 
             println!("\n✅ Build completed successfully!");
         }
+        LanguageEnvironment::TypescriptBunAstro => {
+            println!("Running bun run build...");
+            let status = Command::new("bun")
+                .args(["run", "build"])
+                .status()
+                .map_err(|e| eyre!("Failed to execute 'bun run build': {}", e))?;
+
+            if !status.success() {
+                return Err(eyre!("Build failed"));
+            }
+
+            println!("\n✅ Build completed successfully!");
+        }
     }
 
     Ok(())

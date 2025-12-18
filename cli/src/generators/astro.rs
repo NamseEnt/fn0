@@ -1,21 +1,21 @@
 use crate::{
     config::ProjectConfig,
-    generators::templates::{hono, package_json, rolldown_config, wit_component, wit_deps},
+    generators::templates::{astro, astro_rolldown, wit_component, wit_deps},
     utils::command::CommandExecutor,
 };
 use color_eyre::Result;
 use std::path::Path;
 use tokio::fs;
 
-pub struct TypeScriptGenerator;
+pub struct AstroGenerator;
 
-impl TypeScriptGenerator {
+impl AstroGenerator {
     pub async fn generate(project_path: &Path, config: &ProjectConfig) -> Result<()> {
         println!("📦 Creating project directory...");
         fs::create_dir_all(project_path).await?;
 
         println!("📄 Creating package.json...");
-        let package_json_content = package_json::generate(config);
+        let package_json_content = Self::generate_package_json(config);
         let package_json_path = project_path.join("package.json");
         fs::write(package_json_path, package_json_content).await?;
 
@@ -24,8 +24,13 @@ impl TypeScriptGenerator {
         let tsconfig_path = project_path.join("tsconfig.json");
         fs::write(tsconfig_path, tsconfig_content).await?;
 
+        println!("📄 Creating astro.config.mjs...");
+        let astro_config_content = astro::generate_config();
+        let astro_config_path = project_path.join("astro.config.mjs");
+        fs::write(astro_config_path, astro_config_content).await?;
+
         println!("📄 Creating rolldown.config.mjs...");
-        let rolldown_content = rolldown_config::generate();
+        let rolldown_content = astro_rolldown::generate();
         let rolldown_path = project_path.join("rolldown.config.mjs");
         fs::write(rolldown_path, rolldown_content).await?;
 
@@ -61,20 +66,35 @@ impl TypeScriptGenerator {
         let src_path = project_path.join("src");
         fs::create_dir_all(&src_path).await?;
 
-        println!("📄 Creating server files...");
-        let index_content = hono::generate_index();
-        let index_path = src_path.join("index.ts");
+        println!("📄 Creating Astro pages and adapter...");
+
+        let pages_path = src_path.join("pages");
+        fs::create_dir_all(&pages_path).await?;
+
+        let index_content = astro::generate_index_page();
+        let index_path = pages_path.join("index.astro");
         fs::write(index_path, index_content).await?;
 
-        let component_content = hono::generate_component();
-        let component_path = src_path.join("component.ts");
-        fs::write(component_path, component_content).await?;
+        let lib_path = src_path.join("lib");
+        fs::create_dir_all(&lib_path).await?;
+
+        let adapter_content = astro::generate_adapter();
+        let adapter_path = lib_path.join("fn0-adapter.ts");
+        fs::write(adapter_path, adapter_content).await?;
+
+        let server_entry_content = astro::generate_server_entry();
+        let server_entry_path = lib_path.join("server-entry.ts");
+        fs::write(server_entry_path, server_entry_content).await?;
+
+        let env_d_ts_content = astro::generate_env_d_ts();
+        let env_d_ts_path = src_path.join("env.d.ts");
+        fs::write(env_d_ts_path, env_d_ts_content).await?;
 
         println!("📥 Installing dependencies...");
 
         let pm_cmd = config.package_manager.command();
 
-        println!("  Installing {}...", config.framework);
+        println!("  Installing Astro...");
         let mut install_args = config.package_manager.install_args();
         install_args.push(config.framework.package_name());
 
@@ -94,22 +114,34 @@ impl TypeScriptGenerator {
         Ok(())
     }
 
+    fn generate_package_json(config: &ProjectConfig) -> String {
+        use serde_json::json;
+
+        let package_json = json!({
+            "name": config.name,
+            "type": "module",
+            "scripts": {
+                "dev": "astro dev",
+                "build": "astro build && rolldown -c && jco componentize -w wit -o dist/component.wasm dist/component.js"
+            },
+        });
+
+        serde_json::to_string_pretty(&package_json).unwrap()
+    }
+
     fn generate_tsconfig() -> String {
         r#"{
+  "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "nodenext",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+    "resolveJsonModule": true
+  }
 }
 "#
         .to_string()
@@ -122,6 +154,7 @@ dist/
 .DS_Store
 *.log
 *.wasm
+.astro/
 "#
         .to_string()
     }

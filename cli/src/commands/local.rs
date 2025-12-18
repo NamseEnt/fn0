@@ -1,12 +1,16 @@
 use color_eyre::{eyre::eyre, Result};
 use fn0::Fn0;
-use hyper::{server::conn::http1, Request};
+use http_body_util::{BodyExt, Full};
+use hyper::{body::Bytes, server::conn::http1, Request, Response, StatusCode};
 use hyper_util::{rt::TokioIo, service::TowerToHyperService};
+use mime_guess::from_path;
 use socket2::{Domain, Protocol, Socket, Type};
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
+use wasmtime_wasi_http::body::HyperOutgoingBody;
+use wasmtime_wasi_http::bindings::http::types::ErrorCode;
 
 pub async fn execute(port: Option<u16>) -> Result<()> {
     println!("Starting local fn0 server...\n");
@@ -14,6 +18,18 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     let wasm_file = PathBuf::from("./dist/component.wasm");
 
     crate::commands::build::execute().await?;
+
+    let cli_config = crate::config::Config::load("fn0.toml").map_err(|e| {
+        eyre!(
+            "Failed to load fn0.toml: {}. Make sure you're in a fn0 project directory.",
+            e
+        )
+    })?;
+
+    let static_dir = match cli_config.language_env {
+        crate::config::LanguageEnvironment::TypescriptBunHono => None,
+        crate::config::LanguageEnvironment::TypescriptBunAstro => Some(PathBuf::from("dist/client")),
+    };
 
     let config = fn0::Config {
         port,
@@ -53,12 +69,22 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
         let tower_service = ServiceBuilder::new().service(tower::util::service_fn({
             let code_id = code_id.clone();
             let fn0 = fn0.clone();
+            let static_dir = static_dir.clone();
 
             move |req: Request<hyper::body::Incoming>| {
                 let code_id = code_id.clone();
                 let fn0 = fn0.clone();
+                let static_dir = static_dir.clone();
 
-                async move { fn0.run(code_id, req).await }
+                async move {
+                    if let Some(ref dir) = static_dir {
+                        if let Some(static_resp) = try_serve_static(dir, req.uri().path()).await {
+                            return Ok(static_resp);
+                        }
+                    }
+
+                    fn0.run(code_id, req).await
+                }
             }
         }));
 
@@ -74,6 +100,51 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
             }
         });
     }
+}
+
+async fn try_serve_static(
+    base_dir: &Path,
+    req_path: &str,
+) -> Option<Response<HyperOutgoingBody>> {
+    let path_str = req_path.trim_start_matches('/');
+    let mut file_path = base_dir.join(path_str);
+
+    if let Ok(canonical_base) = base_dir.canonicalize() {
+        if let Ok(canonical_file) = file_path.canonicalize() {
+            if !canonical_file.starts_with(&canonical_base) {
+                return None;
+            }
+        }
+    }
+
+    if file_path.is_dir() {
+        file_path.push("index.html");
+    }
+
+    if let Ok(file_content) = tokio::fs::read(&file_path).await {
+        let mime_type = from_path(&file_path).first_or_octet_stream();
+
+        let body = Full::new(Bytes::from(file_content))
+            .map_err(|_| ErrorCode::InternalError(None));
+
+        let mut response = Response::new(HyperOutgoingBody::new(body));
+        *response.status_mut() = StatusCode::OK;
+        response.headers_mut().insert(
+            hyper::header::CONTENT_TYPE,
+            mime_type.as_ref().parse().ok()?,
+        );
+
+        if path_str.starts_with("_astro/") {
+            response.headers_mut().insert(
+                hyper::header::CACHE_CONTROL,
+                "public, max-age=31536000, immutable".parse().ok()?,
+            );
+        }
+
+        return Some(response);
+    }
+
+    None
 }
 
 fn open_tcp_listener(mut port: u16, increment_on_fail: bool) -> Result<TcpListener> {

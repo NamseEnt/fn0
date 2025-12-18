@@ -32,7 +32,7 @@ impl InitPrompts {
     }
 
     pub fn ask_framework() -> Result<Framework> {
-        let frameworks = vec![Framework::Hono];
+        let frameworks = vec![Framework::Hono, Framework::Astro];
 
         let selection = Select::new("Which framework do you want to use?", frameworks).prompt()?;
 
