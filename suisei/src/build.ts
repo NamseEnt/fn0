@@ -1,61 +1,65 @@
-import { fileURLToPath } from 'node:url';
-import { resolve, dirname } from 'node:path';
-import { spawn, type SpawnOptions } from 'node:child_process';
-import { promises as fs } from 'node:fs';
-import { generateRolldownConfig } from './rolldown/config.js';
+import { fileURLToPath } from "node:url";
+import { resolve, dirname } from "node:path";
+import { spawn, type SpawnOptions } from "node:child_process";
+import { promises as fs } from "node:fs";
+import { generateRolldownConfig } from "./rolldown/config.js";
 
-interface BuildConfig {
+export interface BuildConfig {
   server: URL;
   client: URL;
 }
 
-export async function buildServer(config: any, buildConfig: BuildConfig) {
-  console.log('🚀 Building WASM component with suisei...');
+export async function buildServer(buildConfig: BuildConfig) {
+  console.log("🚀 Building WASM component with suisei...");
 
   const serverDir = fileURLToPath(buildConfig.server);
   const clientDir = fileURLToPath(buildConfig.client);
 
   await createServerEntry(serverDir);
 
-  const rolldownConfigPath = resolve(serverDir, 'rolldown.config.mjs');
-  const componentInput = resolve(serverDir, 'component.ts');
-  const componentOutput = resolve(serverDir, 'component.js');
+  const rolldownConfigPath = resolve(serverDir, "rolldown.config.mjs");
+  const componentOutput = resolve(serverDir, "component.js");
 
-  const rolldownConfig = generateRolldownConfig('./component.ts', './component.js');
+  const rolldownConfig = generateRolldownConfig(
+    "./component.ts",
+    "./component.js"
+  );
   await fs.writeFile(rolldownConfigPath, rolldownConfig);
 
-  const suiseiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const witDir = resolve(suiseiRoot, 'wit');
-  const rolldownBin = resolve(suiseiRoot, 'node_modules', '.bin', 'rolldown');
-  const jcoBin = resolve(suiseiRoot, 'node_modules', '.bin', 'jco');
+  const suiseiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const witDir = resolve(suiseiRoot, "wit");
+  const rolldownBin = resolve(suiseiRoot, "node_modules", ".bin", "rolldown");
+  const jcoBin = resolve(suiseiRoot, "node_modules", ".bin", "jco");
 
-  console.log('📦 Running Rolldown bundler...');
-  await runCommand(rolldownBin, ['-c', rolldownConfigPath], { cwd: serverDir });
+  console.log("📦 Running Rolldown bundler...");
+  await runCommand(rolldownBin, ["-c", rolldownConfigPath], { cwd: serverDir });
 
-  console.log('🔧 Running JCO componentization...');
-  const wasmOutput = resolve(serverDir, 'component.wasm');
-  const projectRoot = resolve(serverDir, '..', '..');
+  console.log("🔧 Running JCO componentization...");
+  const wasmOutput = resolve(serverDir, "component.wasm");
+  const projectRoot = resolve(serverDir, "..", "..");
 
-  const nodeModulesPath = resolve(projectRoot, 'node_modules');
+  const nodeModulesPath = resolve(projectRoot, "node_modules");
   await runCommand(
     jcoBin,
-    ['componentize', '-w', witDir, '-o', wasmOutput, componentOutput],
+    ["componentize", "-w", witDir, "-o", wasmOutput, componentOutput],
     {
       cwd: projectRoot,
-      env: { ...process.env, NODE_PATH: nodeModulesPath }
+      env: { ...process.env, NODE_PATH: nodeModulesPath },
     }
   );
 
-  console.log('✅ WASM component built successfully!');
+  console.log("✅ WASM component built successfully!");
   console.log(`   Output: ${wasmOutput}`);
 }
 
 async function createServerEntry(serverDir: string) {
   const files = await fs.readdir(serverDir);
-  const manifestFile = files.find((file) => file.startsWith('manifest_') && file.endsWith('.mjs'));
+  const manifestFile = files.find(
+    (file) => file.startsWith("manifest_") && file.endsWith(".mjs")
+  );
 
   if (!manifestFile) {
-    throw new Error('Could not find manifest file in server directory');
+    throw new Error("Could not find manifest file in server directory");
   }
 
   const shimContent = `const IntlMock = {
@@ -118,8 +122,10 @@ fire(app);
 export { incomingHandler } from '@bytecodealliance/jco-std/wasi/0.2.6/http/adapters/hono/server';
 `;
 
-  await fs.writeFile(resolve(serverDir, 'shim-intl.js'), shimContent);
-  await fs.writeFile(resolve(serverDir, 'component.ts'), entryContent);
+  await Promise.all([
+    fs.writeFile(resolve(serverDir, "shim-intl.js"), shimContent),
+    fs.writeFile(resolve(serverDir, "component.ts"), entryContent),
+  ]);
 }
 
 function runCommand(
@@ -128,14 +134,14 @@ function runCommand(
   options: SpawnOptions = {}
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: 'inherit', ...options });
-    child.on('close', (code) => {
+    const child = spawn(cmd, args, { stdio: "inherit", ...options });
+    child.on("close", (code) => {
       if (code === 0) {
         resolve();
       } else {
         reject(new Error(`Command failed with code ${code}`));
       }
     });
-    child.on('error', reject);
+    child.on("error", reject);
   });
 }

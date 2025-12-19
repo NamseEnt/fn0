@@ -1,14 +1,15 @@
-import type { AstroAdapter } from 'astro';
+import type { AstroAdapter } from "astro";
 
 export function getAdapter(): AstroAdapter {
   return {
-    name: 'suisei',
-    serverEntrypoint: 'suisei/server-entry',
-    exports: ['handler', 'incomingHandler'],
+    name: "suisei",
+    serverEntrypoint: "suisei/server-entry",
+    exports: ["handler", "incomingHandler"],
     supportedAstroFeatures: {
-      hybridOutput: 'stable',
-      staticOutput: 'stable',
-      serverOutput: 'stable',
+      hybridOutput: "stable",
+      staticOutput: "stable",
+      serverOutput: "stable",
+      sharpImageService: "unsupported",
     },
   };
 }
