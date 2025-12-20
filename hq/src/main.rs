@@ -1,79 +1,61 @@
 mod args;
+mod args_parse;
+mod deployment_db;
 mod dns;
-mod health_checker;
+mod host_connection;
 mod host_id;
 mod host_provider;
-mod params;
-mod reaper;
+mod random_sleep;
+mod site;
 mod telemetry;
 
-use color_eyre::eyre::Result;
-use dashmap::DashMap;
-use health_checker::*;
+use args::HqArgs;
+use color_eyre::eyre::{Result, eyre};
 use host_id::*;
 use host_provider::*;
 use http_body_util::Full;
 use hyper::{Request, Response, body::Bytes, server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
-use params::HqParams;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::net::TcpListener;
+use std::{net::SocketAddr, sync::Arc};
+use tokio::{net::TcpListener, task::JoinSet};
 use tracing::*;
+
+use crate::args_parse::HqArgsParsed;
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
 
     rt.block_on(async move {
         let telemetry_providers = telemetry::setup_otlp()?;
-        // let hq_params = HqParams::load()?;
+        let HqArgsParsed {
+            sites,
+            deployment_db,
+        } = HqArgs::parse().await?;
 
-        // let host_info_map = Arc::new(DashMap::new());
-        // let health_check_map = Arc::new(DashMap::new());
+        let mut set = JoinSet::new();
 
-        let shutdown_signal = async {
+        set.spawn(async move {
+            deployment_db.run_sync().await;
+            Ok(())
+        });
+        for mut site in sites {
+            set.spawn(async move {
+                site.run().await;
+                Ok(())
+            });
+        }
+        set.spawn(async {
             tokio::signal::ctrl_c().await?;
             Ok(())
-        };
+        });
+        set.spawn(web_server());
 
-        // let host_provider = HostProvider::from_params(&hq_params)?;
-
-        let heartbeat_future = async {
-            loop {
-                telemetry::HqHeartbeat.send();
-                info!("heartbeat sent");
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            }
-            #[allow(unreachable_code)]
-            Ok::<(), color_eyre::eyre::Error>(())
-        };
-
-        // let sync_host_info_map_future =
-        //     host_provider::run_sync_host_info_map(host_provider.clone(), host_info_map.clone());
-        // let health_checker_future =
-        //     health_checker::run(host_info_map.clone(), health_check_map.clone());
-        // let reaper_future = reaper::run(
-        //     host_provider.clone(),
-        //     host_info_map.clone(),
-        //     health_check_map.clone(),
-        // );
-        // let dns_sync_ips_future = dns::sync_ips(health_check_map.clone());
-
-        let result = tokio::select! {
-            result = shutdown_signal => { result }
-            result = web_server() => { result }
-            result = heartbeat_future => { result }
-            // result = sync_host_info_map_future => { result }
-            // result = health_checker_future => { result }
-            // result = reaper_future => { result }
-            // result = dns_sync_ips_future => { result }
-        };
+        let result = set.join_next().await.unwrap().map_err(|err| eyre!(err));
 
         telemetry::on_shutdown(telemetry_providers)?;
 
         result
-    })?;
-    Ok(())
+    })?
 }
 
 async fn web_server() -> Result<()> {
