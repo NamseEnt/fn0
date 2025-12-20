@@ -1,9 +1,9 @@
 use color_eyre::eyre::Result;
-use opentelemetry::{global, trace::TracerProvider, KeyValue};
+use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::{Protocol, WithExportConfig};
+use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
-use opentelemetry_sdk::Resource;
 use std::env;
 use std::time::Duration;
 use tracing::info;
@@ -61,36 +61,6 @@ pub fn on_shutdown(
     Ok(())
 }
 
-pub fn send_health_check_status(host_id: impl ToString, success: bool) {
-    let counter = global::meter("hq")
-        .u64_counter("health_check_status")
-        .build();
-    counter.add(
-        1,
-        &[
-            KeyValue::new("result", if success { "success" } else { "failure" }),
-            KeyValue::new("host_id", host_id.to_string()),
-        ],
-    );
-}
-
-pub fn send_health_check_removed(count: usize) {
-    let gauge = global::meter("hq")
-        .f64_gauge("health_check_removed")
-        .build();
-    gauge.record(count as f64, &[]);
-}
-
-pub fn send_health_check_duration(host_id: impl ToString, duration: std::time::Duration) {
-    let histogram = global::meter("hq")
-        .f64_histogram("health_check_duration_seconds")
-        .build();
-    histogram.record(
-        duration.as_secs_f64(),
-        &[KeyValue::new("host_id", host_id.to_string())],
-    );
-}
-
 pub fn send_reaper_terminate_candidates(count: usize) {
     let gauge = global::meter("hq")
         .f64_gauge("reaper_terminate_candidates")
@@ -103,19 +73,6 @@ pub fn send_reaper_terminate_attempts() {
         .u64_counter("reaper_terminate_attempts")
         .build();
     counter.add(1, &[]);
-}
-
-pub fn send_sync_host_info_status(success: bool) {
-    let counter = global::meter("hq")
-        .u64_counter("sync_host_info_status")
-        .build();
-    counter.add(
-        1,
-        &[KeyValue::new(
-            "result",
-            if success { "success" } else { "failure" },
-        )],
-    );
 }
 
 pub fn send_dns_healthy_ips(count: usize) {
@@ -134,11 +91,104 @@ pub fn send_dns_sync_status(success: bool) {
     );
 }
 
-pub struct HqHeartbeat;
+pub fn send_list_hosts_status(success: bool) {
+    let counter = global::meter("hq").u64_counter("list_hosts_status").build();
+    counter.add(
+        1,
+        &[KeyValue::new(
+            "result",
+            if success { "success" } else { "failure" },
+        )],
+    );
+}
 
-impl HqHeartbeat {
-    pub fn send(self) {
-        let counter = global::meter("hq").u64_counter("hq_heartbeat").build();
-        counter.add(1, &[]);
-    }
+pub fn send_host_connect_attempt(host_id: impl ToString) {
+    let counter = global::meter("hq")
+        .u64_counter("host_connect_attempts")
+        .build();
+    counter.add(1, &[KeyValue::new("host_id", host_id.to_string())]);
+}
+
+pub fn send_host_connect_status(host_id: impl ToString, success: bool) {
+    let counter = global::meter("hq")
+        .u64_counter("host_connect_status")
+        .build();
+    counter.add(
+        1,
+        &[
+            KeyValue::new("result", if success { "success" } else { "failure" }),
+            KeyValue::new("host_id", host_id.to_string()),
+        ],
+    );
+}
+
+pub fn send_host_connect_duration(host_id: impl ToString, duration: std::time::Duration) {
+    let histogram = global::meter("hq")
+        .f64_histogram("host_connect_duration_seconds")
+        .build();
+    histogram.record(
+        duration.as_secs_f64(),
+        &[KeyValue::new("host_id", host_id.to_string())],
+    );
+}
+
+pub fn send_pong_received(host_id: impl ToString) {
+    let counter = global::meter("hq").u64_counter("pong_received").build();
+    counter.add(1, &[KeyValue::new("host_id", host_id.to_string())]);
+}
+
+pub fn send_deployment_updates_sent(host_id: impl ToString, update_count: usize) {
+    let counter = global::meter("hq")
+        .u64_counter("deployment_updates_sent")
+        .build();
+    counter.add(
+        update_count as u64,
+        &[KeyValue::new("host_id", host_id.to_string())],
+    );
+}
+
+pub fn send_deployment_updates_status(success: bool) {
+    let counter = global::meter("hq")
+        .u64_counter("deployment_updates_status")
+        .build();
+    counter.add(
+        1,
+        &[KeyValue::new(
+            "result",
+            if success { "success" } else { "failure" },
+        )],
+    );
+}
+
+pub fn send_ping_sent_status(success: bool) {
+    let counter = global::meter("hq").u64_counter("ping_sent_status").build();
+    counter.add(
+        1,
+        &[KeyValue::new(
+            "result",
+            if success { "success" } else { "failure" },
+        )],
+    );
+}
+
+pub fn send_reaper_removed_count(count: usize) {
+    let gauge = global::meter("hq")
+        .f64_gauge("reaper_removed_count")
+        .build();
+    gauge.record(count as f64, &[]);
+}
+
+pub fn send_active_connections(count: usize) {
+    let gauge = global::meter("hq").f64_gauge("active_connections").build();
+    gauge.record(count as f64, &[]);
+}
+
+pub fn send_known_hosts(count: usize) {
+    let gauge = global::meter("hq").f64_gauge("known_hosts").build();
+    gauge.record(count as f64, &[]);
+}
+
+pub fn send_dead_hosts(count: usize) {
+    let gauge = global::meter("hq").f64_gauge("dead_hosts").build();
+    gauge.record(count as f64, &[]);
 }
