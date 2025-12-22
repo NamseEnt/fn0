@@ -8,10 +8,22 @@ pub struct InstanceConfigurationHostGroupPlacementConstraintDetails {
     pub compute_host_group_id: String,
 }
 
+/// Required fields for InstanceConfigurationHostGroupPlacementConstraintDetails
+pub struct InstanceConfigurationHostGroupPlacementConstraintDetailsRequired {
+    pub compute_host_group_id: String,
+}
+
 impl InstanceConfigurationHostGroupPlacementConstraintDetails {
-    pub fn new(compute_host_group_id: impl Into<String>) -> Self {
+    /// Create new instance with required fields
+    pub fn new(required: InstanceConfigurationHostGroupPlacementConstraintDetailsRequired) -> Self {
         Self {
-            compute_host_group_id: compute_host_group_id.into(),
+            compute_host_group_id: required.compute_host_group_id,
         }
+    }
+
+    /// Set the compute host group ID
+    pub fn set_compute_host_group_id(mut self, compute_host_group_id: String) -> Self {
+        self.compute_host_group_id = compute_host_group_id;
+        self
     }
 }

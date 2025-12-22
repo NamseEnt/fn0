@@ -20,6 +20,12 @@ impl ComputeInstanceOptions {
         self.options = Some(options);
         self
     }
+
+    /// Set options
+    pub fn set_options(mut self, options: Option<Vec<super::ComputeInstanceDetails>>) -> Self {
+        self.options = options;
+        self
+    }
 }
 
 impl Default for ComputeInstanceOptions {

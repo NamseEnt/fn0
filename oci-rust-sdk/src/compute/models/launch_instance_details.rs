@@ -65,7 +65,7 @@ pub struct LaunchInstanceDetails {
 }
 
 /// Required fields for launching an instance
-pub struct LaunchInstanceRequiredFields {
+pub struct LaunchInstanceDetailsRequired {
     /// The OCID of the compartment
     pub compartment_id: String,
     /// The availability domain to place the instance in
@@ -77,9 +77,9 @@ pub struct LaunchInstanceRequiredFields {
 }
 
 impl LaunchInstanceDetails {
-    /// Create a new instance launch details builder with required fields
-    pub fn builder(required: LaunchInstanceRequiredFields) -> LaunchInstanceDetailsBuilder {
-        LaunchInstanceDetailsBuilder {
+    /// Create a new instance launch details with required fields
+    pub fn new(required: LaunchInstanceDetailsRequired) -> Self {
+        Self {
             compartment_id: required.compartment_id,
             availability_domain: required.availability_domain,
             shape: required.shape,
@@ -97,115 +97,136 @@ impl LaunchInstanceDetails {
             is_pv_encryption_in_transit_enabled: None,
         }
     }
-}
 
-/// Builder for LaunchInstanceDetails
-pub struct LaunchInstanceDetailsBuilder {
-    compartment_id: String,
-    availability_domain: String,
-    create_vnic_details: Option<CreateVnicDetails>,
-    dedicated_vm_host_id: Option<String>,
-    defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    display_name: Option<String>,
-    metadata: Option<HashMap<String, String>>,
-    extended_metadata: Option<HashMap<String, serde_json::Value>>,
-    freeform_tags: Option<HashMap<String, String>>,
-    shape: String,
-    shape_config: Option<LaunchInstanceShapeConfigDetails>,
-    source_details: InstanceSourceDetails,
-    fault_domain: Option<String>,
-    capacity_reservation_id: Option<String>,
-    is_pv_encryption_in_transit_enabled: Option<bool>,
-}
-
-impl LaunchInstanceDetailsBuilder {
-    /// Set the VNIC details
-    pub fn create_vnic_details(mut self, details: CreateVnicDetails) -> Self {
-        self.create_vnic_details = Some(details);
+    // Setters for all fields (required + optional)
+    pub fn set_compartment_id(mut self, compartment_id: String) -> Self {
+        self.compartment_id = compartment_id;
         self
     }
 
-    /// Set the display name
-    pub fn display_name(mut self, name: impl Into<String>) -> Self {
-        self.display_name = Some(name.into());
+    pub fn set_availability_domain(mut self, availability_domain: String) -> Self {
+        self.availability_domain = availability_domain;
         self
     }
 
-    /// Set custom metadata
-    pub fn metadata(mut self, metadata: HashMap<String, String>) -> Self {
+    pub fn set_shape(mut self, shape: String) -> Self {
+        self.shape = shape;
+        self
+    }
+
+    pub fn set_source_details(mut self, source_details: InstanceSourceDetails) -> Self {
+        self.source_details = source_details;
+        self
+    }
+
+    pub fn set_create_vnic_details(mut self, create_vnic_details: Option<CreateVnicDetails>) -> Self {
+        self.create_vnic_details = create_vnic_details;
+        self
+    }
+
+    pub fn set_dedicated_vm_host_id(mut self, dedicated_vm_host_id: Option<String>) -> Self {
+        self.dedicated_vm_host_id = dedicated_vm_host_id;
+        self
+    }
+
+    pub fn set_defined_tags(mut self, defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+        self.defined_tags = defined_tags;
+        self
+    }
+
+    pub fn set_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
+        self
+    }
+
+    pub fn set_metadata(mut self, metadata: Option<HashMap<String, String>>) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
+    pub fn set_extended_metadata(mut self, extended_metadata: Option<HashMap<String, serde_json::Value>>) -> Self {
+        self.extended_metadata = extended_metadata;
+        self
+    }
+
+    pub fn set_freeform_tags(mut self, freeform_tags: Option<HashMap<String, String>>) -> Self {
+        self.freeform_tags = freeform_tags;
+        self
+    }
+
+    pub fn set_shape_config(mut self, shape_config: Option<LaunchInstanceShapeConfigDetails>) -> Self {
+        self.shape_config = shape_config;
+        self
+    }
+
+    pub fn set_fault_domain(mut self, fault_domain: Option<String>) -> Self {
+        self.fault_domain = fault_domain;
+        self
+    }
+
+    pub fn set_capacity_reservation_id(mut self, capacity_reservation_id: Option<String>) -> Self {
+        self.capacity_reservation_id = capacity_reservation_id;
+        self
+    }
+
+    pub fn set_is_pv_encryption_in_transit_enabled(mut self, is_pv_encryption_in_transit_enabled: Option<bool>) -> Self {
+        self.is_pv_encryption_in_transit_enabled = is_pv_encryption_in_transit_enabled;
+        self
+    }
+
+    // With methods for optional fields only
+    pub fn with_create_vnic_details(mut self, create_vnic_details: CreateVnicDetails) -> Self {
+        self.create_vnic_details = Some(create_vnic_details);
+        self
+    }
+
+    pub fn with_dedicated_vm_host_id(mut self, dedicated_vm_host_id: impl Into<String>) -> Self {
+        self.dedicated_vm_host_id = Some(dedicated_vm_host_id.into());
+        self
+    }
+
+    pub fn with_defined_tags(mut self, defined_tags: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+        self.defined_tags = Some(defined_tags);
+        self
+    }
+
+    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
+        self.display_name = Some(display_name.into());
+        self
+    }
+
+    pub fn with_metadata(mut self, metadata: HashMap<String, String>) -> Self {
         self.metadata = Some(metadata);
         self
     }
 
-    /// Set extended metadata
-    pub fn extended_metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
-        self.extended_metadata = Some(metadata);
+    pub fn with_extended_metadata(mut self, extended_metadata: HashMap<String, serde_json::Value>) -> Self {
+        self.extended_metadata = Some(extended_metadata);
         self
     }
 
-    /// Set free-form tags
-    pub fn freeform_tags(mut self, tags: HashMap<String, String>) -> Self {
-        self.freeform_tags = Some(tags);
+    pub fn with_freeform_tags(mut self, freeform_tags: HashMap<String, String>) -> Self {
+        self.freeform_tags = Some(freeform_tags);
         self
     }
 
-    /// Set defined tags
-    pub fn defined_tags(
-        mut self,
-        tags: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
-        self.defined_tags = Some(tags);
+    pub fn with_shape_config(mut self, shape_config: LaunchInstanceShapeConfigDetails) -> Self {
+        self.shape_config = Some(shape_config);
         self
     }
 
-    /// Set the dedicated VM host ID
-    pub fn dedicated_vm_host_id(mut self, id: impl Into<String>) -> Self {
-        self.dedicated_vm_host_id = Some(id.into());
+    pub fn with_fault_domain(mut self, fault_domain: impl Into<String>) -> Self {
+        self.fault_domain = Some(fault_domain.into());
         self
     }
 
-    /// Set the fault domain
-    pub fn fault_domain(mut self, domain: impl Into<String>) -> Self {
-        self.fault_domain = Some(domain.into());
+    pub fn with_capacity_reservation_id(mut self, capacity_reservation_id: impl Into<String>) -> Self {
+        self.capacity_reservation_id = Some(capacity_reservation_id.into());
         self
     }
 
-    /// Set the capacity reservation ID
-    pub fn capacity_reservation_id(mut self, id: impl Into<String>) -> Self {
-        self.capacity_reservation_id = Some(id.into());
+    pub fn with_is_pv_encryption_in_transit_enabled(mut self, is_pv_encryption_in_transit_enabled: bool) -> Self {
+        self.is_pv_encryption_in_transit_enabled = Some(is_pv_encryption_in_transit_enabled);
         self
-    }
-
-    /// Set whether to enable PV encryption in transit
-    pub fn is_pv_encryption_in_transit_enabled(mut self, enabled: bool) -> Self {
-        self.is_pv_encryption_in_transit_enabled = Some(enabled);
-        self
-    }
-
-    /// Set the shape configuration
-    pub fn shape_config(mut self, config: LaunchInstanceShapeConfigDetails) -> Self {
-        self.shape_config = Some(config);
-        self
-    }
-
-    /// Build the LaunchInstanceDetails
-    pub fn build(self) -> LaunchInstanceDetails {
-        LaunchInstanceDetails {
-            compartment_id: self.compartment_id,
-            availability_domain: self.availability_domain,
-            shape: self.shape,
-            shape_config: self.shape_config,
-            source_details: self.source_details,
-            create_vnic_details: self.create_vnic_details,
-            dedicated_vm_host_id: self.dedicated_vm_host_id,
-            defined_tags: self.defined_tags,
-            display_name: self.display_name,
-            metadata: self.metadata,
-            extended_metadata: self.extended_metadata,
-            freeform_tags: self.freeform_tags,
-            fault_domain: self.fault_domain,
-            capacity_reservation_id: self.capacity_reservation_id,
-            is_pv_encryption_in_transit_enabled: self.is_pv_encryption_in_transit_enabled,
-        }
     }
 }

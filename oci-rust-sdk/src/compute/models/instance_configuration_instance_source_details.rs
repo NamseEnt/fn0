@@ -97,6 +97,41 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
         self.boot_volume_vpus_per_gb = Some(vpus);
         self
     }
+
+    pub fn with_instance_source_image_filter_details(mut self, details: super::InstanceConfigurationInstanceSourceImageFilterDetails) -> Self {
+        self.instance_source_image_filter_details = Some(details);
+        self
+    }
+
+    /// Set boot_volume_size_in_g_bs
+    pub fn set_boot_volume_size_in_g_bs(mut self, boot_volume_size_in_g_bs: Option<i64>) -> Self {
+        self.boot_volume_size_in_g_bs = boot_volume_size_in_g_bs;
+        self
+    }
+
+    /// Set image_id
+    pub fn set_image_id(mut self, image_id: Option<String>) -> Self {
+        self.image_id = image_id;
+        self
+    }
+
+    /// Set kms_key_id
+    pub fn set_kms_key_id(mut self, kms_key_id: Option<String>) -> Self {
+        self.kms_key_id = kms_key_id;
+        self
+    }
+
+    /// Set boot_volume_vpus_per_gb
+    pub fn set_boot_volume_vpus_per_gb(mut self, boot_volume_vpus_per_gb: Option<i64>) -> Self {
+        self.boot_volume_vpus_per_gb = boot_volume_vpus_per_gb;
+        self
+    }
+
+    /// Set instance_source_image_filter_details
+    pub fn set_instance_source_image_filter_details(mut self, instance_source_image_filter_details: Option<super::InstanceConfigurationInstanceSourceImageFilterDetails>) -> Self {
+        self.instance_source_image_filter_details = instance_source_image_filter_details;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationInstanceSourceViaImageDetails {
@@ -114,6 +149,12 @@ impl InstanceConfigurationInstanceSourceViaBootVolumeDetails {
 
     pub fn with_boot_volume_id(mut self, boot_volume_id: impl Into<String>) -> Self {
         self.boot_volume_id = Some(boot_volume_id.into());
+        self
+    }
+
+    /// Set boot_volume_id
+    pub fn set_boot_volume_id(mut self, boot_volume_id: Option<String>) -> Self {
+        self.boot_volume_id = boot_volume_id;
         self
     }
 }

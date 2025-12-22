@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use super::search_context::SearchContext;
 
 /// Required fields for ResourceSummary
-pub struct ResourceSummaryRequiredFields {
+pub struct ResourceSummaryRequired {
     /// The resource type name (e.g., "Instance", "VolumeAttachment")
     pub resource_type: String,
     /// The unique identifier for this particular resource, usually an OCID
@@ -88,9 +88,9 @@ pub struct ResourceSummary {
 }
 
 impl ResourceSummary {
-    /// Create a new ResourceSummaryBuilder to construct a ResourceSummary.
-    pub fn builder(required: ResourceSummaryRequiredFields) -> ResourceSummaryBuilder {
-        ResourceSummaryBuilder {
+    /// Create a new ResourceSummary with required fields
+    pub fn new(required: ResourceSummaryRequired) -> Self {
+        Self {
             resource_type: required.resource_type,
             identifier: required.identifier,
             compartment_id: required.compartment_id,
@@ -106,104 +106,121 @@ impl ResourceSummary {
             additional_details: None,
         }
     }
-}
 
-/// Builder for ResourceSummary.
-#[derive(Debug, Clone)]
-pub struct ResourceSummaryBuilder {
-    resource_type: String,
-    identifier: String,
-    compartment_id: String,
-    time_created: Option<DateTime<Utc>>,
-    display_name: Option<String>,
-    availability_domain: Option<String>,
-    lifecycle_state: Option<String>,
-    freeform_tags: Option<HashMap<String, String>>,
-    defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    system_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    search_context: Option<SearchContext>,
-    identity_context: Option<HashMap<String, serde_json::Value>>,
-    additional_details: Option<HashMap<String, serde_json::Value>>,
-}
+    // Setters for all fields (required + optional)
+    pub fn set_resource_type(mut self, resource_type: String) -> Self {
+        self.resource_type = resource_type;
+        self
+    }
 
-impl ResourceSummaryBuilder {
-    pub fn time_created(mut self, time_created: DateTime<Utc>) -> Self {
+    pub fn set_identifier(mut self, identifier: String) -> Self {
+        self.identifier = identifier;
+        self
+    }
+
+    pub fn set_compartment_id(mut self, compartment_id: String) -> Self {
+        self.compartment_id = compartment_id;
+        self
+    }
+
+    pub fn set_time_created(mut self, time_created: Option<DateTime<Utc>>) -> Self {
+        self.time_created = time_created;
+        self
+    }
+
+    pub fn set_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
+        self
+    }
+
+    pub fn set_availability_domain(mut self, availability_domain: Option<String>) -> Self {
+        self.availability_domain = availability_domain;
+        self
+    }
+
+    pub fn set_lifecycle_state(mut self, lifecycle_state: Option<String>) -> Self {
+        self.lifecycle_state = lifecycle_state;
+        self
+    }
+
+    pub fn set_freeform_tags(mut self, freeform_tags: Option<HashMap<String, String>>) -> Self {
+        self.freeform_tags = freeform_tags;
+        self
+    }
+
+    pub fn set_defined_tags(mut self, defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+        self.defined_tags = defined_tags;
+        self
+    }
+
+    pub fn set_system_tags(mut self, system_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+        self.system_tags = system_tags;
+        self
+    }
+
+    pub fn set_search_context(mut self, search_context: Option<SearchContext>) -> Self {
+        self.search_context = search_context;
+        self
+    }
+
+    pub fn set_identity_context(mut self, identity_context: Option<HashMap<String, serde_json::Value>>) -> Self {
+        self.identity_context = identity_context;
+        self
+    }
+
+    pub fn set_additional_details(mut self, additional_details: Option<HashMap<String, serde_json::Value>>) -> Self {
+        self.additional_details = additional_details;
+        self
+    }
+
+    // With methods for optional fields only
+    pub fn with_time_created(mut self, time_created: DateTime<Utc>) -> Self {
         self.time_created = Some(time_created);
         self
     }
 
-    pub fn display_name(mut self, display_name: impl Into<String>) -> Self {
+    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
         self.display_name = Some(display_name.into());
         self
     }
 
-    pub fn availability_domain(mut self, availability_domain: impl Into<String>) -> Self {
+    pub fn with_availability_domain(mut self, availability_domain: impl Into<String>) -> Self {
         self.availability_domain = Some(availability_domain.into());
         self
     }
 
-    pub fn lifecycle_state(mut self, lifecycle_state: impl Into<String>) -> Self {
+    pub fn with_lifecycle_state(mut self, lifecycle_state: impl Into<String>) -> Self {
         self.lifecycle_state = Some(lifecycle_state.into());
         self
     }
 
-    pub fn freeform_tags(mut self, freeform_tags: HashMap<String, String>) -> Self {
+    pub fn with_freeform_tags(mut self, freeform_tags: HashMap<String, String>) -> Self {
         self.freeform_tags = Some(freeform_tags);
         self
     }
 
-    pub fn defined_tags(
-        mut self,
-        defined_tags: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, defined_tags: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(defined_tags);
         self
     }
 
-    pub fn system_tags(
-        mut self,
-        system_tags: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_system_tags(mut self, system_tags: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.system_tags = Some(system_tags);
         self
     }
 
-    pub fn search_context(mut self, search_context: SearchContext) -> Self {
+    pub fn with_search_context(mut self, search_context: SearchContext) -> Self {
         self.search_context = Some(search_context);
         self
     }
 
-    pub fn identity_context(
-        mut self,
-        identity_context: HashMap<String, serde_json::Value>,
-    ) -> Self {
+    pub fn with_identity_context(mut self, identity_context: HashMap<String, serde_json::Value>) -> Self {
         self.identity_context = Some(identity_context);
         self
     }
 
-    pub fn additional_details(
-        mut self,
-        additional_details: HashMap<String, serde_json::Value>,
-    ) -> Self {
+    pub fn with_additional_details(mut self, additional_details: HashMap<String, serde_json::Value>) -> Self {
         self.additional_details = Some(additional_details);
         self
-    }
-
-    pub fn build(self) -> ResourceSummary {
-        ResourceSummary {
-            resource_type: self.resource_type,
-            identifier: self.identifier,
-            compartment_id: self.compartment_id,
-            time_created: self.time_created,
-            display_name: self.display_name,
-            availability_domain: self.availability_domain,
-            lifecycle_state: self.lifecycle_state,
-            freeform_tags: self.freeform_tags,
-            defined_tags: self.defined_tags,
-            system_tags: self.system_tags,
-            search_context: self.search_context,
-            identity_context: self.identity_context,
-            additional_details: self.additional_details,
-        }
     }
 }

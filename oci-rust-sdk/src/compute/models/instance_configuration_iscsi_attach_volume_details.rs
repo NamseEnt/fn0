@@ -61,6 +61,36 @@ impl InstanceConfigurationIscsiAttachVolumeDetails {
         self.use_chap = Some(use_chap);
         self
     }
+
+    /// Set display_name
+    pub fn set_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
+        self
+    }
+
+    /// Set is_read_only
+    pub fn set_is_read_only(mut self, is_read_only: Option<bool>) -> Self {
+        self.is_read_only = is_read_only;
+        self
+    }
+
+    /// Set device
+    pub fn set_device(mut self, device: Option<String>) -> Self {
+        self.device = device;
+        self
+    }
+
+    /// Set is_shareable
+    pub fn set_is_shareable(mut self, is_shareable: Option<bool>) -> Self {
+        self.is_shareable = is_shareable;
+        self
+    }
+
+    /// Set use_chap
+    pub fn set_use_chap(mut self, use_chap: Option<bool>) -> Self {
+        self.use_chap = use_chap;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationIscsiAttachVolumeDetails {

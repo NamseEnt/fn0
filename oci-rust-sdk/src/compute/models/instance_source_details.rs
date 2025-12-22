@@ -23,6 +23,16 @@ pub struct InstanceSourceDetails {
 }
 
 impl InstanceSourceDetails {
+    /// Create a new instance with default source_type (Image)
+    pub fn new() -> Self {
+        Self {
+            source_type: SourceType::Image,
+            image_id: None,
+            boot_volume_id: None,
+            boot_volume_size_in_g_bs: None,
+        }
+    }
+
     /// Create source details from an image
     pub fn from_image(image_id: impl Into<String>) -> Self {
         Self {
@@ -47,5 +57,35 @@ impl InstanceSourceDetails {
     pub fn with_boot_volume_size(mut self, size_in_gbs: i64) -> Self {
         self.boot_volume_size_in_g_bs = Some(size_in_gbs);
         self
+    }
+
+    /// Set source_type
+    pub fn set_source_type(mut self, source_type: SourceType) -> Self {
+        self.source_type = source_type;
+        self
+    }
+
+    /// Set image_id
+    pub fn set_image_id(mut self, image_id: Option<String>) -> Self {
+        self.image_id = image_id;
+        self
+    }
+
+    /// Set boot_volume_id
+    pub fn set_boot_volume_id(mut self, boot_volume_id: Option<String>) -> Self {
+        self.boot_volume_id = boot_volume_id;
+        self
+    }
+
+    /// Set boot_volume_size_in_g_bs
+    pub fn set_boot_volume_size_in_g_bs(mut self, boot_volume_size_in_g_bs: Option<i64>) -> Self {
+        self.boot_volume_size_in_g_bs = boot_volume_size_in_g_bs;
+        self
+    }
+}
+
+impl Default for InstanceSourceDetails {
+    fn default() -> Self {
+        Self::new()
     }
 }

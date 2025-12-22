@@ -45,11 +45,16 @@ pub struct CreateVnicDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
+/// Required fields for CreateVnicDetails
+pub struct CreateVnicDetailsRequired {
+    pub subnet_id: String,
+}
+
 impl CreateVnicDetails {
-    /// Create new VNIC details with required subnet_id
-    pub fn new(subnet_id: impl Into<String>) -> Self {
+    /// Create new VNIC details with required fields
+    pub fn new(required: CreateVnicDetailsRequired) -> Self {
         Self {
-            subnet_id: subnet_id.into(),
+            subnet_id: required.subnet_id,
             assign_public_ip: None,
             assign_private_dns_record: None,
             display_name: None,
@@ -62,39 +67,117 @@ impl CreateVnicDetails {
         }
     }
 
+    /// Set the subnet ID
+    pub fn set_subnet_id(mut self, subnet_id: String) -> Self {
+        self.subnet_id = subnet_id;
+        self
+    }
+
     /// Set whether to assign a public IP
+    pub fn set_assign_public_ip(mut self, assign: Option<bool>) -> Self {
+        self.assign_public_ip = assign;
+        self
+    }
+
+    /// Set whether to assign a private DNS record
+    pub fn set_assign_private_dns_record(mut self, assign: Option<bool>) -> Self {
+        self.assign_private_dns_record = assign;
+        self
+    }
+
+    /// Set the display name
+    pub fn set_display_name(mut self, name: Option<String>) -> Self {
+        self.display_name = name;
+        self
+    }
+
+    /// Set the hostname label
+    pub fn set_hostname_label(mut self, label: Option<String>) -> Self {
+        self.hostname_label = label;
+        self
+    }
+
+    /// Set a specific private IP address
+    pub fn set_private_ip(mut self, ip: Option<String>) -> Self {
+        self.private_ip = ip;
+        self
+    }
+
+    /// Set network security groups
+    pub fn set_nsg_ids(mut self, nsg_ids: Option<Vec<String>>) -> Self {
+        self.nsg_ids = nsg_ids;
+        self
+    }
+
+    /// Set whether to skip source/destination check
+    pub fn set_skip_source_dest_check(mut self, skip: Option<bool>) -> Self {
+        self.skip_source_dest_check = skip;
+        self
+    }
+
+    /// Set defined tags
+    pub fn set_defined_tags(mut self, tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+        self.defined_tags = tags;
+        self
+    }
+
+    /// Set freeform tags
+    pub fn set_freeform_tags(mut self, tags: Option<HashMap<String, String>>) -> Self {
+        self.freeform_tags = tags;
+        self
+    }
+
+    /// Set whether to assign a public IP (builder pattern)
     pub fn with_assign_public_ip(mut self, assign: bool) -> Self {
         self.assign_public_ip = Some(assign);
         self
     }
 
-    /// Set the display name
+    /// Set whether to assign a private DNS record (builder pattern)
+    pub fn with_assign_private_dns_record(mut self, assign: bool) -> Self {
+        self.assign_private_dns_record = Some(assign);
+        self
+    }
+
+    /// Set the display name (builder pattern)
     pub fn with_display_name(mut self, name: impl Into<String>) -> Self {
         self.display_name = Some(name.into());
         self
     }
 
-    /// Set the hostname label
+    /// Set the hostname label (builder pattern)
     pub fn with_hostname_label(mut self, label: impl Into<String>) -> Self {
         self.hostname_label = Some(label.into());
         self
     }
 
-    /// Set a specific private IP address
+    /// Set a specific private IP address (builder pattern)
     pub fn with_private_ip(mut self, ip: impl Into<String>) -> Self {
         self.private_ip = Some(ip.into());
         self
     }
 
-    /// Set network security groups
+    /// Set network security groups (builder pattern)
     pub fn with_nsg_ids(mut self, nsg_ids: Vec<String>) -> Self {
         self.nsg_ids = Some(nsg_ids);
         self
     }
 
-    /// Set whether to skip source/destination check
+    /// Set whether to skip source/destination check (builder pattern)
     pub fn with_skip_source_dest_check(mut self, skip: bool) -> Self {
         self.skip_source_dest_check = Some(skip);
+        self
+    }
+
+    /// Set defined tags (builder pattern)
+    pub fn with_defined_tags(mut self, tags: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+        self.defined_tags = Some(tags);
+        self
+    }
+
+    /// Set freeform tags (builder pattern)
+    pub fn with_freeform_tags(mut self, tags: HashMap<String, String>) -> Self {
+        self.freeform_tags = Some(tags);
         self
     }
 }

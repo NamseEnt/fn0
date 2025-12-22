@@ -49,6 +49,24 @@ impl ComputeInstanceDetails {
         self.secondary_vnics = Some(secondary_vnics);
         self
     }
+
+    /// Set block_volumes
+    pub fn set_block_volumes(mut self, block_volumes: Option<Vec<super::InstanceConfigurationBlockVolumeDetails>>) -> Self {
+        self.block_volumes = block_volumes;
+        self
+    }
+
+    /// Set launch_details
+    pub fn set_launch_details(mut self, launch_details: Option<super::InstanceConfigurationLaunchInstanceDetails>) -> Self {
+        self.launch_details = launch_details;
+        self
+    }
+
+    /// Set secondary_vnics
+    pub fn set_secondary_vnics(mut self, secondary_vnics: Option<Vec<super::InstanceConfigurationAttachVnicDetails>>) -> Self {
+        self.secondary_vnics = secondary_vnics;
+        self
+    }
 }
 
 impl Default for ComputeInstanceDetails {

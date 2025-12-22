@@ -40,6 +40,18 @@ impl InstanceConfigurationAvailabilityConfig {
         self.recovery_action = Some(action);
         self
     }
+
+    /// Set is_live_migration_preferred
+    pub fn set_is_live_migration_preferred(mut self, is_live_migration_preferred: Option<bool>) -> Self {
+        self.is_live_migration_preferred = is_live_migration_preferred;
+        self
+    }
+
+    /// Set recovery_action
+    pub fn set_recovery_action(mut self, recovery_action: Option<RecoveryAction>) -> Self {
+        self.recovery_action = recovery_action;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationAvailabilityConfig {

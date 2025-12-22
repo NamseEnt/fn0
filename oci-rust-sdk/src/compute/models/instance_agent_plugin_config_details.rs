@@ -22,19 +22,46 @@ pub enum DesiredState {
     Disabled,
 }
 
+/// Required fields for InstanceAgentPluginConfigDetails
+pub struct InstanceAgentPluginConfigDetailsRequired {
+    pub name: String,
+    pub desired_state: DesiredState,
+}
+
 impl InstanceAgentPluginConfigDetails {
-    pub fn new(name: impl Into<String>, desired_state: DesiredState) -> Self {
+    /// Create new instance with required fields
+    pub fn new(required: InstanceAgentPluginConfigDetailsRequired) -> Self {
         Self {
-            name: name.into(),
-            desired_state,
+            name: required.name,
+            desired_state: required.desired_state,
         }
     }
 
-    pub fn enabled(name: impl Into<String>) -> Self {
-        Self::new(name, DesiredState::Enabled)
+    /// Set the plugin name
+    pub fn set_name(mut self, name: String) -> Self {
+        self.name = name;
+        self
     }
 
+    /// Set the desired state
+    pub fn set_desired_state(mut self, desired_state: DesiredState) -> Self {
+        self.desired_state = desired_state;
+        self
+    }
+
+    /// Factory method to create enabled plugin config
+    pub fn enabled(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            desired_state: DesiredState::Enabled,
+        }
+    }
+
+    /// Factory method to create disabled plugin config
     pub fn disabled(name: impl Into<String>) -> Self {
-        Self::new(name, DesiredState::Disabled)
+        Self {
+            name: name.into(),
+            desired_state: DesiredState::Disabled,
+        }
     }
 }

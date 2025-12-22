@@ -102,6 +102,52 @@ impl InstanceConfigurationLaunchOptions {
         self.remote_data_volume_type = Some(volume_type);
         self
     }
+
+    pub fn with_is_pv_encryption_in_transit_enabled(mut self, enabled: bool) -> Self {
+        self.is_pv_encryption_in_transit_enabled = Some(enabled);
+        self
+    }
+
+    pub fn with_is_consistent_volume_naming_enabled(mut self, enabled: bool) -> Self {
+        self.is_consistent_volume_naming_enabled = Some(enabled);
+        self
+    }
+
+    /// Set boot_volume_type
+    pub fn set_boot_volume_type(mut self, boot_volume_type: Option<BootVolumeType>) -> Self {
+        self.boot_volume_type = boot_volume_type;
+        self
+    }
+
+    /// Set firmware
+    pub fn set_firmware(mut self, firmware: Option<Firmware>) -> Self {
+        self.firmware = firmware;
+        self
+    }
+
+    /// Set network_type
+    pub fn set_network_type(mut self, network_type: Option<NetworkType>) -> Self {
+        self.network_type = network_type;
+        self
+    }
+
+    /// Set remote_data_volume_type
+    pub fn set_remote_data_volume_type(mut self, remote_data_volume_type: Option<RemoteDataVolumeType>) -> Self {
+        self.remote_data_volume_type = remote_data_volume_type;
+        self
+    }
+
+    /// Set is_pv_encryption_in_transit_enabled
+    pub fn set_is_pv_encryption_in_transit_enabled(mut self, is_pv_encryption_in_transit_enabled: Option<bool>) -> Self {
+        self.is_pv_encryption_in_transit_enabled = is_pv_encryption_in_transit_enabled;
+        self
+    }
+
+    /// Set is_consistent_volume_naming_enabled
+    pub fn set_is_consistent_volume_naming_enabled(mut self, is_consistent_volume_naming_enabled: Option<bool>) -> Self {
+        self.is_consistent_volume_naming_enabled = is_consistent_volume_naming_enabled;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationLaunchOptions {

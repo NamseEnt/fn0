@@ -1,6 +1,5 @@
 use crate::compute::models::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Required fields for LaunchInstanceRequest
 pub struct LaunchInstanceRequestRequiredFields {
@@ -64,56 +63,6 @@ impl LaunchInstanceRequestBuilder {
     }
 }
 
-/// Wrapper to allow chaining LaunchInstanceDetails builder methods
-pub struct LaunchInstanceDetailsBuilderWrapper {
-    details_builder: LaunchInstanceDetailsBuilder,
-    opc_retry_token: Option<String>,
-}
-
-impl LaunchInstanceDetailsBuilderWrapper {
-    /// Set the VNIC details
-    pub fn create_vnic_details(mut self, details: CreateVnicDetails) -> Self {
-        self.details_builder = self.details_builder.create_vnic_details(details);
-        self
-    }
-
-    /// Set the display name
-    pub fn display_name(mut self, name: impl Into<String>) -> Self {
-        self.details_builder = self.details_builder.display_name(name);
-        self
-    }
-
-    /// Set custom metadata
-    pub fn metadata(mut self, metadata: HashMap<String, String>) -> Self {
-        self.details_builder = self.details_builder.metadata(metadata);
-        self
-    }
-
-    /// Set free-form tags
-    pub fn freeform_tags(mut self, tags: HashMap<String, String>) -> Self {
-        self.details_builder = self.details_builder.freeform_tags(tags);
-        self
-    }
-
-    /// Set the retry token for idempotency
-    pub fn opc_retry_token(mut self, token: impl Into<String>) -> Self {
-        self.opc_retry_token = Some(token.into());
-        self
-    }
-
-    pub fn set_opc_retry_token(mut self, token: Option<impl Into<String>>) -> Self {
-        self.opc_retry_token = token.map(|t| t.into());
-        self
-    }
-
-    /// Build the request
-    pub fn build(self) -> LaunchInstanceRequest {
-        LaunchInstanceRequest {
-            launch_instance_details: self.details_builder.build(),
-            opc_retry_token: self.opc_retry_token,
-        }
-    }
-}
 
 /// Response from launching an instance
 #[derive(Debug, Clone, Serialize, Deserialize)]

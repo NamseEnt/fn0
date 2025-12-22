@@ -88,6 +88,47 @@ impl InstanceConfigurationLaunchInstanceShapeConfigDetails {
         self.nvmes = Some(nvmes);
         self
     }
+
+    pub fn with_resource_management(mut self, resource_management: ResourceManagement) -> Self {
+        self.resource_management = Some(resource_management);
+        self
+    }
+
+    /// Set ocpus
+    pub fn set_ocpus(mut self, ocpus: Option<f64>) -> Self {
+        self.ocpus = ocpus;
+        self
+    }
+
+    /// Set vcpus
+    pub fn set_vcpus(mut self, vcpus: Option<i32>) -> Self {
+        self.vcpus = vcpus;
+        self
+    }
+
+    /// Set memory_in_g_bs
+    pub fn set_memory_in_g_bs(mut self, memory_in_g_bs: Option<f64>) -> Self {
+        self.memory_in_g_bs = memory_in_g_bs;
+        self
+    }
+
+    /// Set baseline_ocpu_utilization
+    pub fn set_baseline_ocpu_utilization(mut self, baseline_ocpu_utilization: Option<BaselineOcpuUtilization>) -> Self {
+        self.baseline_ocpu_utilization = baseline_ocpu_utilization;
+        self
+    }
+
+    /// Set nvmes
+    pub fn set_nvmes(mut self, nvmes: Option<i32>) -> Self {
+        self.nvmes = nvmes;
+        self
+    }
+
+    /// Set resource_management
+    pub fn set_resource_management(mut self, resource_management: Option<ResourceManagement>) -> Self {
+        self.resource_management = resource_management;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationLaunchInstanceShapeConfigDetails {

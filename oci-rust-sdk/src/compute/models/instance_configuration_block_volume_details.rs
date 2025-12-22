@@ -46,6 +46,24 @@ impl InstanceConfigurationBlockVolumeDetails {
         self.volume_id = Some(id.into());
         self
     }
+
+    /// Set attach_details
+    pub fn set_attach_details(mut self, attach_details: Option<super::InstanceConfigurationAttachVolumeDetails>) -> Self {
+        self.attach_details = attach_details;
+        self
+    }
+
+    /// Set create_details
+    pub fn set_create_details(mut self, create_details: Option<super::InstanceConfigurationCreateVolumeDetails>) -> Self {
+        self.create_details = create_details;
+        self
+    }
+
+    /// Set volume_id
+    pub fn set_volume_id(mut self, volume_id: Option<String>) -> Self {
+        self.volume_id = volume_id;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationBlockVolumeDetails {

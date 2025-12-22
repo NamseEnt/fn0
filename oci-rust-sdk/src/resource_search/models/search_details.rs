@@ -31,6 +31,39 @@ pub struct StructuredSearchDetails {
     pub matching_context_type: Option<MatchingContextType>,
 }
 
+/// Required fields for StructuredSearchDetails
+pub struct StructuredSearchDetailsRequired {
+    pub query: String,
+}
+
+impl StructuredSearchDetails {
+    /// Create new instance with required fields
+    pub fn new(required: StructuredSearchDetailsRequired) -> Self {
+        Self {
+            query: required.query,
+            matching_context_type: None,
+        }
+    }
+
+    /// Set the query
+    pub fn set_query(mut self, query: String) -> Self {
+        self.query = query;
+        self
+    }
+
+    /// Set the matching context type
+    pub fn set_matching_context_type(mut self, matching_context_type: Option<MatchingContextType>) -> Self {
+        self.matching_context_type = matching_context_type;
+        self
+    }
+
+    /// Set the matching context type (builder pattern)
+    pub fn with_matching_context_type(mut self, matching_context_type: MatchingContextType) -> Self {
+        self.matching_context_type = Some(matching_context_type);
+        self
+    }
+}
+
 /// A request that uses free text search.
 ///
 /// Searches across resource names, descriptions, and other text fields.
@@ -43,6 +76,39 @@ pub struct FreeTextSearchDetails {
     /// The type of matching context to return in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matching_context_type: Option<MatchingContextType>,
+}
+
+/// Required fields for FreeTextSearchDetails
+pub struct FreeTextSearchDetailsRequired {
+    pub text: String,
+}
+
+impl FreeTextSearchDetails {
+    /// Create new instance with required fields
+    pub fn new(required: FreeTextSearchDetailsRequired) -> Self {
+        Self {
+            text: required.text,
+            matching_context_type: None,
+        }
+    }
+
+    /// Set the text to search for
+    pub fn set_text(mut self, text: String) -> Self {
+        self.text = text;
+        self
+    }
+
+    /// Set the matching context type
+    pub fn set_matching_context_type(mut self, matching_context_type: Option<MatchingContextType>) -> Self {
+        self.matching_context_type = matching_context_type;
+        self
+    }
+
+    /// Set the matching context type (builder pattern)
+    pub fn with_matching_context_type(mut self, matching_context_type: MatchingContextType) -> Self {
+        self.matching_context_type = Some(matching_context_type);
+        self
+    }
 }
 
 #[cfg(test)]

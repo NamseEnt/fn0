@@ -47,6 +47,24 @@ impl InstanceConfigurationAttachVnicDetails {
         self.nic_index = Some(index);
         self
     }
+
+    /// Set create_vnic_details
+    pub fn set_create_vnic_details(mut self, create_vnic_details: Option<super::InstanceConfigurationCreateVnicDetails>) -> Self {
+        self.create_vnic_details = create_vnic_details;
+        self
+    }
+
+    /// Set display_name
+    pub fn set_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
+        self
+    }
+
+    /// Set nic_index
+    pub fn set_nic_index(mut self, nic_index: Option<i32>) -> Self {
+        self.nic_index = nic_index;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationAttachVnicDetails {

@@ -77,38 +77,74 @@ impl LaunchInstanceShapeConfigDetails {
     }
 
     /// Set the number of OCPUs
-    pub fn ocpus(mut self, ocpus: f64) -> Self {
+    pub fn with_ocpus(mut self, ocpus: f64) -> Self {
         self.ocpus = Some(ocpus);
         self
     }
 
     /// Set the number of VCPUs
-    pub fn vcpus(mut self, vcpus: i32) -> Self {
+    pub fn with_vcpus(mut self, vcpus: i32) -> Self {
         self.vcpus = Some(vcpus);
         self
     }
 
     /// Set the memory in GBs
-    pub fn memory_in_gbs(mut self, memory: f64) -> Self {
+    pub fn with_memory_in_gbs(mut self, memory: f64) -> Self {
         self.memory_in_g_bs = Some(memory);
         self
     }
 
     /// Set the baseline OCPU utilization
-    pub fn baseline_ocpu_utilization(mut self, utilization: BaselineOcpuUtilization) -> Self {
+    pub fn with_baseline_ocpu_utilization(mut self, utilization: BaselineOcpuUtilization) -> Self {
         self.baseline_ocpu_utilization = Some(utilization);
         self
     }
 
     /// Set the number of NVMe drives
-    pub fn nvmes(mut self, nvmes: i32) -> Self {
+    pub fn with_nvmes(mut self, nvmes: i32) -> Self {
         self.nvmes = Some(nvmes);
         self
     }
 
     /// Set the resource management mode
-    pub fn resource_management(mut self, mode: ResourceManagement) -> Self {
+    pub fn with_resource_management(mut self, mode: ResourceManagement) -> Self {
         self.resource_management = Some(mode);
+        self
+    }
+
+    /// Set ocpus
+    pub fn set_ocpus(mut self, ocpus: Option<f64>) -> Self {
+        self.ocpus = ocpus;
+        self
+    }
+
+    /// Set vcpus
+    pub fn set_vcpus(mut self, vcpus: Option<i32>) -> Self {
+        self.vcpus = vcpus;
+        self
+    }
+
+    /// Set memory_in_g_bs
+    pub fn set_memory_in_g_bs(mut self, memory_in_g_bs: Option<f64>) -> Self {
+        self.memory_in_g_bs = memory_in_g_bs;
+        self
+    }
+
+    /// Set baseline_ocpu_utilization
+    pub fn set_baseline_ocpu_utilization(mut self, baseline_ocpu_utilization: Option<BaselineOcpuUtilization>) -> Self {
+        self.baseline_ocpu_utilization = baseline_ocpu_utilization;
+        self
+    }
+
+    /// Set nvmes
+    pub fn set_nvmes(mut self, nvmes: Option<i32>) -> Self {
+        self.nvmes = nvmes;
+        self
+    }
+
+    /// Set resource_management
+    pub fn set_resource_management(mut self, resource_management: Option<ResourceManagement>) -> Self {
+        self.resource_management = resource_management;
         self
     }
 }

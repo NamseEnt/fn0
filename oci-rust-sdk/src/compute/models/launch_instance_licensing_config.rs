@@ -39,6 +39,12 @@ impl LaunchInstanceWindowsLicensingConfig {
         self.license_type = Some(license_type);
         self
     }
+
+    /// Set license_type
+    pub fn set_license_type(mut self, license_type: Option<LicenseType>) -> Self {
+        self.license_type = license_type;
+        self
+    }
 }
 
 impl Default for LaunchInstanceWindowsLicensingConfig {

@@ -14,3 +14,28 @@ pub struct SearchContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub highlights: Option<HashMap<String, Vec<String>>>,
 }
+
+impl SearchContext {
+    pub fn new() -> Self {
+        Self {
+            highlights: None,
+        }
+    }
+
+    pub fn with_highlights(mut self, highlights: HashMap<String, Vec<String>>) -> Self {
+        self.highlights = Some(highlights);
+        self
+    }
+
+    /// Set highlights
+    pub fn set_highlights(mut self, highlights: Option<HashMap<String, Vec<String>>>) -> Self {
+        self.highlights = highlights;
+        self
+    }
+}
+
+impl Default for SearchContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}

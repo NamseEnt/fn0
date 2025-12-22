@@ -56,6 +56,30 @@ impl InstanceConfigurationInstanceSourceImageFilterDetails {
         self.operating_system_version = Some(version.into());
         self
     }
+
+    /// Set compartment_id
+    pub fn set_compartment_id(mut self, compartment_id: Option<String>) -> Self {
+        self.compartment_id = compartment_id;
+        self
+    }
+
+    /// Set defined_tags_filter
+    pub fn set_defined_tags_filter(mut self, defined_tags_filter: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+        self.defined_tags_filter = defined_tags_filter;
+        self
+    }
+
+    /// Set operating_system
+    pub fn set_operating_system(mut self, operating_system: Option<String>) -> Self {
+        self.operating_system = operating_system;
+        self
+    }
+
+    /// Set operating_system_version
+    pub fn set_operating_system_version(mut self, operating_system_version: Option<String>) -> Self {
+        self.operating_system_version = operating_system_version;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationInstanceSourceImageFilterDetails {

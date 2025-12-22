@@ -32,6 +32,18 @@ impl InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails {
         self.ipv6_address = Some(address.into());
         self
     }
+
+    /// Set ipv6_subnet_cidr
+    pub fn set_ipv6_subnet_cidr(mut self, ipv6_subnet_cidr: Option<String>) -> Self {
+        self.ipv6_subnet_cidr = ipv6_subnet_cidr;
+        self
+    }
+
+    /// Set ipv6_address
+    pub fn set_ipv6_address(mut self, ipv6_address: Option<String>) -> Self {
+        self.ipv6_address = ipv6_address;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails {

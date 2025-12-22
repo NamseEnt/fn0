@@ -8,8 +8,22 @@ pub struct PreemptibleInstanceConfigDetails {
     pub preemption_action: super::PreemptionAction,
 }
 
+/// Required fields for PreemptibleInstanceConfigDetails
+pub struct PreemptibleInstanceConfigDetailsRequired {
+    pub preemption_action: super::PreemptionAction,
+}
+
 impl PreemptibleInstanceConfigDetails {
-    pub fn new(preemption_action: super::PreemptionAction) -> Self {
-        Self { preemption_action }
+    /// Create new instance with required fields
+    pub fn new(required: PreemptibleInstanceConfigDetailsRequired) -> Self {
+        Self {
+            preemption_action: required.preemption_action,
+        }
+    }
+
+    /// Set the preemption action
+    pub fn set_preemption_action(mut self, preemption_action: super::PreemptionAction) -> Self {
+        self.preemption_action = preemption_action;
+        self
     }
 }

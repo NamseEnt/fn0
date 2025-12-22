@@ -1,6 +1,6 @@
 [package]
 name = "oci-rust-sdk"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 description = "Unofficial Oracle OCI SDK for Rust"
 authors = ["namse"]

@@ -21,6 +21,12 @@ impl InstanceConfigurationInstanceOptions {
         self.are_legacy_imds_endpoints_disabled = Some(disabled);
         self
     }
+
+    /// Set are_legacy_imds_endpoints_disabled
+    pub fn set_are_legacy_imds_endpoints_disabled(mut self, are_legacy_imds_endpoints_disabled: Option<bool>) -> Self {
+        self.are_legacy_imds_endpoints_disabled = are_legacy_imds_endpoints_disabled;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationInstanceOptions {

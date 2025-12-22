@@ -47,6 +47,35 @@ impl InstanceConfigurationLaunchInstanceAgentConfigDetails {
         self.are_all_plugins_disabled = Some(disabled);
         self
     }
+
+    pub fn with_plugins_config(mut self, config: Vec<super::InstanceAgentPluginConfigDetails>) -> Self {
+        self.plugins_config = Some(config);
+        self
+    }
+
+    /// Set is_monitoring_disabled
+    pub fn set_is_monitoring_disabled(mut self, is_monitoring_disabled: Option<bool>) -> Self {
+        self.is_monitoring_disabled = is_monitoring_disabled;
+        self
+    }
+
+    /// Set is_management_disabled
+    pub fn set_is_management_disabled(mut self, is_management_disabled: Option<bool>) -> Self {
+        self.is_management_disabled = is_management_disabled;
+        self
+    }
+
+    /// Set are_all_plugins_disabled
+    pub fn set_are_all_plugins_disabled(mut self, are_all_plugins_disabled: Option<bool>) -> Self {
+        self.are_all_plugins_disabled = are_all_plugins_disabled;
+        self
+    }
+
+    /// Set plugins_config
+    pub fn set_plugins_config(mut self, plugins_config: Option<Vec<super::InstanceAgentPluginConfigDetails>>) -> Self {
+        self.plugins_config = plugins_config;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationLaunchInstanceAgentConfigDetails {

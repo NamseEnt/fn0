@@ -116,6 +116,125 @@ impl InstanceConfigurationCreateVnicDetails {
         self.skip_source_dest_check = Some(skip);
         self
     }
+
+    pub fn with_assign_ipv6_ip(mut self, assign: bool) -> Self {
+        self.assign_ipv6_ip = Some(assign);
+        self
+    }
+
+    pub fn with_assign_private_dns_record(mut self, assign: bool) -> Self {
+        self.assign_private_dns_record = Some(assign);
+        self
+    }
+
+    pub fn with_defined_tags(mut self, tags: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+        self.defined_tags = Some(tags);
+        self
+    }
+
+    pub fn with_freeform_tags(mut self, tags: HashMap<String, String>) -> Self {
+        self.freeform_tags = Some(tags);
+        self
+    }
+
+    pub fn with_security_attributes(mut self, attrs: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+        self.security_attributes = Some(attrs);
+        self
+    }
+
+    pub fn with_ipv6_address_ipv6_subnet_cidr_pair_details(mut self, details: Vec<super::InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>) -> Self {
+        self.ipv6_address_ipv6_subnet_cidr_pair_details = Some(details);
+        self
+    }
+
+    pub fn with_subnet_cidr(mut self, cidr: impl Into<String>) -> Self {
+        self.subnet_cidr = Some(cidr.into());
+        self
+    }
+
+    /// Set assign_ipv6_ip
+    pub fn set_assign_ipv6_ip(mut self, assign_ipv6_ip: Option<bool>) -> Self {
+        self.assign_ipv6_ip = assign_ipv6_ip;
+        self
+    }
+
+    /// Set assign_public_ip
+    pub fn set_assign_public_ip(mut self, assign_public_ip: Option<bool>) -> Self {
+        self.assign_public_ip = assign_public_ip;
+        self
+    }
+
+    /// Set assign_private_dns_record
+    pub fn set_assign_private_dns_record(mut self, assign_private_dns_record: Option<bool>) -> Self {
+        self.assign_private_dns_record = assign_private_dns_record;
+        self
+    }
+
+    /// Set defined_tags
+    pub fn set_defined_tags(mut self, defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+        self.defined_tags = defined_tags;
+        self
+    }
+
+    /// Set display_name
+    pub fn set_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
+        self
+    }
+
+    /// Set freeform_tags
+    pub fn set_freeform_tags(mut self, freeform_tags: Option<HashMap<String, String>>) -> Self {
+        self.freeform_tags = freeform_tags;
+        self
+    }
+
+    /// Set security_attributes
+    pub fn set_security_attributes(mut self, security_attributes: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+        self.security_attributes = security_attributes;
+        self
+    }
+
+    /// Set ipv6_address_ipv6_subnet_cidr_pair_details
+    pub fn set_ipv6_address_ipv6_subnet_cidr_pair_details(mut self, ipv6_address_ipv6_subnet_cidr_pair_details: Option<Vec<super::InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>>) -> Self {
+        self.ipv6_address_ipv6_subnet_cidr_pair_details = ipv6_address_ipv6_subnet_cidr_pair_details;
+        self
+    }
+
+    /// Set hostname_label
+    pub fn set_hostname_label(mut self, hostname_label: Option<String>) -> Self {
+        self.hostname_label = hostname_label;
+        self
+    }
+
+    /// Set nsg_ids
+    pub fn set_nsg_ids(mut self, nsg_ids: Option<Vec<String>>) -> Self {
+        self.nsg_ids = nsg_ids;
+        self
+    }
+
+    /// Set subnet_cidr
+    pub fn set_subnet_cidr(mut self, subnet_cidr: Option<String>) -> Self {
+        self.subnet_cidr = subnet_cidr;
+        self
+    }
+
+    /// Set private_ip
+    pub fn set_private_ip(mut self, private_ip: Option<String>) -> Self {
+        self.private_ip = private_ip;
+        self
+    }
+
+    /// Set skip_source_dest_check
+    pub fn set_skip_source_dest_check(mut self, skip_source_dest_check: Option<bool>) -> Self {
+        self.skip_source_dest_check = skip_source_dest_check;
+        self
+    }
+
+    /// Set subnet_id
+    pub fn set_subnet_id(mut self, subnet_id: Option<String>) -> Self {
+        self.subnet_id = subnet_id;
+        self
+    }
 }
 
 impl Default for InstanceConfigurationCreateVnicDetails {

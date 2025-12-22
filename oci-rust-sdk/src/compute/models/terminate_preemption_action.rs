@@ -21,6 +21,12 @@ impl TerminatePreemptionAction {
         self.preserve_boot_volume = Some(preserve);
         self
     }
+
+    /// Set preserve_boot_volume
+    pub fn set_preserve_boot_volume(mut self, preserve_boot_volume: Option<bool>) -> Self {
+        self.preserve_boot_volume = preserve_boot_volume;
+        self
+    }
 }
 
 impl Default for TerminatePreemptionAction {
