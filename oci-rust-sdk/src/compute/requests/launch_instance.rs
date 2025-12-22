@@ -50,6 +50,11 @@ impl LaunchInstanceRequestBuilder {
         self
     }
 
+    pub fn set_opc_retry_token(mut self, token: Option<impl Into<String>>) -> Self {
+        self.opc_retry_token = token.map(|t| t.into());
+        self
+    }
+
     /// Build the request
     pub fn build(self) -> LaunchInstanceRequest {
         LaunchInstanceRequest {
@@ -93,6 +98,11 @@ impl LaunchInstanceDetailsBuilderWrapper {
     /// Set the retry token for idempotency
     pub fn opc_retry_token(mut self, token: impl Into<String>) -> Self {
         self.opc_retry_token = Some(token.into());
+        self
+    }
+
+    pub fn set_opc_retry_token(mut self, token: Option<impl Into<String>>) -> Self {
+        self.opc_retry_token = token.map(|t| t.into());
         self
     }
 

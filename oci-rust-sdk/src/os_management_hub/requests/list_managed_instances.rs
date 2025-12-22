@@ -245,8 +245,18 @@ impl ListManagedInstancesRequestBuilder {
         self
     }
 
+    pub fn set_compartment_id(mut self, compartment_id: Option<impl Into<String>>) -> Self {
+        self.request.compartment_id = compartment_id.map(|c| c.into());
+        self
+    }
+
     pub fn display_name(mut self, display_name: Vec<String>) -> Self {
         self.request.display_name = Some(display_name);
+        self
+    }
+
+    pub fn set_display_name(mut self, display_name: Option<Vec<String>>) -> Self {
+        self.request.display_name = display_name;
         self
     }
 
@@ -255,8 +265,18 @@ impl ListManagedInstancesRequestBuilder {
         self
     }
 
+    pub fn set_display_name_contains(mut self, display_name_contains: Option<impl Into<String>>) -> Self {
+        self.request.display_name_contains = display_name_contains.map(|d| d.into());
+        self
+    }
+
     pub fn status(mut self, status: Vec<ManagedInstanceStatus>) -> Self {
         self.request.status = Some(status);
+        self
+    }
+
+    pub fn set_status(mut self, status: Option<Vec<ManagedInstanceStatus>>) -> Self {
+        self.request.status = status;
         self
     }
 
@@ -265,8 +285,18 @@ impl ListManagedInstancesRequestBuilder {
         self
     }
 
+    pub fn set_arch_type(mut self, arch_type: Option<Vec<ArchType>>) -> Self {
+        self.request.arch_type = arch_type;
+        self
+    }
+
     pub fn os_family(mut self, os_family: Vec<OsFamily>) -> Self {
         self.request.os_family = Some(os_family);
+        self
+    }
+
+    pub fn set_os_family(mut self, os_family: Option<Vec<OsFamily>>) -> Self {
+        self.request.os_family = os_family;
         self
     }
 
@@ -275,8 +305,18 @@ impl ListManagedInstancesRequestBuilder {
         self
     }
 
+    pub fn set_limit(mut self, limit: Option<u32>) -> Self {
+        self.request.limit = limit;
+        self
+    }
+
     pub fn page(mut self, page: impl Into<String>) -> Self {
         self.request.page = Some(page.into());
+        self
+    }
+
+    pub fn set_page(mut self, page: Option<impl Into<String>>) -> Self {
+        self.request.page = page.map(|p| p.into());
         self
     }
 
@@ -285,8 +325,18 @@ impl ListManagedInstancesRequestBuilder {
         self
     }
 
+    pub fn set_sort_order(mut self, sort_order: Option<SortOrder>) -> Self {
+        self.request.sort_order = sort_order;
+        self
+    }
+
     pub fn sort_by(mut self, sort_by: ListManagedInstancesSortBy) -> Self {
         self.request.sort_by = Some(sort_by);
+        self
+    }
+
+    pub fn set_sort_by(mut self, sort_by: Option<ListManagedInstancesSortBy>) -> Self {
+        self.request.sort_by = sort_by;
         self
     }
 

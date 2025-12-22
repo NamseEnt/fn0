@@ -9,19 +9,12 @@ pub struct ListContainerInstancesRequestRequiredFields {
 #[serde(rename_all = "camelCase")]
 pub struct ListContainerInstancesRequest {
     pub compartment_id: String,
-
     pub lifecycle_state: Option<ContainerInstanceLifecycleState>,
-
     pub display_name: Option<String>,
-
     pub availability_domain: Option<String>,
-
     pub limit: Option<u32>,
-
     pub page: Option<String>,
-
     pub sort_order: Option<SortOrder>,
-
     pub sort_by: Option<SortBy>,
 }
 
@@ -80,11 +73,13 @@ pub struct ListContainerInstancesRequestBuilder {
 }
 
 impl ListContainerInstancesRequestBuilder {
-    pub fn lifecycle_state(
-        mut self,
-        lifecycle_state: ContainerInstanceLifecycleState,
-    ) -> Self {
+    pub fn lifecycle_state(mut self, lifecycle_state: ContainerInstanceLifecycleState) -> Self {
         self.request.lifecycle_state = Some(lifecycle_state);
+        self
+    }
+
+    pub fn set_lifecycle_state(mut self, lifecycle_state: Option<ContainerInstanceLifecycleState>) -> Self {
+        self.request.lifecycle_state = lifecycle_state;
         self
     }
 
@@ -93,8 +88,18 @@ impl ListContainerInstancesRequestBuilder {
         self
     }
 
+    pub fn set_display_name(mut self, display_name: Option<impl Into<String>>) -> Self {
+        self.request.display_name = display_name.map(|d| d.into());
+        self
+    }
+
     pub fn availability_domain(mut self, availability_domain: impl Into<String>) -> Self {
         self.request.availability_domain = Some(availability_domain.into());
+        self
+    }
+
+    pub fn set_availability_domain(mut self, availability_domain: Option<impl Into<String>>) -> Self {
+        self.request.availability_domain = availability_domain.map(|a| a.into());
         self
     }
 
@@ -103,8 +108,18 @@ impl ListContainerInstancesRequestBuilder {
         self
     }
 
+    pub fn set_limit(mut self, limit: Option<u32>) -> Self {
+        self.request.limit = limit;
+        self
+    }
+
     pub fn page(mut self, page: impl Into<String>) -> Self {
         self.request.page = Some(page.into());
+        self
+    }
+
+    pub fn set_page(mut self, page: Option<impl Into<String>>) -> Self {
+        self.request.page = page.map(|p| p.into());
         self
     }
 
@@ -113,8 +128,18 @@ impl ListContainerInstancesRequestBuilder {
         self
     }
 
+    pub fn set_sort_order(mut self, sort_order: Option<SortOrder>) -> Self {
+        self.request.sort_order = sort_order;
+        self
+    }
+
     pub fn sort_by(mut self, sort_by: SortBy) -> Self {
         self.request.sort_by = Some(sort_by);
+        self
+    }
+
+    pub fn set_sort_by(mut self, sort_by: Option<SortBy>) -> Self {
+        self.request.sort_by = sort_by;
         self
     }
 
@@ -127,8 +152,6 @@ impl ListContainerInstancesRequestBuilder {
 #[serde(rename_all = "camelCase")]
 pub struct ListContainerInstancesResponse {
     pub items: Vec<ContainerInstance>,
-
     pub opc_request_id: Option<String>,
-
     pub opc_next_page: Option<String>,
 }

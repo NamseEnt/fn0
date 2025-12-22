@@ -50,6 +50,11 @@ impl LaunchInstanceConfigurationRequestBuilder {
         self
     }
 
+    pub fn set_opc_retry_token(mut self, token: Option<impl Into<String>>) -> Self {
+        self.opc_retry_token = token.map(|t| t.into());
+        self
+    }
+
     /// Builds the final request.
     pub fn build(self) -> LaunchInstanceConfigurationRequest {
         LaunchInstanceConfigurationRequest {

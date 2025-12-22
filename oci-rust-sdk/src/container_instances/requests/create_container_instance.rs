@@ -9,9 +9,7 @@ pub struct CreateContainerInstanceRequestRequiredFields {
 #[serde(rename_all = "camelCase")]
 pub struct CreateContainerInstanceRequest {
     pub create_container_instance_details: CreateContainerInstanceDetails,
-
     pub opc_retry_token: Option<String>,
-
     pub opc_request_id: Option<String>,
 }
 
@@ -40,8 +38,18 @@ impl CreateContainerInstanceRequestBuilder {
         self
     }
 
+    pub fn set_opc_retry_token(mut self, opc_retry_token: Option<impl Into<String>>) -> Self {
+        self.request.opc_retry_token = opc_retry_token.map(|o| o.into());
+        self
+    }
+
     pub fn opc_request_id(mut self, opc_request_id: impl Into<String>) -> Self {
         self.request.opc_request_id = Some(opc_request_id.into());
+        self
+    }
+
+    pub fn set_opc_request_id(mut self, opc_request_id: Option<impl Into<String>>) -> Self {
+        self.request.opc_request_id = opc_request_id.map(|o| o.into());
         self
     }
 
@@ -54,10 +62,7 @@ impl CreateContainerInstanceRequestBuilder {
 #[serde(rename_all = "camelCase")]
 pub struct CreateContainerInstanceResponse {
     pub container_instance: ContainerInstance,
-
     pub etag: Option<String>,
-
     pub opc_work_request_id: Option<String>,
-
     pub opc_request_id: Option<String>,
 }

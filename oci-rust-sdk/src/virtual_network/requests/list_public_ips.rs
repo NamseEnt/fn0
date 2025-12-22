@@ -90,8 +90,18 @@ impl ListPublicIpsRequestBuilder {
         self
     }
 
+    pub fn set_limit(mut self, limit: Option<u32>) -> Self {
+        self.request.limit = limit;
+        self
+    }
+
     pub fn page(mut self, page: impl Into<String>) -> Self {
         self.request.page = Some(page.into());
+        self
+    }
+
+    pub fn set_page(mut self, page: Option<impl Into<String>>) -> Self {
+        self.request.page = page.map(|p| p.into());
         self
     }
 
@@ -100,13 +110,28 @@ impl ListPublicIpsRequestBuilder {
         self
     }
 
+    pub fn set_availability_domain(mut self, availability_domain: Option<impl Into<String>>) -> Self {
+        self.request.availability_domain = availability_domain.map(|a| a.into());
+        self
+    }
+
     pub fn lifetime(mut self, lifetime: Lifetime) -> Self {
         self.request.lifetime = Some(lifetime);
         self
     }
 
+    pub fn set_lifetime(mut self, lifetime: Option<Lifetime>) -> Self {
+        self.request.lifetime = lifetime;
+        self
+    }
+
     pub fn public_ip_pool_id(mut self, public_ip_pool_id: impl Into<String>) -> Self {
         self.request.public_ip_pool_id = Some(public_ip_pool_id.into());
+        self
+    }
+
+    pub fn set_public_ip_pool_id(mut self, public_ip_pool_id: Option<impl Into<String>>) -> Self {
+        self.request.public_ip_pool_id = public_ip_pool_id.map(|p| p.into());
         self
     }
 

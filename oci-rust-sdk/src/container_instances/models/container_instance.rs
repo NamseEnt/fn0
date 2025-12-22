@@ -8,9 +8,7 @@ use super::enums::ContainerInstanceLifecycleState;
 #[serde(rename_all = "camelCase")]
 pub struct ContainerInstance {
     pub id: String,
-
     pub display_name: String,
-
     pub compartment_id: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -18,26 +16,20 @@ pub struct ContainerInstance {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-
     pub availability_domain: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fault_domain: Option<String>,
-
     pub lifecycle_state: ContainerInstanceLifecycleState,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lifecycle_details: Option<String>,
-
     pub container_count: i32,
-
     pub time_created: DateTime<Utc>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_updated: Option<DateTime<Utc>>,
-
     pub shape: String,
-
     pub shape_config: ContainerInstanceShapeConfig,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -48,7 +40,6 @@ pub struct ContainerInstance {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub graceful_shutdown_timeout_in_seconds: Option<i64>,
-
     pub container_restart_policy: ContainerRestartPolicy,
 }
 
@@ -56,7 +47,6 @@ pub struct ContainerInstance {
 #[serde(rename_all = "camelCase")]
 pub struct ContainerInstanceShapeConfig {
     pub ocpus: f32,
-
     pub memory_in_gbs: f32,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,7 +66,6 @@ pub struct ContainerVnic {
 #[serde(rename_all = "camelCase")]
 pub struct ContainerInstanceContainer {
     pub container_id: String,
-
     pub display_name: String,
 }
 
