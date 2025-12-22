@@ -8,7 +8,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./server-entry": "./dist/server-entry.js",
-    "./server/hono-app": "./dist/server/hono-app.js"
+    "./server/hono-app": "./dist/server/hono-app.js",
+    "./preview": "./dist/preview.js"
   },
   "scripts": {
     "build": "tsc",

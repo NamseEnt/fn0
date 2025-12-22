@@ -4,6 +4,7 @@ export function getAdapter(): AstroAdapter {
   return {
     name: "suisei",
     serverEntrypoint: "suisei/server-entry",
+    previewEntrypoint: "suisei/preview",
     exports: ["handler", "incomingHandler"],
     supportedAstroFeatures: {
       hybridOutput: "stable",

@@ -72,6 +72,11 @@ impl TypeScriptGenerator {
                 let component_path = src_path.join("component.ts");
                 fs::write(component_path, component_content).await?;
             }
+            Framework::Astro => {
+                // For Astro projects, assume the project is already initialized
+                // with astro.config.mjs and suisei adapter configured
+                println!("  Astro project setup - using existing configuration");
+            }
         }
 
         println!("📥 Installing dependencies...");

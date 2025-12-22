@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "fn0")]
@@ -18,5 +19,7 @@ pub enum Commands {
     Local {
         #[arg(short, long)]
         port: Option<u16>,
+        #[arg(short = 's', long)]
+        static_dir: Option<PathBuf>,
     },
 }

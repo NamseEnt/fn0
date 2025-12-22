@@ -22,8 +22,8 @@ async fn main() -> Result<()> {
         Commands::Build => {
             commands::build::execute().await?;
         }
-        Commands::Local { port } => {
-            commands::local::execute(port).await?;
+        Commands::Local { port, static_dir } => {
+            commands::local::execute(port, static_dir).await?;
         }
     }
 
