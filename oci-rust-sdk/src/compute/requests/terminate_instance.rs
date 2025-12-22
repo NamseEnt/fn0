@@ -80,15 +80,30 @@ impl TerminateInstanceRequestBuilder {
         self
     }
 
+    pub fn set_if_match(mut self, etag: Option<impl Into<String>>) -> Self {
+        self.request.if_match = etag.map(|e| e.into());
+        self
+    }
+
     /// Set whether to preserve the boot volume
     pub fn preserve_boot_volume(mut self, preserve: bool) -> Self {
         self.request.preserve_boot_volume = Some(preserve);
         self
     }
 
+    pub fn set_preserve_boot_volume(mut self, preserve: Option<bool>) -> Self {
+        self.request.preserve_boot_volume = preserve;
+        self
+    }
+
     /// Set whether to preserve data volumes created at launch
     pub fn preserve_data_volumes_created_at_launch(mut self, preserve: bool) -> Self {
         self.request.preserve_data_volumes_created_at_launch = Some(preserve);
+        self
+    }
+
+    pub fn set_preserve_data_volumes_created_at_launch(mut self, preserve: Option<bool>) -> Self {
+        self.request.preserve_data_volumes_created_at_launch = preserve;
         self
     }
 

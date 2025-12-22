@@ -5,15 +5,10 @@ use std::collections::HashMap;
 #[serde(rename_all = "camelCase")]
 pub struct CreateContainerInstanceDetails {
     pub compartment_id: String,
-
     pub availability_domain: String,
-
     pub shape: String,
-
     pub shape_config: CreateContainerInstanceShapeConfigDetails,
-
     pub containers: Vec<CreateContainerDetails>,
-
     pub vnics: Vec<CreateContainerVnicDetails>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,7 +34,6 @@ pub struct CreateContainerInstanceDetails {
 #[serde(rename_all = "camelCase")]
 pub struct CreateContainerInstanceShapeConfigDetails {
     pub ocpus: f32,
-
     pub memory_in_gbs: f32,
 }
 

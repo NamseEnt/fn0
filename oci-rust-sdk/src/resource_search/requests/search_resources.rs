@@ -76,9 +76,19 @@ impl SearchResourcesRequestBuilder {
         self
     }
 
+    pub fn set_limit(mut self, limit: Option<u32>) -> Self {
+        self.limit = limit;
+        self
+    }
+
     /// Set the page token for pagination.
     pub fn page(mut self, page: impl Into<String>) -> Self {
         self.page = Some(page.into());
+        self
+    }
+
+    pub fn set_page(mut self, page: Option<impl Into<String>>) -> Self {
+        self.page = page.map(|p| p.into());
         self
     }
 
@@ -88,9 +98,19 @@ impl SearchResourcesRequestBuilder {
         self
     }
 
+    pub fn set_tenant_id(mut self, tenant_id: Option<impl Into<String>>) -> Self {
+        self.tenant_id = tenant_id.map(|t| t.into());
+        self
+    }
+
     /// Set the OPC request ID.
     pub fn opc_request_id(mut self, opc_request_id: impl Into<String>) -> Self {
         self.opc_request_id = Some(opc_request_id.into());
+        self
+    }
+
+    pub fn set_opc_request_id(mut self, opc_request_id: Option<impl Into<String>>) -> Self {
+        self.opc_request_id = opc_request_id.map(|o| o.into());
         self
     }
 
