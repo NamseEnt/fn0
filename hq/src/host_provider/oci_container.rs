@@ -8,6 +8,7 @@ use oci_rust_sdk::core::{
     region::Region,
 };
 use std::collections::{BTreeMap, HashMap};
+use std::num::NonZeroUsize;
 use std::{net::IpAddr, str::FromStr, sync::Arc};
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
@@ -18,8 +19,8 @@ pub struct OciContainerInstanceHostProvider {
     compartment_id: String,
     availability_domain: String,
     shape: String,
-    ocpus: f32,
-    memory_in_gbs: f32,
+    ocpus: NonZeroUsize,
+    memory_in_gbs: NonZeroUsize,
     subnet_id: String,
     image: String,
     envs: BTreeMap<String, String>,
@@ -138,8 +139,8 @@ impl HostProvide for OciContainerInstanceHostProvider {
             availability_domain: self.availability_domain.clone(),
             shape: self.shape.clone(),
             shape_config: CreateContainerInstanceShapeConfigDetails {
-                ocpus: self.ocpus,
-                memory_in_gbs: self.memory_in_gbs,
+                ocpus: self.ocpus.get() as f32,
+                memory_in_gbs: self.memory_in_gbs.get() as f32,
             },
             containers: vec![CreateContainerDetails {
                 image_url: self.image.clone(),

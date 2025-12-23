@@ -1,5 +1,5 @@
-use bytes::Bytes;
 use color_eyre::eyre::{Result, eyre};
+use host_hq_protocol::{HqToHostDatagram, HqToHostReliable};
 use quinn::{ClientConfig, Connection, Endpoint, ReadDatagram};
 use rustls::pki_types::CertificateDer;
 use std::{
@@ -27,14 +27,16 @@ impl HostConnection {
 
         Ok(Self { connection })
     }
-    pub fn send_unreliable_small_message(&self, bytes: Bytes) -> Result<()> {
+    pub fn send_datagram(&self, datagram: HqToHostDatagram) -> Result<()> {
+        let bytes = datagram.to_bytes()?;
         if bytes.len() > 1200 {
             return Err(eyre!("Datagram is too large"));
         }
         self.connection.send_datagram(bytes)?;
         Ok(())
     }
-    pub async fn send_reliable_big_message(&self, bytes: Bytes) -> Result<()> {
+    pub async fn send_reliable(&self, message: HqToHostReliable) -> Result<()> {
+        let bytes = message.to_bytes()?;
         let mut send = self.connection.open_uni().await?;
         send.write_all(&bytes).await?;
         send.finish()?;

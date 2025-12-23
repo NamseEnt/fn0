@@ -1,6 +1,6 @@
 mod args;
 mod args_parse;
-mod deployment_db;
+mod deployment_cache;
 mod dns;
 mod host_connection;
 mod host_id;
@@ -29,13 +29,13 @@ fn main() -> Result<()> {
         let telemetry_providers = telemetry::setup_otlp()?;
         let HqArgsParsed {
             sites,
-            deployment_db,
+            deployment_cache,
         } = HqArgs::parse().await?;
 
         let mut set = JoinSet::new();
 
         set.spawn(async move {
-            deployment_db.run_sync().await;
+            deployment_cache.run_sync().await;
             Ok(())
         });
         for mut site in sites {

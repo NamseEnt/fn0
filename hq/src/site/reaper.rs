@@ -14,18 +14,18 @@ impl Site {
 
             let timeout_threshold = host_connection_timeout_ms();
             let terminate_candidates = self
-                .hosts_last_pong
+                .hosts_status
                 .iter()
-                .filter(|entry| entry.value().elapsed() >= timeout_threshold)
+                .filter(|entry| entry.value().received_at.elapsed() < timeout_threshold)
                 .count();
 
-            telemetry::send_reaper_terminate_candidates(terminate_candidates);
-            telemetry::send_active_connections(self.host_connections.len());
+            telemetry::reaper_terminate_candidates(terminate_candidates);
+            telemetry::active_connections(self.host_connections.len());
 
             let mut removed_count = 0;
 
-            self.hosts_last_pong.retain(|host, last_pong| {
-                if last_pong.elapsed() < timeout_threshold {
+            self.hosts_status.retain(|host, status| {
+                if status.received_at.elapsed() < timeout_threshold {
                     return true;
                 }
                 if let Some((_host, connection)) = self.host_connections.remove(host) {
@@ -33,13 +33,13 @@ impl Site {
                 };
                 self.dead_hosts.insert(host.clone(), Instant::now());
                 removed_count += 1;
-                telemetry::send_reaper_terminate_attempts();
+                telemetry::reaper_terminate_attempts();
 
                 false
             });
 
             if removed_count > 0 {
-                telemetry::send_reaper_removed_count(removed_count);
+                telemetry::reaper_removed_count(removed_count);
             }
         }
     }

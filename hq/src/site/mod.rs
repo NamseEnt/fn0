@@ -2,12 +2,16 @@ mod dns_sync;
 mod list_host;
 mod reaper;
 mod recv_pong;
+mod scaler;
 mod send_ping;
 
 use crate::{
-    deployment_db::DeploymentDb, dns::DnsProvider, host_connection::HostConnection, telemetry, *,
+    deployment_cache::DeploymentCache, dns::DnsProvider, host_connection::HostConnection,
+    telemetry, *,
 };
 use dashmap::{DashMap, DashSet};
+use doc_db::DocDb;
+use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio::time::MissedTickBehavior;
@@ -16,13 +20,17 @@ pub struct Site {
     host_provider: HostProvider,
     dns_provider: DnsProvider,
     host_connections: Arc<DashMap<Host, HostConnection>>,
-    hosts_last_pong: Arc<DashMap<Host, Instant>>,
+    hosts_status: Arc<DashMap<Host, HostStatus>>,
     cert: String,
-    pub deployment_db: DeploymentDb,
+    pub deployment_cache: DeploymentCache,
     // Below fields won't be cleared so may occur out-of-memory.
     // But the size is expected to be too small to cause out-of-memory.
     known_hosts: Arc<DashSet<Host>>,
     dead_hosts: Arc<DashMap<Host, Instant>>,
+    graceful_shutdown_hosts: Arc<DashMap<Host, Instant>>,
+    host_cpu_cores: NonZeroUsize,
+    host_memory_in_gb: NonZeroUsize,
+    doc_db: DocDb,
 }
 
 impl Site {
@@ -30,17 +38,24 @@ impl Site {
         host_provider: HostProvider,
         dns_provider: DnsProvider,
         cert: String,
-        deployment_db: DeploymentDb,
+        deployment_cache: DeploymentCache,
+        host_cpu_cores: NonZeroUsize,
+        host_memory_in_gb: NonZeroUsize,
+        doc_db: DocDb,
     ) -> Self {
         Site {
             host_provider,
             dns_provider,
             host_connections: Default::default(),
-            hosts_last_pong: Default::default(),
+            hosts_status: Default::default(),
             known_hosts: Default::default(),
             dead_hosts: Default::default(),
+            graceful_shutdown_hosts: Default::default(),
             cert,
-            deployment_db,
+            deployment_cache,
+            host_cpu_cores,
+            host_memory_in_gb,
+            doc_db,
         }
     }
     #[tracing::instrument(skip_all)]
@@ -53,6 +68,7 @@ impl Site {
             self.run_reaper(),
             self.run_dns_sync(),
             self.run_metrics_reporter(),
+            self.run_scaler()
         );
     }
 
@@ -64,8 +80,15 @@ impl Site {
         loop {
             interval.tick().await;
 
-            telemetry::send_known_hosts(self.known_hosts.len());
-            telemetry::send_dead_hosts(self.dead_hosts.len());
+            telemetry::known_hosts(self.known_hosts.len());
+            telemetry::dead_hosts(self.dead_hosts.len());
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct HostStatus {
+    received_at: Instant,
+    host_timestamp: u64,
+    instances: u64,
 }

@@ -18,15 +18,15 @@ impl Site {
                 .map(|conn| conn.key().ip)
                 .collect::<BTreeSet<_>>();
 
-            telemetry::send_dns_healthy_ips(ips.len());
+            telemetry::dns_healthy_ips(ips.len());
 
             match self.dns_provider.sync_ips(ips).await {
                 Ok(_) => {
-                    telemetry::send_dns_sync_status(true);
+                    telemetry::dns_sync_status(true);
                 }
                 Err(err) => {
                     warn!(%err, "Failed to sync DNS");
-                    telemetry::send_dns_sync_status(false);
+                    telemetry::dns_sync_status(false);
                 }
             }
         }

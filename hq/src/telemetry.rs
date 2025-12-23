@@ -61,26 +61,26 @@ pub fn on_shutdown(
     Ok(())
 }
 
-pub fn send_reaper_terminate_candidates(count: usize) {
+pub fn reaper_terminate_candidates(count: usize) {
     let gauge = global::meter("hq")
         .f64_gauge("reaper_terminate_candidates")
         .build();
     gauge.record(count as f64, &[]);
 }
 
-pub fn send_reaper_terminate_attempts() {
+pub fn reaper_terminate_attempts() {
     let counter = global::meter("hq")
         .u64_counter("reaper_terminate_attempts")
         .build();
     counter.add(1, &[]);
 }
 
-pub fn send_dns_healthy_ips(count: usize) {
+pub fn dns_healthy_ips(count: usize) {
     let gauge = global::meter("hq").f64_gauge("dns_healthy_ips").build();
     gauge.record(count as f64, &[]);
 }
 
-pub fn send_dns_sync_status(success: bool) {
+pub fn dns_sync_status(success: bool) {
     let counter = global::meter("hq").u64_counter("dns_sync_status").build();
     counter.add(
         1,
@@ -91,7 +91,7 @@ pub fn send_dns_sync_status(success: bool) {
     );
 }
 
-pub fn send_list_hosts_status(success: bool) {
+pub fn list_hosts_status(success: bool) {
     let counter = global::meter("hq").u64_counter("list_hosts_status").build();
     counter.add(
         1,
@@ -102,14 +102,14 @@ pub fn send_list_hosts_status(success: bool) {
     );
 }
 
-pub fn send_host_connect_attempt(host_id: impl ToString) {
+pub fn host_connect_attempt(host_id: impl ToString) {
     let counter = global::meter("hq")
         .u64_counter("host_connect_attempts")
         .build();
     counter.add(1, &[KeyValue::new("host_id", host_id.to_string())]);
 }
 
-pub fn send_host_connect_status(host_id: impl ToString, success: bool) {
+pub fn host_connect_status(host_id: impl ToString, success: bool) {
     let counter = global::meter("hq")
         .u64_counter("host_connect_status")
         .build();
@@ -122,7 +122,7 @@ pub fn send_host_connect_status(host_id: impl ToString, success: bool) {
     );
 }
 
-pub fn send_host_connect_duration(host_id: impl ToString, duration: std::time::Duration) {
+pub fn host_connect_duration(host_id: impl ToString, duration: std::time::Duration) {
     let histogram = global::meter("hq")
         .f64_histogram("host_connect_duration_seconds")
         .build();
@@ -132,12 +132,12 @@ pub fn send_host_connect_duration(host_id: impl ToString, duration: std::time::D
     );
 }
 
-pub fn send_pong_received(host_id: impl ToString) {
+pub fn pong_received(host_id: impl ToString) {
     let counter = global::meter("hq").u64_counter("pong_received").build();
     counter.add(1, &[KeyValue::new("host_id", host_id.to_string())]);
 }
 
-pub fn send_deployment_updates_sent(host_id: impl ToString, update_count: usize) {
+pub fn deployment_updates_sent(host_id: impl ToString, update_count: usize) {
     let counter = global::meter("hq")
         .u64_counter("deployment_updates_sent")
         .build();
@@ -147,7 +147,7 @@ pub fn send_deployment_updates_sent(host_id: impl ToString, update_count: usize)
     );
 }
 
-pub fn send_deployment_updates_status(success: bool) {
+pub fn deployment_updates_status(success: bool) {
     let counter = global::meter("hq")
         .u64_counter("deployment_updates_status")
         .build();
@@ -160,7 +160,7 @@ pub fn send_deployment_updates_status(success: bool) {
     );
 }
 
-pub fn send_ping_sent_status(success: bool) {
+pub fn ping_sent_status(success: bool) {
     let counter = global::meter("hq").u64_counter("ping_sent_status").build();
     counter.add(
         1,
@@ -171,58 +171,45 @@ pub fn send_ping_sent_status(success: bool) {
     );
 }
 
-pub fn send_reaper_removed_count(count: usize) {
+pub fn reaper_removed_count(count: usize) {
     let gauge = global::meter("hq")
         .f64_gauge("reaper_removed_count")
         .build();
     gauge.record(count as f64, &[]);
 }
 
-pub fn send_active_connections(count: usize) {
+pub fn active_connections(count: usize) {
     let gauge = global::meter("hq").f64_gauge("active_connections").build();
     gauge.record(count as f64, &[]);
 }
 
-pub fn send_known_hosts(count: usize) {
+pub fn known_hosts(count: usize) {
     let gauge = global::meter("hq").f64_gauge("known_hosts").build();
     gauge.record(count as f64, &[]);
 }
 
-pub fn send_dead_hosts(count: usize) {
+pub fn dead_hosts(count: usize) {
     let gauge = global::meter("hq").f64_gauge("dead_hosts").build();
     gauge.record(count as f64, &[]);
 }
 
-pub fn send_deployment_db_sync_status(success: bool) {
-    let counter = global::meter("hq")
-        .u64_counter("deployment_db_sync_status")
-        .build();
-    counter.add(
-        1,
-        &[KeyValue::new(
-            "result",
-            if success { "success" } else { "failure" },
-        )],
-    );
-}
-
-pub fn send_deployment_db_cached_count(count: usize) {
+pub fn deployment_cache_cached_count(count: usize) {
     let gauge = global::meter("hq")
-        .f64_gauge("deployment_db_cached_count")
+        .f64_gauge("deployment_cache_cached_count")
         .build();
     gauge.record(count as f64, &[]);
 }
 
-pub fn send_deployment_db_new_loaded(count: usize) {
+pub fn deployment_cache_new_loaded(count: usize) {
     let counter = global::meter("hq")
-        .u64_counter("deployment_db_new_loaded")
+        .u64_counter("deployment_cache_new_loaded")
         .build();
     counter.add(count as u64, &[]);
 }
 
-pub fn send_deployment_db_connect_status(success: bool) {
+pub fn deployment_cache_fetch_status(success: bool) {
     let counter = global::meter("hq")
-        .u64_counter("deployment_db_connect_status")
+        .u64_counter("deployment_cache_fetch_status")
         .build();
     counter.add(
         1,
@@ -233,9 +220,69 @@ pub fn send_deployment_db_connect_status(success: bool) {
     );
 }
 
-pub fn send_deployment_db_fetch_status(success: bool) {
+pub fn scaler_running_hosts(count: usize) {
+    let gauge = global::meter("hq")
+        .f64_gauge("scaler_running_hosts")
+        .build();
+    gauge.record(count as f64, &[]);
+}
+
+pub fn scaler_total_instances(count: u64) {
+    let gauge = global::meter("hq")
+        .f64_gauge("scaler_total_instances")
+        .build();
+    gauge.record(count as f64, &[]);
+}
+
+pub fn scaler_max_instances_per_host(count: u64) {
+    let gauge = global::meter("hq")
+        .f64_gauge("scaler_max_instances_per_host")
+        .build();
+    gauge.record(count as f64, &[]);
+}
+
+pub fn scaler_targets(scale_out: usize, scale_in: usize) {
+    let gauge = global::meter("hq").f64_gauge("scaler_targets").build();
+    gauge.record(scale_out as f64, &[KeyValue::new("type", "scale_out")]);
+    gauge.record(scale_in as f64, &[KeyValue::new("type", "scale_in")]);
+}
+
+pub fn scaler_action_triggered(action: &'static str, count: usize) {
     let counter = global::meter("hq")
-        .u64_counter("deployment_db_fetch_status")
+        .u64_counter("scaler_action_triggered")
+        .build();
+    counter.add(count as u64, &[KeyValue::new("action", action)]);
+}
+
+pub fn scaler_launch_attempt_status(success: bool) {
+    let counter = global::meter("hq")
+        .u64_counter("scaler_launch_attempt_status")
+        .build();
+    counter.add(
+        1,
+        &[KeyValue::new(
+            "result",
+            if success { "success" } else { "failure" },
+        )],
+    );
+}
+
+pub fn scaler_shutdown_command_status(success: bool) {
+    let counter = global::meter("hq")
+        .u64_counter("scaler_shutdown_command_status")
+        .build();
+    counter.add(
+        1,
+        &[KeyValue::new(
+            "result",
+            if success { "success" } else { "failure" },
+        )],
+    );
+}
+
+pub fn scaler_config_fetch_status(success: bool) {
+    let counter = global::meter("hq")
+        .u64_counter("scaler_config_fetch_status")
         .build();
     counter.add(
         1,

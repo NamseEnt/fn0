@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, num::NonZeroUsize};
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
-    pub deployment_db: DeploymentDbArgs,
+    pub doc_db: DocDbArgs,
     pub cert: String,
 }
 
@@ -34,8 +34,9 @@ pub struct OciContainerInstanceHostProviderArgs {
     pub compartment_id: String,
     pub availability_domain: String,
     pub shape: String,
-    pub ocpus: f32,
-    pub memory_in_gbs: f32,
+    pub ocpus: NonZeroUsize,
+    pub physics_cpu_cores: NonZeroUsize,
+    pub memory_in_gbs: NonZeroUsize,
     pub subnet_id: String,
     pub image: String,
     pub envs: BTreeMap<String, String>,
@@ -57,7 +58,7 @@ pub struct CloudflareDnsProviderArgs {
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct DeploymentDbArgs {
+pub struct DocDbArgs {
     pub url: String,
     pub token: String,
 }
