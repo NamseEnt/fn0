@@ -1,11 +1,10 @@
+use crate::telemetry;
 use bytes::Buf;
 use color_eyre::eyre::Result;
 use libsql::{Builder, Database, Row};
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tracing::warn;
-
-use crate::telemetry;
 
 #[derive(Clone)]
 pub struct DeploymentDb {

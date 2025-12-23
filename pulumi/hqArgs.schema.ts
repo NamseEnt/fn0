@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
+  cert: pulumi.Input<string>;
   deploymentDb: pulumi.Input<DeploymentDbArgs>;
   sites: pulumi.Input<Array<SiteArgs>>;
 }
@@ -34,7 +35,6 @@ export interface OciContainerInstanceHostProviderArgs {
   userId: pulumi.Input<string>;
 }
 export interface SiteArgs {
-  cert: pulumi.Input<string>;
   dnsProvider: pulumi.Input<DnsProviderArg>;
   hostProvider: pulumi.Input<HostProviderArg>;
 }

@@ -6,3 +6,5 @@ export * as buildChain from "./buildChain";
 export * as docDb from "./docDb";
 export { OciHeadQuarter } from "./OciHeadQuarter";
 export { OciHeadQuarterVcn } from "./OciHeadQuarterVcn";
+export * as dns from "./dns";
+export { Suffix } from "./Suffix";

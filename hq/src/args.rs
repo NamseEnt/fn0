@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
     pub deployment_db: DeploymentDbArgs,
+    pub cert: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -14,7 +15,6 @@ pub struct HqArgs {
 pub struct SiteArgs {
     pub host_provider: HostProviderArg,
     pub dns_provider: DnsProviderArg,
-    pub cert: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
