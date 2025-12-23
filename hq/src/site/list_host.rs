@@ -14,12 +14,12 @@ impl Site {
 
             let hosts = match self.host_provider.list_hosts().await {
                 Ok(hosts) => {
-                    telemetry::send_list_hosts_status(true);
+                    telemetry::list_hosts_status(true);
                     hosts
                 }
                 Err(err) => {
                     warn!(%err, "Failed to list hosts");
-                    telemetry::send_list_hosts_status(false);
+                    telemetry::list_hosts_status(false);
                     continue;
                 }
             };
@@ -64,11 +64,11 @@ impl Site {
 
                 if deadline < start_time {
                     dead_hosts.insert(host.clone(), Instant::now());
-                    telemetry::send_host_connect_status(&host.id, false);
+                    telemetry::host_connect_status(&host.id, false);
                     break;
                 }
 
-                telemetry::send_host_connect_attempt(&host.id);
+                telemetry::host_connect_attempt(&host.id);
 
                 let connect_start = Instant::now();
                 let connect_result =
@@ -77,19 +77,19 @@ impl Site {
                 match connect_result {
                     Ok(Ok(connection)) => {
                         let connect_duration = connect_start.elapsed();
-                        telemetry::send_host_connect_status(&host.id, true);
-                        telemetry::send_host_connect_duration(&host.id, connect_duration);
+                        telemetry::host_connect_status(&host.id, true);
+                        telemetry::host_connect_duration(&host.id, connect_duration);
                         host_connections.insert(host.clone(), connection);
                         let _ = new_host_tx.send(host);
                         break;
                     }
                     Ok(Err(err)) => {
                         warn!(%err, "Failed to connect to host");
-                        telemetry::send_host_connect_status(&host.id, false);
+                        telemetry::host_connect_status(&host.id, false);
                     }
                     Err(_elapsed) => {
                         warn!("Timeout to connect to host");
-                        telemetry::send_host_connect_status(&host.id, false);
+                        telemetry::host_connect_status(&host.id, false);
                     }
                 }
             }

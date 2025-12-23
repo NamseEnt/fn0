@@ -7,6 +7,8 @@ edition = "2024"
 debug = true
 
 [dependencies]
+host-hq-protocol = { path = "../host-hq-protocol", version = "0.1" }
+doc-db = { path = "../doc-db", version = "0.1" }
 chrono = "0.4.42"
 color-eyre = "0.6.5"
 dashmap = "6.1.0"
@@ -41,7 +43,6 @@ rustls = "0.23.35"
 bytes = "1.11.0"
 singleflight = "0.3.0"
 boxcar = "0.2.14"
-libsql = "0.9.29"
 
 [dev-dependencies]
 wiremock = "0.6"

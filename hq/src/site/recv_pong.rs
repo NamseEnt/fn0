@@ -1,10 +1,7 @@
-use bytes::{BufMut, BytesMut};
-
 use super::*;
-use crate::{
-    deployment_db::{Deployment, DeploymentId},
-    telemetry, *,
-};
+use crate::{deployment_cache::DeploymentId, telemetry, *};
+use doc_db::Deployment;
+use host_hq_protocol::{HostToHq, HqToHostReliable};
 
 impl Site {
     #[tracing::instrument(skip_all)]
@@ -16,23 +13,46 @@ impl Site {
             };
 
             let connection = connection.clone();
-            let hosts_last_pong = self.hosts_last_pong.clone();
-            let deployment_db = self.deployment_db.clone();
+            let hosts_status = self.hosts_status.clone();
+            let deployment_cache = self.deployment_cache.clone();
 
             tokio::spawn(async move {
                 while let Ok(bytes) = connection.read_unreliable_small_message().await {
-                    let len = size_of::<u64>();
-                    let Ok(array) = bytes[0..len].try_into() else {
-                        warn!("Invalid pong message {}", bytes.len());
-                        return;
+                    let host_to_hq = match HostToHq::from_bytes(bytes) {
+                        Ok(host_to_hq) => host_to_hq,
+                        Err(err) => {
+                            warn!(%err, "Failed to parse host message");
+                            return;
+                        }
                     };
 
-                    telemetry::send_pong_received(&new_host.id);
-                    hosts_last_pong.insert(new_host.clone(), Instant::now());
+                    telemetry::pong_received(&new_host.id);
 
-                    let host_deployment_id = u64::from_le_bytes(array);
-                    let updates = deployment_db.slice_updates(DeploymentId(host_deployment_id));
-                    send_updates(&connection, &new_host.id, updates, host_deployment_id);
+                    match host_to_hq {
+                        HostToHq::NotifyHostStatus {
+                            timestamp,
+                            deployment_id,
+                            instances,
+                        } => {
+                            let new_status = HostStatus {
+                                received_at: Instant::now(),
+                                host_timestamp: timestamp,
+                                instances,
+                            };
+                            let entry = hosts_status.entry(new_host.clone());
+                            entry
+                                .and_modify(|host_status| {
+                                    if host_status.host_timestamp < timestamp {
+                                        *host_status = new_status;
+                                    }
+                                })
+                                .or_insert(new_status);
+
+                            let updates =
+                                deployment_cache.slice_updates(DeploymentId(deployment_id));
+                            send_updates(&connection, &new_host.id, updates, deployment_id);
+                        }
+                    }
                 }
             });
         }
@@ -50,25 +70,24 @@ fn send_updates(
         return;
     }
 
-    telemetry::send_deployment_updates_sent(host_id, updates.len());
+    telemetry::deployment_updates_sent(host_id, updates.len());
 
-    let mut bytes =
-        BytesMut::with_capacity(updates.len() * size_of::<u64>() * 2 + size_of::<u64>());
-
-    bytes.put_u64_le(host_deployment_id);
-    for update in updates {
-        bytes.put_u64_le(update.code_id);
-        bytes.put_u64_le(update.code_version);
-    }
+    let message = HqToHostReliable::DeploymentUpdates {
+        deployment_id: host_deployment_id,
+        code_id_and_versions: updates
+            .into_iter()
+            .map(|update| (update.code_id, update.code_version))
+            .collect(),
+    };
     let connection = connection.clone();
     tokio::spawn(async move {
-        match connection.send_reliable_big_message(bytes.freeze()).await {
+        match connection.send_reliable(message).await {
             Ok(_) => {
-                telemetry::send_deployment_updates_status(true);
+                telemetry::deployment_updates_status(true);
             }
             Err(err) => {
                 warn!(%err, "Failed to send updates");
-                telemetry::send_deployment_updates_status(false);
+                telemetry::deployment_updates_status(false);
             }
         }
     });

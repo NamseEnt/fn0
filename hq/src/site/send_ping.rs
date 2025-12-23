@@ -1,5 +1,6 @@
 use super::*;
 use crate::{random_sleep::random_sleep, telemetry, *};
+use host_hq_protocol::HqToHostDatagram;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 
@@ -12,21 +13,21 @@ impl Site {
         loop {
             interval.tick().await;
 
-            let deployment_id = self.deployment_db.last_deployment_id();
-            let bytes = Bytes::copy_from_slice(&deployment_id.to_le_bytes());
+            let deployment_id = self.deployment_cache.last_deployment_id();
+            let datagram = HqToHostDatagram::AdvertiseLatestDeploymentId { deployment_id };
 
             for connection in self.host_connections.iter() {
                 let connection = connection.value().clone();
-                let bytes = bytes.clone();
+                let datagram = datagram.clone();
                 tokio::spawn(async move {
                     random_sleep(250).await;
-                    match connection.send_unreliable_small_message(bytes) {
+                    match connection.send_datagram(datagram) {
                         Ok(_) => {
-                            telemetry::send_ping_sent_status(true);
+                            telemetry::ping_sent_status(true);
                         }
                         Err(err) => {
                             warn!(%err, "Fail to send ping");
-                            telemetry::send_ping_sent_status(false);
+                            telemetry::ping_sent_status(false);
                         }
                     }
                 });
