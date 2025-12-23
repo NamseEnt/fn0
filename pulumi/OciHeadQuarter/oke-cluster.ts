@@ -9,7 +9,7 @@ export function createOkeCluster(
     compartmentId,
     vcnId,
     regionalSubnetId,
-    nameSuffix,
+    suffix,
     region,
     tenancyOcid,
     userOcid,
@@ -19,7 +19,7 @@ export function createOkeCluster(
     compartmentId: pulumi.Input<string>;
     vcnId: pulumi.Input<string>;
     regionalSubnetId: pulumi.Input<string>;
-    nameSuffix: pulumi.Output<string>;
+    suffix: pulumi.Input<string>;
     region: pulumi.Input<string>;
     tenancyOcid: string;
     userOcid: string;
@@ -73,7 +73,7 @@ export function createOkeCluster(
         ipFamilies: ["IPv4", "IPv6"],
       },
       vcnId,
-      name: pulumi.interpolate`fn0-${nameSuffix}`,
+      name: pulumi.interpolate`fn0-${suffix}`,
     },
     { parent, deleteBeforeReplace: true }
   );
@@ -102,7 +102,7 @@ export function createOkeCluster(
       compartmentId,
       clusterId: cluster.id,
       kubernetesVersion,
-      name: pulumi.interpolate`fn0-nodepool-${nameSuffix}`,
+      name: pulumi.interpolate`fn0-nodepool-${suffix}`,
       nodeShape: "VM.Standard.A1.Flex",
       nodeShapeConfig: {
         ocpus: 1,

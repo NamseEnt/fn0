@@ -29,15 +29,15 @@ impl HqArgs {
         let sites = args
             .sites
             .into_iter()
-            .map(|args| {
-                let host_provider = match args.host_provider {
+            .map(|site_args| {
+                let host_provider = match site_args.host_provider {
                     HostProviderArg::OciContainerInstance(args) => {
                         HostProvider::OciContainerInstance(OciContainerInstanceHostProvider::new(
                             args,
                         ))
                     }
                 };
-                let dns_provider = match args.dns_provider {
+                let dns_provider = match site_args.dns_provider {
                     DnsProviderArg::Cloudflare(args) => {
                         DnsProvider::Cloudflare(CloudflareDnsProvider::new(args, None))
                     }
@@ -45,7 +45,7 @@ impl HqArgs {
                 Site::new(
                     host_provider,
                     dns_provider,
-                    args.cert,
+                    args.cert.clone(),
                     deployment_db.clone(),
                 )
             })

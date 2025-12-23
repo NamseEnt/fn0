@@ -6,22 +6,21 @@ export function createDockerRegistry(
   parent: pulumi.Resource,
   {
     compartmentId,
-    nameSuffix,
+    suffix,
     region,
   }: {
     compartmentId: pulumi.Input<string>;
-    nameSuffix: pulumi.Output<string>;
+    suffix: pulumi.Input<string>;
     region: pulumi.Input<string>;
   }
 ): {
   hqImage: docker.Image;
 } {
-
   const repo = new oci.artifacts.ContainerRepository(
     "hq-repo",
     {
       compartmentId,
-      displayName: pulumi.interpolate`hq-repo-${nameSuffix}`,
+      displayName: pulumi.interpolate`hq-repo-${suffix}`,
       isPublic: true,
     },
     { parent, retainOnDelete: false }
@@ -30,7 +29,7 @@ export function createDockerRegistry(
   const user = new oci.identity.User(
     "hq-user",
     {
-      name: pulumi.interpolate`hq-user-${nameSuffix}`,
+      name: pulumi.interpolate`hq-user-${suffix}`,
       description: "User for HQ deployment",
     },
     { parent }
@@ -39,7 +38,7 @@ export function createDockerRegistry(
   const dockerGroup = new oci.identity.Group(
     "hq-docker-pusher-group",
     {
-      name: pulumi.interpolate`hq-docker-pushers-${nameSuffix}`,
+      name: pulumi.interpolate`hq-docker-pushers-${suffix}`,
       description: "Group allowed to push to OCIR",
     },
     { parent }
@@ -58,7 +57,7 @@ export function createDockerRegistry(
     "ocir-push-policy",
     {
       compartmentId,
-      name: pulumi.interpolate`allow-docker-push-${nameSuffix}`,
+      name: pulumi.interpolate`allow-docker-push-${suffix}`,
       description: "Policy to allow docker pushers to manage repos",
       statements: [
         pulumi.interpolate`Allow group ${dockerGroup.name} to manage repos in compartment id ${compartmentId}`,

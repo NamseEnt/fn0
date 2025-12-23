@@ -1,5 +1,4 @@
 import * as pulumi from "@pulumi/pulumi";
-import * as random from "@pulumi/random";
 import { hqGrafana } from "./grafana";
 import { createNetworking } from "./networking";
 import { createOkeCluster } from "./oke-cluster";
@@ -9,6 +8,7 @@ import { deployHqApplication } from "./hq-deployment";
 import { SiteArgs } from "../hqArgs.schema";
 
 export interface OciHeadQuarterArgs {
+  suffix: pulumi.Input<string>;
   ociRegion: pulumi.Input<string>;
   compartmentId: pulumi.Input<string>;
   vcnId: pulumi.Input<string>;
@@ -18,6 +18,7 @@ export interface OciHeadQuarterArgs {
   docDbUrl: pulumi.Input<string>;
   docDbToken: pulumi.Input<string>;
   sites: pulumi.Input<SiteArgs[]>;
+  certificate: pulumi.Input<string>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
@@ -29,18 +30,16 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
   ) {
     super("pkg:index:oci-head-quarter", name, args, opts);
 
-    const { ociRegion, compartmentId, vcnId, docDbUrl, docDbToken, sites } =
-      args;
-
-    const nameSuffix8 = new random.RandomString(
-      "name-suffix-8",
-      {
-        length: 8,
-        special: false,
-        upper: false,
-      },
-      { parent: this }
-    ).result;
+    const {
+      suffix,
+      ociRegion,
+      compartmentId,
+      vcnId,
+      docDbUrl,
+      docDbToken,
+      sites,
+      certificate,
+    } = args;
 
     const { regionalSubnet } = createNetworking(this, {
       compartmentId,
@@ -58,7 +57,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       compartmentId,
       vcnId,
       regionalSubnetId: regionalSubnet.id,
-      nameSuffix: nameSuffix8,
+      suffix,
       region: ociRegion,
       tenancyOcid,
       userOcid,
@@ -71,7 +70,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       regionSlug: args.grafanaRegion,
       slug: args.grafanaSlug,
       k8sProvider: k8sProvider,
-      suffix: nameSuffix8,
+      suffix,
     });
 
     deployK8sDashboard(this, {
@@ -81,7 +80,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
 
     const { hqImage } = createDockerRegistry(this, {
       compartmentId,
-      nameSuffix: nameSuffix8,
+      suffix,
       region: ociRegion,
     });
 
@@ -95,6 +94,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           url: docDbUrl,
           token: docDbToken,
         },
+        cert: certificate,
       },
     });
   }

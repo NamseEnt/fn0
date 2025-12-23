@@ -1,4 +1,3 @@
-import * as cloudflare from "@pulumi/cloudflare";
 import * as fn0 from "@pulumi/fn0";
 import * as pulumi from "@pulumi/pulumi";
 
@@ -8,42 +7,32 @@ const accountId = config.require("cloudflareAccountId");
 const zoneId = config.require("cloudflareZoneId");
 const domain = config.require("domain");
 
-const apiTokenPermissionGroups = Promise.all([
-  cloudflare.getAccountApiTokenPermissionGroupsList({
-    accountId,
-    name: "DNS Write",
-  }),
-]).then((x) => x.flatMap((x) => x.results.map((x) => ({ id: x.id }))));
+const suffix = new fn0.Suffix("suffix").result;
 
-// const cloudflareApiToken = new cloudflare.AccountToken("cloudflareApiToken", {
-//   accountId,
-//   name: "fn0Cloud",
-//   policies: [
-//     {
-//       effect: "allow",
-//       resources: {
-//         [`com.cloudflare.api.account.zone.${zoneId}`]: "*",
-//       },
-//       permissionGroups: apiTokenPermissionGroups,
-//     },
-//   ],
-// });
+const dns = new fn0.CloudflareDns("cloudflare-dns", {
+  suffix,
+  accountId,
+  zoneId,
+  domain,
+});
 
-const docDb = new fn0.TursoDocDb("docDb", {
+const docDb = new fn0.TursoDocDb("doc-db", {
   organizationSlug: config.require("tursoOrganizationSlug"),
   location: config.require("tursoLocation"),
 });
 
-const ociHeadQuarterVcn = new fn0.OciHeadQuarterVcn("ociHeadQuarterVcn", {
+const ociHeadQuarterVcn = new fn0.OciHeadQuarterVcn("oci-head-quarter-vcn", {
+  suffix,
   region: config.require("ociHeadQuarterRegion"),
 });
 
-const ociComputeWorker = new fn0.OciComputeWorker("ociComputeWorker", {
+const ociComputeWorker = new fn0.OciComputeWorker("oci-compute-worker", {
   region: config.require("ociComputeWorkerRegion"),
   hqIpv6CidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
 });
 
-const ociHeadQuarter = new fn0.OciHeadQuarter("ociHeadQuarter", {
+const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
+  suffix,
   ociRegion: config.require("ociHeadQuarterRegion"),
   compartmentId: ociHeadQuarterVcn.compartmentId,
   vcnId: ociHeadQuarterVcn.vcnId,
@@ -52,6 +41,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("ociHeadQuarter", {
   grafanaRegion: config.require("grafanaRegion"),
   docDbUrl: docDb.url,
   docDbToken: docDb.token,
+  certificate: dns.certificate,
   sites: [],
 });
 
