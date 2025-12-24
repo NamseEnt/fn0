@@ -1,56 +1,60 @@
-# OCI Rust SDK 자동 생성 가이드
-
-이 가이드는 OCI TypeScript SDK로부터 Rust SDK를 자동으로 생성하는 방법을 설명합니다.
-
-## 목차
-
-- [개요](#개요)
-- [파이프라인 아키텍처](#파이프라인-아키텍처)
-- [빠른 시작](#빠른-시작)
-- [새 서비스 추가하기](#새-서비스-추가하기)
-- [고급 사용법](#고급-사용법)
-- [문제 해결](#문제-해결)
-- [코드 생성 규칙](#코드-생성-규칙)
+Here is the English translation of the document.
 
 ---
 
-## 개요
+# OCI Rust SDK Auto-generation Guide
 
-OCI Rust SDK는 Oracle의 공식 TypeScript SDK를 소스로 사용하여 Rust 코드를 자동으로 생성합니다.
+This guide explains how to automatically generate the Rust SDK from the OCI TypeScript SDK.
 
-### 전체 프로세스
+## Table of Contents
+
+- [Overview](#overview)
+- [Pipeline Architecture](#pipeline-architecture)
+- [Quick Start](#quick-start)
+- [Adding a New Service](#adding-a-new-service)
+- [Advanced Usage](#advanced-usage)
+- [Troubleshooting](#troubleshooting)
+- [Code Generation Rules](#code-generation-rules)
+
+---
+
+## Overview
+
+The OCI Rust SDK automatically generates Rust code using Oracle's official TypeScript SDK as the source.
+
+### Overall Process
 
 ```
 TypeScript SDK → [Discovery] → [Parser] → [Generator] → Rust SDK
                     (Node.js)    (ts-morph)   (Rust/Tera)
 ```
 
-### 지원되는 서비스
+### Supported Services
 
-현재 다음 서비스가 구현되어 있습니다:
-- **core** - Compute, VirtualNetwork, BlockStorage (986 모델)
-- **audit** - Audit 서비스 (8 모델)
-- **containerinstances** - Container Instances (76 모델)
-- **osmanagementhub** - OS Management Hub (329 모델)
-- **resourcesearch** - Resource Search (10 모델)
+Currently, the following services are implemented:
+- **core** - Compute, VirtualNetwork, BlockStorage (986 models)
+- **audit** - Audit Service (8 models)
+- **containerinstances** - Container Instances (76 models)
+- **osmanagementhub** - OS Management Hub (329 models)
+- **resourcesearch** - Resource Search (10 models)
 
 ---
 
-## 파이프라인 아키텍처
+## Pipeline Architecture
 
-### 1단계: Service Discovery
+### Step 1: Service Discovery
 
-**도구**: `tools/discovery/discover.ts`
-**출력**: `data/services-metadata.json`
+**Tool**: `tools/discovery/discover.ts`
+**Output**: `data/services-metadata.json`
 
-OCI TypeScript SDK에서 사용 가능한 모든 서비스를 검색하고 메타데이터를 추출합니다.
+Searches for all available services in the OCI TypeScript SDK and extracts metadata.
 
 ```bash
 cd tools/discovery
 npm run discover > ../../data/services-metadata.json
 ```
 
-**출력 예시**:
+**Output Example**:
 ```json
 {
   "name": "core",
@@ -61,31 +65,31 @@ npm run discover > ../../data/services-metadata.json
 }
 ```
 
-### 2단계: TypeScript Parsing
+### Step 2: TypeScript Parsing
 
-**도구**: `tools/parser/parse-models.ts`
-**출력**: `data/parsed/{service}-models.json`
+**Tool**: `tools/parser/parse-models.ts`
+**Output**: `data/parsed/{service}-models.json`
 
-TypeScript AST를 분석하여 인터페이스, enum, 타입 정보를 추출합니다.
+Analyzes the TypeScript AST to extract interfaces, enums, and type information.
 
 ```bash
 cd tools/parser
 npx ts-node parse-models.ts --service=core > ../../data/parsed/core-models.json
 ```
 
-**주요 기능**:
-- Interface 파싱 (필드, 타입, required/optional)
-- Enum 파싱 (variants, values)
-- Namespace enum 처리 (`Shape.LifecycleState` → `ShapeLifecycleState`)
-- **Rust 키워드 자동 escaping** (`type` → `r#type`)
-- JSDoc 문서 보존
+**Key Features**:
+- Interface parsing (fields, types, required/optional)
+- Enum parsing (variants, values)
+- Namespace enum handling (`Shape.LifecycleState` → `ShapeLifecycleState`)
+- **Rust keyword automatic escaping** (`type` → `r#type`)
+- Preservation of JSDoc documentation
 
-### 3단계: Rust Code Generation
+### Step 3: Rust Code Generation
 
-**도구**: `tools/generator/`
-**출력**: `src/{service}/models/*.rs`
+**Tool**: `tools/generator/`
+**Output**: `src/{service}/models/*.rs`
 
-Tera 템플릿 엔진을 사용하여 Rust 코드를 생성합니다.
+Generates Rust code using the Tera template engine.
 
 ```bash
 cd tools/generator
@@ -94,178 +98,178 @@ cargo run --release -- \
   --output ../../src/core/models
 ```
 
-**생성되는 파일**:
-- `{model_name}.rs` - 각 모델별 Rust 파일
-- `mod.rs` - 모듈 export (수동 생성 필요)
+**Generated Files**:
+- `{model_name}.rs` - Rust file for each model
+- `mod.rs` - Module exports (requires manual creation)
 
-### 4단계: Validation & Formatting
+### Step 4: Validation & Formatting
 
-자동으로 실행됩니다:
-- `cargo check` - 컴파일 검증
-- `cargo clippy --fix --allow-dirty` - Lint 자동 수정
-- `cargo clippy --all-features` - 최종 검증
+Runs automatically:
+- `cargo check` - Compilation verification
+- `cargo clippy --fix --allow-dirty` - Lint auto-fix
+- `cargo clippy --all-features` - Final verification
 
 ---
 
-## 빠른 시작
+## Quick Start
 
-### 전체 서비스 생성
+### Generate Full Service
 
 ```bash
-# 단일 서비스
+# Single service
 ./generate-sdk.sh audit
 
-# 여러 서비스
+# Multiple services
 ./generate-sdk.sh core,audit,containerinstances
 
-# 서비스 목록 확인
+# Check service list
 ./generate-sdk.sh --list
 ```
 
-### 생성 후 확인
+### Verify After Generation
 
 ```bash
-# 특정 서비스 컴파일 확인
+# Check compilation for a specific service
 cargo check --features audit
 
-# 모든 서비스 확인
+# Check all services
 cargo check --all-features
 
-# Clippy 검증
+# Clippy verification
 cargo clippy --all-features
 ```
 
 ---
 
-## 새 서비스 추가하기
+## Adding a New Service
 
-### Step 1: TypeScript SDK 확인
+### Step 1: Check TypeScript SDK
 
 ```bash
-# 서비스가 존재하는지 확인
+# Verify if the service exists
 ls oci-typescript-sdk/lib/
 ```
 
-서비스 디렉토리 구조:
+Service directory structure:
 ```
 oci-typescript-sdk/lib/{service}/
 ├── lib/
 │   └── model/
-│       ├── *.ts (모델 파일들)
+│       ├── *.ts (Model files)
 │       └── index.ts
 └── index.ts
 ```
 
-### Step 2: 서비스 이름 규칙 확인
+### Step 2: Check Service Naming Rules
 
-**중요**: Rust SDK는 underscore 없는 이름을 사용합니다.
+**Important**: The Rust SDK uses names without underscores.
 
-| TypeScript | Rust Feature | 모듈 경로 |
+| TypeScript | Rust Feature | Module Path |
 |------------|--------------|-----------|
 | `container-instances` | `containerinstances` | `src/containerinstances/` |
 | `os-management-hub` | `osmanagementhub` | `src/osmanagementhub/` |
 | `resource-search` | `resourcesearch` | `src/resourcesearch/` |
 
-### Step 3: SDK 생성
+### Step 3: Generate SDK
 
 ```bash
-# 1. 서비스 생성
+# 1. Generate service
 ./generate-sdk.sh identity
 
-# 2. Cargo.toml에 feature 추가
-# (generate-sdk.sh가 자동으로 추가하지만 확인 필요)
+# 2. Add feature to Cargo.toml
+# (generate-sdk.sh adds it automatically, but double-check is required)
 ```
 
-`Cargo.toml`에 다음을 추가:
+Add the following to `Cargo.toml`:
 ```toml
 [features]
 identity = []
 ```
 
-### Step 4: src/lib.rs에 모듈 등록
+### Step 4: Register Module in src/lib.rs
 
 ```rust
 #[cfg(feature = "identity")]
 pub mod identity;
 ```
 
-### Step 5: mod.rs 생성
+### Step 5: Create mod.rs
 
-**중요**: 생성기가 `mod.rs`를 자동으로 만들지 않으므로 수동 생성이 필요합니다.
+**Important**: Since the generator does not create `mod.rs` automatically, manual creation is required.
 
 ```bash
-# 자동 생성 스크립트
+# Auto-generation script
 ls src/identity/models/*.rs | grep -v mod.rs | \
   xargs -I {} basename {} .rs | \
   awk '{print "pub mod "$1";\npub use "$1"::*;"}' > src/identity/models/mod.rs
 ```
 
-또는 수동으로 `src/identity/models/mod.rs` 생성:
+Or manually create `src/identity/models/mod.rs`:
 ```rust
 pub mod user;
 pub use user::*;
 pub mod group;
 pub use group::*;
-// ... 모든 모델에 대해 반복
+// ... repeat for all models
 ```
 
-### Step 6: 검증
+### Step 6: Validation
 
 ```bash
-# 컴파일 확인
+# Check compilation
 cargo check --features identity
 
-# Clippy 확인
+# Check Clippy
 cargo clippy --features identity
 
-# 테스트 (있는 경우)
+# Test (if any)
 cargo test --features identity
 ```
 
 ---
 
-## 고급 사용법
+## Advanced Usage
 
-### 특정 모델만 생성
+### Generate Specific Models Only
 
 ```bash
 cd tools/generator
 cargo run --release -- \
   --input ../../data/parsed/core-models.json \
   --output ../../src/core/models \
-  --limit 10  # 처음 10개 모델만
+  --limit 10  # Only the first 10 models
 ```
 
-### Dry-run 모드
+### Dry-run Mode
 
 ```bash
 cargo run --release -- \
   --input ../../data/parsed/audit-models.json \
   --output ../../src/audit/models \
-  --dry-run  # 파일을 쓰지 않고 미리보기만
+  --dry-run  # Preview only, does not write files
 ```
 
-### 파서 직접 실행
+### Run Parser Manually
 
 ```bash
 cd tools/parser
 
-# 서비스 파싱
+# Parse service
 npx ts-node parse-models.ts --service=identity > ../../data/parsed/identity-models.json
 
-# 결과 확인
+# Check results
 cat ../../data/parsed/identity-models.json | head -50
 ```
 
-### 생성기 직접 실행
+### Run Generator Manually
 
 ```bash
 cd tools/generator
 
-# 빌드
+# Build
 cargo build --release
 
-# 실행
+# Run
 ./target/release/oci-gen \
   --input ../../data/parsed/audit-models.json \
   --output ../../src/audit/models
@@ -273,17 +277,17 @@ cargo build --release
 
 ---
 
-## 문제 해결
+## Troubleshooting
 
-### 문제 1: Parser 컴파일 오류
+### Issue 1: Parser Compilation Error
 
-**증상**:
+**Symptom**:
 ```
 error TS1343: The 'import.meta' meta-property is only allowed...
 ```
 
-**해결**:
-`tools/parser/tsconfig.json` 확인:
+**Solution**:
+Check `tools/parser/tsconfig.json`:
 ```json
 {
   "compilerOptions": {
@@ -293,86 +297,86 @@ error TS1343: The 'import.meta' meta-property is only allowed...
 }
 ```
 
-### 문제 2: Rust 키워드 오류
+### Issue 2: Rust Keyword Error
 
-**증상**:
+**Symptom**:
 ```rust
 error: expected identifier, found keyword `type`
 ```
 
-**원인**: TypeScript의 `type` 필드가 Rust 키워드와 충돌
+**Cause**: The TypeScript `type` field conflicts with a Rust keyword.
 
-**해결**: 이미 자동으로 처리됨. 만약 오류가 발생한다면:
-1. `tools/parser/parse-models.ts`의 `RUST_KEYWORDS` 배열 확인
-2. `escapeRustKeyword()` 함수가 올바르게 호출되는지 확인
+**Solution**: This is already handled automatically. If an error occurs:
+1. Check the `RUST_KEYWORDS` array in `tools/parser/parse-models.ts`.
+2. Ensure the `escapeRustKeyword()` function is being called correctly.
 
-### 문제 3: mod.rs 누락
+### Issue 3: Missing mod.rs
 
-**증상**:
+**Symptom**:
 ```
 error[E0583]: file not found for module `models`
 ```
 
-**해결**:
+**Solution**:
 ```bash
 ls src/{service}/models/*.rs | grep -v mod.rs | \
   xargs -I {} basename {} .rs | \
   awk '{print "pub mod "$1";\npub use "$1"::*;"}' > src/{service}/models/mod.rs
 ```
 
-### 문제 4: Namespace Enum 오류
+### Issue 4: Namespace Enum Error
 
-**증상**:
+**Symptom**:
 ```rust
-// 잘못된 생성
-pub type: Vec<Shape.LifecycleState>  // 점(.) 사용 불가
+// Incorrect generation
+pub type: Vec<Shape.LifecycleState>  // Cannot use dot (.)
 ```
 
-**해결**: 파서가 자동으로 처리합니다:
+**Solution**: The parser handles this automatically:
 - `Shape.LifecycleState` → `ShapeLifecycleState`
-- 별도의 enum 파일로 생성: `shape_lifecycle_state.rs`
+- Generated as a separate enum file: `shape_lifecycle_state.rs`
 
-### 문제 5: Clippy 경고
+### Issue 5: Clippy Warnings
 
-**증상**:
+**Symptom**:
 ```
 warning: this function has too many arguments
 ```
 
-**해결**:
+**Solution**:
 ```bash
-# 자동 수정
+# Auto-fix
 cargo clippy --fix --allow-dirty --features {service}
 
-# 또는 generate-sdk.sh가 자동으로 실행
+# Or generate-sdk.sh runs this automatically
 ```
 
 ---
 
-## 코드 생성 규칙
+## Code Generation Rules
 
-### Builder Pattern (CLAUDE.md 준수)
+### Builder Pattern (Complies with CLAUDE.md)
 
-#### Required 필드가 있는 경우
+#### With Required Fields
 
 ```rust
-// Required 필드 구조체
+// Structure for required fields
 pub struct LaunchInstanceDetailsRequired {
     pub compartment_id: String,
     pub shape: String,
 }
 
 pub struct LaunchInstanceDetails {
-    // Required 필드
+    // Required fields
     pub compartment_id: String,
     pub shape: String,
-    // Optional 필드
+    // Optional fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
 }
 
 impl LaunchInstanceDetails {
-    // Required 구조체를 받는 생성자
+    // Constructor receiving required struct
     pub fn new(required: LaunchInstanceDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
@@ -381,7 +385,7 @@ impl LaunchInstanceDetails {
         }
     }
 
-    // 모든 필드에 대한 set_* 메서드
+    // set_* methods for all fields
     pub fn set_compartment_id(mut self, value: String) -> Self {
         self.compartment_id = value;
         self
@@ -392,7 +396,7 @@ impl LaunchInstanceDetails {
         self
     }
 
-    // Optional 필드만 with_* 메서드 (Option 언래핑)
+    // with_* methods for optional fields (unwrapping Option)
     pub fn with_display_name(mut self, value: impl Into<String>) -> Self {
         self.display_name = Some(value.into());
         self
@@ -400,7 +404,7 @@ impl LaunchInstanceDetails {
 }
 ```
 
-#### Required 필드가 없는 경우
+#### Without Required Fields
 
 ```rust
 pub struct Configuration {
@@ -409,7 +413,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    // 인자 없는 생성자
+    // Constructor without arguments
     pub fn new() -> Self {
         Self {
             retention_period_days: None,
@@ -434,7 +438,7 @@ impl Default for Configuration {
 }
 ```
 
-### Enum 생성
+### Enum Generation
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -454,9 +458,9 @@ pub enum LifecycleState {
 }
 ```
 
-### Rust 키워드 처리
+### Rust Keyword Handling
 
-TypeScript의 예약어가 Rust 키워드인 경우:
+If a TypeScript reserved word is a Rust keyword:
 
 ```rust
 pub struct SomeModel {
@@ -467,7 +471,7 @@ pub struct SomeModel {
 }
 
 impl SomeModel {
-    // 메서드명은 r# 없이
+    // Method name without r#
     pub fn set_type(mut self, value: String) -> Self {
         self.r#type = value;
         self
@@ -475,7 +479,7 @@ impl SomeModel {
 }
 ```
 
-### 타입 매핑
+### Type Mapping
 
 | TypeScript | Rust | Import |
 |------------|------|--------|
@@ -490,17 +494,17 @@ impl SomeModel {
 
 ---
 
-## 생성 파이프라인 확장
+## Expanding the Generation Pipeline
 
-### 새로운 타입 추가
+### Adding New Types
 
-`tools/generator/src/type_mapper.rs` 수정:
+Modify `tools/generator/src/type_mapper.rs`:
 
 ```rust
 pub fn map_type(&self, ts_type: &str, is_optional: bool) -> (String, bool, bool) {
     let (base_type, needs_hashmap, needs_datetime) = match ts_type {
         "string" => ("String".to_string(), false, false),
-        // 새 타입 추가
+        // Add new type
         "BigInt" => ("i128".to_string(), false, false),
         // ...
     };
@@ -513,16 +517,16 @@ pub fn map_type(&self, ts_type: &str, is_optional: bool) -> (String, bool, bool)
 }
 ```
 
-### 템플릿 커스터마이징
+### Customizing Templates
 
-`tools/generator/templates/model.rs.tera` 수정:
+Modify `tools/generator/templates/model.rs.tera`:
 
 ```rust
-// 커스텀 derive 추가
+// Add custom derive
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-                                               // ^^^^^^^^ 추가
+                                               // ^^^^^^^^ Added
 
-// 커스텀 attribute 추가
+// Add custom attribute
 {% if is_cached_model %}
 #[cached]
 {% endif %}
@@ -531,43 +535,43 @@ pub struct {{ name }} {
 
 ---
 
-## 성능 최적화
+## Performance Optimization
 
-### 병렬 생성
+### Parallel Generation
 
-여러 서비스를 동시에 생성:
+Generate multiple services simultaneously:
 
 ```bash
-# 백그라운드에서 여러 서비스 생성
+# Generate multiple services in background
 ./generate-sdk.sh core &
 ./generate-sdk.sh identity &
 ./generate-sdk.sh objectstorage &
 wait
 
-# 모든 작업 완료 후 검증
+# Verify after all tasks are done
 cargo check --all-features
 ```
 
-### 증분 생성
+### Incremental Generation
 
-이미 생성된 서비스는 건너뛰기:
+Skip already generated services:
 
 ```bash
-# 기존 모델 백업
+# Backup existing models
 mv src/core/models src/core/models.backup
 
-# 새로 생성
+# Generate anew
 ./generate-sdk.sh core
 
-# 비교
+# Compare
 diff -r src/core/models.backup src/core/models
 ```
 
 ---
 
-## CI/CD 통합
+## CI/CD Integration
 
-### GitHub Actions 예시
+### GitHub Actions Example
 
 ```yaml
 name: Generate SDK
@@ -609,32 +613,32 @@ jobs:
 
 ---
 
-## 참고 자료
+## References
 
-- **CLAUDE.md** - Builder pattern 규칙
-- **tools/README.md** - 도구 상세 문서
-- **GENERATION_REPORT.md** - 생성 결과 보고서
-- **VALIDATION_REPORT.md** - 검증 결과
-
----
-
-## 기여하기
-
-SDK 생성 파이프라인 개선:
-
-1. **Parser 개선**: `tools/parser/parse-models.ts`
-   - 새로운 TypeScript 패턴 지원
-   - 문서 추출 개선
-
-2. **Generator 개선**: `tools/generator/src/`
-   - 새로운 Rust 패턴 생성
-   - 타입 매핑 확장
-
-3. **Template 개선**: `tools/generator/templates/`
-   - 코드 품질 향상
-   - 문서 포맷 개선
+- **CLAUDE.md** - Builder pattern rules
+- **tools/README.md** - Detailed tools documentation
+- **GENERATION_REPORT.md** - Generation result report
+- **VALIDATION_REPORT.md** - Validation results
 
 ---
 
-**최종 업데이트**: 2025-12-24
-**버전**: 0.3.0
+## Contribution
+
+Improve the SDK generation pipeline:
+
+1.  **Parser Improvements**: `tools/parser/parse-models.ts`
+    - Support new TypeScript patterns
+    - Improve documentation extraction
+
+2.  **Generator Improvements**: `tools/generator/src/`
+    - Generate new Rust patterns
+    - Expand type mappings
+
+3.  **Template Improvements**: `tools/generator/templates/`
+    - Improve code quality
+    - Improve documentation formatting
+
+---
+
+**Last Updated**: 2025-12-24
+**Version**: 0.3.0
