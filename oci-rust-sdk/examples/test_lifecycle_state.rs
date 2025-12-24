@@ -1,4 +1,6 @@
-use oci_rust_sdk::compute::{LifecycleState, ListInstancesRequest, ListInstancesRequestRequiredFields};
+use oci_rust_sdk::compute::{
+    LifecycleState, ListInstancesRequest, ListInstancesRequestRequiredFields,
+};
 
 fn main() {
     println!("=== Testing LifecycleState Enum ===\n");
@@ -39,8 +41,8 @@ fn main() {
         let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
             compartment_id: "test-compartment-id".to_string(),
         })
-            .lifecycle_state(*state)
-            .build();
+        .lifecycle_state(*state)
+        .build();
 
         let params = request.to_query_params();
         let lifecycle_param = params
@@ -62,10 +64,10 @@ fn main() {
     let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
         compartment_id: "compartment-123".to_string(),
     })
-        .lifecycle_state(LifecycleState::Running)
-        .display_name("my-instance")
-        .limit(10)
-        .build();
+    .lifecycle_state(LifecycleState::Running)
+    .display_name("my-instance")
+    .limit(10)
+    .build();
 
     let params = request.to_query_params();
 

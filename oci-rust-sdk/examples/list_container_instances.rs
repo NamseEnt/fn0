@@ -1,9 +1,9 @@
 use oci_rust_sdk::{
-    container_instances::{
+    containerinstances::{
         self, ContainerInstanceLifecycleState, ListContainerInstancesRequest,
         ListContainerInstancesRequestRequiredFields, SortBy, SortOrder,
     },
-    core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig},
+    core::{ClientConfig, RetryConfiguration, auth::ConfigFileAuthProvider, region::Region},
 };
 use std::time::Duration;
 
@@ -11,24 +11,23 @@ use std::time::Duration;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth = ConfigFileAuthProvider::from_default()?;
 
-    let client = container_instances::client(ClientConfig {
+    let client = containerinstances::client(ClientConfig {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(30),
-        retry: RetryConfig::no_retry(),
+        retry: RetryConfiguration::no_retry(),
     })?;
 
     let compartment_id = std::env::var("OCI_COMPARTMENT_ID")
         .unwrap_or_else(|_| "ocid1.compartment.oc1..aaaaaaaxxxxx".to_string());
 
     println!("=== Example 1: List All Container Instances ===");
-    let request = ListContainerInstancesRequest::builder(
-        ListContainerInstancesRequestRequiredFields {
+    let request =
+        ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
             compartment_id: compartment_id.clone(),
-        },
-    )
-    .limit(10)
-    .build();
+        })
+        .limit(10)
+        .build();
 
     match client.list_container_instances(request).await {
         Ok(response) => {
@@ -60,20 +59,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Example 2: List Active Container Instances Only ===");
-    let request = ListContainerInstancesRequest::builder(
-        ListContainerInstancesRequestRequiredFields {
+    let request =
+        ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
             compartment_id: compartment_id.clone(),
-        },
-    )
-    .lifecycle_state(ContainerInstanceLifecycleState::Active)
-    .build();
+        })
+        .lifecycle_state(ContainerInstanceLifecycleState::Active)
+        .build();
 
     match client.list_container_instances(request).await {
         Ok(response) => {
-            println!(
-                "Found {} active container instances",
-                response.items.len()
-            );
+            println!("Found {} active container instances", response.items.len());
             for instance in &response.items {
                 println!("  - {}: {}", instance.display_name, instance.shape);
                 println!(
@@ -88,15 +83,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Example 3: List Container Instances Sorted by Display Name ===");
-    let request = ListContainerInstancesRequest::builder(
-        ListContainerInstancesRequestRequiredFields {
+    let request =
+        ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
             compartment_id: compartment_id.clone(),
-        },
-    )
-    .sort_by(SortBy::DisplayName)
-    .sort_order(SortOrder::Asc)
-    .limit(5)
-    .build();
+        })
+        .sort_by(SortBy::DisplayName)
+        .sort_order(SortOrder::Asc)
+        .limit(5)
+        .build();
 
     match client.list_container_instances(request).await {
         Ok(response) => {
@@ -114,13 +108,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Example 4: Filter by Display Name ===");
-    let request = ListContainerInstancesRequest::builder(
-        ListContainerInstancesRequestRequiredFields {
+    let request =
+        ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
             compartment_id: compartment_id.clone(),
-        },
-    )
-    .display_name("my-container-instance")
-    .build();
+        })
+        .display_name("my-container-instance")
+        .build();
 
     match client.list_container_instances(request).await {
         Ok(response) => {
@@ -146,14 +139,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     for state in states_to_check {
-        let request = ListContainerInstancesRequest::builder(
-            ListContainerInstancesRequestRequiredFields {
+        let request =
+            ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
                 compartment_id: compartment_id.clone(),
-            },
-        )
-        .lifecycle_state(state)
-        .limit(5)
-        .build();
+            })
+            .lifecycle_state(state)
+            .limit(5)
+            .build();
 
         match client.list_container_instances(request).await {
             Ok(response) => {
@@ -172,12 +164,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut total_instances = 0;
 
     loop {
-        let mut request_builder = ListContainerInstancesRequest::builder(
-            ListContainerInstancesRequestRequiredFields {
+        let mut request_builder =
+            ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
                 compartment_id: compartment_id.clone(),
-            },
-        )
-        .limit(2);
+            })
+            .limit(2);
 
         if let Some(ref token) = page_token {
             request_builder = request_builder.page(token);

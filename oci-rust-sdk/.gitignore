@@ -1,2 +1,3 @@
 /target
-/oci-typescript-sdk/
+/oci-typescript-sdk
+*.backup

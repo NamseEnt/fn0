@@ -1,4 +1,4 @@
-use oci_rust_sdk::core::auth::{AuthProvider, SimpleAuthProvider, SimpleAuthProviderRequiredFields};
+use oci_rust_sdk::auth::{AuthProvider, SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 use oci_rust_sdk::core::region::Region;
 
 fn main() {
@@ -24,7 +24,9 @@ fn main() {
         tenancy: "ocid1.tenancy.oc1..aaaaaaaexample".to_string(),
         user: "ocid1.user.oc1..aaaaaaaexample".to_string(),
         fingerprint: "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99".to_string(),
-        private_key: "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----".to_string(),
+        private_key:
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+                .to_string(),
     };
 
     let provider2 = SimpleAuthProvider::builder(required)

@@ -1,5 +1,7 @@
 use oci_rust_sdk::compute::{self, models::*, requests::*};
-use oci_rust_sdk::core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig};
+use oci_rust_sdk::core::{
+    ClientConfig, RetryConfiguration, auth::ConfigFileAuthProvider, region::Region,
+};
 use std::time::Duration;
 
 #[tokio::main]
@@ -10,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(30),
-        retry: RetryConfig::no_retry(),
+        retry: RetryConfiguration::no_retry(),
     })?;
 
     // Set your instance configuration OCID

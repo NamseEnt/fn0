@@ -1,12 +1,12 @@
-use crate::core::auth::provider::AuthProvider;
-use crate::core::auth::signer::RequestSigner;
+use crate::auth::provider::AuthProvider;
+use crate::auth::signer::RequestSigner;
 use crate::core::error::{OciError, ServiceErrorResponse};
-use crate::core::retry::{Retrier, RetryConfig};
+use crate::core::retry::Retrier;
 use reqwest::Method;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
-use std::time::Duration;
 
+/// OCI API client for making requests to Oracle Cloud Infrastructure services
 pub struct OciClient {
     client: reqwest::Client,
     signer: RequestSigner,
@@ -15,20 +15,22 @@ pub struct OciClient {
 }
 
 impl OciClient {
+    /// Create a new OCI client
+    ///
+    /// # Arguments
+    /// * `auth_provider` - Authentication provider
+    /// * `endpoint` - Base endpoint URL (e.g., "https://osmh.ap-seoul-1.oci.oraclecloud.com")
     pub fn new(
         auth_provider: Arc<dyn AuthProvider>,
         endpoint: String,
-        timeout: Duration,
-        retry: RetryConfig,
     ) -> crate::core::Result<Self> {
         let client = reqwest::Client::builder()
             .user_agent(format!("oci-rust-sdk/{}", env!("CARGO_PKG_VERSION")))
-            .timeout(timeout)
             .build()
             .map_err(OciError::HttpError)?;
 
         let signer = RequestSigner::new(auth_provider)?;
-        let retrier = Retrier::new(retry);
+        let retrier = Retrier::new();
 
         Ok(Self {
             client,
@@ -36,6 +38,12 @@ impl OciClient {
             endpoint,
             retrier,
         })
+    }
+
+    /// Create a new client with custom retry configuration
+    pub fn with_retrier(mut self, retrier: Retrier) -> Self {
+        self.retrier = retrier;
+        self
     }
 
     /// Make a GET request

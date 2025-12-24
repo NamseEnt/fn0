@@ -1,8 +1,15 @@
 use oci_rust_sdk::{
     container_instances::{
-        self, CreateContainerDetails, CreateContainerInstanceDetails,
-        CreateContainerInstanceRequest, CreateContainerInstanceRequestRequiredFields,
-        CreateContainerInstanceShapeConfigDetails, CreateContainerVnicDetails,
+        self,
+        models::{
+            CreateContainerDetails, CreateContainerDetailsRequired,
+            CreateContainerInstanceDetails, CreateContainerInstanceDetailsRequired,
+            CreateContainerInstanceShapeConfigDetails, CreateContainerVnicDetails,
+            CreateContainerVnicDetailsRequired,
+        },
+        requests::{
+            CreateContainerInstanceRequest, CreateContainerInstanceRequestRequiredFields,
+        },
     },
     core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig},
 };
@@ -31,47 +38,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut env_vars = HashMap::new();
     env_vars.insert("APP_NAME".to_string(), "my-app".to_string());
 
-    let create_details = CreateContainerInstanceDetails {
-        compartment_id,
-        availability_domain,
-        shape: "CI.Standard.E4.Flex".to_string(),
-        shape_config: CreateContainerInstanceShapeConfigDetails {
-            ocpus: 1.0,
-            memory_in_gbs: 4.0,
-        },
-        containers: vec![CreateContainerDetails {
-            image_url: "nginx:alpine".to_string(),
-            display_name: Some("nginx".to_string()),
-            command: None,
-            arguments: None,
-            environment_variables: Some(env_vars),
-            resource_config: None,
-        }],
-        vnics: vec![CreateContainerVnicDetails {
-            subnet_id,
-            display_name: Some("main-vnic".to_string()),
-            hostname_label: None,
-            is_public_ip_assigned: Some(true),
-            skip_source_dest_check: None,
-            nsg_ids: None,
-            private_ip: None,
-            freeform_tags: None,
-            defined_tags: None,
-        }],
-        display_name: Some("my-nginx-instance".to_string()),
-        fault_domain: None,
-        graceful_shutdown_timeout_in_seconds: Some(30),
-        container_restart_policy: Some("ALWAYS".to_string()),
-        freeform_tags: None,
-        defined_tags: None,
-    };
+    let container = CreateContainerDetails::new(CreateContainerDetailsRequired {
+        image_url: "nginx:alpine".to_string(),
+    })
+    .with_display_name("nginx")
+    .with_environment_variables(env_vars);
 
-    let request = CreateContainerInstanceRequest::builder(
-        CreateContainerInstanceRequestRequiredFields {
-            create_container_instance_details: create_details,
+    let vnic = CreateContainerVnicDetails::new(CreateContainerVnicDetailsRequired { subnet_id })
+        .with_display_name("main-vnic")
+        .with_is_public_ip_assigned(true);
+
+    let create_details = CreateContainerInstanceDetails::new(
+        CreateContainerInstanceDetailsRequired {
+            compartment_id,
+            availability_domain,
+            shape: "CI.Standard.E4.Flex".to_string(),
+            shape_config: CreateContainerInstanceShapeConfigDetails {
+                ocpus: 1.0,
+                memory_in_gbs: 4.0,
+            },
+            containers: vec![container],
+            vnics: vec![vnic],
         },
     )
-    .build();
+    .with_display_name("my-nginx-instance")
+    .with_graceful_shutdown_timeout_in_seconds(30)
+    .with_container_restart_policy("ALWAYS");
+
+    let request =
+        CreateContainerInstanceRequest::builder(CreateContainerInstanceRequestRequiredFields {
+            create_container_instance_details: create_details,
+        })
+        .build();
 
     match client.create_container_instance(request).await {
         Ok(response) => {
@@ -82,10 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "  Display Name: {}",
                 response.container_instance.display_name
             );
-            println!(
-                "  State: {:?}",
-                response.container_instance.lifecycle_state
-            );
+            println!("  State: {:?}", response.container_instance.lifecycle_state);
             println!("  Shape: {}", response.container_instance.shape);
             println!(
                 "  OCPUs: {}",

@@ -1,0 +1,14 @@
+use serde::{Deserialize, Serialize};
+
+{% if documentation %}/// {{ documentation | replace(from="\n", to="\n/// ") }}
+{% endif %}#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum {{ name }} {
+{%- for variant in variants %}
+    {% if variant.name != "UnknownValue" %}#[serde(rename = "{{ variant.value }}")]
+    {{ variant.name }},
+    {% endif %}
+{%- endfor %}
+    /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
+    #[serde(other)]
+    UnknownValue,
+}

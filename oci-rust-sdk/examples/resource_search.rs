@@ -1,52 +1,61 @@
 use oci_rust_sdk::{
-    core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig},
-    resource_search::{
-        self, MatchingContextType, SearchDetails, SearchResourcesRequest, SearchResourcesRequestRequiredFields, StructuredSearchDetails,
+    auth::ConfigFileAuthProvider,
+    core::{
+        region::Region,
+        retry::{RetryConfiguration, Retrier},
+    },
+    resourcesearch::{
+        self, SearchDetails, SearchDetailsMatchingContextType, SearchDetailsRequired,
+        SearchResourcesRequest, SearchResourcesRequestRequiredFields,
     },
 };
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let auth = ConfigFileAuthProvider::from_default()?;
+    let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
 
-    let client = resource_search::client(ClientConfig {
+    let client = resourcesearch::client(resourcesearch::ClientConfig {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(30),
-        retry: RetryConfig::no_retry(),
+        retry: Retrier::with_config(RetryConfiguration {
+            max_attempts: 1,
+            base_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(1),
+        }),
     })?;
 
     // Example 1: Structured search query
     println!("=== Example 1: Structured Search ===");
-    let search_details = SearchDetails::Structured(StructuredSearchDetails {
-        query: "query instance resources".to_string(),
-        matching_context_type: Some(MatchingContextType::Highlights),
-    });
-
-    let request = SearchResourcesRequest::builder(SearchResourcesRequestRequiredFields {
-        search_details,
+    let search_details = SearchDetails::new(SearchDetailsRequired {
+        r#type: "Structured".to_string(),
     })
-        .limit(10)
-        .build();
+    .with_matching_context_type(SearchDetailsMatchingContextType::Highlights);
+
+    let request =
+        SearchResourcesRequest::builder(SearchResourcesRequestRequiredFields { search_details })
+            .limit(10)
+            .build();
 
     match client.search_resources(request).await {
         Ok(response) => {
-            println!(
-                "Found {} resources",
-                response.resource_summary_collection.items.len()
-            );
-            for resource in &response.resource_summary_collection.items {
-                println!("  - {}: {}", resource.resource_type, resource.identifier);
-                if let Some(display_name) = &resource.display_name {
-                    println!("    Name: {}", display_name);
+            if let Some(items) = &response.resource_summary_collection.items {
+                println!("Found {} resources", items.len());
+                for resource in items {
+                    println!("  - {}: {}", resource.resource_type, resource.identifier);
+                    if let Some(display_name) = &resource.display_name {
+                        println!("    Name: {}", display_name);
+                    }
+                    if let Some(state) = &resource.lifecycle_state {
+                        println!("    State: {}", state);
+                    }
+                    if let Some(tags) = &resource.freeform_tags {
+                        println!("    Tags: {:?}", tags);
+                    }
                 }
-                if let Some(state) = &resource.lifecycle_state {
-                    println!("    State: {}", state);
-                }
-                if let Some(tags) = &resource.freeform_tags {
-                    println!("    Tags: {:?}", tags);
-                }
+            } else {
+                println!("No resources found");
             }
 
             if let Some(next_page) = response.opc_next_page {
@@ -59,26 +68,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Example 2: Free Text Search ===");
-    let free_text_search =
-        SearchDetails::FreeText(oci_rust_sdk::resource_search::FreeTextSearchDetails {
-            text: "production".to_string(),
-            matching_context_type: Some(MatchingContextType::None),
-        });
+    let free_text_search = SearchDetails::new(SearchDetailsRequired {
+        r#type: "FreeText".to_string(),
+    })
+    .with_matching_context_type(SearchDetailsMatchingContextType::None);
 
     let request = SearchResourcesRequest::builder(SearchResourcesRequestRequiredFields {
         search_details: free_text_search,
     })
-        .limit(5)
-        .build();
+    .limit(5)
+    .build();
 
     match client.search_resources(request).await {
         Ok(response) => {
-            println!(
-                "Found {} resources with 'production'",
-                response.resource_summary_collection.items.len()
-            );
-            for resource in &response.resource_summary_collection.items {
-                println!("  - {} ({})", resource.identifier, resource.resource_type);
+            if let Some(items) = &response.resource_summary_collection.items {
+                println!("Found {} resources with 'production'", items.len());
+                for resource in items {
+                    println!("  - {} ({})", resource.identifier, resource.resource_type);
+                }
+            } else {
+                println!("No resources found");
             }
         }
         Err(e) => {

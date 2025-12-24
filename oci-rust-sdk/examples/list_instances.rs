@@ -1,6 +1,9 @@
 use oci_rust_sdk::{
-    compute::{self, LifecycleState, ListInstancesRequest, ListInstancesRequestRequiredFields, SortBy, SortOrder},
-    core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig},
+    compute::{
+        self, LifecycleState, ListInstancesRequest, ListInstancesRequestRequiredFields, SortBy,
+        SortOrder,
+    },
+    core::{ClientConfig, RetryConfiguration, auth::ConfigFileAuthProvider, region::Region},
 };
 use std::time::Duration;
 
@@ -12,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(30),
-        retry: RetryConfig::no_retry(),
+        retry: RetryConfiguration::no_retry(),
     })?;
 
     // IMPORTANT: Replace this with your actual compartment OCID
@@ -23,8 +26,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
         compartment_id: compartment_id.clone(),
     })
-        .limit(10)
-        .build();
+    .limit(10)
+    .build();
 
     match client.list_instances(request).await {
         Ok(response) => {
@@ -58,8 +61,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
         compartment_id: compartment_id.clone(),
     })
-        .lifecycle_state(LifecycleState::Running)
-        .build();
+    .lifecycle_state(LifecycleState::Running)
+    .build();
 
     match client.list_instances(request).await {
         Ok(response) => {
@@ -81,10 +84,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
         compartment_id: compartment_id.clone(),
     })
-        .sort_by(SortBy::DisplayName)
-        .sort_order(SortOrder::Asc)
-        .limit(5)
-        .build();
+    .sort_by(SortBy::DisplayName)
+    .sort_order(SortOrder::Asc)
+    .limit(5)
+    .build();
 
     match client.list_instances(request).await {
         Ok(response) => {
@@ -105,12 +108,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
         compartment_id: compartment_id.clone(),
     })
-        .display_name("my-instance")
-        .build();
+    .display_name("my-instance")
+    .build();
 
     match client.list_instances(request).await {
         Ok(response) => {
-            println!("Found {} instances matching 'my-instance'", response.items.len());
+            println!(
+                "Found {} instances matching 'my-instance'",
+                response.items.len()
+            );
             for instance in &response.items {
                 println!("  - {} ({})", instance.id, instance.lifecycle_state);
             }
@@ -131,17 +137,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
             compartment_id: compartment_id.clone(),
         })
-            .lifecycle_state(state)
-            .limit(5)
-            .build();
+        .lifecycle_state(state)
+        .limit(5)
+        .build();
 
         match client.list_instances(request).await {
             Ok(response) => {
-                println!(
-                    "  {} state: {} instances",
-                    state,
-                    response.items.len()
-                );
+                println!("  {} state: {} instances", state, response.items.len());
             }
             Err(e) => {
                 eprintln!("Error checking {} state: {}", state, e);
@@ -156,9 +158,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut total_instances = 0;
 
     loop {
-        let mut request_builder = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
-            compartment_id: compartment_id.clone(),
-        }).limit(2);
+        let mut request_builder =
+            ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
+                compartment_id: compartment_id.clone(),
+            })
+            .limit(2);
 
         if let Some(ref token) = page_token {
             request_builder = request_builder.page(token);

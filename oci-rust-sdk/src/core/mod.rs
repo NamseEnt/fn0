@@ -1,22 +1,17 @@
-pub mod error;
-pub mod retry;
-pub mod region;
-pub mod auth;
+//! Core Services Module
+//!
+//! Contains models for Oracle Cloud Infrastructure Core Services:
+//! - Compute (instances, images, shapes)
+//! - VirtualNetwork (VCNs, subnets, security lists)
+//! - Blockstorage (volumes, backups)
+
 pub mod client;
+pub mod error;
+pub mod models;
+pub mod region;
+pub mod retry;
 
+// Re-exports for convenience
 pub use error::{OciError, Result};
-pub use client::OciClient;
-pub use retry::{Retrier, RetryConfig};
-
-use std::time::Duration;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmptyResponse {}
-
-pub struct ClientConfig<A: auth::AuthProvider + 'static> {
-    pub auth_provider: A,
-    pub region: region::Region,
-    pub timeout: Duration,
-    pub retry: RetryConfig,
-}
+pub use region::Region;
+pub use retry::{Retrier, RetryConfiguration};

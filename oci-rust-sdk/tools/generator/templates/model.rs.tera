@@ -1,0 +1,76 @@
+use serde::{Deserialize, Serialize};
+{% if needs_hashmap %}use std::collections::HashMap;
+{% endif %}{% if needs_datetime %}use chrono::{DateTime, Utc};
+{% endif %}
+#[allow(unused_imports)]
+use super::*;
+{% if documentation %}/// {{ documentation }}{% endif %}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct {{ name }} {
+{%- for field in required_fields %}
+    {% if field.documentation %}/// {{ field.documentation }}
+    {% endif %}{% if field.rust_name is starting_with("r#") %}#[serde(rename = "{{ field.name }}")]
+    {% endif %}pub {{ field.rust_name }}: {{ field.rust_type }},
+{% endfor -%}
+{%- for field in optional_fields %}
+    {% if field.documentation %}/// {{ field.documentation }}
+    {% endif %}{% if field.rust_name is starting_with("r#") %}#[serde(rename = "{{ field.name }}")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    {% else %}#[serde(skip_serializing_if = "Option::is_none")]
+    {% endif %}pub {{ field.rust_name }}: {{ field.rust_type }},
+{% endfor -%}
+}
+
+{% if has_required_fields %}
+/// Required fields for {{ name }}
+pub struct {{ name }}Required {
+{%- for field in required_fields %}
+    {% if field.documentation %}/// {{ field.documentation | replace(from="\n", to="\n    /// ") }}
+    {% endif %}pub {{ field.rust_name }}: {{ field.base_rust_type }},
+{% endfor -%}
+}
+
+{% endif -%}
+impl {{ name }} {
+{% if has_required_fields %}    /// Create a new {{ name }} with required fields
+    pub fn new(required: {{ name }}Required) -> Self {
+        Self {
+{%- for field in required_fields %}
+            {{ field.rust_name }}: required.{{ field.rust_name }},
+{% endfor -%}
+{%- for field in optional_fields %}
+            {{ field.rust_name }}: None,
+{% endfor -%}
+        }
+    }
+{% else %}    /// Create a new {{ name }}
+    pub fn new() -> Self {
+        Self {
+{%- for field in optional_fields %}
+            {{ field.rust_name }}: None,
+{% endfor %}        }
+    }
+{% endif %}
+{%- for field in all_fields %}
+    /// Set {{ field.rust_name }}
+    pub fn set_{{ field.rust_name_base }}(mut self, value: {{ field.rust_type }}) -> Self {
+        self.{{ field.rust_name }} = value;
+        self
+    }
+{% endfor %}
+{%- for field in optional_fields %}
+    /// Set {{ field.rust_name }} (unwraps Option)
+    pub fn with_{{ field.rust_name_base }}(mut self, value: {% if field.is_string %}impl Into<String>{% else %}{{ field.base_rust_type }}{% endif %}) -> Self {
+        self.{{ field.rust_name }} = Some(value{% if field.is_string %}.into(){% endif %});
+        self
+    }
+{% endfor -%}
+}
+
+{% if not has_required_fields %}impl Default for {{ name }} {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+{% endif %}
