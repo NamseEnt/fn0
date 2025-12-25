@@ -1,10 +1,10 @@
-use crate::execute;
 use hyper::Request;
-use wasmtime::{component::Component, Store};
+use wasmtime::{Store, component::Component};
 use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxView, WasiView};
 use wasmtime_wasi_http::{
-    bindings::{http::types::Scheme, ProxyPre},
     WasiHttpCtx, WasiHttpView,
+    bindings::{ProxyPre, http::types::Scheme},
+    body::HyperOutgoingBody,
 };
 
 pub struct Config<'a> {
@@ -31,7 +31,7 @@ impl Fn0One {
     pub async fn run(
         &self,
         req: Request<hyper::body::Incoming>,
-    ) -> anyhow::Result<execute::Response> {
+    ) -> anyhow::Result<hyper::Response<HyperOutgoingBody>> {
         let mut store = Store::new(
             self.proxy_pre.engine(),
             ClientState {

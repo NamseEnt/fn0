@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-adapt-cache = { path = "../adapt-cache" }
+# adapt-cache = { path = "../adapt-cache" }
 measure-cpu-time = { path = "../measure-cpu-time" }
 wasmtime = { version = "39", default-features = false, features = [
     "runtime",
@@ -21,13 +21,14 @@ tokio = { version = "1" }
 memberlist = { version = "0.7", features = ["snappy", "tokio", "quinn"] }
 hyper = { version = "1", features = ["server"] }
 hyper-util = { version = "0.1", features = ["service"] }
+http = "1"
 tower = { version = "0.5.2", features = ["timeout", "util"] }
-tower-http = { version = "0.6.7", features = ["timeout"] }
+tower-http = { version = "0.6.1", features = ["timeout"] }
 bytes = "1"
 http-body-util = "0.1"
 sysinfo = "0.37.2"
 oci-rust-sdk = { path = "../oci-rust-sdk", features = ["virtual_network"] }
-reqwest = { version = "0.12.24", default-features = false, features = [
+reqwest = { version = "0.12.5", default-features = false, features = [
     "http2",
     "rustls-tls",
 ] }
@@ -46,6 +47,21 @@ tracing-opentelemetry = "0.32.0"
 tracing-subscriber = "0.3.22"
 tracing = "0.1.43"
 anyhow = "1.0.100"
+
+# onejs runtime dependencies (WinterCG APIs only)
+deno_core = "0.324.0"
+deno_fetch = "0.206.0"
+deno_http = "0.180.0"
+deno_web = "0.213.0"
+deno_url = "0.182.0"
+deno_webidl = "0.182.0"
+deno_console = "0.182.0"
+deno_crypto = "0.196.0"
+deno_websocket = "0.187.0"
+deno_permissions = "0.42.0"
+deno_net = "0.174.0"
+deno_tls = "0.169.0"
+v8 = "130.0.7"
 
 [dev-dependencies]
 wasmtime = { version = "39", features = [
