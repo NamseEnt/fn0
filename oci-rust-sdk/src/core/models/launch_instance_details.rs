@@ -117,7 +117,7 @@ pub struct LaunchInstanceDetails {
 
     /// Whether to enable AI enterprise on the instance.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_a_i_enterprise_enabled: Option<bool>,
+    pub is_aienterprise_enabled: Option<bool>,
 
     /// The OCID of the Instance Configuration containing instance launch details. Any other fields supplied in this instance launch request will override the details stored in the Instance Configuration for this instance launch.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -127,6 +127,7 @@ pub struct LaunchInstanceDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub licensing_configs: Option<Vec<LaunchInstanceLicensingConfig>>,
 }
+
 
 /// Required fields for LaunchInstanceDetails
 pub struct LaunchInstanceDetailsRequired {
@@ -201,12 +202,12 @@ impl LaunchInstanceDetails {
 
             placement_constraint_details: None,
 
-            is_a_i_enterprise_enabled: None,
+            is_aienterprise_enabled: None,
 
             instance_configuration_id: None,
 
             licensing_configs: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -240,19 +241,13 @@ impl LaunchInstanceDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.security_attributes = value;
         self
     }
@@ -264,10 +259,7 @@ impl LaunchInstanceDetails {
     }
 
     /// Set extended_metadata
-    pub fn set_extended_metadata(
-        mut self,
-        value: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn set_extended_metadata(mut self, value: Option<HashMap<String, serde_json::Value>>) -> Self {
         self.extended_metadata = value;
         self
     }
@@ -327,19 +319,13 @@ impl LaunchInstanceDetails {
     }
 
     /// Set availability_config
-    pub fn set_availability_config(
-        mut self,
-        value: Option<LaunchInstanceAvailabilityConfigDetails>,
-    ) -> Self {
+    pub fn set_availability_config(mut self, value: Option<LaunchInstanceAvailabilityConfigDetails>) -> Self {
         self.availability_config = value;
         self
     }
 
     /// Set preemptible_instance_config
-    pub fn set_preemptible_instance_config(
-        mut self,
-        value: Option<PreemptibleInstanceConfigDetails>,
-    ) -> Self {
+    pub fn set_preemptible_instance_config(mut self, value: Option<PreemptibleInstanceConfigDetails>) -> Self {
         self.preemptible_instance_config = value;
         self
     }
@@ -381,10 +367,7 @@ impl LaunchInstanceDetails {
     }
 
     /// Set launch_volume_attachments
-    pub fn set_launch_volume_attachments(
-        mut self,
-        value: Option<Vec<LaunchAttachVolumeDetails>>,
-    ) -> Self {
+    pub fn set_launch_volume_attachments(mut self, value: Option<Vec<LaunchAttachVolumeDetails>>) -> Self {
         self.launch_volume_attachments = value;
         self
     }
@@ -396,26 +379,20 @@ impl LaunchInstanceDetails {
     }
 
     /// Set platform_config
-    pub fn set_platform_config(
-        mut self,
-        value: Option<AmdRomeBmGpuLaunchInstancePlatformConfig>,
-    ) -> Self {
+    pub fn set_platform_config(mut self, value: Option<AmdRomeBmGpuLaunchInstancePlatformConfig>) -> Self {
         self.platform_config = value;
         self
     }
 
     /// Set placement_constraint_details
-    pub fn set_placement_constraint_details(
-        mut self,
-        value: Option<HostGroupPlacementConstraintDetails>,
-    ) -> Self {
+    pub fn set_placement_constraint_details(mut self, value: Option<HostGroupPlacementConstraintDetails>) -> Self {
         self.placement_constraint_details = value;
         self
     }
 
-    /// Set is_a_i_enterprise_enabled
-    pub fn set_is_a_i_enterprise_enabled(mut self, value: Option<bool>) -> Self {
-        self.is_a_i_enterprise_enabled = value;
+    /// Set is_aienterprise_enabled
+    pub fn set_is_aienterprise_enabled(mut self, value: Option<bool>) -> Self {
+        self.is_aienterprise_enabled = value;
         self
     }
 
@@ -426,10 +403,7 @@ impl LaunchInstanceDetails {
     }
 
     /// Set licensing_configs
-    pub fn set_licensing_configs(
-        mut self,
-        value: Option<Vec<LaunchInstanceLicensingConfig>>,
-    ) -> Self {
+    pub fn set_licensing_configs(mut self, value: Option<Vec<LaunchInstanceLicensingConfig>>) -> Self {
         self.licensing_configs = value;
         self
     }
@@ -453,19 +427,13 @@ impl LaunchInstanceDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.security_attributes = Some(value);
         self
     }
@@ -537,19 +505,13 @@ impl LaunchInstanceDetails {
     }
 
     /// Set availability_config (unwraps Option)
-    pub fn with_availability_config(
-        mut self,
-        value: LaunchInstanceAvailabilityConfigDetails,
-    ) -> Self {
+    pub fn with_availability_config(mut self, value: LaunchInstanceAvailabilityConfigDetails) -> Self {
         self.availability_config = Some(value);
         self
     }
 
     /// Set preemptible_instance_config (unwraps Option)
-    pub fn with_preemptible_instance_config(
-        mut self,
-        value: PreemptibleInstanceConfigDetails,
-    ) -> Self {
+    pub fn with_preemptible_instance_config(mut self, value: PreemptibleInstanceConfigDetails) -> Self {
         self.preemptible_instance_config = Some(value);
         self
     }
@@ -609,17 +571,14 @@ impl LaunchInstanceDetails {
     }
 
     /// Set placement_constraint_details (unwraps Option)
-    pub fn with_placement_constraint_details(
-        mut self,
-        value: HostGroupPlacementConstraintDetails,
-    ) -> Self {
+    pub fn with_placement_constraint_details(mut self, value: HostGroupPlacementConstraintDetails) -> Self {
         self.placement_constraint_details = Some(value);
         self
     }
 
-    /// Set is_a_i_enterprise_enabled (unwraps Option)
-    pub fn with_is_a_i_enterprise_enabled(mut self, value: bool) -> Self {
-        self.is_a_i_enterprise_enabled = Some(value);
+    /// Set is_aienterprise_enabled (unwraps Option)
+    pub fn with_is_aienterprise_enabled(mut self, value: bool) -> Self {
+        self.is_aienterprise_enabled = Some(value);
         self
     }
 
@@ -635,3 +594,5 @@ impl LaunchInstanceDetails {
         self
     }
 }
+
+

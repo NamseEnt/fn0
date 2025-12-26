@@ -4,25 +4,26 @@ use serde::{Deserialize, Serialize};
 pub enum VolumeAttachmentIscsiLoginState {
     #[serde(rename = "UNKNOWN")]
     Unknown,
-
+    
     #[serde(rename = "LOGGING_IN")]
     LoggingIn,
-
+    
     #[serde(rename = "LOGIN_SUCCEEDED")]
     LoginSucceeded,
-
+    
     #[serde(rename = "LOGIN_FAILED")]
     LoginFailed,
-
+    
     #[serde(rename = "LOGGING_OUT")]
     LoggingOut,
-
+    
     #[serde(rename = "LOGOUT_SUCCEEDED")]
     LogoutSucceeded,
-
+    
     #[serde(rename = "LOGOUT_FAILED")]
     LogoutFailed,
-
+    
+    
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

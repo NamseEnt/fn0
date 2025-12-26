@@ -30,6 +30,7 @@ pub struct InstanceReservationConfig {
     pub cluster_placement_group_id: Option<String>,
 }
 
+
 /// Required fields for InstanceReservationConfig
 pub struct InstanceReservationConfigRequired {
     /// The shape to use when launching instances using compute capacity reservations. The shape determines the number of CPUs, the amount of memory, and other resources allocated to the instance. You can list all available shapes by calling {@link ListComputeCapacityReservationInstanceShapes}.
@@ -59,7 +60,7 @@ impl InstanceReservationConfig {
             instance_shape_config: None,
 
             cluster_placement_group_id: None,
-        }
+}
     }
 
     /// Set fault_domain
@@ -81,10 +82,7 @@ impl InstanceReservationConfig {
     }
 
     /// Set instance_shape_config
-    pub fn set_instance_shape_config(
-        mut self,
-        value: Option<InstanceReservationShapeConfigDetails>,
-    ) -> Self {
+    pub fn set_instance_shape_config(mut self, value: Option<InstanceReservationShapeConfigDetails>) -> Self {
         self.instance_shape_config = value;
         self
     }
@@ -120,10 +118,7 @@ impl InstanceReservationConfig {
     }
 
     /// Set instance_shape_config (unwraps Option)
-    pub fn with_instance_shape_config(
-        mut self,
-        value: InstanceReservationShapeConfigDetails,
-    ) -> Self {
+    pub fn with_instance_shape_config(mut self, value: InstanceReservationShapeConfigDetails) -> Self {
         self.instance_shape_config = Some(value);
         self
     }
@@ -134,3 +129,5 @@ impl InstanceReservationConfig {
         self
     }
 }
+
+

@@ -55,3 +55,4 @@ impl Default for InventorySubnetCidrBlockSummary {
         Self::new()
     }
 }
+

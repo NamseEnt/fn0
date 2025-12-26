@@ -10,6 +10,7 @@ pub struct ComputeNetworkBlockCollection {
     pub items: Vec<ComputeNetworkBlockSummary>,
 }
 
+
 /// Required fields for ComputeNetworkBlockCollection
 pub struct ComputeNetworkBlockCollectionRequired {
     /// The list of compute network blocks.
@@ -21,7 +22,7 @@ impl ComputeNetworkBlockCollection {
     pub fn new(required: ComputeNetworkBlockCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ComputeNetworkBlockCollection {
         self
     }
 }
+
+

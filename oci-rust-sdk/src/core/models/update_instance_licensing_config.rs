@@ -14,6 +14,7 @@ pub struct UpdateInstanceLicensingConfig {
     pub license_type: Option<UpdateInstanceLicensingConfigLicenseType>,
 }
 
+
 /// Required fields for UpdateInstanceLicensingConfig
 pub struct UpdateInstanceLicensingConfigRequired {
     pub r#type: String,
@@ -26,14 +27,11 @@ impl UpdateInstanceLicensingConfig {
             r#type: required.r#type,
 
             license_type: None,
-        }
+}
     }
 
     /// Set license_type
-    pub fn set_license_type(
-        mut self,
-        value: Option<UpdateInstanceLicensingConfigLicenseType>,
-    ) -> Self {
+    pub fn set_license_type(mut self, value: Option<UpdateInstanceLicensingConfigLicenseType>) -> Self {
         self.license_type = value;
         self
     }
@@ -50,3 +48,5 @@ impl UpdateInstanceLicensingConfig {
         self
     }
 }
+
+

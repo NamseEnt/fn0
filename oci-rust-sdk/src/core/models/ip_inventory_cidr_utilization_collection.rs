@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -57,10 +57,7 @@ impl IpInventoryCidrUtilizationCollection {
     }
 
     /// Set ip_inventory_cidr_utilization_summary
-    pub fn set_ip_inventory_cidr_utilization_summary(
-        mut self,
-        value: Option<Vec<IpInventoryCidrUtilizationSummary>>,
-    ) -> Self {
+    pub fn set_ip_inventory_cidr_utilization_summary(mut self, value: Option<Vec<IpInventoryCidrUtilizationSummary>>) -> Self {
         self.ip_inventory_cidr_utilization_summary = value;
         self
     }
@@ -90,10 +87,7 @@ impl IpInventoryCidrUtilizationCollection {
     }
 
     /// Set ip_inventory_cidr_utilization_summary (unwraps Option)
-    pub fn with_ip_inventory_cidr_utilization_summary(
-        mut self,
-        value: Vec<IpInventoryCidrUtilizationSummary>,
-    ) -> Self {
+    pub fn with_ip_inventory_cidr_utilization_summary(mut self, value: Vec<IpInventoryCidrUtilizationSummary>) -> Self {
         self.ip_inventory_cidr_utilization_summary = Some(value);
         self
     }
@@ -116,3 +110,4 @@ impl Default for IpInventoryCidrUtilizationCollection {
         Self::new()
     }
 }
+

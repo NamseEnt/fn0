@@ -10,6 +10,7 @@ pub struct UpdateInstancePlatformConfig {
     pub r#type: String,
 }
 
+
 /// Required fields for UpdateInstancePlatformConfig
 pub struct UpdateInstancePlatformConfigRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl UpdateInstancePlatformConfig {
     pub fn new(required: UpdateInstancePlatformConfigRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl UpdateInstancePlatformConfig {
         self
     }
 }
+
+

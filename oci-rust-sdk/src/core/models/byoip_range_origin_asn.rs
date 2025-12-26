@@ -18,6 +18,7 @@ pub struct ByoipRangeOriginAsn {
     pub as_path_prepend_length: Option<i64>,
 }
 
+
 /// Required fields for ByoipRangeOriginAsn
 pub struct ByoipRangeOriginAsnRequired {
     /// The Autonomous System Number (ASN) you are importing to the Oracle cloud. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -33,7 +34,7 @@ impl ByoipRangeOriginAsn {
             byoasn_id: None,
 
             as_path_prepend_length: None,
-        }
+}
     }
 
     /// Set byoasn_id
@@ -66,3 +67,5 @@ impl ByoipRangeOriginAsn {
         self
     }
 }
+
+

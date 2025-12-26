@@ -10,6 +10,7 @@ pub struct PublicIpPoolCollection {
     pub items: Vec<PublicIpPoolSummary>,
 }
 
+
 /// Required fields for PublicIpPoolCollection
 pub struct PublicIpPoolCollectionRequired {
     /// A list of public IP pool summaries.
@@ -21,7 +22,7 @@ impl PublicIpPoolCollection {
     pub fn new(required: PublicIpPoolCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl PublicIpPoolCollection {
         self
     }
 }
+
+

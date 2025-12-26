@@ -131,19 +131,13 @@ impl FlowLogCaptureFilterRuleDetails {
     }
 
     /// Set flow_log_type
-    pub fn set_flow_log_type(
-        mut self,
-        value: Option<FlowLogCaptureFilterRuleDetailsFlowLogType>,
-    ) -> Self {
+    pub fn set_flow_log_type(mut self, value: Option<FlowLogCaptureFilterRuleDetailsFlowLogType>) -> Self {
         self.flow_log_type = value;
         self
     }
 
     /// Set rule_action
-    pub fn set_rule_action(
-        mut self,
-        value: Option<FlowLogCaptureFilterRuleDetailsRuleAction>,
-    ) -> Self {
+    pub fn set_rule_action(mut self, value: Option<FlowLogCaptureFilterRuleDetailsRuleAction>) -> Self {
         self.rule_action = value;
         self
     }
@@ -220,3 +214,4 @@ impl Default for FlowLogCaptureFilterRuleDetails {
         Self::new()
     }
 }
+

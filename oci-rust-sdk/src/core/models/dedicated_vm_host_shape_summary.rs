@@ -18,6 +18,7 @@ pub struct DedicatedVmHostShapeSummary {
     pub capacity_configs: Option<Vec<CapacityConfig>>,
 }
 
+
 /// Required fields for DedicatedVmHostShapeSummary
 pub struct DedicatedVmHostShapeSummaryRequired {
     /// The name of the dedicated VM host shape. You can enumerate all available shapes by calling {@link #listDedicatedVmHostShapes(ListDedicatedVmHostShapesRequest) listDedicatedVmHostShapes}.
@@ -33,7 +34,7 @@ impl DedicatedVmHostShapeSummary {
             availability_domain: None,
 
             capacity_configs: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -66,3 +67,5 @@ impl DedicatedVmHostShapeSummary {
         self
     }
 }
+
+

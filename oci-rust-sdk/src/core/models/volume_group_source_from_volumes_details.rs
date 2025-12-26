@@ -13,6 +13,7 @@ pub struct VolumeGroupSourceFromVolumesDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for VolumeGroupSourceFromVolumesDetails
 pub struct VolumeGroupSourceFromVolumesDetailsRequired {
     /// OCIDs for the volumes in this volume group.
@@ -28,7 +29,7 @@ impl VolumeGroupSourceFromVolumesDetails {
             volume_ids: required.volume_ids,
 
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set volume_ids
@@ -43,3 +44,5 @@ impl VolumeGroupSourceFromVolumesDetails {
         self
     }
 }
+
+

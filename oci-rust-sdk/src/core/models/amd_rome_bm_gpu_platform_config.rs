@@ -35,6 +35,7 @@ pub struct AmdRomeBmGpuPlatformConfig {
     pub config_map: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for AmdRomeBmGpuPlatformConfig
 pub struct AmdRomeBmGpuPlatformConfigRequired {
     pub r#type: String,
@@ -57,14 +58,11 @@ impl AmdRomeBmGpuPlatformConfig {
             is_input_output_memory_management_unit_enabled: None,
 
             config_map: None,
-        }
+}
     }
 
     /// Set numa_nodes_per_socket
-    pub fn set_numa_nodes_per_socket(
-        mut self,
-        value: Option<AmdRomeBmGpuPlatformConfigNumaNodesPerSocket>,
-    ) -> Self {
+    pub fn set_numa_nodes_per_socket(mut self, value: Option<AmdRomeBmGpuPlatformConfigNumaNodesPerSocket>) -> Self {
         self.numa_nodes_per_socket = value;
         self
     }
@@ -88,10 +86,7 @@ impl AmdRomeBmGpuPlatformConfig {
     }
 
     /// Set is_input_output_memory_management_unit_enabled
-    pub fn set_is_input_output_memory_management_unit_enabled(
-        mut self,
-        value: Option<bool>,
-    ) -> Self {
+    pub fn set_is_input_output_memory_management_unit_enabled(mut self, value: Option<bool>) -> Self {
         self.is_input_output_memory_management_unit_enabled = value;
         self
     }
@@ -109,10 +104,7 @@ impl AmdRomeBmGpuPlatformConfig {
     }
 
     /// Set numa_nodes_per_socket (unwraps Option)
-    pub fn with_numa_nodes_per_socket(
-        mut self,
-        value: AmdRomeBmGpuPlatformConfigNumaNodesPerSocket,
-    ) -> Self {
+    pub fn with_numa_nodes_per_socket(mut self, value: AmdRomeBmGpuPlatformConfigNumaNodesPerSocket) -> Self {
         self.numa_nodes_per_socket = Some(value);
         self
     }
@@ -147,3 +139,5 @@ impl AmdRomeBmGpuPlatformConfig {
         self
     }
 }
+
+

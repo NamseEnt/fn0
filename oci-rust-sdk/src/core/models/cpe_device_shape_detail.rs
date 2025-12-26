@@ -90,3 +90,4 @@ impl Default for CpeDeviceShapeDetail {
         Self::new()
     }
 }
+

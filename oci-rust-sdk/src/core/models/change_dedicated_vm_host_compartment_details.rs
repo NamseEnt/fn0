@@ -10,6 +10,7 @@ pub struct ChangeDedicatedVmHostCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeDedicatedVmHostCompartmentDetails
 pub struct ChangeDedicatedVmHostCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the dedicated virtual machine host to.
@@ -21,7 +22,7 @@ impl ChangeDedicatedVmHostCompartmentDetails {
     pub fn new(required: ChangeDedicatedVmHostCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeDedicatedVmHostCompartmentDetails {
         self
     }
 }
+
+

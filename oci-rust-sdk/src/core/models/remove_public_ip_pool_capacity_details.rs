@@ -10,6 +10,7 @@ pub struct RemovePublicIpPoolCapacityDetails {
     pub cidr_block: String,
 }
 
+
 /// Required fields for RemovePublicIpPoolCapacityDetails
 pub struct RemovePublicIpPoolCapacityDetailsRequired {
     /// The CIDR block to remove from the  public IP pool. Example: {@code 10.0.1.0/24}
@@ -21,7 +22,7 @@ impl RemovePublicIpPoolCapacityDetails {
     pub fn new(required: RemovePublicIpPoolCapacityDetailsRequired) -> Self {
         Self {
             cidr_block: required.cidr_block,
-        }
+}
     }
 
     /// Set cidr_block
@@ -30,3 +31,5 @@ impl RemovePublicIpPoolCapacityDetails {
         self
     }
 }
+
+

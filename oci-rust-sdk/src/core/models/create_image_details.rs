@@ -34,6 +34,7 @@ pub struct CreateImageDetails {
     pub launch_mode: Option<CreateImageDetailsLaunchMode>,
 }
 
+
 /// Required fields for CreateImageDetails
 pub struct CreateImageDetailsRequired {
     /// The OCID of the compartment you want the image to be created in.
@@ -57,7 +58,7 @@ impl CreateImageDetails {
             instance_id: None,
 
             launch_mode: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -67,10 +68,7 @@ impl CreateImageDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -88,10 +86,7 @@ impl CreateImageDetails {
     }
 
     /// Set image_source_details
-    pub fn set_image_source_details(
-        mut self,
-        value: Option<ImageSourceViaObjectStorageTupleDetails>,
-    ) -> Self {
+    pub fn set_image_source_details(mut self, value: Option<ImageSourceViaObjectStorageTupleDetails>) -> Self {
         self.image_source_details = value;
         self
     }
@@ -109,10 +104,7 @@ impl CreateImageDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -130,10 +122,7 @@ impl CreateImageDetails {
     }
 
     /// Set image_source_details (unwraps Option)
-    pub fn with_image_source_details(
-        mut self,
-        value: ImageSourceViaObjectStorageTupleDetails,
-    ) -> Self {
+    pub fn with_image_source_details(mut self, value: ImageSourceViaObjectStorageTupleDetails) -> Self {
         self.image_source_details = Some(value);
         self
     }
@@ -150,3 +139,5 @@ impl CreateImageDetails {
         self
     }
 }
+
+

@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -38,7 +38,7 @@ pub struct Instance {
 
     /// Whether AI enterprise is enabled on the instance.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_a_i_enterprise_enabled: Option<bool>,
+    pub is_aienterprise_enabled: Option<bool>,
 
     /// The OCID of the cluster placement group of the instance.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -137,6 +137,7 @@ pub struct Instance {
     pub licensing_configs: Option<Vec<LicensingConfig>>,
 }
 
+
 /// Required fields for Instance
 pub struct InstanceRequired {
     /// The availability domain the instance is running in. <p> Example: {@code Uocm:PHX-AD-1}
@@ -183,7 +184,7 @@ impl Instance {
 
             placement_constraint_details: None,
 
-            is_a_i_enterprise_enabled: None,
+            is_aienterprise_enabled: None,
 
             cluster_placement_group_id: None,
 
@@ -236,7 +237,7 @@ impl Instance {
             instance_configuration_id: None,
 
             licensing_configs: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -258,17 +259,14 @@ impl Instance {
     }
 
     /// Set placement_constraint_details
-    pub fn set_placement_constraint_details(
-        mut self,
-        value: Option<HostGroupPlacementConstraintDetails>,
-    ) -> Self {
+    pub fn set_placement_constraint_details(mut self, value: Option<HostGroupPlacementConstraintDetails>) -> Self {
         self.placement_constraint_details = value;
         self
     }
 
-    /// Set is_a_i_enterprise_enabled
-    pub fn set_is_a_i_enterprise_enabled(mut self, value: Option<bool>) -> Self {
-        self.is_a_i_enterprise_enabled = value;
+    /// Set is_aienterprise_enabled
+    pub fn set_is_aienterprise_enabled(mut self, value: Option<bool>) -> Self {
+        self.is_aienterprise_enabled = value;
         self
     }
 
@@ -285,28 +283,19 @@ impl Instance {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.security_attributes = value;
         self
     }
 
     /// Set security_attributes_state
-    pub fn set_security_attributes_state(
-        mut self,
-        value: Option<InstanceSecurityAttributesState>,
-    ) -> Self {
+    pub fn set_security_attributes_state(mut self, value: Option<InstanceSecurityAttributesState>) -> Self {
         self.security_attributes_state = value;
         self
     }
@@ -318,10 +307,7 @@ impl Instance {
     }
 
     /// Set extended_metadata
-    pub fn set_extended_metadata(
-        mut self,
-        value: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn set_extended_metadata(mut self, value: Option<HashMap<String, serde_json::Value>>) -> Self {
         self.extended_metadata = value;
         self
     }
@@ -381,10 +367,7 @@ impl Instance {
     }
 
     /// Set preemptible_instance_config
-    pub fn set_preemptible_instance_config(
-        mut self,
-        value: Option<PreemptibleInstanceConfigDetails>,
-    ) -> Self {
+    pub fn set_preemptible_instance_config(mut self, value: Option<PreemptibleInstanceConfigDetails>) -> Self {
         self.preemptible_instance_config = value;
         self
     }
@@ -432,10 +415,7 @@ impl Instance {
     }
 
     /// Set system_tags
-    pub fn set_system_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.system_tags = value;
         self
     }
@@ -483,17 +463,14 @@ impl Instance {
     }
 
     /// Set placement_constraint_details (unwraps Option)
-    pub fn with_placement_constraint_details(
-        mut self,
-        value: HostGroupPlacementConstraintDetails,
-    ) -> Self {
+    pub fn with_placement_constraint_details(mut self, value: HostGroupPlacementConstraintDetails) -> Self {
         self.placement_constraint_details = Some(value);
         self
     }
 
-    /// Set is_a_i_enterprise_enabled (unwraps Option)
-    pub fn with_is_a_i_enterprise_enabled(mut self, value: bool) -> Self {
-        self.is_a_i_enterprise_enabled = Some(value);
+    /// Set is_aienterprise_enabled (unwraps Option)
+    pub fn with_is_aienterprise_enabled(mut self, value: bool) -> Self {
+        self.is_aienterprise_enabled = Some(value);
         self
     }
 
@@ -510,28 +487,19 @@ impl Instance {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.security_attributes = Some(value);
         self
     }
 
     /// Set security_attributes_state (unwraps Option)
-    pub fn with_security_attributes_state(
-        mut self,
-        value: InstanceSecurityAttributesState,
-    ) -> Self {
+    pub fn with_security_attributes_state(mut self, value: InstanceSecurityAttributesState) -> Self {
         self.security_attributes_state = Some(value);
         self
     }
@@ -597,10 +565,7 @@ impl Instance {
     }
 
     /// Set preemptible_instance_config (unwraps Option)
-    pub fn with_preemptible_instance_config(
-        mut self,
-        value: PreemptibleInstanceConfigDetails,
-    ) -> Self {
+    pub fn with_preemptible_instance_config(mut self, value: PreemptibleInstanceConfigDetails) -> Self {
         self.preemptible_instance_config = Some(value);
         self
     }
@@ -630,10 +595,7 @@ impl Instance {
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -668,3 +630,5 @@ impl Instance {
         self
     }
 }
+
+

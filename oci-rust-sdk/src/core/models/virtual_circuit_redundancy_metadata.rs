@@ -8,18 +8,15 @@ use super::*;
 pub struct VirtualCircuitRedundancyMetadata {
     /// The configured redundancy level of the virtual circuit.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub configured_redundancy_level:
-        Option<VirtualCircuitRedundancyMetadataConfiguredRedundancyLevel>,
+    pub configured_redundancy_level: Option<VirtualCircuitRedundancyMetadataConfiguredRedundancyLevel>,
 
     /// Indicates if the configured level is met for IPv4 BGP redundancy.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ipv4bgp_session_redundancy_status:
-        Option<VirtualCircuitRedundancyMetadataIpv4bgpSessionRedundancyStatus>,
+    pub ipv4bgp_session_redundancy_status: Option<VirtualCircuitRedundancyMetadataIpv4bgpSessionRedundancyStatus>,
 
     /// Indicates if the configured level is met for IPv6 BGP redundancy.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ipv6bgp_session_redundancy_status:
-        Option<VirtualCircuitRedundancyMetadataIpv6bgpSessionRedundancyStatus>,
+    pub ipv6bgp_session_redundancy_status: Option<VirtualCircuitRedundancyMetadataIpv6bgpSessionRedundancyStatus>,
 }
 
 impl VirtualCircuitRedundancyMetadata {
@@ -35,55 +32,37 @@ impl VirtualCircuitRedundancyMetadata {
     }
 
     /// Set configured_redundancy_level
-    pub fn set_configured_redundancy_level(
-        mut self,
-        value: Option<VirtualCircuitRedundancyMetadataConfiguredRedundancyLevel>,
-    ) -> Self {
+    pub fn set_configured_redundancy_level(mut self, value: Option<VirtualCircuitRedundancyMetadataConfiguredRedundancyLevel>) -> Self {
         self.configured_redundancy_level = value;
         self
     }
 
     /// Set ipv4bgp_session_redundancy_status
-    pub fn set_ipv4bgp_session_redundancy_status(
-        mut self,
-        value: Option<VirtualCircuitRedundancyMetadataIpv4bgpSessionRedundancyStatus>,
-    ) -> Self {
+    pub fn set_ipv4bgp_session_redundancy_status(mut self, value: Option<VirtualCircuitRedundancyMetadataIpv4bgpSessionRedundancyStatus>) -> Self {
         self.ipv4bgp_session_redundancy_status = value;
         self
     }
 
     /// Set ipv6bgp_session_redundancy_status
-    pub fn set_ipv6bgp_session_redundancy_status(
-        mut self,
-        value: Option<VirtualCircuitRedundancyMetadataIpv6bgpSessionRedundancyStatus>,
-    ) -> Self {
+    pub fn set_ipv6bgp_session_redundancy_status(mut self, value: Option<VirtualCircuitRedundancyMetadataIpv6bgpSessionRedundancyStatus>) -> Self {
         self.ipv6bgp_session_redundancy_status = value;
         self
     }
 
     /// Set configured_redundancy_level (unwraps Option)
-    pub fn with_configured_redundancy_level(
-        mut self,
-        value: VirtualCircuitRedundancyMetadataConfiguredRedundancyLevel,
-    ) -> Self {
+    pub fn with_configured_redundancy_level(mut self, value: VirtualCircuitRedundancyMetadataConfiguredRedundancyLevel) -> Self {
         self.configured_redundancy_level = Some(value);
         self
     }
 
     /// Set ipv4bgp_session_redundancy_status (unwraps Option)
-    pub fn with_ipv4bgp_session_redundancy_status(
-        mut self,
-        value: VirtualCircuitRedundancyMetadataIpv4bgpSessionRedundancyStatus,
-    ) -> Self {
+    pub fn with_ipv4bgp_session_redundancy_status(mut self, value: VirtualCircuitRedundancyMetadataIpv4bgpSessionRedundancyStatus) -> Self {
         self.ipv4bgp_session_redundancy_status = Some(value);
         self
     }
 
     /// Set ipv6bgp_session_redundancy_status (unwraps Option)
-    pub fn with_ipv6bgp_session_redundancy_status(
-        mut self,
-        value: VirtualCircuitRedundancyMetadataIpv6bgpSessionRedundancyStatus,
-    ) -> Self {
+    pub fn with_ipv6bgp_session_redundancy_status(mut self, value: VirtualCircuitRedundancyMetadataIpv6bgpSessionRedundancyStatus) -> Self {
         self.ipv6bgp_session_redundancy_status = Some(value);
         self
     }
@@ -94,3 +73,4 @@ impl Default for VirtualCircuitRedundancyMetadata {
         Self::new()
     }
 }
+

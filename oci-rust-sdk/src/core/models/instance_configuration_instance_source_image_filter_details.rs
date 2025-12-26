@@ -45,10 +45,7 @@ impl InstanceConfigurationInstanceSourceImageFilterDetails {
     }
 
     /// Set defined_tags_filter
-    pub fn set_defined_tags_filter(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags_filter(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags_filter = value;
         self
     }
@@ -72,10 +69,7 @@ impl InstanceConfigurationInstanceSourceImageFilterDetails {
     }
 
     /// Set defined_tags_filter (unwraps Option)
-    pub fn with_defined_tags_filter(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags_filter(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags_filter = Some(value);
         self
     }
@@ -98,3 +92,4 @@ impl Default for InstanceConfigurationInstanceSourceImageFilterDetails {
         Self::new()
     }
 }
+

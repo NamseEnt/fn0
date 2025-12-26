@@ -1,30 +1,26 @@
 use oci_rust_sdk::{
-    container_instances::{
-        self,
-        models::{
-            CreateContainerDetails, CreateContainerDetailsRequired,
-            CreateContainerInstanceDetails, CreateContainerInstanceDetailsRequired,
-            CreateContainerInstanceShapeConfigDetails, CreateContainerVnicDetails,
-            CreateContainerVnicDetailsRequired,
-        },
-        requests::{
-            CreateContainerInstanceRequest, CreateContainerInstanceRequestRequiredFields,
-        },
+    containerinstances::{
+        self, ClientConfig as ContainerInstancesConfig, CreateContainerDetails,
+        CreateContainerDetailsRequired, CreateContainerInstanceDetails,
+        CreateContainerInstanceDetailsRequired, CreateContainerInstanceShapeConfigDetails,
+        CreateContainerInstanceShapeConfigDetailsRequired, CreateContainerVnicDetails,
+        CreateContainerVnicDetailsRequired, CreateContainerInstanceRequest,
+        CreateContainerInstanceRequestRequired,
     },
-    core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig},
+    auth::ConfigFileAuthProvider,
+    core::{region::Region, retry::Retrier},
 };
-use std::collections::HashMap;
-use std::time::Duration;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let auth = ConfigFileAuthProvider::from_default()?;
+    let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
 
-    let client = container_instances::client(ClientConfig {
+    let client = containerinstances::client(ContainerInstancesConfig {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(60),
-        retry: RetryConfig::no_retry(),
+        retry: Retrier::new(),
     })?;
 
     let compartment_id =
@@ -48,15 +44,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_display_name("main-vnic")
         .with_is_public_ip_assigned(true);
 
+    let shape_config = CreateContainerInstanceShapeConfigDetails::new(
+        CreateContainerInstanceShapeConfigDetailsRequired { ocpus: 1 },
+    )
+    .with_memory_in_gbs(4);
+
     let create_details = CreateContainerInstanceDetails::new(
         CreateContainerInstanceDetailsRequired {
             compartment_id,
             availability_domain,
             shape: "CI.Standard.E4.Flex".to_string(),
-            shape_config: CreateContainerInstanceShapeConfigDetails {
-                ocpus: 1.0,
-                memory_in_gbs: 4.0,
-            },
+            shape_config,
             containers: vec![container],
             vnics: vec![vnic],
         },
@@ -65,46 +63,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_graceful_shutdown_timeout_in_seconds(30)
     .with_container_restart_policy("ALWAYS");
 
-    let request =
-        CreateContainerInstanceRequest::builder(CreateContainerInstanceRequestRequiredFields {
-            create_container_instance_details: create_details,
-        })
-        .build();
+    let request = CreateContainerInstanceRequest::new(CreateContainerInstanceRequestRequired {
+        create_container_instance_details: create_details,
+    });
 
     match client.create_container_instance(request).await {
         Ok(response) => {
-            println!("✓ Container instance created successfully!");
-            println!("\nDetails:");
-            println!("  ID: {}", response.container_instance.id);
-            println!(
-                "  Display Name: {}",
-                response.container_instance.display_name
-            );
-            println!("  State: {:?}", response.container_instance.lifecycle_state);
-            println!("  Shape: {}", response.container_instance.shape);
-            println!(
-                "  OCPUs: {}",
-                response.container_instance.shape_config.ocpus
-            );
-            println!(
-                "  Memory: {} GB",
-                response.container_instance.shape_config.memory_in_gbs
-            );
-            println!(
-                "  Containers: {}",
-                response.container_instance.container_count
-            );
-
-            if let Some(work_request_id) = response.opc_work_request_id {
-                println!("\n  Work Request ID: {}", work_request_id);
-                println!("  You can monitor the work request to track the creation progress.");
-            }
-
-            println!("\n✓ Done! The container instance is being created.");
-            println!("  Use the OCI Console or CLI to monitor its progress.");
+            println!("Container instance created successfully!");
+            println!("ID: {}", response.container_instance.id);
+            println!("Display Name: {}", response.container_instance.display_name);
         }
         Err(e) => {
-            eprintln!("✗ Error creating container instance: {}", e);
+            eprintln!("Error creating container instance: {}", e);
             return Err(e.into());
         }
     }

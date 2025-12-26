@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -236,3 +236,4 @@ impl Default for TunnelPhaseTwoDetails {
         Self::new()
     }
 }
+

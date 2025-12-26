@@ -13,6 +13,7 @@ pub struct HealthCheckHttpHeader {
     pub value: String,
 }
 
+
 /// Required fields for HealthCheckHttpHeader
 pub struct HealthCheckHttpHeaderRequired {
     /// Container HTTP header Key.
@@ -29,7 +30,7 @@ impl HealthCheckHttpHeader {
             name: required.name,
 
             value: required.value,
-        }
+}
     }
 
     /// Set name
@@ -44,3 +45,5 @@ impl HealthCheckHttpHeader {
         self
     }
 }
+
+

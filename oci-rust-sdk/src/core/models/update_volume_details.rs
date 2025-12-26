@@ -21,11 +21,11 @@ pub struct UpdateVolumeDetails {
 
     /// The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See [Block Volume Performance Levels](https://docs.oracle.com/iaas/Content/Block/Concepts/blockvolumeperformance.htm#perf_levels) for more information. <p> Allowed values: <p> {@code 0}: Represents Lower Cost option. <p> {@code 10}: Represents Balanced option. <p> {@code 20}: Represents Higher Performance option. <p> {@code 30}-{@code 120}: Represents the Ultra High Performance option. <p> For performance autotune enabled volumes, it would be the Default(Minimum) VPUs/GB. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub vpus_per_g_b: Option<i64>,
+    pub vpus_per_gb: Option<i64>,
 
     /// The size to resize the volume to in GBs. Has to be larger than the current size. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_g_bs: Option<i64>,
+    pub size_in_gbs: Option<i64>,
 
     /// Specifies whether the auto-tune performance is enabled for this volume. This field is deprecated. Use the {@code DetachedVolumeAutotunePolicy} instead to enable the volume for detached autotune.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,9 +54,9 @@ impl UpdateVolumeDetails {
 
             freeform_tags: None,
 
-            vpus_per_g_b: None,
+            vpus_per_gb: None,
 
-            size_in_g_bs: None,
+            size_in_gbs: None,
 
             is_auto_tune_enabled: None,
 
@@ -69,10 +69,7 @@ impl UpdateVolumeDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -89,15 +86,15 @@ impl UpdateVolumeDetails {
         self
     }
 
-    /// Set vpus_per_g_b
-    pub fn set_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.vpus_per_g_b = value;
+    /// Set vpus_per_gb
+    pub fn set_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.vpus_per_gb = value;
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
@@ -108,10 +105,7 @@ impl UpdateVolumeDetails {
     }
 
     /// Set block_volume_replicas
-    pub fn set_block_volume_replicas(
-        mut self,
-        value: Option<Vec<BlockVolumeReplicaDetails>>,
-    ) -> Self {
+    pub fn set_block_volume_replicas(mut self, value: Option<Vec<BlockVolumeReplicaDetails>>) -> Self {
         self.block_volume_replicas = value;
         self
     }
@@ -129,10 +123,7 @@ impl UpdateVolumeDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -149,15 +140,15 @@ impl UpdateVolumeDetails {
         self
     }
 
-    /// Set vpus_per_g_b (unwraps Option)
-    pub fn with_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.vpus_per_g_b = Some(value);
+    /// Set vpus_per_gb (unwraps Option)
+    pub fn with_vpus_per_gb(mut self, value: i64) -> Self {
+        self.vpus_per_gb = Some(value);
         self
     }
 
-    /// Set size_in_g_bs (unwraps Option)
-    pub fn with_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = Some(value);
+    /// Set size_in_gbs (unwraps Option)
+    pub fn with_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = Some(value);
         self
     }
 
@@ -191,3 +182,4 @@ impl Default for UpdateVolumeDetails {
         Self::new()
     }
 }
+

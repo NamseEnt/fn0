@@ -12,6 +12,7 @@ pub struct ImagePullSecret {
     pub secret_type: String,
 }
 
+
 /// Required fields for ImagePullSecret
 pub struct ImagePullSecretRequired {
     /// The registry endpoint of the container image.
@@ -27,7 +28,7 @@ impl ImagePullSecret {
             registry_endpoint: required.registry_endpoint,
 
             secret_type: required.secret_type,
-        }
+}
     }
 
     /// Set registry_endpoint
@@ -42,3 +43,5 @@ impl ImagePullSecret {
         self
     }
 }
+
+

@@ -10,6 +10,7 @@ pub struct CrossConnectMappingDetailsCollection {
     pub items: Vec<CrossConnectMappingDetails>,
 }
 
+
 /// Required fields for CrossConnectMappingDetailsCollection
 pub struct CrossConnectMappingDetailsCollectionRequired {
     /// CrossConnectMappingDetails items
@@ -21,7 +22,7 @@ impl CrossConnectMappingDetailsCollection {
     pub fn new(required: CrossConnectMappingDetailsCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl CrossConnectMappingDetailsCollection {
         self
     }
 }
+
+

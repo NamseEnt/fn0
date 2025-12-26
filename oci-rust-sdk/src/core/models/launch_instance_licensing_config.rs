@@ -14,6 +14,7 @@ pub struct LaunchInstanceLicensingConfig {
     pub license_type: Option<LaunchInstanceLicensingConfigLicenseType>,
 }
 
+
 /// Required fields for LaunchInstanceLicensingConfig
 pub struct LaunchInstanceLicensingConfigRequired {
     pub r#type: String,
@@ -26,14 +27,11 @@ impl LaunchInstanceLicensingConfig {
             r#type: required.r#type,
 
             license_type: None,
-        }
+}
     }
 
     /// Set license_type
-    pub fn set_license_type(
-        mut self,
-        value: Option<LaunchInstanceLicensingConfigLicenseType>,
-    ) -> Self {
+    pub fn set_license_type(mut self, value: Option<LaunchInstanceLicensingConfigLicenseType>) -> Self {
         self.license_type = value;
         self
     }
@@ -50,3 +48,5 @@ impl LaunchInstanceLicensingConfig {
         self
     }
 }
+
+

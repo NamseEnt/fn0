@@ -16,6 +16,7 @@ pub struct EnumStringImageCapabilitySchemaDescriptor {
     pub default_value: Option<String>,
 }
 
+
 /// Required fields for EnumStringImageCapabilitySchemaDescriptor
 pub struct EnumStringImageCapabilitySchemaDescriptorRequired {
     /// the list of values for the enum
@@ -33,7 +34,7 @@ impl EnumStringImageCapabilitySchemaDescriptor {
             descriptor_type: required.descriptor_type,
 
             default_value: None,
-        }
+}
     }
 
     /// Set values
@@ -60,3 +61,5 @@ impl EnumStringImageCapabilitySchemaDescriptor {
         self
     }
 }
+
+

@@ -44,6 +44,7 @@ pub struct CreateDedicatedVmHostDetails {
     pub is_memory_encryption_enabled: Option<bool>,
 }
 
+
 /// Required fields for CreateDedicatedVmHostDetails
 pub struct CreateDedicatedVmHostDetailsRequired {
     /// The availability domain of the dedicated virtual machine host. <p> Example: {@code Uocm:PHX-AD-1}
@@ -79,7 +80,7 @@ impl CreateDedicatedVmHostDetails {
             capacity_config: None,
 
             is_memory_encryption_enabled: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -101,10 +102,7 @@ impl CreateDedicatedVmHostDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -128,10 +126,7 @@ impl CreateDedicatedVmHostDetails {
     }
 
     /// Set placement_constraint_details
-    pub fn set_placement_constraint_details(
-        mut self,
-        value: Option<HostGroupPlacementConstraintDetails>,
-    ) -> Self {
+    pub fn set_placement_constraint_details(mut self, value: Option<HostGroupPlacementConstraintDetails>) -> Self {
         self.placement_constraint_details = value;
         self
     }
@@ -149,10 +144,7 @@ impl CreateDedicatedVmHostDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -176,10 +168,7 @@ impl CreateDedicatedVmHostDetails {
     }
 
     /// Set placement_constraint_details (unwraps Option)
-    pub fn with_placement_constraint_details(
-        mut self,
-        value: HostGroupPlacementConstraintDetails,
-    ) -> Self {
+    pub fn with_placement_constraint_details(mut self, value: HostGroupPlacementConstraintDetails) -> Self {
         self.placement_constraint_details = Some(value);
         self
     }
@@ -196,3 +185,5 @@ impl CreateDedicatedVmHostDetails {
         self
     }
 }
+
+

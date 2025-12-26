@@ -4,13 +4,14 @@ use serde::{Deserialize, Serialize};
 pub enum DhcpDnsOptionServerType {
     #[serde(rename = "VcnLocal")]
     VcnLocal,
-
+    
     #[serde(rename = "VcnLocalPlusInternet")]
     VcnLocalPlusInternet,
-
+    
     #[serde(rename = "CustomDnsServer")]
     CustomDnsServer,
-
+    
+    
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

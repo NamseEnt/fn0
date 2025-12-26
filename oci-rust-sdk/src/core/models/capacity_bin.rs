@@ -16,14 +16,15 @@ pub struct CapacityBin {
     pub remaining_ocpus: i64,
 
     /// The total memory of the capacity bucket, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub total_memory_in_g_bs: i64,
+    pub total_memory_in_gbs: i64,
 
     /// The remaining memory of the capacity bucket, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub remaining_memory_in_g_bs: i64,
+    pub remaining_memory_in_gbs: i64,
 
     /// List of VMI shapes supported on each capacity bucket.
     pub supported_shapes: Vec<String>,
 }
+
 
 /// Required fields for CapacityBin
 pub struct CapacityBinRequired {
@@ -37,10 +38,10 @@ pub struct CapacityBinRequired {
     pub remaining_ocpus: i64,
 
     /// The total memory of the capacity bucket, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub total_memory_in_g_bs: i64,
+    pub total_memory_in_gbs: i64,
 
     /// The remaining memory of the capacity bucket, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub remaining_memory_in_g_bs: i64,
+    pub remaining_memory_in_gbs: i64,
 
     /// List of VMI shapes supported on each capacity bucket.
     pub supported_shapes: Vec<String>,
@@ -56,12 +57,12 @@ impl CapacityBin {
 
             remaining_ocpus: required.remaining_ocpus,
 
-            total_memory_in_g_bs: required.total_memory_in_g_bs,
+            total_memory_in_gbs: required.total_memory_in_gbs,
 
-            remaining_memory_in_g_bs: required.remaining_memory_in_g_bs,
+            remaining_memory_in_gbs: required.remaining_memory_in_gbs,
 
             supported_shapes: required.supported_shapes,
-        }
+}
     }
 
     /// Set capacity_index
@@ -82,15 +83,15 @@ impl CapacityBin {
         self
     }
 
-    /// Set total_memory_in_g_bs
-    pub fn set_total_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.total_memory_in_g_bs = value;
+    /// Set total_memory_in_gbs
+    pub fn set_total_memory_in_gbs(mut self, value: i64) -> Self {
+        self.total_memory_in_gbs = value;
         self
     }
 
-    /// Set remaining_memory_in_g_bs
-    pub fn set_remaining_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.remaining_memory_in_g_bs = value;
+    /// Set remaining_memory_in_gbs
+    pub fn set_remaining_memory_in_gbs(mut self, value: i64) -> Self {
+        self.remaining_memory_in_gbs = value;
         self
     }
 
@@ -100,3 +101,5 @@ impl CapacityBin {
         self
     }
 }
+
+

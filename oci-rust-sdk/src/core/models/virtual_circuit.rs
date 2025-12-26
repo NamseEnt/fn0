@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -226,10 +226,7 @@ impl VirtualCircuit {
     }
 
     /// Set bgp_ipv6_session_state
-    pub fn set_bgp_ipv6_session_state(
-        mut self,
-        value: Option<VirtualCircuitBgpIpv6SessionState>,
-    ) -> Self {
+    pub fn set_bgp_ipv6_session_state(mut self, value: Option<VirtualCircuitBgpIpv6SessionState>) -> Self {
         self.bgp_ipv6_session_state = value;
         self
     }
@@ -283,10 +280,7 @@ impl VirtualCircuit {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -400,10 +394,7 @@ impl VirtualCircuit {
     }
 
     /// Set virtual_circuit_redundancy_metadata
-    pub fn set_virtual_circuit_redundancy_metadata(
-        mut self,
-        value: Option<VirtualCircuitRedundancyMetadata>,
-    ) -> Self {
+    pub fn set_virtual_circuit_redundancy_metadata(mut self, value: Option<VirtualCircuitRedundancyMetadata>) -> Self {
         self.virtual_circuit_redundancy_metadata = value;
         self
     }
@@ -481,10 +472,7 @@ impl VirtualCircuit {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -598,10 +586,7 @@ impl VirtualCircuit {
     }
 
     /// Set virtual_circuit_redundancy_metadata (unwraps Option)
-    pub fn with_virtual_circuit_redundancy_metadata(
-        mut self,
-        value: VirtualCircuitRedundancyMetadata,
-    ) -> Self {
+    pub fn with_virtual_circuit_redundancy_metadata(mut self, value: VirtualCircuitRedundancyMetadata) -> Self {
         self.virtual_circuit_redundancy_metadata = Some(value);
         self
     }
@@ -612,3 +597,4 @@ impl Default for VirtualCircuit {
         Self::new()
     }
 }
+

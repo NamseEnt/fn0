@@ -13,6 +13,7 @@ pub struct ComputeInstanceOptions {
     pub options: Option<Vec<ComputeInstanceDetails>>,
 }
 
+
 /// Required fields for ComputeInstanceOptions
 pub struct ComputeInstanceOptionsRequired {
     pub instance_type: String,
@@ -25,7 +26,7 @@ impl ComputeInstanceOptions {
             instance_type: required.instance_type,
 
             options: None,
-        }
+}
     }
 
     /// Set options
@@ -46,3 +47,5 @@ impl ComputeInstanceOptions {
         self
     }
 }
+
+

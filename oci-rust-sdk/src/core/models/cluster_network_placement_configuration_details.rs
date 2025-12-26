@@ -11,8 +11,7 @@ pub struct ClusterNetworkPlacementConfigurationDetails {
 
     /// The placement constraint when reserving hosts.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub placement_constraint:
-        Option<ClusterNetworkPlacementConfigurationDetailsPlacementConstraint>,
+    pub placement_constraint: Option<ClusterNetworkPlacementConfigurationDetailsPlacementConstraint>,
 
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the primary subnet to place instances. This field is deprecated. Use {@code primaryVnicSubnets} instead to set VNIC data for instances in the pool.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -25,6 +24,7 @@ pub struct ClusterNetworkPlacementConfigurationDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secondary_vnic_subnets: Option<Vec<InstancePoolPlacementSecondaryVnicSubnet>>,
 }
+
 
 /// Required fields for ClusterNetworkPlacementConfigurationDetails
 pub struct ClusterNetworkPlacementConfigurationDetailsRequired {
@@ -45,7 +45,7 @@ impl ClusterNetworkPlacementConfigurationDetails {
             primary_vnic_subnets: None,
 
             secondary_vnic_subnets: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -55,10 +55,7 @@ impl ClusterNetworkPlacementConfigurationDetails {
     }
 
     /// Set placement_constraint
-    pub fn set_placement_constraint(
-        mut self,
-        value: Option<ClusterNetworkPlacementConfigurationDetailsPlacementConstraint>,
-    ) -> Self {
+    pub fn set_placement_constraint(mut self, value: Option<ClusterNetworkPlacementConfigurationDetailsPlacementConstraint>) -> Self {
         self.placement_constraint = value;
         self
     }
@@ -70,28 +67,19 @@ impl ClusterNetworkPlacementConfigurationDetails {
     }
 
     /// Set primary_vnic_subnets
-    pub fn set_primary_vnic_subnets(
-        mut self,
-        value: Option<InstancePoolPlacementPrimarySubnet>,
-    ) -> Self {
+    pub fn set_primary_vnic_subnets(mut self, value: Option<InstancePoolPlacementPrimarySubnet>) -> Self {
         self.primary_vnic_subnets = value;
         self
     }
 
     /// Set secondary_vnic_subnets
-    pub fn set_secondary_vnic_subnets(
-        mut self,
-        value: Option<Vec<InstancePoolPlacementSecondaryVnicSubnet>>,
-    ) -> Self {
+    pub fn set_secondary_vnic_subnets(mut self, value: Option<Vec<InstancePoolPlacementSecondaryVnicSubnet>>) -> Self {
         self.secondary_vnic_subnets = value;
         self
     }
 
     /// Set placement_constraint (unwraps Option)
-    pub fn with_placement_constraint(
-        mut self,
-        value: ClusterNetworkPlacementConfigurationDetailsPlacementConstraint,
-    ) -> Self {
+    pub fn with_placement_constraint(mut self, value: ClusterNetworkPlacementConfigurationDetailsPlacementConstraint) -> Self {
         self.placement_constraint = Some(value);
         self
     }
@@ -109,11 +97,10 @@ impl ClusterNetworkPlacementConfigurationDetails {
     }
 
     /// Set secondary_vnic_subnets (unwraps Option)
-    pub fn with_secondary_vnic_subnets(
-        mut self,
-        value: Vec<InstancePoolPlacementSecondaryVnicSubnet>,
-    ) -> Self {
+    pub fn with_secondary_vnic_subnets(mut self, value: Vec<InstancePoolPlacementSecondaryVnicSubnet>) -> Self {
         self.secondary_vnic_subnets = Some(value);
         self
     }
 }
+
+

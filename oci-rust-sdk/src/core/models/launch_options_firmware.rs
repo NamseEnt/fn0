@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 pub enum LaunchOptionsFirmware {
     #[serde(rename = "BIOS")]
     Bios,
-
+    
     #[serde(rename = "UEFI_64")]
     Uefi64,
-
+    
+    
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

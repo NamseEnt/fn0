@@ -13,11 +13,12 @@ pub struct CapacityBinPreview {
     pub total_ocpus: i64,
 
     /// The total memory of the capacity bucket, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub total_memory_in_g_bs: i64,
+    pub total_memory_in_gbs: i64,
 
     /// List of VMI shapes supported on each capacity bucket.
     pub supported_shapes: Vec<String>,
 }
+
 
 /// Required fields for CapacityBinPreview
 pub struct CapacityBinPreviewRequired {
@@ -28,7 +29,7 @@ pub struct CapacityBinPreviewRequired {
     pub total_ocpus: i64,
 
     /// The total memory of the capacity bucket, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub total_memory_in_g_bs: i64,
+    pub total_memory_in_gbs: i64,
 
     /// List of VMI shapes supported on each capacity bucket.
     pub supported_shapes: Vec<String>,
@@ -42,10 +43,10 @@ impl CapacityBinPreview {
 
             total_ocpus: required.total_ocpus,
 
-            total_memory_in_g_bs: required.total_memory_in_g_bs,
+            total_memory_in_gbs: required.total_memory_in_gbs,
 
             supported_shapes: required.supported_shapes,
-        }
+}
     }
 
     /// Set capacity_index
@@ -60,9 +61,9 @@ impl CapacityBinPreview {
         self
     }
 
-    /// Set total_memory_in_g_bs
-    pub fn set_total_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.total_memory_in_g_bs = value;
+    /// Set total_memory_in_gbs
+    pub fn set_total_memory_in_gbs(mut self, value: i64) -> Self {
+        self.total_memory_in_gbs = value;
         self
     }
 
@@ -72,3 +73,5 @@ impl CapacityBinPreview {
         self
     }
 }
+
+

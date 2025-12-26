@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ContainerInstanceLifecycleState {
@@ -26,4 +27,19 @@ pub enum ContainerInstanceLifecycleState {
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,
+}
+
+impl fmt::Display for ContainerInstanceLifecycleState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ContainerInstanceLifecycleState::Creating => write!(f, "CREATING"),
+            ContainerInstanceLifecycleState::Updating => write!(f, "UPDATING"),
+            ContainerInstanceLifecycleState::Active => write!(f, "ACTIVE"),
+            ContainerInstanceLifecycleState::Inactive => write!(f, "INACTIVE"),
+            ContainerInstanceLifecycleState::Deleting => write!(f, "DELETING"),
+            ContainerInstanceLifecycleState::Deleted => write!(f, "DELETED"),
+            ContainerInstanceLifecycleState::Failed => write!(f, "FAILED"),
+            ContainerInstanceLifecycleState::UnknownValue => write!(f, "UNKNOWN"),
+        }
+    }
 }

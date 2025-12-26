@@ -38,6 +38,7 @@ pub struct CreateDrgAttachmentDetails {
     pub vcn_id: Option<String>,
 }
 
+
 /// Required fields for CreateDrgAttachmentDetails
 pub struct CreateDrgAttachmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG.
@@ -63,7 +64,7 @@ impl CreateDrgAttachmentDetails {
             route_table_id: None,
 
             vcn_id: None,
-        }
+}
     }
 
     /// Set display_name
@@ -85,19 +86,13 @@ impl CreateDrgAttachmentDetails {
     }
 
     /// Set network_details
-    pub fn set_network_details(
-        mut self,
-        value: Option<VcnDrgAttachmentNetworkCreateDetails>,
-    ) -> Self {
+    pub fn set_network_details(mut self, value: Option<VcnDrgAttachmentNetworkCreateDetails>) -> Self {
         self.network_details = value;
         self
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -139,10 +134,7 @@ impl CreateDrgAttachmentDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -165,3 +157,5 @@ impl CreateDrgAttachmentDetails {
         self
     }
 }
+
+

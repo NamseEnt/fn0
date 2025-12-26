@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -40,6 +40,7 @@ pub struct ComputeImageCapabilitySchemaSummary {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for ComputeImageCapabilitySchemaSummary
 pub struct ComputeImageCapabilitySchemaSummaryRequired {
     /// The compute image capability schema [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm).
@@ -64,8 +65,7 @@ impl ComputeImageCapabilitySchemaSummary {
         Self {
             id: required.id,
 
-            compute_global_image_capability_schema_version_name: required
-                .compute_global_image_capability_schema_version_name,
+            compute_global_image_capability_schema_version_name: required.compute_global_image_capability_schema_version_name,
 
             image_id: required.image_id,
 
@@ -80,7 +80,7 @@ impl ComputeImageCapabilitySchemaSummary {
             defined_tags: None,
 
             freeform_tags: None,
-        }
+}
     }
 
     /// Set id
@@ -96,10 +96,7 @@ impl ComputeImageCapabilitySchemaSummary {
     }
 
     /// Set compute_global_image_capability_schema_version_name
-    pub fn set_compute_global_image_capability_schema_version_name(
-        mut self,
-        value: String,
-    ) -> Self {
+    pub fn set_compute_global_image_capability_schema_version_name(mut self, value: String) -> Self {
         self.compute_global_image_capability_schema_version_name = value;
         self
     }
@@ -117,10 +114,7 @@ impl ComputeImageCapabilitySchemaSummary {
     }
 
     /// Set schema_data
-    pub fn set_schema_data(
-        mut self,
-        value: Option<HashMap<String, ImageCapabilitySchemaDescriptor>>,
-    ) -> Self {
+    pub fn set_schema_data(mut self, value: Option<HashMap<String, ImageCapabilitySchemaDescriptor>>) -> Self {
         self.schema_data = value;
         self
     }
@@ -132,10 +126,7 @@ impl ComputeImageCapabilitySchemaSummary {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -153,19 +144,13 @@ impl ComputeImageCapabilitySchemaSummary {
     }
 
     /// Set schema_data (unwraps Option)
-    pub fn with_schema_data(
-        mut self,
-        value: HashMap<String, ImageCapabilitySchemaDescriptor>,
-    ) -> Self {
+    pub fn with_schema_data(mut self, value: HashMap<String, ImageCapabilitySchemaDescriptor>) -> Self {
         self.schema_data = Some(value);
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -176,3 +161,5 @@ impl ComputeImageCapabilitySchemaSummary {
         self
     }
 }
+
+

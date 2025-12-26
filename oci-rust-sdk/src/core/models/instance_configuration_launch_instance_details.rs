@@ -17,11 +17,10 @@ pub struct InstanceConfigurationLaunchInstanceDetails {
 
     /// Whether to enable AI enterprise on the instance.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_a_i_enterprise_enabled: Option<bool>,
+    pub is_aienterprise_enabled: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub placement_constraint_details:
-        Option<InstanceConfigurationHostGroupPlacementConstraintDetails>,
+    pub placement_constraint_details: Option<InstanceConfigurationHostGroupPlacementConstraintDetails>,
 
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the [compute cluster](https://docs.oracle.com/iaas/Content/Compute/Tasks/compute-clusters.htm) that the instance will be created in.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -103,8 +102,7 @@ pub struct InstanceConfigurationLaunchInstanceDetails {
 
     /// The preferred maintenance action for an instance. The default is LIVE_MIGRATE, if live migration is supported. * {@code LIVE_MIGRATE} - Run maintenance using a live migration. * {@code REBOOT} - Run maintenance using a reboot.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub preferred_maintenance_action:
-        Option<InstanceConfigurationLaunchInstanceDetailsPreferredMaintenanceAction>,
+    pub preferred_maintenance_action: Option<InstanceConfigurationLaunchInstanceDetailsPreferredMaintenanceAction>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instance_options: Option<InstanceConfigurationInstanceOptions>,
@@ -128,7 +126,7 @@ impl InstanceConfigurationLaunchInstanceDetails {
 
             capacity_reservation_id: None,
 
-            is_a_i_enterprise_enabled: None,
+            is_aienterprise_enabled: None,
 
             placement_constraint_details: None,
 
@@ -198,17 +196,14 @@ impl InstanceConfigurationLaunchInstanceDetails {
         self
     }
 
-    /// Set is_a_i_enterprise_enabled
-    pub fn set_is_a_i_enterprise_enabled(mut self, value: Option<bool>) -> Self {
-        self.is_a_i_enterprise_enabled = value;
+    /// Set is_aienterprise_enabled
+    pub fn set_is_aienterprise_enabled(mut self, value: Option<bool>) -> Self {
+        self.is_aienterprise_enabled = value;
         self
     }
 
     /// Set placement_constraint_details
-    pub fn set_placement_constraint_details(
-        mut self,
-        value: Option<InstanceConfigurationHostGroupPlacementConstraintDetails>,
-    ) -> Self {
+    pub fn set_placement_constraint_details(mut self, value: Option<InstanceConfigurationHostGroupPlacementConstraintDetails>) -> Self {
         self.placement_constraint_details = value;
         self
     }
@@ -232,28 +227,19 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set create_vnic_details
-    pub fn set_create_vnic_details(
-        mut self,
-        value: Option<InstanceConfigurationCreateVnicDetails>,
-    ) -> Self {
+    pub fn set_create_vnic_details(mut self, value: Option<InstanceConfigurationCreateVnicDetails>) -> Self {
         self.create_vnic_details = value;
         self
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.security_attributes = value;
         self
     }
@@ -265,10 +251,7 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set extended_metadata
-    pub fn set_extended_metadata(
-        mut self,
-        value: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn set_extended_metadata(mut self, value: Option<HashMap<String, serde_json::Value>>) -> Self {
         self.extended_metadata = value;
         self
     }
@@ -298,28 +281,19 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set shape_config
-    pub fn set_shape_config(
-        mut self,
-        value: Option<InstanceConfigurationLaunchInstanceShapeConfigDetails>,
-    ) -> Self {
+    pub fn set_shape_config(mut self, value: Option<InstanceConfigurationLaunchInstanceShapeConfigDetails>) -> Self {
         self.shape_config = value;
         self
     }
 
     /// Set platform_config
-    pub fn set_platform_config(
-        mut self,
-        value: Option<InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig>,
-    ) -> Self {
+    pub fn set_platform_config(mut self, value: Option<InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig>) -> Self {
         self.platform_config = value;
         self
     }
 
     /// Set source_details
-    pub fn set_source_details(
-        mut self,
-        value: Option<InstanceConfigurationInstanceSourceViaImageDetails>,
-    ) -> Self {
+    pub fn set_source_details(mut self, value: Option<InstanceConfigurationInstanceSourceViaImageDetails>) -> Self {
         self.source_details = value;
         self
     }
@@ -337,10 +311,7 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set launch_mode
-    pub fn set_launch_mode(
-        mut self,
-        value: Option<InstanceConfigurationLaunchInstanceDetailsLaunchMode>,
-    ) -> Self {
+    pub fn set_launch_mode(mut self, value: Option<InstanceConfigurationLaunchInstanceDetailsLaunchMode>) -> Self {
         self.launch_mode = value;
         self
     }
@@ -352,10 +323,7 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set agent_config
-    pub fn set_agent_config(
-        mut self,
-        value: Option<InstanceConfigurationLaunchInstanceAgentConfigDetails>,
-    ) -> Self {
+    pub fn set_agent_config(mut self, value: Option<InstanceConfigurationLaunchInstanceAgentConfigDetails>) -> Self {
         self.agent_config = value;
         self
     }
@@ -367,46 +335,31 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set preferred_maintenance_action
-    pub fn set_preferred_maintenance_action(
-        mut self,
-        value: Option<InstanceConfigurationLaunchInstanceDetailsPreferredMaintenanceAction>,
-    ) -> Self {
+    pub fn set_preferred_maintenance_action(mut self, value: Option<InstanceConfigurationLaunchInstanceDetailsPreferredMaintenanceAction>) -> Self {
         self.preferred_maintenance_action = value;
         self
     }
 
     /// Set instance_options
-    pub fn set_instance_options(
-        mut self,
-        value: Option<InstanceConfigurationInstanceOptions>,
-    ) -> Self {
+    pub fn set_instance_options(mut self, value: Option<InstanceConfigurationInstanceOptions>) -> Self {
         self.instance_options = value;
         self
     }
 
     /// Set availability_config
-    pub fn set_availability_config(
-        mut self,
-        value: Option<InstanceConfigurationAvailabilityConfig>,
-    ) -> Self {
+    pub fn set_availability_config(mut self, value: Option<InstanceConfigurationAvailabilityConfig>) -> Self {
         self.availability_config = value;
         self
     }
 
     /// Set preemptible_instance_config
-    pub fn set_preemptible_instance_config(
-        mut self,
-        value: Option<PreemptibleInstanceConfigDetails>,
-    ) -> Self {
+    pub fn set_preemptible_instance_config(mut self, value: Option<PreemptibleInstanceConfigDetails>) -> Self {
         self.preemptible_instance_config = value;
         self
     }
 
     /// Set licensing_configs
-    pub fn set_licensing_configs(
-        mut self,
-        value: Option<Vec<LaunchInstanceLicensingConfig>>,
-    ) -> Self {
+    pub fn set_licensing_configs(mut self, value: Option<Vec<LaunchInstanceLicensingConfig>>) -> Self {
         self.licensing_configs = value;
         self
     }
@@ -423,17 +376,14 @@ impl InstanceConfigurationLaunchInstanceDetails {
         self
     }
 
-    /// Set is_a_i_enterprise_enabled (unwraps Option)
-    pub fn with_is_a_i_enterprise_enabled(mut self, value: bool) -> Self {
-        self.is_a_i_enterprise_enabled = Some(value);
+    /// Set is_aienterprise_enabled (unwraps Option)
+    pub fn with_is_aienterprise_enabled(mut self, value: bool) -> Self {
+        self.is_aienterprise_enabled = Some(value);
         self
     }
 
     /// Set placement_constraint_details (unwraps Option)
-    pub fn with_placement_constraint_details(
-        mut self,
-        value: InstanceConfigurationHostGroupPlacementConstraintDetails,
-    ) -> Self {
+    pub fn with_placement_constraint_details(mut self, value: InstanceConfigurationHostGroupPlacementConstraintDetails) -> Self {
         self.placement_constraint_details = Some(value);
         self
     }
@@ -457,28 +407,19 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set create_vnic_details (unwraps Option)
-    pub fn with_create_vnic_details(
-        mut self,
-        value: InstanceConfigurationCreateVnicDetails,
-    ) -> Self {
+    pub fn with_create_vnic_details(mut self, value: InstanceConfigurationCreateVnicDetails) -> Self {
         self.create_vnic_details = Some(value);
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.security_attributes = Some(value);
         self
     }
@@ -520,28 +461,19 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set shape_config (unwraps Option)
-    pub fn with_shape_config(
-        mut self,
-        value: InstanceConfigurationLaunchInstanceShapeConfigDetails,
-    ) -> Self {
+    pub fn with_shape_config(mut self, value: InstanceConfigurationLaunchInstanceShapeConfigDetails) -> Self {
         self.shape_config = Some(value);
         self
     }
 
     /// Set platform_config (unwraps Option)
-    pub fn with_platform_config(
-        mut self,
-        value: InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig,
-    ) -> Self {
+    pub fn with_platform_config(mut self, value: InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig) -> Self {
         self.platform_config = Some(value);
         self
     }
 
     /// Set source_details (unwraps Option)
-    pub fn with_source_details(
-        mut self,
-        value: InstanceConfigurationInstanceSourceViaImageDetails,
-    ) -> Self {
+    pub fn with_source_details(mut self, value: InstanceConfigurationInstanceSourceViaImageDetails) -> Self {
         self.source_details = Some(value);
         self
     }
@@ -559,10 +491,7 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set launch_mode (unwraps Option)
-    pub fn with_launch_mode(
-        mut self,
-        value: InstanceConfigurationLaunchInstanceDetailsLaunchMode,
-    ) -> Self {
+    pub fn with_launch_mode(mut self, value: InstanceConfigurationLaunchInstanceDetailsLaunchMode) -> Self {
         self.launch_mode = Some(value);
         self
     }
@@ -574,10 +503,7 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set agent_config (unwraps Option)
-    pub fn with_agent_config(
-        mut self,
-        value: InstanceConfigurationLaunchInstanceAgentConfigDetails,
-    ) -> Self {
+    pub fn with_agent_config(mut self, value: InstanceConfigurationLaunchInstanceAgentConfigDetails) -> Self {
         self.agent_config = Some(value);
         self
     }
@@ -589,10 +515,7 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set preferred_maintenance_action (unwraps Option)
-    pub fn with_preferred_maintenance_action(
-        mut self,
-        value: InstanceConfigurationLaunchInstanceDetailsPreferredMaintenanceAction,
-    ) -> Self {
+    pub fn with_preferred_maintenance_action(mut self, value: InstanceConfigurationLaunchInstanceDetailsPreferredMaintenanceAction) -> Self {
         self.preferred_maintenance_action = Some(value);
         self
     }
@@ -604,19 +527,13 @@ impl InstanceConfigurationLaunchInstanceDetails {
     }
 
     /// Set availability_config (unwraps Option)
-    pub fn with_availability_config(
-        mut self,
-        value: InstanceConfigurationAvailabilityConfig,
-    ) -> Self {
+    pub fn with_availability_config(mut self, value: InstanceConfigurationAvailabilityConfig) -> Self {
         self.availability_config = Some(value);
         self
     }
 
     /// Set preemptible_instance_config (unwraps Option)
-    pub fn with_preemptible_instance_config(
-        mut self,
-        value: PreemptibleInstanceConfigDetails,
-    ) -> Self {
+    pub fn with_preemptible_instance_config(mut self, value: PreemptibleInstanceConfigDetails) -> Self {
         self.preemptible_instance_config = Some(value);
         self
     }
@@ -633,3 +550,4 @@ impl Default for InstanceConfigurationLaunchInstanceDetails {
         Self::new()
     }
 }
+

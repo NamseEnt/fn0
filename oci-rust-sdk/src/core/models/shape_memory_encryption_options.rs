@@ -55,3 +55,4 @@ impl Default for ShapeMemoryEncryptionOptions {
         Self::new()
     }
 }
+

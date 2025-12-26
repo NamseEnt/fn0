@@ -18,6 +18,7 @@ pub struct BlockVolumeReplicaDetails {
     pub xrr_kms_key_id: Option<String>,
 }
 
+
 /// Required fields for BlockVolumeReplicaDetails
 pub struct BlockVolumeReplicaDetailsRequired {
     /// The availability domain of the block volume replica. <p> Example: {@code Uocm:PHX-AD-1}
@@ -33,7 +34,7 @@ impl BlockVolumeReplicaDetails {
             display_name: None,
 
             xrr_kms_key_id: None,
-        }
+}
     }
 
     /// Set display_name
@@ -66,3 +67,5 @@ impl BlockVolumeReplicaDetails {
         self
     }
 }
+
+

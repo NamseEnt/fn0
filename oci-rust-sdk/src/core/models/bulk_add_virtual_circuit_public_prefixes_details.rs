@@ -10,6 +10,7 @@ pub struct BulkAddVirtualCircuitPublicPrefixesDetails {
     pub public_prefixes: Vec<CreateVirtualCircuitPublicPrefixDetails>,
 }
 
+
 /// Required fields for BulkAddVirtualCircuitPublicPrefixesDetails
 pub struct BulkAddVirtualCircuitPublicPrefixesDetailsRequired {
     /// The public IP prefixes (CIDRs) to add to the public virtual circuit.
@@ -21,15 +22,14 @@ impl BulkAddVirtualCircuitPublicPrefixesDetails {
     pub fn new(required: BulkAddVirtualCircuitPublicPrefixesDetailsRequired) -> Self {
         Self {
             public_prefixes: required.public_prefixes,
-        }
+}
     }
 
     /// Set public_prefixes
-    pub fn set_public_prefixes(
-        mut self,
-        value: Vec<CreateVirtualCircuitPublicPrefixDetails>,
-    ) -> Self {
+    pub fn set_public_prefixes(mut self, value: Vec<CreateVirtualCircuitPublicPrefixDetails>) -> Self {
         self.public_prefixes = value;
         self
     }
 }
+
+

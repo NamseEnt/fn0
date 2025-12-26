@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -59,6 +59,7 @@ pub struct SecurityRule {
     pub udp_options: Option<UdpOptions>,
 }
 
+
 /// Required fields for SecurityRule
 pub struct SecurityRuleRequired {
     /// Direction of the security rule. Set to {@code EGRESS} for rules to allow outbound IP packets, or {@code INGRESS} for rules to allow inbound IP packets.
@@ -99,7 +100,7 @@ impl SecurityRule {
             time_created: None,
 
             udp_options: None,
-        }
+}
     }
 
     /// Set description
@@ -258,3 +259,5 @@ impl SecurityRule {
         self
     }
 }
+
+

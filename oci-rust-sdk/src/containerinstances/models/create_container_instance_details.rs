@@ -60,6 +60,7 @@ pub struct CreateContainerInstanceDetails {
     pub defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
 }
 
+
 /// Required fields for CreateContainerInstanceDetails
 pub struct CreateContainerInstanceDetailsRequired {
     /// The compartment OCID.
@@ -113,7 +114,7 @@ impl CreateContainerInstanceDetails {
             freeform_tags: None,
 
             defined_tags: None,
-        }
+}
     }
 
     /// Set display_name
@@ -183,10 +184,7 @@ impl CreateContainerInstanceDetails {
     }
 
     /// Set image_pull_secrets
-    pub fn set_image_pull_secrets(
-        mut self,
-        value: Option<Vec<CreateImagePullSecretDetails>>,
-    ) -> Self {
+    pub fn set_image_pull_secrets(mut self, value: Option<Vec<CreateImagePullSecretDetails>>) -> Self {
         self.image_pull_secrets = value;
         self
     }
@@ -204,10 +202,7 @@ impl CreateContainerInstanceDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -261,11 +256,10 @@ impl CreateContainerInstanceDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 }
+
+

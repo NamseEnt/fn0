@@ -10,6 +10,7 @@ pub struct ConnectLocalPeeringGatewaysDetails {
     pub peer_id: String,
 }
 
+
 /// Required fields for ConnectLocalPeeringGatewaysDetails
 pub struct ConnectLocalPeeringGatewaysDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the LPG you want to peer with.
@@ -21,7 +22,7 @@ impl ConnectLocalPeeringGatewaysDetails {
     pub fn new(required: ConnectLocalPeeringGatewaysDetailsRequired) -> Self {
         Self {
             peer_id: required.peer_id,
-        }
+}
     }
 
     /// Set peer_id
@@ -30,3 +31,5 @@ impl ConnectLocalPeeringGatewaysDetails {
         self
     }
 }
+
+

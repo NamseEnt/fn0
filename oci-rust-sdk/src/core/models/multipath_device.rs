@@ -17,6 +17,7 @@ pub struct MultipathDevice {
     pub port: Option<i64>,
 }
 
+
 /// Required fields for MultipathDevice
 pub struct MultipathDeviceRequired {
     /// The volume's iSCSI IP address. <p> Example: {@code 169.254.2.2}
@@ -35,7 +36,7 @@ impl MultipathDevice {
             iqn: required.iqn,
 
             port: None,
-        }
+}
     }
 
     /// Set ipv4
@@ -62,3 +63,5 @@ impl MultipathDevice {
         self
     }
 }
+
+

@@ -13,6 +13,7 @@ pub struct VirtualCircuitPublicPrefix {
     pub verification_state: VirtualCircuitPublicPrefixVerificationState,
 }
 
+
 /// Required fields for VirtualCircuitPublicPrefix
 pub struct VirtualCircuitPublicPrefixRequired {
     /// Publix IP prefix (CIDR) that the customer specified.
@@ -29,7 +30,7 @@ impl VirtualCircuitPublicPrefix {
             cidr_block: required.cidr_block,
 
             verification_state: required.verification_state,
-        }
+}
     }
 
     /// Set cidr_block
@@ -39,11 +40,10 @@ impl VirtualCircuitPublicPrefix {
     }
 
     /// Set verification_state
-    pub fn set_verification_state(
-        mut self,
-        value: VirtualCircuitPublicPrefixVerificationState,
-    ) -> Self {
+    pub fn set_verification_state(mut self, value: VirtualCircuitPublicPrefixVerificationState) -> Self {
         self.verification_state = value;
         self
     }
 }
+
+

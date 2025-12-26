@@ -9,6 +9,7 @@ pub struct InstanceSourceDetails {
     pub source_type: String,
 }
 
+
 /// Required fields for InstanceSourceDetails
 pub struct InstanceSourceDetailsRequired {
     pub source_type: String,
@@ -19,7 +20,7 @@ impl InstanceSourceDetails {
     pub fn new(required: InstanceSourceDetailsRequired) -> Self {
         Self {
             source_type: required.source_type,
-        }
+}
     }
 
     /// Set source_type
@@ -28,3 +29,5 @@ impl InstanceSourceDetails {
         self
     }
 }
+
+

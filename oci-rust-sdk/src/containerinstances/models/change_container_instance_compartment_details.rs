@@ -10,6 +10,7 @@ pub struct ChangeContainerInstanceCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeContainerInstanceCompartmentDetails
 pub struct ChangeContainerInstanceCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the container instance to.
@@ -21,7 +22,7 @@ impl ChangeContainerInstanceCompartmentDetails {
     pub fn new(required: ChangeContainerInstanceCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeContainerInstanceCompartmentDetails {
         self
     }
 }
+
+

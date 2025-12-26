@@ -56,10 +56,7 @@ impl TunnelSecurityAssociationSummary {
     }
 
     /// Set tunnel_sa_status
-    pub fn set_tunnel_sa_status(
-        mut self,
-        value: Option<TunnelSecurityAssociationSummaryTunnelSaStatus>,
-    ) -> Self {
+    pub fn set_tunnel_sa_status(mut self, value: Option<TunnelSecurityAssociationSummaryTunnelSaStatus>) -> Self {
         self.tunnel_sa_status = value;
         self
     }
@@ -89,10 +86,7 @@ impl TunnelSecurityAssociationSummary {
     }
 
     /// Set tunnel_sa_status (unwraps Option)
-    pub fn with_tunnel_sa_status(
-        mut self,
-        value: TunnelSecurityAssociationSummaryTunnelSaStatus,
-    ) -> Self {
+    pub fn with_tunnel_sa_status(mut self, value: TunnelSecurityAssociationSummaryTunnelSaStatus) -> Self {
         self.tunnel_sa_status = Some(value);
         self
     }
@@ -115,3 +109,4 @@ impl Default for TunnelSecurityAssociationSummary {
         Self::new()
     }
 }
+

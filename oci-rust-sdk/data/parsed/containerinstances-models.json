@@ -1,0 +1,4426 @@
+[
+  {
+    "name": "ActionType",
+    "fileName": "action_type",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nPossible types of actions.",
+    "variants": [
+      {
+        "name": "Created",
+        "value": "CREATED"
+      },
+      {
+        "name": "Updated",
+        "value": "UPDATED"
+      },
+      {
+        "name": "Deleted",
+        "value": "DELETED"
+      },
+      {
+        "name": "InProgress",
+        "value": "IN_PROGRESS"
+      },
+      {
+        "name": "Related",
+        "value": "RELATED"
+      },
+      {
+        "name": "Failed",
+        "value": "FAILED"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "BasicImagePullSecret",
+    "fileName": "basic_image_pull_secret",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA BasicImagePullSecret is a ImagePullSecret which accepts username and password as credentials information.\n",
+    "fields": [
+      {
+        "name": "secretType",
+        "rustName": "secret_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.ImagePullSecret"
+  },
+  {
+    "name": "ChangeContainerInstanceCompartmentDetails",
+    "fileName": "change_container_instance_compartment_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe configuration details for the move operation.",
+    "fields": [
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the container instance to."
+      }
+    ],
+    "discriminator": "compartmentId"
+  },
+  {
+    "name": "ContainerCapabilities",
+    "fileName": "container_capabilities",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nLinux Container capabilities to configure capabilities of container.\n",
+    "fields": [
+      {
+        "name": "addCapabilities",
+        "rustName": "add_capabilities",
+        "tsType": "Array<ContainerCapabilitiesAddCapabilities>",
+        "isRequired": false,
+        "documentation": "A list of additional configurable container capabilities."
+      },
+      {
+        "name": "dropCapabilities",
+        "rustName": "drop_capabilities",
+        "tsType": "Array<ContainerCapabilitiesDropCapabilities>",
+        "isRequired": false,
+        "documentation": "A list of container capabilities that can be dropped."
+      }
+    ]
+  },
+  {
+    "name": "ContainerCapabilitiesAddCapabilities",
+    "fileName": "container_capabilities_add_capabilities",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "CapChown",
+        "value": "CAP_CHOWN"
+      },
+      {
+        "name": "CapDacOverride",
+        "value": "CAP_DAC_OVERRIDE"
+      },
+      {
+        "name": "CapFsetid",
+        "value": "CAP_FSETID"
+      },
+      {
+        "name": "CapFowner",
+        "value": "CAP_FOWNER"
+      },
+      {
+        "name": "CapMknod",
+        "value": "CAP_MKNOD"
+      },
+      {
+        "name": "CapNetRaw",
+        "value": "CAP_NET_RAW"
+      },
+      {
+        "name": "CapSetgid",
+        "value": "CAP_SETGID"
+      },
+      {
+        "name": "CapSetuid",
+        "value": "CAP_SETUID"
+      },
+      {
+        "name": "CapSetfcap",
+        "value": "CAP_SETFCAP"
+      },
+      {
+        "name": "CapSetpcap",
+        "value": "CAP_SETPCAP"
+      },
+      {
+        "name": "CapNetBindService",
+        "value": "CAP_NET_BIND_SERVICE"
+      },
+      {
+        "name": "CapSysChroot",
+        "value": "CAP_SYS_CHROOT"
+      },
+      {
+        "name": "CapKill",
+        "value": "CAP_KILL"
+      },
+      {
+        "name": "CapAuditWrite",
+        "value": "CAP_AUDIT_WRITE"
+      },
+      {
+        "name": "All",
+        "value": "ALL"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerCapabilitiesDropCapabilities",
+    "fileName": "container_capabilities_drop_capabilities",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "CapChown",
+        "value": "CAP_CHOWN"
+      },
+      {
+        "name": "CapDacOverride",
+        "value": "CAP_DAC_OVERRIDE"
+      },
+      {
+        "name": "CapFsetid",
+        "value": "CAP_FSETID"
+      },
+      {
+        "name": "CapFowner",
+        "value": "CAP_FOWNER"
+      },
+      {
+        "name": "CapMknod",
+        "value": "CAP_MKNOD"
+      },
+      {
+        "name": "CapNetRaw",
+        "value": "CAP_NET_RAW"
+      },
+      {
+        "name": "CapSetgid",
+        "value": "CAP_SETGID"
+      },
+      {
+        "name": "CapSetuid",
+        "value": "CAP_SETUID"
+      },
+      {
+        "name": "CapSetfcap",
+        "value": "CAP_SETFCAP"
+      },
+      {
+        "name": "CapSetpcap",
+        "value": "CAP_SETPCAP"
+      },
+      {
+        "name": "CapNetBindService",
+        "value": "CAP_NET_BIND_SERVICE"
+      },
+      {
+        "name": "CapSysChroot",
+        "value": "CAP_SYS_CHROOT"
+      },
+      {
+        "name": "CapKill",
+        "value": "CAP_KILL"
+      },
+      {
+        "name": "CapAuditWrite",
+        "value": "CAP_AUDIT_WRITE"
+      },
+      {
+        "name": "All",
+        "value": "ALL"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerCapabilityType",
+    "fileName": "container_capability_type",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nTypes of container capability.",
+    "variants": [
+      {
+        "name": "CapChown",
+        "value": "CAP_CHOWN"
+      },
+      {
+        "name": "CapDacOverride",
+        "value": "CAP_DAC_OVERRIDE"
+      },
+      {
+        "name": "CapFsetid",
+        "value": "CAP_FSETID"
+      },
+      {
+        "name": "CapFowner",
+        "value": "CAP_FOWNER"
+      },
+      {
+        "name": "CapMknod",
+        "value": "CAP_MKNOD"
+      },
+      {
+        "name": "CapNetRaw",
+        "value": "CAP_NET_RAW"
+      },
+      {
+        "name": "CapSetgid",
+        "value": "CAP_SETGID"
+      },
+      {
+        "name": "CapSetuid",
+        "value": "CAP_SETUID"
+      },
+      {
+        "name": "CapSetfcap",
+        "value": "CAP_SETFCAP"
+      },
+      {
+        "name": "CapSetpcap",
+        "value": "CAP_SETPCAP"
+      },
+      {
+        "name": "CapNetBindService",
+        "value": "CAP_NET_BIND_SERVICE"
+      },
+      {
+        "name": "CapSysChroot",
+        "value": "CAP_SYS_CHROOT"
+      },
+      {
+        "name": "CapKill",
+        "value": "CAP_KILL"
+      },
+      {
+        "name": "CapAuditWrite",
+        "value": "CAP_AUDIT_WRITE"
+      },
+      {
+        "name": "All",
+        "value": "ALL"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerCapability",
+    "fileName": "container_capability",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nAdditional configurable container capabilities.",
+    "variants": [
+      {
+        "name": "CapNetAdmin",
+        "value": "CAP_NET_ADMIN"
+      },
+      {
+        "name": "CapNetRaw",
+        "value": "CAP_NET_RAW"
+      }
+    ]
+  },
+  {
+    "name": "ContainerCollection",
+    "fileName": "container_collection",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA list of containers.\n",
+    "fields": [
+      {
+        "name": "items",
+        "rustName": "items",
+        "tsType": "Array<ContainerSummary>",
+        "isRequired": true,
+        "documentation": "List of containers."
+      }
+    ]
+  },
+  {
+    "name": "ContainerConfigFileVolume",
+    "fileName": "container_config_file_volume",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe volume based on configuration files received during container creation.\n",
+    "fields": [
+      {
+        "name": "configs",
+        "rustName": "configs",
+        "tsType": "Array<ContainerConfigFile>",
+        "isRequired": false,
+        "documentation": "Contains string key value pairs which can be mounted as individual files inside the container. The value needs to be base64 encoded. It is decoded to plain text before the mount."
+      },
+      {
+        "name": "volumeType",
+        "rustName": "volume_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.ContainerVolume"
+  },
+  {
+    "name": "ContainerConfigFile",
+    "fileName": "container_config_file",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe file that is mounted on a container instance through a volume mount.\n",
+    "fields": [
+      {
+        "name": "fileName",
+        "rustName": "file_name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The name of the file. The fileName should be unique across the volume."
+      },
+      {
+        "name": "data",
+        "rustName": "data",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The base64 encoded contents of the file. The contents are decoded to plain text before mounted as a file to a container inside container instance."
+      },
+      {
+        "name": "path",
+        "rustName": "path",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "(Optional) Relative path for this file inside the volume mount directory. By default, the file is presented at the root of the volume mount path."
+      }
+    ]
+  },
+  {
+    "name": "ContainerDnsConfig",
+    "fileName": "container_dns_config",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nDNS settings for containers.",
+    "fields": [
+      {
+        "name": "nameservers",
+        "rustName": "nameservers",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "IP address of the name server.."
+      },
+      {
+        "name": "searches",
+        "rustName": "searches",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "Search list for hostname lookup."
+      },
+      {
+        "name": "options",
+        "rustName": "options",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "Options allows certain internal resolver variables to be modified."
+      }
+    ]
+  },
+  {
+    "name": "ContainerEmptyDirVolume",
+    "fileName": "container_empty_dir_volume",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe empty directory volume of a container instance. You can create up to 64 EmptyDir per container instance.",
+    "fields": [
+      {
+        "name": "backingStore",
+        "rustName": "backing_store",
+        "tsType": "ContainerEmptyDirVolumeBackingStore",
+        "isRequired": false,
+        "documentation": "The volume type of the empty directory, can be either File Storage or Memory."
+      },
+      {
+        "name": "volumeType",
+        "rustName": "volume_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.ContainerVolume"
+  },
+  {
+    "name": "ContainerEmptyDirVolumeBackingStore",
+    "fileName": "container_empty_dir_volume_backing_store",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "EphemeralStorage",
+        "value": "EPHEMERAL_STORAGE"
+      },
+      {
+        "name": "Memory",
+        "value": "MEMORY"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerHealthCheckFailureAction",
+    "fileName": "container_health_check_failure_action",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nThe failure action will be taken on behalf of container instance status.",
+    "variants": [
+      {
+        "name": "Kill",
+        "value": "KILL"
+      },
+      {
+        "name": "None",
+        "value": "NONE"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerHealthCheckType",
+    "fileName": "container_health_check_type",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nThe container health check type.",
+    "variants": [
+      {
+        "name": "Http",
+        "value": "HTTP"
+      },
+      {
+        "name": "Tcp",
+        "value": "TCP"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerHealthCheck",
+    "fileName": "container_health_check",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nType of container health check which could be either HTTP, TCP, or Command.",
+    "fields": [
+      {
+        "name": "name",
+        "rustName": "name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Health check name."
+      },
+      {
+        "name": "initialDelayInSeconds",
+        "rustName": "initial_delay_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The initial delay in seconds before start checking container health status. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "intervalInSeconds",
+        "rustName": "interval_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Number of seconds between two consecutive runs for checking container health. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "failureThreshold",
+        "rustName": "failure_threshold",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Number of consecutive failures at which we consider the check failed. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "successThreshold",
+        "rustName": "success_threshold",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Number of consecutive successes at which we consider the check succeeded again after it was in failure state. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "timeoutInSeconds",
+        "rustName": "timeout_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Length of waiting time in seconds before marking health check failed. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "status",
+        "rustName": "status",
+        "tsType": "ContainerHealthCheckStatus",
+        "isRequired": false,
+        "documentation": "Status of container"
+      },
+      {
+        "name": "statusDetails",
+        "rustName": "status_details",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A message describing the current status in more details."
+      },
+      {
+        "name": "failureAction",
+        "rustName": "failure_action",
+        "tsType": "ContainerHealthCheckFailureAction",
+        "isRequired": false,
+        "documentation": "The action will be triggered when the container health check fails. There are two types of action: KILL or NONE. The default\naction is KILL. If failure action is KILL, the container will be subject to the container restart policy."
+      },
+      {
+        "name": "healthCheckType",
+        "rustName": "health_check_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "ContainerHealthCheckStatus",
+    "fileName": "container_health_check_status",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "Healthy",
+        "value": "HEALTHY"
+      },
+      {
+        "name": "Unhealthy",
+        "value": "UNHEALTHY"
+      },
+      {
+        "name": "Unknown",
+        "value": "UNKNOWN"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerHttpHealthCheck",
+    "fileName": "container_http_health_check",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nContainer Health Check HTTP type.",
+    "fields": [
+      {
+        "name": "path",
+        "rustName": "path",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Container health check HTTP path."
+      },
+      {
+        "name": "port",
+        "rustName": "port",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "Container health check HTTP port. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "headers",
+        "rustName": "headers",
+        "tsType": "Array<HealthCheckHttpHeader>",
+        "isRequired": false,
+        "documentation": "Container health check HTTP headers."
+      },
+      {
+        "name": "healthCheckType",
+        "rustName": "health_check_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.ContainerHealthCheck"
+  },
+  {
+    "name": "ContainerInstanceCollection",
+    "fileName": "container_instance_collection",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nSummary information about a list of container instances.",
+    "fields": [
+      {
+        "name": "items",
+        "rustName": "items",
+        "tsType": "Array<ContainerInstanceSummary>",
+        "isRequired": true,
+        "documentation": "List of container instances."
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstanceContainer",
+    "fileName": "container_instance_container",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA container on a container instance.\n",
+    "fields": [
+      {
+        "name": "containerId",
+        "rustName": "container_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the container."
+      },
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Display name for the Container."
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstanceShapeCollection",
+    "fileName": "container_instance_shape_collection",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA collection of container instance shapes.",
+    "fields": [
+      {
+        "name": "items",
+        "rustName": "items",
+        "tsType": "Array<ContainerInstanceShapeSummary>",
+        "isRequired": true,
+        "documentation": "A list of shapes."
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstanceShapeConfig",
+    "fileName": "container_instance_shape_config",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe shape configuration for a container instance. The shape configuration determines\nthe resources thats are available to the container instance and its containers.\n",
+    "fields": [
+      {
+        "name": "ocpus",
+        "rustName": "ocpus",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The total number of OCPUs available to the container instance.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "memoryInGBs",
+        "rustName": "memory_in_gbs",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The total amount of memory available to the container instance, in gigabytes.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "processorDescription",
+        "rustName": "processor_description",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A short description of the container instance's processor (CPU)."
+      },
+      {
+        "name": "networkingBandwidthInGbps",
+        "rustName": "networking_bandwidth_in_gbps",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The networking bandwidth available to the container instance, in gigabits per second.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstanceShapeSummary",
+    "fileName": "container_instance_shape_summary",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nDetails about a shape for a container instance.\n",
+    "fields": [
+      {
+        "name": "name",
+        "rustName": "name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The name identifying the shape."
+      },
+      {
+        "name": "processorDescription",
+        "rustName": "processor_description",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A short description of the container instance's processor (CPU)."
+      },
+      {
+        "name": "ocpuOptions",
+        "rustName": "ocpu_options",
+        "tsType": "ShapeOcpuOptions",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "memoryOptions",
+        "rustName": "memory_options",
+        "tsType": "ShapeMemoryOptions",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "networkingBandwidthOptions",
+        "rustName": "networking_bandwidth_options",
+        "tsType": "ShapeNetworkingBandwidthOptions",
+        "isRequired": false,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstanceSummary",
+    "fileName": "container_instance_summary",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA set of details about a single container instance returned by list APIs.\n",
+    "fields": [
+      {
+        "name": "id",
+        "rustName": "id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "OCID that cannot be changed."
+      },
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information."
+      },
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the compartment to create the container instance in."
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      },
+      {
+        "name": "systemTags",
+        "rustName": "system_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Usage of system tag keys. These predefined keys are scoped to namespaces.\nExample: {@code {\\\"orcl-cloud\\\": {\\\"free-tier-retained\\\": \\\"true\\\"}}}."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The availability domain where the container instance runs."
+      },
+      {
+        "name": "faultDomain",
+        "rustName": "fault_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The fault domain where the container instance runs."
+      },
+      {
+        "name": "lifecycleState",
+        "rustName": "lifecycle_state",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The current state of the container instance."
+      },
+      {
+        "name": "lifecycleDetails",
+        "rustName": "lifecycle_details",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A message that describes the current state of the container instance in more detail. Can be used to provide\nactionable information."
+      },
+      {
+        "name": "timeCreated",
+        "rustName": "time_created",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The time the container instance was created, in the format defined by RFC3339."
+      },
+      {
+        "name": "timeUpdated",
+        "rustName": "time_updated",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The time the container instance was updated, in the format defined by RFC3339."
+      },
+      {
+        "name": "shape",
+        "rustName": "shape",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The shape of the container instance. The shape determines the resources available to the container instance."
+      },
+      {
+        "name": "shapeConfig",
+        "rustName": "shape_config",
+        "tsType": "ContainerInstanceShapeConfig",
+        "isRequired": true,
+        "documentation": ""
+      },
+      {
+        "name": "containerCount",
+        "rustName": "container_count",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The number of containers in the container instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "gracefulShutdownTimeoutInSeconds",
+        "rustName": "graceful_shutdown_timeout_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The amount of time that processes in a container have to gracefully end when the container must be stopped. For example, when you delete a container instance. After the timeout is reached, the processes are sent a signal to be deleted. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "volumeCount",
+        "rustName": "volume_count",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The number of volumes that are attached to the container instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "containerRestartPolicy",
+        "rustName": "container_restart_policy",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Container Restart Policy"
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstance",
+    "fileName": "container_instance",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA container instance to host containers.\n<p>\nIf you delete a container instance, the record remains visible for a short period\nof time before being permanently removed.\n",
+    "fields": [
+      {
+        "name": "id",
+        "rustName": "id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "An OCID that cannot be changed."
+      },
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information."
+      },
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the compartment."
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      },
+      {
+        "name": "systemTags",
+        "rustName": "system_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Usage of system tag keys. These predefined keys are scoped to namespaces.\nExample: {@code {\\\"orcl-cloud\\\": {\\\"free-tier-retained\\\": \\\"true\\\"}}}."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The availability domain to place the container instance."
+      },
+      {
+        "name": "faultDomain",
+        "rustName": "fault_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The fault domain to place the container instance."
+      },
+      {
+        "name": "lifecycleState",
+        "rustName": "lifecycle_state",
+        "tsType": "ContainerInstanceLifecycleState",
+        "isRequired": true,
+        "documentation": "The current state of the container instance."
+      },
+      {
+        "name": "lifecycleDetails",
+        "rustName": "lifecycle_details",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A message that describes the current state of the container in more detail. Can be used to provide\nactionable information."
+      },
+      {
+        "name": "volumes",
+        "rustName": "volumes",
+        "tsType": "Array<ContainerVolume>",
+        "isRequired": false,
+        "documentation": "A volume is a directory with data that is accessible across multiple containers in a\ncontainer instance."
+      },
+      {
+        "name": "volumeCount",
+        "rustName": "volume_count",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The number of volumes that are attached to the container instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "containers",
+        "rustName": "containers",
+        "tsType": "Array<ContainerInstanceContainer>",
+        "isRequired": true,
+        "documentation": "The containers on the container instance."
+      },
+      {
+        "name": "containerCount",
+        "rustName": "container_count",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The number of containers on the container instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "timeCreated",
+        "rustName": "time_created",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The time the container instance was created, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      },
+      {
+        "name": "timeUpdated",
+        "rustName": "time_updated",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The time the container instance was updated, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      },
+      {
+        "name": "shape",
+        "rustName": "shape",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The shape of the container instance. The shape determines the number of OCPUs, amount of memory, and other resources that are allocated to a container instance."
+      },
+      {
+        "name": "shapeConfig",
+        "rustName": "shape_config",
+        "tsType": "ContainerInstanceShapeConfig",
+        "isRequired": true,
+        "documentation": ""
+      },
+      {
+        "name": "vnics",
+        "rustName": "vnics",
+        "tsType": "Array<ContainerVnic>",
+        "isRequired": true,
+        "documentation": "The virtual networks available to the containers in the container instance."
+      },
+      {
+        "name": "dnsConfig",
+        "rustName": "dns_config",
+        "tsType": "ContainerDnsConfig",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "gracefulShutdownTimeoutInSeconds",
+        "rustName": "graceful_shutdown_timeout_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The amount of time that processes in a container have to gracefully end when the container must be stopped. For example, when you delete a container instance. After the timeout is reached, the processes are sent a signal to be deleted. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "imagePullSecrets",
+        "rustName": "image_pull_secrets",
+        "tsType": "Array<ImagePullSecret>",
+        "isRequired": false,
+        "documentation": "The image pulls secrets so you can access private registry to pull container images."
+      },
+      {
+        "name": "containerRestartPolicy",
+        "rustName": "container_restart_policy",
+        "tsType": "ContainerInstanceContainerRestartPolicy",
+        "isRequired": true,
+        "documentation": "The container restart policy is applied for all containers in container instance."
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstanceLifecycleState",
+    "fileName": "container_instance_lifecycle_state",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "Creating",
+        "value": "CREATING"
+      },
+      {
+        "name": "Updating",
+        "value": "UPDATING"
+      },
+      {
+        "name": "Active",
+        "value": "ACTIVE"
+      },
+      {
+        "name": "Inactive",
+        "value": "INACTIVE"
+      },
+      {
+        "name": "Deleting",
+        "value": "DELETING"
+      },
+      {
+        "name": "Deleted",
+        "value": "DELETED"
+      },
+      {
+        "name": "Failed",
+        "value": "FAILED"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerInstanceContainerRestartPolicy",
+    "fileName": "container_instance_container_restart_policy",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "Always",
+        "value": "ALWAYS"
+      },
+      {
+        "name": "Never",
+        "value": "NEVER"
+      },
+      {
+        "name": "OnFailure",
+        "value": "ON_FAILURE"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerResourceConfig",
+    "fileName": "container_resource_config",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe resource configuration for a container. The resource configuration determines\nthe amount of resources allocated to the container and the maximum allowed resources for a container.\n",
+    "fields": [
+      {
+        "name": "vcpusLimit",
+        "rustName": "vcpus_limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The maximum amount of CPUs that can be consumed by the container's process.\n<p>\nIf you do not set a value, then the process\nmay use all available CPU resources on the container instance.\n<p>\nCPU usage is defined in terms of logical CPUs. This means that the\nmaximum possible value on an E3 ContainerInstance with 1 OCPU is 2.0.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "memoryLimitInGBs",
+        "rustName": "memory_limit_in_gbs",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The maximum amount of memory that can be consumed by the container's\nprocess. If you do not set a value, then the process\nmay use all available memory on the instance.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "ContainerSummary",
+    "fileName": "container_summary",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nSummary information about a container.\n",
+    "fields": [
+      {
+        "name": "id",
+        "rustName": "id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container."
+      },
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information."
+      },
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The compartment [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm)."
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      },
+      {
+        "name": "systemTags",
+        "rustName": "system_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Usage of system tag keys. These predefined keys are scoped to namespaces.\nExample: {@code {\\\"orcl-cloud\\\": {\\\"free-tier-retained\\\": \\\"true\\\"}}}."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The availability domain where the container instance that hosts this container runs."
+      },
+      {
+        "name": "faultDomain",
+        "rustName": "fault_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The fault domain where the container instance that hosts the container runs."
+      },
+      {
+        "name": "lifecycleState",
+        "rustName": "lifecycle_state",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The current state of the container."
+      },
+      {
+        "name": "lifecycleDetails",
+        "rustName": "lifecycle_details",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A message that describes the current state of the container in more detail. Can be used to provide\nactionable information."
+      },
+      {
+        "name": "timeCreated",
+        "rustName": "time_created",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The time the the container was created in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      },
+      {
+        "name": "timeUpdated",
+        "rustName": "time_updated",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The time the container was updated in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      },
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance on which the container is running."
+      },
+      {
+        "name": "resourceConfig",
+        "rustName": "resource_config",
+        "tsType": "ContainerResourceConfig",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "imageUrl",
+        "rustName": "image_url",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A URL identifying the image that the container runs in, such as docker.io/library/busybox:latest. If you do not provide a tag, the tag will default to latest.\n<p>\nIf no registry is provided, will default the registry to public docker hub {@code docker.io/library}.\nThe registry used for container image must be reachable over the Container Instance's VNIC."
+      },
+      {
+        "name": "isResourcePrincipalDisabled",
+        "rustName": "is_resource_principal_disabled",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Determines whether the container will have access to the container instance resource principal.\n<p>\nThis method utilizes resource principal version 2.2. For information on how to use the exposed resource principal elements, see\nhttps://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdk_authentication_methods.htm#sdk_authentication_methods_resource_principal."
+      },
+      {
+        "name": "securityContext",
+        "rustName": "security_context",
+        "tsType": "LinuxSecurityContext",
+        "isRequired": false,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "ContainerTcpHealthCheck",
+    "fileName": "container_tcp_health_check",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nContainer Health Check with TCP type.",
+    "fields": [
+      {
+        "name": "port",
+        "rustName": "port",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "Container health check port. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "healthCheckType",
+        "rustName": "health_check_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.ContainerHealthCheck"
+  },
+  {
+    "name": "ContainerVnic",
+    "fileName": "container_vnic",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nAn interface to a virtual network available to containers on a container instance.\n",
+    "fields": [
+      {
+        "name": "vnicId",
+        "rustName": "vnic_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The identifier of the virtual network interface card (VNIC) over which\nthe containers accessing this network can communicate with the\nlarger virtual cloud network."
+      }
+    ],
+    "discriminator": "vnicId"
+  },
+  {
+    "name": "ContainerVolumeType",
+    "fileName": "container_volume_type",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nContainer Volume Type",
+    "variants": [
+      {
+        "name": "Emptydir",
+        "value": "EMPTYDIR"
+      },
+      {
+        "name": "Configfile",
+        "value": "CONFIGFILE"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "ContainerVolume",
+    "fileName": "container_volume",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA volume represents a directory with data that is accessible across multiple containers in a\ncontainer instance.\n",
+    "fields": [
+      {
+        "name": "name",
+        "rustName": "name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The name of the volume. This must be unique within a single container instance."
+      },
+      {
+        "name": "volumeType",
+        "rustName": "volume_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "Container",
+    "fileName": "container",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA single container on a container instance.\n<p>\nIf you delete a container, the record remains visible for a short period\nof time before being permanently removed.\n",
+    "fields": [
+      {
+        "name": "id",
+        "rustName": "id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container."
+      },
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information."
+      },
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the compartment that contains the container."
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      },
+      {
+        "name": "systemTags",
+        "rustName": "system_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Usage of system tag keys. These predefined keys are scoped to namespaces.\nExample: {@code {\\\"orcl-cloud\\\": {\\\"free-tier-retained\\\": \\\"true\\\"}}}."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The availability domain where the container instance that hosts the container runs."
+      },
+      {
+        "name": "faultDomain",
+        "rustName": "fault_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The fault domain of the container instance that hosts the container runs."
+      },
+      {
+        "name": "lifecycleState",
+        "rustName": "lifecycle_state",
+        "tsType": "ContainerLifecycleState",
+        "isRequired": true,
+        "documentation": "The current state of the container."
+      },
+      {
+        "name": "lifecycleDetails",
+        "rustName": "lifecycle_details",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A message that describes the current state of the container in more detail. Can be used to provide\nactionable information."
+      },
+      {
+        "name": "exitCode",
+        "rustName": "exit_code",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The exit code of the container process when it stopped running. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "timeTerminated",
+        "rustName": "time_terminated",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The time when the container last deleted (terminated), in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      },
+      {
+        "name": "timeCreated",
+        "rustName": "time_created",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The time the container was created, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      },
+      {
+        "name": "timeUpdated",
+        "rustName": "time_updated",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The time the container was updated, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      },
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance that the container is running on."
+      },
+      {
+        "name": "imageUrl",
+        "rustName": "image_url",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The container image information. Currently only supports public Docker registry.\n<p>\nYou can provide either the image name (containerImage), image name with version (containerImagev1), or complete Docker image URL\n{@code docker.io/library/containerImage:latest}.\n<p>\nIf you do not provide a registry, the registry defaults to public Docker hub {@code docker.io/library}.\nThe registry used for the container image must be reachable over the VNIC of the container instance."
+      },
+      {
+        "name": "command",
+        "rustName": "command",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "This command overrides ENTRYPOINT process of the container.\nIf you do not specify this command, the existing ENTRYPOINT process defined in the image is the default."
+      },
+      {
+        "name": "arguments",
+        "rustName": "arguments",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "A list of string arguments for the ENTRYPOINT process of the container.\n<p>\nMany containers use an ENTRYPOINT process pointing to a shell\n{@code /bin/bash}. For those containers, you can use the argument list to specify the main command in the container process."
+      },
+      {
+        "name": "workingDirectory",
+        "rustName": "working_directory",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The working directory within the container's filesystem for\nthe container process. If not specified, the default\nworking directory from the image is used."
+      },
+      {
+        "name": "environmentVariables",
+        "rustName": "environment_variables",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "A map of additional environment variables to set in the environment of the\nENTRYPOINT process of the container. These variables are in addition to any variables already defined\nin the container's image."
+      },
+      {
+        "name": "volumeMounts",
+        "rustName": "volume_mounts",
+        "tsType": "Array<VolumeMount>",
+        "isRequired": false,
+        "documentation": "List of the volume mounts."
+      },
+      {
+        "name": "healthChecks",
+        "rustName": "health_checks",
+        "tsType": "Array<ContainerHealthCheck>",
+        "isRequired": false,
+        "documentation": "List of container health checks"
+      },
+      {
+        "name": "isResourcePrincipalDisabled",
+        "rustName": "is_resource_principal_disabled",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Determines if the container will have access to the container instance resource principal.\n<p>\nThis method utilizes resource principal version 2.2. For more information on how to use the exposed resource principal elements, see\nhttps://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdk_authentication_methods.htm#sdk_authentication_methods_resource_principal."
+      },
+      {
+        "name": "resourceConfig",
+        "rustName": "resource_config",
+        "tsType": "ContainerResourceConfig",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "containerRestartAttemptCount",
+        "rustName": "container_restart_attempt_count",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The number of container restart attempts. Depending on the restart policy, a restart might be attempted after a health check failure or a container exit. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "securityContext",
+        "rustName": "security_context",
+        "tsType": "LinuxSecurityContext",
+        "isRequired": false,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "ContainerLifecycleState",
+    "fileName": "container_lifecycle_state",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "Creating",
+        "value": "CREATING"
+      },
+      {
+        "name": "Updating",
+        "value": "UPDATING"
+      },
+      {
+        "name": "Active",
+        "value": "ACTIVE"
+      },
+      {
+        "name": "Inactive",
+        "value": "INACTIVE"
+      },
+      {
+        "name": "Deleting",
+        "value": "DELETING"
+      },
+      {
+        "name": "Deleted",
+        "value": "DELETED"
+      },
+      {
+        "name": "Failed",
+        "value": "FAILED"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "CreateBasicImagePullSecretDetails",
+    "fileName": "create_basic_image_pull_secret_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA CreateBasicImagePullSecretDetails is a ImagePullSecret which accepts username and password as credentials information.\n",
+    "fields": [
+      {
+        "name": "username",
+        "rustName": "username",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The username which should be used with the registry for authentication. The value is expected in base64 format."
+      },
+      {
+        "name": "password",
+        "rustName": "password",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The password which should be used with the registry for authentication. The value is expected in base64 format."
+      },
+      {
+        "name": "secretType",
+        "rustName": "secret_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.CreateImagePullSecretDetails"
+  },
+  {
+    "name": "CreateContainerConfigFileVolumeDetails",
+    "fileName": "create_container_config_file_volume_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe configuration files to pass to the container using volume mounts.\n",
+    "fields": [
+      {
+        "name": "configs",
+        "rustName": "configs",
+        "tsType": "Array<ContainerConfigFile>",
+        "isRequired": false,
+        "documentation": "Contains key value pairs which can be mounted as individual files inside the container. The value needs to be base64 encoded. It is decoded to plain text before the mount."
+      },
+      {
+        "name": "volumeType",
+        "rustName": "volume_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.CreateContainerVolumeDetails"
+  },
+  {
+    "name": "CreateContainerDetails",
+    "fileName": "create_container_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nInformation to create a new container within a container instance.\n<p>\nThe container created by this call contains both the tags specified\nin this object and any tags specified in the parent container instance.\n<p>\nThe container is created in the same compartment, availability domain,\nand fault domain as its container instance.\n",
+    "fields": [
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information.\nIf you don't provide a name, a name is generated automatically."
+      },
+      {
+        "name": "imageUrl",
+        "rustName": "image_url",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A URL identifying the image that the container runs in, such as docker.io/library/busybox:latest. If you do not provide a tag, the tag will default to latest.\n<p>\nIf no registry is provided, will default the registry to public docker hub {@code docker.io/library}.\n<p>\nThe registry used for container image must be reachable over the Container Instance's VNIC."
+      },
+      {
+        "name": "command",
+        "rustName": "command",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "An optional command that overrides the ENTRYPOINT process.\nIf you do not provide a value, the existing ENTRYPOINT process defined in the image is used."
+      },
+      {
+        "name": "arguments",
+        "rustName": "arguments",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "A list of string arguments for a container's ENTRYPOINT process.\n<p>\nMany containers use an ENTRYPOINT process pointing to a shell\n(/bin/bash). For those containers, this argument list\nspecifies the main command in the container process.\n<p>\nThe total size of all arguments combined must be 64 KB or smaller."
+      },
+      {
+        "name": "workingDirectory",
+        "rustName": "working_directory",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The working directory within the container's filesystem for\nthe container process. If not specified, the default\nworking directory from the image is used."
+      },
+      {
+        "name": "environmentVariables",
+        "rustName": "environment_variables",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "A map of additional environment variables to set in the environment of the container's\nENTRYPOINT process. These variables are in addition to any variables already defined\nin the container's image.\n<p>\nThe total size of all environment variables combined, name and values, must be 64 KB or smaller."
+      },
+      {
+        "name": "volumeMounts",
+        "rustName": "volume_mounts",
+        "tsType": "Array<CreateVolumeMountDetails>",
+        "isRequired": false,
+        "documentation": "List of the volume mounts."
+      },
+      {
+        "name": "isResourcePrincipalDisabled",
+        "rustName": "is_resource_principal_disabled",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Determines if the container will have access to the container instance resource principal.\n<p>\nThis method utilizes resource principal version 2.2. For information on how to use the exposed resource principal elements, see\nhttps://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdk_authentication_methods.htm#sdk_authentication_methods_resource_principal."
+      },
+      {
+        "name": "resourceConfig",
+        "rustName": "resource_config",
+        "tsType": "CreateContainerResourceConfigDetails",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "healthChecks",
+        "rustName": "health_checks",
+        "tsType": "Array<CreateContainerHealthCheckDetails>",
+        "isRequired": false,
+        "documentation": "list of container health checks to check container status and take appropriate action if container status is failed.\nThere are two types of health checks that we currently support HTTP and TCP."
+      },
+      {
+        "name": "securityContext",
+        "rustName": "security_context",
+        "tsType": "CreateLinuxSecurityContextDetails",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerDnsConfigDetails",
+    "fileName": "create_container_dns_config_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nAllow customers to define DNS settings for containers. If this is not provided, the containers use\nthe default DNS settings of the subnet.\n",
+    "fields": [
+      {
+        "name": "nameservers",
+        "rustName": "nameservers",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "IP address of a name server that the resolver should query, either an IPv4 address\n(in dot notation), or an IPv6 address in colon (and possibly dot) notation. If null, uses\nnameservers from subnet dhcpDnsOptions."
+      },
+      {
+        "name": "searches",
+        "rustName": "searches",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "Search list for host-name lookup. If null, we will use searches from subnet dhcpDnsOptios."
+      },
+      {
+        "name": "options",
+        "rustName": "options",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "Options allows certain internal resolver variables to be modified. Options are a list of objects in\nhttps://man7.org/linux/man-pages/man5/resolv.conf.5.html. Examples: [\\\"ndots:n\\\", \\\"edns0\\\"]."
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerEmptyDirVolumeDetails",
+    "fileName": "create_container_empty_dir_volume_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe empty directory for the container instance.",
+    "fields": [
+      {
+        "name": "backingStore",
+        "rustName": "backing_store",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The volume type of the empty directory, can be either File Storage or Memory."
+      },
+      {
+        "name": "volumeType",
+        "rustName": "volume_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.CreateContainerVolumeDetails"
+  },
+  {
+    "name": "CreateContainerHealthCheckDetails",
+    "fileName": "create_container_health_check_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nContainer Health Check is used to check and report the status of a container.\n",
+    "fields": [
+      {
+        "name": "name",
+        "rustName": "name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Health check name."
+      },
+      {
+        "name": "initialDelayInSeconds",
+        "rustName": "initial_delay_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The initial delay in seconds before start checking container health status. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "intervalInSeconds",
+        "rustName": "interval_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Number of seconds between two consecutive runs for checking container health. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "failureThreshold",
+        "rustName": "failure_threshold",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Number of consecutive failures at which we consider the check failed. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "successThreshold",
+        "rustName": "success_threshold",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Number of consecutive successes at which we consider the check succeeded again after it was in failure state. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "timeoutInSeconds",
+        "rustName": "timeout_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "Length of waiting time in seconds before marking health check failed. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "failureAction",
+        "rustName": "failure_action",
+        "tsType": "ContainerHealthCheckFailureAction",
+        "isRequired": false,
+        "documentation": "The action will be triggered when the container health check fails. There are two types of action: KILL or NONE. The default\naction is KILL. If failure action is KILL, the container will be subject to the container restart policy."
+      },
+      {
+        "name": "healthCheckType",
+        "rustName": "health_check_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerHttpHealthCheckDetails",
+    "fileName": "create_container_http_health_check_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nContainer Health Check HTTP type.",
+    "fields": [
+      {
+        "name": "path",
+        "rustName": "path",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Container health check HTTP path."
+      },
+      {
+        "name": "port",
+        "rustName": "port",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "Container health check HTTP port. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "headers",
+        "rustName": "headers",
+        "tsType": "Array<HealthCheckHttpHeader>",
+        "isRequired": false,
+        "documentation": "Container health check HTTP headers."
+      },
+      {
+        "name": "healthCheckType",
+        "rustName": "health_check_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.CreateContainerHealthCheckDetails"
+  },
+  {
+    "name": "CreateContainerInstanceDetails",
+    "fileName": "create_container_instance_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nInformation to create a container instance.",
+    "fields": [
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information. If you don't provide a name, a name is generated automatically."
+      },
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The compartment OCID."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The availability domain where the container instance runs."
+      },
+      {
+        "name": "faultDomain",
+        "rustName": "fault_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The fault domain where the container instance runs."
+      },
+      {
+        "name": "shape",
+        "rustName": "shape",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The shape of the container instance. The shape determines the resources available to the container instance."
+      },
+      {
+        "name": "shapeConfig",
+        "rustName": "shape_config",
+        "tsType": "CreateContainerInstanceShapeConfigDetails",
+        "isRequired": true,
+        "documentation": ""
+      },
+      {
+        "name": "volumes",
+        "rustName": "volumes",
+        "tsType": "Array<CreateContainerVolumeDetails>",
+        "isRequired": false,
+        "documentation": "A volume is a directory with data that is accessible across multiple containers in a\ncontainer instance.\n<p>\nYou can attach up to 32 volumes to single container instance."
+      },
+      {
+        "name": "containers",
+        "rustName": "containers",
+        "tsType": "Array<CreateContainerDetails>",
+        "isRequired": true,
+        "documentation": "The containers to create on this container instance."
+      },
+      {
+        "name": "vnics",
+        "rustName": "vnics",
+        "tsType": "Array<CreateContainerVnicDetails>",
+        "isRequired": true,
+        "documentation": "The networks available to containers on this container instance."
+      },
+      {
+        "name": "dnsConfig",
+        "rustName": "dns_config",
+        "tsType": "CreateContainerDnsConfigDetails",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "gracefulShutdownTimeoutInSeconds",
+        "rustName": "graceful_shutdown_timeout_in_seconds",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The amount of time that processes in a container have to gracefully end when the container must be stopped. For example, when you delete a container instance. After the timeout is reached, the processes are sent a signal to be deleted. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "imagePullSecrets",
+        "rustName": "image_pull_secrets",
+        "tsType": "Array<CreateImagePullSecretDetails>",
+        "isRequired": false,
+        "documentation": "The image pulls secrets so you can access private registry to pull container images."
+      },
+      {
+        "name": "containerRestartPolicy",
+        "rustName": "container_restart_policy",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Container restart policy"
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerInstanceShapeConfigDetails",
+    "fileName": "create_container_instance_shape_config_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe size and amount of resources available to the container instance.\n",
+    "fields": [
+      {
+        "name": "ocpus",
+        "rustName": "ocpus",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The total number of OCPUs available to the container instance.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "memoryInGBs",
+        "rustName": "memory_in_gbs",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The total amount of memory available to the container instance (GB).\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerResourceConfigDetails",
+    "fileName": "create_container_resource_config_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe size and amount of resources available to the container.\n",
+    "fields": [
+      {
+        "name": "vcpusLimit",
+        "rustName": "vcpus_limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The maximum amount of CPUs that can be consumed by the container's process.\n<p>\nIf you do not set a value, then the process\ncan use all available CPU resources on the instance.\n<p>\nCPU usage is defined in terms of logical CPUs. This means that the maximum possible value on\nan E3 ContainerInstance with 1 OCPU is 2.0.\n<p>\nA container with a 2.0 vcpusLimit could consume up to 100% of the CPU resources available on the container instance.\nValues can be fractional. A value of \\\"1.5\\\" means that the container\ncan consume at most the equivalent of 1 and a half logical CPUs worth of CPU capacity.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "memoryLimitInGBs",
+        "rustName": "memory_limit_in_gbs",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The maximum amount of memory that can be consumed by the container's\nprocess.\n<p>\nIf you do not set a value, then the process\nmay use all available memory on the instance.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerTcpHealthCheckDetails",
+    "fileName": "create_container_tcp_health_check_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nContainer Health Check TCP type.",
+    "fields": [
+      {
+        "name": "port",
+        "rustName": "port",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "Container health check port. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "healthCheckType",
+        "rustName": "health_check_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.CreateContainerHealthCheckDetails"
+  },
+  {
+    "name": "CreateContainerVnicDetails",
+    "fileName": "create_container_vnic_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nInformation to create a virtual network interface card (VNIC) which gives\nthe containers on this container instance access to a virtual client network (VCN).\n<p>\nYou use this object when creating the primary VNIC during container instance launch or when creating a secondary VNIC.\nThis VNIC is created in the same compartment as the specified subnet on\nbehalf of the customer.\n<p>\nThe VNIC created by this call contains both the tags specified\nin this object as well as any tags specified in the parent container instance.\n",
+    "fields": [
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A user-friendly name for the VNIC. Does not have to be unique.\nAvoid entering confidential information."
+      },
+      {
+        "name": "hostnameLabel",
+        "rustName": "hostname_label",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The hostname for the VNIC's primary private IP. Used for DNS."
+      },
+      {
+        "name": "isPublicIpAssigned",
+        "rustName": "is_public_ip_assigned",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Whether the VNIC should be assigned a public IP address."
+      },
+      {
+        "name": "skipSourceDestCheck",
+        "rustName": "skip_source_dest_check",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Whether the source/destination check is disabled on the VNIC."
+      },
+      {
+        "name": "nsgIds",
+        "rustName": "nsg_ids",
+        "tsType": "Array<string>",
+        "isRequired": false,
+        "documentation": "A list of the OCIDs of the network security groups (NSGs) to add the VNIC to."
+      },
+      {
+        "name": "privateIp",
+        "rustName": "private_ip",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A private IP address of your choice to assign to the VNIC. Must be an\navailable IP address within the subnet's CIDR."
+      },
+      {
+        "name": "subnetId",
+        "rustName": "subnet_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the subnet to create the VNIC in."
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerVolumeDetails",
+    "fileName": "create_container_volume_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA volume represents a directory with data that is accessible across multiple containers in a\ncontainer instance.\n",
+    "fields": [
+      {
+        "name": "name",
+        "rustName": "name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The name of the volume. This must be unique within a single container instance."
+      },
+      {
+        "name": "volumeType",
+        "rustName": "volume_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "CreateImagePullSecretDetails",
+    "fileName": "create_image_pull_secret_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe image pull secrets for accessing private registry to pull images for containers\n",
+    "fields": [
+      {
+        "name": "registryEndpoint",
+        "rustName": "registry_endpoint",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The registry endpoint of the container image."
+      },
+      {
+        "name": "secretType",
+        "rustName": "secret_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "CreateLinuxSecurityContextDetails",
+    "fileName": "create_linux_security_context_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nSecurity context for Linux container.",
+    "fields": [
+      {
+        "name": "runAsUser",
+        "rustName": "run_as_user",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The user ID (UID) to run the entrypoint process of the container. Defaults to user specified UID in container image metadata if not provided. This must be provided if runAsGroup is provided.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "runAsGroup",
+        "rustName": "run_as_group",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The group ID (GID) to run the entrypoint process of the container. Uses runtime default if not provided. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "isNonRootUserCheckEnabled",
+        "rustName": "is_non_root_user_check_enabled",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Indicates if the container must run as a non-root user. If true, the service validates the container image at runtime to ensure that it is not going to run with UID 0 (root) and fails the container instance creation if the validation fails."
+      },
+      {
+        "name": "isRootFileSystemReadonly",
+        "rustName": "is_root_file_system_readonly",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Determines if the container will have a read-only root file system. Default value is false."
+      },
+      {
+        "name": "capabilities",
+        "rustName": "capabilities",
+        "tsType": "ContainerCapabilities",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "securityContextType",
+        "rustName": "security_context_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.CreateSecurityContextDetails"
+  },
+  {
+    "name": "CreateSecurityContextDetails",
+    "fileName": "create_security_context_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nSecurity context for container.",
+    "fields": [
+      {
+        "name": "securityContextType",
+        "rustName": "security_context_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "discriminator": "securityContextType"
+  },
+  {
+    "name": "CreateVaultImagePullSecretDetails",
+    "fileName": "create_vault_image_pull_secret_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA CreateVaultImagePullSecretDetails is a ImagePullSecret which accepts secretId as credentials information.\n**Sample Format for username and password in Vault Secret**\n{@code\n{\n  \\\"username\\\": \\\"this-is-not-the-secret\\\",\n  \\\"password\\\": \\\"example-password\\\"\n}\n}\n",
+    "fields": [
+      {
+        "name": "secretId",
+        "rustName": "secret_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the secret for registry credentials."
+      },
+      {
+        "name": "secretType",
+        "rustName": "secret_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.CreateImagePullSecretDetails"
+  },
+  {
+    "name": "CreateVolumeMountDetails",
+    "fileName": "create_volume_mount_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nDefines the mapping from volume to a mount path in a container.\n",
+    "fields": [
+      {
+        "name": "mountPath",
+        "rustName": "mount_path",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The volume access path."
+      },
+      {
+        "name": "volumeName",
+        "rustName": "volume_name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The name of the volume. Avoid entering confidential information."
+      },
+      {
+        "name": "subPath",
+        "rustName": "sub_path",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A subpath inside the referenced volume."
+      },
+      {
+        "name": "isReadOnly",
+        "rustName": "is_read_only",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Whether the volume was mounted in read-only mode. By default, the volume is not read-only."
+      },
+      {
+        "name": "partition",
+        "rustName": "partition",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "If there is more than one partition in the volume, reference this number of partitions.\nHere is an example:\nNumber  Start   End     Size    File system  Name                  Flags\n1      1049kB  106MB   105MB   fat16        EFI System Partition  boot, esp\n2      106MB   1180MB  1074MB  xfs\n3      1180MB  50.0GB  48.8GB                                     lvm\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "HealthCheckHttpHeader",
+    "fileName": "health_check_http_header",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nContainer Http headers for Http health check.",
+    "fields": [
+      {
+        "name": "name",
+        "rustName": "name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Container HTTP header Key."
+      },
+      {
+        "name": "value",
+        "rustName": "value",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Container HTTP header value."
+      }
+    ]
+  },
+  {
+    "name": "ImagePullSecret",
+    "fileName": "image_pull_secret",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe image pull secrets for accessing private registry to pull images for containers\n",
+    "fields": [
+      {
+        "name": "registryEndpoint",
+        "rustName": "registry_endpoint",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The registry endpoint of the container image."
+      },
+      {
+        "name": "secretType",
+        "rustName": "secret_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ]
+  },
+  {
+    "name": "LinuxSecurityContext",
+    "fileName": "linux_security_context",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nSecurity context for Linux container.",
+    "fields": [
+      {
+        "name": "runAsUser",
+        "rustName": "run_as_user",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The user ID (UID) to run the entrypoint process of the container. Defaults to user specified UID in container image metadata if not provided. This must be provided if runAsGroup is provided.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "runAsGroup",
+        "rustName": "run_as_group",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "The group ID (GID) to run the entrypoint process of the container. Uses runtime default if not provided. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "isNonRootUserCheckEnabled",
+        "rustName": "is_non_root_user_check_enabled",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Indicates if the container must run as a non-root user. If true, the service validates the container image at runtime to ensure that it is not going to run with UID 0 (root) and fails the container instance creation if the validation fails."
+      },
+      {
+        "name": "isRootFileSystemReadonly",
+        "rustName": "is_root_file_system_readonly",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Determines if the container will have a read-only root file system. Default value is false."
+      },
+      {
+        "name": "capabilities",
+        "rustName": "capabilities",
+        "tsType": "ContainerCapabilities",
+        "isRequired": false,
+        "documentation": ""
+      },
+      {
+        "name": "securityContextType",
+        "rustName": "security_context_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.SecurityContext"
+  },
+  {
+    "name": "OperationStatus",
+    "fileName": "operation_status",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nPossible operation status.",
+    "variants": [
+      {
+        "name": "Accepted",
+        "value": "ACCEPTED"
+      },
+      {
+        "name": "InProgress",
+        "value": "IN_PROGRESS"
+      },
+      {
+        "name": "Failed",
+        "value": "FAILED"
+      },
+      {
+        "name": "Succeeded",
+        "value": "SUCCEEDED"
+      },
+      {
+        "name": "Canceling",
+        "value": "CANCELING"
+      },
+      {
+        "name": "Canceled",
+        "value": "CANCELED"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "OperationType",
+    "fileName": "operation_type",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nPossible operation types.",
+    "variants": [
+      {
+        "name": "CreateContainerInstance",
+        "value": "CREATE_CONTAINER_INSTANCE"
+      },
+      {
+        "name": "UpdateContainerInstance",
+        "value": "UPDATE_CONTAINER_INSTANCE"
+      },
+      {
+        "name": "DeleteContainerInstance",
+        "value": "DELETE_CONTAINER_INSTANCE"
+      },
+      {
+        "name": "MoveContainerInstance",
+        "value": "MOVE_CONTAINER_INSTANCE"
+      },
+      {
+        "name": "StartContainerInstance",
+        "value": "START_CONTAINER_INSTANCE"
+      },
+      {
+        "name": "StopContainerInstance",
+        "value": "STOP_CONTAINER_INSTANCE"
+      },
+      {
+        "name": "RestartContainerInstance",
+        "value": "RESTART_CONTAINER_INSTANCE"
+      },
+      {
+        "name": "UpdateContainer",
+        "value": "UPDATE_CONTAINER"
+      },
+      {
+        "name": "UnknownValue",
+        "value": "UNKNOWN_VALUE"
+      }
+    ]
+  },
+  {
+    "name": "SecurityContext",
+    "fileName": "security_context",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nSecurity context for container.",
+    "fields": [
+      {
+        "name": "securityContextType",
+        "rustName": "security_context_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "discriminator": "securityContextType"
+  },
+  {
+    "name": "ShapeMemoryOptions",
+    "fileName": "shape_memory_options",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nFor a flexible shape, the amount of memory available for container instances that use this shape.\n",
+    "fields": [
+      {
+        "name": "minInGBs",
+        "rustName": "min_in_gbs",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The minimum amount of memory (GB).\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "maxInGBs",
+        "rustName": "max_in_gbs",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The maximum amount of memory (GB).\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "defaultPerOcpuInGBs",
+        "rustName": "default_per_ocpu_in_gbs",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The default amount of memory per OCPU available for this shape (GB).\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "minPerOcpuInGBs",
+        "rustName": "min_per_ocpu_in_gbs",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The minimum amount of memory per OCPU available for this shape (GB).\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "maxPerOcpuInGBs",
+        "rustName": "max_per_ocpu_in_gbs",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The maximum amount of memory per OCPU available for this shape (GB).\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "ShapeNetworkingBandwidthOptions",
+    "fileName": "shape_networking_bandwidth_options",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nFor a flexible shape, the amount of networking bandwidth available for container instances that use this shape.\n",
+    "fields": [
+      {
+        "name": "minInGbps",
+        "rustName": "min_in_gbps",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The minimum amount of networking bandwidth, in gigabits per second.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "maxInGbps",
+        "rustName": "max_in_gbps",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The maximum amount of networking bandwidth, in gigabits per second.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "defaultPerOcpuInGbps",
+        "rustName": "default_per_ocpu_in_gbps",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The default amount of networking bandwidth per OCPU, in gigabits per second.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "ShapeOcpuOptions",
+    "fileName": "shape_ocpu_options",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nFor a flexible shape, the number of OCPUs available for container instances that use this shape.\n",
+    "fields": [
+      {
+        "name": "min",
+        "rustName": "min",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The minimum number of OCPUs.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "max",
+        "rustName": "max",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "The maximum number of OCPUs.\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "SortOrder",
+    "fileName": "sort_order",
+    "kind": "enum",
+    "sourceDir": "model",
+    "documentation": "\nSort orders.",
+    "variants": [
+      {
+        "name": "Asc",
+        "value": "ASC"
+      },
+      {
+        "name": "Desc",
+        "value": "DESC"
+      }
+    ]
+  },
+  {
+    "name": "UpdateContainerDetails",
+    "fileName": "update_container_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe container information to be updated.",
+    "fields": [
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information."
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      }
+    ]
+  },
+  {
+    "name": "UpdateContainerInstanceDetails",
+    "fileName": "update_container_instance_details",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nThe information to be updated.",
+    "fields": [
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information."
+      },
+      {
+        "name": "freeformTags",
+        "rustName": "freeform_tags",
+        "tsType": "{ [key: string]: string }",
+        "isRequired": false,
+        "documentation": "Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.\nExample: {@code {\\\"bar-key\\\": \\\"value\\\"}}"
+      },
+      {
+        "name": "definedTags",
+        "rustName": "defined_tags",
+        "tsType": "{ [key: string]: { [key: string]: any } }",
+        "isRequired": false,
+        "documentation": "Defined tags for this resource. Each key is predefined and scoped to a namespace.\nExample: {@code {\\\"foo-namespace\\\": {\\\"bar-key\\\": \\\"value\\\"}}}."
+      }
+    ]
+  },
+  {
+    "name": "VaultImagePullSecret",
+    "fileName": "vault_image_pull_secret",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA VaultImagePullSecret is a ImagePullSecret which accepts secretId as credentials information.\n",
+    "fields": [
+      {
+        "name": "secretId",
+        "rustName": "secret_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the secret for registry credentials."
+      },
+      {
+        "name": "secretType",
+        "rustName": "secret_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": ""
+      }
+    ],
+    "baseType": "model.ImagePullSecret"
+  },
+  {
+    "name": "VolumeMount",
+    "fileName": "volume_mount",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nDefine the mapping from volume to a mount path in container.\n",
+    "fields": [
+      {
+        "name": "mountPath",
+        "rustName": "mount_path",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Describes the volume access path."
+      },
+      {
+        "name": "volumeName",
+        "rustName": "volume_name",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The name of the volume."
+      },
+      {
+        "name": "subPath",
+        "rustName": "sub_path",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A sub-path inside the referenced volume."
+      },
+      {
+        "name": "isReadOnly",
+        "rustName": "is_read_only",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Whether the volume was mounted in read-only mode. By default, the volume is mounted with write access."
+      },
+      {
+        "name": "partition",
+        "rustName": "partition",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "If there is more than one partition in the volume, reference this number of partitions.\nHere is an example:\nNumber  Start   End     Size    File system  Name                  Flags\n1      1049kB  106MB   105MB   fat16        EFI System Partition  boot, esp\n2      106MB   1180MB  1074MB  xfs\n3      1180MB  50.0GB  48.8GB                                     lvm\n Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequestErrorCollection",
+    "fileName": "work_request_error_collection",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nResults of a workRequestError search. Contains both WorkRequestError items and other information, such as metadata.",
+    "fields": [
+      {
+        "name": "items",
+        "rustName": "items",
+        "tsType": "Array<WorkRequestError>",
+        "isRequired": true,
+        "documentation": "List of workRequestError objects."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequestError",
+    "fileName": "work_request_error",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nAn error encountered while executing a work request.",
+    "fields": [
+      {
+        "name": "code",
+        "rustName": "code",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A machine-usable code for the error that occured. See [API Errors](https://docs.oracle.com/iaas/Content/API/References/apierrors.htm) for a list of error codes."
+      },
+      {
+        "name": "message",
+        "rustName": "message",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "A description of the issue encountered."
+      },
+      {
+        "name": "timestamp",
+        "rustName": "timestamp",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The time the error occured, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequestLogEntryCollection",
+    "fileName": "work_request_log_entry_collection",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nResults of a workRequestLog search. Contains both workRequestLog items and other information, such as metadata.",
+    "fields": [
+      {
+        "name": "items",
+        "rustName": "items",
+        "tsType": "Array<WorkRequestLogEntry>",
+        "isRequired": true,
+        "documentation": "List of workRequestLogEntries."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequestLogEntry",
+    "fileName": "work_request_log_entry",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA log message from a work request.",
+    "fields": [
+      {
+        "name": "message",
+        "rustName": "message",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Human-readable log message."
+      },
+      {
+        "name": "timestamp",
+        "rustName": "timestamp",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The time the log message was written, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequestResource",
+    "fileName": "work_request_resource",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA resource created or operated on by a work request.",
+    "fields": [
+      {
+        "name": "entityType",
+        "rustName": "entity_type",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The resource type the work request affects."
+      },
+      {
+        "name": "actionType",
+        "rustName": "action_type",
+        "tsType": "ActionType",
+        "isRequired": true,
+        "documentation": "The way in which this resource is affected by the work tracked in the work request.\nA resource being created, updated, or deleted remains in the IN_PROGRESS state until\nwork is complete for that resource, at which point it updates to CREATED, UPDATED,\nor DELETED, respectively."
+      },
+      {
+        "name": "identifier",
+        "rustName": "identifier",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The ID of the resource the work request affects."
+      },
+      {
+        "name": "entityUri",
+        "rustName": "entity_uri",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The URI path that the user can do a GET on to access the resource metadata."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequestSummaryCollection",
+    "fileName": "work_request_summary_collection",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nResults of a workRequest search. Contains both WorkRequest items and other information, such as metadata.",
+    "fields": [
+      {
+        "name": "items",
+        "rustName": "items",
+        "tsType": "Array<WorkRequestSummary>",
+        "isRequired": true,
+        "documentation": "List of workRequestSummary objects."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequestSummary",
+    "fileName": "work_request_summary",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA summary of the status of a work request.",
+    "fields": [
+      {
+        "name": "operationType",
+        "rustName": "operation_type",
+        "tsType": "OperationType",
+        "isRequired": true,
+        "documentation": "Type of work request."
+      },
+      {
+        "name": "status",
+        "rustName": "status",
+        "tsType": "OperationStatus",
+        "isRequired": true,
+        "documentation": "Status of current work request."
+      },
+      {
+        "name": "id",
+        "rustName": "id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The ID of the work request."
+      },
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the compartment that contains the work request. Work requests should be scoped to\nthe same compartment as the resource the work request affects."
+      },
+      {
+        "name": "resources",
+        "rustName": "resources",
+        "tsType": "Array<WorkRequestResource>",
+        "isRequired": true,
+        "documentation": "The resources affected by this work request."
+      },
+      {
+        "name": "percentComplete",
+        "rustName": "percent_complete",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "Percentage of the request completed. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "timeAccepted",
+        "rustName": "time_accepted",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The date and time the request was created, as described in\n[RFC 3339](https://tools.ietf.org/rfc/rfc3339), section 14.29."
+      },
+      {
+        "name": "timeStarted",
+        "rustName": "time_started",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The date and time the request was started, as described in [RFC 3339](https://tools.ietf.org/rfc/rfc3339),\nsection 14.29."
+      },
+      {
+        "name": "timeFinished",
+        "rustName": "time_finished",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The date and time the object was finished, as described in [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      }
+    ]
+  },
+  {
+    "name": "WorkRequest",
+    "fileName": "work_request",
+    "kind": "interface",
+    "sourceDir": "model",
+    "documentation": "\nA description of the work request status.",
+    "fields": [
+      {
+        "name": "operationType",
+        "rustName": "operation_type",
+        "tsType": "OperationType",
+        "isRequired": true,
+        "documentation": "Type of work request."
+      },
+      {
+        "name": "status",
+        "rustName": "status",
+        "tsType": "OperationStatus",
+        "isRequired": true,
+        "documentation": "Status of current work request."
+      },
+      {
+        "name": "id",
+        "rustName": "id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The ID of the work request."
+      },
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The OCID of the compartment that contains the work request. Work requests should be scoped to\nthe same compartment as the resource the work request affects."
+      },
+      {
+        "name": "resources",
+        "rustName": "resources",
+        "tsType": "Array<WorkRequestResource>",
+        "isRequired": true,
+        "documentation": "The resources affected by this work request."
+      },
+      {
+        "name": "percentComplete",
+        "rustName": "percent_complete",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "Percentage of the request completed. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues."
+      },
+      {
+        "name": "timeAccepted",
+        "rustName": "time_accepted",
+        "tsType": "Date",
+        "isRequired": true,
+        "documentation": "The date and time the request was created, as described in\n[RFC 3339](https://tools.ietf.org/rfc/rfc3339), section 14.29."
+      },
+      {
+        "name": "timeStarted",
+        "rustName": "time_started",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The date and time the request was started, as described in [RFC 3339](https://tools.ietf.org/rfc/rfc3339),\nsection 14.29."
+      },
+      {
+        "name": "timeFinished",
+        "rustName": "time_finished",
+        "tsType": "Date",
+        "isRequired": false,
+        "documentation": "The date and time the object was finished, as described in [RFC 3339](https://tools.ietf.org/rfc/rfc3339)."
+      }
+    ]
+  },
+  {
+    "name": "ChangeContainerInstanceCompartmentRequest",
+    "fileName": "change_container_instance_compartment_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "changeContainerInstanceCompartmentDetails",
+        "rustName": "change_container_instance_compartment_details",
+        "tsType": "ChangeContainerInstanceCompartmentDetails",
+        "isRequired": true,
+        "documentation": "The information to be updated."
+      },
+      {
+        "name": "ifMatch",
+        "rustName": "if_match",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For optimistic concurrency control. In the PUT or DELETE call\nfor a resource, set the {@code if-match} parameter to the value of the\netag from a previous GET or POST response for that resource.\nThe resource will be updated or deleted only if the etag you\nprovide matches the resource's current etag value."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "CreateContainerInstanceRequest",
+    "fileName": "create_container_instance_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "createContainerInstanceDetails",
+        "rustName": "create_container_instance_details",
+        "tsType": "CreateContainerInstanceDetails",
+        "isRequired": true,
+        "documentation": "Details for the new container instance."
+      },
+      {
+        "name": "opcRetryToken",
+        "rustName": "opc_retry_token",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A token that uniquely identifies a request so it can be retried in case of a timeout or\nserver error without risk of executing that same action again. Retry tokens expire after 24\nhours, but can be invalidated before then due to conflicting operations. For example, if a resource\nhas been deleted and purged from the system, then a retry of the original creation request\nmight be rejected."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "DeleteContainerInstanceRequest",
+    "fileName": "delete_container_instance_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "ifMatch",
+        "rustName": "if_match",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For optimistic concurrency control. In the PUT or DELETE call\nfor a resource, set the {@code if-match} parameter to the value of the\netag from a previous GET or POST response for that resource.\nThe resource will be updated or deleted only if the etag you\nprovide matches the resource's current etag value."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "GetContainerInstanceRequest",
+    "fileName": "get_container_instance_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "GetContainerRequest",
+    "fileName": "get_container_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerId",
+        "rustName": "container_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "GetWorkRequestRequest",
+    "fileName": "get_work_request_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "workRequestId",
+        "rustName": "work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The ID of the asynchronous request."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ListContainerInstanceShapesRequest",
+    "fileName": "list_container_instance_shapes_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The name of the availability domain.\n<p>\nExample: {@code Uocm:PHX-AD-1}"
+      },
+      {
+        "name": "limit",
+        "rustName": "limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "For list pagination. The maximum number of results per page, or items to return in a paginated \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "page",
+        "rustName": "page",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For list pagination. The value of the opc-next-page response header from the previous \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ListContainerInstancesRequest",
+    "fileName": "list_container_instances_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources."
+      },
+      {
+        "name": "lifecycleState",
+        "rustName": "lifecycle_state",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A filter to only return resources that match the given lifecycle state."
+      },
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A filter to return only resources that match the entire display name given."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The name of the availability domain.\n<p>\nExample: {@code Uocm:PHX-AD-1}"
+      },
+      {
+        "name": "limit",
+        "rustName": "limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "For list pagination. The maximum number of results per page, or items to return in a paginated \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "page",
+        "rustName": "page",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For list pagination. The value of the opc-next-page response header from the previous \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "sortOrder",
+        "rustName": "sort_order",
+        "tsType": "SortOrder",
+        "isRequired": false,
+        "documentation": "The sort order to use (ASC) or (DESC)."
+      },
+      {
+        "name": "sortBy",
+        "rustName": "sort_by",
+        "tsType": "ListContainerInstancesRequestSortBy",
+        "isRequired": false,
+        "documentation": "The field to sort by. You can provide one sort order. Default order for timeCreated is descending. Default order for displayName is ascending. If you don't specify a value, timeCreated is the default."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ListContainerInstancesRequestSortBy",
+    "fileName": "list_container_instances_request_sort_by",
+    "kind": "enum",
+    "sourceDir": "request",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "TimeCreated",
+        "value": "timeCreated"
+      },
+      {
+        "name": "DisplayName",
+        "value": "displayName"
+      }
+    ]
+  },
+  {
+    "name": "ListContainersRequest",
+    "fileName": "list_containers_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources."
+      },
+      {
+        "name": "lifecycleState",
+        "rustName": "lifecycle_state",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A filter to only return resources that match the given lifecycle state."
+      },
+      {
+        "name": "displayName",
+        "rustName": "display_name",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "A filter to return only resources that match the entire display name given."
+      },
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The name of the availability domain.\n<p>\nExample: {@code Uocm:PHX-AD-1}"
+      },
+      {
+        "name": "limit",
+        "rustName": "limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "For list pagination. The maximum number of results per page, or items to return in a paginated \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "page",
+        "rustName": "page",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For list pagination. The value of the opc-next-page response header from the previous \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "sortOrder",
+        "rustName": "sort_order",
+        "tsType": "SortOrder",
+        "isRequired": false,
+        "documentation": "The sort order to use (ASC) or (DESC)."
+      },
+      {
+        "name": "sortBy",
+        "rustName": "sort_by",
+        "tsType": "ListContainersRequestSortBy",
+        "isRequired": false,
+        "documentation": "The field to sort by. You can provide one sort order. Default order for timeCreated is descending. Default order for displayName is ascending. If you don't specify a value, timeCreated is the default."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ListContainersRequestSortBy",
+    "fileName": "list_containers_request_sort_by",
+    "kind": "enum",
+    "sourceDir": "request",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "TimeCreated",
+        "value": "timeCreated"
+      },
+      {
+        "name": "DisplayName",
+        "value": "displayName"
+      }
+    ]
+  },
+  {
+    "name": "ListWorkRequestErrorsRequest",
+    "fileName": "list_work_request_errors_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "workRequestId",
+        "rustName": "work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The ID of the asynchronous request."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "page",
+        "rustName": "page",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For list pagination. The value of the opc-next-page response header from the previous \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "limit",
+        "rustName": "limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "For list pagination. The maximum number of results per page, or items to return in a paginated \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "sortBy",
+        "rustName": "sort_by",
+        "tsType": "ListWorkRequestErrorsRequestSortBy",
+        "isRequired": false,
+        "documentation": "The field to sort by. You can provide one sort order. Default order for timestamp is descending."
+      },
+      {
+        "name": "sortOrder",
+        "rustName": "sort_order",
+        "tsType": "SortOrder",
+        "isRequired": false,
+        "documentation": "The sort order to use, either ascending (ASC) or descending (DESC)."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ListWorkRequestErrorsRequestSortBy",
+    "fileName": "list_work_request_errors_request_sort_by",
+    "kind": "enum",
+    "sourceDir": "request",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "Timestamp",
+        "value": "timestamp"
+      }
+    ]
+  },
+  {
+    "name": "ListWorkRequestLogsRequest",
+    "fileName": "list_work_request_logs_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "workRequestId",
+        "rustName": "work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The ID of the asynchronous request."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "page",
+        "rustName": "page",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For list pagination. The value of the opc-next-page response header from the previous \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "limit",
+        "rustName": "limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "For list pagination. The maximum number of results per page, or items to return in a paginated \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "sortBy",
+        "rustName": "sort_by",
+        "tsType": "ListWorkRequestLogsRequestSortBy",
+        "isRequired": false,
+        "documentation": "The field to sort by. You can provide one sort order. Default order for timestamp is descending."
+      },
+      {
+        "name": "sortOrder",
+        "rustName": "sort_order",
+        "tsType": "SortOrder",
+        "isRequired": false,
+        "documentation": "The sort order to use, either ascending (ASC) or descending (DESC)."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ListWorkRequestLogsRequestSortBy",
+    "fileName": "list_work_request_logs_request_sort_by",
+    "kind": "enum",
+    "sourceDir": "request",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "Timestamp",
+        "value": "timestamp"
+      }
+    ]
+  },
+  {
+    "name": "ListWorkRequestsRequest",
+    "fileName": "list_work_requests_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "compartmentId",
+        "rustName": "compartment_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources."
+      },
+      {
+        "name": "workRequestId",
+        "rustName": "work_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The ID of the asynchronous work request."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "page",
+        "rustName": "page",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For list pagination. The value of the opc-next-page response header from the previous \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "limit",
+        "rustName": "limit",
+        "tsType": "number",
+        "isRequired": false,
+        "documentation": "For list pagination. The maximum number of results per page, or items to return in a paginated \\\"List\\\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine)."
+      },
+      {
+        "name": "availabilityDomain",
+        "rustName": "availability_domain",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The name of the availability domain.\n<p>\nExample: {@code Uocm:PHX-AD-1}"
+      },
+      {
+        "name": "status",
+        "rustName": "status",
+        "tsType": "OperationStatus",
+        "isRequired": false,
+        "documentation": "A filter to return resources with a lifecycleState that matches the given OperationStatus."
+      },
+      {
+        "name": "sortBy",
+        "rustName": "sort_by",
+        "tsType": "ListWorkRequestsRequestSortBy",
+        "isRequired": false,
+        "documentation": "The field to sort by. You can provide one sort order. Default order for timeAccepted is descending."
+      },
+      {
+        "name": "sortOrder",
+        "rustName": "sort_order",
+        "tsType": "SortOrder",
+        "isRequired": false,
+        "documentation": "The sort order to use, either ascending (ASC) or descending (DESC)."
+      },
+      {
+        "name": "resourceId",
+        "rustName": "resource_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "The OCID of the resource affected by the work request."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ListWorkRequestsRequestSortBy",
+    "fileName": "list_work_requests_request_sort_by",
+    "kind": "enum",
+    "sourceDir": "request",
+    "documentation": "",
+    "variants": [
+      {
+        "name": "TimeAccepted",
+        "value": "timeAccepted"
+      }
+    ]
+  },
+  {
+    "name": "RestartContainerInstanceRequest",
+    "fileName": "restart_container_instance_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "ifMatch",
+        "rustName": "if_match",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For optimistic concurrency control. In the PUT or DELETE call\nfor a resource, set the {@code if-match} parameter to the value of the\netag from a previous GET or POST response for that resource.\nThe resource will be updated or deleted only if the etag you\nprovide matches the resource's current etag value."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "RetrieveLogsRequest",
+    "fileName": "retrieve_logs_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerId",
+        "rustName": "container_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "isPrevious",
+        "rustName": "is_previous",
+        "tsType": "boolean",
+        "isRequired": false,
+        "documentation": "Returns the logs for the previous run of the container in a pod.\nIf the container fails, this parameter can help you to determine the root cause of the failure."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "StartContainerInstanceRequest",
+    "fileName": "start_container_instance_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "ifMatch",
+        "rustName": "if_match",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For optimistic concurrency control. In the PUT or DELETE call\nfor a resource, set the {@code if-match} parameter to the value of the\netag from a previous GET or POST response for that resource.\nThe resource will be updated or deleted only if the etag you\nprovide matches the resource's current etag value."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "StopContainerInstanceRequest",
+    "fileName": "stop_container_instance_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "ifMatch",
+        "rustName": "if_match",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For optimistic concurrency control. In the PUT or DELETE call\nfor a resource, set the {@code if-match} parameter to the value of the\netag from a previous GET or POST response for that resource.\nThe resource will be updated or deleted only if the etag you\nprovide matches the resource's current etag value."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "UpdateContainerInstanceRequest",
+    "fileName": "update_container_instance_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerInstanceId",
+        "rustName": "container_instance_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance."
+      },
+      {
+        "name": "updateContainerInstanceDetails",
+        "rustName": "update_container_instance_details",
+        "tsType": "UpdateContainerInstanceDetails",
+        "isRequired": true,
+        "documentation": "The information to be updated."
+      },
+      {
+        "name": "ifMatch",
+        "rustName": "if_match",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For optimistic concurrency control. In the PUT or DELETE call\nfor a resource, set the {@code if-match} parameter to the value of the\netag from a previous GET or POST response for that resource.\nThe resource will be updated or deleted only if the etag you\nprovide matches the resource's current etag value."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "UpdateContainerRequest",
+    "fileName": "update_container_request",
+    "kind": "interface",
+    "sourceDir": "request",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "containerId",
+        "rustName": "container_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container."
+      },
+      {
+        "name": "updateContainerDetails",
+        "rustName": "update_container_details",
+        "tsType": "UpdateContainerDetails",
+        "isRequired": true,
+        "documentation": "The information to be updated."
+      },
+      {
+        "name": "ifMatch",
+        "rustName": "if_match",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "For optimistic concurrency control. In the PUT or DELETE call\nfor a resource, set the {@code if-match} parameter to the value of the\netag from a previous GET or POST response for that resource.\nThe resource will be updated or deleted only if the etag you\nprovide matches the resource's current etag value."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": false,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ],
+    "baseType": "common.BaseRequest"
+  },
+  {
+    "name": "ChangeContainerInstanceCompartmentResponse",
+    "fileName": "change_container_instance_compartment_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ]
+  },
+  {
+    "name": "CreateContainerInstanceResponse",
+    "fileName": "create_container_instance_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "etag",
+        "rustName": "etag",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "For optimistic concurrency control. See {@code if-match}."
+      },
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "containerInstance",
+        "rustName": "container_instance",
+        "tsType": "ContainerInstance",
+        "isRequired": true,
+        "documentation": "The returned model.ContainerInstance instance."
+      }
+    ]
+  },
+  {
+    "name": "DeleteContainerInstanceResponse",
+    "fileName": "delete_container_instance_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ]
+  },
+  {
+    "name": "GetContainerInstanceResponse",
+    "fileName": "get_container_instance_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "etag",
+        "rustName": "etag",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "For optimistic concurrency control. See {@code if-match}."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "containerInstance",
+        "rustName": "container_instance",
+        "tsType": "ContainerInstance",
+        "isRequired": true,
+        "documentation": "The returned model.ContainerInstance instance."
+      }
+    ]
+  },
+  {
+    "name": "GetContainerResponse",
+    "fileName": "get_container_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "etag",
+        "rustName": "etag",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "For optimistic concurrency control. See {@code if-match}."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "container",
+        "rustName": "container",
+        "tsType": "Container",
+        "isRequired": true,
+        "documentation": "The returned model.Container instance."
+      }
+    ]
+  },
+  {
+    "name": "GetWorkRequestResponse",
+    "fileName": "get_work_request_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "retryAfter",
+        "rustName": "retry_after",
+        "tsType": "number",
+        "isRequired": true,
+        "documentation": "A decimal number representing the number of seconds the client should wait before polling this endpoint again."
+      },
+      {
+        "name": "workRequest",
+        "rustName": "work_request",
+        "tsType": "WorkRequest",
+        "isRequired": true,
+        "documentation": "The returned model.WorkRequest instance."
+      }
+    ]
+  },
+  {
+    "name": "ListContainerInstanceShapesResponse",
+    "fileName": "list_container_instance_shapes_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "opcNextPage",
+        "rustName": "opc_next_page",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Pagination of a list of items. When paging through a list, if this header appears in the response,\nthen a partial list might have been returned. Include this value as the {@code page} parameter for the\nsubsequent GET request to get the next batch of items."
+      },
+      {
+        "name": "containerInstanceShapeCollection",
+        "rustName": "container_instance_shape_collection",
+        "tsType": "ContainerInstanceShapeCollection",
+        "isRequired": true,
+        "documentation": "The returned model.ContainerInstanceShapeCollection instance."
+      }
+    ]
+  },
+  {
+    "name": "ListContainerInstancesResponse",
+    "fileName": "list_container_instances_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "opcNextPage",
+        "rustName": "opc_next_page",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Pagination of a list of items. When paging through a list, if this header appears in the response,\nthen a partial list might have been returned. Include this value as the {@code page} parameter for the\nsubsequent GET request to get the next batch of items."
+      },
+      {
+        "name": "containerInstanceCollection",
+        "rustName": "container_instance_collection",
+        "tsType": "ContainerInstanceCollection",
+        "isRequired": true,
+        "documentation": "The returned model.ContainerInstanceCollection instance."
+      }
+    ]
+  },
+  {
+    "name": "ListContainersResponse",
+    "fileName": "list_containers_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "opcNextPage",
+        "rustName": "opc_next_page",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Pagination of a list of items. When paging through a list, if this header appears in the response,\nthen a partial list might have been returned. Include this value as the {@code page} parameter for the\nsubsequent GET request to get the next batch of items."
+      },
+      {
+        "name": "containerCollection",
+        "rustName": "container_collection",
+        "tsType": "ContainerCollection",
+        "isRequired": true,
+        "documentation": "The returned model.ContainerCollection instance."
+      }
+    ]
+  },
+  {
+    "name": "ListWorkRequestErrorsResponse",
+    "fileName": "list_work_request_errors_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcNextPage",
+        "rustName": "opc_next_page",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Pagination of a list of items. When paging through a list, if this header appears in the response,\nthen a partial list might have been returned. Include this value as the {@code page} parameter for the\nsubsequent GET request to get the next batch of items."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "workRequestErrorCollection",
+        "rustName": "work_request_error_collection",
+        "tsType": "WorkRequestErrorCollection",
+        "isRequired": true,
+        "documentation": "The returned model.WorkRequestErrorCollection instance."
+      }
+    ]
+  },
+  {
+    "name": "ListWorkRequestLogsResponse",
+    "fileName": "list_work_request_logs_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcNextPage",
+        "rustName": "opc_next_page",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Pagination of a list of items. When paging through a list, if this header appears in the response,\nthen a partial list might have been returned. Include this value as the {@code page} parameter for the\nsubsequent GET request to get the next batch of items."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "workRequestLogEntryCollection",
+        "rustName": "work_request_log_entry_collection",
+        "tsType": "WorkRequestLogEntryCollection",
+        "isRequired": true,
+        "documentation": "The returned model.WorkRequestLogEntryCollection instance."
+      }
+    ]
+  },
+  {
+    "name": "ListWorkRequestsResponse",
+    "fileName": "list_work_requests_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "opcNextPage",
+        "rustName": "opc_next_page",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Pagination of a list of items. When paging through a list, if this header appears in the response,\nthen a partial list might have been returned. Include this value as the {@code page} parameter for the\nsubsequent GET request to get the next batch of items."
+      },
+      {
+        "name": "workRequestSummaryCollection",
+        "rustName": "work_request_summary_collection",
+        "tsType": "WorkRequestSummaryCollection",
+        "isRequired": true,
+        "documentation": "The returned model.WorkRequestSummaryCollection instance."
+      }
+    ]
+  },
+  {
+    "name": "RestartContainerInstanceResponse",
+    "fileName": "restart_container_instance_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ]
+  },
+  {
+    "name": "RetrieveLogsResponse",
+    "fileName": "retrieve_logs_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      },
+      {
+        "name": "value",
+        "rustName": "value",
+        "tsType": "stream.Readable | ReadableStream",
+        "isRequired": true,
+        "documentation": "The returned stream.Readable | ReadableStream instance."
+      }
+    ]
+  },
+  {
+    "name": "StartContainerInstanceResponse",
+    "fileName": "start_container_instance_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ]
+  },
+  {
+    "name": "StopContainerInstanceResponse",
+    "fileName": "stop_container_instance_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ]
+  },
+  {
+    "name": "UpdateContainerInstanceResponse",
+    "fileName": "update_container_instance_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ]
+  },
+  {
+    "name": "UpdateContainerResponse",
+    "fileName": "update_container_response",
+    "kind": "interface",
+    "sourceDir": "response",
+    "documentation": "",
+    "fields": [
+      {
+        "name": "opcWorkRequestId",
+        "rustName": "opc_work_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation."
+      },
+      {
+        "name": "opcRequestId",
+        "rustName": "opc_request_id",
+        "tsType": "string",
+        "isRequired": true,
+        "documentation": "Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID."
+      }
+    ]
+  }
+]

@@ -10,6 +10,7 @@ pub struct InstanceConfigurationVolumeSourceDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for InstanceConfigurationVolumeSourceDetails
 pub struct InstanceConfigurationVolumeSourceDetailsRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl InstanceConfigurationVolumeSourceDetails {
     pub fn new(required: InstanceConfigurationVolumeSourceDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl InstanceConfigurationVolumeSourceDetails {
         self
     }
 }
+
+

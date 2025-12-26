@@ -17,6 +17,7 @@ pub struct CreateVolumeBackupPolicyAssignmentDetails {
     pub xrc_kms_key_id: Option<String>,
 }
 
+
 /// Required fields for CreateVolumeBackupPolicyAssignmentDetails
 pub struct CreateVolumeBackupPolicyAssignmentDetailsRequired {
     /// The OCID of the volume to assign the policy to.
@@ -35,7 +36,7 @@ impl CreateVolumeBackupPolicyAssignmentDetails {
             policy_id: required.policy_id,
 
             xrc_kms_key_id: None,
-        }
+}
     }
 
     /// Set asset_id
@@ -62,3 +63,5 @@ impl CreateVolumeBackupPolicyAssignmentDetails {
         self
     }
 }
+
+

@@ -32,6 +32,7 @@ pub struct CreateVolumeGroupBackupDetails {
     pub r#type: Option<CreateVolumeGroupBackupDetailsType>,
 }
 
+
 /// Required fields for CreateVolumeGroupBackupDetails
 pub struct CreateVolumeGroupBackupDetailsRequired {
     /// The OCID of the volume group that needs to be backed up.
@@ -53,7 +54,7 @@ impl CreateVolumeGroupBackupDetails {
             freeform_tags: None,
 
             r#type: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -63,10 +64,7 @@ impl CreateVolumeGroupBackupDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -102,10 +100,7 @@ impl CreateVolumeGroupBackupDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -128,3 +123,5 @@ impl CreateVolumeGroupBackupDetails {
         self
     }
 }
+
+

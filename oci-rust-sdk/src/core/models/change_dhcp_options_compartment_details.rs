@@ -10,6 +10,7 @@ pub struct ChangeDhcpOptionsCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeDhcpOptionsCompartmentDetails
 pub struct ChangeDhcpOptionsCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the set of DHCP options to.
@@ -21,7 +22,7 @@ impl ChangeDhcpOptionsCompartmentDetails {
     pub fn new(required: ChangeDhcpOptionsCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeDhcpOptionsCompartmentDetails {
         self
     }
 }
+
+

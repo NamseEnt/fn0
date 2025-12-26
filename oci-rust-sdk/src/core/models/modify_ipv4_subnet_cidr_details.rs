@@ -13,6 +13,7 @@ pub struct ModifyIpv4SubnetCidrDetails {
     pub updated_ipv4_cidr_block: String,
 }
 
+
 /// Required fields for ModifyIpv4SubnetCidrDetails
 pub struct ModifyIpv4SubnetCidrDetailsRequired {
     /// The Ipv4 CIDR IP address to update.
@@ -29,7 +30,7 @@ impl ModifyIpv4SubnetCidrDetails {
             ipv4_cidr_block: required.ipv4_cidr_block,
 
             updated_ipv4_cidr_block: required.updated_ipv4_cidr_block,
-        }
+}
     }
 
     /// Set ipv4_cidr_block
@@ -44,3 +45,5 @@ impl ModifyIpv4SubnetCidrDetails {
         self
     }
 }
+
+

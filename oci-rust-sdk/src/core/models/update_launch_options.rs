@@ -32,10 +32,7 @@ impl UpdateLaunchOptions {
     }
 
     /// Set boot_volume_type
-    pub fn set_boot_volume_type(
-        mut self,
-        value: Option<UpdateLaunchOptionsBootVolumeType>,
-    ) -> Self {
+    pub fn set_boot_volume_type(mut self, value: Option<UpdateLaunchOptionsBootVolumeType>) -> Self {
         self.boot_volume_type = value;
         self
     }
@@ -76,3 +73,4 @@ impl Default for UpdateLaunchOptions {
         Self::new()
     }
 }
+

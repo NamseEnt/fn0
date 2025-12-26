@@ -72,12 +72,24 @@ fn main() -> Result<()> {
 
                 if !args.dry_run {
                     let file_name = format!("{}.rs", model.file_name);
-                    let output_path = args.output.join(&file_name);
+
+                    // Determine subdirectory based on sourceDir
+                    let subdir = match model.source_dir {
+                        models::SourceDir::Model => "models",
+                        models::SourceDir::Request => "requests",
+                        models::SourceDir::Response => "responses",
+                    };
+
+                    let output_dir = args.output.join(subdir);
+                    fs::create_dir_all(&output_dir)
+                        .with_context(|| format!("Failed to create directory {}", output_dir.display()))?;
+
+                    let output_path = output_dir.join(&file_name);
 
                     fs::write(&output_path, code)
                         .with_context(|| format!("Failed to write {}", output_path.display()))?;
 
-                    println!("  ✓ Generated {}", file_name);
+                    println!("  ✓ Generated {}/{}", subdir, file_name);
                 } else {
                     println!("  [DRY RUN] Would generate {}.rs ({} lines)",
                         model.file_name, code.lines().count());

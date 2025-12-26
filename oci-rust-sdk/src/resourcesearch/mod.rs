@@ -1,10 +1,12 @@
 //! resourcesearch service module
 pub mod models;
 pub mod requests;
+pub mod responses;
 
 // Re-export commonly used types
 pub use models::*;
 pub use requests::*;
+pub use responses::*;
 
 use crate::auth::provider::AuthProvider;
 use crate::core::{client::http_client::OciClient, region::Region, retry::Retrier, Result};

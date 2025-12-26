@@ -10,7 +10,8 @@ pub struct ContainerInstanceShapeConfig {
     pub ocpus: i64,
 
     /// The total amount of memory available to the container instance, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub memory_in_g_bs: i64,
+    #[serde(rename = "memoryInGBs")]
+    pub memory_in_gbs: i64,
 
     /// A short description of the container instance's processor (CPU).
     pub processor_description: String,
@@ -19,13 +20,14 @@ pub struct ContainerInstanceShapeConfig {
     pub networking_bandwidth_in_gbps: i64,
 }
 
+
 /// Required fields for ContainerInstanceShapeConfig
 pub struct ContainerInstanceShapeConfigRequired {
     /// The total number of OCPUs available to the container instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     pub ocpus: i64,
 
     /// The total amount of memory available to the container instance, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub memory_in_g_bs: i64,
+    pub memory_in_gbs: i64,
 
     /// A short description of the container instance's processor (CPU).
     pub processor_description: String,
@@ -40,12 +42,12 @@ impl ContainerInstanceShapeConfig {
         Self {
             ocpus: required.ocpus,
 
-            memory_in_g_bs: required.memory_in_g_bs,
+            memory_in_gbs: required.memory_in_gbs,
 
             processor_description: required.processor_description,
 
             networking_bandwidth_in_gbps: required.networking_bandwidth_in_gbps,
-        }
+}
     }
 
     /// Set ocpus
@@ -54,9 +56,9 @@ impl ContainerInstanceShapeConfig {
         self
     }
 
-    /// Set memory_in_g_bs
-    pub fn set_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.memory_in_g_bs = value;
+    /// Set memory_in_gbs
+    pub fn set_memory_in_gbs(mut self, value: i64) -> Self {
+        self.memory_in_gbs = value;
         self
     }
 
@@ -72,3 +74,5 @@ impl ContainerInstanceShapeConfig {
         self
     }
 }
+
+

@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 pub enum CreateBootVolumeBackupDetailsType {
     #[serde(rename = "FULL")]
     Full,
-
+    
     #[serde(rename = "INCREMENTAL")]
     Incremental,
-
+    
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

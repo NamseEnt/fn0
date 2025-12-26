@@ -1,0 +1,216 @@
+use serde::{Deserialize, Serialize};
+
+#[allow(unused_imports)]
+use super::*;
+#[allow(unused_imports)]
+use super::super::models::*;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListContainerInstancesRequest {
+    /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources.
+    pub compartment_id: String,
+
+    /// A filter to only return resources that match the given lifecycle state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lifecycle_state: Option<String>,
+
+    /// A filter to return only resources that match the entire display name given.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+
+    /// The name of the availability domain. <p> Example: {@code Uocm:PHX-AD-1}
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub availability_domain: Option<String>,
+
+    /// For list pagination. The maximum number of results per page, or items to return in a paginated \"List\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+
+    /// For list pagination. The value of the opc-next-page response header from the previous \"List\" call. For important details about how pagination works, see [List Pagination](https://docs.oracle.com/iaas/Content/API/Concepts/usingapi.htm#nine).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<String>,
+
+    /// Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opc_request_id: Option<String>,
+
+    /// The sort order to use (ASC) or (DESC).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<SortOrder>,
+
+    /// The field to sort by. You can provide one sort order. Default order for timeCreated is descending. Default order for displayName is ascending. If you don't specify a value, timeCreated is the default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_by: Option<ListContainerInstancesRequestSortBy>,
+}
+
+
+/// Required fields for ListContainerInstancesRequest
+pub struct ListContainerInstancesRequestRequired {
+    /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources.
+    pub compartment_id: String,
+}
+
+impl ListContainerInstancesRequest {
+    /// Create a new ListContainerInstancesRequest with required fields
+    pub fn new(required: ListContainerInstancesRequestRequired) -> Self {
+        Self {
+            compartment_id: required.compartment_id,
+
+            lifecycle_state: None,
+
+            display_name: None,
+
+            availability_domain: None,
+
+            limit: None,
+
+            page: None,
+
+            opc_request_id: None,
+
+            sort_order: None,
+
+            sort_by: None,
+}
+    }
+
+    /// Set compartment_id
+    pub fn set_compartment_id(mut self, value: String) -> Self {
+        self.compartment_id = value;
+        self
+    }
+
+    /// Set lifecycle_state
+    pub fn set_lifecycle_state(mut self, value: Option<String>) -> Self {
+        self.lifecycle_state = value;
+        self
+    }
+
+    /// Set display_name
+    pub fn set_display_name(mut self, value: Option<String>) -> Self {
+        self.display_name = value;
+        self
+    }
+
+    /// Set availability_domain
+    pub fn set_availability_domain(mut self, value: Option<String>) -> Self {
+        self.availability_domain = value;
+        self
+    }
+
+    /// Set limit
+    pub fn set_limit(mut self, value: Option<i64>) -> Self {
+        self.limit = value;
+        self
+    }
+
+    /// Set page
+    pub fn set_page(mut self, value: Option<String>) -> Self {
+        self.page = value;
+        self
+    }
+
+    /// Set opc_request_id
+    pub fn set_opc_request_id(mut self, value: Option<String>) -> Self {
+        self.opc_request_id = value;
+        self
+    }
+
+    /// Set sort_order
+    pub fn set_sort_order(mut self, value: Option<SortOrder>) -> Self {
+        self.sort_order = value;
+        self
+    }
+
+    /// Set sort_by
+    pub fn set_sort_by(mut self, value: Option<ListContainerInstancesRequestSortBy>) -> Self {
+        self.sort_by = value;
+        self
+    }
+
+    /// Set lifecycle_state (unwraps Option)
+    pub fn with_lifecycle_state(mut self, value: impl Into<String>) -> Self {
+        self.lifecycle_state = Some(value.into());
+        self
+    }
+
+    /// Set display_name (unwraps Option)
+    pub fn with_display_name(mut self, value: impl Into<String>) -> Self {
+        self.display_name = Some(value.into());
+        self
+    }
+
+    /// Set availability_domain (unwraps Option)
+    pub fn with_availability_domain(mut self, value: impl Into<String>) -> Self {
+        self.availability_domain = Some(value.into());
+        self
+    }
+
+    /// Set limit (unwraps Option)
+    pub fn with_limit(mut self, value: i64) -> Self {
+        self.limit = Some(value);
+        self
+    }
+
+    /// Set page (unwraps Option)
+    pub fn with_page(mut self, value: impl Into<String>) -> Self {
+        self.page = Some(value.into());
+        self
+    }
+
+    /// Set opc_request_id (unwraps Option)
+    pub fn with_opc_request_id(mut self, value: impl Into<String>) -> Self {
+        self.opc_request_id = Some(value.into());
+        self
+    }
+
+    /// Set sort_order (unwraps Option)
+    pub fn with_sort_order(mut self, value: SortOrder) -> Self {
+        self.sort_order = Some(value);
+        self
+    }
+
+    /// Set sort_by (unwraps Option)
+    pub fn with_sort_by(mut self, value: ListContainerInstancesRequestSortBy) -> Self {
+        self.sort_by = Some(value);
+        self
+    }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        let mut params = Vec::new();
+
+        if let Some(ref lifecycle_state) = self.lifecycle_state {
+            params.push(("lifecycleState".to_string(), lifecycle_state.to_string()));
+        }
+
+        if let Some(ref display_name) = self.display_name {
+            params.push(("displayName".to_string(), display_name.clone()));
+        }
+
+        if let Some(ref availability_domain) = self.availability_domain {
+            params.push(("availabilityDomain".to_string(), availability_domain.clone()));
+        }
+
+        if let Some(ref limit) = self.limit {
+            params.push(("limit".to_string(), limit.to_string()));
+        }
+
+        if let Some(ref page) = self.page {
+            params.push(("page".to_string(), page.clone()));
+        }
+
+        if let Some(ref sort_order) = self.sort_order {
+            params.push(("sortOrder".to_string(), sort_order.to_string()));
+        }
+
+        if let Some(ref sort_by) = self.sort_by {
+            params.push(("sortBy".to_string(), sort_by.to_string()));
+        }
+
+        params
+    }
+
+}
+
+

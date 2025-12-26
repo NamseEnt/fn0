@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -117,10 +117,7 @@ impl ComputeGpuMemoryClusterInstanceSummary {
     }
 
     /// Set lifecycle_state
-    pub fn set_lifecycle_state(
-        mut self,
-        value: Option<ComputeGpuMemoryClusterInstanceSummaryLifecycleState>,
-    ) -> Self {
+    pub fn set_lifecycle_state(mut self, value: Option<ComputeGpuMemoryClusterInstanceSummaryLifecycleState>) -> Self {
         self.lifecycle_state = value;
         self
     }
@@ -180,10 +177,7 @@ impl ComputeGpuMemoryClusterInstanceSummary {
     }
 
     /// Set lifecycle_state (unwraps Option)
-    pub fn with_lifecycle_state(
-        mut self,
-        value: ComputeGpuMemoryClusterInstanceSummaryLifecycleState,
-    ) -> Self {
+    pub fn with_lifecycle_state(mut self, value: ComputeGpuMemoryClusterInstanceSummaryLifecycleState) -> Self {
         self.lifecycle_state = Some(value);
         self
     }
@@ -206,3 +200,4 @@ impl Default for ComputeGpuMemoryClusterInstanceSummary {
         Self::new()
     }
 }
+

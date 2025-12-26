@@ -10,6 +10,7 @@ pub struct DetachComputeHostGroupHostDetails {
     pub compute_host_group_id: String,
 }
 
+
 /// Required fields for DetachComputeHostGroupHostDetails
 pub struct DetachComputeHostGroupHostDetailsRequired {
     /// 'The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute host group.'
@@ -21,7 +22,7 @@ impl DetachComputeHostGroupHostDetails {
     pub fn new(required: DetachComputeHostGroupHostDetailsRequired) -> Self {
         Self {
             compute_host_group_id: required.compute_host_group_id,
-        }
+}
     }
 
     /// Set compute_host_group_id
@@ -30,3 +31,5 @@ impl DetachComputeHostGroupHostDetails {
         self
     }
 }
+
+

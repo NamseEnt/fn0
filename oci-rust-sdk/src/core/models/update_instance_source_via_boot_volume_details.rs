@@ -12,6 +12,7 @@ pub struct UpdateInstanceSourceViaBootVolumeDetails {
     pub source_type: String,
 }
 
+
 /// Required fields for UpdateInstanceSourceViaBootVolumeDetails
 pub struct UpdateInstanceSourceViaBootVolumeDetailsRequired {
     /// The OCID of the boot volume used to boot the instance.
@@ -27,7 +28,7 @@ impl UpdateInstanceSourceViaBootVolumeDetails {
             boot_volume_id: required.boot_volume_id,
 
             source_type: required.source_type,
-        }
+}
     }
 
     /// Set boot_volume_id
@@ -42,3 +43,5 @@ impl UpdateInstanceSourceViaBootVolumeDetails {
         self
     }
 }
+
+

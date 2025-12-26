@@ -26,37 +26,25 @@ impl ContainerCapabilities {
     }
 
     /// Set add_capabilities
-    pub fn set_add_capabilities(
-        mut self,
-        value: Option<Vec<ContainerCapabilitiesAddCapabilities>>,
-    ) -> Self {
+    pub fn set_add_capabilities(mut self, value: Option<Vec<ContainerCapabilitiesAddCapabilities>>) -> Self {
         self.add_capabilities = value;
         self
     }
 
     /// Set drop_capabilities
-    pub fn set_drop_capabilities(
-        mut self,
-        value: Option<Vec<ContainerCapabilitiesDropCapabilities>>,
-    ) -> Self {
+    pub fn set_drop_capabilities(mut self, value: Option<Vec<ContainerCapabilitiesDropCapabilities>>) -> Self {
         self.drop_capabilities = value;
         self
     }
 
     /// Set add_capabilities (unwraps Option)
-    pub fn with_add_capabilities(
-        mut self,
-        value: Vec<ContainerCapabilitiesAddCapabilities>,
-    ) -> Self {
+    pub fn with_add_capabilities(mut self, value: Vec<ContainerCapabilitiesAddCapabilities>) -> Self {
         self.add_capabilities = Some(value);
         self
     }
 
     /// Set drop_capabilities (unwraps Option)
-    pub fn with_drop_capabilities(
-        mut self,
-        value: Vec<ContainerCapabilitiesDropCapabilities>,
-    ) -> Self {
+    pub fn with_drop_capabilities(mut self, value: Vec<ContainerCapabilitiesDropCapabilities>) -> Self {
         self.drop_capabilities = Some(value);
         self
     }
@@ -67,3 +55,4 @@ impl Default for ContainerCapabilities {
         Self::new()
     }
 }
+

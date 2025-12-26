@@ -32,10 +32,7 @@ impl LaunchInstanceAvailabilityConfigDetails {
     }
 
     /// Set recovery_action
-    pub fn set_recovery_action(
-        mut self,
-        value: Option<LaunchInstanceAvailabilityConfigDetailsRecoveryAction>,
-    ) -> Self {
+    pub fn set_recovery_action(mut self, value: Option<LaunchInstanceAvailabilityConfigDetailsRecoveryAction>) -> Self {
         self.recovery_action = value;
         self
     }
@@ -47,10 +44,7 @@ impl LaunchInstanceAvailabilityConfigDetails {
     }
 
     /// Set recovery_action (unwraps Option)
-    pub fn with_recovery_action(
-        mut self,
-        value: LaunchInstanceAvailabilityConfigDetailsRecoveryAction,
-    ) -> Self {
+    pub fn with_recovery_action(mut self, value: LaunchInstanceAvailabilityConfigDetailsRecoveryAction) -> Self {
         self.recovery_action = Some(value);
         self
     }
@@ -61,3 +55,4 @@ impl Default for LaunchInstanceAvailabilityConfigDetails {
         Self::new()
     }
 }
+

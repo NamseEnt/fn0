@@ -1,0 +1,65 @@
+use serde::{Deserialize, Serialize};
+
+#[allow(unused_imports)]
+use super::*;
+#[allow(unused_imports)]
+use super::super::models::*;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateBootVolumeResponse {
+    /// For optimistic concurrency control. See {@code if-match}.
+    pub etag: String,
+
+    /// Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID.
+    pub opc_request_id: String,
+
+    /// The returned model.BootVolume instance.
+    pub boot_volume: BootVolume,
+}
+
+
+/// Required fields for CreateBootVolumeResponse
+pub struct CreateBootVolumeResponseRequired {
+    /// For optimistic concurrency control. See {@code if-match}.
+    pub etag: String,
+
+    /// Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID.
+    pub opc_request_id: String,
+
+    /// The returned model.BootVolume instance.
+    pub boot_volume: BootVolume,
+}
+
+impl CreateBootVolumeResponse {
+    /// Create a new CreateBootVolumeResponse with required fields
+    pub fn new(required: CreateBootVolumeResponseRequired) -> Self {
+        Self {
+            etag: required.etag,
+
+            opc_request_id: required.opc_request_id,
+
+            boot_volume: required.boot_volume,
+}
+    }
+
+    /// Set etag
+    pub fn set_etag(mut self, value: String) -> Self {
+        self.etag = value;
+        self
+    }
+
+    /// Set opc_request_id
+    pub fn set_opc_request_id(mut self, value: String) -> Self {
+        self.opc_request_id = value;
+        self
+    }
+
+    /// Set boot_volume
+    pub fn set_boot_volume(mut self, value: BootVolume) -> Self {
+        self.boot_volume = value;
+        self
+    }
+}
+
+

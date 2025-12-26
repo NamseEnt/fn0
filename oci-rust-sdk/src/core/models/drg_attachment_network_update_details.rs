@@ -10,6 +10,7 @@ pub struct DrgAttachmentNetworkUpdateDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for DrgAttachmentNetworkUpdateDetails
 pub struct DrgAttachmentNetworkUpdateDetailsRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl DrgAttachmentNetworkUpdateDetails {
     pub fn new(required: DrgAttachmentNetworkUpdateDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl DrgAttachmentNetworkUpdateDetails {
         self
     }
 }
+
+

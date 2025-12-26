@@ -13,6 +13,7 @@ pub struct VolumeGroupSourceFromVolumeGroupBackupDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for VolumeGroupSourceFromVolumeGroupBackupDetails
 pub struct VolumeGroupSourceFromVolumeGroupBackupDetailsRequired {
     /// The OCID of the volume group backup to restore from.
@@ -28,7 +29,7 @@ impl VolumeGroupSourceFromVolumeGroupBackupDetails {
             volume_group_backup_id: required.volume_group_backup_id,
 
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set volume_group_backup_id
@@ -43,3 +44,5 @@ impl VolumeGroupSourceFromVolumeGroupBackupDetails {
         self
     }
 }
+
+

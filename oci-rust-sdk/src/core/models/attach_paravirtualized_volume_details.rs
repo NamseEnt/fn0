@@ -14,6 +14,7 @@ pub struct AttachParavirtualizedVolumeDetails {
     pub is_pv_encryption_in_transit_enabled: Option<bool>,
 }
 
+
 /// Required fields for AttachParavirtualizedVolumeDetails
 pub struct AttachParavirtualizedVolumeDetailsRequired {
     pub r#type: String,
@@ -26,7 +27,7 @@ impl AttachParavirtualizedVolumeDetails {
             r#type: required.r#type,
 
             is_pv_encryption_in_transit_enabled: None,
-        }
+}
     }
 
     /// Set is_pv_encryption_in_transit_enabled
@@ -47,3 +48,5 @@ impl AttachParavirtualizedVolumeDetails {
         self
     }
 }
+
+

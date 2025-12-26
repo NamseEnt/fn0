@@ -14,7 +14,9 @@ pub struct UpdateDrgRouteRulesDetails {
 impl UpdateDrgRouteRulesDetails {
     /// Create a new UpdateDrgRouteRulesDetails
     pub fn new() -> Self {
-        Self { route_rules: None }
+        Self {
+            route_rules: None,
+        }
     }
 
     /// Set route_rules
@@ -35,3 +37,4 @@ impl Default for UpdateDrgRouteRulesDetails {
         Self::new()
     }
 }
+

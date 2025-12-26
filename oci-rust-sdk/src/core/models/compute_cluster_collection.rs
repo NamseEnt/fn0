@@ -10,6 +10,7 @@ pub struct ComputeClusterCollection {
     pub items: Vec<ComputeClusterSummary>,
 }
 
+
 /// Required fields for ComputeClusterCollection
 pub struct ComputeClusterCollectionRequired {
     /// The list of compute clusters.
@@ -21,7 +22,7 @@ impl ComputeClusterCollection {
     pub fn new(required: ComputeClusterCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ComputeClusterCollection {
         self
     }
 }
+
+

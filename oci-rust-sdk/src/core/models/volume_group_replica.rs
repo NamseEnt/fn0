@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -24,7 +24,7 @@ pub struct VolumeGroupReplica {
     pub lifecycle_state: VolumeGroupReplicaLifecycleState,
 
     /// The aggregate size of the volume group replica in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_g_bs: i64,
+    pub size_in_gbs: i64,
 
     /// The OCID of the source volume group.
     pub volume_group_id: String,
@@ -47,6 +47,7 @@ pub struct VolumeGroupReplica {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for VolumeGroupReplica
 pub struct VolumeGroupReplicaRequired {
     /// The availability domain of the volume group replica.
@@ -65,7 +66,7 @@ pub struct VolumeGroupReplicaRequired {
     pub lifecycle_state: VolumeGroupReplicaLifecycleState,
 
     /// The aggregate size of the volume group replica in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_g_bs: i64,
+    pub size_in_gbs: i64,
 
     /// The OCID of the source volume group.
     pub volume_group_id: String,
@@ -94,7 +95,7 @@ impl VolumeGroupReplica {
 
             lifecycle_state: required.lifecycle_state,
 
-            size_in_g_bs: required.size_in_g_bs,
+            size_in_gbs: required.size_in_gbs,
 
             volume_group_id: required.volume_group_id,
 
@@ -107,7 +108,7 @@ impl VolumeGroupReplica {
             defined_tags: None,
 
             freeform_tags: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -123,10 +124,7 @@ impl VolumeGroupReplica {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -155,9 +153,9 @@ impl VolumeGroupReplica {
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
@@ -186,10 +184,7 @@ impl VolumeGroupReplica {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -200,3 +195,5 @@ impl VolumeGroupReplica {
         self
     }
 }
+
+

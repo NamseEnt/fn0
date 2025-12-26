@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -24,7 +24,7 @@ pub struct BlockVolumeReplica {
     pub lifecycle_state: BlockVolumeReplicaLifecycleState,
 
     /// The size of the source block volume, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_g_bs: i64,
+    pub size_in_gbs: i64,
 
     /// The date and time the block volume replica was created. Format defined by [RFC3339](https://tools.ietf.org/html/rfc3339).
     pub time_created: DateTime<Utc>,
@@ -45,7 +45,7 @@ pub struct BlockVolumeReplica {
 
     /// The total size of the data transferred from the source block volume to the block volume replica, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_data_transferred_in_g_bs: Option<i64>,
+    pub total_data_transferred_in_gbs: Option<i64>,
 
     /// The OCID of the volume group replica.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -55,6 +55,7 @@ pub struct BlockVolumeReplica {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kms_key_id: Option<String>,
 }
+
 
 /// Required fields for BlockVolumeReplica
 pub struct BlockVolumeReplicaRequired {
@@ -74,7 +75,7 @@ pub struct BlockVolumeReplicaRequired {
     pub lifecycle_state: BlockVolumeReplicaLifecycleState,
 
     /// The size of the source block volume, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_g_bs: i64,
+    pub size_in_gbs: i64,
 
     /// The date and time the block volume replica was created. Format defined by [RFC3339](https://tools.ietf.org/html/rfc3339).
     pub time_created: DateTime<Utc>,
@@ -100,7 +101,7 @@ impl BlockVolumeReplica {
 
             lifecycle_state: required.lifecycle_state,
 
-            size_in_g_bs: required.size_in_g_bs,
+            size_in_gbs: required.size_in_gbs,
 
             time_created: required.time_created,
 
@@ -112,12 +113,12 @@ impl BlockVolumeReplica {
 
             freeform_tags: None,
 
-            total_data_transferred_in_g_bs: None,
+            total_data_transferred_in_gbs: None,
 
             volume_group_replica_id: None,
 
             kms_key_id: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -133,10 +134,7 @@ impl BlockVolumeReplica {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -165,9 +163,9 @@ impl BlockVolumeReplica {
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
@@ -189,9 +187,9 @@ impl BlockVolumeReplica {
         self
     }
 
-    /// Set total_data_transferred_in_g_bs
-    pub fn set_total_data_transferred_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.total_data_transferred_in_g_bs = value;
+    /// Set total_data_transferred_in_gbs
+    pub fn set_total_data_transferred_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.total_data_transferred_in_gbs = value;
         self
     }
 
@@ -208,10 +206,7 @@ impl BlockVolumeReplica {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -222,9 +217,9 @@ impl BlockVolumeReplica {
         self
     }
 
-    /// Set total_data_transferred_in_g_bs (unwraps Option)
-    pub fn with_total_data_transferred_in_g_bs(mut self, value: i64) -> Self {
-        self.total_data_transferred_in_g_bs = Some(value);
+    /// Set total_data_transferred_in_gbs (unwraps Option)
+    pub fn with_total_data_transferred_in_gbs(mut self, value: i64) -> Self {
+        self.total_data_transferred_in_gbs = Some(value);
         self
     }
 
@@ -240,3 +235,5 @@ impl BlockVolumeReplica {
         self
     }
 }
+
+

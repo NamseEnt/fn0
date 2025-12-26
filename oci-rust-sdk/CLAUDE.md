@@ -1,5 +1,36 @@
 # OCI Rust SDK - Development Guidelines
 
+## CRITICAL: No Manual Code Fixes
+
+**ALL code in `src/` (except hand-written modules like `auth/` and main service modules) is auto-generated.**
+
+### Absolute Rules:
+
+1. **NEVER manually edit generated files** in:
+   - `src/*/models/*.rs`
+   - `src/*/requests/*.rs`
+   - `src/*/responses/*.rs`
+
+2. **If generated code has issues**:
+   - ❌ DO NOT fix the generated `.rs` files directly
+   - ✅ DO fix the code generation templates in `tools/generator/templates/`
+   - ✅ DO fix the code generator logic in `tools/generator/src/`
+   - ✅ DO regenerate the service using `./generate-sdk.sh <service>`
+
+3. **Why this matters**:
+   - Manual fixes will be **lost** on next regeneration
+   - Manual fixes create **inconsistencies** across services
+   - The **root cause** must be fixed in the generator
+
+### When you find bugs in generated code:
+
+1. Identify the template or generator code responsible
+2. Fix the template/generator
+3. Regenerate ALL affected services
+4. Commit both the generator fix AND regenerated code
+
+**Exception**: Hand-written code like `src/auth/`, `src/lib.rs`, service-level `mod.rs` files can be edited directly.
+
 ## Struct Builder Pattern Standards
 
 All model structs in this codebase MUST follow these builder pattern rules:

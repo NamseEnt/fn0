@@ -73,3 +73,4 @@ impl Default for CpeDeviceConfigQuestion {
         Self::new()
     }
 }
+

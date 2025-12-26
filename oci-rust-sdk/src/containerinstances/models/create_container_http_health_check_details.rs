@@ -19,6 +19,7 @@ pub struct CreateContainerHttpHealthCheckDetails {
     pub headers: Option<Vec<HealthCheckHttpHeader>>,
 }
 
+
 /// Required fields for CreateContainerHttpHealthCheckDetails
 pub struct CreateContainerHttpHealthCheckDetailsRequired {
     /// Container health check HTTP path.
@@ -41,7 +42,7 @@ impl CreateContainerHttpHealthCheckDetails {
             health_check_type: required.health_check_type,
 
             headers: None,
-        }
+}
     }
 
     /// Set path
@@ -74,3 +75,5 @@ impl CreateContainerHttpHealthCheckDetails {
         self
     }
 }
+
+

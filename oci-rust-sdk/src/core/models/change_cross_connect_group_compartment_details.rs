@@ -10,6 +10,7 @@ pub struct ChangeCrossConnectGroupCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeCrossConnectGroupCompartmentDetails
 pub struct ChangeCrossConnectGroupCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the cross-connect group to.
@@ -21,7 +22,7 @@ impl ChangeCrossConnectGroupCompartmentDetails {
     pub fn new(required: ChangeCrossConnectGroupCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeCrossConnectGroupCompartmentDetails {
         self
     }
 }
+
+

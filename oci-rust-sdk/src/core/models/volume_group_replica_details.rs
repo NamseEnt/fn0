@@ -18,6 +18,7 @@ pub struct VolumeGroupReplicaDetails {
     pub xrr_kms_key_id: Option<String>,
 }
 
+
 /// Required fields for VolumeGroupReplicaDetails
 pub struct VolumeGroupReplicaDetailsRequired {
     /// The availability domain of the volume group replica. <p> Example: {@code Uocm:PHX-AD-1}
@@ -33,7 +34,7 @@ impl VolumeGroupReplicaDetails {
             display_name: None,
 
             xrr_kms_key_id: None,
-        }
+}
     }
 
     /// Set display_name
@@ -66,3 +67,5 @@ impl VolumeGroupReplicaDetails {
         self
     }
 }
+
+

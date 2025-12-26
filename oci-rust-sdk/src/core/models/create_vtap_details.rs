@@ -76,6 +76,7 @@ pub struct CreateVtapDetails {
     pub source_private_endpoint_subnet_id: Option<String>,
 }
 
+
 /// Required fields for CreateVtapDetails
 pub struct CreateVtapDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the {@code Vtap} resource.
@@ -130,7 +131,7 @@ impl CreateVtapDetails {
             source_private_endpoint_ip: None,
 
             source_private_endpoint_subnet_id: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -146,10 +147,7 @@ impl CreateVtapDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -191,10 +189,7 @@ impl CreateVtapDetails {
     }
 
     /// Set encapsulation_protocol
-    pub fn set_encapsulation_protocol(
-        mut self,
-        value: Option<CreateVtapDetailsEncapsulationProtocol>,
-    ) -> Self {
+    pub fn set_encapsulation_protocol(mut self, value: Option<CreateVtapDetailsEncapsulationProtocol>) -> Self {
         self.encapsulation_protocol = value;
         self
     }
@@ -248,10 +243,7 @@ impl CreateVtapDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -281,10 +273,7 @@ impl CreateVtapDetails {
     }
 
     /// Set encapsulation_protocol (unwraps Option)
-    pub fn with_encapsulation_protocol(
-        mut self,
-        value: CreateVtapDetailsEncapsulationProtocol,
-    ) -> Self {
+    pub fn with_encapsulation_protocol(mut self, value: CreateVtapDetailsEncapsulationProtocol) -> Self {
         self.encapsulation_protocol = Some(value);
         self
     }
@@ -337,3 +326,5 @@ impl CreateVtapDetails {
         self
     }
 }
+
+

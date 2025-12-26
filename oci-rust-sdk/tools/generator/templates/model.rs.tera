@@ -4,7 +4,11 @@ use serde::{Deserialize, Serialize};
 {% endif %}
 #[allow(unused_imports)]
 use super::*;
-{% if documentation %}/// {{ documentation }}{% endif %}
+{% if is_request %}#[allow(unused_imports)]
+use super::super::models::*;
+{% endif %}{% if is_response %}#[allow(unused_imports)]
+use super::super::models::*;
+{% endif %}{% if documentation %}/// {{ documentation }}{% endif %}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct {{ name }} {

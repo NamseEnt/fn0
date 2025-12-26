@@ -17,6 +17,7 @@ pub struct DedicatedVmHostInstanceShapeSummary {
     pub supported_capabilities: Option<SupportedCapabilities>,
 }
 
+
 /// Required fields for DedicatedVmHostInstanceShapeSummary
 pub struct DedicatedVmHostInstanceShapeSummaryRequired {
     /// The name of the virtual machine instance shapes that can be launched on a dedicated VM host.
@@ -32,7 +33,7 @@ impl DedicatedVmHostInstanceShapeSummary {
             availability_domain: None,
 
             supported_capabilities: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -65,3 +66,5 @@ impl DedicatedVmHostInstanceShapeSummary {
         self
     }
 }
+
+

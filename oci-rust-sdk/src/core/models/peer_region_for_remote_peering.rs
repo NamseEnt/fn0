@@ -10,6 +10,7 @@ pub struct PeerRegionForRemotePeering {
     pub name: String,
 }
 
+
 /// Required fields for PeerRegionForRemotePeering
 pub struct PeerRegionForRemotePeeringRequired {
     /// The region's name. <p> Example: {@code us-phoenix-1}
@@ -21,7 +22,7 @@ impl PeerRegionForRemotePeering {
     pub fn new(required: PeerRegionForRemotePeeringRequired) -> Self {
         Self {
             name: required.name,
-        }
+}
     }
 
     /// Set name
@@ -30,3 +31,5 @@ impl PeerRegionForRemotePeering {
         self
     }
 }
+
+

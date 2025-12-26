@@ -53,6 +53,7 @@ pub struct ListIpInventoryDetails {
     pub pagination_limit: Option<i64>,
 }
 
+
 /// Required fields for ListIpInventoryDetails
 pub struct ListIpInventoryDetailsRequired {
     /// Lists the selected regions.
@@ -89,7 +90,7 @@ impl ListIpInventoryDetails {
             pagination_offset: None,
 
             pagination_limit: None,
-        }
+}
     }
 
     /// Set region_list
@@ -129,10 +130,7 @@ impl ListIpInventoryDetails {
     }
 
     /// Set resource_type_list
-    pub fn set_resource_type_list(
-        mut self,
-        value: Option<Vec<ListIpInventoryDetailsResourceTypeList>>,
-    ) -> Self {
+    pub fn set_resource_type_list(mut self, value: Option<Vec<ListIpInventoryDetailsResourceTypeList>>) -> Self {
         self.resource_type_list = value;
         self
     }
@@ -192,10 +190,7 @@ impl ListIpInventoryDetails {
     }
 
     /// Set resource_type_list (unwraps Option)
-    pub fn with_resource_type_list(
-        mut self,
-        value: Vec<ListIpInventoryDetailsResourceTypeList>,
-    ) -> Self {
+    pub fn with_resource_type_list(mut self, value: Vec<ListIpInventoryDetailsResourceTypeList>) -> Self {
         self.resource_type_list = Some(value);
         self
     }
@@ -230,3 +225,5 @@ impl ListIpInventoryDetails {
         self
     }
 }
+
+

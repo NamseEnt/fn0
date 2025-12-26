@@ -26,6 +26,7 @@ pub struct PlatformConfig {
     pub is_memory_encryption_enabled: Option<bool>,
 }
 
+
 /// Required fields for PlatformConfig
 pub struct PlatformConfigRequired {
     pub r#type: String,
@@ -44,7 +45,7 @@ impl PlatformConfig {
             is_measured_boot_enabled: None,
 
             is_memory_encryption_enabled: None,
-        }
+}
     }
 
     /// Set is_secure_boot_enabled
@@ -101,3 +102,5 @@ impl PlatformConfig {
         self
     }
 }
+
+

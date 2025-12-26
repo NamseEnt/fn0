@@ -13,6 +13,7 @@ pub struct SoftResetActionDetails {
     pub allow_dense_reboot_migration: Option<bool>,
 }
 
+
 /// Required fields for SoftResetActionDetails
 pub struct SoftResetActionDetailsRequired {
     pub action_type: String,
@@ -25,7 +26,7 @@ impl SoftResetActionDetails {
             action_type: required.action_type,
 
             allow_dense_reboot_migration: None,
-        }
+}
     }
 
     /// Set allow_dense_reboot_migration
@@ -46,3 +47,5 @@ impl SoftResetActionDetails {
         self
     }
 }
+
+

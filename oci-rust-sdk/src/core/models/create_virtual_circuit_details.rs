@@ -91,6 +91,7 @@ pub struct CreateVirtualCircuitDetails {
     pub ip_mtu: Option<VirtualCircuitIpMtu>,
 }
 
+
 /// Required fields for CreateVirtualCircuitDetails
 pub struct CreateVirtualCircuitDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the virtual circuit.
@@ -145,7 +146,7 @@ impl CreateVirtualCircuitDetails {
             region: None,
 
             ip_mtu: None,
-        }
+}
     }
 
     /// Set bandwidth_shape_name
@@ -167,19 +168,13 @@ impl CreateVirtualCircuitDetails {
     }
 
     /// Set routing_policy
-    pub fn set_routing_policy(
-        mut self,
-        value: Option<Vec<CreateVirtualCircuitDetailsRoutingPolicy>>,
-    ) -> Self {
+    pub fn set_routing_policy(mut self, value: Option<Vec<CreateVirtualCircuitDetailsRoutingPolicy>>) -> Self {
         self.routing_policy = value;
         self
     }
 
     /// Set bgp_admin_state
-    pub fn set_bgp_admin_state(
-        mut self,
-        value: Option<CreateVirtualCircuitDetailsBgpAdminState>,
-    ) -> Self {
+    pub fn set_bgp_admin_state(mut self, value: Option<CreateVirtualCircuitDetailsBgpAdminState>) -> Self {
         self.bgp_admin_state = value;
         self
     }
@@ -209,10 +204,7 @@ impl CreateVirtualCircuitDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -260,10 +252,7 @@ impl CreateVirtualCircuitDetails {
     }
 
     /// Set public_prefixes
-    pub fn set_public_prefixes(
-        mut self,
-        value: Option<Vec<CreateVirtualCircuitPublicPrefixDetails>>,
-    ) -> Self {
+    pub fn set_public_prefixes(mut self, value: Option<Vec<CreateVirtualCircuitPublicPrefixDetails>>) -> Self {
         self.public_prefixes = value;
         self
     }
@@ -299,10 +288,7 @@ impl CreateVirtualCircuitDetails {
     }
 
     /// Set routing_policy (unwraps Option)
-    pub fn with_routing_policy(
-        mut self,
-        value: Vec<CreateVirtualCircuitDetailsRoutingPolicy>,
-    ) -> Self {
+    pub fn with_routing_policy(mut self, value: Vec<CreateVirtualCircuitDetailsRoutingPolicy>) -> Self {
         self.routing_policy = Some(value);
         self
     }
@@ -338,10 +324,7 @@ impl CreateVirtualCircuitDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -389,10 +372,7 @@ impl CreateVirtualCircuitDetails {
     }
 
     /// Set public_prefixes (unwraps Option)
-    pub fn with_public_prefixes(
-        mut self,
-        value: Vec<CreateVirtualCircuitPublicPrefixDetails>,
-    ) -> Self {
+    pub fn with_public_prefixes(mut self, value: Vec<CreateVirtualCircuitPublicPrefixDetails>) -> Self {
         self.public_prefixes = Some(value);
         self
     }
@@ -409,3 +389,5 @@ impl CreateVirtualCircuitDetails {
         self
     }
 }
+
+

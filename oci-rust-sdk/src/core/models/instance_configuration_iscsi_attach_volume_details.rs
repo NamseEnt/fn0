@@ -14,6 +14,7 @@ pub struct InstanceConfigurationIscsiAttachVolumeDetails {
     pub use_chap: Option<bool>,
 }
 
+
 /// Required fields for InstanceConfigurationIscsiAttachVolumeDetails
 pub struct InstanceConfigurationIscsiAttachVolumeDetailsRequired {
     pub r#type: String,
@@ -26,7 +27,7 @@ impl InstanceConfigurationIscsiAttachVolumeDetails {
             r#type: required.r#type,
 
             use_chap: None,
-        }
+}
     }
 
     /// Set use_chap
@@ -47,3 +48,5 @@ impl InstanceConfigurationIscsiAttachVolumeDetails {
         self
     }
 }
+
+

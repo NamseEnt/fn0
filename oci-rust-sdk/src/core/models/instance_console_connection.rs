@@ -87,10 +87,7 @@ impl InstanceConsoleConnection {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -120,10 +117,7 @@ impl InstanceConsoleConnection {
     }
 
     /// Set lifecycle_state
-    pub fn set_lifecycle_state(
-        mut self,
-        value: Option<InstanceConsoleConnectionLifecycleState>,
-    ) -> Self {
+    pub fn set_lifecycle_state(mut self, value: Option<InstanceConsoleConnectionLifecycleState>) -> Self {
         self.lifecycle_state = value;
         self
     }
@@ -153,10 +147,7 @@ impl InstanceConsoleConnection {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -209,3 +200,4 @@ impl Default for InstanceConsoleConnection {
         Self::new()
     }
 }
+

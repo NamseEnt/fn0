@@ -72,3 +72,4 @@ impl Default for AddVcnIpv6CidrDetails {
         Self::new()
     }
 }
+

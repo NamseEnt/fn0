@@ -29,6 +29,7 @@ pub struct CreateRouteTableDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for CreateRouteTableDetails
 pub struct CreateRouteTableDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the route table.
@@ -56,7 +57,7 @@ impl CreateRouteTableDetails {
             display_name: None,
 
             freeform_tags: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -66,10 +67,7 @@ impl CreateRouteTableDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -99,10 +97,7 @@ impl CreateRouteTableDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -119,3 +114,5 @@ impl CreateRouteTableDetails {
         self
     }
 }
+
+

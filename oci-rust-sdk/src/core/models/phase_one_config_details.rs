@@ -50,28 +50,19 @@ impl PhaseOneConfigDetails {
     }
 
     /// Set authentication_algorithm
-    pub fn set_authentication_algorithm(
-        mut self,
-        value: Option<PhaseOneConfigDetailsAuthenticationAlgorithm>,
-    ) -> Self {
+    pub fn set_authentication_algorithm(mut self, value: Option<PhaseOneConfigDetailsAuthenticationAlgorithm>) -> Self {
         self.authentication_algorithm = value;
         self
     }
 
     /// Set encryption_algorithm
-    pub fn set_encryption_algorithm(
-        mut self,
-        value: Option<PhaseOneConfigDetailsEncryptionAlgorithm>,
-    ) -> Self {
+    pub fn set_encryption_algorithm(mut self, value: Option<PhaseOneConfigDetailsEncryptionAlgorithm>) -> Self {
         self.encryption_algorithm = value;
         self
     }
 
     /// Set diffie_helman_group
-    pub fn set_diffie_helman_group(
-        mut self,
-        value: Option<PhaseOneConfigDetailsDiffieHelmanGroup>,
-    ) -> Self {
+    pub fn set_diffie_helman_group(mut self, value: Option<PhaseOneConfigDetailsDiffieHelmanGroup>) -> Self {
         self.diffie_helman_group = value;
         self
     }
@@ -89,28 +80,19 @@ impl PhaseOneConfigDetails {
     }
 
     /// Set authentication_algorithm (unwraps Option)
-    pub fn with_authentication_algorithm(
-        mut self,
-        value: PhaseOneConfigDetailsAuthenticationAlgorithm,
-    ) -> Self {
+    pub fn with_authentication_algorithm(mut self, value: PhaseOneConfigDetailsAuthenticationAlgorithm) -> Self {
         self.authentication_algorithm = Some(value);
         self
     }
 
     /// Set encryption_algorithm (unwraps Option)
-    pub fn with_encryption_algorithm(
-        mut self,
-        value: PhaseOneConfigDetailsEncryptionAlgorithm,
-    ) -> Self {
+    pub fn with_encryption_algorithm(mut self, value: PhaseOneConfigDetailsEncryptionAlgorithm) -> Self {
         self.encryption_algorithm = Some(value);
         self
     }
 
     /// Set diffie_helman_group (unwraps Option)
-    pub fn with_diffie_helman_group(
-        mut self,
-        value: PhaseOneConfigDetailsDiffieHelmanGroup,
-    ) -> Self {
+    pub fn with_diffie_helman_group(mut self, value: PhaseOneConfigDetailsDiffieHelmanGroup) -> Self {
         self.diffie_helman_group = Some(value);
         self
     }
@@ -127,3 +109,4 @@ impl Default for PhaseOneConfigDetails {
         Self::new()
     }
 }
+

@@ -13,6 +13,7 @@ pub struct ExportImageDetails {
     pub export_format: Option<ExportImageDetailsExportFormat>,
 }
 
+
 /// Required fields for ExportImageDetails
 pub struct ExportImageDetailsRequired {
     pub destination_type: String,
@@ -25,7 +26,7 @@ impl ExportImageDetails {
             destination_type: required.destination_type,
 
             export_format: None,
-        }
+}
     }
 
     /// Set export_format
@@ -46,3 +47,5 @@ impl ExportImageDetails {
         self
     }
 }
+
+

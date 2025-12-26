@@ -13,6 +13,7 @@ pub struct AddPublicIpPoolCapacityDetails {
     pub cidr_block: String,
 }
 
+
 /// Required fields for AddPublicIpPoolCapacityDetails
 pub struct AddPublicIpPoolCapacityDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code ByoipRange} resource to which the CIDR block belongs.
@@ -29,7 +30,7 @@ impl AddPublicIpPoolCapacityDetails {
             byoip_range_id: required.byoip_range_id,
 
             cidr_block: required.cidr_block,
-        }
+}
     }
 
     /// Set byoip_range_id
@@ -44,3 +45,5 @@ impl AddPublicIpPoolCapacityDetails {
         self
     }
 }
+
+

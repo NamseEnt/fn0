@@ -13,6 +13,7 @@ pub struct ContainerConfigFileVolume {
     pub configs: Option<Vec<ContainerConfigFile>>,
 }
 
+
 /// Required fields for ContainerConfigFileVolume
 pub struct ContainerConfigFileVolumeRequired {
     pub volume_type: String,
@@ -25,7 +26,7 @@ impl ContainerConfigFileVolume {
             volume_type: required.volume_type,
 
             configs: None,
-        }
+}
     }
 
     /// Set configs
@@ -46,3 +47,5 @@ impl ContainerConfigFileVolume {
         self
     }
 }
+
+

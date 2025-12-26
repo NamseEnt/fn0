@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -63,6 +63,7 @@ pub struct VolumeAttachment {
     pub is_volume_created_during_launch: Option<bool>,
 }
 
+
 /// Required fields for VolumeAttachment
 pub struct VolumeAttachmentRequired {
     /// The availability domain of an instance. <p> Example: {@code Uocm:PHX-AD-1}
@@ -124,7 +125,7 @@ impl VolumeAttachment {
             iscsi_login_state: None,
 
             is_volume_created_during_launch: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -271,3 +272,5 @@ impl VolumeAttachment {
         self
     }
 }
+
+

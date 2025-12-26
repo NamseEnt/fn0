@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -19,6 +19,7 @@ pub struct NetworkSecurityGroupVnic {
     pub time_associated: Option<DateTime<Utc>>,
 }
 
+
 /// Required fields for NetworkSecurityGroupVnic
 pub struct NetworkSecurityGroupVnicRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VNIC.
@@ -34,7 +35,7 @@ impl NetworkSecurityGroupVnic {
             resource_id: None,
 
             time_associated: None,
-        }
+}
     }
 
     /// Set resource_id
@@ -67,3 +68,5 @@ impl NetworkSecurityGroupVnic {
         self
     }
 }
+
+

@@ -1,20 +1,24 @@
 use oci_rust_sdk::{
-    core::{ClientConfig, RetryConfiguration, auth::ConfigFileAuthProvider, region::Region},
-    virtual_network::{
-        self, Lifetime, ListPublicIpsRequest, ListPublicIpsRequestRequiredFields, Scope,
+    auth::ConfigFileAuthProvider,
+    core::{
+        self, region::Region, Retrier, ListPublicIpsRequest, ListPublicIpsRequestLifetime,
+        ListPublicIpsRequestRequired, ListPublicIpsRequestScope,
     },
 };
+use std::sync::Arc;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let auth = ConfigFileAuthProvider::from_default()?;
+    // Set up authentication from default OCI config file
+    let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
 
-    let client = virtual_network::client(ClientConfig {
+    // Create a Core Services client
+    let client = core::client(core::ClientConfig {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(30),
-        retry: RetryConfiguration::no_retry(),
+        retry: Retrier::new(),
     })?;
 
     // IMPORTANT: Replace this with your actual compartment OCID
@@ -22,12 +26,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "ocid1.compartment.oc1..aaaaaaaxxxxx".to_string());
 
     println!("=== Example 1: List Regional Public IPs ===");
-    let request = ListPublicIpsRequest::builder(ListPublicIpsRequestRequiredFields {
-        scope: Scope::Region,
+    let request = ListPublicIpsRequest::new(ListPublicIpsRequestRequired {
+        scope: ListPublicIpsRequestScope::Region,
         compartment_id: compartment_id.clone(),
     })
-    .limit(10)
-    .build();
+    .with_limit(10);
 
     match client.list_public_ips(request).await {
         Ok(response) => {
@@ -36,14 +39,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!(
                     "  - {}: {}",
                     ip.display_name.as_deref().unwrap_or("(unnamed)"),
-                    ip.ip_address
+                    ip.ip_address.as_deref().unwrap_or("N/A")
                 );
-                println!("    ID: {}", ip.id);
+                if let Some(ref id) = ip.id {
+                    println!("    ID: {}", id);
+                }
                 println!("    State: {:?}", ip.lifecycle_state);
                 println!("    Lifetime: {:?}", ip.lifetime);
                 if let Some(ref entity_id) = ip.assigned_entity_id {
                     println!("    Assigned to: {}", entity_id);
-                    println!("    Entity type: {:?}", ip.assigned_entity_type);
+                    if let Some(ref entity_type) = ip.assigned_entity_type {
+                        println!("    Entity type: {:?}", entity_type);
+                    }
                 }
             }
 
@@ -61,18 +68,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Example 2: List Reserved Public IPs Only ===");
-    let request = ListPublicIpsRequest::builder(ListPublicIpsRequestRequiredFields {
-        scope: Scope::Region,
+    let request = ListPublicIpsRequest::new(ListPublicIpsRequestRequired {
+        scope: ListPublicIpsRequestScope::Region,
         compartment_id: compartment_id.clone(),
     })
-    .lifetime(Lifetime::Reserved)
-    .build();
+    .with_lifetime(ListPublicIpsRequestLifetime::Reserved);
 
     match client.list_public_ips(request).await {
         Ok(response) => {
             println!("Found {} reserved public IPs", response.items.len());
             for ip in &response.items {
-                println!("  - {}", ip.ip_address);
+                println!("  - {}", ip.ip_address.as_deref().unwrap_or("N/A"));
                 println!(
                     "    Name: {}",
                     ip.display_name.as_deref().unwrap_or("(unnamed)")
@@ -90,20 +96,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Example 3: List Ephemeral Public IPs ===");
-    let request = ListPublicIpsRequest::builder(ListPublicIpsRequestRequiredFields {
-        scope: Scope::Region,
+    let request = ListPublicIpsRequest::new(ListPublicIpsRequestRequired {
+        scope: ListPublicIpsRequestScope::Region,
         compartment_id: compartment_id.clone(),
     })
-    .lifetime(Lifetime::Ephemeral)
-    .limit(5)
-    .build();
+    .with_lifetime(ListPublicIpsRequestLifetime::Ephemeral)
+    .with_limit(5);
 
     match client.list_public_ips(request).await {
         Ok(response) => {
             println!("Found {} ephemeral public IPs", response.items.len());
             for ip in &response.items {
-                println!("  - {}", ip.ip_address);
-                println!("    Created: {}", ip.time_created);
+                println!("  - {}", ip.ip_address.as_deref().unwrap_or("N/A"));
+                if let Some(ref created) = ip.time_created {
+                    println!("    Created: {}", created);
+                }
                 if let Some(ref pool_id) = ip.public_ip_pool_id {
                     println!("    Pool: {}", pool_id);
                 }
@@ -120,18 +127,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_pages = 3;
 
     loop {
-        let mut request_builder =
-            ListPublicIpsRequest::builder(ListPublicIpsRequestRequiredFields {
-                scope: Scope::Region,
-                compartment_id: compartment_id.clone(),
-            })
-            .limit(2);
+        let mut request = ListPublicIpsRequest::new(ListPublicIpsRequestRequired {
+            scope: ListPublicIpsRequestScope::Region,
+            compartment_id: compartment_id.clone(),
+        })
+        .with_limit(2); // Small limit to demonstrate pagination
 
         if let Some(ref token) = page_token {
-            request_builder = request_builder.page(token);
+            request = request.with_page(token);
         }
-
-        let request = request_builder.build();
 
         match client.list_public_ips(request).await {
             Ok(response) => {
@@ -141,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     response.items.len()
                 );
                 for ip in &response.items {
-                    println!("  - {}", ip.ip_address);
+                    println!("  - {}", ip.ip_address.as_deref().unwrap_or("N/A"));
                 }
 
                 // Check if there are more pages

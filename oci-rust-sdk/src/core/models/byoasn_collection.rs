@@ -10,6 +10,7 @@ pub struct ByoasnCollection {
     pub items: Vec<ByoasnSummary>,
 }
 
+
 /// Required fields for ByoasnCollection
 pub struct ByoasnCollectionRequired {
     /// A list of {@code Byoasn} resource summaries.
@@ -21,7 +22,7 @@ impl ByoasnCollection {
     pub fn new(required: ByoasnCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ByoasnCollection {
         self
     }
 }
+
+

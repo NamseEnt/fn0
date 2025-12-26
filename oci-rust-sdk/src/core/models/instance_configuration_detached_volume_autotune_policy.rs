@@ -9,6 +9,7 @@ pub struct InstanceConfigurationDetachedVolumeAutotunePolicy {
     pub autotune_type: String,
 }
 
+
 /// Required fields for InstanceConfigurationDetachedVolumeAutotunePolicy
 pub struct InstanceConfigurationDetachedVolumeAutotunePolicyRequired {
     pub autotune_type: String,
@@ -19,7 +20,7 @@ impl InstanceConfigurationDetachedVolumeAutotunePolicy {
     pub fn new(required: InstanceConfigurationDetachedVolumeAutotunePolicyRequired) -> Self {
         Self {
             autotune_type: required.autotune_type,
-        }
+}
     }
 
     /// Set autotune_type
@@ -28,3 +29,5 @@ impl InstanceConfigurationDetachedVolumeAutotunePolicy {
         self
     }
 }
+
+

@@ -7,7 +7,7 @@ use super::*;
 #[serde(rename_all = "camelCase")]
 pub struct LaunchCreateVolumeFromAttributes {
     /// The size of the volume in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_g_bs: i64,
+    pub size_in_gbs: i64,
 
     pub volume_creation_type: String,
 
@@ -25,13 +25,14 @@ pub struct LaunchCreateVolumeFromAttributes {
 
     /// The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See [Block Volume Performance Levels](https://docs.oracle.com/iaas/Content/Block/Concepts/blockvolumeperformance.htm#perf_levels) for more information. <p> Allowed values: <p> {@code 0}: Represents Lower Cost option. <p> {@code 10}: Represents Balanced option. <p> {@code 20}: Represents Higher Performance option. <p> {@code 30}-{@code 120}: Represents the Ultra High Performance option. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub vpus_per_g_b: Option<i64>,
+    pub vpus_per_gb: Option<i64>,
 }
+
 
 /// Required fields for LaunchCreateVolumeFromAttributes
 pub struct LaunchCreateVolumeFromAttributesRequired {
     /// The size of the volume in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_g_bs: i64,
+    pub size_in_gbs: i64,
 
     pub volume_creation_type: String,
 }
@@ -40,7 +41,7 @@ impl LaunchCreateVolumeFromAttributes {
     /// Create a new LaunchCreateVolumeFromAttributes with required fields
     pub fn new(required: LaunchCreateVolumeFromAttributesRequired) -> Self {
         Self {
-            size_in_g_bs: required.size_in_g_bs,
+            size_in_gbs: required.size_in_gbs,
 
             volume_creation_type: required.volume_creation_type,
 
@@ -50,8 +51,8 @@ impl LaunchCreateVolumeFromAttributes {
 
             kms_key_id: None,
 
-            vpus_per_g_b: None,
-        }
+            vpus_per_gb: None,
+}
     }
 
     /// Set compartment_id
@@ -72,15 +73,15 @@ impl LaunchCreateVolumeFromAttributes {
         self
     }
 
-    /// Set vpus_per_g_b
-    pub fn set_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.vpus_per_g_b = value;
+    /// Set vpus_per_gb
+    pub fn set_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.vpus_per_gb = value;
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
@@ -108,9 +109,11 @@ impl LaunchCreateVolumeFromAttributes {
         self
     }
 
-    /// Set vpus_per_g_b (unwraps Option)
-    pub fn with_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.vpus_per_g_b = Some(value);
+    /// Set vpus_per_gb (unwraps Option)
+    pub fn with_vpus_per_gb(mut self, value: i64) -> Self {
+        self.vpus_per_gb = Some(value);
         self
     }
 }
+
+

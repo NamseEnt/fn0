@@ -4,13 +4,14 @@ use serde::{Deserialize, Serialize};
 pub enum FlowLogCaptureFilterRuleDetailsFlowLogType {
     #[serde(rename = "ALL")]
     All,
-
+    
     #[serde(rename = "REJECT")]
     Reject,
-
+    
     #[serde(rename = "ACCEPT")]
     Accept,
-
+    
+    
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

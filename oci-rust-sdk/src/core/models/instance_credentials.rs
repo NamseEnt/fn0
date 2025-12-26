@@ -13,6 +13,7 @@ pub struct InstanceCredentials {
     pub username: String,
 }
 
+
 /// Required fields for InstanceCredentials
 pub struct InstanceCredentialsRequired {
     /// The password for the username.
@@ -29,7 +30,7 @@ impl InstanceCredentials {
             password: required.password,
 
             username: required.username,
-        }
+}
     }
 
     /// Set password
@@ -44,3 +45,5 @@ impl InstanceCredentials {
         self
     }
 }
+
+

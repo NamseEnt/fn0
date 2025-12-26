@@ -34,6 +34,7 @@ pub struct EgressSecurityRule {
     pub description: Option<String>,
 }
 
+
 /// Required fields for EgressSecurityRule
 pub struct EgressSecurityRuleRequired {
     /// Conceptually, this is the range of IP addresses that a packet originating from the instance can go to. <p> Allowed values: <p> IP address range in CIDR notation. For example: {@code 192.168.1.0/24} or {@code 2001:0db8:0123:45::/56} Note that IPv6 addressing is currently supported only in certain regions. See [IPv6 Addresses](https://docs.oracle.com/iaas/Content/Network/Concepts/ipv6.htm). <p> The {@code cidrBlock} value for a {@link Service}, if you're setting up a security list rule for traffic destined for a particular {@code Service} through a service gateway. For example: {@code oci-phx-objectstorage}.
@@ -62,7 +63,7 @@ impl EgressSecurityRule {
             udp_options: None,
 
             description: None,
-        }
+}
     }
 
     /// Set destination
@@ -72,10 +73,7 @@ impl EgressSecurityRule {
     }
 
     /// Set destination_type
-    pub fn set_destination_type(
-        mut self,
-        value: Option<EgressSecurityRuleDestinationType>,
-    ) -> Self {
+    pub fn set_destination_type(mut self, value: Option<EgressSecurityRuleDestinationType>) -> Self {
         self.destination_type = value;
         self
     }
@@ -152,3 +150,5 @@ impl EgressSecurityRule {
         self
     }
 }
+
+

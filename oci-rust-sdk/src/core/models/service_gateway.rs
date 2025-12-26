@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -46,6 +46,7 @@ pub struct ServiceGateway {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_created: Option<DateTime<Utc>>,
 }
+
 
 /// Required fields for ServiceGateway
 pub struct ServiceGatewayRequired {
@@ -93,7 +94,7 @@ impl ServiceGateway {
             route_table_id: None,
 
             time_created: None,
-        }
+}
     }
 
     /// Set block_traffic
@@ -109,10 +110,7 @@ impl ServiceGateway {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -166,10 +164,7 @@ impl ServiceGateway {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -198,3 +193,5 @@ impl ServiceGateway {
         self
     }
 }
+
+

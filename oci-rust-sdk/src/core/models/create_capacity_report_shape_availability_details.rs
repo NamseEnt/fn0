@@ -17,6 +17,7 @@ pub struct CreateCapacityReportShapeAvailabilityDetails {
     pub instance_shape_config: Option<CapacityReportInstanceShapeConfig>,
 }
 
+
 /// Required fields for CreateCapacityReportShapeAvailabilityDetails
 pub struct CreateCapacityReportShapeAvailabilityDetailsRequired {
     /// The shape that you want to request a capacity report for. You can enumerate all available shapes by calling {@link #listShapes(ListShapesRequest) listShapes}.
@@ -32,7 +33,7 @@ impl CreateCapacityReportShapeAvailabilityDetails {
             fault_domain: None,
 
             instance_shape_config: None,
-        }
+}
     }
 
     /// Set fault_domain
@@ -48,10 +49,7 @@ impl CreateCapacityReportShapeAvailabilityDetails {
     }
 
     /// Set instance_shape_config
-    pub fn set_instance_shape_config(
-        mut self,
-        value: Option<CapacityReportInstanceShapeConfig>,
-    ) -> Self {
+    pub fn set_instance_shape_config(mut self, value: Option<CapacityReportInstanceShapeConfig>) -> Self {
         self.instance_shape_config = value;
         self
     }
@@ -68,3 +66,5 @@ impl CreateCapacityReportShapeAvailabilityDetails {
         self
     }
 }
+
+

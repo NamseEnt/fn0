@@ -20,6 +20,7 @@ pub struct VolumeGroupReplicaInfo {
     pub kms_key_id: Option<String>,
 }
 
+
 /// Required fields for VolumeGroupReplicaInfo
 pub struct VolumeGroupReplicaInfoRequired {
     /// A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information.
@@ -43,7 +44,7 @@ impl VolumeGroupReplicaInfo {
             availability_domain: required.availability_domain,
 
             kms_key_id: None,
-        }
+}
     }
 
     /// Set display_name
@@ -76,3 +77,5 @@ impl VolumeGroupReplicaInfo {
         self
     }
 }
+
+

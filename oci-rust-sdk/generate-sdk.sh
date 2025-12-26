@@ -58,25 +58,28 @@ echo "==========================="
 for SERVICE in ${SERVICES//,/ }; do
     echo "Generating Rust code for $SERVICE..."
 
-    # Create output directory for this service
-    SERVICE_OUTPUT="$OUTPUT_DIR/$SERVICE/models"
-    mkdir -p "$SERVICE_OUTPUT"
+    # Create output base directory for this service
+    SERVICE_OUTPUT_BASE="$OUTPUT_DIR/$SERVICE"
+    mkdir -p "$SERVICE_OUTPUT_BASE"
 
-    # Generate models
+    # Generate models, requests, and responses
     cd "$SCRIPT_DIR"
     cargo run --manifest-path tools/generator/Cargo.toml --release -- \
         --input "$PARSED_DIR/${SERVICE}-models.json" \
-        --output "$SERVICE_OUTPUT" \
+        --output "$SERVICE_OUTPUT_BASE" \
         2>&1 | grep -E "(Generating|Generated|complete|Interfaces|Enums)"
 
-    # Generate mod.rs for the service
-    echo "  Generating mod.rs..."
-    if [ -d "$SERVICE_OUTPUT" ] && [ "$(ls -A $SERVICE_OUTPUT/*.rs 2>/dev/null | grep -v mod.rs)" ]; then
-        ls "$SERVICE_OUTPUT"/*.rs | grep -v mod.rs | xargs -I {} basename {} .rs | \
-            awk '{print "pub mod "$1";\npub use "$1"::*;"}' > "$SERVICE_OUTPUT/mod.rs"
-        MODEL_COUNT=$(grep -c "^pub mod" "$SERVICE_OUTPUT/mod.rs" || echo "0")
-        echo "  ✓ Generated mod.rs with $MODEL_COUNT modules"
-    fi
+    # Generate mod.rs for each subdirectory (models, requests, responses)
+    echo "  Generating mod.rs files..."
+    for SUBDIR in models requests responses; do
+        SUBDIR_PATH="$SERVICE_OUTPUT_BASE/$SUBDIR"
+        if [ -d "$SUBDIR_PATH" ] && [ "$(ls -A $SUBDIR_PATH/*.rs 2>/dev/null | grep -v mod.rs)" ]; then
+            ls "$SUBDIR_PATH"/*.rs | grep -v mod.rs | xargs -I {} basename {} .rs | \
+                awk '{print "pub mod "$1";\npub use "$1"::*;"}' > "$SUBDIR_PATH/mod.rs"
+            COUNT=$(grep -c "^pub mod" "$SUBDIR_PATH/mod.rs" || echo "0")
+            echo "  ✓ Generated $SUBDIR/mod.rs with $COUNT modules"
+        fi
+    done
 done
 echo ""
 
@@ -96,18 +99,10 @@ echo ""
 
 # Step 2: Auto-fix with clippy
 echo "[4.2] Running clippy auto-fix..."
-# Build features list for all generated services
-FEATURES=""
-for SERVICE in ${SERVICES//,/ }; do
-    if [ -z "$FEATURES" ]; then
-        FEATURES="$SERVICE"
-    else
-        FEATURES="$FEATURES,$SERVICE"
-    fi
-done
-
-if cargo clippy --fix --allow-dirty --features "$FEATURES" --quiet 2>&1; then
-    echo "✓ Clippy auto-fix completed"
+# IMPORTANT: Use --all-features to auto-fix issues in ALL services
+# This ensures consistency across the entire codebase
+if cargo clippy --fix --allow-dirty --all-features --quiet 2>&1; then
+    echo "✓ Clippy auto-fix completed for all services"
 else
     echo "⚠ Some clippy fixes may have failed (this is normal)"
 fi
@@ -115,17 +110,22 @@ echo ""
 
 # Step 3: Verify no clippy errors remain
 echo "[4.3] Verifying clippy compliance..."
-CLIPPY_OUTPUT=$(cargo clippy --features "$FEATURES" 2>&1)
+# IMPORTANT: Use --all-features to catch issues in ALL services, not just generated ones
+# This ensures no old/uncommitted service code has clippy errors
+CLIPPY_OUTPUT=$(cargo clippy --all-features 2>&1)
 CLIPPY_ERRORS=$(echo "$CLIPPY_OUTPUT" | grep "^error" | wc -l | tr -d ' ')
 CLIPPY_WARNINGS=$(echo "$CLIPPY_OUTPUT" | grep "^warning" | wc -l | tr -d ' ')
 
 if [ "$CLIPPY_ERRORS" -eq "0" ]; then
-    echo "✓ No clippy errors ($CLIPPY_WARNINGS warnings)"
+    echo "✓ No clippy errors in any service ($CLIPPY_WARNINGS warnings)"
 else
-    echo "✗ Found $CLIPPY_ERRORS clippy errors"
+    echo "✗ Found $CLIPPY_ERRORS clippy errors across all services"
     echo ""
     echo "Clippy errors:"
     echo "$CLIPPY_OUTPUT" | grep -A 5 "^error"
+    echo ""
+    echo "NOTE: If errors are in services you didn't regenerate,"
+    echo "      you may need to regenerate those services too."
     exit 1
 fi
 echo ""

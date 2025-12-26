@@ -13,6 +13,7 @@ pub struct VolumeSourceFromVolumeBackupDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for VolumeSourceFromVolumeBackupDetails
 pub struct VolumeSourceFromVolumeBackupDetailsRequired {
     /// The OCID of the volume backup.
@@ -28,7 +29,7 @@ impl VolumeSourceFromVolumeBackupDetails {
             id: required.id,
 
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set id
@@ -43,3 +44,5 @@ impl VolumeSourceFromVolumeBackupDetails {
         self
     }
 }
+
+

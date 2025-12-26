@@ -10,6 +10,7 @@ pub struct ComputeBareMetalHostCollection {
     pub items: Vec<ComputeBareMetalHostSummary>,
 }
 
+
 /// Required fields for ComputeBareMetalHostCollection
 pub struct ComputeBareMetalHostCollectionRequired {
     /// The list of compute bare metal hosts.
@@ -21,7 +22,7 @@ impl ComputeBareMetalHostCollection {
     pub fn new(required: ComputeBareMetalHostCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ComputeBareMetalHostCollection {
         self
     }
 }
+
+

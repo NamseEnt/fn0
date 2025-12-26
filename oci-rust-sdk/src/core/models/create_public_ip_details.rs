@@ -34,6 +34,7 @@ pub struct CreatePublicIpDetails {
     pub public_ip_pool_id: Option<String>,
 }
 
+
 /// Required fields for CreatePublicIpDetails
 pub struct CreatePublicIpDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the public IP. For ephemeral public IPs, you must set this to the private IP's compartment [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm).
@@ -60,7 +61,7 @@ impl CreatePublicIpDetails {
             private_ip_id: None,
 
             public_ip_pool_id: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -70,10 +71,7 @@ impl CreatePublicIpDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -109,10 +107,7 @@ impl CreatePublicIpDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -141,3 +136,5 @@ impl CreatePublicIpDetails {
         self
     }
 }
+
+

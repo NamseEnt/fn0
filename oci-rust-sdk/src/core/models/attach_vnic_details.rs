@@ -20,6 +20,7 @@ pub struct AttachVnicDetails {
     pub nic_index: Option<i64>,
 }
 
+
 /// Required fields for AttachVnicDetails
 pub struct AttachVnicDetailsRequired {
     pub create_vnic_details: CreateVnicDetails,
@@ -39,7 +40,7 @@ impl AttachVnicDetails {
             display_name: None,
 
             nic_index: None,
-        }
+}
     }
 
     /// Set create_vnic_details
@@ -78,3 +79,5 @@ impl AttachVnicDetails {
         self
     }
 }
+
+

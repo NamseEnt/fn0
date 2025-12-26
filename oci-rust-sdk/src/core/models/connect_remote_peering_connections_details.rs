@@ -13,6 +13,7 @@ pub struct ConnectRemotePeeringConnectionsDetails {
     pub peer_region_name: String,
 }
 
+
 /// Required fields for ConnectRemotePeeringConnectionsDetails
 pub struct ConnectRemotePeeringConnectionsDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the RPC you want to peer with.
@@ -29,7 +30,7 @@ impl ConnectRemotePeeringConnectionsDetails {
             peer_id: required.peer_id,
 
             peer_region_name: required.peer_region_name,
-        }
+}
     }
 
     /// Set peer_id
@@ -44,3 +45,5 @@ impl ConnectRemotePeeringConnectionsDetails {
         self
     }
 }
+
+

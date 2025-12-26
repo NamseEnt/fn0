@@ -27,8 +27,9 @@ pub struct CrossConnectStatus {
 
     /// The light levels of the cross-connect (in dBm). <p> Example: {@code [14.0, -14.0, 2.1, -10.1]}
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub light_levels_in_d_bm: Option<Vec<i64>>,
+    pub light_levels_in_dbm: Option<Vec<i64>>,
 }
+
 
 /// Required fields for CrossConnectStatus
 pub struct CrossConnectStatusRequired {
@@ -50,8 +51,8 @@ impl CrossConnectStatus {
 
             encryption_status: None,
 
-            light_levels_in_d_bm: None,
-        }
+            light_levels_in_dbm: None,
+}
     }
 
     /// Set cross_connect_id
@@ -73,26 +74,20 @@ impl CrossConnectStatus {
     }
 
     /// Set light_level_indicator
-    pub fn set_light_level_indicator(
-        mut self,
-        value: Option<CrossConnectStatusLightLevelIndicator>,
-    ) -> Self {
+    pub fn set_light_level_indicator(mut self, value: Option<CrossConnectStatusLightLevelIndicator>) -> Self {
         self.light_level_indicator = value;
         self
     }
 
     /// Set encryption_status
-    pub fn set_encryption_status(
-        mut self,
-        value: Option<CrossConnectStatusEncryptionStatus>,
-    ) -> Self {
+    pub fn set_encryption_status(mut self, value: Option<CrossConnectStatusEncryptionStatus>) -> Self {
         self.encryption_status = value;
         self
     }
 
-    /// Set light_levels_in_d_bm
-    pub fn set_light_levels_in_d_bm(mut self, value: Option<Vec<i64>>) -> Self {
-        self.light_levels_in_d_bm = value;
+    /// Set light_levels_in_dbm
+    pub fn set_light_levels_in_dbm(mut self, value: Option<Vec<i64>>) -> Self {
+        self.light_levels_in_dbm = value;
         self
     }
 
@@ -109,10 +104,7 @@ impl CrossConnectStatus {
     }
 
     /// Set light_level_indicator (unwraps Option)
-    pub fn with_light_level_indicator(
-        mut self,
-        value: CrossConnectStatusLightLevelIndicator,
-    ) -> Self {
+    pub fn with_light_level_indicator(mut self, value: CrossConnectStatusLightLevelIndicator) -> Self {
         self.light_level_indicator = Some(value);
         self
     }
@@ -123,9 +115,11 @@ impl CrossConnectStatus {
         self
     }
 
-    /// Set light_levels_in_d_bm (unwraps Option)
-    pub fn with_light_levels_in_d_bm(mut self, value: Vec<i64>) -> Self {
-        self.light_levels_in_d_bm = Some(value);
+    /// Set light_levels_in_dbm (unwraps Option)
+    pub fn with_light_levels_in_dbm(mut self, value: Vec<i64>) -> Self {
+        self.light_levels_in_dbm = Some(value);
         self
     }
 }
+
+

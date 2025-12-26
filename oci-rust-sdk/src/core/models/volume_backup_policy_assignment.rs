@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -23,6 +23,7 @@ pub struct VolumeBackupPolicyAssignment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xrc_kms_key_id: Option<String>,
 }
+
 
 /// Required fields for VolumeBackupPolicyAssignment
 pub struct VolumeBackupPolicyAssignmentRequired {
@@ -52,7 +53,7 @@ impl VolumeBackupPolicyAssignment {
             time_created: required.time_created,
 
             xrc_kms_key_id: None,
-        }
+}
     }
 
     /// Set asset_id
@@ -91,3 +92,5 @@ impl VolumeBackupPolicyAssignment {
         self
     }
 }
+
+

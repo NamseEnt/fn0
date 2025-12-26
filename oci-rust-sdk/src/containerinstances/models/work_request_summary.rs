@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -36,6 +36,7 @@ pub struct WorkRequestSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_finished: Option<DateTime<Utc>>,
 }
+
 
 /// Required fields for WorkRequestSummary
 pub struct WorkRequestSummaryRequired {
@@ -82,7 +83,7 @@ impl WorkRequestSummary {
             time_started: None,
 
             time_finished: None,
-        }
+}
     }
 
     /// Set operation_type
@@ -151,3 +152,5 @@ impl WorkRequestSummary {
         self
     }
 }
+
+

@@ -123,19 +123,13 @@ impl UpdateVirtualCircuitDetails {
     }
 
     /// Set routing_policy
-    pub fn set_routing_policy(
-        mut self,
-        value: Option<Vec<UpdateVirtualCircuitDetailsRoutingPolicy>>,
-    ) -> Self {
+    pub fn set_routing_policy(mut self, value: Option<Vec<UpdateVirtualCircuitDetailsRoutingPolicy>>) -> Self {
         self.routing_policy = value;
         self
     }
 
     /// Set bgp_admin_state
-    pub fn set_bgp_admin_state(
-        mut self,
-        value: Option<UpdateVirtualCircuitDetailsBgpAdminState>,
-    ) -> Self {
+    pub fn set_bgp_admin_state(mut self, value: Option<UpdateVirtualCircuitDetailsBgpAdminState>) -> Self {
         self.bgp_admin_state = value;
         self
     }
@@ -165,10 +159,7 @@ impl UpdateVirtualCircuitDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -192,10 +183,7 @@ impl UpdateVirtualCircuitDetails {
     }
 
     /// Set provider_state
-    pub fn set_provider_state(
-        mut self,
-        value: Option<UpdateVirtualCircuitDetailsProviderState>,
-    ) -> Self {
+    pub fn set_provider_state(mut self, value: Option<UpdateVirtualCircuitDetailsProviderState>) -> Self {
         self.provider_state = value;
         self
     }
@@ -231,10 +219,7 @@ impl UpdateVirtualCircuitDetails {
     }
 
     /// Set routing_policy (unwraps Option)
-    pub fn with_routing_policy(
-        mut self,
-        value: Vec<UpdateVirtualCircuitDetailsRoutingPolicy>,
-    ) -> Self {
+    pub fn with_routing_policy(mut self, value: Vec<UpdateVirtualCircuitDetailsRoutingPolicy>) -> Self {
         self.routing_policy = Some(value);
         self
     }
@@ -270,10 +255,7 @@ impl UpdateVirtualCircuitDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -326,3 +308,4 @@ impl Default for UpdateVirtualCircuitDetails {
         Self::new()
     }
 }
+

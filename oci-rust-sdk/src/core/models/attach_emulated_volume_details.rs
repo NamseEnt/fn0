@@ -10,6 +10,7 @@ pub struct AttachEmulatedVolumeDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for AttachEmulatedVolumeDetails
 pub struct AttachEmulatedVolumeDetailsRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl AttachEmulatedVolumeDetails {
     pub fn new(required: AttachEmulatedVolumeDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl AttachEmulatedVolumeDetails {
         self
     }
 }
+
+

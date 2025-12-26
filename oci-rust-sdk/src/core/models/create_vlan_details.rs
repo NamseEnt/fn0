@@ -45,6 +45,7 @@ pub struct CreateVlanDetails {
     pub vlan_tag: Option<i64>,
 }
 
+
 /// Required fields for CreateVlanDetails
 pub struct CreateVlanDetailsRequired {
     /// The range of IPv4 addresses that will be used for layer 3 communication with hosts outside the VLAN. The CIDR must maintain the following rules - <p> 1. The CIDR block is valid and correctly formatted. 2. The new range is within one of the parent VCN ranges. <p> Example: {@code 192.0.2.0/24}
@@ -80,7 +81,7 @@ impl CreateVlanDetails {
             route_table_id: None,
 
             vlan_tag: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -102,10 +103,7 @@ impl CreateVlanDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -153,10 +151,7 @@ impl CreateVlanDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -191,3 +186,5 @@ impl CreateVlanDetails {
         self
     }
 }
+
+

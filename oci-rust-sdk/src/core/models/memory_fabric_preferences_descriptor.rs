@@ -32,10 +32,7 @@ impl MemoryFabricPreferencesDescriptor {
     }
 
     /// Set fabric_recycle_level
-    pub fn set_fabric_recycle_level(
-        mut self,
-        value: Option<MemoryFabricPreferencesDescriptorFabricRecycleLevel>,
-    ) -> Self {
+    pub fn set_fabric_recycle_level(mut self, value: Option<MemoryFabricPreferencesDescriptorFabricRecycleLevel>) -> Self {
         self.fabric_recycle_level = value;
         self
     }
@@ -47,10 +44,7 @@ impl MemoryFabricPreferencesDescriptor {
     }
 
     /// Set fabric_recycle_level (unwraps Option)
-    pub fn with_fabric_recycle_level(
-        mut self,
-        value: MemoryFabricPreferencesDescriptorFabricRecycleLevel,
-    ) -> Self {
+    pub fn with_fabric_recycle_level(mut self, value: MemoryFabricPreferencesDescriptorFabricRecycleLevel) -> Self {
         self.fabric_recycle_level = Some(value);
         self
     }
@@ -61,3 +55,4 @@ impl Default for MemoryFabricPreferencesDescriptor {
         Self::new()
     }
 }
+

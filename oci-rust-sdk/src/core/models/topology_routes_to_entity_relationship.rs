@@ -12,6 +12,7 @@ pub struct TopologyRoutesToEntityRelationship {
     pub r#type: String,
 }
 
+
 /// Required fields for TopologyRoutesToEntityRelationship
 pub struct TopologyRoutesToEntityRelationshipRequired {
     pub route_rule_details: TopologyRoutesToRelationshipDetails,
@@ -26,7 +27,7 @@ impl TopologyRoutesToEntityRelationship {
             route_rule_details: required.route_rule_details,
 
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set route_rule_details
@@ -41,3 +42,5 @@ impl TopologyRoutesToEntityRelationship {
         self
     }
 }
+
+
