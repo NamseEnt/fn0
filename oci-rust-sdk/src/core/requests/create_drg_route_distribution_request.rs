@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateDrgRouteDistributionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateDrgRouteDistributionRequest
 pub struct CreateDrgRouteDistributionRequestRequired {
@@ -30,11 +29,14 @@ impl CreateDrgRouteDistributionRequest {
             create_drg_route_distribution_details: required.create_drg_route_distribution_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_drg_route_distribution_details
-    pub fn set_create_drg_route_distribution_details(mut self, value: CreateDrgRouteDistributionDetails) -> Self {
+    pub fn set_create_drg_route_distribution_details(
+        mut self,
+        value: CreateDrgRouteDistributionDetails,
+    ) -> Self {
         self.create_drg_route_distribution_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl CreateDrgRouteDistributionRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateVirtualCircuitRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateVirtualCircuitRequest
 pub struct UpdateVirtualCircuitRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateVirtualCircuitRequest {
             update_virtual_circuit_details: required.update_virtual_circuit_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set virtual_circuit_id
@@ -48,7 +47,10 @@ impl UpdateVirtualCircuitRequest {
     }
 
     /// Set update_virtual_circuit_details
-    pub fn set_update_virtual_circuit_details(mut self, value: UpdateVirtualCircuitDetails) -> Self {
+    pub fn set_update_virtual_circuit_details(
+        mut self,
+        value: UpdateVirtualCircuitDetails,
+    ) -> Self {
         self.update_virtual_circuit_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateVirtualCircuitRequest {
         self
     }
 }
-
-

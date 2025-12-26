@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,7 +56,6 @@ pub struct ListDrgAttachmentsRequest {
     pub lifecycle_state: Option<String>,
 }
 
-
 /// Required fields for ListDrgAttachmentsRequest
 pub struct ListDrgAttachmentsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -90,7 +89,7 @@ impl ListDrgAttachmentsRequest {
             sort_order: None,
 
             lifecycle_state: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -130,7 +129,10 @@ impl ListDrgAttachmentsRequest {
     }
 
     /// Set attachment_type
-    pub fn set_attachment_type(mut self, value: Option<ListDrgAttachmentsRequestAttachmentType>) -> Self {
+    pub fn set_attachment_type(
+        mut self,
+        value: Option<ListDrgAttachmentsRequestAttachmentType>,
+    ) -> Self {
         self.attachment_type = value;
         self
     }
@@ -231,5 +233,3 @@ impl ListDrgAttachmentsRequest {
         self
     }
 }
-
-

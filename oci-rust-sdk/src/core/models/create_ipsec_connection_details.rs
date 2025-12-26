@@ -45,7 +45,6 @@ pub struct CreateIPSecConnectionDetails {
     pub tunnel_configuration: Option<Vec<CreateIPSecConnectionTunnelDetails>>,
 }
 
-
 /// Required fields for CreateIPSecConnectionDetails
 pub struct CreateIPSecConnectionDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the IPSec connection.
@@ -81,7 +80,7 @@ impl CreateIPSecConnectionDetails {
             static_routes: None,
 
             tunnel_configuration: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -97,7 +96,10 @@ impl CreateIPSecConnectionDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -127,7 +129,10 @@ impl CreateIPSecConnectionDetails {
     }
 
     /// Set cpe_local_identifier_type
-    pub fn set_cpe_local_identifier_type(mut self, value: Option<CreateIPSecConnectionDetailsCpeLocalIdentifierType>) -> Self {
+    pub fn set_cpe_local_identifier_type(
+        mut self,
+        value: Option<CreateIPSecConnectionDetailsCpeLocalIdentifierType>,
+    ) -> Self {
         self.cpe_local_identifier_type = value;
         self
     }
@@ -139,13 +144,19 @@ impl CreateIPSecConnectionDetails {
     }
 
     /// Set tunnel_configuration
-    pub fn set_tunnel_configuration(mut self, value: Option<Vec<CreateIPSecConnectionTunnelDetails>>) -> Self {
+    pub fn set_tunnel_configuration(
+        mut self,
+        value: Option<Vec<CreateIPSecConnectionTunnelDetails>>,
+    ) -> Self {
         self.tunnel_configuration = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -169,7 +180,10 @@ impl CreateIPSecConnectionDetails {
     }
 
     /// Set cpe_local_identifier_type (unwraps Option)
-    pub fn with_cpe_local_identifier_type(mut self, value: CreateIPSecConnectionDetailsCpeLocalIdentifierType) -> Self {
+    pub fn with_cpe_local_identifier_type(
+        mut self,
+        value: CreateIPSecConnectionDetailsCpeLocalIdentifierType,
+    ) -> Self {
         self.cpe_local_identifier_type = Some(value);
         self
     }
@@ -181,10 +195,11 @@ impl CreateIPSecConnectionDetails {
     }
 
     /// Set tunnel_configuration (unwraps Option)
-    pub fn with_tunnel_configuration(mut self, value: Vec<CreateIPSecConnectionTunnelDetails>) -> Self {
+    pub fn with_tunnel_configuration(
+        mut self,
+        value: Vec<CreateIPSecConnectionTunnelDetails>,
+    ) -> Self {
         self.tunnel_configuration = Some(value);
         self
     }
 }
-
-

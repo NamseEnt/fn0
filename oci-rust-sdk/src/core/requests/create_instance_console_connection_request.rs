@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,7 +16,6 @@ pub struct CreateInstanceConsoleConnectionRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateInstanceConsoleConnectionRequest
 pub struct CreateInstanceConsoleConnectionRequestRequired {
     /// Request object for creating an InstanceConsoleConnection
@@ -27,14 +26,18 @@ impl CreateInstanceConsoleConnectionRequest {
     /// Create a new CreateInstanceConsoleConnectionRequest with required fields
     pub fn new(required: CreateInstanceConsoleConnectionRequestRequired) -> Self {
         Self {
-            create_instance_console_connection_details: required.create_instance_console_connection_details,
+            create_instance_console_connection_details: required
+                .create_instance_console_connection_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_instance_console_connection_details
-    pub fn set_create_instance_console_connection_details(mut self, value: CreateInstanceConsoleConnectionDetails) -> Self {
+    pub fn set_create_instance_console_connection_details(
+        mut self,
+        value: CreateInstanceConsoleConnectionDetails,
+    ) -> Self {
         self.create_instance_console_connection_details = value;
         self
     }
@@ -51,5 +54,3 @@ impl CreateInstanceConsoleConnectionRequest {
         self
     }
 }
-
-

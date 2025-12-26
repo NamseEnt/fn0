@@ -13,7 +13,6 @@ pub struct ComputeBareMetalHostPlacementConstraintDetails {
     pub r#type: String,
 }
 
-
 /// Required fields for ComputeBareMetalHostPlacementConstraintDetails
 pub struct ComputeBareMetalHostPlacementConstraintDetailsRequired {
     /// The OCID of the compute bare metal host. This is only available for dedicated capacity customers.
@@ -29,7 +28,7 @@ impl ComputeBareMetalHostPlacementConstraintDetails {
             compute_bare_metal_host_id: required.compute_bare_metal_host_id,
 
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set compute_bare_metal_host_id
@@ -44,5 +43,3 @@ impl ComputeBareMetalHostPlacementConstraintDetails {
         self
     }
 }
-
-

@@ -47,7 +47,6 @@ pub struct CreateInstancePoolDetails {
     pub lifecycle_management: Option<InstancePoolLifecycleManagementDetails>,
 }
 
-
 /// Required fields for CreateInstancePoolDetails
 pub struct CreateInstancePoolDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the instance pool.
@@ -88,7 +87,7 @@ impl CreateInstancePoolDetails {
             instance_hostname_formatter: None,
 
             lifecycle_management: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -98,7 +97,10 @@ impl CreateInstancePoolDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -122,7 +124,10 @@ impl CreateInstancePoolDetails {
     }
 
     /// Set placement_configurations
-    pub fn set_placement_configurations(mut self, value: Vec<CreateInstancePoolPlacementConfigurationDetails>) -> Self {
+    pub fn set_placement_configurations(
+        mut self,
+        value: Vec<CreateInstancePoolPlacementConfigurationDetails>,
+    ) -> Self {
         self.placement_configurations = value;
         self
     }
@@ -152,13 +157,19 @@ impl CreateInstancePoolDetails {
     }
 
     /// Set lifecycle_management
-    pub fn set_lifecycle_management(mut self, value: Option<InstancePoolLifecycleManagementDetails>) -> Self {
+    pub fn set_lifecycle_management(
+        mut self,
+        value: Option<InstancePoolLifecycleManagementDetails>,
+    ) -> Self {
         self.lifecycle_management = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -194,10 +205,11 @@ impl CreateInstancePoolDetails {
     }
 
     /// Set lifecycle_management (unwraps Option)
-    pub fn with_lifecycle_management(mut self, value: InstancePoolLifecycleManagementDetails) -> Self {
+    pub fn with_lifecycle_management(
+        mut self,
+        value: InstancePoolLifecycleManagementDetails,
+    ) -> Self {
         self.lifecycle_management = Some(value);
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct ListIPSecConnectionTunnelSecurityAssociationsResponse {
     /// A list of TunnelSecurityAssociationSummary instances.
     pub items: Vec<TunnelSecurityAssociationSummary>,
 }
-
 
 /// Required fields for ListIPSecConnectionTunnelSecurityAssociationsResponse
 pub struct ListIPSecConnectionTunnelSecurityAssociationsResponseRequired {
@@ -48,7 +47,7 @@ impl ListIPSecConnectionTunnelSecurityAssociationsResponse {
             opc_total_items: required.opc_total_items,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -75,5 +74,3 @@ impl ListIPSecConnectionTunnelSecurityAssociationsResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetVolumeGroupBackupResponse {
     /// The returned model.VolumeGroupBackup instance.
     pub volume_group_backup: VolumeGroupBackup,
 }
-
 
 /// Required fields for GetVolumeGroupBackupResponse
 pub struct GetVolumeGroupBackupResponseRequired {
@@ -40,7 +39,7 @@ impl GetVolumeGroupBackupResponse {
             opc_request_id: required.opc_request_id,
 
             volume_group_backup: required.volume_group_backup,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetVolumeGroupBackupResponse {
         self
     }
 }
-
-

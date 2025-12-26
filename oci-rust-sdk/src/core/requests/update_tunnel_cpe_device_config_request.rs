@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,7 +30,6 @@ pub struct UpdateTunnelCpeDeviceConfigRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for UpdateTunnelCpeDeviceConfigRequest
 pub struct UpdateTunnelCpeDeviceConfigRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the IPSec connection.
@@ -51,14 +50,15 @@ impl UpdateTunnelCpeDeviceConfigRequest {
 
             tunnel_id: required.tunnel_id,
 
-            update_tunnel_cpe_device_config_details: required.update_tunnel_cpe_device_config_details,
+            update_tunnel_cpe_device_config_details: required
+                .update_tunnel_cpe_device_config_details,
 
             if_match: None,
 
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set ipsc_id
@@ -74,7 +74,10 @@ impl UpdateTunnelCpeDeviceConfigRequest {
     }
 
     /// Set update_tunnel_cpe_device_config_details
-    pub fn set_update_tunnel_cpe_device_config_details(mut self, value: UpdateTunnelCpeDeviceConfigDetails) -> Self {
+    pub fn set_update_tunnel_cpe_device_config_details(
+        mut self,
+        value: UpdateTunnelCpeDeviceConfigDetails,
+    ) -> Self {
         self.update_tunnel_cpe_device_config_details = value;
         self
     }
@@ -115,5 +118,3 @@ impl UpdateTunnelCpeDeviceConfigRequest {
         self
     }
 }
-
-

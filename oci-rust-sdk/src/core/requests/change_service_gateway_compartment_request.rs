@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeServiceGatewayCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeServiceGatewayCompartmentRequest
 pub struct ChangeServiceGatewayCompartmentRequestRequired {
     /// The service gateway's [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm).
@@ -39,12 +38,13 @@ impl ChangeServiceGatewayCompartmentRequest {
         Self {
             service_gateway_id: required.service_gateway_id,
 
-            change_service_gateway_compartment_details: required.change_service_gateway_compartment_details,
+            change_service_gateway_compartment_details: required
+                .change_service_gateway_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set service_gateway_id
@@ -54,7 +54,10 @@ impl ChangeServiceGatewayCompartmentRequest {
     }
 
     /// Set change_service_gateway_compartment_details
-    pub fn set_change_service_gateway_compartment_details(mut self, value: ChangeServiceGatewayCompartmentDetails) -> Self {
+    pub fn set_change_service_gateway_compartment_details(
+        mut self,
+        value: ChangeServiceGatewayCompartmentDetails,
+    ) -> Self {
         self.change_service_gateway_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangeServiceGatewayCompartmentRequest {
         self
     }
 }
-
-

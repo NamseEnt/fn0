@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateDrgAttachmentResponse {
     /// The returned model.DrgAttachment instance.
     pub drg_attachment: DrgAttachment,
 }
-
 
 /// Required fields for CreateDrgAttachmentResponse
 pub struct CreateDrgAttachmentResponseRequired {
@@ -40,7 +39,7 @@ impl CreateDrgAttachmentResponse {
             opc_request_id: required.opc_request_id,
 
             drg_attachment: required.drg_attachment,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateDrgAttachmentResponse {
         self
     }
 }
-
-

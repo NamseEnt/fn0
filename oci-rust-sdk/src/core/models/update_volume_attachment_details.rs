@@ -20,13 +20,19 @@ impl UpdateVolumeAttachmentDetails {
     }
 
     /// Set iscsi_login_state
-    pub fn set_iscsi_login_state(mut self, value: Option<UpdateVolumeAttachmentDetailsIscsiLoginState>) -> Self {
+    pub fn set_iscsi_login_state(
+        mut self,
+        value: Option<UpdateVolumeAttachmentDetailsIscsiLoginState>,
+    ) -> Self {
         self.iscsi_login_state = value;
         self
     }
 
     /// Set iscsi_login_state (unwraps Option)
-    pub fn with_iscsi_login_state(mut self, value: UpdateVolumeAttachmentDetailsIscsiLoginState) -> Self {
+    pub fn with_iscsi_login_state(
+        mut self,
+        value: UpdateVolumeAttachmentDetailsIscsiLoginState,
+    ) -> Self {
         self.iscsi_login_state = Some(value);
         self
     }
@@ -37,4 +43,3 @@ impl Default for UpdateVolumeAttachmentDetails {
         Self::new()
     }
 }
-

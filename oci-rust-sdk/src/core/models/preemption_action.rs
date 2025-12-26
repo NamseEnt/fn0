@@ -10,7 +10,6 @@ pub struct PreemptionAction {
     pub r#type: String,
 }
 
-
 /// Required fields for PreemptionAction
 pub struct PreemptionActionRequired {
     pub r#type: String,
@@ -21,7 +20,7 @@ impl PreemptionAction {
     pub fn new(required: PreemptionActionRequired) -> Self {
         Self {
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set r#type
@@ -30,5 +29,3 @@ impl PreemptionAction {
         self
     }
 }
-
-

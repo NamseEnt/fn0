@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetVolumeBackupRequest {
     /// The OCID of the volume backup.
     pub volume_backup_id: String,
 }
-
 
 /// Required fields for GetVolumeBackupRequest
 pub struct GetVolumeBackupRequestRequired {
@@ -24,7 +23,7 @@ impl GetVolumeBackupRequest {
     pub fn new(required: GetVolumeBackupRequestRequired) -> Self {
         Self {
             volume_backup_id: required.volume_backup_id,
-}
+        }
     }
 
     /// Set volume_backup_id
@@ -33,5 +32,3 @@ impl GetVolumeBackupRequest {
         self
     }
 }
-
-

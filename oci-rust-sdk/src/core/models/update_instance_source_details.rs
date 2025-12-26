@@ -13,7 +13,6 @@ pub struct UpdateInstanceSourceDetails {
     pub is_preserve_boot_volume_enabled: Option<bool>,
 }
 
-
 /// Required fields for UpdateInstanceSourceDetails
 pub struct UpdateInstanceSourceDetailsRequired {
     pub source_type: String,
@@ -26,7 +25,7 @@ impl UpdateInstanceSourceDetails {
             source_type: required.source_type,
 
             is_preserve_boot_volume_enabled: None,
-}
+        }
     }
 
     /// Set is_preserve_boot_volume_enabled
@@ -47,5 +46,3 @@ impl UpdateInstanceSourceDetails {
         self
     }
 }
-
-

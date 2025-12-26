@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeCrossConnectGroupCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeCrossConnectGroupCompartmentRequest
 pub struct ChangeCrossConnectGroupCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the cross-connect group.
@@ -39,12 +38,13 @@ impl ChangeCrossConnectGroupCompartmentRequest {
         Self {
             cross_connect_group_id: required.cross_connect_group_id,
 
-            change_cross_connect_group_compartment_details: required.change_cross_connect_group_compartment_details,
+            change_cross_connect_group_compartment_details: required
+                .change_cross_connect_group_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set cross_connect_group_id
@@ -54,7 +54,10 @@ impl ChangeCrossConnectGroupCompartmentRequest {
     }
 
     /// Set change_cross_connect_group_compartment_details
-    pub fn set_change_cross_connect_group_compartment_details(mut self, value: ChangeCrossConnectGroupCompartmentDetails) -> Self {
+    pub fn set_change_cross_connect_group_compartment_details(
+        mut self,
+        value: ChangeCrossConnectGroupCompartmentDetails,
+    ) -> Self {
         self.change_cross_connect_group_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangeCrossConnectGroupCompartmentRequest {
         self
     }
 }
-
-

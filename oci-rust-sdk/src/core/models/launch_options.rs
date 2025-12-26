@@ -68,7 +68,10 @@ impl LaunchOptions {
     }
 
     /// Set remote_data_volume_type
-    pub fn set_remote_data_volume_type(mut self, value: Option<LaunchOptionsRemoteDataVolumeType>) -> Self {
+    pub fn set_remote_data_volume_type(
+        mut self,
+        value: Option<LaunchOptionsRemoteDataVolumeType>,
+    ) -> Self {
         self.remote_data_volume_type = value;
         self
     }
@@ -104,7 +107,10 @@ impl LaunchOptions {
     }
 
     /// Set remote_data_volume_type (unwraps Option)
-    pub fn with_remote_data_volume_type(mut self, value: LaunchOptionsRemoteDataVolumeType) -> Self {
+    pub fn with_remote_data_volume_type(
+        mut self,
+        value: LaunchOptionsRemoteDataVolumeType,
+    ) -> Self {
         self.remote_data_volume_type = Some(value);
         self
     }
@@ -127,4 +133,3 @@ impl Default for LaunchOptions {
         Self::new()
     }
 }
-

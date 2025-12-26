@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -25,7 +25,6 @@ pub struct IPSecConnectionTunnelErrorDetails {
     /// Timestamp when the error occurred.
     pub timestamp: DateTime<Utc>,
 }
-
 
 /// Required fields for IPSecConnectionTunnelErrorDetails
 pub struct IPSecConnectionTunnelErrorDetailsRequired {
@@ -63,7 +62,7 @@ impl IPSecConnectionTunnelErrorDetails {
             oci_resources_link: required.oci_resources_link,
 
             timestamp: required.timestamp,
-}
+        }
     }
 
     /// Set id
@@ -102,5 +101,3 @@ impl IPSecConnectionTunnelErrorDetails {
         self
     }
 }
-
-

@@ -19,13 +19,19 @@ impl TunnelCpeDeviceConfig {
     }
 
     /// Set tunnel_cpe_device_config_parameter
-    pub fn set_tunnel_cpe_device_config_parameter(mut self, value: Option<Vec<CpeDeviceConfigAnswer>>) -> Self {
+    pub fn set_tunnel_cpe_device_config_parameter(
+        mut self,
+        value: Option<Vec<CpeDeviceConfigAnswer>>,
+    ) -> Self {
         self.tunnel_cpe_device_config_parameter = value;
         self
     }
 
     /// Set tunnel_cpe_device_config_parameter (unwraps Option)
-    pub fn with_tunnel_cpe_device_config_parameter(mut self, value: Vec<CpeDeviceConfigAnswer>) -> Self {
+    pub fn with_tunnel_cpe_device_config_parameter(
+        mut self,
+        value: Vec<CpeDeviceConfigAnswer>,
+    ) -> Self {
         self.tunnel_cpe_device_config_parameter = Some(value);
         self
     }
@@ -36,4 +42,3 @@ impl Default for TunnelCpeDeviceConfig {
         Self::new()
     }
 }
-

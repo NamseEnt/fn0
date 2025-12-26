@@ -9,7 +9,6 @@ pub struct AutotunePolicy {
     pub autotune_type: String,
 }
 
-
 /// Required fields for AutotunePolicy
 pub struct AutotunePolicyRequired {
     pub autotune_type: String,
@@ -20,7 +19,7 @@ impl AutotunePolicy {
     pub fn new(required: AutotunePolicyRequired) -> Self {
         Self {
             autotune_type: required.autotune_type,
-}
+        }
     }
 
     /// Set autotune_type
@@ -29,5 +28,3 @@ impl AutotunePolicy {
         self
     }
 }
-
-

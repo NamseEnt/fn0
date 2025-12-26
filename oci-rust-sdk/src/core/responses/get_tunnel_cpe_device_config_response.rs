@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetTunnelCpeDeviceConfigResponse {
     /// The returned model.TunnelCpeDeviceConfig instance.
     pub tunnel_cpe_device_config: TunnelCpeDeviceConfig,
 }
-
 
 /// Required fields for GetTunnelCpeDeviceConfigResponse
 pub struct GetTunnelCpeDeviceConfigResponseRequired {
@@ -40,7 +39,7 @@ impl GetTunnelCpeDeviceConfigResponse {
             opc_request_id: required.opc_request_id,
 
             tunnel_cpe_device_config: required.tunnel_cpe_device_config,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetTunnelCpeDeviceConfigResponse {
         self
     }
 }
-
-

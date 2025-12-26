@@ -15,7 +15,6 @@ pub struct InstancePoolPreTerminationActionDetails {
     pub on_timeout: InstancePoolPreTerminationActionHandleTimeoutDetails,
 }
 
-
 /// Required fields for InstancePoolPreTerminationActionDetails
 pub struct InstancePoolPreTerminationActionDetailsRequired {
     /// Whether pre-termination action is enabled or not.
@@ -36,7 +35,7 @@ impl InstancePoolPreTerminationActionDetails {
             timeout: required.timeout,
 
             on_timeout: required.on_timeout,
-}
+        }
     }
 
     /// Set is_enabled
@@ -52,10 +51,11 @@ impl InstancePoolPreTerminationActionDetails {
     }
 
     /// Set on_timeout
-    pub fn set_on_timeout(mut self, value: InstancePoolPreTerminationActionHandleTimeoutDetails) -> Self {
+    pub fn set_on_timeout(
+        mut self,
+        value: InstancePoolPreTerminationActionHandleTimeoutDetails,
+    ) -> Self {
         self.on_timeout = value;
         self
     }
 }
-
-

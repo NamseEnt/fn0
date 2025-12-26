@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct Ipv6VnicDetachResponse {
     /// The returned model.Ipv6 instance.
     pub ipv6: Ipv6,
 }
-
 
 /// Required fields for Ipv6VnicDetachResponse
 pub struct Ipv6VnicDetachResponseRequired {
@@ -40,7 +39,7 @@ impl Ipv6VnicDetachResponse {
             opc_request_id: required.opc_request_id,
 
             ipv6: required.ipv6,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl Ipv6VnicDetachResponse {
         self
     }
 }
-
-

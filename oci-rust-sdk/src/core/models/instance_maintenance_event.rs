@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -97,7 +97,6 @@ pub struct InstanceMaintenanceEvent {
     pub additional_details: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for InstanceMaintenanceEvent
 pub struct InstanceMaintenanceEventRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the maintenance event.
@@ -190,7 +189,7 @@ impl InstanceMaintenanceEvent {
             can_delete_local_storage: None,
 
             additional_details: None,
-}
+        }
     }
 
     /// Set display_name
@@ -200,7 +199,10 @@ impl InstanceMaintenanceEvent {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -230,13 +232,19 @@ impl InstanceMaintenanceEvent {
     }
 
     /// Set maintenance_category
-    pub fn set_maintenance_category(mut self, value: InstanceMaintenanceEventMaintenanceCategory) -> Self {
+    pub fn set_maintenance_category(
+        mut self,
+        value: InstanceMaintenanceEventMaintenanceCategory,
+    ) -> Self {
         self.maintenance_category = value;
         self
     }
 
     /// Set maintenance_reason
-    pub fn set_maintenance_reason(mut self, value: InstanceMaintenanceEventMaintenanceReason) -> Self {
+    pub fn set_maintenance_reason(
+        mut self,
+        value: InstanceMaintenanceEventMaintenanceReason,
+    ) -> Self {
         self.maintenance_reason = value;
         self
     }
@@ -248,7 +256,10 @@ impl InstanceMaintenanceEvent {
     }
 
     /// Set alternative_resolution_actions
-    pub fn set_alternative_resolution_actions(mut self, value: Vec<InstanceMaintenanceEventAlternativeResolutionActions>) -> Self {
+    pub fn set_alternative_resolution_actions(
+        mut self,
+        value: Vec<InstanceMaintenanceEventAlternativeResolutionActions>,
+    ) -> Self {
         self.alternative_resolution_actions = value;
         self
     }
@@ -350,7 +361,10 @@ impl InstanceMaintenanceEvent {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -421,5 +435,3 @@ impl InstanceMaintenanceEvent {
         self
     }
 }
-
-

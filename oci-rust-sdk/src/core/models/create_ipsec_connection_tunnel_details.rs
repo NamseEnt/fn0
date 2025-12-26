@@ -105,7 +105,10 @@ impl CreateIPSecConnectionTunnelDetails {
     }
 
     /// Set ike_version
-    pub fn set_ike_version(mut self, value: Option<CreateIPSecConnectionTunnelDetailsIkeVersion>) -> Self {
+    pub fn set_ike_version(
+        mut self,
+        value: Option<CreateIPSecConnectionTunnelDetailsIkeVersion>,
+    ) -> Self {
         self.ike_version = value;
         self
     }
@@ -117,19 +120,28 @@ impl CreateIPSecConnectionTunnelDetails {
     }
 
     /// Set bgp_session_config
-    pub fn set_bgp_session_config(mut self, value: Option<CreateIPSecTunnelBgpSessionDetails>) -> Self {
+    pub fn set_bgp_session_config(
+        mut self,
+        value: Option<CreateIPSecTunnelBgpSessionDetails>,
+    ) -> Self {
         self.bgp_session_config = value;
         self
     }
 
     /// Set oracle_initiation
-    pub fn set_oracle_initiation(mut self, value: Option<CreateIPSecConnectionTunnelDetailsOracleInitiation>) -> Self {
+    pub fn set_oracle_initiation(
+        mut self,
+        value: Option<CreateIPSecConnectionTunnelDetailsOracleInitiation>,
+    ) -> Self {
         self.oracle_initiation = value;
         self
     }
 
     /// Set nat_translation_enabled
-    pub fn set_nat_translation_enabled(mut self, value: Option<CreateIPSecConnectionTunnelDetailsNatTranslationEnabled>) -> Self {
+    pub fn set_nat_translation_enabled(
+        mut self,
+        value: Option<CreateIPSecConnectionTunnelDetailsNatTranslationEnabled>,
+    ) -> Self {
         self.nat_translation_enabled = value;
         self
     }
@@ -171,7 +183,10 @@ impl CreateIPSecConnectionTunnelDetails {
     }
 
     /// Set encryption_domain_config
-    pub fn set_encryption_domain_config(mut self, value: Option<CreateIPSecTunnelEncryptionDomainDetails>) -> Self {
+    pub fn set_encryption_domain_config(
+        mut self,
+        value: Option<CreateIPSecTunnelEncryptionDomainDetails>,
+    ) -> Self {
         self.encryption_domain_config = value;
         self
     }
@@ -207,13 +222,19 @@ impl CreateIPSecConnectionTunnelDetails {
     }
 
     /// Set oracle_initiation (unwraps Option)
-    pub fn with_oracle_initiation(mut self, value: CreateIPSecConnectionTunnelDetailsOracleInitiation) -> Self {
+    pub fn with_oracle_initiation(
+        mut self,
+        value: CreateIPSecConnectionTunnelDetailsOracleInitiation,
+    ) -> Self {
         self.oracle_initiation = Some(value);
         self
     }
 
     /// Set nat_translation_enabled (unwraps Option)
-    pub fn with_nat_translation_enabled(mut self, value: CreateIPSecConnectionTunnelDetailsNatTranslationEnabled) -> Self {
+    pub fn with_nat_translation_enabled(
+        mut self,
+        value: CreateIPSecConnectionTunnelDetailsNatTranslationEnabled,
+    ) -> Self {
         self.nat_translation_enabled = Some(value);
         self
     }
@@ -255,7 +276,10 @@ impl CreateIPSecConnectionTunnelDetails {
     }
 
     /// Set encryption_domain_config (unwraps Option)
-    pub fn with_encryption_domain_config(mut self, value: CreateIPSecTunnelEncryptionDomainDetails) -> Self {
+    pub fn with_encryption_domain_config(
+        mut self,
+        value: CreateIPSecTunnelEncryptionDomainDetails,
+    ) -> Self {
         self.encryption_domain_config = Some(value);
         self
     }
@@ -266,4 +290,3 @@ impl Default for CreateIPSecConnectionTunnelDetails {
         Self::new()
     }
 }
-

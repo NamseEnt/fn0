@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +40,6 @@ pub struct ListComputeCapacityReservationInstanceShapesRequest {
     pub sort_order: Option<ListComputeCapacityReservationInstanceShapesRequestSortOrder>,
 }
 
-
 /// Required fields for ListComputeCapacityReservationInstanceShapesRequest
 pub struct ListComputeCapacityReservationInstanceShapesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -66,7 +65,7 @@ impl ListComputeCapacityReservationInstanceShapesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -106,13 +105,19 @@ impl ListComputeCapacityReservationInstanceShapesRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeCapacityReservationInstanceShapesRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeCapacityReservationInstanceShapesRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeCapacityReservationInstanceShapesRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeCapacityReservationInstanceShapesRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -148,16 +153,20 @@ impl ListComputeCapacityReservationInstanceShapesRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListComputeCapacityReservationInstanceShapesRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListComputeCapacityReservationInstanceShapesRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeCapacityReservationInstanceShapesRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeCapacityReservationInstanceShapesRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

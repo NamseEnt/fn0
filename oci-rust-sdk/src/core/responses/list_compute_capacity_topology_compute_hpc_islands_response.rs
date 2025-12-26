@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeCapacityTopologyComputeHpcIslandsResponse {
     /// The returned model.ComputeHpcIslandCollection instance.
     pub compute_hpc_island_collection: ComputeHpcIslandCollection,
 }
-
 
 /// Required fields for ListComputeCapacityTopologyComputeHpcIslandsResponse
 pub struct ListComputeCapacityTopologyComputeHpcIslandsResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeCapacityTopologyComputeHpcIslandsResponse {
             opc_request_id: required.opc_request_id,
 
             compute_hpc_island_collection: required.compute_hpc_island_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListComputeCapacityTopologyComputeHpcIslandsResponse {
         self
     }
 }
-
-

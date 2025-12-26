@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct ExportImageResponse {
     /// The returned model.Image instance.
     pub image: Image,
 }
-
 
 /// Required fields for ExportImageResponse
 pub struct ExportImageResponseRequired {
@@ -48,7 +47,7 @@ impl ExportImageResponse {
             opc_work_request_id: required.opc_work_request_id,
 
             image: required.image,
-}
+        }
     }
 
     /// Set etag
@@ -75,5 +74,3 @@ impl ExportImageResponse {
         self
     }
 }
-
-

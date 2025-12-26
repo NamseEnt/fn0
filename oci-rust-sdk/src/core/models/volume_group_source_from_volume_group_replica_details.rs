@@ -13,7 +13,6 @@ pub struct VolumeGroupSourceFromVolumeGroupReplicaDetails {
     pub r#type: String,
 }
 
-
 /// Required fields for VolumeGroupSourceFromVolumeGroupReplicaDetails
 pub struct VolumeGroupSourceFromVolumeGroupReplicaDetailsRequired {
     /// The OCID of the volume group replica.
@@ -29,7 +28,7 @@ impl VolumeGroupSourceFromVolumeGroupReplicaDetails {
             volume_group_replica_id: required.volume_group_replica_id,
 
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set volume_group_replica_id
@@ -44,5 +43,3 @@ impl VolumeGroupSourceFromVolumeGroupReplicaDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct UpdateContainerRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for UpdateContainerRequest
 pub struct UpdateContainerRequestRequired {
@@ -44,7 +43,7 @@ impl UpdateContainerRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set container_id
@@ -84,15 +83,6 @@ impl UpdateContainerRequest {
     }
     /// Convert this request's query parameters to a vector of key-value pairs.
     pub fn to_query_params(&self) -> Vec<(String, String)> {
-        let mut params = Vec::new();
-
-        if let Some(ref if_match) = self.if_match {
-            params.push(("if_match".to_string(), if_match.clone()));
-        }
-
-        params
+        Vec::new()
     }
-
 }
-
-

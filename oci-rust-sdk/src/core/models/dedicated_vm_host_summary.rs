@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -50,7 +50,6 @@ pub struct DedicatedVmHostSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining_memory_in_gbs: Option<i64>,
 }
-
 
 /// Required fields for DedicatedVmHostSummary
 pub struct DedicatedVmHostSummaryRequired {
@@ -111,7 +110,7 @@ impl DedicatedVmHostSummary {
             total_memory_in_gbs: None,
 
             remaining_memory_in_gbs: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -216,5 +215,3 @@ impl DedicatedVmHostSummary {
         self
     }
 }
-
-

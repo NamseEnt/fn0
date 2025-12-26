@@ -34,7 +34,6 @@ pub struct IngressSecurityRule {
     pub description: Option<String>,
 }
 
-
 /// Required fields for IngressSecurityRule
 pub struct IngressSecurityRuleRequired {
     /// The transport protocol. Specify either {@code all} or an IPv4 protocol number as defined in [Protocol Numbers](http://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml). Options are supported only for ICMP (\"1\"), TCP (\"6\"), UDP (\"17\"), and ICMPv6 (\"58\").
@@ -63,7 +62,7 @@ impl IngressSecurityRule {
             udp_options: None,
 
             description: None,
-}
+        }
     }
 
     /// Set icmp_options
@@ -150,5 +149,3 @@ impl IngressSecurityRule {
         self
     }
 }
-
-

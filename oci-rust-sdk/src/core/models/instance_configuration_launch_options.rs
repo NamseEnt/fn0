@@ -50,25 +50,37 @@ impl InstanceConfigurationLaunchOptions {
     }
 
     /// Set boot_volume_type
-    pub fn set_boot_volume_type(mut self, value: Option<InstanceConfigurationLaunchOptionsBootVolumeType>) -> Self {
+    pub fn set_boot_volume_type(
+        mut self,
+        value: Option<InstanceConfigurationLaunchOptionsBootVolumeType>,
+    ) -> Self {
         self.boot_volume_type = value;
         self
     }
 
     /// Set firmware
-    pub fn set_firmware(mut self, value: Option<InstanceConfigurationLaunchOptionsFirmware>) -> Self {
+    pub fn set_firmware(
+        mut self,
+        value: Option<InstanceConfigurationLaunchOptionsFirmware>,
+    ) -> Self {
         self.firmware = value;
         self
     }
 
     /// Set network_type
-    pub fn set_network_type(mut self, value: Option<InstanceConfigurationLaunchOptionsNetworkType>) -> Self {
+    pub fn set_network_type(
+        mut self,
+        value: Option<InstanceConfigurationLaunchOptionsNetworkType>,
+    ) -> Self {
         self.network_type = value;
         self
     }
 
     /// Set remote_data_volume_type
-    pub fn set_remote_data_volume_type(mut self, value: Option<InstanceConfigurationLaunchOptionsRemoteDataVolumeType>) -> Self {
+    pub fn set_remote_data_volume_type(
+        mut self,
+        value: Option<InstanceConfigurationLaunchOptionsRemoteDataVolumeType>,
+    ) -> Self {
         self.remote_data_volume_type = value;
         self
     }
@@ -86,7 +98,10 @@ impl InstanceConfigurationLaunchOptions {
     }
 
     /// Set boot_volume_type (unwraps Option)
-    pub fn with_boot_volume_type(mut self, value: InstanceConfigurationLaunchOptionsBootVolumeType) -> Self {
+    pub fn with_boot_volume_type(
+        mut self,
+        value: InstanceConfigurationLaunchOptionsBootVolumeType,
+    ) -> Self {
         self.boot_volume_type = Some(value);
         self
     }
@@ -98,13 +113,19 @@ impl InstanceConfigurationLaunchOptions {
     }
 
     /// Set network_type (unwraps Option)
-    pub fn with_network_type(mut self, value: InstanceConfigurationLaunchOptionsNetworkType) -> Self {
+    pub fn with_network_type(
+        mut self,
+        value: InstanceConfigurationLaunchOptionsNetworkType,
+    ) -> Self {
         self.network_type = Some(value);
         self
     }
 
     /// Set remote_data_volume_type (unwraps Option)
-    pub fn with_remote_data_volume_type(mut self, value: InstanceConfigurationLaunchOptionsRemoteDataVolumeType) -> Self {
+    pub fn with_remote_data_volume_type(
+        mut self,
+        value: InstanceConfigurationLaunchOptionsRemoteDataVolumeType,
+    ) -> Self {
         self.remote_data_volume_type = Some(value);
         self
     }
@@ -127,4 +148,3 @@ impl Default for InstanceConfigurationLaunchOptions {
         Self::new()
     }
 }
-

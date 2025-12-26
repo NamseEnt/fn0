@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +40,6 @@ pub struct ListComputeCapacityReservationInstancesRequest {
     pub sort_order: Option<ListComputeCapacityReservationInstancesRequestSortOrder>,
 }
 
-
 /// Required fields for ListComputeCapacityReservationInstancesRequest
 pub struct ListComputeCapacityReservationInstancesRequestRequired {
     /// The OCID of the compute capacity reservation.
@@ -66,7 +65,7 @@ impl ListComputeCapacityReservationInstancesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set capacity_reservation_id
@@ -106,13 +105,19 @@ impl ListComputeCapacityReservationInstancesRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeCapacityReservationInstancesRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeCapacityReservationInstancesRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeCapacityReservationInstancesRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeCapacityReservationInstancesRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -148,16 +153,20 @@ impl ListComputeCapacityReservationInstancesRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListComputeCapacityReservationInstancesRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListComputeCapacityReservationInstancesRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeCapacityReservationInstancesRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeCapacityReservationInstancesRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

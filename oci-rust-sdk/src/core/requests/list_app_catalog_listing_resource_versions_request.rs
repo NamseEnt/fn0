@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,6 @@ pub struct ListAppCatalogListingResourceVersionsRequest {
     pub sort_order: Option<ListAppCatalogListingResourceVersionsRequestSortOrder>,
 }
 
-
 /// Required fields for ListAppCatalogListingResourceVersionsRequest
 pub struct ListAppCatalogListingResourceVersionsRequestRequired {
     /// The OCID of the listing.
@@ -42,7 +41,7 @@ impl ListAppCatalogListingResourceVersionsRequest {
             page: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set listing_id
@@ -64,7 +63,10 @@ impl ListAppCatalogListingResourceVersionsRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListAppCatalogListingResourceVersionsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListAppCatalogListingResourceVersionsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -82,10 +84,11 @@ impl ListAppCatalogListingResourceVersionsRequest {
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListAppCatalogListingResourceVersionsRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListAppCatalogListingResourceVersionsRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetDhcpOptionsRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) for the set of DHCP options.
     pub dhcp_id: String,
 }
-
 
 /// Required fields for GetDhcpOptionsRequest
 pub struct GetDhcpOptionsRequestRequired {
@@ -24,7 +23,7 @@ impl GetDhcpOptionsRequest {
     pub fn new(required: GetDhcpOptionsRequestRequired) -> Self {
         Self {
             dhcp_id: required.dhcp_id,
-}
+        }
     }
 
     /// Set dhcp_id
@@ -33,5 +32,3 @@ impl GetDhcpOptionsRequest {
         self
     }
 }
-
-

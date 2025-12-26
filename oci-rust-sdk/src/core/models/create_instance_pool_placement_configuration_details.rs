@@ -25,7 +25,6 @@ pub struct CreateInstancePoolPlacementConfigurationDetails {
     pub secondary_vnic_subnets: Option<Vec<InstancePoolPlacementSecondaryVnicSubnet>>,
 }
 
-
 /// Required fields for CreateInstancePoolPlacementConfigurationDetails
 pub struct CreateInstancePoolPlacementConfigurationDetailsRequired {
     /// The availability domain to place instances. <p> Example: {@code Uocm:PHX-AD-1}
@@ -45,7 +44,7 @@ impl CreateInstancePoolPlacementConfigurationDetails {
             primary_vnic_subnets: None,
 
             secondary_vnic_subnets: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -67,13 +66,19 @@ impl CreateInstancePoolPlacementConfigurationDetails {
     }
 
     /// Set primary_vnic_subnets
-    pub fn set_primary_vnic_subnets(mut self, value: Option<InstancePoolPlacementPrimarySubnet>) -> Self {
+    pub fn set_primary_vnic_subnets(
+        mut self,
+        value: Option<InstancePoolPlacementPrimarySubnet>,
+    ) -> Self {
         self.primary_vnic_subnets = value;
         self
     }
 
     /// Set secondary_vnic_subnets
-    pub fn set_secondary_vnic_subnets(mut self, value: Option<Vec<InstancePoolPlacementSecondaryVnicSubnet>>) -> Self {
+    pub fn set_secondary_vnic_subnets(
+        mut self,
+        value: Option<Vec<InstancePoolPlacementSecondaryVnicSubnet>>,
+    ) -> Self {
         self.secondary_vnic_subnets = value;
         self
     }
@@ -97,10 +102,11 @@ impl CreateInstancePoolPlacementConfigurationDetails {
     }
 
     /// Set secondary_vnic_subnets (unwraps Option)
-    pub fn with_secondary_vnic_subnets(mut self, value: Vec<InstancePoolPlacementSecondaryVnicSubnet>) -> Self {
+    pub fn with_secondary_vnic_subnets(
+        mut self,
+        value: Vec<InstancePoolPlacementSecondaryVnicSubnet>,
+    ) -> Self {
         self.secondary_vnic_subnets = Some(value);
         self
     }
 }
-
-

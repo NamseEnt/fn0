@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -22,7 +22,6 @@ pub struct IPSecConnectionDeviceConfig {
     pub tunnels: Option<Vec<TunnelConfig>>,
 }
 
-
 /// Required fields for IPSecConnectionDeviceConfig
 pub struct IPSecConnectionDeviceConfigRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the IPSec connection.
@@ -43,7 +42,7 @@ impl IPSecConnectionDeviceConfig {
             time_created: None,
 
             tunnels: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -82,5 +81,3 @@ impl IPSecConnectionDeviceConfig {
         self
     }
 }
-
-

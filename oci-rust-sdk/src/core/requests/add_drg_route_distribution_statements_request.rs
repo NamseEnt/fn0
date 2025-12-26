@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct AddDrgRouteDistributionStatementsRequest {
     /// Request with one or more route distribution statements to be inserted into the route distribution.
     pub add_drg_route_distribution_statements_details: AddDrgRouteDistributionStatementsDetails,
 }
-
 
 /// Required fields for AddDrgRouteDistributionStatementsRequest
 pub struct AddDrgRouteDistributionStatementsRequestRequired {
@@ -31,8 +30,9 @@ impl AddDrgRouteDistributionStatementsRequest {
         Self {
             drg_route_distribution_id: required.drg_route_distribution_id,
 
-            add_drg_route_distribution_statements_details: required.add_drg_route_distribution_statements_details,
-}
+            add_drg_route_distribution_statements_details: required
+                .add_drg_route_distribution_statements_details,
+        }
     }
 
     /// Set drg_route_distribution_id
@@ -42,10 +42,11 @@ impl AddDrgRouteDistributionStatementsRequest {
     }
 
     /// Set add_drg_route_distribution_statements_details
-    pub fn set_add_drg_route_distribution_statements_details(mut self, value: AddDrgRouteDistributionStatementsDetails) -> Self {
+    pub fn set_add_drg_route_distribution_statements_details(
+        mut self,
+        value: AddDrgRouteDistributionStatementsDetails,
+    ) -> Self {
         self.add_drg_route_distribution_statements_details = value;
         self
     }
 }
-
-

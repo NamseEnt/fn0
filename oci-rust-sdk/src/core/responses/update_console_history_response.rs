@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateConsoleHistoryResponse {
     /// The returned model.ConsoleHistory instance.
     pub console_history: ConsoleHistory,
 }
-
 
 /// Required fields for UpdateConsoleHistoryResponse
 pub struct UpdateConsoleHistoryResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateConsoleHistoryResponse {
             opc_request_id: required.opc_request_id,
 
             console_history: required.console_history,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateConsoleHistoryResponse {
         self
     }
 }
-
-

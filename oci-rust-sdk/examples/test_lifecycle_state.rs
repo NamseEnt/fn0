@@ -1,4 +1,6 @@
-use oci_rust_sdk::core::{InstanceLifecycleState, ListInstancesRequest, ListInstancesRequestRequired};
+use oci_rust_sdk::core::{
+    InstanceLifecycleState, ListInstancesRequest, ListInstancesRequestRequired,
+};
 
 fn main() {
     println!("=== Testing InstanceLifecycleState Enum ===\n");

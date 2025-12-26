@@ -27,7 +27,6 @@ pub struct DrgPromotionStatusResponse {
     pub ipsec_promotion_status: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for DrgPromotionStatusResponse
 pub struct DrgPromotionStatusResponseRequired {
     /// OCID of the DRG
@@ -47,7 +46,7 @@ impl DrgPromotionStatusResponse {
             vc_promotion_status: None,
 
             ipsec_promotion_status: None,
-}
+        }
     }
 
     /// Set drg_id
@@ -57,7 +56,10 @@ impl DrgPromotionStatusResponse {
     }
 
     /// Set drg_promotion_status
-    pub fn set_drg_promotion_status(mut self, value: Option<DrgPromotionStatusResponseDrgPromotionStatus>) -> Self {
+    pub fn set_drg_promotion_status(
+        mut self,
+        value: Option<DrgPromotionStatusResponseDrgPromotionStatus>,
+    ) -> Self {
         self.drg_promotion_status = value;
         self
     }
@@ -81,7 +83,10 @@ impl DrgPromotionStatusResponse {
     }
 
     /// Set drg_promotion_status (unwraps Option)
-    pub fn with_drg_promotion_status(mut self, value: DrgPromotionStatusResponseDrgPromotionStatus) -> Self {
+    pub fn with_drg_promotion_status(
+        mut self,
+        value: DrgPromotionStatusResponseDrgPromotionStatus,
+    ) -> Self {
         self.drg_promotion_status = Some(value);
         self
     }
@@ -104,5 +109,3 @@ impl DrgPromotionStatusResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetInstanceMaintenanceRebootResponse {
     /// The returned model.InstanceMaintenanceReboot instance.
     pub instance_maintenance_reboot: InstanceMaintenanceReboot,
 }
-
 
 /// Required fields for GetInstanceMaintenanceRebootResponse
 pub struct GetInstanceMaintenanceRebootResponseRequired {
@@ -32,7 +31,7 @@ impl GetInstanceMaintenanceRebootResponse {
             opc_request_id: required.opc_request_id,
 
             instance_maintenance_reboot: required.instance_maintenance_reboot,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetInstanceMaintenanceRebootResponse {
         self
     }
 }
-
-

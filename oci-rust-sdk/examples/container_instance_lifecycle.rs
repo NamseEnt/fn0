@@ -1,4 +1,5 @@
 use oci_rust_sdk::{
+    auth::ConfigFileAuthProvider,
     containerinstances::{
         self, ContainerInstanceLifecycleState, CreateContainerDetails,
         CreateContainerDetailsRequired, CreateContainerInstanceDetails,
@@ -13,8 +14,7 @@ use oci_rust_sdk::{
         StartContainerInstanceRequestRequired, StopContainerInstanceRequest,
         StopContainerInstanceRequestRequired,
     },
-    auth::ConfigFileAuthProvider,
-    core::{region::Region, Retrier},
+    core::{Retrier, region::Region},
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,8 +35,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let compartment_id = std::env::var("OCI_COMPARTMENT_ID")
         .expect("OCI_COMPARTMENT_ID environment variable must be set");
-    let subnet_id = std::env::var("OCI_SUBNET_ID")
-        .expect("OCI_SUBNET_ID environment variable must be set");
+    let subnet_id =
+        std::env::var("OCI_SUBNET_ID").expect("OCI_SUBNET_ID environment variable must be set");
     let availability_domain = std::env::var("OCI_AVAILABILITY_DOMAIN")
         .expect("OCI_AVAILABILITY_DOMAIN environment variable must be set");
 
@@ -69,25 +69,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .with_memory_in_gbs(4);
 
-    let create_details = CreateContainerInstanceDetails::new(
-        CreateContainerInstanceDetailsRequired {
+    let create_details =
+        CreateContainerInstanceDetails::new(CreateContainerInstanceDetailsRequired {
             compartment_id: compartment_id.clone(),
             availability_domain: availability_domain.clone(),
             shape: "CI.Standard.E4.Flex".to_string(),
             shape_config,
             containers: vec![container],
             vnics: vec![vnic],
-        },
-    )
-    .with_display_name("example-container-instance")
-    .with_graceful_shutdown_timeout_in_seconds(30)
-    .with_container_restart_policy("ALWAYS");
+        })
+        .with_display_name("example-container-instance")
+        .with_graceful_shutdown_timeout_in_seconds(30)
+        .with_container_restart_policy("ALWAYS");
 
-    let create_request = CreateContainerInstanceRequest::new(
-        CreateContainerInstanceRequestRequired {
+    let create_request =
+        CreateContainerInstanceRequest::new(CreateContainerInstanceRequestRequired {
             create_container_instance_details: create_details,
-        },
-    );
+        });
 
     let container_instance_id = match client.create_container_instance(create_request).await {
         Ok(response) => {
@@ -97,10 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "  Display Name: {}",
                 response.container_instance.display_name
             );
-            println!(
-                "  State: {:?}",
-                response.container_instance.lifecycle_state
-            );
+            println!("  State: {:?}", response.container_instance.lifecycle_state);
 
             if let Some(work_request_id) = response.opc_work_request_id {
                 println!("  Work Request ID: {}", work_request_id);
@@ -124,11 +119,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(Duration::from_secs(5)).await;
         poll_count += 1;
 
-        let get_request = GetContainerInstanceRequest::new(
-            GetContainerInstanceRequestRequired {
-                container_instance_id: container_instance_id.clone(),
-            },
-        );
+        let get_request = GetContainerInstanceRequest::new(GetContainerInstanceRequestRequired {
+            container_instance_id: container_instance_id.clone(),
+        });
 
         match client.get_container_instance(get_request).await {
             Ok(response) => {
@@ -152,7 +145,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     _ => {
                         if poll_count >= max_polls {
-                            eprintln!("\n✗ Timeout waiting for container instance to become active");
+                            eprintln!(
+                                "\n✗ Timeout waiting for container instance to become active"
+                            );
                             return Err("Timeout".into());
                         }
                     }
@@ -223,11 +218,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Step 6: List All Container Instances ===");
-    let list_request = ListContainerInstancesRequest::new(
-        ListContainerInstancesRequestRequired {
-            compartment_id: compartment_id.clone(),
-        },
-    );
+    let list_request = ListContainerInstancesRequest::new(ListContainerInstancesRequestRequired {
+        compartment_id: compartment_id.clone(),
+    });
 
     match client.list_container_instances(list_request).await {
         Ok(response) => {
@@ -245,11 +238,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Step 7: Delete Container Instance ===");
     println!("Deleting container instance: {}", container_instance_id);
 
-    let delete_request = DeleteContainerInstanceRequest::new(
-        DeleteContainerInstanceRequestRequired {
+    let delete_request =
+        DeleteContainerInstanceRequest::new(DeleteContainerInstanceRequestRequired {
             container_instance_id: container_instance_id.clone(),
-        },
-    );
+        });
 
     match client.delete_container_instance(delete_request).await {
         Ok(response) => {
@@ -271,12 +263,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(Duration::from_secs(5)).await;
         poll_count += 1;
 
-        let list_request = ListContainerInstancesRequest::new(
-            ListContainerInstancesRequestRequired {
+        let list_request =
+            ListContainerInstancesRequest::new(ListContainerInstancesRequestRequired {
                 compartment_id: compartment_id.clone(),
-            },
-        )
-        .with_display_name("example-container-instance");
+            })
+            .with_display_name("example-container-instance");
 
         match client.list_container_instances(list_request).await {
             Ok(response) => {

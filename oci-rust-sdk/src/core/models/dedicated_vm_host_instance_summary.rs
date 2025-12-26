@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -26,7 +26,6 @@ pub struct DedicatedVmHostInstanceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_memory_encryption_enabled: Option<bool>,
 }
-
 
 /// Required fields for DedicatedVmHostInstanceSummary
 pub struct DedicatedVmHostInstanceSummaryRequired {
@@ -61,7 +60,7 @@ impl DedicatedVmHostInstanceSummary {
             time_created: required.time_created,
 
             is_memory_encryption_enabled: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -106,5 +105,3 @@ impl DedicatedVmHostInstanceSummary {
         self
     }
 }
-
-

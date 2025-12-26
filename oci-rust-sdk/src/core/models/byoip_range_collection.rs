@@ -10,7 +10,6 @@ pub struct ByoipRangeCollection {
     pub items: Vec<ByoipRangeSummary>,
 }
 
-
 /// Required fields for ByoipRangeCollection
 pub struct ByoipRangeCollectionRequired {
     /// A list of {@code ByoipRange} resource summaries.
@@ -22,7 +21,7 @@ impl ByoipRangeCollection {
     pub fn new(required: ByoipRangeCollectionRequired) -> Self {
         Self {
             items: required.items,
-}
+        }
     }
 
     /// Set items
@@ -31,5 +30,3 @@ impl ByoipRangeCollection {
         self
     }
 }
-
-

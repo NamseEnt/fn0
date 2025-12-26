@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeVtapCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeVtapCompartmentRequest
 pub struct ChangeVtapCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VTAP.
@@ -50,7 +49,7 @@ impl ChangeVtapCompartmentRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set vtap_id
@@ -60,7 +59,10 @@ impl ChangeVtapCompartmentRequest {
     }
 
     /// Set change_vtap_compartment_details
-    pub fn set_change_vtap_compartment_details(mut self, value: ChangeVtapCompartmentDetails) -> Self {
+    pub fn set_change_vtap_compartment_details(
+        mut self,
+        value: ChangeVtapCompartmentDetails,
+    ) -> Self {
         self.change_vtap_compartment_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl ChangeVtapCompartmentRequest {
         self
     }
 }
-
-

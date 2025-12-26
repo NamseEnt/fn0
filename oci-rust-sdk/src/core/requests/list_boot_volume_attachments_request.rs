@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,7 +31,6 @@ pub struct ListBootVolumeAttachmentsRequest {
     pub boot_volume_id: Option<String>,
 }
 
-
 /// Required fields for ListBootVolumeAttachmentsRequest
 pub struct ListBootVolumeAttachmentsRequestRequired {
     /// The name of the availability domain. <p> Example: {@code Uocm:PHX-AD-1}
@@ -56,7 +55,7 @@ impl ListBootVolumeAttachmentsRequest {
             instance_id: None,
 
             boot_volume_id: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -119,5 +118,3 @@ impl ListBootVolumeAttachmentsRequest {
         self
     }
 }
-
-

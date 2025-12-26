@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteVolumeBackupPolicyRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for DeleteVolumeBackupPolicyRequest
 pub struct DeleteVolumeBackupPolicyRequestRequired {
     /// The OCID of the volume backup policy.
@@ -36,7 +35,7 @@ impl DeleteVolumeBackupPolicyRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set policy_id
@@ -69,5 +68,3 @@ impl DeleteVolumeBackupPolicyRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeGlobalImageCapabilitySchemaVersionsResponse {
     /// A list of ComputeGlobalImageCapabilitySchemaVersionSummary instances.
     pub items: Vec<ComputeGlobalImageCapabilitySchemaVersionSummary>,
 }
-
 
 /// Required fields for ListComputeGlobalImageCapabilitySchemaVersionsResponse
 pub struct ListComputeGlobalImageCapabilitySchemaVersionsResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeGlobalImageCapabilitySchemaVersionsResponse {
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -56,10 +55,11 @@ impl ListComputeGlobalImageCapabilitySchemaVersionsResponse {
     }
 
     /// Set items
-    pub fn set_items(mut self, value: Vec<ComputeGlobalImageCapabilitySchemaVersionSummary>) -> Self {
+    pub fn set_items(
+        mut self,
+        value: Vec<ComputeGlobalImageCapabilitySchemaVersionSummary>,
+    ) -> Self {
         self.items = value;
         self
     }
 }
-
-

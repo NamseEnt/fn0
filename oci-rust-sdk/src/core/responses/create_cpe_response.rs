@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateCpeResponse {
     /// The returned model.Cpe instance.
     pub cpe: Cpe,
 }
-
 
 /// Required fields for CreateCpeResponse
 pub struct CreateCpeResponseRequired {
@@ -40,7 +39,7 @@ impl CreateCpeResponse {
             opc_request_id: required.opc_request_id,
 
             cpe: required.cpe,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateCpeResponse {
         self
     }
 }
-
-

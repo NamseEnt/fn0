@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,6 @@ pub struct ListImageShapeCompatibilityEntriesRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for ListImageShapeCompatibilityEntriesRequest
 pub struct ListImageShapeCompatibilityEntriesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the image.
@@ -42,7 +41,7 @@ impl ListImageShapeCompatibilityEntriesRequest {
             page: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set image_id
@@ -87,5 +86,3 @@ impl ListImageShapeCompatibilityEntriesRequest {
         self
     }
 }
-
-

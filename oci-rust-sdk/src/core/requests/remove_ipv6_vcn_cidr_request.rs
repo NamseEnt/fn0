@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,6 @@ pub struct RemoveIpv6VcnCidrRequest {
     pub remove_vcn_ipv6_cidr_details: Option<RemoveVcnIpv6CidrDetails>,
 }
 
-
 /// Required fields for RemoveIpv6VcnCidrRequest
 pub struct RemoveIpv6VcnCidrRequestRequired {
     /// Specify the [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VCN.
@@ -48,7 +47,7 @@ impl RemoveIpv6VcnCidrRequest {
             if_match: None,
 
             remove_vcn_ipv6_cidr_details: None,
-}
+        }
     }
 
     /// Set vcn_id
@@ -76,7 +75,10 @@ impl RemoveIpv6VcnCidrRequest {
     }
 
     /// Set remove_vcn_ipv6_cidr_details
-    pub fn set_remove_vcn_ipv6_cidr_details(mut self, value: Option<RemoveVcnIpv6CidrDetails>) -> Self {
+    pub fn set_remove_vcn_ipv6_cidr_details(
+        mut self,
+        value: Option<RemoveVcnIpv6CidrDetails>,
+    ) -> Self {
         self.remove_vcn_ipv6_cidr_details = value;
         self
     }
@@ -105,5 +107,3 @@ impl RemoveIpv6VcnCidrRequest {
         self
     }
 }
-
-

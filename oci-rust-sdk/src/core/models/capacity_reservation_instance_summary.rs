@@ -30,7 +30,6 @@ pub struct CapacityReservationInstanceSummary {
     pub shape_config: Option<InstanceReservationShapeConfigDetails>,
 }
 
-
 /// Required fields for CapacityReservationInstanceSummary
 pub struct CapacityReservationInstanceSummaryRequired {
     /// The OCID of the instance.
@@ -63,7 +62,7 @@ impl CapacityReservationInstanceSummary {
             cluster_placement_group_id: None,
 
             shape_config: None,
-}
+        }
     }
 
     /// Set id
@@ -97,7 +96,10 @@ impl CapacityReservationInstanceSummary {
     }
 
     /// Set shape_config
-    pub fn set_shape_config(mut self, value: Option<InstanceReservationShapeConfigDetails>) -> Self {
+    pub fn set_shape_config(
+        mut self,
+        value: Option<InstanceReservationShapeConfigDetails>,
+    ) -> Self {
         self.shape_config = value;
         self
     }
@@ -126,5 +128,3 @@ impl CapacityReservationInstanceSummary {
         self
     }
 }
-
-

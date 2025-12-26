@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,6 @@ pub struct ListDrgRouteDistributionStatementsRequest {
     pub sort_order: Option<ListDrgRouteDistributionStatementsRequestSortOrder>,
 }
 
-
 /// Required fields for ListDrgRouteDistributionStatementsRequest
 pub struct ListDrgRouteDistributionStatementsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the route distribution.
@@ -48,7 +47,7 @@ impl ListDrgRouteDistributionStatementsRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set drg_route_distribution_id
@@ -70,13 +69,19 @@ impl ListDrgRouteDistributionStatementsRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListDrgRouteDistributionStatementsRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListDrgRouteDistributionStatementsRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListDrgRouteDistributionStatementsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListDrgRouteDistributionStatementsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -100,10 +105,11 @@ impl ListDrgRouteDistributionStatementsRequest {
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListDrgRouteDistributionStatementsRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListDrgRouteDistributionStatementsRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

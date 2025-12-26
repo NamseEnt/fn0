@@ -14,7 +14,6 @@ pub struct DrgAttachmentNetworkDetails {
     pub id: Option<String>,
 }
 
-
 /// Required fields for DrgAttachmentNetworkDetails
 pub struct DrgAttachmentNetworkDetailsRequired {
     pub r#type: String,
@@ -27,7 +26,7 @@ impl DrgAttachmentNetworkDetails {
             r#type: required.r#type,
 
             id: None,
-}
+        }
     }
 
     /// Set id
@@ -48,5 +47,3 @@ impl DrgAttachmentNetworkDetails {
         self
     }
 }
-
-

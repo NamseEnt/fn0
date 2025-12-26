@@ -26,7 +26,10 @@ impl ShapeNumaNodesPerSocketPlatformOptions {
     }
 
     /// Set allowed_values
-    pub fn set_allowed_values(mut self, value: Option<Vec<ShapeNumaNodesPerSocketPlatformOptionsAllowedValues>>) -> Self {
+    pub fn set_allowed_values(
+        mut self,
+        value: Option<Vec<ShapeNumaNodesPerSocketPlatformOptionsAllowedValues>>,
+    ) -> Self {
         self.allowed_values = value;
         self
     }
@@ -38,7 +41,10 @@ impl ShapeNumaNodesPerSocketPlatformOptions {
     }
 
     /// Set allowed_values (unwraps Option)
-    pub fn with_allowed_values(mut self, value: Vec<ShapeNumaNodesPerSocketPlatformOptionsAllowedValues>) -> Self {
+    pub fn with_allowed_values(
+        mut self,
+        value: Vec<ShapeNumaNodesPerSocketPlatformOptionsAllowedValues>,
+    ) -> Self {
         self.allowed_values = Some(value);
         self
     }
@@ -55,4 +61,3 @@ impl Default for ShapeNumaNodesPerSocketPlatformOptions {
         Self::new()
     }
 }
-

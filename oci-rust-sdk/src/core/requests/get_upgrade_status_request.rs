@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetUpgradeStatusRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetUpgradeStatusRequest
 pub struct GetUpgradeStatusRequestRequired {
@@ -30,7 +29,7 @@ impl GetUpgradeStatusRequest {
             drg_id: required.drg_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set drg_id
@@ -51,5 +50,3 @@ impl GetUpgradeStatusRequest {
         self
     }
 }
-
-

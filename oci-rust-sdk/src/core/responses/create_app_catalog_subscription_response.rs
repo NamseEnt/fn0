@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateAppCatalogSubscriptionResponse {
     /// The returned model.AppCatalogSubscription instance.
     pub app_catalog_subscription: AppCatalogSubscription,
 }
-
 
 /// Required fields for CreateAppCatalogSubscriptionResponse
 pub struct CreateAppCatalogSubscriptionResponseRequired {
@@ -40,7 +39,7 @@ impl CreateAppCatalogSubscriptionResponse {
             opc_request_id: required.opc_request_id,
 
             app_catalog_subscription: required.app_catalog_subscription,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateAppCatalogSubscriptionResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetCrossConnectLetterOfAuthorityResponse {
     /// The returned model.LetterOfAuthority instance.
     pub letter_of_authority: LetterOfAuthority,
 }
-
 
 /// Required fields for GetCrossConnectLetterOfAuthorityResponse
 pub struct GetCrossConnectLetterOfAuthorityResponseRequired {
@@ -32,7 +31,7 @@ impl GetCrossConnectLetterOfAuthorityResponse {
             opc_request_id: required.opc_request_id,
 
             letter_of_authority: required.letter_of_authority,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetCrossConnectLetterOfAuthorityResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct CreateComputeCapacityReportResponse {
     /// The returned model.ComputeCapacityReport instance.
     pub compute_capacity_report: ComputeCapacityReport,
 }
-
 
 /// Required fields for CreateComputeCapacityReportResponse
 pub struct CreateComputeCapacityReportResponseRequired {
@@ -32,7 +31,7 @@ impl CreateComputeCapacityReportResponse {
             opc_request_id: required.opc_request_id,
 
             compute_capacity_report: required.compute_capacity_report,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl CreateComputeCapacityReportResponse {
         self
     }
 }
-
-

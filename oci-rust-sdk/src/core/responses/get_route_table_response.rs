@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetRouteTableResponse {
     /// The returned model.RouteTable instance.
     pub route_table: RouteTable,
 }
-
 
 /// Required fields for GetRouteTableResponse
 pub struct GetRouteTableResponseRequired {
@@ -40,7 +39,7 @@ impl GetRouteTableResponse {
             opc_request_id: required.opc_request_id,
 
             route_table: required.route_table,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetRouteTableResponse {
         self
     }
 }
-
-

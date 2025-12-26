@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,6 @@ pub struct ValidateByoasnRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ValidateByoasnRequest
 pub struct ValidateByoasnRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code Byoasn} resource.
@@ -42,7 +41,7 @@ impl ValidateByoasnRequest {
             if_match: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set byoasn_id
@@ -87,5 +86,3 @@ impl ValidateByoasnRequest {
         self
     }
 }
-
-

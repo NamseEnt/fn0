@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetFastConnectProviderServiceRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the provider service.
     pub provider_service_id: String,
 }
-
 
 /// Required fields for GetFastConnectProviderServiceRequest
 pub struct GetFastConnectProviderServiceRequestRequired {
@@ -24,7 +23,7 @@ impl GetFastConnectProviderServiceRequest {
     pub fn new(required: GetFastConnectProviderServiceRequestRequired) -> Self {
         Self {
             provider_service_id: required.provider_service_id,
-}
+        }
     }
 
     /// Set provider_service_id
@@ -33,5 +32,3 @@ impl GetFastConnectProviderServiceRequest {
         self
     }
 }
-
-

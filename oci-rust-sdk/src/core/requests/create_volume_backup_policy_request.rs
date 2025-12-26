@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateVolumeBackupPolicyRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for CreateVolumeBackupPolicyRequest
 pub struct CreateVolumeBackupPolicyRequestRequired {
     /// Request to create a new scheduled backup policy.
@@ -36,11 +35,14 @@ impl CreateVolumeBackupPolicyRequest {
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set create_volume_backup_policy_details
-    pub fn set_create_volume_backup_policy_details(mut self, value: CreateVolumeBackupPolicyDetails) -> Self {
+    pub fn set_create_volume_backup_policy_details(
+        mut self,
+        value: CreateVolumeBackupPolicyDetails,
+    ) -> Self {
         self.create_volume_backup_policy_details = value;
         self
     }
@@ -69,5 +71,3 @@ impl CreateVolumeBackupPolicyRequest {
         self
     }
 }
-
-

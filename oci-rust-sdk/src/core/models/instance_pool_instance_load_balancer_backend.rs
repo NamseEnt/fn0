@@ -19,7 +19,6 @@ pub struct InstancePoolInstanceLoadBalancerBackend {
     pub backend_health_status: InstancePoolInstanceLoadBalancerBackendBackendHealthStatus,
 }
 
-
 /// Required fields for InstancePoolInstanceLoadBalancerBackend
 pub struct InstancePoolInstanceLoadBalancerBackendRequired {
     /// The OCID of the load balancer attached to the instance pool.
@@ -46,7 +45,7 @@ impl InstancePoolInstanceLoadBalancerBackend {
             backend_name: required.backend_name,
 
             backend_health_status: required.backend_health_status,
-}
+        }
     }
 
     /// Set load_balancer_id
@@ -68,10 +67,11 @@ impl InstancePoolInstanceLoadBalancerBackend {
     }
 
     /// Set backend_health_status
-    pub fn set_backend_health_status(mut self, value: InstancePoolInstanceLoadBalancerBackendBackendHealthStatus) -> Self {
+    pub fn set_backend_health_status(
+        mut self,
+        value: InstancePoolInstanceLoadBalancerBackendBackendHealthStatus,
+    ) -> Self {
         self.backend_health_status = value;
         self
     }
 }
-
-

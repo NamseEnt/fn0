@@ -13,7 +13,6 @@ pub struct PortRange {
     pub min: i64,
 }
 
-
 /// Required fields for PortRange
 pub struct PortRangeRequired {
     /// The maximum port number, which must not be less than the minimum port number. To specify a single port number, set both the min and max to the same value. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -30,7 +29,7 @@ impl PortRange {
             max: required.max,
 
             min: required.min,
-}
+        }
     }
 
     /// Set max
@@ -45,5 +44,3 @@ impl PortRange {
         self
     }
 }
-
-

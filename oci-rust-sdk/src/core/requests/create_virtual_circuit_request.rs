@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateVirtualCircuitRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateVirtualCircuitRequest
 pub struct CreateVirtualCircuitRequestRequired {
@@ -30,11 +29,14 @@ impl CreateVirtualCircuitRequest {
             create_virtual_circuit_details: required.create_virtual_circuit_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_virtual_circuit_details
-    pub fn set_create_virtual_circuit_details(mut self, value: CreateVirtualCircuitDetails) -> Self {
+    pub fn set_create_virtual_circuit_details(
+        mut self,
+        value: CreateVirtualCircuitDetails,
+    ) -> Self {
         self.create_virtual_circuit_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl CreateVirtualCircuitRequest {
         self
     }
 }
-
-

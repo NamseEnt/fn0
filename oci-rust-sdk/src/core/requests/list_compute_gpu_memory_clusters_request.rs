@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,7 +48,6 @@ pub struct ListComputeGpuMemoryClustersRequest {
     pub limit: Option<i64>,
 }
 
-
 /// Required fields for ListComputeGpuMemoryClustersRequest
 pub struct ListComputeGpuMemoryClustersRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -78,7 +77,7 @@ impl ListComputeGpuMemoryClustersRequest {
             sort_order: None,
 
             limit: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -130,7 +129,10 @@ impl ListComputeGpuMemoryClustersRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeGpuMemoryClustersRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeGpuMemoryClustersRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -195,5 +197,3 @@ impl ListComputeGpuMemoryClustersRequest {
         self
     }
 }
-
-

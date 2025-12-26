@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,9 +12,9 @@ pub struct BulkDeleteVirtualCircuitPublicPrefixesRequest {
     pub virtual_circuit_id: String,
 
     /// Request with public prefixes to be deleted from the virtual circuit.
-    pub bulk_delete_virtual_circuit_public_prefixes_details: BulkDeleteVirtualCircuitPublicPrefixesDetails,
+    pub bulk_delete_virtual_circuit_public_prefixes_details:
+        BulkDeleteVirtualCircuitPublicPrefixesDetails,
 }
-
 
 /// Required fields for BulkDeleteVirtualCircuitPublicPrefixesRequest
 pub struct BulkDeleteVirtualCircuitPublicPrefixesRequestRequired {
@@ -22,7 +22,8 @@ pub struct BulkDeleteVirtualCircuitPublicPrefixesRequestRequired {
     pub virtual_circuit_id: String,
 
     /// Request with public prefixes to be deleted from the virtual circuit.
-    pub bulk_delete_virtual_circuit_public_prefixes_details: BulkDeleteVirtualCircuitPublicPrefixesDetails,
+    pub bulk_delete_virtual_circuit_public_prefixes_details:
+        BulkDeleteVirtualCircuitPublicPrefixesDetails,
 }
 
 impl BulkDeleteVirtualCircuitPublicPrefixesRequest {
@@ -31,8 +32,9 @@ impl BulkDeleteVirtualCircuitPublicPrefixesRequest {
         Self {
             virtual_circuit_id: required.virtual_circuit_id,
 
-            bulk_delete_virtual_circuit_public_prefixes_details: required.bulk_delete_virtual_circuit_public_prefixes_details,
-}
+            bulk_delete_virtual_circuit_public_prefixes_details: required
+                .bulk_delete_virtual_circuit_public_prefixes_details,
+        }
     }
 
     /// Set virtual_circuit_id
@@ -42,10 +44,11 @@ impl BulkDeleteVirtualCircuitPublicPrefixesRequest {
     }
 
     /// Set bulk_delete_virtual_circuit_public_prefixes_details
-    pub fn set_bulk_delete_virtual_circuit_public_prefixes_details(mut self, value: BulkDeleteVirtualCircuitPublicPrefixesDetails) -> Self {
+    pub fn set_bulk_delete_virtual_circuit_public_prefixes_details(
+        mut self,
+        value: BulkDeleteVirtualCircuitPublicPrefixesDetails,
+    ) -> Self {
         self.bulk_delete_virtual_circuit_public_prefixes_details = value;
         self
     }
 }
-
-

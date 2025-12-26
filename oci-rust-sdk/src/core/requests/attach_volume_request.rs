@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct AttachVolumeRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for AttachVolumeRequest
 pub struct AttachVolumeRequestRequired {
@@ -30,11 +29,14 @@ impl AttachVolumeRequest {
             attach_volume_details: required.attach_volume_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set attach_volume_details
-    pub fn set_attach_volume_details(mut self, value: AttachServiceDeterminedVolumeDetails) -> Self {
+    pub fn set_attach_volume_details(
+        mut self,
+        value: AttachServiceDeterminedVolumeDetails,
+    ) -> Self {
         self.attach_volume_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl AttachVolumeRequest {
         self
     }
 }
-
-

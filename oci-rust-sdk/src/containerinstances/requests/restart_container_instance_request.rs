@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct RestartContainerInstanceRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for RestartContainerInstanceRequest
 pub struct RestartContainerInstanceRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance.
@@ -36,7 +35,7 @@ impl RestartContainerInstanceRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set container_instance_id
@@ -68,6 +67,8 @@ impl RestartContainerInstanceRequest {
         self.opc_request_id = Some(value.into());
         self
     }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
-
-

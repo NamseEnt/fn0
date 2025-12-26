@@ -35,7 +35,6 @@ pub struct VtapCaptureFilterRuleDetails {
     pub udp_options: Option<UdpOptions>,
 }
 
-
 /// Required fields for VtapCaptureFilterRuleDetails
 pub struct VtapCaptureFilterRuleDetailsRequired {
     /// The traffic direction the VTAP is configured to mirror.
@@ -61,17 +60,23 @@ impl VtapCaptureFilterRuleDetails {
             tcp_options: None,
 
             udp_options: None,
-}
+        }
     }
 
     /// Set traffic_direction
-    pub fn set_traffic_direction(mut self, value: VtapCaptureFilterRuleDetailsTrafficDirection) -> Self {
+    pub fn set_traffic_direction(
+        mut self,
+        value: VtapCaptureFilterRuleDetailsTrafficDirection,
+    ) -> Self {
         self.traffic_direction = value;
         self
     }
 
     /// Set rule_action
-    pub fn set_rule_action(mut self, value: Option<VtapCaptureFilterRuleDetailsRuleAction>) -> Self {
+    pub fn set_rule_action(
+        mut self,
+        value: Option<VtapCaptureFilterRuleDetailsRuleAction>,
+    ) -> Self {
         self.rule_action = value;
         self
     }
@@ -154,5 +159,3 @@ impl VtapCaptureFilterRuleDetails {
         self
     }
 }
-
-

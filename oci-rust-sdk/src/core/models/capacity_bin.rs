@@ -25,7 +25,6 @@ pub struct CapacityBin {
     pub supported_shapes: Vec<String>,
 }
 
-
 /// Required fields for CapacityBin
 pub struct CapacityBinRequired {
     /// Zero-based index for the corresponding capacity bucket. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -62,7 +61,7 @@ impl CapacityBin {
             remaining_memory_in_gbs: required.remaining_memory_in_gbs,
 
             supported_shapes: required.supported_shapes,
-}
+        }
     }
 
     /// Set capacity_index
@@ -101,5 +100,3 @@ impl CapacityBin {
         self
     }
 }
-
-

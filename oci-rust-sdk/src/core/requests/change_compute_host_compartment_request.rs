@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeComputeHostCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeComputeHostCompartmentRequest
 pub struct ChangeComputeHostCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute host.
@@ -43,14 +42,15 @@ impl ChangeComputeHostCompartmentRequest {
         Self {
             compute_host_id: required.compute_host_id,
 
-            change_compute_host_compartment_details: required.change_compute_host_compartment_details,
+            change_compute_host_compartment_details: required
+                .change_compute_host_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_host_id
@@ -60,7 +60,10 @@ impl ChangeComputeHostCompartmentRequest {
     }
 
     /// Set change_compute_host_compartment_details
-    pub fn set_change_compute_host_compartment_details(mut self, value: ChangeComputeHostCompartmentDetails) -> Self {
+    pub fn set_change_compute_host_compartment_details(
+        mut self,
+        value: ChangeComputeHostCompartmentDetails,
+    ) -> Self {
         self.change_compute_host_compartment_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl ChangeComputeHostCompartmentRequest {
         self
     }
 }
-
-

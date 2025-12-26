@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct UpdateComputeCapacityReservationRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for UpdateComputeCapacityReservationRequest
 pub struct UpdateComputeCapacityReservationRequestRequired {
     /// The OCID of the compute capacity reservation.
@@ -39,12 +38,13 @@ impl UpdateComputeCapacityReservationRequest {
         Self {
             capacity_reservation_id: required.capacity_reservation_id,
 
-            update_compute_capacity_reservation_details: required.update_compute_capacity_reservation_details,
+            update_compute_capacity_reservation_details: required
+                .update_compute_capacity_reservation_details,
 
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set capacity_reservation_id
@@ -54,7 +54,10 @@ impl UpdateComputeCapacityReservationRequest {
     }
 
     /// Set update_compute_capacity_reservation_details
-    pub fn set_update_compute_capacity_reservation_details(mut self, value: UpdateComputeCapacityReservationDetails) -> Self {
+    pub fn set_update_compute_capacity_reservation_details(
+        mut self,
+        value: UpdateComputeCapacityReservationDetails,
+    ) -> Self {
         self.update_compute_capacity_reservation_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl UpdateComputeCapacityReservationRequest {
         self
     }
 }
-
-

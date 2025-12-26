@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetVolumeGroupReplicaRequest {
     /// The OCID of the volume replica group.
     pub volume_group_replica_id: String,
 }
-
 
 /// Required fields for GetVolumeGroupReplicaRequest
 pub struct GetVolumeGroupReplicaRequestRequired {
@@ -24,7 +23,7 @@ impl GetVolumeGroupReplicaRequest {
     pub fn new(required: GetVolumeGroupReplicaRequestRequired) -> Self {
         Self {
             volume_group_replica_id: required.volume_group_replica_id,
-}
+        }
     }
 
     /// Set volume_group_replica_id
@@ -33,5 +32,3 @@ impl GetVolumeGroupReplicaRequest {
         self
     }
 }
-
-

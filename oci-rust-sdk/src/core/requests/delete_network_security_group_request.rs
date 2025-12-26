@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DeleteNetworkSecurityGroupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for DeleteNetworkSecurityGroupRequest
 pub struct DeleteNetworkSecurityGroupRequestRequired {
@@ -30,7 +29,7 @@ impl DeleteNetworkSecurityGroupRequest {
             network_security_group_id: required.network_security_group_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set network_security_group_id
@@ -51,5 +50,3 @@ impl DeleteNetworkSecurityGroupRequest {
         self
     }
 }
-
-

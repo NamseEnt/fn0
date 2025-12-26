@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateCrossConnectGroupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateCrossConnectGroupRequest
 pub struct CreateCrossConnectGroupRequestRequired {
@@ -30,11 +29,14 @@ impl CreateCrossConnectGroupRequest {
             create_cross_connect_group_details: required.create_cross_connect_group_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_cross_connect_group_details
-    pub fn set_create_cross_connect_group_details(mut self, value: CreateCrossConnectGroupDetails) -> Self {
+    pub fn set_create_cross_connect_group_details(
+        mut self,
+        value: CreateCrossConnectGroupDetails,
+    ) -> Self {
         self.create_cross_connect_group_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl CreateCrossConnectGroupRequest {
         self
     }
 }
-
-

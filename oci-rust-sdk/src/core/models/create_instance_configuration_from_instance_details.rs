@@ -12,7 +12,6 @@ pub struct CreateInstanceConfigurationFromInstanceDetails {
     pub source: String,
 }
 
-
 /// Required fields for CreateInstanceConfigurationFromInstanceDetails
 pub struct CreateInstanceConfigurationFromInstanceDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance to use to create the instance configuration.
@@ -28,7 +27,7 @@ impl CreateInstanceConfigurationFromInstanceDetails {
             instance_id: required.instance_id,
 
             source: required.source,
-}
+        }
     }
 
     /// Set instance_id
@@ -43,5 +42,3 @@ impl CreateInstanceConfigurationFromInstanceDetails {
         self
     }
 }
-
-

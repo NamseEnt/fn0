@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateVnicResponse {
     /// The returned model.Vnic instance.
     pub vnic: Vnic,
 }
-
 
 /// Required fields for UpdateVnicResponse
 pub struct UpdateVnicResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateVnicResponse {
             opc_request_id: required.opc_request_id,
 
             vnic: required.vnic,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateVnicResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteVtapRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for DeleteVtapRequest
 pub struct DeleteVtapRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VTAP.
@@ -36,7 +35,7 @@ impl DeleteVtapRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set vtap_id
@@ -69,5 +68,3 @@ impl DeleteVtapRequest {
         self
     }
 }
-
-

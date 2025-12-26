@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetComputeHostGroupResponse {
     /// The returned model.ComputeHostGroup instance.
     pub compute_host_group: ComputeHostGroup,
 }
-
 
 /// Required fields for GetComputeHostGroupResponse
 pub struct GetComputeHostGroupResponseRequired {
@@ -40,7 +39,7 @@ impl GetComputeHostGroupResponse {
             opc_request_id: required.opc_request_id,
 
             compute_host_group: required.compute_host_group,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetComputeHostGroupResponse {
         self
     }
 }
-
-

@@ -44,7 +44,6 @@ pub struct CreateVolumeGroupDetails {
     pub xrc_kms_key_id: Option<String>,
 }
 
-
 /// Required fields for CreateVolumeGroupDetails
 pub struct CreateVolumeGroupDetailsRequired {
     /// The availability domain of the volume group.
@@ -79,7 +78,7 @@ impl CreateVolumeGroupDetails {
             cluster_placement_group_id: None,
 
             xrc_kms_key_id: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -101,7 +100,10 @@ impl CreateVolumeGroupDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -119,13 +121,19 @@ impl CreateVolumeGroupDetails {
     }
 
     /// Set source_details
-    pub fn set_source_details(mut self, value: VolumeGroupSourceFromVolumeGroupReplicaDetails) -> Self {
+    pub fn set_source_details(
+        mut self,
+        value: VolumeGroupSourceFromVolumeGroupReplicaDetails,
+    ) -> Self {
         self.source_details = value;
         self
     }
 
     /// Set volume_group_replicas
-    pub fn set_volume_group_replicas(mut self, value: Option<Vec<VolumeGroupReplicaDetails>>) -> Self {
+    pub fn set_volume_group_replicas(
+        mut self,
+        value: Option<Vec<VolumeGroupReplicaDetails>>,
+    ) -> Self {
         self.volume_group_replicas = value;
         self
     }
@@ -149,7 +157,10 @@ impl CreateVolumeGroupDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -184,5 +195,3 @@ impl CreateVolumeGroupDetails {
         self
     }
 }
-
-

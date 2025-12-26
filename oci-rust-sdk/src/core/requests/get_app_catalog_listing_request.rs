@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetAppCatalogListingRequest {
     /// The OCID of the listing.
     pub listing_id: String,
 }
-
 
 /// Required fields for GetAppCatalogListingRequest
 pub struct GetAppCatalogListingRequestRequired {
@@ -24,7 +23,7 @@ impl GetAppCatalogListingRequest {
     pub fn new(required: GetAppCatalogListingRequestRequired) -> Self {
         Self {
             listing_id: required.listing_id,
-}
+        }
     }
 
     /// Set listing_id
@@ -33,5 +32,3 @@ impl GetAppCatalogListingRequest {
         self
     }
 }
-
-

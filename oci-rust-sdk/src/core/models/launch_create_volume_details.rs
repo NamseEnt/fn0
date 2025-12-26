@@ -9,7 +9,6 @@ pub struct LaunchCreateVolumeDetails {
     pub volume_creation_type: String,
 }
 
-
 /// Required fields for LaunchCreateVolumeDetails
 pub struct LaunchCreateVolumeDetailsRequired {
     pub volume_creation_type: String,
@@ -20,7 +19,7 @@ impl LaunchCreateVolumeDetails {
     pub fn new(required: LaunchCreateVolumeDetailsRequired) -> Self {
         Self {
             volume_creation_type: required.volume_creation_type,
-}
+        }
     }
 
     /// Set volume_creation_type
@@ -29,5 +28,3 @@ impl LaunchCreateVolumeDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateByoasnResponse {
     /// The returned model.Byoasn instance.
     pub byoasn: Byoasn,
 }
-
 
 /// Required fields for CreateByoasnResponse
 pub struct CreateByoasnResponseRequired {
@@ -40,7 +39,7 @@ impl CreateByoasnResponse {
             opc_request_id: required.opc_request_id,
 
             byoasn: required.byoasn,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateByoasnResponse {
         self
     }
 }
-
-

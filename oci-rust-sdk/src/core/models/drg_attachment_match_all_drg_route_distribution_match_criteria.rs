@@ -9,7 +9,6 @@ pub struct DrgAttachmentMatchAllDrgRouteDistributionMatchCriteria {
     pub match_type: String,
 }
 
-
 /// Required fields for DrgAttachmentMatchAllDrgRouteDistributionMatchCriteria
 pub struct DrgAttachmentMatchAllDrgRouteDistributionMatchCriteriaRequired {
     pub match_type: String,
@@ -20,7 +19,7 @@ impl DrgAttachmentMatchAllDrgRouteDistributionMatchCriteria {
     pub fn new(required: DrgAttachmentMatchAllDrgRouteDistributionMatchCriteriaRequired) -> Self {
         Self {
             match_type: required.match_type,
-}
+        }
     }
 
     /// Set match_type
@@ -29,5 +28,3 @@ impl DrgAttachmentMatchAllDrgRouteDistributionMatchCriteria {
         self
     }
 }
-
-

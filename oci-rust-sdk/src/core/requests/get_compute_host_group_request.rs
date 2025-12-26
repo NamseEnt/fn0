@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetComputeHostGroupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetComputeHostGroupRequest
 pub struct GetComputeHostGroupRequestRequired {
@@ -30,7 +29,7 @@ impl GetComputeHostGroupRequest {
             compute_host_group_id: required.compute_host_group_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compute_host_group_id
@@ -51,5 +50,3 @@ impl GetComputeHostGroupRequest {
         self
     }
 }
-
-

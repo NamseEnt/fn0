@@ -48,7 +48,6 @@ pub struct CreateCrossConnectDetails {
     pub macsec_properties: Option<CreateMacsecProperties>,
 }
 
-
 /// Required fields for CreateCrossConnectDetails
 pub struct CreateCrossConnectDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the cross-connect.
@@ -86,7 +85,7 @@ impl CreateCrossConnectDetails {
             customer_reference_name: None,
 
             macsec_properties: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -102,7 +101,10 @@ impl CreateCrossConnectDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -114,7 +116,10 @@ impl CreateCrossConnectDetails {
     }
 
     /// Set far_cross_connect_or_cross_connect_group_id
-    pub fn set_far_cross_connect_or_cross_connect_group_id(mut self, value: Option<String>) -> Self {
+    pub fn set_far_cross_connect_or_cross_connect_group_id(
+        mut self,
+        value: Option<String>,
+    ) -> Self {
         self.far_cross_connect_or_cross_connect_group_id = value;
         self
     }
@@ -132,7 +137,10 @@ impl CreateCrossConnectDetails {
     }
 
     /// Set near_cross_connect_or_cross_connect_group_id
-    pub fn set_near_cross_connect_or_cross_connect_group_id(mut self, value: Option<String>) -> Self {
+    pub fn set_near_cross_connect_or_cross_connect_group_id(
+        mut self,
+        value: Option<String>,
+    ) -> Self {
         self.near_cross_connect_or_cross_connect_group_id = value;
         self
     }
@@ -162,7 +170,10 @@ impl CreateCrossConnectDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -174,7 +185,10 @@ impl CreateCrossConnectDetails {
     }
 
     /// Set far_cross_connect_or_cross_connect_group_id (unwraps Option)
-    pub fn with_far_cross_connect_or_cross_connect_group_id(mut self, value: impl Into<String>) -> Self {
+    pub fn with_far_cross_connect_or_cross_connect_group_id(
+        mut self,
+        value: impl Into<String>,
+    ) -> Self {
         self.far_cross_connect_or_cross_connect_group_id = Some(value.into());
         self
     }
@@ -186,7 +200,10 @@ impl CreateCrossConnectDetails {
     }
 
     /// Set near_cross_connect_or_cross_connect_group_id (unwraps Option)
-    pub fn with_near_cross_connect_or_cross_connect_group_id(mut self, value: impl Into<String>) -> Self {
+    pub fn with_near_cross_connect_or_cross_connect_group_id(
+        mut self,
+        value: impl Into<String>,
+    ) -> Self {
         self.near_cross_connect_or_cross_connect_group_id = Some(value.into());
         self
     }
@@ -203,5 +220,3 @@ impl CreateCrossConnectDetails {
         self
     }
 }
-
-

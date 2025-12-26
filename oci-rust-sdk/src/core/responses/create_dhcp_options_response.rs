@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateDhcpOptionsResponse {
     /// The returned model.DhcpOptions instance.
     pub dhcp_options: DhcpOptions,
 }
-
 
 /// Required fields for CreateDhcpOptionsResponse
 pub struct CreateDhcpOptionsResponseRequired {
@@ -40,7 +39,7 @@ impl CreateDhcpOptionsResponse {
             opc_request_id: required.opc_request_id,
 
             dhcp_options: required.dhcp_options,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateDhcpOptionsResponse {
         self
     }
 }
-
-

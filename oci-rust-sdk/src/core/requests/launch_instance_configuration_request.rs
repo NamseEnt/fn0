@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct LaunchInstanceConfigurationRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for LaunchInstanceConfigurationRequest
 pub struct LaunchInstanceConfigurationRequestRequired {
@@ -38,7 +37,7 @@ impl LaunchInstanceConfigurationRequest {
             instance_configuration: required.instance_configuration,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set instance_configuration_id
@@ -65,5 +64,3 @@ impl LaunchInstanceConfigurationRequest {
         self
     }
 }
-
-

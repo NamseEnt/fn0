@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct PrivateIpVnicDetachResponse {
     /// The returned model.PrivateIp instance.
     pub private_ip: PrivateIp,
 }
-
 
 /// Required fields for PrivateIpVnicDetachResponse
 pub struct PrivateIpVnicDetachResponseRequired {
@@ -40,7 +39,7 @@ impl PrivateIpVnicDetachResponse {
             opc_request_id: required.opc_request_id,
 
             private_ip: required.private_ip,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl PrivateIpVnicDetachResponse {
         self
     }
 }
-
-

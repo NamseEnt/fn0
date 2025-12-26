@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct ChangeBootVolumeCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for ChangeBootVolumeCompartmentRequest
 pub struct ChangeBootVolumeCompartmentRequestRequired {
@@ -38,7 +37,7 @@ impl ChangeBootVolumeCompartmentRequest {
             change_boot_volume_compartment_details: required.change_boot_volume_compartment_details,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set boot_volume_id
@@ -48,7 +47,10 @@ impl ChangeBootVolumeCompartmentRequest {
     }
 
     /// Set change_boot_volume_compartment_details
-    pub fn set_change_boot_volume_compartment_details(mut self, value: ChangeBootVolumeCompartmentDetails) -> Self {
+    pub fn set_change_boot_volume_compartment_details(
+        mut self,
+        value: ChangeBootVolumeCompartmentDetails,
+    ) -> Self {
         self.change_boot_volume_compartment_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl ChangeBootVolumeCompartmentRequest {
         self
     }
 }
-
-

@@ -127,4 +127,3 @@ impl Default for ShapeMemoryOptions {
         Self::new()
     }
 }
-

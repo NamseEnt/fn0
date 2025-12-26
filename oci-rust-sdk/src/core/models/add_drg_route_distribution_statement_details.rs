@@ -16,7 +16,6 @@ pub struct AddDrgRouteDistributionStatementDetails {
     pub priority: i64,
 }
 
-
 /// Required fields for AddDrgRouteDistributionStatementDetails
 pub struct AddDrgRouteDistributionStatementDetailsRequired {
     /// The action is applied only if all of the match criteria is met.
@@ -38,7 +37,7 @@ impl AddDrgRouteDistributionStatementDetails {
             action: required.action,
 
             priority: required.priority,
-}
+        }
     }
 
     /// Set match_criteria
@@ -59,5 +58,3 @@ impl AddDrgRouteDistributionStatementDetails {
         self
     }
 }
-
-

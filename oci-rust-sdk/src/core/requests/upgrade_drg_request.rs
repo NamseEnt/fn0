@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct UpgradeDrgRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpgradeDrgRequest
 pub struct UpgradeDrgRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG.
@@ -36,7 +35,7 @@ impl UpgradeDrgRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set drg_id
@@ -69,5 +68,3 @@ impl UpgradeDrgRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateBootVolumeBackupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateBootVolumeBackupRequest
 pub struct UpdateBootVolumeBackupRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateBootVolumeBackupRequest {
             update_boot_volume_backup_details: required.update_boot_volume_backup_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set boot_volume_backup_id
@@ -48,7 +47,10 @@ impl UpdateBootVolumeBackupRequest {
     }
 
     /// Set update_boot_volume_backup_details
-    pub fn set_update_boot_volume_backup_details(mut self, value: UpdateBootVolumeBackupDetails) -> Self {
+    pub fn set_update_boot_volume_backup_details(
+        mut self,
+        value: UpdateBootVolumeBackupDetails,
+    ) -> Self {
         self.update_boot_volume_backup_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateBootVolumeBackupRequest {
         self
     }
 }
-
-

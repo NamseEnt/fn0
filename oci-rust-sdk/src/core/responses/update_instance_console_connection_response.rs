@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateInstanceConsoleConnectionResponse {
     /// The returned model.InstanceConsoleConnection instance.
     pub instance_console_connection: InstanceConsoleConnection,
 }
-
 
 /// Required fields for UpdateInstanceConsoleConnectionResponse
 pub struct UpdateInstanceConsoleConnectionResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateInstanceConsoleConnectionResponse {
             opc_request_id: required.opc_request_id,
 
             instance_console_connection: required.instance_console_connection,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateInstanceConsoleConnectionResponse {
         self
     }
 }
-
-

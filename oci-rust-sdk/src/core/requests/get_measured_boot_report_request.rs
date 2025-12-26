@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetMeasuredBootReportRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetMeasuredBootReportRequest
 pub struct GetMeasuredBootReportRequestRequired {
@@ -30,7 +29,7 @@ impl GetMeasuredBootReportRequest {
             instance_id: required.instance_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set instance_id
@@ -51,5 +50,3 @@ impl GetMeasuredBootReportRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct ListVnicAttachmentsRequest {
     pub vnic_id: Option<String>,
 }
 
-
 /// Required fields for ListVnicAttachmentsRequest
 pub struct ListVnicAttachmentsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -54,7 +53,7 @@ impl ListVnicAttachmentsRequest {
             page: None,
 
             vnic_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -123,5 +122,3 @@ impl ListVnicAttachmentsRequest {
         self
     }
 }
-
-

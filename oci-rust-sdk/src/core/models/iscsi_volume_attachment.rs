@@ -38,7 +38,6 @@ pub struct IScsiVolumeAttachment {
     pub is_agent_auto_iscsi_login_enabled: Option<bool>,
 }
 
-
 /// Required fields for IScsiVolumeAttachment
 pub struct IScsiVolumeAttachmentRequired {
     /// The volume's iSCSI IP address. <p> Example: {@code 169.254.0.2}
@@ -74,7 +73,7 @@ impl IScsiVolumeAttachment {
             encryption_in_transit_type: None,
 
             is_agent_auto_iscsi_login_enabled: None,
-}
+        }
     }
 
     /// Set chap_secret
@@ -114,7 +113,10 @@ impl IScsiVolumeAttachment {
     }
 
     /// Set encryption_in_transit_type
-    pub fn set_encryption_in_transit_type(mut self, value: Option<EncryptionInTransitType>) -> Self {
+    pub fn set_encryption_in_transit_type(
+        mut self,
+        value: Option<EncryptionInTransitType>,
+    ) -> Self {
         self.encryption_in_transit_type = value;
         self
     }
@@ -161,5 +163,3 @@ impl IScsiVolumeAttachment {
         self
     }
 }
-
-

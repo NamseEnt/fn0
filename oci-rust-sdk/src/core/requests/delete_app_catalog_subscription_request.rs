@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct DeleteAppCatalogSubscriptionRequest {
     /// Listing Resource Version.
     pub resource_version: String,
 }
-
 
 /// Required fields for DeleteAppCatalogSubscriptionRequest
 pub struct DeleteAppCatalogSubscriptionRequestRequired {
@@ -40,7 +39,7 @@ impl DeleteAppCatalogSubscriptionRequest {
             compartment_id: required.compartment_id,
 
             resource_version: required.resource_version,
-}
+        }
     }
 
     /// Set listing_id
@@ -61,5 +60,3 @@ impl DeleteAppCatalogSubscriptionRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetComputeGlobalImageCapabilitySchemaRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute global image capability schema
     pub compute_global_image_capability_schema_id: String,
 }
-
 
 /// Required fields for GetComputeGlobalImageCapabilitySchemaRequest
 pub struct GetComputeGlobalImageCapabilitySchemaRequestRequired {
@@ -23,8 +22,9 @@ impl GetComputeGlobalImageCapabilitySchemaRequest {
     /// Create a new GetComputeGlobalImageCapabilitySchemaRequest with required fields
     pub fn new(required: GetComputeGlobalImageCapabilitySchemaRequestRequired) -> Self {
         Self {
-            compute_global_image_capability_schema_id: required.compute_global_image_capability_schema_id,
-}
+            compute_global_image_capability_schema_id: required
+                .compute_global_image_capability_schema_id,
+        }
     }
 
     /// Set compute_global_image_capability_schema_id
@@ -33,5 +33,3 @@ impl GetComputeGlobalImageCapabilitySchemaRequest {
         self
     }
 }
-
-

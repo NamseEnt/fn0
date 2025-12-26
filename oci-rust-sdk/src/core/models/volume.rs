@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -89,7 +89,6 @@ pub struct Volume {
     pub is_reservations_enabled: Option<bool>,
 }
 
-
 /// Required fields for Volume
 pub struct VolumeRequired {
     /// The availability domain of the volume. <p> Example: {@code Uocm:PHX-AD-1}
@@ -161,7 +160,7 @@ impl Volume {
             autotune_policies: None,
 
             is_reservations_enabled: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -177,7 +176,10 @@ impl Volume {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -195,7 +197,10 @@ impl Volume {
     }
 
     /// Set system_tags
-    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_system_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.system_tags = value;
         self
     }
@@ -249,7 +254,10 @@ impl Volume {
     }
 
     /// Set source_details
-    pub fn set_source_details(mut self, value: Option<VolumeSourceFromBlockVolumeReplicaDetails>) -> Self {
+    pub fn set_source_details(
+        mut self,
+        value: Option<VolumeSourceFromBlockVolumeReplicaDetails>,
+    ) -> Self {
         self.source_details = value;
         self
     }
@@ -297,7 +305,10 @@ impl Volume {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -309,7 +320,10 @@ impl Volume {
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_system_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -386,5 +400,3 @@ impl Volume {
         self
     }
 }
-
-

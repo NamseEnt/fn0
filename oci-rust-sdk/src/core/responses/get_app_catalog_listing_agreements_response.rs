@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetAppCatalogListingAgreementsResponse {
     /// The returned model.AppCatalogListingResourceVersionAgreements instance.
     pub app_catalog_listing_resource_version_agreements: AppCatalogListingResourceVersionAgreements,
 }
-
 
 /// Required fields for GetAppCatalogListingAgreementsResponse
 pub struct GetAppCatalogListingAgreementsResponseRequired {
@@ -39,8 +38,9 @@ impl GetAppCatalogListingAgreementsResponse {
 
             opc_request_id: required.opc_request_id,
 
-            app_catalog_listing_resource_version_agreements: required.app_catalog_listing_resource_version_agreements,
-}
+            app_catalog_listing_resource_version_agreements: required
+                .app_catalog_listing_resource_version_agreements,
+        }
     }
 
     /// Set etag
@@ -56,10 +56,11 @@ impl GetAppCatalogListingAgreementsResponse {
     }
 
     /// Set app_catalog_listing_resource_version_agreements
-    pub fn set_app_catalog_listing_resource_version_agreements(mut self, value: AppCatalogListingResourceVersionAgreements) -> Self {
+    pub fn set_app_catalog_listing_resource_version_agreements(
+        mut self,
+        value: AppCatalogListingResourceVersionAgreements,
+    ) -> Self {
         self.app_catalog_listing_resource_version_agreements = value;
         self
     }
 }
-
-

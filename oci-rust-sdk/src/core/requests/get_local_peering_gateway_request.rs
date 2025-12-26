@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetLocalPeeringGatewayRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the local peering gateway.
     pub local_peering_gateway_id: String,
 }
-
 
 /// Required fields for GetLocalPeeringGatewayRequest
 pub struct GetLocalPeeringGatewayRequestRequired {
@@ -24,7 +23,7 @@ impl GetLocalPeeringGatewayRequest {
     pub fn new(required: GetLocalPeeringGatewayRequestRequired) -> Self {
         Self {
             local_peering_gateway_id: required.local_peering_gateway_id,
-}
+        }
     }
 
     /// Set local_peering_gateway_id
@@ -33,5 +32,3 @@ impl GetLocalPeeringGatewayRequest {
         self
     }
 }
-
-

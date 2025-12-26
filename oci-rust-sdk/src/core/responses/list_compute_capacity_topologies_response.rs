@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeCapacityTopologiesResponse {
     /// The returned model.ComputeCapacityTopologyCollection instance.
     pub compute_capacity_topology_collection: ComputeCapacityTopologyCollection,
 }
-
 
 /// Required fields for ListComputeCapacityTopologiesResponse
 pub struct ListComputeCapacityTopologiesResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeCapacityTopologiesResponse {
             opc_request_id: required.opc_request_id,
 
             compute_capacity_topology_collection: required.compute_capacity_topology_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -56,10 +55,11 @@ impl ListComputeCapacityTopologiesResponse {
     }
 
     /// Set compute_capacity_topology_collection
-    pub fn set_compute_capacity_topology_collection(mut self, value: ComputeCapacityTopologyCollection) -> Self {
+    pub fn set_compute_capacity_topology_collection(
+        mut self,
+        value: ComputeCapacityTopologyCollection,
+    ) -> Self {
         self.compute_capacity_topology_collection = value;
         self
     }
 }
-
-

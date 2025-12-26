@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateCpeRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateCpeRequest
 pub struct CreateCpeRequestRequired {
@@ -30,7 +29,7 @@ impl CreateCpeRequest {
             create_cpe_details: required.create_cpe_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_cpe_details
@@ -51,5 +50,3 @@ impl CreateCpeRequest {
         self
     }
 }
-
-

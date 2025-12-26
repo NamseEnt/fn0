@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetAppCatalogListingResponse {
     /// The returned model.AppCatalogListing instance.
     pub app_catalog_listing: AppCatalogListing,
 }
-
 
 /// Required fields for GetAppCatalogListingResponse
 pub struct GetAppCatalogListingResponseRequired {
@@ -40,7 +39,7 @@ impl GetAppCatalogListingResponse {
             opc_request_id: required.opc_request_id,
 
             app_catalog_listing: required.app_catalog_listing,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetAppCatalogListingResponse {
         self
     }
 }
-
-

@@ -20,7 +20,6 @@ pub struct UpdateInstanceSourceViaImageDetails {
     pub kms_key_id: Option<String>,
 }
 
-
 /// Required fields for UpdateInstanceSourceViaImageDetails
 pub struct UpdateInstanceSourceViaImageDetailsRequired {
     /// The OCID of the image used to boot the instance.
@@ -40,7 +39,7 @@ impl UpdateInstanceSourceViaImageDetails {
             boot_volume_size_in_gbs: None,
 
             kms_key_id: None,
-}
+        }
     }
 
     /// Set boot_volume_size_in_gbs
@@ -79,5 +78,3 @@ impl UpdateInstanceSourceViaImageDetails {
         self
     }
 }
-
-

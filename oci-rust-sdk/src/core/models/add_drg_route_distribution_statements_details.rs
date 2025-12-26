@@ -10,7 +10,6 @@ pub struct AddDrgRouteDistributionStatementsDetails {
     pub statements: Vec<AddDrgRouteDistributionStatementDetails>,
 }
 
-
 /// Required fields for AddDrgRouteDistributionStatementsDetails
 pub struct AddDrgRouteDistributionStatementsDetailsRequired {
     /// The collection of route distribution statements to insert into the route distribution.
@@ -22,7 +21,7 @@ impl AddDrgRouteDistributionStatementsDetails {
     pub fn new(required: AddDrgRouteDistributionStatementsDetailsRequired) -> Self {
         Self {
             statements: required.statements,
-}
+        }
     }
 
     /// Set statements
@@ -31,5 +30,3 @@ impl AddDrgRouteDistributionStatementsDetails {
         self
     }
 }
-
-

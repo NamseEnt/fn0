@@ -12,7 +12,8 @@ pub struct InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig {
 
     /// The number of NUMA nodes per socket (NPS).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub numa_nodes_per_socket: Option<InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigNumaNodesPerSocket>,
+    pub numa_nodes_per_socket:
+        Option<InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigNumaNodesPerSocket>,
 
     /// Whether symmetric multithreading is enabled on the instance. Symmetric multithreading is also called simultaneous multithreading (SMT) or Intel Hyper-Threading. <p> Intel and AMD processors have two hardware execution threads per core (OCPU). SMT permits multiple independent threads of execution, to better use the resources and increase the efficiency of the CPU. When multithreading is disabled, only one thread is permitted to run on each core, which can provide higher or more predictable performance for some workloads.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,7 +40,6 @@ pub struct InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig {
     pub config_map: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig
 pub struct InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigRequired {
     pub r#type: String,
@@ -47,7 +47,9 @@ pub struct InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigRequired {
 
 impl InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig {
     /// Create a new InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig with required fields
-    pub fn new(required: InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigRequired) -> Self {
+    pub fn new(
+        required: InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigRequired,
+    ) -> Self {
         Self {
             r#type: required.r#type,
 
@@ -64,11 +66,16 @@ impl InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig {
             percentage_of_cores_enabled: None,
 
             config_map: None,
-}
+        }
     }
 
     /// Set numa_nodes_per_socket
-    pub fn set_numa_nodes_per_socket(mut self, value: Option<InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigNumaNodesPerSocket>) -> Self {
+    pub fn set_numa_nodes_per_socket(
+        mut self,
+        value: Option<
+            InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigNumaNodesPerSocket,
+        >,
+    ) -> Self {
         self.numa_nodes_per_socket = value;
         self
     }
@@ -92,7 +99,10 @@ impl InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig {
     }
 
     /// Set is_input_output_memory_management_unit_enabled
-    pub fn set_is_input_output_memory_management_unit_enabled(mut self, value: Option<bool>) -> Self {
+    pub fn set_is_input_output_memory_management_unit_enabled(
+        mut self,
+        value: Option<bool>,
+    ) -> Self {
         self.is_input_output_memory_management_unit_enabled = value;
         self
     }
@@ -116,7 +126,10 @@ impl InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig {
     }
 
     /// Set numa_nodes_per_socket (unwraps Option)
-    pub fn with_numa_nodes_per_socket(mut self, value: InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigNumaNodesPerSocket) -> Self {
+    pub fn with_numa_nodes_per_socket(
+        mut self,
+        value: InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfigNumaNodesPerSocket,
+    ) -> Self {
         self.numa_nodes_per_socket = Some(value);
         self
     }
@@ -157,5 +170,3 @@ impl InstanceConfigurationAmdMilanBmLaunchInstancePlatformConfig {
         self
     }
 }
-
-

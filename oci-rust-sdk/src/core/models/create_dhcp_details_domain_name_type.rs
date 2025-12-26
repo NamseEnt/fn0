@@ -4,13 +4,13 @@ use serde::{Deserialize, Serialize};
 pub enum CreateDhcpDetailsDomainNameType {
     #[serde(rename = "SUBNET_DOMAIN")]
     SubnetDomain,
-    
+
     #[serde(rename = "VCN_DOMAIN")]
     VcnDomain,
-    
+
     #[serde(rename = "CUSTOM_DOMAIN")]
     CustomDomain,
-    
+
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

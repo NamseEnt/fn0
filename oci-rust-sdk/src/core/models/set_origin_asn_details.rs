@@ -14,7 +14,6 @@ pub struct SetOriginAsnDetails {
     pub as_path_prepend_length: Option<i64>,
 }
 
-
 /// Required fields for SetOriginAsnDetails
 pub struct SetOriginAsnDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code Byoasn} Resource to be associated.
@@ -28,7 +27,7 @@ impl SetOriginAsnDetails {
             byoasn_id: required.byoasn_id,
 
             as_path_prepend_length: None,
-}
+        }
     }
 
     /// Set byoasn_id
@@ -49,5 +48,3 @@ impl SetOriginAsnDetails {
         self
     }
 }
-
-

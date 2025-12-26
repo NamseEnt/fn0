@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateComputeImageCapabilitySchemaRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateComputeImageCapabilitySchemaRequest
 pub struct UpdateComputeImageCapabilitySchemaRequestRequired {
@@ -35,10 +34,11 @@ impl UpdateComputeImageCapabilitySchemaRequest {
         Self {
             compute_image_capability_schema_id: required.compute_image_capability_schema_id,
 
-            update_compute_image_capability_schema_details: required.update_compute_image_capability_schema_details,
+            update_compute_image_capability_schema_details: required
+                .update_compute_image_capability_schema_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set compute_image_capability_schema_id
@@ -48,7 +48,10 @@ impl UpdateComputeImageCapabilitySchemaRequest {
     }
 
     /// Set update_compute_image_capability_schema_details
-    pub fn set_update_compute_image_capability_schema_details(mut self, value: UpdateComputeImageCapabilitySchemaDetails) -> Self {
+    pub fn set_update_compute_image_capability_schema_details(
+        mut self,
+        value: UpdateComputeImageCapabilitySchemaDetails,
+    ) -> Self {
         self.update_compute_image_capability_schema_details = value;
         self
     }
@@ -65,5 +68,3 @@ impl UpdateComputeImageCapabilitySchemaRequest {
         self
     }
 }
-
-

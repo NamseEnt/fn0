@@ -18,7 +18,6 @@ pub struct VcnDrgAttachmentNetworkUpdateDetails {
     pub vcn_route_type: Option<String>,
 }
 
-
 /// Required fields for VcnDrgAttachmentNetworkUpdateDetails
 pub struct VcnDrgAttachmentNetworkUpdateDetailsRequired {
     pub r#type: String,
@@ -33,7 +32,7 @@ impl VcnDrgAttachmentNetworkUpdateDetails {
             route_table_id: None,
 
             vcn_route_type: None,
-}
+        }
     }
 
     /// Set route_table_id
@@ -66,5 +65,3 @@ impl VcnDrgAttachmentNetworkUpdateDetails {
         self
     }
 }
-
-

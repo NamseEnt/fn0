@@ -10,7 +10,6 @@ pub struct IPSecConnectionTunnelSharedSecret {
     pub shared_secret: String,
 }
 
-
 /// Required fields for IPSecConnectionTunnelSharedSecret
 pub struct IPSecConnectionTunnelSharedSecretRequired {
     /// The tunnel's shared secret (pre-shared key).
@@ -22,7 +21,7 @@ impl IPSecConnectionTunnelSharedSecret {
     pub fn new(required: IPSecConnectionTunnelSharedSecretRequired) -> Self {
         Self {
             shared_secret: required.shared_secret,
-}
+        }
     }
 
     /// Set shared_secret
@@ -31,5 +30,3 @@ impl IPSecConnectionTunnelSharedSecret {
         self
     }
 }
-
-

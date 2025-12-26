@@ -37,4 +37,3 @@ impl Default for RemoveNetworkSecurityGroupSecurityRulesDetails {
         Self::new()
     }
 }
-

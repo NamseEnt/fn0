@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +40,6 @@ pub struct ListComputeCapacityTopologiesRequest {
     pub sort_order: Option<ListComputeCapacityTopologiesRequestSortOrder>,
 }
 
-
 /// Required fields for ListComputeCapacityTopologiesRequest
 pub struct ListComputeCapacityTopologiesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -66,7 +65,7 @@ impl ListComputeCapacityTopologiesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -106,13 +105,19 @@ impl ListComputeCapacityTopologiesRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeCapacityTopologiesRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeCapacityTopologiesRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeCapacityTopologiesRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeCapacityTopologiesRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -159,5 +164,3 @@ impl ListComputeCapacityTopologiesRequest {
         self
     }
 }
-
-

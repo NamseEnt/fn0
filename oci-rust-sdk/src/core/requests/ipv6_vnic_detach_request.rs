@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,6 @@ pub struct Ipv6VnicDetachRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for Ipv6VnicDetachRequest
 pub struct Ipv6VnicDetachRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the IPv6.
@@ -42,7 +41,7 @@ impl Ipv6VnicDetachRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set ipv6_id
@@ -87,5 +86,3 @@ impl Ipv6VnicDetachRequest {
         self
     }
 }
-
-

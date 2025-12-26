@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateConsoleHistoryRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateConsoleHistoryRequest
 pub struct UpdateConsoleHistoryRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateConsoleHistoryRequest {
             update_console_history_details: required.update_console_history_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set instance_console_history_id
@@ -48,7 +47,10 @@ impl UpdateConsoleHistoryRequest {
     }
 
     /// Set update_console_history_details
-    pub fn set_update_console_history_details(mut self, value: UpdateConsoleHistoryDetails) -> Self {
+    pub fn set_update_console_history_details(
+        mut self,
+        value: UpdateConsoleHistoryDetails,
+    ) -> Self {
         self.update_console_history_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateConsoleHistoryRequest {
         self
     }
 }
-
-

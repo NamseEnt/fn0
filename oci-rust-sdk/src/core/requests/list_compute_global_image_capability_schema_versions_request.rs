@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct ListComputeGlobalImageCapabilitySchemaVersionsRequest {
     pub sort_order: Option<ListComputeGlobalImageCapabilitySchemaVersionsRequestSortOrder>,
 }
 
-
 /// Required fields for ListComputeGlobalImageCapabilitySchemaVersionsRequest
 pub struct ListComputeGlobalImageCapabilitySchemaVersionsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute global image capability schema
@@ -43,7 +42,8 @@ impl ListComputeGlobalImageCapabilitySchemaVersionsRequest {
     /// Create a new ListComputeGlobalImageCapabilitySchemaVersionsRequest with required fields
     pub fn new(required: ListComputeGlobalImageCapabilitySchemaVersionsRequestRequired) -> Self {
         Self {
-            compute_global_image_capability_schema_id: required.compute_global_image_capability_schema_id,
+            compute_global_image_capability_schema_id: required
+                .compute_global_image_capability_schema_id,
 
             display_name: None,
 
@@ -54,7 +54,7 @@ impl ListComputeGlobalImageCapabilitySchemaVersionsRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compute_global_image_capability_schema_id
@@ -82,13 +82,19 @@ impl ListComputeGlobalImageCapabilitySchemaVersionsRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeGlobalImageCapabilitySchemaVersionsRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeGlobalImageCapabilitySchemaVersionsRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeGlobalImageCapabilitySchemaVersionsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeGlobalImageCapabilitySchemaVersionsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -112,16 +118,20 @@ impl ListComputeGlobalImageCapabilitySchemaVersionsRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListComputeGlobalImageCapabilitySchemaVersionsRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListComputeGlobalImageCapabilitySchemaVersionsRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeGlobalImageCapabilitySchemaVersionsRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeGlobalImageCapabilitySchemaVersionsRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

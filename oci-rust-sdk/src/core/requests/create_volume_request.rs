@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateVolumeRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateVolumeRequest
 pub struct CreateVolumeRequestRequired {
@@ -30,7 +29,7 @@ impl CreateVolumeRequest {
             create_volume_details: required.create_volume_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_volume_details
@@ -51,5 +50,3 @@ impl CreateVolumeRequest {
         self
     }
 }
-
-

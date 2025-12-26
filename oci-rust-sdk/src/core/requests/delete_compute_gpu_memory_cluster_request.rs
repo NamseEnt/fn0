@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteComputeGpuMemoryClusterRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for DeleteComputeGpuMemoryClusterRequest
 pub struct DeleteComputeGpuMemoryClusterRequestRequired {
     /// The OCID of the compute GPU memory cluster.
@@ -36,7 +35,7 @@ impl DeleteComputeGpuMemoryClusterRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compute_gpu_memory_cluster_id
@@ -69,5 +68,3 @@ impl DeleteComputeGpuMemoryClusterRequest {
         self
     }
 }
-
-

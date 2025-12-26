@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetVnicRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VNIC.
     pub vnic_id: String,
 }
-
 
 /// Required fields for GetVnicRequest
 pub struct GetVnicRequestRequired {
@@ -24,7 +23,7 @@ impl GetVnicRequest {
     pub fn new(required: GetVnicRequestRequired) -> Self {
         Self {
             vnic_id: required.vnic_id,
-}
+        }
     }
 
     /// Set vnic_id
@@ -33,5 +32,3 @@ impl GetVnicRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateServiceGatewayRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateServiceGatewayRequest
 pub struct UpdateServiceGatewayRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateServiceGatewayRequest {
             update_service_gateway_details: required.update_service_gateway_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set service_gateway_id
@@ -48,7 +47,10 @@ impl UpdateServiceGatewayRequest {
     }
 
     /// Set update_service_gateway_details
-    pub fn set_update_service_gateway_details(mut self, value: UpdateServiceGatewayDetails) -> Self {
+    pub fn set_update_service_gateway_details(
+        mut self,
+        value: UpdateServiceGatewayDetails,
+    ) -> Self {
         self.update_service_gateway_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateServiceGatewayRequest {
         self
     }
 }
-
-

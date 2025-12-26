@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +12,8 @@ pub struct ChangeInstanceConfigurationCompartmentRequest {
     pub instance_configuration_id: String,
 
     /// Request to change the compartment of given instance configuration.
-    pub change_instance_configuration_compartment_details: ChangeInstanceConfigurationCompartmentDetails,
+    pub change_instance_configuration_compartment_details:
+        ChangeInstanceConfigurationCompartmentDetails,
 
     /// For optimistic concurrency control. In the PUT or DELETE call for a resource, set the {@code if-match} parameter to the value of the etag from a previous GET or POST response for that resource. The resource will be updated or deleted only if the etag you provide matches the resource's current etag value.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -27,14 +28,14 @@ pub struct ChangeInstanceConfigurationCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeInstanceConfigurationCompartmentRequest
 pub struct ChangeInstanceConfigurationCompartmentRequestRequired {
     /// The OCID of the instance configuration.
     pub instance_configuration_id: String,
 
     /// Request to change the compartment of given instance configuration.
-    pub change_instance_configuration_compartment_details: ChangeInstanceConfigurationCompartmentDetails,
+    pub change_instance_configuration_compartment_details:
+        ChangeInstanceConfigurationCompartmentDetails,
 }
 
 impl ChangeInstanceConfigurationCompartmentRequest {
@@ -43,14 +44,15 @@ impl ChangeInstanceConfigurationCompartmentRequest {
         Self {
             instance_configuration_id: required.instance_configuration_id,
 
-            change_instance_configuration_compartment_details: required.change_instance_configuration_compartment_details,
+            change_instance_configuration_compartment_details: required
+                .change_instance_configuration_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set instance_configuration_id
@@ -60,7 +62,10 @@ impl ChangeInstanceConfigurationCompartmentRequest {
     }
 
     /// Set change_instance_configuration_compartment_details
-    pub fn set_change_instance_configuration_compartment_details(mut self, value: ChangeInstanceConfigurationCompartmentDetails) -> Self {
+    pub fn set_change_instance_configuration_compartment_details(
+        mut self,
+        value: ChangeInstanceConfigurationCompartmentDetails,
+    ) -> Self {
         self.change_instance_configuration_compartment_details = value;
         self
     }
@@ -101,5 +106,3 @@ impl ChangeInstanceConfigurationCompartmentRequest {
         self
     }
 }
-
-

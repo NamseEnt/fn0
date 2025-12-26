@@ -10,7 +10,6 @@ pub struct ChangeComputeCapacityReservationCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeComputeCapacityReservationCompartmentDetails
 pub struct ChangeComputeCapacityReservationCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the compute capacity reservation to.
@@ -22,7 +21,7 @@ impl ChangeComputeCapacityReservationCompartmentDetails {
     pub fn new(required: ChangeComputeCapacityReservationCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeComputeCapacityReservationCompartmentDetails {
         self
     }
 }
-
-

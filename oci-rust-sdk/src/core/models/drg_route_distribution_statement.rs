@@ -19,7 +19,6 @@ pub struct DrgRouteDistributionStatement {
     pub id: String,
 }
 
-
 /// Required fields for DrgRouteDistributionStatement
 pub struct DrgRouteDistributionStatementRequired {
     /// The action is applied only if all of the match criteria is met. If there are no match criteria in a statement, any input is considered a match and the action is applied.
@@ -46,7 +45,7 @@ impl DrgRouteDistributionStatement {
             priority: required.priority,
 
             id: required.id,
-}
+        }
     }
 
     /// Set match_criteria
@@ -73,5 +72,3 @@ impl DrgRouteDistributionStatement {
         self
     }
 }
-
-

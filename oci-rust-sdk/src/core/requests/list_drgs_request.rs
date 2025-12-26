@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct ListDrgsRequest {
     pub page: Option<String>,
 }
 
-
 /// Required fields for ListDrgsRequest
 pub struct ListDrgsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -36,7 +35,7 @@ impl ListDrgsRequest {
             limit: None,
 
             page: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -69,5 +68,3 @@ impl ListDrgsRequest {
         self
     }
 }
-
-

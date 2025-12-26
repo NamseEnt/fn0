@@ -57,7 +57,6 @@ pub struct CreateContainerDetails {
     pub defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
 }
 
-
 /// Required fields for CreateContainerDetails
 pub struct CreateContainerDetailsRequired {
     /// A URL identifying the image that the container runs in, such as docker.io/library/busybox:latest. If you do not provide a tag, the tag will default to latest. <p> If no registry is provided, will default the registry to public docker hub {@code docker.io/library}. <p> The registry used for container image must be reachable over the Container Instance's VNIC.
@@ -93,7 +92,7 @@ impl CreateContainerDetails {
             freeform_tags: None,
 
             defined_tags: None,
-}
+        }
     }
 
     /// Set display_name
@@ -145,19 +144,28 @@ impl CreateContainerDetails {
     }
 
     /// Set resource_config
-    pub fn set_resource_config(mut self, value: Option<CreateContainerResourceConfigDetails>) -> Self {
+    pub fn set_resource_config(
+        mut self,
+        value: Option<CreateContainerResourceConfigDetails>,
+    ) -> Self {
         self.resource_config = value;
         self
     }
 
     /// Set health_checks
-    pub fn set_health_checks(mut self, value: Option<Vec<CreateContainerHealthCheckDetails>>) -> Self {
+    pub fn set_health_checks(
+        mut self,
+        value: Option<Vec<CreateContainerHealthCheckDetails>>,
+    ) -> Self {
         self.health_checks = value;
         self
     }
 
     /// Set security_context
-    pub fn set_security_context(mut self, value: Option<CreateLinuxSecurityContextDetails>) -> Self {
+    pub fn set_security_context(
+        mut self,
+        value: Option<CreateLinuxSecurityContextDetails>,
+    ) -> Self {
         self.security_context = value;
         self
     }
@@ -169,7 +177,10 @@ impl CreateContainerDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -241,10 +252,11 @@ impl CreateContainerDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
 }
-
-

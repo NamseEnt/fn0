@@ -20,7 +20,6 @@ pub struct WorkRequestResource {
     pub entity_uri: Option<String>,
 }
 
-
 /// Required fields for WorkRequestResource
 pub struct WorkRequestResourceRequired {
     /// The resource type the work request affects.
@@ -44,7 +43,7 @@ impl WorkRequestResource {
             identifier: required.identifier,
 
             entity_uri: None,
-}
+        }
     }
 
     /// Set entity_type
@@ -77,5 +76,3 @@ impl WorkRequestResource {
         self
     }
 }
-
-

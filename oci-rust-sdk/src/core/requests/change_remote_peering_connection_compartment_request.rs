@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +12,8 @@ pub struct ChangeRemotePeeringConnectionCompartmentRequest {
     pub remote_peering_connection_id: String,
 
     /// Request to change the compartment of a remote peering connection.
-    pub change_remote_peering_connection_compartment_details: ChangeRemotePeeringConnectionCompartmentDetails,
+    pub change_remote_peering_connection_compartment_details:
+        ChangeRemotePeeringConnectionCompartmentDetails,
 
     /// Unique identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -23,14 +24,14 @@ pub struct ChangeRemotePeeringConnectionCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeRemotePeeringConnectionCompartmentRequest
 pub struct ChangeRemotePeeringConnectionCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the remote peering connection (RPC).
     pub remote_peering_connection_id: String,
 
     /// Request to change the compartment of a remote peering connection.
-    pub change_remote_peering_connection_compartment_details: ChangeRemotePeeringConnectionCompartmentDetails,
+    pub change_remote_peering_connection_compartment_details:
+        ChangeRemotePeeringConnectionCompartmentDetails,
 }
 
 impl ChangeRemotePeeringConnectionCompartmentRequest {
@@ -39,12 +40,13 @@ impl ChangeRemotePeeringConnectionCompartmentRequest {
         Self {
             remote_peering_connection_id: required.remote_peering_connection_id,
 
-            change_remote_peering_connection_compartment_details: required.change_remote_peering_connection_compartment_details,
+            change_remote_peering_connection_compartment_details: required
+                .change_remote_peering_connection_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set remote_peering_connection_id
@@ -54,7 +56,10 @@ impl ChangeRemotePeeringConnectionCompartmentRequest {
     }
 
     /// Set change_remote_peering_connection_compartment_details
-    pub fn set_change_remote_peering_connection_compartment_details(mut self, value: ChangeRemotePeeringConnectionCompartmentDetails) -> Self {
+    pub fn set_change_remote_peering_connection_compartment_details(
+        mut self,
+        value: ChangeRemotePeeringConnectionCompartmentDetails,
+    ) -> Self {
         self.change_remote_peering_connection_compartment_details = value;
         self
     }
@@ -83,5 +88,3 @@ impl ChangeRemotePeeringConnectionCompartmentRequest {
         self
     }
 }
-
-

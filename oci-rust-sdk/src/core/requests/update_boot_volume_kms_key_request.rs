@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateBootVolumeKmsKeyRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateBootVolumeKmsKeyRequest
 pub struct UpdateBootVolumeKmsKeyRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateBootVolumeKmsKeyRequest {
             update_boot_volume_kms_key_details: required.update_boot_volume_kms_key_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set boot_volume_id
@@ -48,7 +47,10 @@ impl UpdateBootVolumeKmsKeyRequest {
     }
 
     /// Set update_boot_volume_kms_key_details
-    pub fn set_update_boot_volume_kms_key_details(mut self, value: UpdateBootVolumeKmsKeyDetails) -> Self {
+    pub fn set_update_boot_volume_kms_key_details(
+        mut self,
+        value: UpdateBootVolumeKmsKeyDetails,
+    ) -> Self {
         self.update_boot_volume_kms_key_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateBootVolumeKmsKeyRequest {
         self
     }
 }
-
-

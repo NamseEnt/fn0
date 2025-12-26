@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListPublicIpPoolsResponse {
     /// The returned model.PublicIpPoolCollection instance.
     pub public_ip_pool_collection: PublicIpPoolCollection,
 }
-
 
 /// Required fields for ListPublicIpPoolsResponse
 pub struct ListPublicIpPoolsResponseRequired {
@@ -40,7 +39,7 @@ impl ListPublicIpPoolsResponse {
             opc_request_id: required.opc_request_id,
 
             public_ip_pool_collection: required.public_ip_pool_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListPublicIpPoolsResponse {
         self
     }
 }
-
-

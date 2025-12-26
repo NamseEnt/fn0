@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct UpdateDrgRouteRulesRequest {
     /// Request to update one or more route rules in the DRG route table.
     pub update_drg_route_rules_details: UpdateDrgRouteRulesDetails,
 }
-
 
 /// Required fields for UpdateDrgRouteRulesRequest
 pub struct UpdateDrgRouteRulesRequestRequired {
@@ -32,7 +31,7 @@ impl UpdateDrgRouteRulesRequest {
             drg_route_table_id: required.drg_route_table_id,
 
             update_drg_route_rules_details: required.update_drg_route_rules_details,
-}
+        }
     }
 
     /// Set drg_route_table_id
@@ -47,5 +46,3 @@ impl UpdateDrgRouteRulesRequest {
         self
     }
 }
-
-

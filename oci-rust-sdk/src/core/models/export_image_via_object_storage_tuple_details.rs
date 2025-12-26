@@ -18,7 +18,6 @@ pub struct ExportImageViaObjectStorageTupleDetails {
     pub destination_type: String,
 }
 
-
 /// Required fields for ExportImageViaObjectStorageTupleDetails
 pub struct ExportImageViaObjectStorageTupleDetailsRequired {
     /// The Object Storage bucket to export the image to.
@@ -44,7 +43,7 @@ impl ExportImageViaObjectStorageTupleDetails {
             object_name: required.object_name,
 
             destination_type: required.destination_type,
-}
+        }
     }
 
     /// Set bucket_name
@@ -71,5 +70,3 @@ impl ExportImageViaObjectStorageTupleDetails {
         self
     }
 }
-
-

@@ -16,7 +16,6 @@ pub struct UpgradeStatus {
     pub upgraded_connections: String,
 }
 
-
 /// Required fields for UpgradeStatus
 pub struct UpgradeStatusRequired {
     /// The {@code drgId} of the upgraded DRG.
@@ -38,7 +37,7 @@ impl UpgradeStatus {
             status: required.status,
 
             upgraded_connections: required.upgraded_connections,
-}
+        }
     }
 
     /// Set drg_id
@@ -59,5 +58,3 @@ impl UpgradeStatus {
         self
     }
 }
-
-

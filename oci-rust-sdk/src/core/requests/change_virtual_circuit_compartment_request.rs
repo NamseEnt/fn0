@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeVirtualCircuitCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeVirtualCircuitCompartmentRequest
 pub struct ChangeVirtualCircuitCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the virtual circuit.
@@ -39,12 +38,13 @@ impl ChangeVirtualCircuitCompartmentRequest {
         Self {
             virtual_circuit_id: required.virtual_circuit_id,
 
-            change_virtual_circuit_compartment_details: required.change_virtual_circuit_compartment_details,
+            change_virtual_circuit_compartment_details: required
+                .change_virtual_circuit_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set virtual_circuit_id
@@ -54,7 +54,10 @@ impl ChangeVirtualCircuitCompartmentRequest {
     }
 
     /// Set change_virtual_circuit_compartment_details
-    pub fn set_change_virtual_circuit_compartment_details(mut self, value: ChangeVirtualCircuitCompartmentDetails) -> Self {
+    pub fn set_change_virtual_circuit_compartment_details(
+        mut self,
+        value: ChangeVirtualCircuitCompartmentDetails,
+    ) -> Self {
         self.change_virtual_circuit_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangeVirtualCircuitCompartmentRequest {
         self
     }
 }
-
-

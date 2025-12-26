@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetWindowsInstanceInitialCredentialsRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance.
     pub instance_id: String,
 }
-
 
 /// Required fields for GetWindowsInstanceInitialCredentialsRequest
 pub struct GetWindowsInstanceInitialCredentialsRequestRequired {
@@ -24,7 +23,7 @@ impl GetWindowsInstanceInitialCredentialsRequest {
     pub fn new(required: GetWindowsInstanceInitialCredentialsRequestRequired) -> Self {
         Self {
             instance_id: required.instance_id,
-}
+        }
     }
 
     /// Set instance_id
@@ -33,5 +32,3 @@ impl GetWindowsInstanceInitialCredentialsRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetInstanceResponse {
     /// The returned model.Instance instance.
     pub instance: Instance,
 }
-
 
 /// Required fields for GetInstanceResponse
 pub struct GetInstanceResponseRequired {
@@ -65,5 +64,3 @@ impl GetInstanceResponse {
         self
     }
 }
-
-

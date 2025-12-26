@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,7 +16,6 @@ pub struct CreateRemotePeeringConnectionRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateRemotePeeringConnectionRequest
 pub struct CreateRemotePeeringConnectionRequestRequired {
     /// Request to create peering connection to remote region
@@ -27,14 +26,18 @@ impl CreateRemotePeeringConnectionRequest {
     /// Create a new CreateRemotePeeringConnectionRequest with required fields
     pub fn new(required: CreateRemotePeeringConnectionRequestRequired) -> Self {
         Self {
-            create_remote_peering_connection_details: required.create_remote_peering_connection_details,
+            create_remote_peering_connection_details: required
+                .create_remote_peering_connection_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_remote_peering_connection_details
-    pub fn set_create_remote_peering_connection_details(mut self, value: CreateRemotePeeringConnectionDetails) -> Self {
+    pub fn set_create_remote_peering_connection_details(
+        mut self,
+        value: CreateRemotePeeringConnectionDetails,
+    ) -> Self {
         self.create_remote_peering_connection_details = value;
         self
     }
@@ -51,5 +54,3 @@ impl CreateRemotePeeringConnectionRequest {
         self
     }
 }
-
-

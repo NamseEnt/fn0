@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +40,6 @@ pub struct ListByoipRangesRequest {
     pub sort_order: Option<ListByoipRangesRequestSortOrder>,
 }
 
-
 /// Required fields for ListByoipRangesRequest
 pub struct ListByoipRangesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -66,7 +65,7 @@ impl ListByoipRangesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -159,5 +158,3 @@ impl ListByoipRangesRequest {
         self
     }
 }
-
-

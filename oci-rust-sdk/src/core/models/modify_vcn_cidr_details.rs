@@ -13,7 +13,6 @@ pub struct ModifyVcnCidrDetails {
     pub new_cidr_block: String,
 }
 
-
 /// Required fields for ModifyVcnCidrDetails
 pub struct ModifyVcnCidrDetailsRequired {
     /// The CIDR IP address to update.
@@ -30,7 +29,7 @@ impl ModifyVcnCidrDetails {
             original_cidr_block: required.original_cidr_block,
 
             new_cidr_block: required.new_cidr_block,
-}
+        }
     }
 
     /// Set original_cidr_block
@@ -45,5 +44,3 @@ impl ModifyVcnCidrDetails {
         self
     }
 }
-
-

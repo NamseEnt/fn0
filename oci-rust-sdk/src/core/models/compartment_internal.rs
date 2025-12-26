@@ -14,9 +14,7 @@ pub struct CompartmentInternal {
 impl CompartmentInternal {
     /// Create a new CompartmentInternal
     pub fn new() -> Self {
-        Self {
-            id: None,
-        }
+        Self { id: None }
     }
 
     /// Set id
@@ -37,4 +35,3 @@ impl Default for CompartmentInternal {
         Self::new()
     }
 }
-

@@ -16,7 +16,6 @@ pub struct TopologyEntityRelationship {
     pub r#type: String,
 }
 
-
 /// Required fields for TopologyEntityRelationship
 pub struct TopologyEntityRelationshipRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the first entity in the relationship.
@@ -37,7 +36,7 @@ impl TopologyEntityRelationship {
             id2: required.id2,
 
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set id1
@@ -58,5 +57,3 @@ impl TopologyEntityRelationship {
         self
     }
 }
-
-

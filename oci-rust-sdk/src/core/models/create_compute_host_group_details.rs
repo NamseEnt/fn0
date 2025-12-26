@@ -32,7 +32,6 @@ pub struct CreateComputeHostGroupDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for CreateComputeHostGroupDetails
 pub struct CreateComputeHostGroupDetailsRequired {
     /// The availability domain of a host group. <p> Example: {@code Uocm:PHX-AD-1}
@@ -65,7 +64,7 @@ impl CreateComputeHostGroupDetails {
             defined_tags: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -99,7 +98,10 @@ impl CreateComputeHostGroupDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -117,7 +119,10 @@ impl CreateComputeHostGroupDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -128,5 +133,3 @@ impl CreateComputeHostGroupDetails {
         self
     }
 }
-
-

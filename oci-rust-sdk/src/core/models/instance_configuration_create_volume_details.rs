@@ -134,13 +134,19 @@ impl InstanceConfigurationCreateVolumeDetails {
     }
 
     /// Set block_volume_replicas
-    pub fn set_block_volume_replicas(mut self, value: Option<Vec<InstanceConfigurationBlockVolumeReplicaDetails>>) -> Self {
+    pub fn set_block_volume_replicas(
+        mut self,
+        value: Option<Vec<InstanceConfigurationBlockVolumeReplicaDetails>>,
+    ) -> Self {
         self.block_volume_replicas = value;
         self
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -182,13 +188,19 @@ impl InstanceConfigurationCreateVolumeDetails {
     }
 
     /// Set source_details
-    pub fn set_source_details(mut self, value: Option<InstanceConfigurationVolumeSourceFromVolumeBackupDetails>) -> Self {
+    pub fn set_source_details(
+        mut self,
+        value: Option<InstanceConfigurationVolumeSourceFromVolumeBackupDetails>,
+    ) -> Self {
         self.source_details = value;
         self
     }
 
     /// Set autotune_policies
-    pub fn set_autotune_policies(mut self, value: Option<Vec<InstanceConfigurationAutotunePolicy>>) -> Self {
+    pub fn set_autotune_policies(
+        mut self,
+        value: Option<Vec<InstanceConfigurationAutotunePolicy>>,
+    ) -> Self {
         self.autotune_policies = value;
         self
     }
@@ -230,13 +242,19 @@ impl InstanceConfigurationCreateVolumeDetails {
     }
 
     /// Set block_volume_replicas (unwraps Option)
-    pub fn with_block_volume_replicas(mut self, value: Vec<InstanceConfigurationBlockVolumeReplicaDetails>) -> Self {
+    pub fn with_block_volume_replicas(
+        mut self,
+        value: Vec<InstanceConfigurationBlockVolumeReplicaDetails>,
+    ) -> Self {
         self.block_volume_replicas = Some(value);
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -278,13 +296,19 @@ impl InstanceConfigurationCreateVolumeDetails {
     }
 
     /// Set source_details (unwraps Option)
-    pub fn with_source_details(mut self, value: InstanceConfigurationVolumeSourceFromVolumeBackupDetails) -> Self {
+    pub fn with_source_details(
+        mut self,
+        value: InstanceConfigurationVolumeSourceFromVolumeBackupDetails,
+    ) -> Self {
         self.source_details = Some(value);
         self
     }
 
     /// Set autotune_policies (unwraps Option)
-    pub fn with_autotune_policies(mut self, value: Vec<InstanceConfigurationAutotunePolicy>) -> Self {
+    pub fn with_autotune_policies(
+        mut self,
+        value: Vec<InstanceConfigurationAutotunePolicy>,
+    ) -> Self {
         self.autotune_policies = Some(value);
         self
     }
@@ -307,4 +331,3 @@ impl Default for InstanceConfigurationCreateVolumeDetails {
         Self::new()
     }
 }
-

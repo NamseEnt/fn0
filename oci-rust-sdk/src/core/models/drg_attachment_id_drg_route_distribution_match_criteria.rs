@@ -12,7 +12,6 @@ pub struct DrgAttachmentIdDrgRouteDistributionMatchCriteria {
     pub match_type: String,
 }
 
-
 /// Required fields for DrgAttachmentIdDrgRouteDistributionMatchCriteria
 pub struct DrgAttachmentIdDrgRouteDistributionMatchCriteriaRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG attachment.
@@ -28,7 +27,7 @@ impl DrgAttachmentIdDrgRouteDistributionMatchCriteria {
             drg_attachment_id: required.drg_attachment_id,
 
             match_type: required.match_type,
-}
+        }
     }
 
     /// Set drg_attachment_id
@@ -43,5 +42,3 @@ impl DrgAttachmentIdDrgRouteDistributionMatchCriteria {
         self
     }
 }
-
-

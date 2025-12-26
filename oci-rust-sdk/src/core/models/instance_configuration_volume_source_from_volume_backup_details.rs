@@ -14,7 +14,6 @@ pub struct InstanceConfigurationVolumeSourceFromVolumeBackupDetails {
     pub id: Option<String>,
 }
 
-
 /// Required fields for InstanceConfigurationVolumeSourceFromVolumeBackupDetails
 pub struct InstanceConfigurationVolumeSourceFromVolumeBackupDetailsRequired {
     pub r#type: String,
@@ -27,7 +26,7 @@ impl InstanceConfigurationVolumeSourceFromVolumeBackupDetails {
             r#type: required.r#type,
 
             id: None,
-}
+        }
     }
 
     /// Set id
@@ -48,5 +47,3 @@ impl InstanceConfigurationVolumeSourceFromVolumeBackupDetails {
         self
     }
 }
-
-

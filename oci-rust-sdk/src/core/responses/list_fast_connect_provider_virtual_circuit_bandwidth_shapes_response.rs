@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListFastConnectProviderVirtualCircuitBandwidthShapesResponse {
     /// A list of VirtualCircuitBandwidthShape instances.
     pub items: Vec<VirtualCircuitBandwidthShape>,
 }
-
 
 /// Required fields for ListFastConnectProviderVirtualCircuitBandwidthShapesResponse
 pub struct ListFastConnectProviderVirtualCircuitBandwidthShapesResponseRequired {
@@ -33,14 +32,16 @@ pub struct ListFastConnectProviderVirtualCircuitBandwidthShapesResponseRequired 
 
 impl ListFastConnectProviderVirtualCircuitBandwidthShapesResponse {
     /// Create a new ListFastConnectProviderVirtualCircuitBandwidthShapesResponse with required fields
-    pub fn new(required: ListFastConnectProviderVirtualCircuitBandwidthShapesResponseRequired) -> Self {
+    pub fn new(
+        required: ListFastConnectProviderVirtualCircuitBandwidthShapesResponseRequired,
+    ) -> Self {
         Self {
             opc_next_page: required.opc_next_page,
 
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +62,3 @@ impl ListFastConnectProviderVirtualCircuitBandwidthShapesResponse {
         self
     }
 }
-
-

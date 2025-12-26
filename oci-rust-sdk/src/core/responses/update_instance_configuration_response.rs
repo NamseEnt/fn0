@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateInstanceConfigurationResponse {
     /// The returned model.InstanceConfiguration instance.
     pub instance_configuration: InstanceConfiguration,
 }
-
 
 /// Required fields for UpdateInstanceConfigurationResponse
 pub struct UpdateInstanceConfigurationResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateInstanceConfigurationResponse {
             opc_request_id: required.opc_request_id,
 
             instance_configuration: required.instance_configuration,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateInstanceConfigurationResponse {
         self
     }
 }
-
-

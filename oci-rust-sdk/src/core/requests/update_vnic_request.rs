@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateVnicRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateVnicRequest
 pub struct UpdateVnicRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateVnicRequest {
             update_vnic_details: required.update_vnic_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set vnic_id
@@ -65,5 +64,3 @@ impl UpdateVnicRequest {
         self
     }
 }
-
-

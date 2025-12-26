@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetVcnResponse {
     /// The returned model.Vcn instance.
     pub vcn: Vcn,
 }
-
 
 /// Required fields for GetVcnResponse
 pub struct GetVcnResponseRequired {
@@ -40,7 +39,7 @@ impl GetVcnResponse {
             opc_request_id: required.opc_request_id,
 
             vcn: required.vcn,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetVcnResponse {
         self
     }
 }
-
-

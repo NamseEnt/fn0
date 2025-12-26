@@ -10,7 +10,6 @@ pub struct ChangeVlanCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeVlanCompartmentDetails
 pub struct ChangeVlanCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the VLAN to.
@@ -22,7 +21,7 @@ impl ChangeVlanCompartmentDetails {
     pub fn new(required: ChangeVlanCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeVlanCompartmentDetails {
         self
     }
 }
-
-

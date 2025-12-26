@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetTunnelCpeDeviceConfigContentResponse {
     /// The returned stream.Readable | ReadableStream instance.
     pub value: String,
 }
-
 
 /// Required fields for GetTunnelCpeDeviceConfigContentResponse
 pub struct GetTunnelCpeDeviceConfigContentResponseRequired {
@@ -32,7 +31,7 @@ impl GetTunnelCpeDeviceConfigContentResponse {
             opc_request_id: required.opc_request_id,
 
             value: required.value,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetTunnelCpeDeviceConfigContentResponse {
         self
     }
 }
-
-

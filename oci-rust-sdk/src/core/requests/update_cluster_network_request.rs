@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct UpdateClusterNetworkRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateClusterNetworkRequest
 pub struct UpdateClusterNetworkRequestRequired {
@@ -44,7 +43,7 @@ impl UpdateClusterNetworkRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set cluster_network_id
@@ -54,7 +53,10 @@ impl UpdateClusterNetworkRequest {
     }
 
     /// Set update_cluster_network_details
-    pub fn set_update_cluster_network_details(mut self, value: UpdateClusterNetworkDetails) -> Self {
+    pub fn set_update_cluster_network_details(
+        mut self,
+        value: UpdateClusterNetworkDetails,
+    ) -> Self {
         self.update_cluster_network_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl UpdateClusterNetworkRequest {
         self
     }
 }
-
-

@@ -10,7 +10,6 @@ pub struct ChangeComputeClusterCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeComputeClusterCompartmentDetails
 pub struct ChangeComputeClusterCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the compute cluster to.
@@ -22,7 +21,7 @@ impl ChangeComputeClusterCompartmentDetails {
     pub fn new(required: ChangeComputeClusterCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeComputeClusterCompartmentDetails {
         self
     }
 }
-
-

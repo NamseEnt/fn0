@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetIPSecConnectionTunnelSharedSecretResponse {
     /// The returned model.IPSecConnectionTunnelSharedSecret instance.
     pub i_psec_connection_tunnel_shared_secret: IPSecConnectionTunnelSharedSecret,
 }
-
 
 /// Required fields for GetIPSecConnectionTunnelSharedSecretResponse
 pub struct GetIPSecConnectionTunnelSharedSecretResponseRequired {
@@ -40,7 +39,7 @@ impl GetIPSecConnectionTunnelSharedSecretResponse {
             opc_request_id: required.opc_request_id,
 
             i_psec_connection_tunnel_shared_secret: required.i_psec_connection_tunnel_shared_secret,
-}
+        }
     }
 
     /// Set etag
@@ -56,10 +55,11 @@ impl GetIPSecConnectionTunnelSharedSecretResponse {
     }
 
     /// Set i_psec_connection_tunnel_shared_secret
-    pub fn set_i_psec_connection_tunnel_shared_secret(mut self, value: IPSecConnectionTunnelSharedSecret) -> Self {
+    pub fn set_i_psec_connection_tunnel_shared_secret(
+        mut self,
+        value: IPSecConnectionTunnelSharedSecret,
+    ) -> Self {
         self.i_psec_connection_tunnel_shared_secret = value;
         self
     }
 }
-
-

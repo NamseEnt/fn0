@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangePublicIpPoolCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangePublicIpPoolCompartmentRequest
 pub struct ChangePublicIpPoolCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the public IP pool.
@@ -39,12 +38,13 @@ impl ChangePublicIpPoolCompartmentRequest {
         Self {
             public_ip_pool_id: required.public_ip_pool_id,
 
-            change_public_ip_pool_compartment_details: required.change_public_ip_pool_compartment_details,
+            change_public_ip_pool_compartment_details: required
+                .change_public_ip_pool_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set public_ip_pool_id
@@ -54,7 +54,10 @@ impl ChangePublicIpPoolCompartmentRequest {
     }
 
     /// Set change_public_ip_pool_compartment_details
-    pub fn set_change_public_ip_pool_compartment_details(mut self, value: ChangePublicIpPoolCompartmentDetails) -> Self {
+    pub fn set_change_public_ip_pool_compartment_details(
+        mut self,
+        value: ChangePublicIpPoolCompartmentDetails,
+    ) -> Self {
         self.change_public_ip_pool_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangePublicIpPoolCompartmentRequest {
         self
     }
 }
-
-

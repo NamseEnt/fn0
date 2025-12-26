@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateComputeHostGroupRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpdateComputeHostGroupRequest
 pub struct UpdateComputeHostGroupRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute host group.
@@ -50,7 +49,7 @@ impl UpdateComputeHostGroupRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_host_group_id
@@ -60,7 +59,10 @@ impl UpdateComputeHostGroupRequest {
     }
 
     /// Set update_compute_host_group_details
-    pub fn set_update_compute_host_group_details(mut self, value: UpdateComputeHostGroupDetails) -> Self {
+    pub fn set_update_compute_host_group_details(
+        mut self,
+        value: UpdateComputeHostGroupDetails,
+    ) -> Self {
         self.update_compute_host_group_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl UpdateComputeHostGroupRequest {
         self
     }
 }
-
-

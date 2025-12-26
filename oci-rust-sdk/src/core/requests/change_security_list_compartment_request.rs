@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeSecurityListCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeSecurityListCompartmentRequest
 pub struct ChangeSecurityListCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the security list.
@@ -39,12 +38,13 @@ impl ChangeSecurityListCompartmentRequest {
         Self {
             security_list_id: required.security_list_id,
 
-            change_security_list_compartment_details: required.change_security_list_compartment_details,
+            change_security_list_compartment_details: required
+                .change_security_list_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set security_list_id
@@ -54,7 +54,10 @@ impl ChangeSecurityListCompartmentRequest {
     }
 
     /// Set change_security_list_compartment_details
-    pub fn set_change_security_list_compartment_details(mut self, value: ChangeSecurityListCompartmentDetails) -> Self {
+    pub fn set_change_security_list_compartment_details(
+        mut self,
+        value: ChangeSecurityListCompartmentDetails,
+    ) -> Self {
         self.change_security_list_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangeSecurityListCompartmentRequest {
         self
     }
 }
-
-

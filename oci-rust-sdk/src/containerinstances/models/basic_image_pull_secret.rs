@@ -9,7 +9,6 @@ pub struct BasicImagePullSecret {
     pub secret_type: String,
 }
 
-
 /// Required fields for BasicImagePullSecret
 pub struct BasicImagePullSecretRequired {
     pub secret_type: String,
@@ -20,7 +19,7 @@ impl BasicImagePullSecret {
     pub fn new(required: BasicImagePullSecretRequired) -> Self {
         Self {
             secret_type: required.secret_type,
-}
+        }
     }
 
     /// Set secret_type
@@ -29,5 +28,3 @@ impl BasicImagePullSecret {
         self
     }
 }
-
-

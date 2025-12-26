@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DeleteCrossConnectGroupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for DeleteCrossConnectGroupRequest
 pub struct DeleteCrossConnectGroupRequestRequired {
@@ -30,7 +29,7 @@ impl DeleteCrossConnectGroupRequest {
             cross_connect_group_id: required.cross_connect_group_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set cross_connect_group_id
@@ -51,5 +50,3 @@ impl DeleteCrossConnectGroupRequest {
         self
     }
 }
-
-

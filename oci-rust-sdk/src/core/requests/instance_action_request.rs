@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct InstanceActionRequest {
     pub instance_power_action_details: Option<ResetActionDetails>,
 }
 
-
 /// Required fields for InstanceActionRequest
 pub struct InstanceActionRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance.
@@ -50,7 +49,7 @@ impl InstanceActionRequest {
             if_match: None,
 
             instance_power_action_details: None,
-}
+        }
     }
 
     /// Set instance_id
@@ -101,5 +100,3 @@ impl InstanceActionRequest {
         self
     }
 }
-
-

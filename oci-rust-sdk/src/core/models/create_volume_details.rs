@@ -78,7 +78,6 @@ pub struct CreateVolumeDetails {
     pub is_reservations_enabled: Option<bool>,
 }
 
-
 /// Required fields for CreateVolumeDetails
 pub struct CreateVolumeDetailsRequired {
     /// The OCID of the compartment that contains the volume.
@@ -124,7 +123,7 @@ impl CreateVolumeDetails {
             xrc_kms_key_id: None,
 
             is_reservations_enabled: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -146,7 +145,10 @@ impl CreateVolumeDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -194,7 +196,10 @@ impl CreateVolumeDetails {
     }
 
     /// Set source_details
-    pub fn set_source_details(mut self, value: Option<VolumeSourceFromBlockVolumeReplicaDetails>) -> Self {
+    pub fn set_source_details(
+        mut self,
+        value: Option<VolumeSourceFromBlockVolumeReplicaDetails>,
+    ) -> Self {
         self.source_details = value;
         self
     }
@@ -212,7 +217,10 @@ impl CreateVolumeDetails {
     }
 
     /// Set block_volume_replicas
-    pub fn set_block_volume_replicas(mut self, value: Option<Vec<BlockVolumeReplicaDetails>>) -> Self {
+    pub fn set_block_volume_replicas(
+        mut self,
+        value: Option<Vec<BlockVolumeReplicaDetails>>,
+    ) -> Self {
         self.block_volume_replicas = value;
         self
     }
@@ -248,7 +256,10 @@ impl CreateVolumeDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -337,5 +348,3 @@ impl CreateVolumeDetails {
         self
     }
 }
-
-

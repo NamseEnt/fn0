@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +12,8 @@ pub struct ChangeComputeGpuMemoryClusterCompartmentRequest {
     pub compute_gpu_memory_cluster_id: String,
 
     /// The configuration details for the move operation.
-    pub change_compute_gpu_memory_cluster_compartment_details: ChangeComputeGpuMemoryClusterCompartmentDetails,
+    pub change_compute_gpu_memory_cluster_compartment_details:
+        ChangeComputeGpuMemoryClusterCompartmentDetails,
 
     /// For optimistic concurrency control. In the PUT or DELETE call for a resource, set the {@code if-match} parameter to the value of the etag from a previous GET or POST response for that resource. The resource will be updated or deleted only if the etag you provide matches the resource's current etag value.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -27,14 +28,14 @@ pub struct ChangeComputeGpuMemoryClusterCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeComputeGpuMemoryClusterCompartmentRequest
 pub struct ChangeComputeGpuMemoryClusterCompartmentRequestRequired {
     /// The OCID of the compute GPU memory cluster.
     pub compute_gpu_memory_cluster_id: String,
 
     /// The configuration details for the move operation.
-    pub change_compute_gpu_memory_cluster_compartment_details: ChangeComputeGpuMemoryClusterCompartmentDetails,
+    pub change_compute_gpu_memory_cluster_compartment_details:
+        ChangeComputeGpuMemoryClusterCompartmentDetails,
 }
 
 impl ChangeComputeGpuMemoryClusterCompartmentRequest {
@@ -43,14 +44,15 @@ impl ChangeComputeGpuMemoryClusterCompartmentRequest {
         Self {
             compute_gpu_memory_cluster_id: required.compute_gpu_memory_cluster_id,
 
-            change_compute_gpu_memory_cluster_compartment_details: required.change_compute_gpu_memory_cluster_compartment_details,
+            change_compute_gpu_memory_cluster_compartment_details: required
+                .change_compute_gpu_memory_cluster_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_gpu_memory_cluster_id
@@ -60,7 +62,10 @@ impl ChangeComputeGpuMemoryClusterCompartmentRequest {
     }
 
     /// Set change_compute_gpu_memory_cluster_compartment_details
-    pub fn set_change_compute_gpu_memory_cluster_compartment_details(mut self, value: ChangeComputeGpuMemoryClusterCompartmentDetails) -> Self {
+    pub fn set_change_compute_gpu_memory_cluster_compartment_details(
+        mut self,
+        value: ChangeComputeGpuMemoryClusterCompartmentDetails,
+    ) -> Self {
         self.change_compute_gpu_memory_cluster_compartment_details = value;
         self
     }
@@ -101,5 +106,3 @@ impl ChangeComputeGpuMemoryClusterCompartmentRequest {
         self
     }
 }
-
-

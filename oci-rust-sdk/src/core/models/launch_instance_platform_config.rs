@@ -26,7 +26,6 @@ pub struct LaunchInstancePlatformConfig {
     pub is_memory_encryption_enabled: Option<bool>,
 }
 
-
 /// Required fields for LaunchInstancePlatformConfig
 pub struct LaunchInstancePlatformConfigRequired {
     pub r#type: String,
@@ -45,7 +44,7 @@ impl LaunchInstancePlatformConfig {
             is_measured_boot_enabled: None,
 
             is_memory_encryption_enabled: None,
-}
+        }
     }
 
     /// Set is_secure_boot_enabled
@@ -102,5 +101,3 @@ impl LaunchInstancePlatformConfig {
         self
     }
 }
-
-

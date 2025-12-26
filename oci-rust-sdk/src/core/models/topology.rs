@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -22,7 +22,6 @@ pub struct Topology {
     #[serde(rename = "type")]
     pub r#type: String,
 }
-
 
 /// Required fields for Topology
 pub struct TopologyRequired {
@@ -54,7 +53,7 @@ impl Topology {
             time_created: required.time_created,
 
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set entities
@@ -87,5 +86,3 @@ impl Topology {
         self
     }
 }
-
-

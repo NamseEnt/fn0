@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,7 +60,6 @@ pub struct ListDedicatedVmHostsRequest {
     pub is_memory_encryption_enabled: Option<bool>,
 }
 
-
 /// Required fields for ListDedicatedVmHostsRequest
 pub struct ListDedicatedVmHostsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -96,7 +95,7 @@ impl ListDedicatedVmHostsRequest {
             remaining_ocpus_greater_than_or_equal_to: None,
 
             is_memory_encryption_enabled: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -112,7 +111,10 @@ impl ListDedicatedVmHostsRequest {
     }
 
     /// Set lifecycle_state
-    pub fn set_lifecycle_state(mut self, value: Option<ListDedicatedVmHostsRequestLifecycleState>) -> Self {
+    pub fn set_lifecycle_state(
+        mut self,
+        value: Option<ListDedicatedVmHostsRequestLifecycleState>,
+    ) -> Self {
         self.lifecycle_state = value;
         self
     }
@@ -160,7 +162,10 @@ impl ListDedicatedVmHostsRequest {
     }
 
     /// Set remaining_memory_in_gbs_greater_than_or_equal_to
-    pub fn set_remaining_memory_in_gbs_greater_than_or_equal_to(mut self, value: Option<i64>) -> Self {
+    pub fn set_remaining_memory_in_gbs_greater_than_or_equal_to(
+        mut self,
+        value: Option<i64>,
+    ) -> Self {
         self.remaining_memory_in_gbs_greater_than_or_equal_to = value;
         self
     }
@@ -184,7 +189,10 @@ impl ListDedicatedVmHostsRequest {
     }
 
     /// Set lifecycle_state (unwraps Option)
-    pub fn with_lifecycle_state(mut self, value: ListDedicatedVmHostsRequestLifecycleState) -> Self {
+    pub fn with_lifecycle_state(
+        mut self,
+        value: ListDedicatedVmHostsRequestLifecycleState,
+    ) -> Self {
         self.lifecycle_state = Some(value);
         self
     }
@@ -249,5 +257,3 @@ impl ListDedicatedVmHostsRequest {
         self
     }
 }
-
-

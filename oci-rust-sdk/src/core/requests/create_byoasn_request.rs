@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateByoasnRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateByoasnRequest
 pub struct CreateByoasnRequestRequired {
     /// Details needed to create a BYOASN Resource.
@@ -36,7 +35,7 @@ impl CreateByoasnRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_byoasn_details
@@ -69,5 +68,3 @@ impl CreateByoasnRequest {
         self
     }
 }
-
-

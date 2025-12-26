@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,6 @@ pub struct ListIPSecConnectionsRequest {
     pub page: Option<String>,
 }
 
-
 /// Required fields for ListIPSecConnectionsRequest
 pub struct ListIPSecConnectionsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -48,7 +47,7 @@ impl ListIPSecConnectionsRequest {
             limit: None,
 
             page: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -105,5 +104,3 @@ impl ListIPSecConnectionsRequest {
         self
     }
 }
-
-

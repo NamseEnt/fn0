@@ -10,7 +10,6 @@ pub struct ContainerInstanceShapeCollection {
     pub items: Vec<ContainerInstanceShapeSummary>,
 }
 
-
 /// Required fields for ContainerInstanceShapeCollection
 pub struct ContainerInstanceShapeCollectionRequired {
     /// A list of shapes.
@@ -22,7 +21,7 @@ impl ContainerInstanceShapeCollection {
     pub fn new(required: ContainerInstanceShapeCollectionRequired) -> Self {
         Self {
             items: required.items,
-}
+        }
     }
 
     /// Set items
@@ -31,5 +30,3 @@ impl ContainerInstanceShapeCollection {
         self
     }
 }
-
-

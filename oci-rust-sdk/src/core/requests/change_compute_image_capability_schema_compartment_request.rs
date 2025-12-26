@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +12,8 @@ pub struct ChangeComputeImageCapabilitySchemaCompartmentRequest {
     pub compute_image_capability_schema_id: String,
 
     /// Compute Image Capability Schema change compartment details
-    pub change_compute_image_capability_schema_compartment_details: ChangeComputeImageCapabilitySchemaCompartmentDetails,
+    pub change_compute_image_capability_schema_compartment_details:
+        ChangeComputeImageCapabilitySchemaCompartmentDetails,
 
     /// For optimistic concurrency control. In the PUT or DELETE call for a resource, set the {@code if-match} parameter to the value of the etag from a previous GET or POST response for that resource. The resource will be updated or deleted only if the etag you provide matches the resource's current etag value.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -27,14 +28,14 @@ pub struct ChangeComputeImageCapabilitySchemaCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeComputeImageCapabilitySchemaCompartmentRequest
 pub struct ChangeComputeImageCapabilitySchemaCompartmentRequestRequired {
     /// The id of the compute image capability schema or the image ocid
     pub compute_image_capability_schema_id: String,
 
     /// Compute Image Capability Schema change compartment details
-    pub change_compute_image_capability_schema_compartment_details: ChangeComputeImageCapabilitySchemaCompartmentDetails,
+    pub change_compute_image_capability_schema_compartment_details:
+        ChangeComputeImageCapabilitySchemaCompartmentDetails,
 }
 
 impl ChangeComputeImageCapabilitySchemaCompartmentRequest {
@@ -43,14 +44,15 @@ impl ChangeComputeImageCapabilitySchemaCompartmentRequest {
         Self {
             compute_image_capability_schema_id: required.compute_image_capability_schema_id,
 
-            change_compute_image_capability_schema_compartment_details: required.change_compute_image_capability_schema_compartment_details,
+            change_compute_image_capability_schema_compartment_details: required
+                .change_compute_image_capability_schema_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_image_capability_schema_id
@@ -60,7 +62,10 @@ impl ChangeComputeImageCapabilitySchemaCompartmentRequest {
     }
 
     /// Set change_compute_image_capability_schema_compartment_details
-    pub fn set_change_compute_image_capability_schema_compartment_details(mut self, value: ChangeComputeImageCapabilitySchemaCompartmentDetails) -> Self {
+    pub fn set_change_compute_image_capability_schema_compartment_details(
+        mut self,
+        value: ChangeComputeImageCapabilitySchemaCompartmentDetails,
+    ) -> Self {
         self.change_compute_image_capability_schema_compartment_details = value;
         self
     }
@@ -101,5 +106,3 @@ impl ChangeComputeImageCapabilitySchemaCompartmentRequest {
         self
     }
 }
-
-

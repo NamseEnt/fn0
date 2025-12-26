@@ -13,7 +13,6 @@ pub struct ResetActionDetails {
     pub allow_dense_reboot_migration: Option<bool>,
 }
 
-
 /// Required fields for ResetActionDetails
 pub struct ResetActionDetailsRequired {
     pub action_type: String,
@@ -26,7 +25,7 @@ impl ResetActionDetails {
             action_type: required.action_type,
 
             allow_dense_reboot_migration: None,
-}
+        }
     }
 
     /// Set allow_dense_reboot_migration
@@ -47,5 +46,3 @@ impl ResetActionDetails {
         self
     }
 }
-
-

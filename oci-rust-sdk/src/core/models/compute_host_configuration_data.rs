@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -32,7 +32,10 @@ impl ComputeHostConfigurationData {
     }
 
     /// Set check_details
-    pub fn set_check_details(mut self, value: Option<ComputeHostConfigurationCheckDetails>) -> Self {
+    pub fn set_check_details(
+        mut self,
+        value: Option<ComputeHostConfigurationCheckDetails>,
+    ) -> Self {
         self.check_details = value;
         self
     }
@@ -55,4 +58,3 @@ impl Default for ComputeHostConfigurationData {
         Self::new()
     }
 }
-

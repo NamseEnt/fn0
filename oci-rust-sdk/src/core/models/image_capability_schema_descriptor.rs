@@ -11,7 +11,6 @@ pub struct ImageCapabilitySchemaDescriptor {
     pub descriptor_type: String,
 }
 
-
 /// Required fields for ImageCapabilitySchemaDescriptor
 pub struct ImageCapabilitySchemaDescriptorRequired {
     pub source: ImageCapabilitySchemaDescriptorSource,
@@ -26,7 +25,7 @@ impl ImageCapabilitySchemaDescriptor {
             source: required.source,
 
             descriptor_type: required.descriptor_type,
-}
+        }
     }
 
     /// Set source
@@ -41,5 +40,3 @@ impl ImageCapabilitySchemaDescriptor {
         self
     }
 }
-
-

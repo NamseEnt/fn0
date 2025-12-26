@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetIPSecConnectionRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the IPSec connection.
     pub ipsc_id: String,
 }
-
 
 /// Required fields for GetIPSecConnectionRequest
 pub struct GetIPSecConnectionRequestRequired {
@@ -24,7 +23,7 @@ impl GetIPSecConnectionRequest {
     pub fn new(required: GetIPSecConnectionRequestRequired) -> Self {
         Self {
             ipsc_id: required.ipsc_id,
-}
+        }
     }
 
     /// Set ipsc_id
@@ -33,5 +32,3 @@ impl GetIPSecConnectionRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +12,8 @@ pub struct ChangeLocalPeeringGatewayCompartmentRequest {
     pub local_peering_gateway_id: String,
 
     /// Request to change the compartment of a given local peering gateway.
-    pub change_local_peering_gateway_compartment_details: ChangeLocalPeeringGatewayCompartmentDetails,
+    pub change_local_peering_gateway_compartment_details:
+        ChangeLocalPeeringGatewayCompartmentDetails,
 
     /// Unique identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -23,14 +24,14 @@ pub struct ChangeLocalPeeringGatewayCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeLocalPeeringGatewayCompartmentRequest
 pub struct ChangeLocalPeeringGatewayCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the local peering gateway.
     pub local_peering_gateway_id: String,
 
     /// Request to change the compartment of a given local peering gateway.
-    pub change_local_peering_gateway_compartment_details: ChangeLocalPeeringGatewayCompartmentDetails,
+    pub change_local_peering_gateway_compartment_details:
+        ChangeLocalPeeringGatewayCompartmentDetails,
 }
 
 impl ChangeLocalPeeringGatewayCompartmentRequest {
@@ -39,12 +40,13 @@ impl ChangeLocalPeeringGatewayCompartmentRequest {
         Self {
             local_peering_gateway_id: required.local_peering_gateway_id,
 
-            change_local_peering_gateway_compartment_details: required.change_local_peering_gateway_compartment_details,
+            change_local_peering_gateway_compartment_details: required
+                .change_local_peering_gateway_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set local_peering_gateway_id
@@ -54,7 +56,10 @@ impl ChangeLocalPeeringGatewayCompartmentRequest {
     }
 
     /// Set change_local_peering_gateway_compartment_details
-    pub fn set_change_local_peering_gateway_compartment_details(mut self, value: ChangeLocalPeeringGatewayCompartmentDetails) -> Self {
+    pub fn set_change_local_peering_gateway_compartment_details(
+        mut self,
+        value: ChangeLocalPeeringGatewayCompartmentDetails,
+    ) -> Self {
         self.change_local_peering_gateway_compartment_details = value;
         self
     }
@@ -83,5 +88,3 @@ impl ChangeLocalPeeringGatewayCompartmentRequest {
         self
     }
 }
-
-

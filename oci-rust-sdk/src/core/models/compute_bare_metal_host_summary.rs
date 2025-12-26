@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -45,7 +45,6 @@ pub struct ComputeBareMetalHostSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lifecycle_details: Option<String>,
 }
-
 
 /// Required fields for ComputeBareMetalHostSummary
 pub struct ComputeBareMetalHostSummaryRequired {
@@ -93,7 +92,7 @@ impl ComputeBareMetalHostSummary {
             instance_id: None,
 
             lifecycle_details: None,
-}
+        }
     }
 
     /// Set compute_capacity_topology_id
@@ -192,5 +191,3 @@ impl ComputeBareMetalHostSummary {
         self
     }
 }
-
-

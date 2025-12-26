@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct AttachVolumeResponse {
     /// The returned model.VolumeAttachment instance.
     pub volume_attachment: VolumeAttachment,
 }
-
 
 /// Required fields for AttachVolumeResponse
 pub struct AttachVolumeResponseRequired {
@@ -40,7 +39,7 @@ impl AttachVolumeResponse {
             opc_request_id: required.opc_request_id,
 
             volume_attachment: required.volume_attachment,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl AttachVolumeResponse {
         self
     }
 }
-
-

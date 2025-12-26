@@ -28,7 +28,6 @@ pub struct InstanceSourceViaImageDetails {
     pub instance_source_image_filter_details: Option<InstanceSourceImageFilterDetails>,
 }
 
-
 /// Required fields for InstanceSourceViaImageDetails
 pub struct InstanceSourceViaImageDetailsRequired {
     pub source_type: String,
@@ -49,7 +48,7 @@ impl InstanceSourceViaImageDetails {
             boot_volume_vpus_per_gb: None,
 
             instance_source_image_filter_details: None,
-}
+        }
     }
 
     /// Set boot_volume_size_in_gbs
@@ -77,7 +76,10 @@ impl InstanceSourceViaImageDetails {
     }
 
     /// Set instance_source_image_filter_details
-    pub fn set_instance_source_image_filter_details(mut self, value: Option<InstanceSourceImageFilterDetails>) -> Self {
+    pub fn set_instance_source_image_filter_details(
+        mut self,
+        value: Option<InstanceSourceImageFilterDetails>,
+    ) -> Self {
         self.instance_source_image_filter_details = value;
         self
     }
@@ -113,10 +115,11 @@ impl InstanceSourceViaImageDetails {
     }
 
     /// Set instance_source_image_filter_details (unwraps Option)
-    pub fn with_instance_source_image_filter_details(mut self, value: InstanceSourceImageFilterDetails) -> Self {
+    pub fn with_instance_source_image_filter_details(
+        mut self,
+        value: InstanceSourceImageFilterDetails,
+    ) -> Self {
         self.instance_source_image_filter_details = Some(value);
         self
     }
 }
-
-

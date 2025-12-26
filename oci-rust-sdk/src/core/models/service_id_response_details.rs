@@ -13,7 +13,6 @@ pub struct ServiceIdResponseDetails {
     pub service_name: String,
 }
 
-
 /// Required fields for ServiceIdResponseDetails
 pub struct ServiceIdResponseDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the service.
@@ -30,7 +29,7 @@ impl ServiceIdResponseDetails {
             service_id: required.service_id,
 
             service_name: required.service_name,
-}
+        }
     }
 
     /// Set service_id
@@ -45,5 +44,3 @@ impl ServiceIdResponseDetails {
         self
     }
 }
-
-

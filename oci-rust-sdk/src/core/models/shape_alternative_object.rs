@@ -10,7 +10,6 @@ pub struct ShapeAlternativeObject {
     pub shape_name: String,
 }
 
-
 /// Required fields for ShapeAlternativeObject
 pub struct ShapeAlternativeObjectRequired {
     /// The name of the shape.
@@ -22,7 +21,7 @@ impl ShapeAlternativeObject {
     pub fn new(required: ShapeAlternativeObjectRequired) -> Self {
         Self {
             shape_name: required.shape_name,
-}
+        }
     }
 
     /// Set shape_name
@@ -31,5 +30,3 @@ impl ShapeAlternativeObject {
         self
     }
 }
-
-

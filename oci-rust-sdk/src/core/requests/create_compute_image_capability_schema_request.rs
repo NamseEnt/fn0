@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,7 +16,6 @@ pub struct CreateComputeImageCapabilitySchemaRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateComputeImageCapabilitySchemaRequest
 pub struct CreateComputeImageCapabilitySchemaRequestRequired {
     /// Compute Image Capability Schema creation details
@@ -27,14 +26,18 @@ impl CreateComputeImageCapabilitySchemaRequest {
     /// Create a new CreateComputeImageCapabilitySchemaRequest with required fields
     pub fn new(required: CreateComputeImageCapabilitySchemaRequestRequired) -> Self {
         Self {
-            create_compute_image_capability_schema_details: required.create_compute_image_capability_schema_details,
+            create_compute_image_capability_schema_details: required
+                .create_compute_image_capability_schema_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_compute_image_capability_schema_details
-    pub fn set_create_compute_image_capability_schema_details(mut self, value: CreateComputeImageCapabilitySchemaDetails) -> Self {
+    pub fn set_create_compute_image_capability_schema_details(
+        mut self,
+        value: CreateComputeImageCapabilitySchemaDetails,
+    ) -> Self {
         self.create_compute_image_capability_schema_details = value;
         self
     }
@@ -51,5 +54,3 @@ impl CreateComputeImageCapabilitySchemaRequest {
         self
     }
 }
-
-

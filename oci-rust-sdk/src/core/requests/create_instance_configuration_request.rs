@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateInstanceConfigurationRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateInstanceConfigurationRequest
 pub struct CreateInstanceConfigurationRequestRequired {
@@ -30,11 +29,14 @@ impl CreateInstanceConfigurationRequest {
             create_instance_configuration: required.create_instance_configuration,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_instance_configuration
-    pub fn set_create_instance_configuration(mut self, value: CreateInstanceConfigurationDetails) -> Self {
+    pub fn set_create_instance_configuration(
+        mut self,
+        value: CreateInstanceConfigurationDetails,
+    ) -> Self {
         self.create_instance_configuration = value;
         self
     }
@@ -51,5 +53,3 @@ impl CreateInstanceConfigurationRequest {
         self
     }
 }
-
-

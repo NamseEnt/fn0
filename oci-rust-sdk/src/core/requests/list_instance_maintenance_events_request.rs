@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,7 +57,6 @@ pub struct ListInstanceMaintenanceEventsRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for ListInstanceMaintenanceEventsRequest
 pub struct ListInstanceMaintenanceEventsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -91,7 +90,7 @@ impl ListInstanceMaintenanceEventsRequest {
             sort_order: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -125,13 +124,19 @@ impl ListInstanceMaintenanceEventsRequest {
     }
 
     /// Set time_window_start_greater_than_or_equal_to
-    pub fn set_time_window_start_greater_than_or_equal_to(mut self, value: Option<DateTime<Utc>>) -> Self {
+    pub fn set_time_window_start_greater_than_or_equal_to(
+        mut self,
+        value: Option<DateTime<Utc>>,
+    ) -> Self {
         self.time_window_start_greater_than_or_equal_to = value;
         self
     }
 
     /// Set time_window_start_less_than_or_equal_to
-    pub fn set_time_window_start_less_than_or_equal_to(mut self, value: Option<DateTime<Utc>>) -> Self {
+    pub fn set_time_window_start_less_than_or_equal_to(
+        mut self,
+        value: Option<DateTime<Utc>>,
+    ) -> Self {
         self.time_window_start_less_than_or_equal_to = value;
         self
     }
@@ -149,13 +154,19 @@ impl ListInstanceMaintenanceEventsRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListInstanceMaintenanceEventsRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListInstanceMaintenanceEventsRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListInstanceMaintenanceEventsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListInstanceMaintenanceEventsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -232,5 +243,3 @@ impl ListInstanceMaintenanceEventsRequest {
         self
     }
 }
-
-

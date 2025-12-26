@@ -14,7 +14,6 @@ pub struct VirtualCircuitBandwidthShape {
     pub bandwidth_in_mbps: Option<i64>,
 }
 
-
 /// Required fields for VirtualCircuitBandwidthShape
 pub struct VirtualCircuitBandwidthShapeRequired {
     /// The name of the bandwidth shape. <p> Example: {@code 10 Gbps}
@@ -28,7 +27,7 @@ impl VirtualCircuitBandwidthShape {
             name: required.name,
 
             bandwidth_in_mbps: None,
-}
+        }
     }
 
     /// Set bandwidth_in_mbps
@@ -49,5 +48,3 @@ impl VirtualCircuitBandwidthShape {
         self
     }
 }
-
-

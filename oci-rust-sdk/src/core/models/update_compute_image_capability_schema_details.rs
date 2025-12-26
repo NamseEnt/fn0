@@ -51,13 +51,19 @@ impl UpdateComputeImageCapabilitySchemaDetails {
     }
 
     /// Set schema_data
-    pub fn set_schema_data(mut self, value: Option<HashMap<String, ImageCapabilitySchemaDescriptor>>) -> Self {
+    pub fn set_schema_data(
+        mut self,
+        value: Option<HashMap<String, ImageCapabilitySchemaDescriptor>>,
+    ) -> Self {
         self.schema_data = value;
         self
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -75,13 +81,19 @@ impl UpdateComputeImageCapabilitySchemaDetails {
     }
 
     /// Set schema_data (unwraps Option)
-    pub fn with_schema_data(mut self, value: HashMap<String, ImageCapabilitySchemaDescriptor>) -> Self {
+    pub fn with_schema_data(
+        mut self,
+        value: HashMap<String, ImageCapabilitySchemaDescriptor>,
+    ) -> Self {
         self.schema_data = Some(value);
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -92,4 +104,3 @@ impl Default for UpdateComputeImageCapabilitySchemaDetails {
         Self::new()
     }
 }
-

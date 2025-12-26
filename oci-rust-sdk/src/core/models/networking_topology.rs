@@ -10,7 +10,6 @@ pub struct NetworkingTopology {
     pub r#type: String,
 }
 
-
 /// Required fields for NetworkingTopology
 pub struct NetworkingTopologyRequired {
     pub r#type: String,
@@ -21,7 +20,7 @@ impl NetworkingTopology {
     pub fn new(required: NetworkingTopologyRequired) -> Self {
         Self {
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set r#type
@@ -30,5 +29,3 @@ impl NetworkingTopology {
         self
     }
 }
-
-

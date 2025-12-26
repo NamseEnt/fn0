@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,9 +12,9 @@ pub struct RemoveDrgRouteDistributionStatementsRequest {
     pub drg_route_distribution_id: String,
 
     /// Request with one or more route distribution statements to remove from the route distribution.
-    pub remove_drg_route_distribution_statements_details: RemoveDrgRouteDistributionStatementsDetails,
+    pub remove_drg_route_distribution_statements_details:
+        RemoveDrgRouteDistributionStatementsDetails,
 }
-
 
 /// Required fields for RemoveDrgRouteDistributionStatementsRequest
 pub struct RemoveDrgRouteDistributionStatementsRequestRequired {
@@ -22,7 +22,8 @@ pub struct RemoveDrgRouteDistributionStatementsRequestRequired {
     pub drg_route_distribution_id: String,
 
     /// Request with one or more route distribution statements to remove from the route distribution.
-    pub remove_drg_route_distribution_statements_details: RemoveDrgRouteDistributionStatementsDetails,
+    pub remove_drg_route_distribution_statements_details:
+        RemoveDrgRouteDistributionStatementsDetails,
 }
 
 impl RemoveDrgRouteDistributionStatementsRequest {
@@ -31,8 +32,9 @@ impl RemoveDrgRouteDistributionStatementsRequest {
         Self {
             drg_route_distribution_id: required.drg_route_distribution_id,
 
-            remove_drg_route_distribution_statements_details: required.remove_drg_route_distribution_statements_details,
-}
+            remove_drg_route_distribution_statements_details: required
+                .remove_drg_route_distribution_statements_details,
+        }
     }
 
     /// Set drg_route_distribution_id
@@ -42,10 +44,11 @@ impl RemoveDrgRouteDistributionStatementsRequest {
     }
 
     /// Set remove_drg_route_distribution_statements_details
-    pub fn set_remove_drg_route_distribution_statements_details(mut self, value: RemoveDrgRouteDistributionStatementsDetails) -> Self {
+    pub fn set_remove_drg_route_distribution_statements_details(
+        mut self,
+        value: RemoveDrgRouteDistributionStatementsDetails,
+    ) -> Self {
         self.remove_drg_route_distribution_statements_details = value;
         self
     }
 }
-
-

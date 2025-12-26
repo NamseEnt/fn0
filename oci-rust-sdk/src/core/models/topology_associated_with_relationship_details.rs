@@ -14,9 +14,7 @@ pub struct TopologyAssociatedWithRelationshipDetails {
 impl TopologyAssociatedWithRelationshipDetails {
     /// Create a new TopologyAssociatedWithRelationshipDetails
     pub fn new() -> Self {
-        Self {
-            via: None,
-        }
+        Self { via: None }
     }
 
     /// Set via
@@ -37,4 +35,3 @@ impl Default for TopologyAssociatedWithRelationshipDetails {
         Self::new()
     }
 }
-

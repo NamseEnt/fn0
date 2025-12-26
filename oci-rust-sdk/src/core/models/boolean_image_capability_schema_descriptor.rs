@@ -13,7 +13,6 @@ pub struct BooleanImageCapabilitySchemaDescriptor {
     pub default_value: Option<bool>,
 }
 
-
 /// Required fields for BooleanImageCapabilitySchemaDescriptor
 pub struct BooleanImageCapabilitySchemaDescriptorRequired {
     pub descriptor_type: String,
@@ -26,7 +25,7 @@ impl BooleanImageCapabilitySchemaDescriptor {
             descriptor_type: required.descriptor_type,
 
             default_value: None,
-}
+        }
     }
 
     /// Set default_value
@@ -47,5 +46,3 @@ impl BooleanImageCapabilitySchemaDescriptor {
         self
     }
 }
-
-

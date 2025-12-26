@@ -39,7 +39,6 @@ pub struct AmdMilanBmPlatformConfig {
     pub config_map: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for AmdMilanBmPlatformConfig
 pub struct AmdMilanBmPlatformConfigRequired {
     pub r#type: String,
@@ -64,11 +63,14 @@ impl AmdMilanBmPlatformConfig {
             percentage_of_cores_enabled: None,
 
             config_map: None,
-}
+        }
     }
 
     /// Set numa_nodes_per_socket
-    pub fn set_numa_nodes_per_socket(mut self, value: Option<AmdMilanBmPlatformConfigNumaNodesPerSocket>) -> Self {
+    pub fn set_numa_nodes_per_socket(
+        mut self,
+        value: Option<AmdMilanBmPlatformConfigNumaNodesPerSocket>,
+    ) -> Self {
         self.numa_nodes_per_socket = value;
         self
     }
@@ -92,7 +94,10 @@ impl AmdMilanBmPlatformConfig {
     }
 
     /// Set is_input_output_memory_management_unit_enabled
-    pub fn set_is_input_output_memory_management_unit_enabled(mut self, value: Option<bool>) -> Self {
+    pub fn set_is_input_output_memory_management_unit_enabled(
+        mut self,
+        value: Option<bool>,
+    ) -> Self {
         self.is_input_output_memory_management_unit_enabled = value;
         self
     }
@@ -116,7 +121,10 @@ impl AmdMilanBmPlatformConfig {
     }
 
     /// Set numa_nodes_per_socket (unwraps Option)
-    pub fn with_numa_nodes_per_socket(mut self, value: AmdMilanBmPlatformConfigNumaNodesPerSocket) -> Self {
+    pub fn with_numa_nodes_per_socket(
+        mut self,
+        value: AmdMilanBmPlatformConfigNumaNodesPerSocket,
+    ) -> Self {
         self.numa_nodes_per_socket = Some(value);
         self
     }
@@ -157,5 +165,3 @@ impl AmdMilanBmPlatformConfig {
         self
     }
 }
-
-

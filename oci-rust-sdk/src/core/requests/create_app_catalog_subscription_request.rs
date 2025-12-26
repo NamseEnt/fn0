@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,7 +16,6 @@ pub struct CreateAppCatalogSubscriptionRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateAppCatalogSubscriptionRequest
 pub struct CreateAppCatalogSubscriptionRequestRequired {
     /// Request for the creation of a subscription for listing resource version for a compartment.
@@ -27,14 +26,18 @@ impl CreateAppCatalogSubscriptionRequest {
     /// Create a new CreateAppCatalogSubscriptionRequest with required fields
     pub fn new(required: CreateAppCatalogSubscriptionRequestRequired) -> Self {
         Self {
-            create_app_catalog_subscription_details: required.create_app_catalog_subscription_details,
+            create_app_catalog_subscription_details: required
+                .create_app_catalog_subscription_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_app_catalog_subscription_details
-    pub fn set_create_app_catalog_subscription_details(mut self, value: CreateAppCatalogSubscriptionDetails) -> Self {
+    pub fn set_create_app_catalog_subscription_details(
+        mut self,
+        value: CreateAppCatalogSubscriptionDetails,
+    ) -> Self {
         self.create_app_catalog_subscription_details = value;
         self
     }
@@ -51,5 +54,3 @@ impl CreateAppCatalogSubscriptionRequest {
         self
     }
 }
-
-

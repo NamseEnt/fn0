@@ -1,0 +1,251 @@
+[
+  {
+    "methodName": "changeContainerInstanceCompartment",
+    "requestType": "ChangeContainerInstanceCompartmentRequest",
+    "responseType": "ChangeContainerInstanceCompartmentResponse",
+    "httpMethod": "POST",
+    "httpPath": "/containerInstances/{containerInstanceId}/actions/changeCompartment",
+    "pathParams": [
+      "containerInstanceId"
+    ],
+    "queryParams": [],
+    "bodyParam": "changeContainerInstanceCompartmentDetails"
+  },
+  {
+    "methodName": "createContainerInstance",
+    "requestType": "CreateContainerInstanceRequest",
+    "responseType": "CreateContainerInstanceResponse",
+    "httpMethod": "POST",
+    "httpPath": "/containerInstances",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyParam": "createContainerInstanceDetails",
+    "responseBodyKey": "containerInstance"
+  },
+  {
+    "methodName": "deleteContainerInstance",
+    "requestType": "DeleteContainerInstanceRequest",
+    "responseType": "DeleteContainerInstanceResponse",
+    "httpMethod": "DELETE",
+    "httpPath": "/containerInstances/{containerInstanceId}",
+    "pathParams": [
+      "containerInstanceId"
+    ],
+    "queryParams": []
+  },
+  {
+    "methodName": "getContainer",
+    "requestType": "GetContainerRequest",
+    "responseType": "GetContainerResponse",
+    "httpMethod": "GET",
+    "httpPath": "/containers/{containerId}",
+    "pathParams": [
+      "containerId"
+    ],
+    "queryParams": [],
+    "responseBodyKey": "container"
+  },
+  {
+    "methodName": "getContainerInstance",
+    "requestType": "GetContainerInstanceRequest",
+    "responseType": "GetContainerInstanceResponse",
+    "httpMethod": "GET",
+    "httpPath": "/containerInstances/{containerInstanceId}",
+    "pathParams": [
+      "containerInstanceId"
+    ],
+    "queryParams": [],
+    "responseBodyKey": "containerInstance"
+  },
+  {
+    "methodName": "getWorkRequest",
+    "requestType": "GetWorkRequestRequest",
+    "responseType": "GetWorkRequestResponse",
+    "httpMethod": "GET",
+    "httpPath": "/workRequests/{workRequestId}",
+    "pathParams": [
+      "workRequestId"
+    ],
+    "queryParams": [],
+    "responseBodyKey": "workRequest"
+  },
+  {
+    "methodName": "listContainerInstanceShapes",
+    "requestType": "ListContainerInstanceShapesRequest",
+    "responseType": "ListContainerInstanceShapesResponse",
+    "httpMethod": "GET",
+    "httpPath": "/containerInstanceShapes",
+    "pathParams": [],
+    "queryParams": [
+      "availabilityDomain",
+      "compartmentId",
+      "limit",
+      "page"
+    ],
+    "responseBodyKey": "containerInstanceShapeCollection"
+  },
+  {
+    "methodName": "listContainerInstances",
+    "requestType": "ListContainerInstancesRequest",
+    "responseType": "ListContainerInstancesResponse",
+    "httpMethod": "GET",
+    "httpPath": "/containerInstances",
+    "pathParams": [],
+    "queryParams": [
+      "compartmentId",
+      "lifecycleState",
+      "displayName",
+      "availabilityDomain",
+      "limit",
+      "page",
+      "sortOrder",
+      "sortBy"
+    ],
+    "responseBodyKey": "containerInstanceCollection"
+  },
+  {
+    "methodName": "listContainers",
+    "requestType": "ListContainersRequest",
+    "responseType": "ListContainersResponse",
+    "httpMethod": "GET",
+    "httpPath": "/containers",
+    "pathParams": [],
+    "queryParams": [
+      "compartmentId",
+      "lifecycleState",
+      "displayName",
+      "containerInstanceId",
+      "availabilityDomain",
+      "limit",
+      "page",
+      "sortOrder",
+      "sortBy"
+    ],
+    "responseBodyKey": "containerCollection"
+  },
+  {
+    "methodName": "listWorkRequestErrors",
+    "requestType": "ListWorkRequestErrorsRequest",
+    "responseType": "ListWorkRequestErrorsResponse",
+    "httpMethod": "GET",
+    "httpPath": "/workRequests/{workRequestId}/errors",
+    "pathParams": [
+      "workRequestId"
+    ],
+    "queryParams": [
+      "page",
+      "limit",
+      "sortBy",
+      "sortOrder"
+    ],
+    "responseBodyKey": "workRequestErrorCollection"
+  },
+  {
+    "methodName": "listWorkRequestLogs",
+    "requestType": "ListWorkRequestLogsRequest",
+    "responseType": "ListWorkRequestLogsResponse",
+    "httpMethod": "GET",
+    "httpPath": "/workRequests/{workRequestId}/logs",
+    "pathParams": [
+      "workRequestId"
+    ],
+    "queryParams": [
+      "page",
+      "limit",
+      "sortBy",
+      "sortOrder"
+    ],
+    "responseBodyKey": "workRequestLogEntryCollection"
+  },
+  {
+    "methodName": "listWorkRequests",
+    "requestType": "ListWorkRequestsRequest",
+    "responseType": "ListWorkRequestsResponse",
+    "httpMethod": "GET",
+    "httpPath": "/workRequests",
+    "pathParams": [],
+    "queryParams": [
+      "compartmentId",
+      "workRequestId",
+      "page",
+      "limit",
+      "availabilityDomain",
+      "status",
+      "sortBy",
+      "sortOrder",
+      "resourceId"
+    ],
+    "responseBodyKey": "workRequestSummaryCollection"
+  },
+  {
+    "methodName": "restartContainerInstance",
+    "requestType": "RestartContainerInstanceRequest",
+    "responseType": "RestartContainerInstanceResponse",
+    "httpMethod": "POST",
+    "httpPath": "/containerInstances/{containerInstanceId}/actions/restart",
+    "pathParams": [
+      "containerInstanceId"
+    ],
+    "queryParams": []
+  },
+  {
+    "methodName": "retrieveLogs",
+    "requestType": "RetrieveLogsRequest",
+    "responseType": "RetrieveLogsResponse",
+    "httpMethod": "POST",
+    "httpPath": "/containers/{containerId}/actions/retrieveLogs",
+    "pathParams": [
+      "containerId"
+    ],
+    "queryParams": [
+      "isPrevious"
+    ],
+    "responseBodyKey": "value"
+  },
+  {
+    "methodName": "startContainerInstance",
+    "requestType": "StartContainerInstanceRequest",
+    "responseType": "StartContainerInstanceResponse",
+    "httpMethod": "POST",
+    "httpPath": "/containerInstances/{containerInstanceId}/actions/start",
+    "pathParams": [
+      "containerInstanceId"
+    ],
+    "queryParams": []
+  },
+  {
+    "methodName": "stopContainerInstance",
+    "requestType": "StopContainerInstanceRequest",
+    "responseType": "StopContainerInstanceResponse",
+    "httpMethod": "POST",
+    "httpPath": "/containerInstances/{containerInstanceId}/actions/stop",
+    "pathParams": [
+      "containerInstanceId"
+    ],
+    "queryParams": []
+  },
+  {
+    "methodName": "updateContainer",
+    "requestType": "UpdateContainerRequest",
+    "responseType": "UpdateContainerResponse",
+    "httpMethod": "PUT",
+    "httpPath": "/containers/{containerId}",
+    "pathParams": [
+      "containerId"
+    ],
+    "queryParams": [],
+    "bodyParam": "updateContainerDetails"
+  },
+  {
+    "methodName": "updateContainerInstance",
+    "requestType": "UpdateContainerInstanceRequest",
+    "responseType": "UpdateContainerInstanceResponse",
+    "httpMethod": "PUT",
+    "httpPath": "/containerInstances/{containerInstanceId}",
+    "pathParams": [
+      "containerInstanceId"
+    ],
+    "queryParams": [],
+    "bodyParam": "updateContainerInstanceDetails"
+  }
+]

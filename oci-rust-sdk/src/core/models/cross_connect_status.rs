@@ -30,7 +30,6 @@ pub struct CrossConnectStatus {
     pub light_levels_in_dbm: Option<Vec<i64>>,
 }
 
-
 /// Required fields for CrossConnectStatus
 pub struct CrossConnectStatusRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the cross-connect.
@@ -52,7 +51,7 @@ impl CrossConnectStatus {
             encryption_status: None,
 
             light_levels_in_dbm: None,
-}
+        }
     }
 
     /// Set cross_connect_id
@@ -74,13 +73,19 @@ impl CrossConnectStatus {
     }
 
     /// Set light_level_indicator
-    pub fn set_light_level_indicator(mut self, value: Option<CrossConnectStatusLightLevelIndicator>) -> Self {
+    pub fn set_light_level_indicator(
+        mut self,
+        value: Option<CrossConnectStatusLightLevelIndicator>,
+    ) -> Self {
         self.light_level_indicator = value;
         self
     }
 
     /// Set encryption_status
-    pub fn set_encryption_status(mut self, value: Option<CrossConnectStatusEncryptionStatus>) -> Self {
+    pub fn set_encryption_status(
+        mut self,
+        value: Option<CrossConnectStatusEncryptionStatus>,
+    ) -> Self {
         self.encryption_status = value;
         self
     }
@@ -104,7 +109,10 @@ impl CrossConnectStatus {
     }
 
     /// Set light_level_indicator (unwraps Option)
-    pub fn with_light_level_indicator(mut self, value: CrossConnectStatusLightLevelIndicator) -> Self {
+    pub fn with_light_level_indicator(
+        mut self,
+        value: CrossConnectStatusLightLevelIndicator,
+    ) -> Self {
         self.light_level_indicator = Some(value);
         self
     }
@@ -121,5 +129,3 @@ impl CrossConnectStatus {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,7 +60,6 @@ pub struct ListComputeGpuMemoryFabricsRequest {
     pub sort_order: Option<ListComputeGpuMemoryFabricsRequestSortOrder>,
 }
 
-
 /// Required fields for ListComputeGpuMemoryFabricsRequest
 pub struct ListComputeGpuMemoryFabricsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -96,7 +95,7 @@ impl ListComputeGpuMemoryFabricsRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -172,7 +171,10 @@ impl ListComputeGpuMemoryFabricsRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeGpuMemoryFabricsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeGpuMemoryFabricsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -214,7 +216,10 @@ impl ListComputeGpuMemoryFabricsRequest {
     }
 
     /// Set compute_gpu_memory_fabric_lifecycle_state (unwraps Option)
-    pub fn with_compute_gpu_memory_fabric_lifecycle_state(mut self, value: impl Into<String>) -> Self {
+    pub fn with_compute_gpu_memory_fabric_lifecycle_state(
+        mut self,
+        value: impl Into<String>,
+    ) -> Self {
         self.compute_gpu_memory_fabric_lifecycle_state = Some(value.into());
         self
     }
@@ -249,5 +254,3 @@ impl ListComputeGpuMemoryFabricsRequest {
         self
     }
 }
-
-

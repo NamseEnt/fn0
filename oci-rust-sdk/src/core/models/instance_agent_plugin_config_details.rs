@@ -13,7 +13,6 @@ pub struct InstanceAgentPluginConfigDetails {
     pub desired_state: InstanceAgentPluginConfigDetailsDesiredState,
 }
 
-
 /// Required fields for InstanceAgentPluginConfigDetails
 pub struct InstanceAgentPluginConfigDetailsRequired {
     /// The plugin name. To get a list of available plugins, use the {@link #listInstanceagentAvailablePlugins(ListInstanceagentAvailablePluginsRequest) listInstanceagentAvailablePlugins} operation in the Oracle Cloud Agent API. For more information about the available plugins, see [Managing Plugins with Oracle Cloud Agent](https://docs.oracle.com/iaas/Content/Compute/Tasks/manage-plugins.htm).
@@ -30,7 +29,7 @@ impl InstanceAgentPluginConfigDetails {
             name: required.name,
 
             desired_state: required.desired_state,
-}
+        }
     }
 
     /// Set name
@@ -40,10 +39,11 @@ impl InstanceAgentPluginConfigDetails {
     }
 
     /// Set desired_state
-    pub fn set_desired_state(mut self, value: InstanceAgentPluginConfigDetailsDesiredState) -> Self {
+    pub fn set_desired_state(
+        mut self,
+        value: InstanceAgentPluginConfigDetailsDesiredState,
+    ) -> Self {
         self.desired_state = value;
         self
     }
 }
-
-

@@ -30,13 +30,19 @@ impl InstanceConfigurationBlockVolumeDetails {
     }
 
     /// Set attach_details
-    pub fn set_attach_details(mut self, value: Option<InstanceConfigurationIscsiAttachVolumeDetails>) -> Self {
+    pub fn set_attach_details(
+        mut self,
+        value: Option<InstanceConfigurationIscsiAttachVolumeDetails>,
+    ) -> Self {
         self.attach_details = value;
         self
     }
 
     /// Set create_details
-    pub fn set_create_details(mut self, value: Option<InstanceConfigurationCreateVolumeDetails>) -> Self {
+    pub fn set_create_details(
+        mut self,
+        value: Option<InstanceConfigurationCreateVolumeDetails>,
+    ) -> Self {
         self.create_details = value;
         self
     }
@@ -48,7 +54,10 @@ impl InstanceConfigurationBlockVolumeDetails {
     }
 
     /// Set attach_details (unwraps Option)
-    pub fn with_attach_details(mut self, value: InstanceConfigurationIscsiAttachVolumeDetails) -> Self {
+    pub fn with_attach_details(
+        mut self,
+        value: InstanceConfigurationIscsiAttachVolumeDetails,
+    ) -> Self {
         self.attach_details = Some(value);
         self
     }
@@ -71,4 +80,3 @@ impl Default for InstanceConfigurationBlockVolumeDetails {
         Self::new()
     }
 }
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct ListComputeGpuMemoryClustersResponse {
     /// The returned model.ComputeGpuMemoryClusterCollection instance.
     pub compute_gpu_memory_cluster_collection: ComputeGpuMemoryClusterCollection,
 }
-
 
 /// Required fields for ListComputeGpuMemoryClustersResponse
 pub struct ListComputeGpuMemoryClustersResponseRequired {
@@ -48,7 +47,7 @@ impl ListComputeGpuMemoryClustersResponse {
             opc_request_id: required.opc_request_id,
 
             compute_gpu_memory_cluster_collection: required.compute_gpu_memory_cluster_collection,
-}
+        }
     }
 
     /// Set etag
@@ -70,10 +69,11 @@ impl ListComputeGpuMemoryClustersResponse {
     }
 
     /// Set compute_gpu_memory_cluster_collection
-    pub fn set_compute_gpu_memory_cluster_collection(mut self, value: ComputeGpuMemoryClusterCollection) -> Self {
+    pub fn set_compute_gpu_memory_cluster_collection(
+        mut self,
+        value: ComputeGpuMemoryClusterCollection,
+    ) -> Self {
         self.compute_gpu_memory_cluster_collection = value;
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct ListDedicatedVmHostShapesRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for ListDedicatedVmHostShapesRequest
 pub struct ListDedicatedVmHostShapesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -54,7 +53,7 @@ impl ListDedicatedVmHostShapesRequest {
             page: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -123,5 +122,3 @@ impl ListDedicatedVmHostShapesRequest {
         self
     }
 }
-
-

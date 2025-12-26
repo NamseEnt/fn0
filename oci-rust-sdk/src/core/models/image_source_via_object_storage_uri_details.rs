@@ -12,7 +12,6 @@ pub struct ImageSourceViaObjectStorageUriDetails {
     pub source_type: String,
 }
 
-
 /// Required fields for ImageSourceViaObjectStorageUriDetails
 pub struct ImageSourceViaObjectStorageUriDetailsRequired {
     /// The Object Storage URL for the image.
@@ -28,7 +27,7 @@ impl ImageSourceViaObjectStorageUriDetails {
             source_uri: required.source_uri,
 
             source_type: required.source_type,
-}
+        }
     }
 
     /// Set source_uri
@@ -43,5 +42,3 @@ impl ImageSourceViaObjectStorageUriDetails {
         self
     }
 }
-
-

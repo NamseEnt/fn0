@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateIpv6Request {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateIpv6Request
 pub struct CreateIpv6RequestRequired {
     /// Create IPv6 details.
@@ -36,7 +35,7 @@ impl CreateIpv6Request {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_ipv6_details
@@ -69,5 +68,3 @@ impl CreateIpv6Request {
         self
     }
 }
-
-

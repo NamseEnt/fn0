@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeImageCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeImageCompartmentRequest
 pub struct ChangeImageCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the image.
@@ -50,7 +49,7 @@ impl ChangeImageCompartmentRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set image_id
@@ -60,7 +59,10 @@ impl ChangeImageCompartmentRequest {
     }
 
     /// Set change_image_compartment_details
-    pub fn set_change_image_compartment_details(mut self, value: ChangeImageCompartmentDetails) -> Self {
+    pub fn set_change_image_compartment_details(
+        mut self,
+        value: ChangeImageCompartmentDetails,
+    ) -> Self {
         self.change_image_compartment_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl ChangeImageCompartmentRequest {
         self
     }
 }
-
-

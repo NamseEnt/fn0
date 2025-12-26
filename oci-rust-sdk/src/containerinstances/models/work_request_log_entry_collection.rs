@@ -10,7 +10,6 @@ pub struct WorkRequestLogEntryCollection {
     pub items: Vec<WorkRequestLogEntry>,
 }
 
-
 /// Required fields for WorkRequestLogEntryCollection
 pub struct WorkRequestLogEntryCollectionRequired {
     /// List of workRequestLogEntries.
@@ -22,7 +21,7 @@ impl WorkRequestLogEntryCollection {
     pub fn new(required: WorkRequestLogEntryCollectionRequired) -> Self {
         Self {
             items: required.items,
-}
+        }
     }
 
     /// Set items
@@ -31,5 +30,3 @@ impl WorkRequestLogEntryCollection {
         self
     }
 }
-
-

@@ -31,7 +31,6 @@ pub struct CreateClusterNetworkDetails {
     pub cluster_configuration: Option<ClusterConfigurationDetails>,
 }
 
-
 /// Required fields for CreateClusterNetworkDetails
 pub struct CreateClusterNetworkDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the cluster network.
@@ -60,7 +59,7 @@ impl CreateClusterNetworkDetails {
             freeform_tags: None,
 
             cluster_configuration: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -70,7 +69,10 @@ impl CreateClusterNetworkDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -88,13 +90,19 @@ impl CreateClusterNetworkDetails {
     }
 
     /// Set instance_pools
-    pub fn set_instance_pools(mut self, value: Vec<CreateClusterNetworkInstancePoolDetails>) -> Self {
+    pub fn set_instance_pools(
+        mut self,
+        value: Vec<CreateClusterNetworkInstancePoolDetails>,
+    ) -> Self {
         self.instance_pools = value;
         self
     }
 
     /// Set placement_configuration
-    pub fn set_placement_configuration(mut self, value: ClusterNetworkPlacementConfigurationDetails) -> Self {
+    pub fn set_placement_configuration(
+        mut self,
+        value: ClusterNetworkPlacementConfigurationDetails,
+    ) -> Self {
         self.placement_configuration = value;
         self
     }
@@ -106,7 +114,10 @@ impl CreateClusterNetworkDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -129,5 +140,3 @@ impl CreateClusterNetworkDetails {
         self
     }
 }
-
-

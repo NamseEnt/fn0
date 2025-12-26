@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -56,7 +56,6 @@ pub struct IPSecConnection {
     pub transport_type: Option<IPSecConnectionTransportType>,
 }
 
-
 /// Required fields for IPSecConnection
 pub struct IPSecConnectionRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the IPSec connection.
@@ -104,7 +103,7 @@ impl IPSecConnection {
             time_created: None,
 
             transport_type: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -120,7 +119,10 @@ impl IPSecConnection {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -162,7 +164,10 @@ impl IPSecConnection {
     }
 
     /// Set cpe_local_identifier_type
-    pub fn set_cpe_local_identifier_type(mut self, value: Option<IPSecConnectionCpeLocalIdentifierType>) -> Self {
+    pub fn set_cpe_local_identifier_type(
+        mut self,
+        value: Option<IPSecConnectionCpeLocalIdentifierType>,
+    ) -> Self {
         self.cpe_local_identifier_type = value;
         self
     }
@@ -186,7 +191,10 @@ impl IPSecConnection {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -210,7 +218,10 @@ impl IPSecConnection {
     }
 
     /// Set cpe_local_identifier_type (unwraps Option)
-    pub fn with_cpe_local_identifier_type(mut self, value: IPSecConnectionCpeLocalIdentifierType) -> Self {
+    pub fn with_cpe_local_identifier_type(
+        mut self,
+        value: IPSecConnectionCpeLocalIdentifierType,
+    ) -> Self {
         self.cpe_local_identifier_type = Some(value);
         self
     }
@@ -233,5 +244,3 @@ impl IPSecConnection {
         self
     }
 }
-
-

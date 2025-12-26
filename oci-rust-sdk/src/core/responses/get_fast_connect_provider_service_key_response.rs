@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetFastConnectProviderServiceKeyResponse {
     /// The returned model.FastConnectProviderServiceKey instance.
     pub fast_connect_provider_service_key: FastConnectProviderServiceKey,
 }
-
 
 /// Required fields for GetFastConnectProviderServiceKeyResponse
 pub struct GetFastConnectProviderServiceKeyResponseRequired {
@@ -32,7 +31,7 @@ impl GetFastConnectProviderServiceKeyResponse {
             opc_request_id: required.opc_request_id,
 
             fast_connect_provider_service_key: required.fast_connect_provider_service_key,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -42,10 +41,11 @@ impl GetFastConnectProviderServiceKeyResponse {
     }
 
     /// Set fast_connect_provider_service_key
-    pub fn set_fast_connect_provider_service_key(mut self, value: FastConnectProviderServiceKey) -> Self {
+    pub fn set_fast_connect_provider_service_key(
+        mut self,
+        value: FastConnectProviderServiceKey,
+    ) -> Self {
         self.fast_connect_provider_service_key = value;
         self
     }
 }
-
-

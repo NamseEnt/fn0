@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,7 +44,6 @@ pub struct ListCaptureFiltersRequest {
     pub filter_type: Option<String>,
 }
 
-
 /// Required fields for ListCaptureFiltersRequest
 pub struct ListCaptureFiltersRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -72,7 +71,7 @@ impl ListCaptureFiltersRequest {
             lifecycle_state: None,
 
             filter_type: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -177,5 +176,3 @@ impl ListCaptureFiltersRequest {
         self
     }
 }
-
-

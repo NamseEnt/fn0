@@ -10,7 +10,6 @@ pub struct ChangeRemotePeeringConnectionCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeRemotePeeringConnectionCompartmentDetails
 pub struct ChangeRemotePeeringConnectionCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the remote peering connection to.
@@ -22,7 +21,7 @@ impl ChangeRemotePeeringConnectionCompartmentDetails {
     pub fn new(required: ChangeRemotePeeringConnectionCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeRemotePeeringConnectionCompartmentDetails {
         self
     }
 }
-
-

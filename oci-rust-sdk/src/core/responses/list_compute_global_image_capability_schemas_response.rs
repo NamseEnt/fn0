@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeGlobalImageCapabilitySchemasResponse {
     /// A list of ComputeGlobalImageCapabilitySchemaSummary instances.
     pub items: Vec<ComputeGlobalImageCapabilitySchemaSummary>,
 }
-
 
 /// Required fields for ListComputeGlobalImageCapabilitySchemasResponse
 pub struct ListComputeGlobalImageCapabilitySchemasResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeGlobalImageCapabilitySchemasResponse {
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListComputeGlobalImageCapabilitySchemasResponse {
         self
     }
 }
-
-

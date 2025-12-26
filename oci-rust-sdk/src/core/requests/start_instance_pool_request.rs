@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct StartInstancePoolRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for StartInstancePoolRequest
 pub struct StartInstancePoolRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance pool.
@@ -36,7 +35,7 @@ impl StartInstancePoolRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set instance_pool_id
@@ -69,5 +68,3 @@ impl StartInstancePoolRequest {
         self
     }
 }
-
-

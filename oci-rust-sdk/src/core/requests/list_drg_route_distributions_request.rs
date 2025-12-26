@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,7 +36,6 @@ pub struct ListDrgRouteDistributionsRequest {
     pub lifecycle_state: Option<String>,
 }
 
-
 /// Required fields for ListDrgRouteDistributionsRequest
 pub struct ListDrgRouteDistributionsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG.
@@ -60,7 +59,7 @@ impl ListDrgRouteDistributionsRequest {
             sort_order: None,
 
             lifecycle_state: None,
-}
+        }
     }
 
     /// Set drg_id
@@ -94,7 +93,10 @@ impl ListDrgRouteDistributionsRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListDrgRouteDistributionsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListDrgRouteDistributionsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -141,5 +143,3 @@ impl ListDrgRouteDistributionsRequest {
         self
     }
 }
-
-

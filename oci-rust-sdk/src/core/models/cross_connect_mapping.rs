@@ -104,7 +104,10 @@ impl CrossConnectMapping {
     }
 
     /// Set cross_connect_or_cross_connect_group_id (unwraps Option)
-    pub fn with_cross_connect_or_cross_connect_group_id(mut self, value: impl Into<String>) -> Self {
+    pub fn with_cross_connect_or_cross_connect_group_id(
+        mut self,
+        value: impl Into<String>,
+    ) -> Self {
         self.cross_connect_or_cross_connect_group_id = Some(value.into());
         self
     }
@@ -145,4 +148,3 @@ impl Default for CrossConnectMapping {
         Self::new()
     }
 }
-

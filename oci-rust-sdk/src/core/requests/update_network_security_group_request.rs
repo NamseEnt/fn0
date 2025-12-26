@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateNetworkSecurityGroupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateNetworkSecurityGroupRequest
 pub struct UpdateNetworkSecurityGroupRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateNetworkSecurityGroupRequest {
             update_network_security_group_details: required.update_network_security_group_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set network_security_group_id
@@ -48,7 +47,10 @@ impl UpdateNetworkSecurityGroupRequest {
     }
 
     /// Set update_network_security_group_details
-    pub fn set_update_network_security_group_details(mut self, value: UpdateNetworkSecurityGroupDetails) -> Self {
+    pub fn set_update_network_security_group_details(
+        mut self,
+        value: UpdateNetworkSecurityGroupDetails,
+    ) -> Self {
         self.update_network_security_group_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateNetworkSecurityGroupRequest {
         self
     }
 }
-
-

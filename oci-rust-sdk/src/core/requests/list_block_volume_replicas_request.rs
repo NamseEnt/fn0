@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,7 +112,10 @@ impl ListBlockVolumeReplicasRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListBlockVolumeReplicasRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListBlockVolumeReplicasRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -183,4 +186,3 @@ impl Default for ListBlockVolumeReplicasRequest {
         Self::new()
     }
 }
-

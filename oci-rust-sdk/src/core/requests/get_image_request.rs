@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetImageRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the image.
     pub image_id: String,
 }
-
 
 /// Required fields for GetImageRequest
 pub struct GetImageRequestRequired {
@@ -24,7 +23,7 @@ impl GetImageRequest {
     pub fn new(required: GetImageRequestRequired) -> Self {
         Self {
             image_id: required.image_id,
-}
+        }
     }
 
     /// Set image_id
@@ -33,5 +32,3 @@ impl GetImageRequest {
         self
     }
 }
-
-

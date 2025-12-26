@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateInternetGatewayResponse {
     /// The returned model.InternetGateway instance.
     pub internet_gateway: InternetGateway,
 }
-
 
 /// Required fields for CreateInternetGatewayResponse
 pub struct CreateInternetGatewayResponseRequired {
@@ -40,7 +39,7 @@ impl CreateInternetGatewayResponse {
             opc_request_id: required.opc_request_id,
 
             internet_gateway: required.internet_gateway,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateInternetGatewayResponse {
         self
     }
 }
-
-

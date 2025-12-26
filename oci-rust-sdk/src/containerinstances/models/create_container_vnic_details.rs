@@ -43,7 +43,6 @@ pub struct CreateContainerVnicDetails {
     pub defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
 }
 
-
 /// Required fields for CreateContainerVnicDetails
 pub struct CreateContainerVnicDetailsRequired {
     /// The OCID of the subnet to create the VNIC in.
@@ -71,7 +70,7 @@ impl CreateContainerVnicDetails {
             freeform_tags: None,
 
             defined_tags: None,
-}
+        }
     }
 
     /// Set display_name
@@ -123,7 +122,10 @@ impl CreateContainerVnicDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -171,10 +173,11 @@ impl CreateContainerVnicDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
 }
-
-

@@ -12,7 +12,7 @@ pub struct CreateContainerResourceConfigDetails {
 
     /// The maximum amount of memory that can be consumed by the container's process. <p> If you do not set a value, then the process may use all available memory on the instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_limit_in_g_bs: Option<i64>,
+    pub memory_limit_in_gbs: Option<i64>,
 }
 
 impl CreateContainerResourceConfigDetails {
@@ -21,7 +21,7 @@ impl CreateContainerResourceConfigDetails {
         Self {
             vcpus_limit: None,
 
-            memory_limit_in_g_bs: None,
+            memory_limit_in_gbs: None,
         }
     }
 
@@ -31,9 +31,9 @@ impl CreateContainerResourceConfigDetails {
         self
     }
 
-    /// Set memory_limit_in_g_bs
-    pub fn set_memory_limit_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.memory_limit_in_g_bs = value;
+    /// Set memory_limit_in_gbs
+    pub fn set_memory_limit_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.memory_limit_in_gbs = value;
         self
     }
 
@@ -43,9 +43,9 @@ impl CreateContainerResourceConfigDetails {
         self
     }
 
-    /// Set memory_limit_in_g_bs (unwraps Option)
-    pub fn with_memory_limit_in_g_bs(mut self, value: i64) -> Self {
-        self.memory_limit_in_g_bs = Some(value);
+    /// Set memory_limit_in_gbs (unwraps Option)
+    pub fn with_memory_limit_in_gbs(mut self, value: i64) -> Self {
+        self.memory_limit_in_gbs = Some(value);
         self
     }
 }
@@ -55,4 +55,3 @@ impl Default for CreateContainerResourceConfigDetails {
         Self::new()
     }
 }
-

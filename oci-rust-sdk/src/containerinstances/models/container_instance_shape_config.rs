@@ -10,7 +10,6 @@ pub struct ContainerInstanceShapeConfig {
     pub ocpus: i64,
 
     /// The total amount of memory available to the container instance, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    #[serde(rename = "memoryInGBs")]
     pub memory_in_gbs: i64,
 
     /// A short description of the container instance's processor (CPU).
@@ -19,7 +18,6 @@ pub struct ContainerInstanceShapeConfig {
     /// The networking bandwidth available to the container instance, in gigabits per second. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     pub networking_bandwidth_in_gbps: i64,
 }
-
 
 /// Required fields for ContainerInstanceShapeConfig
 pub struct ContainerInstanceShapeConfigRequired {
@@ -47,7 +45,7 @@ impl ContainerInstanceShapeConfig {
             processor_description: required.processor_description,
 
             networking_bandwidth_in_gbps: required.networking_bandwidth_in_gbps,
-}
+        }
     }
 
     /// Set ocpus
@@ -74,5 +72,3 @@ impl ContainerInstanceShapeConfig {
         self
     }
 }
-
-

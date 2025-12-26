@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct ListFastConnectProviderVirtualCircuitBandwidthShapesRequest {
     pub page: Option<String>,
 }
 
-
 /// Required fields for ListFastConnectProviderVirtualCircuitBandwidthShapesRequest
 pub struct ListFastConnectProviderVirtualCircuitBandwidthShapesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the provider service.
@@ -29,14 +28,16 @@ pub struct ListFastConnectProviderVirtualCircuitBandwidthShapesRequestRequired {
 
 impl ListFastConnectProviderVirtualCircuitBandwidthShapesRequest {
     /// Create a new ListFastConnectProviderVirtualCircuitBandwidthShapesRequest with required fields
-    pub fn new(required: ListFastConnectProviderVirtualCircuitBandwidthShapesRequestRequired) -> Self {
+    pub fn new(
+        required: ListFastConnectProviderVirtualCircuitBandwidthShapesRequestRequired,
+    ) -> Self {
         Self {
             provider_service_id: required.provider_service_id,
 
             limit: None,
 
             page: None,
-}
+        }
     }
 
     /// Set provider_service_id
@@ -69,5 +70,3 @@ impl ListFastConnectProviderVirtualCircuitBandwidthShapesRequest {
         self
     }
 }
-
-

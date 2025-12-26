@@ -32,7 +32,10 @@ impl UpdateInstanceAvailabilityConfigDetails {
     }
 
     /// Set recovery_action
-    pub fn set_recovery_action(mut self, value: Option<UpdateInstanceAvailabilityConfigDetailsRecoveryAction>) -> Self {
+    pub fn set_recovery_action(
+        mut self,
+        value: Option<UpdateInstanceAvailabilityConfigDetailsRecoveryAction>,
+    ) -> Self {
         self.recovery_action = value;
         self
     }
@@ -44,7 +47,10 @@ impl UpdateInstanceAvailabilityConfigDetails {
     }
 
     /// Set recovery_action (unwraps Option)
-    pub fn with_recovery_action(mut self, value: UpdateInstanceAvailabilityConfigDetailsRecoveryAction) -> Self {
+    pub fn with_recovery_action(
+        mut self,
+        value: UpdateInstanceAvailabilityConfigDetailsRecoveryAction,
+    ) -> Self {
         self.recovery_action = Some(value);
         self
     }
@@ -55,4 +61,3 @@ impl Default for UpdateInstanceAvailabilityConfigDetails {
         Self::new()
     }
 }
-

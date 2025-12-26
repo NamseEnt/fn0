@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,7 +48,6 @@ pub struct ListInstancesRequest {
     pub lifecycle_state: Option<String>,
 }
 
-
 /// Required fields for ListInstancesRequest
 pub struct ListInstancesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -78,7 +77,7 @@ impl ListInstancesRequest {
             sort_order: None,
 
             lifecycle_state: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -195,5 +194,3 @@ impl ListInstancesRequest {
         self
     }
 }
-
-

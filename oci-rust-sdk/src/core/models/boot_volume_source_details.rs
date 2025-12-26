@@ -10,7 +10,6 @@ pub struct BootVolumeSourceDetails {
     pub r#type: String,
 }
 
-
 /// Required fields for BootVolumeSourceDetails
 pub struct BootVolumeSourceDetailsRequired {
     pub r#type: String,
@@ -21,7 +20,7 @@ impl BootVolumeSourceDetails {
     pub fn new(required: BootVolumeSourceDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set r#type
@@ -30,5 +29,3 @@ impl BootVolumeSourceDetails {
         self
     }
 }
-
-

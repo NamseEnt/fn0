@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetVolumeGroupRequest {
     /// The Oracle Cloud ID (OCID) that uniquely identifies the volume group.
     pub volume_group_id: String,
 }
-
 
 /// Required fields for GetVolumeGroupRequest
 pub struct GetVolumeGroupRequestRequired {
@@ -24,7 +23,7 @@ impl GetVolumeGroupRequest {
     pub fn new(required: GetVolumeGroupRequestRequired) -> Self {
         Self {
             volume_group_id: required.volume_group_id,
-}
+        }
     }
 
     /// Set volume_group_id
@@ -33,5 +32,3 @@ impl GetVolumeGroupRequest {
         self
     }
 }
-
-

@@ -68,7 +68,10 @@ impl LaunchInstanceShapeConfigDetails {
     }
 
     /// Set baseline_ocpu_utilization
-    pub fn set_baseline_ocpu_utilization(mut self, value: Option<LaunchInstanceShapeConfigDetailsBaselineOcpuUtilization>) -> Self {
+    pub fn set_baseline_ocpu_utilization(
+        mut self,
+        value: Option<LaunchInstanceShapeConfigDetailsBaselineOcpuUtilization>,
+    ) -> Self {
         self.baseline_ocpu_utilization = value;
         self
     }
@@ -80,7 +83,10 @@ impl LaunchInstanceShapeConfigDetails {
     }
 
     /// Set resource_management
-    pub fn set_resource_management(mut self, value: Option<LaunchInstanceShapeConfigDetailsResourceManagement>) -> Self {
+    pub fn set_resource_management(
+        mut self,
+        value: Option<LaunchInstanceShapeConfigDetailsResourceManagement>,
+    ) -> Self {
         self.resource_management = value;
         self
     }
@@ -104,7 +110,10 @@ impl LaunchInstanceShapeConfigDetails {
     }
 
     /// Set baseline_ocpu_utilization (unwraps Option)
-    pub fn with_baseline_ocpu_utilization(mut self, value: LaunchInstanceShapeConfigDetailsBaselineOcpuUtilization) -> Self {
+    pub fn with_baseline_ocpu_utilization(
+        mut self,
+        value: LaunchInstanceShapeConfigDetailsBaselineOcpuUtilization,
+    ) -> Self {
         self.baseline_ocpu_utilization = Some(value);
         self
     }
@@ -116,7 +125,10 @@ impl LaunchInstanceShapeConfigDetails {
     }
 
     /// Set resource_management (unwraps Option)
-    pub fn with_resource_management(mut self, value: LaunchInstanceShapeConfigDetailsResourceManagement) -> Self {
+    pub fn with_resource_management(
+        mut self,
+        value: LaunchInstanceShapeConfigDetailsResourceManagement,
+    ) -> Self {
         self.resource_management = Some(value);
         self
     }
@@ -127,4 +139,3 @@ impl Default for LaunchInstanceShapeConfigDetails {
         Self::new()
     }
 }
-

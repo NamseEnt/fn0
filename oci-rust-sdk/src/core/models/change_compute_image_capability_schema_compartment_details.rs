@@ -10,7 +10,6 @@ pub struct ChangeComputeImageCapabilitySchemaCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeComputeImageCapabilitySchemaCompartmentDetails
 pub struct ChangeComputeImageCapabilitySchemaCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the instance configuration to.
@@ -22,7 +21,7 @@ impl ChangeComputeImageCapabilitySchemaCompartmentDetails {
     pub fn new(required: ChangeComputeImageCapabilitySchemaCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeComputeImageCapabilitySchemaCompartmentDetails {
         self
     }
 }
-
-

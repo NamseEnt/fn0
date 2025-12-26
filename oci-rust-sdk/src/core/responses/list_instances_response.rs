@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListInstancesResponse {
     /// A list of Instance instances.
     pub items: Vec<Instance>,
 }
-
 
 /// Required fields for ListInstancesResponse
 pub struct ListInstancesResponseRequired {
@@ -65,5 +64,3 @@ impl ListInstancesResponse {
         self
     }
 }
-
-

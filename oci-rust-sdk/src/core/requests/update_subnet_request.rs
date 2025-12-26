@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateSubnetRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateSubnetRequest
 pub struct UpdateSubnetRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateSubnetRequest {
             update_subnet_details: required.update_subnet_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set subnet_id
@@ -65,5 +64,3 @@ impl UpdateSubnetRequest {
         self
     }
 }
-
-

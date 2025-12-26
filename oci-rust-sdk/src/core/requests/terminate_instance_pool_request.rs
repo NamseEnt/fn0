@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct TerminateInstancePoolRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for TerminateInstancePoolRequest
 pub struct TerminateInstancePoolRequestRequired {
@@ -30,7 +29,7 @@ impl TerminateInstancePoolRequest {
             instance_pool_id: required.instance_pool_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set instance_pool_id
@@ -51,5 +50,3 @@ impl TerminateInstancePoolRequest {
         self
     }
 }
-
-

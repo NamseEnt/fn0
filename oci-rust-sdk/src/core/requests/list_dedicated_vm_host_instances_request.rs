@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,7 +43,6 @@ pub struct ListDedicatedVmHostInstancesRequest {
     pub sort_order: Option<ListDedicatedVmHostInstancesRequestSortOrder>,
 }
 
-
 /// Required fields for ListDedicatedVmHostInstancesRequest
 pub struct ListDedicatedVmHostInstancesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -74,7 +73,7 @@ impl ListDedicatedVmHostInstancesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -126,7 +125,10 @@ impl ListDedicatedVmHostInstancesRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListDedicatedVmHostInstancesRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListDedicatedVmHostInstancesRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -173,5 +175,3 @@ impl ListDedicatedVmHostInstancesRequest {
         self
     }
 }
-
-

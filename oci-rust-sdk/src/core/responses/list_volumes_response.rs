@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListVolumesResponse {
     /// A list of Volume instances.
     pub items: Vec<Volume>,
 }
-
 
 /// Required fields for ListVolumesResponse
 pub struct ListVolumesResponseRequired {
@@ -40,7 +39,7 @@ impl ListVolumesResponse {
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListVolumesResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateComputeCapacityReportRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateComputeCapacityReportRequest
 pub struct CreateComputeCapacityReportRequestRequired {
     /// Details for creating a new compute capacity report.
@@ -36,11 +35,14 @@ impl CreateComputeCapacityReportRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_compute_capacity_report_details
-    pub fn set_create_compute_capacity_report_details(mut self, value: CreateComputeCapacityReportDetails) -> Self {
+    pub fn set_create_compute_capacity_report_details(
+        mut self,
+        value: CreateComputeCapacityReportDetails,
+    ) -> Self {
         self.create_compute_capacity_report_details = value;
         self
     }
@@ -69,5 +71,3 @@ impl CreateComputeCapacityReportRequest {
         self
     }
 }
-
-

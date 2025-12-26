@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetAppCatalogListingResourceVersionResponse {
     /// The returned model.AppCatalogListingResourceVersion instance.
     pub app_catalog_listing_resource_version: AppCatalogListingResourceVersion,
 }
-
 
 /// Required fields for GetAppCatalogListingResourceVersionResponse
 pub struct GetAppCatalogListingResourceVersionResponseRequired {
@@ -40,7 +39,7 @@ impl GetAppCatalogListingResourceVersionResponse {
             opc_request_id: required.opc_request_id,
 
             app_catalog_listing_resource_version: required.app_catalog_listing_resource_version,
-}
+        }
     }
 
     /// Set etag
@@ -56,10 +55,11 @@ impl GetAppCatalogListingResourceVersionResponse {
     }
 
     /// Set app_catalog_listing_resource_version
-    pub fn set_app_catalog_listing_resource_version(mut self, value: AppCatalogListingResourceVersion) -> Self {
+    pub fn set_app_catalog_listing_resource_version(
+        mut self,
+        value: AppCatalogListingResourceVersion,
+    ) -> Self {
         self.app_catalog_listing_resource_version = value;
         self
     }
 }
-
-

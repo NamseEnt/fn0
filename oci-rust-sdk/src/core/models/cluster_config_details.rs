@@ -14,7 +14,6 @@ pub struct ClusterConfigDetails {
     pub network_block_ids: Option<Vec<String>>,
 }
 
-
 /// Required fields for ClusterConfigDetails
 pub struct ClusterConfigDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the HPC island.
@@ -28,7 +27,7 @@ impl ClusterConfigDetails {
             hpc_island_id: required.hpc_island_id,
 
             network_block_ids: None,
-}
+        }
     }
 
     /// Set hpc_island_id
@@ -49,5 +48,3 @@ impl ClusterConfigDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListIpv6sResponse {
     /// A list of Ipv6 instances.
     pub items: Vec<Ipv6>,
 }
-
 
 /// Required fields for ListIpv6sResponse
 pub struct ListIpv6sResponseRequired {
@@ -40,7 +39,7 @@ impl ListIpv6sResponse {
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListIpv6sResponse {
         self
     }
 }
-
-

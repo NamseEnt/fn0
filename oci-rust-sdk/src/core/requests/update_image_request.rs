@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct UpdateImageRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateImageRequest
 pub struct UpdateImageRequestRequired {
@@ -44,7 +43,7 @@ impl UpdateImageRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set image_id
@@ -83,5 +82,3 @@ impl UpdateImageRequest {
         self
     }
 }
-
-

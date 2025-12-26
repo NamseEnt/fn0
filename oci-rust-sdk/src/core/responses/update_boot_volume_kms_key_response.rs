@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateBootVolumeKmsKeyResponse {
     /// The returned model.BootVolumeKmsKey instance.
     pub boot_volume_kms_key: BootVolumeKmsKey,
 }
-
 
 /// Required fields for UpdateBootVolumeKmsKeyResponse
 pub struct UpdateBootVolumeKmsKeyResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateBootVolumeKmsKeyResponse {
             opc_request_id: required.opc_request_id,
 
             boot_volume_kms_key: required.boot_volume_kms_key,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateBootVolumeKmsKeyResponse {
         self
     }
 }
-
-

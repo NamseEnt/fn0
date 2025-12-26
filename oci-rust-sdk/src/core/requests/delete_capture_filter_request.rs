@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteCaptureFilterRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for DeleteCaptureFilterRequest
 pub struct DeleteCaptureFilterRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the capture filter.
@@ -36,7 +35,7 @@ impl DeleteCaptureFilterRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set capture_filter_id
@@ -69,5 +68,3 @@ impl DeleteCaptureFilterRequest {
         self
     }
 }
-
-

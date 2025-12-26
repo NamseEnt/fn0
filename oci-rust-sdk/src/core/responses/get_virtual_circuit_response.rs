@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetVirtualCircuitResponse {
     /// The returned model.VirtualCircuit instance.
     pub virtual_circuit: VirtualCircuit,
 }
-
 
 /// Required fields for GetVirtualCircuitResponse
 pub struct GetVirtualCircuitResponseRequired {
@@ -40,7 +39,7 @@ impl GetVirtualCircuitResponse {
             opc_request_id: required.opc_request_id,
 
             virtual_circuit: required.virtual_circuit,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetVirtualCircuitResponse {
         self
     }
 }
-
-

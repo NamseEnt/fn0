@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetDrgResponse {
     /// The returned model.Drg instance.
     pub drg: Drg,
 }
-
 
 /// Required fields for GetDrgResponse
 pub struct GetDrgResponseRequired {
@@ -40,7 +39,7 @@ impl GetDrgResponse {
             opc_request_id: required.opc_request_id,
 
             drg: required.drg,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetDrgResponse {
         self
     }
 }
-
-

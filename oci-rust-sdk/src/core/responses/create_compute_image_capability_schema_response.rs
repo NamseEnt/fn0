@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateComputeImageCapabilitySchemaResponse {
     /// The returned model.ComputeImageCapabilitySchema instance.
     pub compute_image_capability_schema: ComputeImageCapabilitySchema,
 }
-
 
 /// Required fields for CreateComputeImageCapabilitySchemaResponse
 pub struct CreateComputeImageCapabilitySchemaResponseRequired {
@@ -40,7 +39,7 @@ impl CreateComputeImageCapabilitySchemaResponse {
             opc_request_id: required.opc_request_id,
 
             compute_image_capability_schema: required.compute_image_capability_schema,
-}
+        }
     }
 
     /// Set etag
@@ -56,10 +55,11 @@ impl CreateComputeImageCapabilitySchemaResponse {
     }
 
     /// Set compute_image_capability_schema
-    pub fn set_compute_image_capability_schema(mut self, value: ComputeImageCapabilitySchema) -> Self {
+    pub fn set_compute_image_capability_schema(
+        mut self,
+        value: ComputeImageCapabilitySchema,
+    ) -> Self {
         self.compute_image_capability_schema = value;
         self
     }
 }
-
-

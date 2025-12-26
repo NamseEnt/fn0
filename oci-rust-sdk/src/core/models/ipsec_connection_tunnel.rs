@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -81,7 +81,6 @@ pub struct IPSecConnectionTunnel {
     pub associated_virtual_circuits: Option<Vec<String>>,
 }
 
-
 /// Required fields for IPSecConnectionTunnel
 pub struct IPSecConnectionTunnelRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the tunnel.
@@ -137,7 +136,7 @@ impl IPSecConnectionTunnel {
             phase_two_details: None,
 
             associated_virtual_circuits: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -219,13 +218,19 @@ impl IPSecConnectionTunnel {
     }
 
     /// Set oracle_can_initiate
-    pub fn set_oracle_can_initiate(mut self, value: Option<IPSecConnectionTunnelOracleCanInitiate>) -> Self {
+    pub fn set_oracle_can_initiate(
+        mut self,
+        value: Option<IPSecConnectionTunnelOracleCanInitiate>,
+    ) -> Self {
         self.oracle_can_initiate = value;
         self
     }
 
     /// Set nat_translation_enabled
-    pub fn set_nat_translation_enabled(mut self, value: Option<IPSecConnectionTunnelNatTranslationEnabled>) -> Self {
+    pub fn set_nat_translation_enabled(
+        mut self,
+        value: Option<IPSecConnectionTunnelNatTranslationEnabled>,
+    ) -> Self {
         self.nat_translation_enabled = value;
         self
     }
@@ -321,13 +326,19 @@ impl IPSecConnectionTunnel {
     }
 
     /// Set oracle_can_initiate (unwraps Option)
-    pub fn with_oracle_can_initiate(mut self, value: IPSecConnectionTunnelOracleCanInitiate) -> Self {
+    pub fn with_oracle_can_initiate(
+        mut self,
+        value: IPSecConnectionTunnelOracleCanInitiate,
+    ) -> Self {
         self.oracle_can_initiate = Some(value);
         self
     }
 
     /// Set nat_translation_enabled (unwraps Option)
-    pub fn with_nat_translation_enabled(mut self, value: IPSecConnectionTunnelNatTranslationEnabled) -> Self {
+    pub fn with_nat_translation_enabled(
+        mut self,
+        value: IPSecConnectionTunnelNatTranslationEnabled,
+    ) -> Self {
         self.nat_translation_enabled = Some(value);
         self
     }
@@ -362,5 +373,3 @@ impl IPSecConnectionTunnel {
         self
     }
 }
-
-

@@ -9,9 +9,9 @@ pub mod client;
 pub mod error;
 pub mod models;
 pub mod region;
-pub mod retry;
 pub mod requests;
 pub mod responses;
+pub mod retry;
 
 // Re-exports for convenience
 pub use error::{OciError, Result};
@@ -36,8 +36,7 @@ pub struct ClientConfig {
 /// Create a new core services client
 pub fn client(config: ClientConfig) -> Result<CoreClient> {
     let endpoint = format!("https://iaas.{}.oraclecloud.com", config.region.id());
-    let client = OciClient::new(config.auth_provider, endpoint)?
-        .with_retrier(config.retry);
+    let client = OciClient::new(config.auth_provider, endpoint)?.with_retrier(config.retry);
 
     Ok(CoreClient { client })
 }
@@ -114,10 +113,7 @@ impl CoreClient {
     }
 
     /// Get details of a specific compute instance
-    pub async fn get_instance(
-        &self,
-        request: GetInstanceRequest,
-    ) -> Result<GetInstanceResponse> {
+    pub async fn get_instance(&self, request: GetInstanceRequest) -> Result<GetInstanceResponse> {
         let path = format!("/20160918/instances/{}", request.instance_id);
         let response = self.client.get(&path).await?;
 
@@ -143,7 +139,10 @@ impl CoreClient {
             query_params.push(("page".to_string(), page.clone()));
         }
         if let Some(availability_domain) = &request.availability_domain {
-            query_params.push(("availabilityDomain".to_string(), availability_domain.clone()));
+            query_params.push((
+                "availabilityDomain".to_string(),
+                availability_domain.clone(),
+            ));
         }
         if let Some(lifetime) = &request.lifetime {
             query_params.push(("lifetime".to_string(), format!("{:?}", lifetime)));

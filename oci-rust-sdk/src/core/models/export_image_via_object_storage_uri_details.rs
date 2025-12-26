@@ -12,7 +12,6 @@ pub struct ExportImageViaObjectStorageUriDetails {
     pub destination_type: String,
 }
 
-
 /// Required fields for ExportImageViaObjectStorageUriDetails
 pub struct ExportImageViaObjectStorageUriDetailsRequired {
     /// The Object Storage URL to export the image to. See [Object Storage URLs](https://docs.oracle.com/iaas/Content/Compute/Tasks/imageimportexport.htm#URLs) and [Using Pre-Authenticated Requests](https://docs.oracle.com/iaas/Content/Object/Tasks/usingpreauthenticatedrequests.htm) for constructing URLs for image import/export.
@@ -28,7 +27,7 @@ impl ExportImageViaObjectStorageUriDetails {
             destination_uri: required.destination_uri,
 
             destination_type: required.destination_type,
-}
+        }
     }
 
     /// Set destination_uri
@@ -43,5 +42,3 @@ impl ExportImageViaObjectStorageUriDetails {
         self
     }
 }
-
-

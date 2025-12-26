@@ -19,7 +19,6 @@ pub struct ImageShapeCompatibilitySummary {
     pub ocpu_constraints: Option<ImageOcpuConstraints>,
 }
 
-
 /// Required fields for ImageShapeCompatibilitySummary
 pub struct ImageShapeCompatibilitySummaryRequired {
     /// The image [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm).
@@ -40,7 +39,7 @@ impl ImageShapeCompatibilitySummary {
             memory_constraints: None,
 
             ocpu_constraints: None,
-}
+        }
     }
 
     /// Set image_id
@@ -79,5 +78,3 @@ impl ImageShapeCompatibilitySummary {
         self
     }
 }
-
-

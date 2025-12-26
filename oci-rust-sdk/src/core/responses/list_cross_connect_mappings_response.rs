@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct ListCrossConnectMappingsResponse {
     /// The returned model.CrossConnectMappingDetailsCollection instance.
     pub cross_connect_mapping_details_collection: CrossConnectMappingDetailsCollection,
 }
-
 
 /// Required fields for ListCrossConnectMappingsResponse
 pub struct ListCrossConnectMappingsResponseRequired {
@@ -31,8 +30,9 @@ impl ListCrossConnectMappingsResponse {
         Self {
             opc_request_id: required.opc_request_id,
 
-            cross_connect_mapping_details_collection: required.cross_connect_mapping_details_collection,
-}
+            cross_connect_mapping_details_collection: required
+                .cross_connect_mapping_details_collection,
+        }
     }
 
     /// Set opc_request_id
@@ -42,10 +42,11 @@ impl ListCrossConnectMappingsResponse {
     }
 
     /// Set cross_connect_mapping_details_collection
-    pub fn set_cross_connect_mapping_details_collection(mut self, value: CrossConnectMappingDetailsCollection) -> Self {
+    pub fn set_cross_connect_mapping_details_collection(
+        mut self,
+        value: CrossConnectMappingDetailsCollection,
+    ) -> Self {
         self.cross_connect_mapping_details_collection = value;
         self
     }
 }
-
-

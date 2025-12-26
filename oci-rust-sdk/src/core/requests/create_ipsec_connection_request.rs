@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateIPSecConnectionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateIPSecConnectionRequest
 pub struct CreateIPSecConnectionRequestRequired {
@@ -30,11 +29,14 @@ impl CreateIPSecConnectionRequest {
             create_ipsec_connection_details: required.create_ipsec_connection_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_ipsec_connection_details
-    pub fn set_create_ipsec_connection_details(mut self, value: CreateIPSecConnectionDetails) -> Self {
+    pub fn set_create_ipsec_connection_details(
+        mut self,
+        value: CreateIPSecConnectionDetails,
+    ) -> Self {
         self.create_ipsec_connection_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl CreateIPSecConnectionRequest {
         self
     }
 }
-
-

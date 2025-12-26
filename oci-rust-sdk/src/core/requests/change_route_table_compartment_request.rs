@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct ChangeRouteTableCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for ChangeRouteTableCompartmentRequest
 pub struct ChangeRouteTableCompartmentRequestRequired {
@@ -44,7 +43,7 @@ impl ChangeRouteTableCompartmentRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set rt_id
@@ -54,7 +53,10 @@ impl ChangeRouteTableCompartmentRequest {
     }
 
     /// Set change_route_table_compartment_details
-    pub fn set_change_route_table_compartment_details(mut self, value: ChangeRouteTableCompartmentDetails) -> Self {
+    pub fn set_change_route_table_compartment_details(
+        mut self,
+        value: ChangeRouteTableCompartmentDetails,
+    ) -> Self {
         self.change_route_table_compartment_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl ChangeRouteTableCompartmentRequest {
         self
     }
 }
-
-

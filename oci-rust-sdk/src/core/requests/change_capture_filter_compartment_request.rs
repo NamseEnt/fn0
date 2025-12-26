@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeCaptureFilterCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeCaptureFilterCompartmentRequest
 pub struct ChangeCaptureFilterCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the capture filter.
@@ -43,14 +42,15 @@ impl ChangeCaptureFilterCompartmentRequest {
         Self {
             capture_filter_id: required.capture_filter_id,
 
-            change_capture_filter_compartment_details: required.change_capture_filter_compartment_details,
+            change_capture_filter_compartment_details: required
+                .change_capture_filter_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set capture_filter_id
@@ -60,7 +60,10 @@ impl ChangeCaptureFilterCompartmentRequest {
     }
 
     /// Set change_capture_filter_compartment_details
-    pub fn set_change_capture_filter_compartment_details(mut self, value: ChangeCaptureFilterCompartmentDetails) -> Self {
+    pub fn set_change_capture_filter_compartment_details(
+        mut self,
+        value: ChangeCaptureFilterCompartmentDetails,
+    ) -> Self {
         self.change_capture_filter_compartment_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl ChangeCaptureFilterCompartmentRequest {
         self
     }
 }
-
-

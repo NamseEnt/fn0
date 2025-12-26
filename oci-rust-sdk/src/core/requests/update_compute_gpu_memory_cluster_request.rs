@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateComputeGpuMemoryClusterRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpdateComputeGpuMemoryClusterRequest
 pub struct UpdateComputeGpuMemoryClusterRequestRequired {
     /// The OCID of the compute GPU memory cluster.
@@ -43,14 +42,15 @@ impl UpdateComputeGpuMemoryClusterRequest {
         Self {
             compute_gpu_memory_cluster_id: required.compute_gpu_memory_cluster_id,
 
-            update_compute_gpu_memory_cluster_details: required.update_compute_gpu_memory_cluster_details,
+            update_compute_gpu_memory_cluster_details: required
+                .update_compute_gpu_memory_cluster_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_gpu_memory_cluster_id
@@ -60,7 +60,10 @@ impl UpdateComputeGpuMemoryClusterRequest {
     }
 
     /// Set update_compute_gpu_memory_cluster_details
-    pub fn set_update_compute_gpu_memory_cluster_details(mut self, value: UpdateComputeGpuMemoryClusterDetails) -> Self {
+    pub fn set_update_compute_gpu_memory_cluster_details(
+        mut self,
+        value: UpdateComputeGpuMemoryClusterDetails,
+    ) -> Self {
         self.update_compute_gpu_memory_cluster_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl UpdateComputeGpuMemoryClusterRequest {
         self
     }
 }
-
-

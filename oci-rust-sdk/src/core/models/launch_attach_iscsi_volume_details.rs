@@ -22,7 +22,6 @@ pub struct LaunchAttachIScsiVolumeDetails {
     pub is_agent_auto_iscsi_login_enabled: Option<bool>,
 }
 
-
 /// Required fields for LaunchAttachIScsiVolumeDetails
 pub struct LaunchAttachIScsiVolumeDetailsRequired {
     pub r#type: String,
@@ -39,7 +38,7 @@ impl LaunchAttachIScsiVolumeDetails {
             encryption_in_transit_type: None,
 
             is_agent_auto_iscsi_login_enabled: None,
-}
+        }
     }
 
     /// Set use_chap
@@ -49,7 +48,10 @@ impl LaunchAttachIScsiVolumeDetails {
     }
 
     /// Set encryption_in_transit_type
-    pub fn set_encryption_in_transit_type(mut self, value: Option<EncryptionInTransitType>) -> Self {
+    pub fn set_encryption_in_transit_type(
+        mut self,
+        value: Option<EncryptionInTransitType>,
+    ) -> Self {
         self.encryption_in_transit_type = value;
         self
     }
@@ -84,5 +86,3 @@ impl LaunchAttachIScsiVolumeDetails {
         self
     }
 }
-
-

@@ -55,4 +55,3 @@ impl Default for ShapeMeasuredBootOptions {
         Self::new()
     }
 }
-

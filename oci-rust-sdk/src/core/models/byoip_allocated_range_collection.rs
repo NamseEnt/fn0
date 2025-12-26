@@ -10,7 +10,6 @@ pub struct ByoipAllocatedRangeCollection {
     pub items: Vec<ByoipAllocatedRangeSummary>,
 }
 
-
 /// Required fields for ByoipAllocatedRangeCollection
 pub struct ByoipAllocatedRangeCollectionRequired {
     /// A list of subranges of a BYOIP CIDR block allocated to an IP pool.
@@ -22,7 +21,7 @@ impl ByoipAllocatedRangeCollection {
     pub fn new(required: ByoipAllocatedRangeCollectionRequired) -> Self {
         Self {
             items: required.items,
-}
+        }
     }
 
     /// Set items
@@ -31,5 +30,3 @@ impl ByoipAllocatedRangeCollection {
         self
     }
 }
-
-

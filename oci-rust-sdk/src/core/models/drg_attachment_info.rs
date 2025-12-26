@@ -10,7 +10,6 @@ pub struct DrgAttachmentInfo {
     pub id: String,
 }
 
-
 /// Required fields for DrgAttachmentInfo
 pub struct DrgAttachmentInfoRequired {
     /// The Oracle-assigned ID of the DRG attachment
@@ -20,9 +19,7 @@ pub struct DrgAttachmentInfoRequired {
 impl DrgAttachmentInfo {
     /// Create a new DrgAttachmentInfo with required fields
     pub fn new(required: DrgAttachmentInfoRequired) -> Self {
-        Self {
-            id: required.id,
-}
+        Self { id: required.id }
     }
 
     /// Set id
@@ -31,5 +28,3 @@ impl DrgAttachmentInfo {
         self
     }
 }
-
-

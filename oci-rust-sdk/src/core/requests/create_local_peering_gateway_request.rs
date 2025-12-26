@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateLocalPeeringGatewayRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateLocalPeeringGatewayRequest
 pub struct CreateLocalPeeringGatewayRequestRequired {
@@ -30,11 +29,14 @@ impl CreateLocalPeeringGatewayRequest {
             create_local_peering_gateway_details: required.create_local_peering_gateway_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_local_peering_gateway_details
-    pub fn set_create_local_peering_gateway_details(mut self, value: CreateLocalPeeringGatewayDetails) -> Self {
+    pub fn set_create_local_peering_gateway_details(
+        mut self,
+        value: CreateLocalPeeringGatewayDetails,
+    ) -> Self {
         self.create_local_peering_gateway_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl CreateLocalPeeringGatewayRequest {
         self
     }
 }
-
-

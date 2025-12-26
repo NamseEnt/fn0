@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -75,7 +75,6 @@ pub struct DedicatedVmHost {
     pub compute_bare_metal_host_id: Option<String>,
 }
 
-
 /// Required fields for DedicatedVmHost
 pub struct DedicatedVmHostRequired {
     /// The availability domain the dedicated virtual machine host is running in. <p> Example: {@code Uocm:PHX-AD-1}
@@ -147,7 +146,7 @@ impl DedicatedVmHost {
             capacity_bins: None,
 
             compute_bare_metal_host_id: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -169,7 +168,10 @@ impl DedicatedVmHost {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -193,7 +195,10 @@ impl DedicatedVmHost {
     }
 
     /// Set placement_constraint_details
-    pub fn set_placement_constraint_details(mut self, value: Option<HostGroupPlacementConstraintDetails>) -> Self {
+    pub fn set_placement_constraint_details(
+        mut self,
+        value: Option<HostGroupPlacementConstraintDetails>,
+    ) -> Self {
         self.placement_constraint_details = value;
         self
     }
@@ -265,7 +270,10 @@ impl DedicatedVmHost {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -283,7 +291,10 @@ impl DedicatedVmHost {
     }
 
     /// Set placement_constraint_details (unwraps Option)
-    pub fn with_placement_constraint_details(mut self, value: HostGroupPlacementConstraintDetails) -> Self {
+    pub fn with_placement_constraint_details(
+        mut self,
+        value: HostGroupPlacementConstraintDetails,
+    ) -> Self {
         self.placement_constraint_details = Some(value);
         self
     }
@@ -324,5 +335,3 @@ impl DedicatedVmHost {
         self
     }
 }
-
-

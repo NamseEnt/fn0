@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -29,7 +29,6 @@ pub struct CreateAppCatalogSubscriptionDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eula_link: Option<String>,
 }
-
 
 /// Required fields for CreateAppCatalogSubscriptionDetails
 pub struct CreateAppCatalogSubscriptionDetailsRequired {
@@ -69,7 +68,7 @@ impl CreateAppCatalogSubscriptionDetails {
             signature: required.signature,
 
             eula_link: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -120,5 +119,3 @@ impl CreateAppCatalogSubscriptionDetails {
         self
     }
 }
-
-

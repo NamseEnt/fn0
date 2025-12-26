@@ -56,7 +56,10 @@ impl InventoryResourceSummary {
     }
 
     /// Set resource_type
-    pub fn set_resource_type(mut self, value: Option<InventoryResourceSummaryResourceType>) -> Self {
+    pub fn set_resource_type(
+        mut self,
+        value: Option<InventoryResourceSummaryResourceType>,
+    ) -> Self {
         self.resource_type = value;
         self
     }
@@ -68,7 +71,10 @@ impl InventoryResourceSummary {
     }
 
     /// Set ip_address_collection
-    pub fn set_ip_address_collection(mut self, value: Option<Vec<InventoryIpAddressSummary>>) -> Self {
+    pub fn set_ip_address_collection(
+        mut self,
+        value: Option<Vec<InventoryIpAddressSummary>>,
+    ) -> Self {
         self.ip_address_collection = value;
         self
     }
@@ -127,4 +133,3 @@ impl Default for InventoryResourceSummary {
         Self::new()
     }
 }
-

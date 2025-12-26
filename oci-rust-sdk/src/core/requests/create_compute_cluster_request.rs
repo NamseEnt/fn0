@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateComputeClusterRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for CreateComputeClusterRequest
 pub struct CreateComputeClusterRequestRequired {
     /// The data for creating a [compute cluster](https://docs.oracle.com/iaas/Content/Compute/Tasks/compute-clusters.htm). A compute cluster is an empty remote direct memory access (RDMA) network group. <p> After the compute cluster is created, you can use the compute cluster's OCID with the {@link #launchInstance(LaunchInstanceRequest) launchInstance} operation to create instances in the compute cluster. The instances must be created in the same compartment and availability domain as the cluster. <p> Use compute clusters when you want to manage instances in the cluster individually in the RDMA network group. <p> For details about creating a cluster network that uses instance pools to manage groups of identical instances, see {@link #createClusterNetworkDetails(CreateClusterNetworkDetailsRequest) createClusterNetworkDetails}.
@@ -36,11 +35,14 @@ impl CreateComputeClusterRequest {
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set create_compute_cluster_details
-    pub fn set_create_compute_cluster_details(mut self, value: CreateComputeClusterDetails) -> Self {
+    pub fn set_create_compute_cluster_details(
+        mut self,
+        value: CreateComputeClusterDetails,
+    ) -> Self {
         self.create_compute_cluster_details = value;
         self
     }
@@ -69,5 +71,3 @@ impl CreateComputeClusterRequest {
         self
     }
 }
-
-

@@ -15,7 +15,6 @@ pub struct CreateBasicImagePullSecretDetails {
     pub secret_type: String,
 }
 
-
 /// Required fields for CreateBasicImagePullSecretDetails
 pub struct CreateBasicImagePullSecretDetailsRequired {
     /// The username which should be used with the registry for authentication. The value is expected in base64 format.
@@ -36,7 +35,7 @@ impl CreateBasicImagePullSecretDetails {
             password: required.password,
 
             secret_type: required.secret_type,
-}
+        }
     }
 
     /// Set username
@@ -57,5 +56,3 @@ impl CreateBasicImagePullSecretDetails {
         self
     }
 }
-
-

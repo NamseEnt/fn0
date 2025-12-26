@@ -12,7 +12,6 @@ pub struct DrgAttachmentTypeDrgRouteDistributionMatchCriteria {
     pub match_type: String,
 }
 
-
 /// Required fields for DrgAttachmentTypeDrgRouteDistributionMatchCriteria
 pub struct DrgAttachmentTypeDrgRouteDistributionMatchCriteriaRequired {
     /// The type of the network resource to be included in this match. A match for a network type implies that all DRG attachments of that type insert routes into the table.
@@ -28,11 +27,14 @@ impl DrgAttachmentTypeDrgRouteDistributionMatchCriteria {
             attachment_type: required.attachment_type,
 
             match_type: required.match_type,
-}
+        }
     }
 
     /// Set attachment_type
-    pub fn set_attachment_type(mut self, value: DrgAttachmentTypeDrgRouteDistributionMatchCriteriaAttachmentType) -> Self {
+    pub fn set_attachment_type(
+        mut self,
+        value: DrgAttachmentTypeDrgRouteDistributionMatchCriteriaAttachmentType,
+    ) -> Self {
         self.attachment_type = value;
         self
     }
@@ -43,5 +45,3 @@ impl DrgAttachmentTypeDrgRouteDistributionMatchCriteria {
         self
     }
 }
-
-

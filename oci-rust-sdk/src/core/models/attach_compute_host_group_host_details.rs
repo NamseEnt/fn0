@@ -10,7 +10,6 @@ pub struct AttachComputeHostGroupHostDetails {
     pub compute_host_group_id: String,
 }
 
-
 /// Required fields for AttachComputeHostGroupHostDetails
 pub struct AttachComputeHostGroupHostDetailsRequired {
     /// 'The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute host group.'
@@ -22,7 +21,7 @@ impl AttachComputeHostGroupHostDetails {
     pub fn new(required: AttachComputeHostGroupHostDetailsRequired) -> Self {
         Self {
             compute_host_group_id: required.compute_host_group_id,
-}
+        }
     }
 
     /// Set compute_host_group_id
@@ -31,5 +30,3 @@ impl AttachComputeHostGroupHostDetails {
         self
     }
 }
-
-

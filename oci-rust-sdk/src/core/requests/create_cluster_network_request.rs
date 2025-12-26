@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateClusterNetworkRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateClusterNetworkRequest
 pub struct CreateClusterNetworkRequestRequired {
@@ -30,11 +29,14 @@ impl CreateClusterNetworkRequest {
             create_cluster_network_details: required.create_cluster_network_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_cluster_network_details
-    pub fn set_create_cluster_network_details(mut self, value: CreateClusterNetworkDetails) -> Self {
+    pub fn set_create_cluster_network_details(
+        mut self,
+        value: CreateClusterNetworkDetails,
+    ) -> Self {
         self.create_cluster_network_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl CreateClusterNetworkRequest {
         self
     }
 }
-
-

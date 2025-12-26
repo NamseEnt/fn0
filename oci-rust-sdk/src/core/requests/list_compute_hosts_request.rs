@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,7 +60,6 @@ pub struct ListComputeHostsRequest {
     pub compute_host_in_subtree: Option<bool>,
 }
 
-
 /// Required fields for ListComputeHostsRequest
 pub struct ListComputeHostsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -96,7 +95,7 @@ impl ListComputeHostsRequest {
             compute_host_group_id: None,
 
             compute_host_in_subtree: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -249,5 +248,3 @@ impl ListComputeHostsRequest {
         self
     }
 }
-
-

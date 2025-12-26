@@ -31,7 +31,6 @@ pub struct CreateVolumeBackupPolicyDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for CreateVolumeBackupPolicyDetails
 pub struct CreateVolumeBackupPolicyDetailsRequired {
     /// The OCID of the compartment.
@@ -53,7 +52,7 @@ impl CreateVolumeBackupPolicyDetails {
             defined_tags: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -81,7 +80,10 @@ impl CreateVolumeBackupPolicyDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -111,7 +113,10 @@ impl CreateVolumeBackupPolicyDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -122,5 +127,3 @@ impl CreateVolumeBackupPolicyDetails {
         self
     }
 }
-
-

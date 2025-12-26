@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -17,7 +17,6 @@ pub struct TunnelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_created: Option<DateTime<Utc>>,
 }
-
 
 /// Required fields for TunnelConfig
 pub struct TunnelConfigRequired {
@@ -37,7 +36,7 @@ impl TunnelConfig {
             shared_secret: required.shared_secret,
 
             time_created: None,
-}
+        }
     }
 
     /// Set ip_address
@@ -64,5 +63,3 @@ impl TunnelConfig {
         self
     }
 }
-
-

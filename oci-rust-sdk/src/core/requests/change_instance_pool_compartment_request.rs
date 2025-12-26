@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeInstancePoolCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeInstancePoolCompartmentRequest
 pub struct ChangeInstancePoolCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance pool.
@@ -43,14 +42,15 @@ impl ChangeInstancePoolCompartmentRequest {
         Self {
             instance_pool_id: required.instance_pool_id,
 
-            change_instance_pool_compartment_details: required.change_instance_pool_compartment_details,
+            change_instance_pool_compartment_details: required
+                .change_instance_pool_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set instance_pool_id
@@ -60,7 +60,10 @@ impl ChangeInstancePoolCompartmentRequest {
     }
 
     /// Set change_instance_pool_compartment_details
-    pub fn set_change_instance_pool_compartment_details(mut self, value: ChangeInstancePoolCompartmentDetails) -> Self {
+    pub fn set_change_instance_pool_compartment_details(
+        mut self,
+        value: ChangeInstancePoolCompartmentDetails,
+    ) -> Self {
         self.change_instance_pool_compartment_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl ChangeInstancePoolCompartmentRequest {
         self
     }
 }
-
-

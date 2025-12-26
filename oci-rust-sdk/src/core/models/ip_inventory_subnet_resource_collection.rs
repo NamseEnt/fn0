@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -57,7 +57,10 @@ impl IpInventorySubnetResourceCollection {
     }
 
     /// Set ip_inventory_subnet_resource_summary
-    pub fn set_ip_inventory_subnet_resource_summary(mut self, value: Option<Vec<IpInventorySubnetResourceSummary>>) -> Self {
+    pub fn set_ip_inventory_subnet_resource_summary(
+        mut self,
+        value: Option<Vec<IpInventorySubnetResourceSummary>>,
+    ) -> Self {
         self.ip_inventory_subnet_resource_summary = value;
         self
     }
@@ -87,7 +90,10 @@ impl IpInventorySubnetResourceCollection {
     }
 
     /// Set ip_inventory_subnet_resource_summary (unwraps Option)
-    pub fn with_ip_inventory_subnet_resource_summary(mut self, value: Vec<IpInventorySubnetResourceSummary>) -> Self {
+    pub fn with_ip_inventory_subnet_resource_summary(
+        mut self,
+        value: Vec<IpInventorySubnetResourceSummary>,
+    ) -> Self {
         self.ip_inventory_subnet_resource_summary = Some(value);
         self
     }
@@ -110,4 +116,3 @@ impl Default for IpInventorySubnetResourceCollection {
         Self::new()
     }
 }
-

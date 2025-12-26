@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetCpeDeviceShapeResponse {
     /// The returned model.CpeDeviceShapeDetail instance.
     pub cpe_device_shape_detail: CpeDeviceShapeDetail,
 }
-
 
 /// Required fields for GetCpeDeviceShapeResponse
 pub struct GetCpeDeviceShapeResponseRequired {
@@ -32,7 +31,7 @@ impl GetCpeDeviceShapeResponse {
             opc_request_id: required.opc_request_id,
 
             cpe_device_shape_detail: required.cpe_device_shape_detail,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetCpeDeviceShapeResponse {
         self
     }
 }
-
-

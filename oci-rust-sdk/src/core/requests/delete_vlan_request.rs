@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteVlanRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for DeleteVlanRequest
 pub struct DeleteVlanRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VLAN.
@@ -36,7 +35,7 @@ impl DeleteVlanRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set vlan_id
@@ -69,5 +68,3 @@ impl DeleteVlanRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct UpdateInstanceConsoleConnectionRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for UpdateInstanceConsoleConnectionRequest
 pub struct UpdateInstanceConsoleConnectionRequestRequired {
     /// The OCID of the instance console connection.
@@ -39,12 +38,13 @@ impl UpdateInstanceConsoleConnectionRequest {
         Self {
             instance_console_connection_id: required.instance_console_connection_id,
 
-            update_instance_console_connection_details: required.update_instance_console_connection_details,
+            update_instance_console_connection_details: required
+                .update_instance_console_connection_details,
 
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set instance_console_connection_id
@@ -54,7 +54,10 @@ impl UpdateInstanceConsoleConnectionRequest {
     }
 
     /// Set update_instance_console_connection_details
-    pub fn set_update_instance_console_connection_details(mut self, value: UpdateInstanceConsoleConnectionDetails) -> Self {
+    pub fn set_update_instance_console_connection_details(
+        mut self,
+        value: UpdateInstanceConsoleConnectionDetails,
+    ) -> Self {
         self.update_instance_console_connection_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl UpdateInstanceConsoleConnectionRequest {
         self
     }
 }
-
-

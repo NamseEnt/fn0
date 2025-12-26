@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetComputeGpuMemoryFabricRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetComputeGpuMemoryFabricRequest
 pub struct GetComputeGpuMemoryFabricRequestRequired {
@@ -30,7 +29,7 @@ impl GetComputeGpuMemoryFabricRequest {
             compute_gpu_memory_fabric_id: required.compute_gpu_memory_fabric_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compute_gpu_memory_fabric_id
@@ -51,5 +50,3 @@ impl GetComputeGpuMemoryFabricRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeInternetGatewayCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeInternetGatewayCompartmentRequest
 pub struct ChangeInternetGatewayCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the internet gateway.
@@ -39,12 +38,13 @@ impl ChangeInternetGatewayCompartmentRequest {
         Self {
             ig_id: required.ig_id,
 
-            change_internet_gateway_compartment_details: required.change_internet_gateway_compartment_details,
+            change_internet_gateway_compartment_details: required
+                .change_internet_gateway_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set ig_id
@@ -54,7 +54,10 @@ impl ChangeInternetGatewayCompartmentRequest {
     }
 
     /// Set change_internet_gateway_compartment_details
-    pub fn set_change_internet_gateway_compartment_details(mut self, value: ChangeInternetGatewayCompartmentDetails) -> Self {
+    pub fn set_change_internet_gateway_compartment_details(
+        mut self,
+        value: ChangeInternetGatewayCompartmentDetails,
+    ) -> Self {
         self.change_internet_gateway_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangeInternetGatewayCompartmentRequest {
         self
     }
 }
-
-

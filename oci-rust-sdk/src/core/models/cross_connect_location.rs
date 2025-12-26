@@ -13,7 +13,6 @@ pub struct CrossConnectLocation {
     pub name: String,
 }
 
-
 /// Required fields for CrossConnectLocation
 pub struct CrossConnectLocationRequired {
     /// A description of the location.
@@ -30,7 +29,7 @@ impl CrossConnectLocation {
             description: required.description,
 
             name: required.name,
-}
+        }
     }
 
     /// Set description
@@ -45,5 +44,3 @@ impl CrossConnectLocation {
         self
     }
 }
-
-

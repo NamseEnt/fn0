@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct GetConsoleHistoryContentRequest {
     pub length: Option<i64>,
 }
 
-
 /// Required fields for GetConsoleHistoryContentRequest
 pub struct GetConsoleHistoryContentRequestRequired {
     /// The OCID of the console history.
@@ -36,7 +35,7 @@ impl GetConsoleHistoryContentRequest {
             offset: None,
 
             length: None,
-}
+        }
     }
 
     /// Set instance_console_history_id
@@ -69,5 +68,3 @@ impl GetConsoleHistoryContentRequest {
         self
     }
 }
-
-

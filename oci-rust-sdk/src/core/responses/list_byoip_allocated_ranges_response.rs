@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListByoipAllocatedRangesResponse {
     /// The returned model.ByoipAllocatedRangeCollection instance.
     pub byoip_allocated_range_collection: ByoipAllocatedRangeCollection,
 }
-
 
 /// Required fields for ListByoipAllocatedRangesResponse
 pub struct ListByoipAllocatedRangesResponseRequired {
@@ -40,7 +39,7 @@ impl ListByoipAllocatedRangesResponse {
             opc_request_id: required.opc_request_id,
 
             byoip_allocated_range_collection: required.byoip_allocated_range_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -56,10 +55,11 @@ impl ListByoipAllocatedRangesResponse {
     }
 
     /// Set byoip_allocated_range_collection
-    pub fn set_byoip_allocated_range_collection(mut self, value: ByoipAllocatedRangeCollection) -> Self {
+    pub fn set_byoip_allocated_range_collection(
+        mut self,
+        value: ByoipAllocatedRangeCollection,
+    ) -> Self {
         self.byoip_allocated_range_collection = value;
         self
     }
 }
-
-

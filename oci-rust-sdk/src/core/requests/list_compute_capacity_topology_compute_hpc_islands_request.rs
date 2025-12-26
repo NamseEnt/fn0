@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +40,6 @@ pub struct ListComputeCapacityTopologyComputeHpcIslandsRequest {
     pub sort_order: Option<ListComputeCapacityTopologyComputeHpcIslandsRequestSortOrder>,
 }
 
-
 /// Required fields for ListComputeCapacityTopologyComputeHpcIslandsRequest
 pub struct ListComputeCapacityTopologyComputeHpcIslandsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute capacity topology.
@@ -66,7 +65,7 @@ impl ListComputeCapacityTopologyComputeHpcIslandsRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compute_capacity_topology_id
@@ -106,13 +105,19 @@ impl ListComputeCapacityTopologyComputeHpcIslandsRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeCapacityTopologyComputeHpcIslandsRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeCapacityTopologyComputeHpcIslandsRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeCapacityTopologyComputeHpcIslandsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeCapacityTopologyComputeHpcIslandsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -148,16 +153,20 @@ impl ListComputeCapacityTopologyComputeHpcIslandsRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListComputeCapacityTopologyComputeHpcIslandsRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListComputeCapacityTopologyComputeHpcIslandsRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeCapacityTopologyComputeHpcIslandsRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeCapacityTopologyComputeHpcIslandsRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

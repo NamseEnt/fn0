@@ -20,7 +20,8 @@ pub struct InstanceConfigurationLaunchInstanceShapeConfigDetails {
 
     /// The baseline OCPU utilization for a subcore burstable VM instance. Leave this attribute blank for a non-burstable instance, or explicitly specify non-burstable with {@code BASELINE_1_1}. <p> The following values are supported: - {@code BASELINE_1_8} - baseline usage is 1/8 of an OCPU. - {@code BASELINE_1_2} - baseline usage is 1/2 of an OCPU. - {@code BASELINE_1_1} - baseline usage is an entire OCPU. This represents a non-burstable instance.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub baseline_ocpu_utilization: Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsBaselineOcpuUtilization>,
+    pub baseline_ocpu_utilization:
+        Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsBaselineOcpuUtilization>,
 
     /// The number of NVMe drives to be used for storage. A single drive has 6.8 TB available. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -28,7 +29,8 @@ pub struct InstanceConfigurationLaunchInstanceShapeConfigDetails {
 
     /// This field is reserved for internal use.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub resource_management: Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsResourceManagement>,
+    pub resource_management:
+        Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsResourceManagement>,
 }
 
 impl InstanceConfigurationLaunchInstanceShapeConfigDetails {
@@ -68,7 +70,10 @@ impl InstanceConfigurationLaunchInstanceShapeConfigDetails {
     }
 
     /// Set baseline_ocpu_utilization
-    pub fn set_baseline_ocpu_utilization(mut self, value: Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsBaselineOcpuUtilization>) -> Self {
+    pub fn set_baseline_ocpu_utilization(
+        mut self,
+        value: Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsBaselineOcpuUtilization>,
+    ) -> Self {
         self.baseline_ocpu_utilization = value;
         self
     }
@@ -80,7 +85,10 @@ impl InstanceConfigurationLaunchInstanceShapeConfigDetails {
     }
 
     /// Set resource_management
-    pub fn set_resource_management(mut self, value: Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsResourceManagement>) -> Self {
+    pub fn set_resource_management(
+        mut self,
+        value: Option<InstanceConfigurationLaunchInstanceShapeConfigDetailsResourceManagement>,
+    ) -> Self {
         self.resource_management = value;
         self
     }
@@ -104,7 +112,10 @@ impl InstanceConfigurationLaunchInstanceShapeConfigDetails {
     }
 
     /// Set baseline_ocpu_utilization (unwraps Option)
-    pub fn with_baseline_ocpu_utilization(mut self, value: InstanceConfigurationLaunchInstanceShapeConfigDetailsBaselineOcpuUtilization) -> Self {
+    pub fn with_baseline_ocpu_utilization(
+        mut self,
+        value: InstanceConfigurationLaunchInstanceShapeConfigDetailsBaselineOcpuUtilization,
+    ) -> Self {
         self.baseline_ocpu_utilization = Some(value);
         self
     }
@@ -116,7 +127,10 @@ impl InstanceConfigurationLaunchInstanceShapeConfigDetails {
     }
 
     /// Set resource_management (unwraps Option)
-    pub fn with_resource_management(mut self, value: InstanceConfigurationLaunchInstanceShapeConfigDetailsResourceManagement) -> Self {
+    pub fn with_resource_management(
+        mut self,
+        value: InstanceConfigurationLaunchInstanceShapeConfigDetailsResourceManagement,
+    ) -> Self {
         self.resource_management = Some(value);
         self
     }
@@ -127,4 +141,3 @@ impl Default for InstanceConfigurationLaunchInstanceShapeConfigDetails {
         Self::new()
     }
 }
-

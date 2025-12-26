@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,9 +12,9 @@ pub struct UpdateNetworkSecurityGroupSecurityRulesRequest {
     pub network_security_group_id: String,
 
     /// Request with one or more security rules associated with the network security group that will be updated.
-    pub update_network_security_group_security_rules_details: UpdateNetworkSecurityGroupSecurityRulesDetails,
+    pub update_network_security_group_security_rules_details:
+        UpdateNetworkSecurityGroupSecurityRulesDetails,
 }
-
 
 /// Required fields for UpdateNetworkSecurityGroupSecurityRulesRequest
 pub struct UpdateNetworkSecurityGroupSecurityRulesRequestRequired {
@@ -22,7 +22,8 @@ pub struct UpdateNetworkSecurityGroupSecurityRulesRequestRequired {
     pub network_security_group_id: String,
 
     /// Request with one or more security rules associated with the network security group that will be updated.
-    pub update_network_security_group_security_rules_details: UpdateNetworkSecurityGroupSecurityRulesDetails,
+    pub update_network_security_group_security_rules_details:
+        UpdateNetworkSecurityGroupSecurityRulesDetails,
 }
 
 impl UpdateNetworkSecurityGroupSecurityRulesRequest {
@@ -31,8 +32,9 @@ impl UpdateNetworkSecurityGroupSecurityRulesRequest {
         Self {
             network_security_group_id: required.network_security_group_id,
 
-            update_network_security_group_security_rules_details: required.update_network_security_group_security_rules_details,
-}
+            update_network_security_group_security_rules_details: required
+                .update_network_security_group_security_rules_details,
+        }
     }
 
     /// Set network_security_group_id
@@ -42,10 +44,11 @@ impl UpdateNetworkSecurityGroupSecurityRulesRequest {
     }
 
     /// Set update_network_security_group_security_rules_details
-    pub fn set_update_network_security_group_security_rules_details(mut self, value: UpdateNetworkSecurityGroupSecurityRulesDetails) -> Self {
+    pub fn set_update_network_security_group_security_rules_details(
+        mut self,
+        value: UpdateNetworkSecurityGroupSecurityRulesDetails,
+    ) -> Self {
         self.update_network_security_group_security_rules_details = value;
         self
     }
 }
-
-

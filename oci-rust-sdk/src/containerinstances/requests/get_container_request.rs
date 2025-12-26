@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetContainerRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetContainerRequest
 pub struct GetContainerRequestRequired {
@@ -30,7 +29,7 @@ impl GetContainerRequest {
             container_id: required.container_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set container_id
@@ -54,7 +53,4 @@ impl GetContainerRequest {
     pub fn to_query_params(&self) -> Vec<(String, String)> {
         Vec::new()
     }
-
 }
-
-

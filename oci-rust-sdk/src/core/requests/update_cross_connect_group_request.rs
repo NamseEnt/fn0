@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateCrossConnectGroupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateCrossConnectGroupRequest
 pub struct UpdateCrossConnectGroupRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateCrossConnectGroupRequest {
             update_cross_connect_group_details: required.update_cross_connect_group_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set cross_connect_group_id
@@ -48,7 +47,10 @@ impl UpdateCrossConnectGroupRequest {
     }
 
     /// Set update_cross_connect_group_details
-    pub fn set_update_cross_connect_group_details(mut self, value: UpdateCrossConnectGroupDetails) -> Self {
+    pub fn set_update_cross_connect_group_details(
+        mut self,
+        value: UpdateCrossConnectGroupDetails,
+    ) -> Self {
         self.update_cross_connect_group_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateCrossConnectGroupRequest {
         self
     }
 }
-
-

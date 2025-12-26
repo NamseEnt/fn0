@@ -10,7 +10,6 @@ pub struct GetPublicIpByIpAddressDetails {
     pub ip_address: String,
 }
 
-
 /// Required fields for GetPublicIpByIpAddressDetails
 pub struct GetPublicIpByIpAddressDetailsRequired {
     /// The public IP address. Example: 203.0.113.2
@@ -22,7 +21,7 @@ impl GetPublicIpByIpAddressDetails {
     pub fn new(required: GetPublicIpByIpAddressDetailsRequired) -> Self {
         Self {
             ip_address: required.ip_address,
-}
+        }
     }
 
     /// Set ip_address
@@ -31,5 +30,3 @@ impl GetPublicIpByIpAddressDetails {
         self
     }
 }
-
-

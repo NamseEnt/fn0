@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -13,7 +13,6 @@ pub struct WorkRequestLogEntry {
     /// The time the log message was written, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339).
     pub timestamp: DateTime<Utc>,
 }
-
 
 /// Required fields for WorkRequestLogEntry
 pub struct WorkRequestLogEntryRequired {
@@ -31,7 +30,7 @@ impl WorkRequestLogEntry {
             message: required.message,
 
             timestamp: required.timestamp,
-}
+        }
     }
 
     /// Set message
@@ -46,5 +45,3 @@ impl WorkRequestLogEntry {
         self
     }
 }
-
-

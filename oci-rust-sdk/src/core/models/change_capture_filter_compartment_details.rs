@@ -10,7 +10,6 @@ pub struct ChangeCaptureFilterCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeCaptureFilterCompartmentDetails
 pub struct ChangeCaptureFilterCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the destination compartment for the VTAP capture filter move.
@@ -22,7 +21,7 @@ impl ChangeCaptureFilterCompartmentDetails {
     pub fn new(required: ChangeCaptureFilterCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeCaptureFilterCompartmentDetails {
         self
     }
 }
-
-

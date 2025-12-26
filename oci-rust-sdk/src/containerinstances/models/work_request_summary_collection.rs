@@ -10,7 +10,6 @@ pub struct WorkRequestSummaryCollection {
     pub items: Vec<WorkRequestSummary>,
 }
 
-
 /// Required fields for WorkRequestSummaryCollection
 pub struct WorkRequestSummaryCollectionRequired {
     /// List of workRequestSummary objects.
@@ -22,7 +21,7 @@ impl WorkRequestSummaryCollection {
     pub fn new(required: WorkRequestSummaryCollectionRequired) -> Self {
         Self {
             items: required.items,
-}
+        }
     }
 
     /// Set items
@@ -31,5 +30,3 @@ impl WorkRequestSummaryCollection {
         self
     }
 }
-
-

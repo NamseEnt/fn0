@@ -116,13 +116,19 @@ impl CrossConnectMappingDetails {
     }
 
     /// Set ipv4_bgp_status
-    pub fn set_ipv4_bgp_status(mut self, value: Option<CrossConnectMappingDetailsIpv4BgpStatus>) -> Self {
+    pub fn set_ipv4_bgp_status(
+        mut self,
+        value: Option<CrossConnectMappingDetailsIpv4BgpStatus>,
+    ) -> Self {
         self.ipv4_bgp_status = value;
         self
     }
 
     /// Set ipv6_bgp_status
-    pub fn set_ipv6_bgp_status(mut self, value: Option<CrossConnectMappingDetailsIpv6BgpStatus>) -> Self {
+    pub fn set_ipv6_bgp_status(
+        mut self,
+        value: Option<CrossConnectMappingDetailsIpv6BgpStatus>,
+    ) -> Self {
         self.ipv6_bgp_status = value;
         self
     }
@@ -140,7 +146,10 @@ impl CrossConnectMappingDetails {
     }
 
     /// Set cross_connect_or_cross_connect_group_id (unwraps Option)
-    pub fn with_cross_connect_or_cross_connect_group_id(mut self, value: impl Into<String>) -> Self {
+    pub fn with_cross_connect_or_cross_connect_group_id(
+        mut self,
+        value: impl Into<String>,
+    ) -> Self {
         self.cross_connect_or_cross_connect_group_id = Some(value.into());
         self
     }
@@ -199,4 +208,3 @@ impl Default for CrossConnectMappingDetails {
         Self::new()
     }
 }
-

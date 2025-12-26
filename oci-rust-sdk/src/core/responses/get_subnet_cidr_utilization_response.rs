@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct GetSubnetCidrUtilizationResponse {
     /// The returned model.IpInventoryCidrUtilizationCollection instance.
     pub ip_inventory_cidr_utilization_collection: IpInventoryCidrUtilizationCollection,
 }
-
 
 /// Required fields for GetSubnetCidrUtilizationResponse
 pub struct GetSubnetCidrUtilizationResponseRequired {
@@ -47,8 +46,9 @@ impl GetSubnetCidrUtilizationResponse {
 
             opc_total_items: required.opc_total_items,
 
-            ip_inventory_cidr_utilization_collection: required.ip_inventory_cidr_utilization_collection,
-}
+            ip_inventory_cidr_utilization_collection: required
+                .ip_inventory_cidr_utilization_collection,
+        }
     }
 
     /// Set etag
@@ -70,10 +70,11 @@ impl GetSubnetCidrUtilizationResponse {
     }
 
     /// Set ip_inventory_cidr_utilization_collection
-    pub fn set_ip_inventory_cidr_utilization_collection(mut self, value: IpInventoryCidrUtilizationCollection) -> Self {
+    pub fn set_ip_inventory_cidr_utilization_collection(
+        mut self,
+        value: IpInventoryCidrUtilizationCollection,
+    ) -> Self {
         self.ip_inventory_cidr_utilization_collection = value;
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct AttachBootVolumeResponse {
     /// The returned model.BootVolumeAttachment instance.
     pub boot_volume_attachment: BootVolumeAttachment,
 }
-
 
 /// Required fields for AttachBootVolumeResponse
 pub struct AttachBootVolumeResponseRequired {
@@ -40,7 +39,7 @@ impl AttachBootVolumeResponse {
             opc_request_id: required.opc_request_id,
 
             boot_volume_attachment: required.boot_volume_attachment,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl AttachBootVolumeResponse {
         self
     }
 }
-
-

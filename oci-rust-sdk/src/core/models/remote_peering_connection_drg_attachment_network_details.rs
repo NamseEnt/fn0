@@ -10,7 +10,6 @@ pub struct RemotePeeringConnectionDrgAttachmentNetworkDetails {
     pub r#type: String,
 }
 
-
 /// Required fields for RemotePeeringConnectionDrgAttachmentNetworkDetails
 pub struct RemotePeeringConnectionDrgAttachmentNetworkDetailsRequired {
     pub r#type: String,
@@ -21,7 +20,7 @@ impl RemotePeeringConnectionDrgAttachmentNetworkDetails {
     pub fn new(required: RemotePeeringConnectionDrgAttachmentNetworkDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set r#type
@@ -30,5 +29,3 @@ impl RemotePeeringConnectionDrgAttachmentNetworkDetails {
         self
     }
 }
-
-

@@ -13,7 +13,6 @@ pub struct GetIpInventoryVcnOverlapDetails {
     pub compartment_list: Vec<String>,
 }
 
-
 /// Required fields for GetIpInventoryVcnOverlapDetails
 pub struct GetIpInventoryVcnOverlapDetailsRequired {
     /// Lists the selected regions.
@@ -30,7 +29,7 @@ impl GetIpInventoryVcnOverlapDetails {
             region_list: required.region_list,
 
             compartment_list: required.compartment_list,
-}
+        }
     }
 
     /// Set region_list
@@ -45,5 +44,3 @@ impl GetIpInventoryVcnOverlapDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct ChangeVolumeCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for ChangeVolumeCompartmentRequest
 pub struct ChangeVolumeCompartmentRequestRequired {
@@ -38,7 +37,7 @@ impl ChangeVolumeCompartmentRequest {
             change_volume_compartment_details: required.change_volume_compartment_details,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set volume_id
@@ -48,7 +47,10 @@ impl ChangeVolumeCompartmentRequest {
     }
 
     /// Set change_volume_compartment_details
-    pub fn set_change_volume_compartment_details(mut self, value: ChangeVolumeCompartmentDetails) -> Self {
+    pub fn set_change_volume_compartment_details(
+        mut self,
+        value: ChangeVolumeCompartmentDetails,
+    ) -> Self {
         self.change_volume_compartment_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl ChangeVolumeCompartmentRequest {
         self
     }
 }
-
-

@@ -65,7 +65,6 @@ pub struct CreateBootVolumeDetails {
     pub xrc_kms_key_id: Option<String>,
 }
 
-
 /// Required fields for CreateBootVolumeDetails
 pub struct CreateBootVolumeDetailsRequired {
     /// The OCID of the compartment that contains the boot volume.
@@ -107,7 +106,7 @@ impl CreateBootVolumeDetails {
             autotune_policies: None,
 
             xrc_kms_key_id: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -129,7 +128,10 @@ impl CreateBootVolumeDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -171,7 +173,10 @@ impl CreateBootVolumeDetails {
     }
 
     /// Set source_details
-    pub fn set_source_details(mut self, value: BootVolumeSourceFromBootVolumeBackupDetails) -> Self {
+    pub fn set_source_details(
+        mut self,
+        value: BootVolumeSourceFromBootVolumeBackupDetails,
+    ) -> Self {
         self.source_details = value;
         self
     }
@@ -183,7 +188,10 @@ impl CreateBootVolumeDetails {
     }
 
     /// Set boot_volume_replicas
-    pub fn set_boot_volume_replicas(mut self, value: Option<Vec<BootVolumeReplicaDetails>>) -> Self {
+    pub fn set_boot_volume_replicas(
+        mut self,
+        value: Option<Vec<BootVolumeReplicaDetails>>,
+    ) -> Self {
         self.boot_volume_replicas = value;
         self
     }
@@ -213,7 +221,10 @@ impl CreateBootVolumeDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -278,5 +289,3 @@ impl CreateBootVolumeDetails {
         self
     }
 }
-
-

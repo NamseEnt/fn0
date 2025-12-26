@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DeleteDrgRouteDistributionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for DeleteDrgRouteDistributionRequest
 pub struct DeleteDrgRouteDistributionRequestRequired {
@@ -30,7 +29,7 @@ impl DeleteDrgRouteDistributionRequest {
             drg_route_distribution_id: required.drg_route_distribution_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set drg_route_distribution_id
@@ -51,5 +50,3 @@ impl DeleteDrgRouteDistributionRequest {
         self
     }
 }
-
-

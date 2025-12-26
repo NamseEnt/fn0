@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateComputeClusterRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for UpdateComputeClusterRequest
 pub struct UpdateComputeClusterRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute cluster. A [compute cluster](https://docs.oracle.com/iaas/Content/Compute/Tasks/compute-clusters.htm) is a remote direct memory access (RDMA) network group.
@@ -50,7 +49,7 @@ impl UpdateComputeClusterRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set compute_cluster_id
@@ -60,7 +59,10 @@ impl UpdateComputeClusterRequest {
     }
 
     /// Set update_compute_cluster_details
-    pub fn set_update_compute_cluster_details(mut self, value: UpdateComputeClusterDetails) -> Self {
+    pub fn set_update_compute_cluster_details(
+        mut self,
+        value: UpdateComputeClusterDetails,
+    ) -> Self {
         self.update_compute_cluster_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl UpdateComputeClusterRequest {
         self
     }
 }
-
-

@@ -12,7 +12,6 @@ pub struct CreateContainerVolumeDetails {
     pub volume_type: String,
 }
 
-
 /// Required fields for CreateContainerVolumeDetails
 pub struct CreateContainerVolumeDetailsRequired {
     /// The name of the volume. This must be unique within a single container instance.
@@ -28,7 +27,7 @@ impl CreateContainerVolumeDetails {
             name: required.name,
 
             volume_type: required.volume_type,
-}
+        }
     }
 
     /// Set name
@@ -43,5 +42,3 @@ impl CreateContainerVolumeDetails {
         self
     }
 }
-
-

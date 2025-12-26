@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -76,13 +76,19 @@ impl ListComputeGlobalImageCapabilitySchemasRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeGlobalImageCapabilitySchemasRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeGlobalImageCapabilitySchemasRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeGlobalImageCapabilitySchemasRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeGlobalImageCapabilitySchemasRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -112,13 +118,19 @@ impl ListComputeGlobalImageCapabilitySchemasRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListComputeGlobalImageCapabilitySchemasRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListComputeGlobalImageCapabilitySchemasRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeGlobalImageCapabilitySchemasRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeGlobalImageCapabilitySchemasRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
@@ -129,4 +141,3 @@ impl Default for ListComputeGlobalImageCapabilitySchemasRequest {
         Self::new()
     }
 }
-

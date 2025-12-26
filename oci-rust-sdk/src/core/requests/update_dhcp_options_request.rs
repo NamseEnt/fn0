@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateDhcpOptionsRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateDhcpOptionsRequest
 pub struct UpdateDhcpOptionsRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateDhcpOptionsRequest {
             update_dhcp_details: required.update_dhcp_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set dhcp_id
@@ -65,5 +64,3 @@ impl UpdateDhcpOptionsRequest {
         self
     }
 }
-
-

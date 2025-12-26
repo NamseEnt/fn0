@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetDrgRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG.
     pub drg_id: String,
 }
-
 
 /// Required fields for GetDrgRequest
 pub struct GetDrgRequestRequired {
@@ -24,7 +23,7 @@ impl GetDrgRequest {
     pub fn new(required: GetDrgRequestRequired) -> Self {
         Self {
             drg_id: required.drg_id,
-}
+        }
     }
 
     /// Set drg_id
@@ -33,5 +32,3 @@ impl GetDrgRequest {
         self
     }
 }
-
-

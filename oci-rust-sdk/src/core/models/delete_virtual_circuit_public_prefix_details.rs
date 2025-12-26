@@ -10,7 +10,6 @@ pub struct DeleteVirtualCircuitPublicPrefixDetails {
     pub cidr_block: String,
 }
 
-
 /// Required fields for DeleteVirtualCircuitPublicPrefixDetails
 pub struct DeleteVirtualCircuitPublicPrefixDetailsRequired {
     /// An individual public IP prefix (CIDR) to remove from the public virtual circuit.
@@ -22,7 +21,7 @@ impl DeleteVirtualCircuitPublicPrefixDetails {
     pub fn new(required: DeleteVirtualCircuitPublicPrefixDetailsRequired) -> Self {
         Self {
             cidr_block: required.cidr_block,
-}
+        }
     }
 
     /// Set cidr_block
@@ -31,5 +30,3 @@ impl DeleteVirtualCircuitPublicPrefixDetails {
         self
     }
 }
-
-

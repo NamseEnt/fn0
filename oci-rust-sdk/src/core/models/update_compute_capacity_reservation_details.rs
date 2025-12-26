@@ -45,7 +45,10 @@ impl UpdateComputeCapacityReservationDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -69,13 +72,19 @@ impl UpdateComputeCapacityReservationDetails {
     }
 
     /// Set instance_reservation_configs
-    pub fn set_instance_reservation_configs(mut self, value: Option<Vec<InstanceReservationConfigDetails>>) -> Self {
+    pub fn set_instance_reservation_configs(
+        mut self,
+        value: Option<Vec<InstanceReservationConfigDetails>>,
+    ) -> Self {
         self.instance_reservation_configs = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -99,7 +108,10 @@ impl UpdateComputeCapacityReservationDetails {
     }
 
     /// Set instance_reservation_configs (unwraps Option)
-    pub fn with_instance_reservation_configs(mut self, value: Vec<InstanceReservationConfigDetails>) -> Self {
+    pub fn with_instance_reservation_configs(
+        mut self,
+        value: Vec<InstanceReservationConfigDetails>,
+    ) -> Self {
         self.instance_reservation_configs = Some(value);
         self
     }
@@ -110,4 +122,3 @@ impl Default for UpdateComputeCapacityReservationDetails {
         Self::new()
     }
 }
-

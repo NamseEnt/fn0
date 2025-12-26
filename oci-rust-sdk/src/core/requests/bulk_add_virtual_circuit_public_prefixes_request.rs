@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,9 +12,9 @@ pub struct BulkAddVirtualCircuitPublicPrefixesRequest {
     pub virtual_circuit_id: String,
 
     /// Request with publix prefixes to be added to the virtual circuit
-    pub bulk_add_virtual_circuit_public_prefixes_details: BulkAddVirtualCircuitPublicPrefixesDetails,
+    pub bulk_add_virtual_circuit_public_prefixes_details:
+        BulkAddVirtualCircuitPublicPrefixesDetails,
 }
-
 
 /// Required fields for BulkAddVirtualCircuitPublicPrefixesRequest
 pub struct BulkAddVirtualCircuitPublicPrefixesRequestRequired {
@@ -22,7 +22,8 @@ pub struct BulkAddVirtualCircuitPublicPrefixesRequestRequired {
     pub virtual_circuit_id: String,
 
     /// Request with publix prefixes to be added to the virtual circuit
-    pub bulk_add_virtual_circuit_public_prefixes_details: BulkAddVirtualCircuitPublicPrefixesDetails,
+    pub bulk_add_virtual_circuit_public_prefixes_details:
+        BulkAddVirtualCircuitPublicPrefixesDetails,
 }
 
 impl BulkAddVirtualCircuitPublicPrefixesRequest {
@@ -31,8 +32,9 @@ impl BulkAddVirtualCircuitPublicPrefixesRequest {
         Self {
             virtual_circuit_id: required.virtual_circuit_id,
 
-            bulk_add_virtual_circuit_public_prefixes_details: required.bulk_add_virtual_circuit_public_prefixes_details,
-}
+            bulk_add_virtual_circuit_public_prefixes_details: required
+                .bulk_add_virtual_circuit_public_prefixes_details,
+        }
     }
 
     /// Set virtual_circuit_id
@@ -42,10 +44,11 @@ impl BulkAddVirtualCircuitPublicPrefixesRequest {
     }
 
     /// Set bulk_add_virtual_circuit_public_prefixes_details
-    pub fn set_bulk_add_virtual_circuit_public_prefixes_details(mut self, value: BulkAddVirtualCircuitPublicPrefixesDetails) -> Self {
+    pub fn set_bulk_add_virtual_circuit_public_prefixes_details(
+        mut self,
+        value: BulkAddVirtualCircuitPublicPrefixesDetails,
+    ) -> Self {
         self.bulk_add_virtual_circuit_public_prefixes_details = value;
         self
     }
 }
-
-

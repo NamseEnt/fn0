@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetPrivateIpRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the private IP or IPv6.
     pub private_ip_id: String,
 }
-
 
 /// Required fields for GetPrivateIpRequest
 pub struct GetPrivateIpRequestRequired {
@@ -24,7 +23,7 @@ impl GetPrivateIpRequest {
     pub fn new(required: GetPrivateIpRequestRequired) -> Self {
         Self {
             private_ip_id: required.private_ip_id,
-}
+        }
     }
 
     /// Set private_ip_id
@@ -33,5 +32,3 @@ impl GetPrivateIpRequest {
         self
     }
 }
-
-

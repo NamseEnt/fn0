@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct ListVirtualCircuitAssociatedTunnelsResponse {
     /// A list of VirtualCircuitAssociatedTunnelDetails instances.
     pub items: Vec<VirtualCircuitAssociatedTunnelDetails>,
 }
-
 
 /// Required fields for ListVirtualCircuitAssociatedTunnelsResponse
 pub struct ListVirtualCircuitAssociatedTunnelsResponseRequired {
@@ -48,7 +47,7 @@ impl ListVirtualCircuitAssociatedTunnelsResponse {
             opc_next_page: required.opc_next_page,
 
             items: required.items,
-}
+        }
     }
 
     /// Set etag
@@ -75,5 +74,3 @@ impl ListVirtualCircuitAssociatedTunnelsResponse {
         self
     }
 }
-
-

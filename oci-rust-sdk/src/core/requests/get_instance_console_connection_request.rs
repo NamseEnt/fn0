@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetInstanceConsoleConnectionRequest {
     /// The OCID of the instance console connection.
     pub instance_console_connection_id: String,
 }
-
 
 /// Required fields for GetInstanceConsoleConnectionRequest
 pub struct GetInstanceConsoleConnectionRequestRequired {
@@ -24,7 +23,7 @@ impl GetInstanceConsoleConnectionRequest {
     pub fn new(required: GetInstanceConsoleConnectionRequestRequired) -> Self {
         Self {
             instance_console_connection_id: required.instance_console_connection_id,
-}
+        }
     }
 
     /// Set instance_console_connection_id
@@ -33,5 +32,3 @@ impl GetInstanceConsoleConnectionRequest {
         self
     }
 }
-
-

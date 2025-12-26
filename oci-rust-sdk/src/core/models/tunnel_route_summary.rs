@@ -109,4 +109,3 @@ impl Default for TunnelRouteSummary {
         Self::new()
     }
 }
-

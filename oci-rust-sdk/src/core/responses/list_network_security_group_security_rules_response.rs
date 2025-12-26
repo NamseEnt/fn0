@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListNetworkSecurityGroupSecurityRulesResponse {
     /// A list of SecurityRule instances.
     pub items: Vec<SecurityRule>,
 }
-
 
 /// Required fields for ListNetworkSecurityGroupSecurityRulesResponse
 pub struct ListNetworkSecurityGroupSecurityRulesResponseRequired {
@@ -40,7 +39,7 @@ impl ListNetworkSecurityGroupSecurityRulesResponse {
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListNetworkSecurityGroupSecurityRulesResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct ListIpInventoryResponse {
     /// The returned model.IpInventoryCollection instance.
     pub ip_inventory_collection: IpInventoryCollection,
 }
-
 
 /// Required fields for ListIpInventoryResponse
 pub struct ListIpInventoryResponseRequired {
@@ -80,7 +79,7 @@ impl ListIpInventoryResponse {
             data_request_id: required.data_request_id,
 
             ip_inventory_collection: required.ip_inventory_collection,
-}
+        }
     }
 
     /// Set etag
@@ -131,5 +130,3 @@ impl ListIpInventoryResponse {
         self
     }
 }
-
-

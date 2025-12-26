@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct AttachServiceIdResponse {
     /// The returned model.ServiceGateway instance.
     pub service_gateway: ServiceGateway,
 }
-
 
 /// Required fields for AttachServiceIdResponse
 pub struct AttachServiceIdResponseRequired {
@@ -32,7 +31,7 @@ impl AttachServiceIdResponse {
             opc_request_id: required.opc_request_id,
 
             service_gateway: required.service_gateway,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl AttachServiceIdResponse {
         self
     }
 }
-
-

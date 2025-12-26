@@ -70,6 +70,12 @@ impl {{ name }} {
         self
     }
 {% endfor -%}
+{% if is_request %}    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
+{% endif -%}
 }
 
 {% if not has_required_fields %}impl Default for {{ name }} {

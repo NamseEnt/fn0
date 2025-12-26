@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetRemotePeeringConnectionResponse {
     /// The returned model.RemotePeeringConnection instance.
     pub remote_peering_connection: RemotePeeringConnection,
 }
-
 
 /// Required fields for GetRemotePeeringConnectionResponse
 pub struct GetRemotePeeringConnectionResponseRequired {
@@ -40,7 +39,7 @@ impl GetRemotePeeringConnectionResponse {
             opc_request_id: required.opc_request_id,
 
             remote_peering_connection: required.remote_peering_connection,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetRemotePeeringConnectionResponse {
         self
     }
 }
-
-

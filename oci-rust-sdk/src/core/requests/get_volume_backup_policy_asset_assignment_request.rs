@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct GetVolumeBackupPolicyAssetAssignmentRequest {
     pub page: Option<String>,
 }
 
-
 /// Required fields for GetVolumeBackupPolicyAssetAssignmentRequest
 pub struct GetVolumeBackupPolicyAssetAssignmentRequestRequired {
     /// The OCID of an asset (e.g. a volume).
@@ -36,7 +35,7 @@ impl GetVolumeBackupPolicyAssetAssignmentRequest {
             limit: None,
 
             page: None,
-}
+        }
     }
 
     /// Set asset_id
@@ -69,5 +68,3 @@ impl GetVolumeBackupPolicyAssetAssignmentRequest {
         self
     }
 }
-
-

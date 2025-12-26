@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ModifyVcnCidrRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for ModifyVcnCidrRequest
 pub struct ModifyVcnCidrRequestRequired {
     /// Specify the [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VCN.
@@ -50,7 +49,7 @@ impl ModifyVcnCidrRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set vcn_id
@@ -101,5 +100,3 @@ impl ModifyVcnCidrRequest {
         self
     }
 }
-
-

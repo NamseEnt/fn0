@@ -22,7 +22,6 @@ pub struct UpdateDrgRouteRuleDetails {
     pub next_hop_drg_attachment_id: Option<String>,
 }
 
-
 /// Required fields for UpdateDrgRouteRuleDetails
 pub struct UpdateDrgRouteRuleDetailsRequired {
     /// The Oracle-assigned ID of each DRG route rule to update.
@@ -40,7 +39,7 @@ impl UpdateDrgRouteRuleDetails {
             destination_type: None,
 
             next_hop_drg_attachment_id: None,
-}
+        }
     }
 
     /// Set id
@@ -56,7 +55,10 @@ impl UpdateDrgRouteRuleDetails {
     }
 
     /// Set destination_type
-    pub fn set_destination_type(mut self, value: Option<UpdateDrgRouteRuleDetailsDestinationType>) -> Self {
+    pub fn set_destination_type(
+        mut self,
+        value: Option<UpdateDrgRouteRuleDetailsDestinationType>,
+    ) -> Self {
         self.destination_type = value;
         self
     }
@@ -74,7 +76,10 @@ impl UpdateDrgRouteRuleDetails {
     }
 
     /// Set destination_type (unwraps Option)
-    pub fn with_destination_type(mut self, value: UpdateDrgRouteRuleDetailsDestinationType) -> Self {
+    pub fn with_destination_type(
+        mut self,
+        value: UpdateDrgRouteRuleDetailsDestinationType,
+    ) -> Self {
         self.destination_type = Some(value);
         self
     }
@@ -85,5 +90,3 @@ impl UpdateDrgRouteRuleDetails {
         self
     }
 }
-
-

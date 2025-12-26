@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,6 @@ pub struct ListContainerInstanceShapesRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for ListContainerInstanceShapesRequest
 pub struct ListContainerInstanceShapesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources.
@@ -48,7 +47,7 @@ impl ListContainerInstanceShapesRequest {
             page: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -104,6 +103,8 @@ impl ListContainerInstanceShapesRequest {
         self.opc_request_id = Some(value.into());
         self
     }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
-
-

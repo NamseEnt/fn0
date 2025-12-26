@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +35,6 @@ pub struct ListInstancePoolInstancesRequest {
     pub sort_order: Option<ListInstancePoolInstancesRequestSortOrder>,
 }
 
-
 /// Required fields for ListInstancePoolInstancesRequest
 pub struct ListInstancePoolInstancesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -62,7 +61,7 @@ impl ListInstancePoolInstancesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -102,7 +101,10 @@ impl ListInstancePoolInstancesRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListInstancePoolInstancesRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListInstancePoolInstancesRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -137,5 +139,3 @@ impl ListInstancePoolInstancesRequest {
         self
     }
 }
-
-

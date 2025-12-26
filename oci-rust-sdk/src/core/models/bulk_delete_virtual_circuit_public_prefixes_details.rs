@@ -10,7 +10,6 @@ pub struct BulkDeleteVirtualCircuitPublicPrefixesDetails {
     pub public_prefixes: Vec<DeleteVirtualCircuitPublicPrefixDetails>,
 }
 
-
 /// Required fields for BulkDeleteVirtualCircuitPublicPrefixesDetails
 pub struct BulkDeleteVirtualCircuitPublicPrefixesDetailsRequired {
     /// The public IP prefixes (CIDRs) to remove from the public virtual circuit.
@@ -22,14 +21,15 @@ impl BulkDeleteVirtualCircuitPublicPrefixesDetails {
     pub fn new(required: BulkDeleteVirtualCircuitPublicPrefixesDetailsRequired) -> Self {
         Self {
             public_prefixes: required.public_prefixes,
-}
+        }
     }
 
     /// Set public_prefixes
-    pub fn set_public_prefixes(mut self, value: Vec<DeleteVirtualCircuitPublicPrefixDetails>) -> Self {
+    pub fn set_public_prefixes(
+        mut self,
+        value: Vec<DeleteVirtualCircuitPublicPrefixDetails>,
+    ) -> Self {
         self.public_prefixes = value;
         self
     }
 }
-
-
