@@ -12,7 +12,7 @@ pub struct CapacityReportInstanceShapeConfig {
 
     /// The total amount of memory available to the instance, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_in_g_bs: Option<i64>,
+    pub memory_in_gbs: Option<i64>,
 
     /// The number of NVMe drives to be used for storage. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -25,7 +25,7 @@ impl CapacityReportInstanceShapeConfig {
         Self {
             ocpus: None,
 
-            memory_in_g_bs: None,
+            memory_in_gbs: None,
 
             nvmes: None,
         }
@@ -37,9 +37,9 @@ impl CapacityReportInstanceShapeConfig {
         self
     }
 
-    /// Set memory_in_g_bs
-    pub fn set_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.memory_in_g_bs = value;
+    /// Set memory_in_gbs
+    pub fn set_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.memory_in_gbs = value;
         self
     }
 
@@ -55,9 +55,9 @@ impl CapacityReportInstanceShapeConfig {
         self
     }
 
-    /// Set memory_in_g_bs (unwraps Option)
-    pub fn with_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.memory_in_g_bs = Some(value);
+    /// Set memory_in_gbs (unwraps Option)
+    pub fn with_memory_in_gbs(mut self, value: i64) -> Self {
+        self.memory_in_gbs = Some(value);
         self
     }
 
@@ -73,3 +73,4 @@ impl Default for CapacityReportInstanceShapeConfig {
         Self::new()
     }
 }
+

@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -41,6 +41,7 @@ pub struct Drg {
     pub default_export_drg_route_distribution_id: Option<String>,
 }
 
+
 /// Required fields for Drg
 pub struct DrgRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the DRG.
@@ -74,7 +75,7 @@ impl Drg {
             default_drg_route_tables: None,
 
             default_export_drg_route_distribution_id: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -84,10 +85,7 @@ impl Drg {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -135,10 +133,7 @@ impl Drg {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -168,11 +163,10 @@ impl Drg {
     }
 
     /// Set default_export_drg_route_distribution_id (unwraps Option)
-    pub fn with_default_export_drg_route_distribution_id(
-        mut self,
-        value: impl Into<String>,
-    ) -> Self {
+    pub fn with_default_export_drg_route_distribution_id(mut self, value: impl Into<String>) -> Self {
         self.default_export_drg_route_distribution_id = Some(value.into());
         self
     }
 }
+
+

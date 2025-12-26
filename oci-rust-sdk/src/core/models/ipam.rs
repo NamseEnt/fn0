@@ -14,7 +14,9 @@ pub struct Ipam {
 impl Ipam {
     /// Create a new Ipam
     pub fn new() -> Self {
-        Self { placeholder: None }
+        Self {
+            placeholder: None,
+        }
     }
 
     /// Set placeholder
@@ -35,3 +37,4 @@ impl Default for Ipam {
         Self::new()
     }
 }
+

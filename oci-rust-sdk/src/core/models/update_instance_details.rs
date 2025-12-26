@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -10,7 +10,7 @@ use super::*;
 pub struct UpdateInstanceDetails {
     /// Whether to enable AI enterprise on the instance.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_a_i_enterprise_enabled: Option<bool>,
+    pub is_aienterprise_enabled: Option<bool>,
 
     /// The OCID of the compute capacity reservation this instance is launched under. You can remove the instance from a reservation by specifying an empty string as input for this field. For more information, see [Capacity Reservations](https://docs.oracle.com/iaas/Content/Compute/Tasks/reserve-capacity.htm#default).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,7 +90,7 @@ impl UpdateInstanceDetails {
     /// Create a new UpdateInstanceDetails
     pub fn new() -> Self {
         Self {
-            is_a_i_enterprise_enabled: None,
+            is_aienterprise_enabled: None,
 
             capacity_reservation_id: None,
 
@@ -134,9 +134,9 @@ impl UpdateInstanceDetails {
         }
     }
 
-    /// Set is_a_i_enterprise_enabled
-    pub fn set_is_a_i_enterprise_enabled(mut self, value: Option<bool>) -> Self {
-        self.is_a_i_enterprise_enabled = value;
+    /// Set is_aienterprise_enabled
+    pub fn set_is_aienterprise_enabled(mut self, value: Option<bool>) -> Self {
+        self.is_aienterprise_enabled = value;
         self
     }
 
@@ -147,19 +147,13 @@ impl UpdateInstanceDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.security_attributes = value;
         self
     }
@@ -189,10 +183,7 @@ impl UpdateInstanceDetails {
     }
 
     /// Set extended_metadata
-    pub fn set_extended_metadata(
-        mut self,
-        value: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn set_extended_metadata(mut self, value: Option<HashMap<String, serde_json::Value>>) -> Self {
         self.extended_metadata = value;
         self
     }
@@ -210,19 +201,13 @@ impl UpdateInstanceDetails {
     }
 
     /// Set source_details
-    pub fn set_source_details(
-        mut self,
-        value: Option<UpdateInstanceSourceViaBootVolumeDetails>,
-    ) -> Self {
+    pub fn set_source_details(mut self, value: Option<UpdateInstanceSourceViaBootVolumeDetails>) -> Self {
         self.source_details = value;
         self
     }
 
     /// Set update_operation_constraint
-    pub fn set_update_operation_constraint(
-        mut self,
-        value: Option<UpdateInstanceDetailsUpdateOperationConstraint>,
-    ) -> Self {
+    pub fn set_update_operation_constraint(mut self, value: Option<UpdateInstanceDetailsUpdateOperationConstraint>) -> Self {
         self.update_operation_constraint = value;
         self
     }
@@ -246,10 +231,7 @@ impl UpdateInstanceDetails {
     }
 
     /// Set availability_config
-    pub fn set_availability_config(
-        mut self,
-        value: Option<UpdateInstanceAvailabilityConfigDetails>,
-    ) -> Self {
+    pub fn set_availability_config(mut self, value: Option<UpdateInstanceAvailabilityConfigDetails>) -> Self {
         self.availability_config = value;
         self
     }
@@ -273,17 +255,14 @@ impl UpdateInstanceDetails {
     }
 
     /// Set licensing_configs
-    pub fn set_licensing_configs(
-        mut self,
-        value: Option<Vec<UpdateInstanceLicensingConfig>>,
-    ) -> Self {
+    pub fn set_licensing_configs(mut self, value: Option<Vec<UpdateInstanceLicensingConfig>>) -> Self {
         self.licensing_configs = value;
         self
     }
 
-    /// Set is_a_i_enterprise_enabled (unwraps Option)
-    pub fn with_is_a_i_enterprise_enabled(mut self, value: bool) -> Self {
-        self.is_a_i_enterprise_enabled = Some(value);
+    /// Set is_aienterprise_enabled (unwraps Option)
+    pub fn with_is_aienterprise_enabled(mut self, value: bool) -> Self {
+        self.is_aienterprise_enabled = Some(value);
         self
     }
 
@@ -294,19 +273,13 @@ impl UpdateInstanceDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.security_attributes = Some(value);
         self
     }
@@ -360,10 +333,7 @@ impl UpdateInstanceDetails {
     }
 
     /// Set update_operation_constraint (unwraps Option)
-    pub fn with_update_operation_constraint(
-        mut self,
-        value: UpdateInstanceDetailsUpdateOperationConstraint,
-    ) -> Self {
+    pub fn with_update_operation_constraint(mut self, value: UpdateInstanceDetailsUpdateOperationConstraint) -> Self {
         self.update_operation_constraint = Some(value);
         self
     }
@@ -387,10 +357,7 @@ impl UpdateInstanceDetails {
     }
 
     /// Set availability_config (unwraps Option)
-    pub fn with_availability_config(
-        mut self,
-        value: UpdateInstanceAvailabilityConfigDetails,
-    ) -> Self {
+    pub fn with_availability_config(mut self, value: UpdateInstanceAvailabilityConfigDetails) -> Self {
         self.availability_config = Some(value);
         self
     }
@@ -425,3 +392,4 @@ impl Default for UpdateInstanceDetails {
         Self::new()
     }
 }
+

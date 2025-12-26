@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -105,10 +105,7 @@ impl IpInventorySubnetResourceSummary {
     }
 
     /// Set ip_address_lifetime
-    pub fn set_ip_address_lifetime(
-        mut self,
-        value: Option<IpInventorySubnetResourceSummaryIpAddressLifetime>,
-    ) -> Self {
+    pub fn set_ip_address_lifetime(mut self, value: Option<IpInventorySubnetResourceSummaryIpAddressLifetime>) -> Self {
         self.ip_address_lifetime = value;
         self
     }
@@ -126,19 +123,13 @@ impl IpInventorySubnetResourceSummary {
     }
 
     /// Set public_ip_lifetime
-    pub fn set_public_ip_lifetime(
-        mut self,
-        value: Option<IpInventorySubnetResourceSummaryPublicIpLifetime>,
-    ) -> Self {
+    pub fn set_public_ip_lifetime(mut self, value: Option<IpInventorySubnetResourceSummaryPublicIpLifetime>) -> Self {
         self.public_ip_lifetime = value;
         self
     }
 
     /// Set associated_public_ip_pool
-    pub fn set_associated_public_ip_pool(
-        mut self,
-        value: Option<IpInventorySubnetResourceSummaryAssociatedPublicIpPool>,
-    ) -> Self {
+    pub fn set_associated_public_ip_pool(mut self, value: Option<IpInventorySubnetResourceSummaryAssociatedPublicIpPool>) -> Self {
         self.associated_public_ip_pool = value;
         self
     }
@@ -162,10 +153,7 @@ impl IpInventorySubnetResourceSummary {
     }
 
     /// Set assigned_resource_type
-    pub fn set_assigned_resource_type(
-        mut self,
-        value: Option<IpInventorySubnetResourceSummaryAssignedResourceType>,
-    ) -> Self {
+    pub fn set_assigned_resource_type(mut self, value: Option<IpInventorySubnetResourceSummaryAssignedResourceType>) -> Self {
         self.assigned_resource_type = value;
         self
     }
@@ -195,10 +183,7 @@ impl IpInventorySubnetResourceSummary {
     }
 
     /// Set ip_address_lifetime (unwraps Option)
-    pub fn with_ip_address_lifetime(
-        mut self,
-        value: IpInventorySubnetResourceSummaryIpAddressLifetime,
-    ) -> Self {
+    pub fn with_ip_address_lifetime(mut self, value: IpInventorySubnetResourceSummaryIpAddressLifetime) -> Self {
         self.ip_address_lifetime = Some(value);
         self
     }
@@ -216,19 +201,13 @@ impl IpInventorySubnetResourceSummary {
     }
 
     /// Set public_ip_lifetime (unwraps Option)
-    pub fn with_public_ip_lifetime(
-        mut self,
-        value: IpInventorySubnetResourceSummaryPublicIpLifetime,
-    ) -> Self {
+    pub fn with_public_ip_lifetime(mut self, value: IpInventorySubnetResourceSummaryPublicIpLifetime) -> Self {
         self.public_ip_lifetime = Some(value);
         self
     }
 
     /// Set associated_public_ip_pool (unwraps Option)
-    pub fn with_associated_public_ip_pool(
-        mut self,
-        value: IpInventorySubnetResourceSummaryAssociatedPublicIpPool,
-    ) -> Self {
+    pub fn with_associated_public_ip_pool(mut self, value: IpInventorySubnetResourceSummaryAssociatedPublicIpPool) -> Self {
         self.associated_public_ip_pool = Some(value);
         self
     }
@@ -252,10 +231,7 @@ impl IpInventorySubnetResourceSummary {
     }
 
     /// Set assigned_resource_type (unwraps Option)
-    pub fn with_assigned_resource_type(
-        mut self,
-        value: IpInventorySubnetResourceSummaryAssignedResourceType,
-    ) -> Self {
+    pub fn with_assigned_resource_type(mut self, value: IpInventorySubnetResourceSummaryAssignedResourceType) -> Self {
         self.assigned_resource_type = Some(value);
         self
     }
@@ -278,3 +254,4 @@ impl Default for IpInventorySubnetResourceSummary {
         Self::new()
     }
 }
+

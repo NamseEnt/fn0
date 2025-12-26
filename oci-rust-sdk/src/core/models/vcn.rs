@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -80,6 +80,7 @@ pub struct Vcn {
     pub is_zpr_only: Option<bool>,
 }
 
+
 /// Required fields for Vcn
 pub struct VcnRequired {
     /// Deprecated. The first CIDR IP address from cidrBlocks. <p> Example: {@code 172.16.0.0/16}
@@ -139,7 +140,7 @@ impl Vcn {
             vcn_domain_name: None,
 
             is_zpr_only: None,
-        }
+}
     }
 
     /// Set byoipv6_cidr_blocks
@@ -191,10 +192,7 @@ impl Vcn {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -218,10 +216,7 @@ impl Vcn {
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.security_attributes = value;
         self
     }
@@ -293,10 +288,7 @@ impl Vcn {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -320,10 +312,7 @@ impl Vcn {
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.security_attributes = Some(value);
         self
     }
@@ -352,3 +341,5 @@ impl Vcn {
         self
     }
 }
+
+

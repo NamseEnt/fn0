@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -44,11 +44,11 @@ pub struct VolumeGroupBackup {
 
     /// The aggregate size of the volume group backup, in MBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_m_bs: Option<i64>,
+    pub size_in_mbs: Option<i64>,
 
     /// The aggregate size of the volume group backup, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_g_bs: Option<i64>,
+    pub size_in_gbs: Option<i64>,
 
     /// Specifies whether the volume group backup was created manually, or via scheduled backup policy.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,6 +74,7 @@ pub struct VolumeGroupBackup {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_volume_group_backup_id: Option<String>,
 }
+
 
 /// Required fields for VolumeGroupBackup
 pub struct VolumeGroupBackupRequired {
@@ -123,9 +124,9 @@ impl VolumeGroupBackup {
 
             freeform_tags: None,
 
-            size_in_m_bs: None,
+            size_in_mbs: None,
 
-            size_in_g_bs: None,
+            size_in_gbs: None,
 
             source_type: None,
 
@@ -138,7 +139,7 @@ impl VolumeGroupBackup {
             volume_group_id: None,
 
             source_volume_group_backup_id: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -148,10 +149,7 @@ impl VolumeGroupBackup {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -186,15 +184,15 @@ impl VolumeGroupBackup {
         self
     }
 
-    /// Set size_in_m_bs
-    pub fn set_size_in_m_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_m_bs = value;
+    /// Set size_in_mbs
+    pub fn set_size_in_mbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_mbs = value;
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
@@ -253,10 +251,7 @@ impl VolumeGroupBackup {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -273,15 +268,15 @@ impl VolumeGroupBackup {
         self
     }
 
-    /// Set size_in_m_bs (unwraps Option)
-    pub fn with_size_in_m_bs(mut self, value: i64) -> Self {
-        self.size_in_m_bs = Some(value);
+    /// Set size_in_mbs (unwraps Option)
+    pub fn with_size_in_mbs(mut self, value: i64) -> Self {
+        self.size_in_mbs = Some(value);
         self
     }
 
-    /// Set size_in_g_bs (unwraps Option)
-    pub fn with_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = Some(value);
+    /// Set size_in_gbs (unwraps Option)
+    pub fn with_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = Some(value);
         self
     }
 
@@ -321,3 +316,5 @@ impl VolumeGroupBackup {
         self
     }
 }
+
+

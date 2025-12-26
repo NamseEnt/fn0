@@ -10,6 +10,7 @@ pub struct ComputeHpcIslandCollection {
     pub items: Vec<ComputeHpcIslandSummary>,
 }
 
+
 /// Required fields for ComputeHpcIslandCollection
 pub struct ComputeHpcIslandCollectionRequired {
     /// The list of compute HPC islands.
@@ -21,7 +22,7 @@ impl ComputeHpcIslandCollection {
     pub fn new(required: ComputeHpcIslandCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ComputeHpcIslandCollection {
         self
     }
 }
+
+

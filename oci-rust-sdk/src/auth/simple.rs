@@ -22,8 +22,8 @@ pub struct SimpleAuthProviderRequiredFields {
 /// # Example
 ///
 /// ```
-/// use oci_rust_sdk::core::auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields};
-/// use oci_rust_sdk::core::region::Region;
+/// use oci_rust_sdk::auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields};
+/// use oci_rust_sdk::core::Region;
 ///
 /// let required = SimpleAuthProviderRequiredFields {
 ///     tenancy: "ocid1.tenancy.oc1..aaa...".to_string(),

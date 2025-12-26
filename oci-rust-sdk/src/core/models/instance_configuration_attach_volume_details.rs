@@ -26,6 +26,7 @@ pub struct InstanceConfigurationAttachVolumeDetails {
     pub is_shareable: Option<bool>,
 }
 
+
 /// Required fields for InstanceConfigurationAttachVolumeDetails
 pub struct InstanceConfigurationAttachVolumeDetailsRequired {
     pub r#type: String,
@@ -44,7 +45,7 @@ impl InstanceConfigurationAttachVolumeDetails {
             device: None,
 
             is_shareable: None,
-        }
+}
     }
 
     /// Set display_name
@@ -101,3 +102,5 @@ impl InstanceConfigurationAttachVolumeDetails {
         self
     }
 }
+
+

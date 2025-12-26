@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 pub enum VolumeBackupScheduleTimeZone {
     #[serde(rename = "UTC")]
     Utc,
-
+    
     #[serde(rename = "REGIONAL_DATA_CENTER_TIME")]
     RegionalDataCenterTime,
-
+    
+    
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

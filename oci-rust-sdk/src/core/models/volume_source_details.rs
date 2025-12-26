@@ -10,6 +10,7 @@ pub struct VolumeSourceDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for VolumeSourceDetails
 pub struct VolumeSourceDetailsRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl VolumeSourceDetails {
     pub fn new(required: VolumeSourceDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl VolumeSourceDetails {
         self
     }
 }
+
+

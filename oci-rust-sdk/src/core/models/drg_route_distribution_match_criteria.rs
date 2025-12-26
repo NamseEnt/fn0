@@ -9,6 +9,7 @@ pub struct DrgRouteDistributionMatchCriteria {
     pub match_type: String,
 }
 
+
 /// Required fields for DrgRouteDistributionMatchCriteria
 pub struct DrgRouteDistributionMatchCriteriaRequired {
     pub match_type: String,
@@ -19,7 +20,7 @@ impl DrgRouteDistributionMatchCriteria {
     pub fn new(required: DrgRouteDistributionMatchCriteriaRequired) -> Self {
         Self {
             match_type: required.match_type,
-        }
+}
     }
 
     /// Set match_type
@@ -28,3 +29,5 @@ impl DrgRouteDistributionMatchCriteria {
         self
     }
 }
+
+

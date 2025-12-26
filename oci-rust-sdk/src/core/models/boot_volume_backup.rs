@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -53,7 +53,7 @@ pub struct BootVolumeBackup {
 
     /// The size of the boot volume, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_g_bs: Option<i64>,
+    pub size_in_gbs: Option<i64>,
 
     /// The OCID of the source boot volume backup.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,8 +74,9 @@ pub struct BootVolumeBackup {
 
     /// The size used by the backup, in GBs. It is typically smaller than sizeInGBs, depending on the space consumed on the boot volume and whether the backup is full or incremental. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unique_size_in_g_bs: Option<i64>,
+    pub unique_size_in_gbs: Option<i64>,
 }
+
 
 /// Required fields for BootVolumeBackup
 pub struct BootVolumeBackupRequired {
@@ -123,7 +124,7 @@ impl BootVolumeBackup {
 
             kms_key_id: None,
 
-            size_in_g_bs: None,
+            size_in_gbs: None,
 
             source_boot_volume_backup_id: None,
 
@@ -133,8 +134,8 @@ impl BootVolumeBackup {
 
             r#type: None,
 
-            unique_size_in_g_bs: None,
-        }
+            unique_size_in_gbs: None,
+}
     }
 
     /// Set boot_volume_id
@@ -150,19 +151,13 @@ impl BootVolumeBackup {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set system_tags
-    pub fn set_system_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.system_tags = value;
         self
     }
@@ -209,9 +204,9 @@ impl BootVolumeBackup {
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
@@ -245,9 +240,9 @@ impl BootVolumeBackup {
         self
     }
 
-    /// Set unique_size_in_g_bs
-    pub fn set_unique_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.unique_size_in_g_bs = value;
+    /// Set unique_size_in_gbs
+    pub fn set_unique_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.unique_size_in_gbs = value;
         self
     }
 
@@ -258,19 +253,13 @@ impl BootVolumeBackup {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -299,9 +288,9 @@ impl BootVolumeBackup {
         self
     }
 
-    /// Set size_in_g_bs (unwraps Option)
-    pub fn with_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = Some(value);
+    /// Set size_in_gbs (unwraps Option)
+    pub fn with_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = Some(value);
         self
     }
 
@@ -329,9 +318,11 @@ impl BootVolumeBackup {
         self
     }
 
-    /// Set unique_size_in_g_bs (unwraps Option)
-    pub fn with_unique_size_in_g_bs(mut self, value: i64) -> Self {
-        self.unique_size_in_g_bs = Some(value);
+    /// Set unique_size_in_gbs (unwraps Option)
+    pub fn with_unique_size_in_gbs(mut self, value: i64) -> Self {
+        self.unique_size_in_gbs = Some(value);
         self
     }
 }
+
+

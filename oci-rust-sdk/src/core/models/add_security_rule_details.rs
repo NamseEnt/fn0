@@ -46,6 +46,7 @@ pub struct AddSecurityRuleDetails {
     pub udp_options: Option<UdpOptions>,
 }
 
+
 /// Required fields for AddSecurityRuleDetails
 pub struct AddSecurityRuleDetailsRequired {
     /// Direction of the security rule. Set to {@code EGRESS} for rules to allow outbound IP packets, or {@code INGRESS} for rules to allow inbound IP packets.
@@ -80,7 +81,7 @@ impl AddSecurityRuleDetails {
             tcp_options: None,
 
             udp_options: None,
-        }
+}
     }
 
     /// Set description
@@ -96,10 +97,7 @@ impl AddSecurityRuleDetails {
     }
 
     /// Set destination_type
-    pub fn set_destination_type(
-        mut self,
-        value: Option<AddSecurityRuleDetailsDestinationType>,
-    ) -> Self {
+    pub fn set_destination_type(mut self, value: Option<AddSecurityRuleDetailsDestinationType>) -> Self {
         self.destination_type = value;
         self
     }
@@ -206,3 +204,5 @@ impl AddSecurityRuleDetails {
         self
     }
 }
+
+

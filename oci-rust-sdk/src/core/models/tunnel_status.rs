@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -23,6 +23,7 @@ pub struct TunnelStatus {
     pub time_state_modified: Option<DateTime<Utc>>,
 }
 
+
 /// Required fields for TunnelStatus
 pub struct TunnelStatusRequired {
     /// The IP address of Oracle's VPN headend. <p> Example: {@code 203.0.113.50}
@@ -40,7 +41,7 @@ impl TunnelStatus {
             time_created: None,
 
             time_state_modified: None,
-        }
+}
     }
 
     /// Set ip_address
@@ -85,3 +86,5 @@ impl TunnelStatus {
         self
     }
 }
+
+

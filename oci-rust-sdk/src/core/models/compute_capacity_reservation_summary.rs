@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -50,6 +50,7 @@ pub struct ComputeCapacityReservationSummary {
     pub is_default_reservation: Option<bool>,
 }
 
+
 /// Required fields for ComputeCapacityReservationSummary
 pub struct ComputeCapacityReservationSummaryRequired {
     /// The OCID of the instance reservation configuration.
@@ -87,7 +88,7 @@ impl ComputeCapacityReservationSummary {
             used_instance_count: None,
 
             is_default_reservation: None,
-        }
+}
     }
 
     /// Set id
@@ -109,10 +110,7 @@ impl ComputeCapacityReservationSummary {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -172,10 +170,7 @@ impl ComputeCapacityReservationSummary {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -210,3 +205,5 @@ impl ComputeCapacityReservationSummary {
         self
     }
 }
+
+

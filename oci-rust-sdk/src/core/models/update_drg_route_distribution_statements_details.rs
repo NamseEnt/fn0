@@ -10,6 +10,7 @@ pub struct UpdateDrgRouteDistributionStatementsDetails {
     pub statements: Vec<UpdateDrgRouteDistributionStatementDetails>,
 }
 
+
 /// Required fields for UpdateDrgRouteDistributionStatementsDetails
 pub struct UpdateDrgRouteDistributionStatementsDetailsRequired {
     /// The route distribution statements to update, and the details to be updated.
@@ -21,15 +22,14 @@ impl UpdateDrgRouteDistributionStatementsDetails {
     pub fn new(required: UpdateDrgRouteDistributionStatementsDetailsRequired) -> Self {
         Self {
             statements: required.statements,
-        }
+}
     }
 
     /// Set statements
-    pub fn set_statements(
-        mut self,
-        value: Vec<UpdateDrgRouteDistributionStatementDetails>,
-    ) -> Self {
+    pub fn set_statements(mut self, value: Vec<UpdateDrgRouteDistributionStatementDetails>) -> Self {
         self.statements = value;
         self
     }
 }
+
+

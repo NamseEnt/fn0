@@ -10,6 +10,7 @@ pub struct ChangeByoasnCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeByoasnCompartmentDetails
 pub struct ChangeByoasnCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the destination compartment for the BYOASN resource move.
@@ -21,7 +22,7 @@ impl ChangeByoasnCompartmentDetails {
     pub fn new(required: ChangeByoasnCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeByoasnCompartmentDetails {
         self
     }
 }
+
+

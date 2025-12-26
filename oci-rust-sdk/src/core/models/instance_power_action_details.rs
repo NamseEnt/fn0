@@ -9,6 +9,7 @@ pub struct InstancePowerActionDetails {
     pub action_type: String,
 }
 
+
 /// Required fields for InstancePowerActionDetails
 pub struct InstancePowerActionDetailsRequired {
     pub action_type: String,
@@ -19,7 +20,7 @@ impl InstancePowerActionDetails {
     pub fn new(required: InstancePowerActionDetailsRequired) -> Self {
         Self {
             action_type: required.action_type,
-        }
+}
     }
 
     /// Set action_type
@@ -28,3 +29,5 @@ impl InstancePowerActionDetails {
         self
     }
 }
+
+

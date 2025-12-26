@@ -14,6 +14,7 @@ pub struct IntelVmUpdateInstancePlatformConfig {
     pub is_symmetric_multi_threading_enabled: Option<bool>,
 }
 
+
 /// Required fields for IntelVmUpdateInstancePlatformConfig
 pub struct IntelVmUpdateInstancePlatformConfigRequired {
     pub r#type: String,
@@ -26,7 +27,7 @@ impl IntelVmUpdateInstancePlatformConfig {
             r#type: required.r#type,
 
             is_symmetric_multi_threading_enabled: None,
-        }
+}
     }
 
     /// Set is_symmetric_multi_threading_enabled
@@ -47,3 +48,5 @@ impl IntelVmUpdateInstancePlatformConfig {
         self
     }
 }
+
+

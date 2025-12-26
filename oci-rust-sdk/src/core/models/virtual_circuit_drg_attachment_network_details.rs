@@ -14,6 +14,7 @@ pub struct VirtualCircuitDrgAttachmentNetworkDetails {
     pub transport_only_mode: Option<bool>,
 }
 
+
 /// Required fields for VirtualCircuitDrgAttachmentNetworkDetails
 pub struct VirtualCircuitDrgAttachmentNetworkDetailsRequired {
     pub r#type: String,
@@ -26,7 +27,7 @@ impl VirtualCircuitDrgAttachmentNetworkDetails {
             r#type: required.r#type,
 
             transport_only_mode: None,
-        }
+}
     }
 
     /// Set transport_only_mode
@@ -47,3 +48,5 @@ impl VirtualCircuitDrgAttachmentNetworkDetails {
         self
     }
 }
+
+

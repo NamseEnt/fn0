@@ -8,116 +8,116 @@ use super::*;
 pub struct ShapeMemoryOptions {
     /// The minimum amount of memory, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_in_g_bs: Option<i64>,
+    pub min_in_gbs: Option<i64>,
 
     /// The maximum amount of memory, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_in_g_bs: Option<i64>,
+    pub max_in_gbs: Option<i64>,
 
     /// The default amount of memory per OCPU available for this shape, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_per_ocpu_in_g_bs: Option<i64>,
+    pub default_per_ocpu_in_gbs: Option<i64>,
 
     /// The minimum amount of memory per OCPU available for this shape, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_per_ocpu_in_g_bs: Option<i64>,
+    pub min_per_ocpu_in_gbs: Option<i64>,
 
     /// The maximum amount of memory per OCPU available for this shape, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_per_ocpu_in_g_bs: Option<i64>,
+    pub max_per_ocpu_in_gbs: Option<i64>,
 
     /// The maximum amount of memory per NUMA node, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_per_numa_node_in_g_bs: Option<i64>,
+    pub max_per_numa_node_in_gbs: Option<i64>,
 }
 
 impl ShapeMemoryOptions {
     /// Create a new ShapeMemoryOptions
     pub fn new() -> Self {
         Self {
-            min_in_g_bs: None,
+            min_in_gbs: None,
 
-            max_in_g_bs: None,
+            max_in_gbs: None,
 
-            default_per_ocpu_in_g_bs: None,
+            default_per_ocpu_in_gbs: None,
 
-            min_per_ocpu_in_g_bs: None,
+            min_per_ocpu_in_gbs: None,
 
-            max_per_ocpu_in_g_bs: None,
+            max_per_ocpu_in_gbs: None,
 
-            max_per_numa_node_in_g_bs: None,
+            max_per_numa_node_in_gbs: None,
         }
     }
 
-    /// Set min_in_g_bs
-    pub fn set_min_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.min_in_g_bs = value;
+    /// Set min_in_gbs
+    pub fn set_min_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.min_in_gbs = value;
         self
     }
 
-    /// Set max_in_g_bs
-    pub fn set_max_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.max_in_g_bs = value;
+    /// Set max_in_gbs
+    pub fn set_max_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.max_in_gbs = value;
         self
     }
 
-    /// Set default_per_ocpu_in_g_bs
-    pub fn set_default_per_ocpu_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.default_per_ocpu_in_g_bs = value;
+    /// Set default_per_ocpu_in_gbs
+    pub fn set_default_per_ocpu_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.default_per_ocpu_in_gbs = value;
         self
     }
 
-    /// Set min_per_ocpu_in_g_bs
-    pub fn set_min_per_ocpu_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.min_per_ocpu_in_g_bs = value;
+    /// Set min_per_ocpu_in_gbs
+    pub fn set_min_per_ocpu_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.min_per_ocpu_in_gbs = value;
         self
     }
 
-    /// Set max_per_ocpu_in_g_bs
-    pub fn set_max_per_ocpu_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.max_per_ocpu_in_g_bs = value;
+    /// Set max_per_ocpu_in_gbs
+    pub fn set_max_per_ocpu_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.max_per_ocpu_in_gbs = value;
         self
     }
 
-    /// Set max_per_numa_node_in_g_bs
-    pub fn set_max_per_numa_node_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.max_per_numa_node_in_g_bs = value;
+    /// Set max_per_numa_node_in_gbs
+    pub fn set_max_per_numa_node_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.max_per_numa_node_in_gbs = value;
         self
     }
 
-    /// Set min_in_g_bs (unwraps Option)
-    pub fn with_min_in_g_bs(mut self, value: i64) -> Self {
-        self.min_in_g_bs = Some(value);
+    /// Set min_in_gbs (unwraps Option)
+    pub fn with_min_in_gbs(mut self, value: i64) -> Self {
+        self.min_in_gbs = Some(value);
         self
     }
 
-    /// Set max_in_g_bs (unwraps Option)
-    pub fn with_max_in_g_bs(mut self, value: i64) -> Self {
-        self.max_in_g_bs = Some(value);
+    /// Set max_in_gbs (unwraps Option)
+    pub fn with_max_in_gbs(mut self, value: i64) -> Self {
+        self.max_in_gbs = Some(value);
         self
     }
 
-    /// Set default_per_ocpu_in_g_bs (unwraps Option)
-    pub fn with_default_per_ocpu_in_g_bs(mut self, value: i64) -> Self {
-        self.default_per_ocpu_in_g_bs = Some(value);
+    /// Set default_per_ocpu_in_gbs (unwraps Option)
+    pub fn with_default_per_ocpu_in_gbs(mut self, value: i64) -> Self {
+        self.default_per_ocpu_in_gbs = Some(value);
         self
     }
 
-    /// Set min_per_ocpu_in_g_bs (unwraps Option)
-    pub fn with_min_per_ocpu_in_g_bs(mut self, value: i64) -> Self {
-        self.min_per_ocpu_in_g_bs = Some(value);
+    /// Set min_per_ocpu_in_gbs (unwraps Option)
+    pub fn with_min_per_ocpu_in_gbs(mut self, value: i64) -> Self {
+        self.min_per_ocpu_in_gbs = Some(value);
         self
     }
 
-    /// Set max_per_ocpu_in_g_bs (unwraps Option)
-    pub fn with_max_per_ocpu_in_g_bs(mut self, value: i64) -> Self {
-        self.max_per_ocpu_in_g_bs = Some(value);
+    /// Set max_per_ocpu_in_gbs (unwraps Option)
+    pub fn with_max_per_ocpu_in_gbs(mut self, value: i64) -> Self {
+        self.max_per_ocpu_in_gbs = Some(value);
         self
     }
 
-    /// Set max_per_numa_node_in_g_bs (unwraps Option)
-    pub fn with_max_per_numa_node_in_g_bs(mut self, value: i64) -> Self {
-        self.max_per_numa_node_in_g_bs = Some(value);
+    /// Set max_per_numa_node_in_gbs (unwraps Option)
+    pub fn with_max_per_numa_node_in_gbs(mut self, value: i64) -> Self {
+        self.max_per_numa_node_in_gbs = Some(value);
         self
     }
 }
@@ -127,3 +127,4 @@ impl Default for ShapeMemoryOptions {
         Self::new()
     }
 }
+

@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -105,10 +105,7 @@ impl AppCatalogListingResourceVersion {
     }
 
     /// Set allowed_actions
-    pub fn set_allowed_actions(
-        mut self,
-        value: Option<Vec<AppCatalogListingResourceVersionAllowedActions>>,
-    ) -> Self {
+    pub fn set_allowed_actions(mut self, value: Option<Vec<AppCatalogListingResourceVersionAllowedActions>>) -> Self {
         self.allowed_actions = value;
         self
     }
@@ -156,10 +153,7 @@ impl AppCatalogListingResourceVersion {
     }
 
     /// Set allowed_actions (unwraps Option)
-    pub fn with_allowed_actions(
-        mut self,
-        value: Vec<AppCatalogListingResourceVersionAllowedActions>,
-    ) -> Self {
+    pub fn with_allowed_actions(mut self, value: Vec<AppCatalogListingResourceVersionAllowedActions>) -> Self {
         self.allowed_actions = Some(value);
         self
     }
@@ -170,3 +164,4 @@ impl Default for AppCatalogListingResourceVersion {
         Self::new()
     }
 }
+

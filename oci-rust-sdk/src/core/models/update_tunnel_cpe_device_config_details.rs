@@ -20,10 +20,7 @@ impl UpdateTunnelCpeDeviceConfigDetails {
     }
 
     /// Set tunnel_cpe_device_config
-    pub fn set_tunnel_cpe_device_config(
-        mut self,
-        value: Option<Vec<CpeDeviceConfigAnswer>>,
-    ) -> Self {
+    pub fn set_tunnel_cpe_device_config(mut self, value: Option<Vec<CpeDeviceConfigAnswer>>) -> Self {
         self.tunnel_cpe_device_config = value;
         self
     }
@@ -40,3 +37,4 @@ impl Default for UpdateTunnelCpeDeviceConfigDetails {
         Self::new()
     }
 }
+

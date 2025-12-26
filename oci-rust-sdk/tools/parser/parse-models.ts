@@ -25,6 +25,7 @@ interface ParsedModel {
   name: string;          // PascalCase
   fileName: string;      // kebab-case
   kind: 'interface' | 'enum' | 'type-alias';
+  sourceDir: 'model' | 'request' | 'response';  // Track which directory this came from
   documentation: string;
   fields?: ParsedField[];
   variants?: { name: string; value: string }[];
@@ -42,7 +43,28 @@ const RUST_KEYWORDS = [
 ];
 
 function toSnakeCase(str: string): string {
-  return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+  if (!str) return str;
+
+  let result = '';
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    const nextChar = i < str.length - 1 ? str[i + 1] : null;
+
+    const isLower = char >= 'a' && char <= 'z';
+    const isDigit = char >= '0' && char <= '9';
+    const isNextUpper = nextChar && nextChar >= 'A' && nextChar <= 'Z';
+
+    result += char.toLowerCase();
+
+    // Add underscore after lowercase/digit when followed by uppercase
+    // Examples: displayName -> display_name, memoryInGBs -> memory_in_gbs, ABcdEfG -> abcd_ef_g
+    if ((isLower || isDigit) && isNextUpper) {
+      result += '_';
+    }
+  }
+
+  return result;
 }
 
 function escapeRustKeyword(rustName: string): string {
@@ -52,7 +74,7 @@ function escapeRustKeyword(rustName: string): string {
   return rustName;
 }
 
-function parseInterface(interfaceDecl: InterfaceDeclaration): ParsedModel {
+function parseInterface(interfaceDecl: InterfaceDeclaration, sourceDir: 'model' | 'request' | 'response'): ParsedModel {
   const name = interfaceDecl.getName();
   const fileName = toSnakeCase(name);
   const documentation = interfaceDecl.getJsDocs()[0]?.getDescription() || '';
@@ -92,6 +114,7 @@ function parseInterface(interfaceDecl: InterfaceDeclaration): ParsedModel {
       name,
       fileName,
       kind: 'interface',
+      sourceDir,
       documentation,
       fields,
       baseType,
@@ -107,13 +130,14 @@ function parseInterface(interfaceDecl: InterfaceDeclaration): ParsedModel {
     name,
     fileName,
     kind: 'interface',
+    sourceDir,
     documentation,
     fields,
     discriminator,
   };
 }
 
-function parseEnum(enumDecl: EnumDeclaration): ParsedModel {
+function parseEnum(enumDecl: EnumDeclaration, sourceDir: 'model' | 'request' | 'response'): ParsedModel {
   const name = enumDecl.getName();
   const fileName = toSnakeCase(name);
   const documentation = enumDecl.getJsDocs()[0]?.getDescription() || '';
@@ -127,6 +151,7 @@ function parseEnum(enumDecl: EnumDeclaration): ParsedModel {
     name,
     fileName,
     kind: 'enum',
+    sourceDir,
     documentation,
     variants,
   };
@@ -134,64 +159,78 @@ function parseEnum(enumDecl: EnumDeclaration): ParsedModel {
 
 async function parseModels(serviceName: string): Promise<ParsedModel[]> {
   const sdkPath = path.join(__dirname, '../../oci-typescript-sdk');
-  const modelPath = path.join(sdkPath, 'lib', serviceName, 'lib', 'model');
+  const serviceLibPath = path.join(sdkPath, 'lib', serviceName, 'lib');
+  const modelPath = path.join(serviceLibPath, 'model');
+  const requestPath = path.join(serviceLibPath, 'request');
+  const responsePath = path.join(serviceLibPath, 'response');
 
   if (!fs.existsSync(modelPath)) {
     console.error(`Error: Model path not found: ${modelPath}`);
     return [];
   }
 
-  console.error(`Parsing models from ${modelPath}`);
-
-  const project = new Project({
-    tsConfigFilePath: path.join(__dirname, 'tsconfig.json'),
-    skipAddingFilesFromTsConfig: true,
-  });
-
-  // Add all model files
-  const modelFiles = fs.readdirSync(modelPath)
-    .filter(f => f.endsWith('.ts') && f !== 'index.ts')
-    .map(f => path.join(modelPath, f));
-
-  project.addSourceFilesAtPaths(modelFiles);
-
   const models: ParsedModel[] = [];
   const namespaceEnumMap = new Map<string, string>(); // "Shape.BaselineOcpuUtilizations" → "ShapeBaselineOcpuUtilizations"
 
-  for (const sourceFile of project.getSourceFiles()) {
-    // Parse interfaces
-    for (const interfaceDecl of sourceFile.getInterfaces()) {
-      // Skip exported namespaces (these are enum containers)
-      if (interfaceDecl.getName().includes('.')) continue;
-
-      const model = parseInterface(interfaceDecl);
-      models.push(model);
+  // Helper function to parse files from a directory
+  const parseDirectory = (dirPath: string, sourceDir: 'model' | 'request' | 'response') => {
+    if (!fs.existsSync(dirPath)) {
+      return;
     }
 
-    // Parse enums
-    for (const enumDecl of sourceFile.getEnums()) {
-      const model = parseEnum(enumDecl);
-      models.push(model);
-    }
+    console.error(`Parsing ${sourceDir}s from ${dirPath}`);
 
-    // Parse namespace enums (e.g., Instance.LifecycleState)
-    for (const namespace of sourceFile.getModules()) {
-      for (const enumDecl of namespace.getEnums()) {
-        const parentName = namespace.getName();
-        const enumName = enumDecl.getName();
-        const fullName = `${parentName}${enumName}`; // No underscore - PascalCase
-        const dottedRef = `${parentName}.${enumName}`; // TypeScript reference
+    const project = new Project({
+      tsConfigFilePath: path.join(__dirname, 'tsconfig.json'),
+      skipAddingFilesFromTsConfig: true,
+    });
 
-        const model = parseEnum(enumDecl);
-        model.name = fullName;
-        // Convert to snake_case for filename: ShapeBaselineOcpuUtilizations → shape_baseline_ocpu_utilizations
-        model.fileName = toSnakeCase(fullName);
+    const files = fs.readdirSync(dirPath)
+      .filter(f => f.endsWith('.ts') && f !== 'index.ts')
+      .map(f => path.join(dirPath, f));
 
-        namespaceEnumMap.set(dottedRef, fullName);
+    project.addSourceFilesAtPaths(files);
+
+    for (const sourceFile of project.getSourceFiles()) {
+      // Parse interfaces
+      for (const interfaceDecl of sourceFile.getInterfaces()) {
+        // Skip exported namespaces (these are enum containers)
+        if (interfaceDecl.getName().includes('.')) continue;
+
+        const model = parseInterface(interfaceDecl, sourceDir);
         models.push(model);
       }
+
+      // Parse enums
+      for (const enumDecl of sourceFile.getEnums()) {
+        const model = parseEnum(enumDecl, sourceDir);
+        models.push(model);
+      }
+
+      // Parse namespace enums (e.g., Instance.LifecycleState or ListContainerInstancesRequest.SortBy)
+      for (const namespace of sourceFile.getModules()) {
+        for (const enumDecl of namespace.getEnums()) {
+          const parentName = namespace.getName();
+          const enumName = enumDecl.getName();
+          const fullName = `${parentName}${enumName}`; // No underscore - PascalCase
+          const dottedRef = `${parentName}.${enumName}`; // TypeScript reference
+
+          const model = parseEnum(enumDecl, sourceDir);
+          model.name = fullName;
+          // Convert to snake_case for filename: ShapeBaselineOcpuUtilizations → shape_baseline_ocpu_utilizations
+          model.fileName = toSnakeCase(fullName);
+
+          namespaceEnumMap.set(dottedRef, fullName);
+          models.push(model);
+        }
+      }
     }
-  }
+  };
+
+  // Parse model, request, and response directories
+  parseDirectory(modelPath, 'model');
+  parseDirectory(requestPath, 'request');
+  parseDirectory(responsePath, 'response');
 
   // Replace all dotted namespace enum references in field types
   for (const model of models) {

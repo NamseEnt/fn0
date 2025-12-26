@@ -17,6 +17,7 @@ pub struct ContainerConfigFile {
     pub path: Option<String>,
 }
 
+
 /// Required fields for ContainerConfigFile
 pub struct ContainerConfigFileRequired {
     /// The name of the file. The fileName should be unique across the volume.
@@ -35,7 +36,7 @@ impl ContainerConfigFile {
             data: required.data,
 
             path: None,
-        }
+}
     }
 
     /// Set file_name
@@ -62,3 +63,5 @@ impl ContainerConfigFile {
         self
     }
 }
+
+

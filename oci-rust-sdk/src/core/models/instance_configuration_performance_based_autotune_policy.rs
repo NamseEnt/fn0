@@ -7,15 +7,16 @@ use super::*;
 #[serde(rename_all = "camelCase")]
 pub struct InstanceConfigurationPerformanceBasedAutotunePolicy {
     /// This will be the maximum VPUs/GB performance level that the volume will be auto-tuned temporarily based on performance monitoring. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub max_vpus_per_g_b: i64,
+    pub max_vpus_per_gb: i64,
 
     pub autotune_type: String,
 }
 
+
 /// Required fields for InstanceConfigurationPerformanceBasedAutotunePolicy
 pub struct InstanceConfigurationPerformanceBasedAutotunePolicyRequired {
     /// This will be the maximum VPUs/GB performance level that the volume will be auto-tuned temporarily based on performance monitoring. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub max_vpus_per_g_b: i64,
+    pub max_vpus_per_gb: i64,
 
     pub autotune_type: String,
 }
@@ -24,15 +25,15 @@ impl InstanceConfigurationPerformanceBasedAutotunePolicy {
     /// Create a new InstanceConfigurationPerformanceBasedAutotunePolicy with required fields
     pub fn new(required: InstanceConfigurationPerformanceBasedAutotunePolicyRequired) -> Self {
         Self {
-            max_vpus_per_g_b: required.max_vpus_per_g_b,
+            max_vpus_per_gb: required.max_vpus_per_gb,
 
             autotune_type: required.autotune_type,
-        }
+}
     }
 
-    /// Set max_vpus_per_g_b
-    pub fn set_max_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.max_vpus_per_g_b = value;
+    /// Set max_vpus_per_gb
+    pub fn set_max_vpus_per_gb(mut self, value: i64) -> Self {
+        self.max_vpus_per_gb = value;
         self
     }
 
@@ -42,3 +43,5 @@ impl InstanceConfigurationPerformanceBasedAutotunePolicy {
         self
     }
 }
+
+

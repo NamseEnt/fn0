@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -45,10 +45,7 @@ impl IpInventoryVcnOverlapCollection {
     }
 
     /// Set ip_inventory_vcn_overlap_summary
-    pub fn set_ip_inventory_vcn_overlap_summary(
-        mut self,
-        value: Option<Vec<IpInventoryVcnOverlapSummary>>,
-    ) -> Self {
+    pub fn set_ip_inventory_vcn_overlap_summary(mut self, value: Option<Vec<IpInventoryVcnOverlapSummary>>) -> Self {
         self.ip_inventory_vcn_overlap_summary = value;
         self
     }
@@ -72,10 +69,7 @@ impl IpInventoryVcnOverlapCollection {
     }
 
     /// Set ip_inventory_vcn_overlap_summary (unwraps Option)
-    pub fn with_ip_inventory_vcn_overlap_summary(
-        mut self,
-        value: Vec<IpInventoryVcnOverlapSummary>,
-    ) -> Self {
+    pub fn with_ip_inventory_vcn_overlap_summary(mut self, value: Vec<IpInventoryVcnOverlapSummary>) -> Self {
         self.ip_inventory_vcn_overlap_summary = Some(value);
         self
     }
@@ -98,3 +92,4 @@ impl Default for IpInventoryVcnOverlapCollection {
         Self::new()
     }
 }
+

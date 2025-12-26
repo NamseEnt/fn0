@@ -19,6 +19,7 @@ pub struct Service {
     pub name: String,
 }
 
+
 /// Required fields for Service
 pub struct ServiceRequired {
     /// A string that represents the regional public IP address ranges for the Oracle service or services covered by this {@code Service} object. Also known as the {@code Service} object's *service CIDR label*. <p> When you set up a route rule to route traffic to the service gateway, use this value as the rule's destination. See {@link RouteTable}. Also, when you set up a security list rule to cover traffic with the service gateway, use the {@code cidrBlock} value as the rule's destination (for an egress rule) or the source (for an ingress rule). See {@link SecurityList}. <p> Example: {@code oci-phx-objectstorage}
@@ -45,7 +46,7 @@ impl Service {
             id: required.id,
 
             name: required.name,
-        }
+}
     }
 
     /// Set cidr_block
@@ -72,3 +73,5 @@ impl Service {
         self
     }
 }
+
+

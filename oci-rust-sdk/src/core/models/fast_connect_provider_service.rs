@@ -43,9 +43,9 @@ pub struct FastConnectProviderService {
 
     /// An array of virtual circuit types supported by this service.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub supported_virtual_circuit_types:
-        Option<Vec<FastConnectProviderServiceSupportedVirtualCircuitTypes>>,
+    pub supported_virtual_circuit_types: Option<Vec<FastConnectProviderServiceSupportedVirtualCircuitTypes>>,
 }
+
 
 /// Required fields for FastConnectProviderService
 pub struct FastConnectProviderServiceRequired {
@@ -107,7 +107,7 @@ impl FastConnectProviderService {
             description: None,
 
             supported_virtual_circuit_types: None,
-        }
+}
     }
 
     /// Set description
@@ -123,10 +123,7 @@ impl FastConnectProviderService {
     }
 
     /// Set private_peering_bgp_management
-    pub fn set_private_peering_bgp_management(
-        mut self,
-        value: FastConnectProviderServicePrivatePeeringBgpManagement,
-    ) -> Self {
+    pub fn set_private_peering_bgp_management(mut self, value: FastConnectProviderServicePrivatePeeringBgpManagement) -> Self {
         self.private_peering_bgp_management = value;
         self
     }
@@ -144,46 +141,31 @@ impl FastConnectProviderService {
     }
 
     /// Set public_peering_bgp_management
-    pub fn set_public_peering_bgp_management(
-        mut self,
-        value: FastConnectProviderServicePublicPeeringBgpManagement,
-    ) -> Self {
+    pub fn set_public_peering_bgp_management(mut self, value: FastConnectProviderServicePublicPeeringBgpManagement) -> Self {
         self.public_peering_bgp_management = value;
         self
     }
 
     /// Set supported_virtual_circuit_types
-    pub fn set_supported_virtual_circuit_types(
-        mut self,
-        value: Option<Vec<FastConnectProviderServiceSupportedVirtualCircuitTypes>>,
-    ) -> Self {
+    pub fn set_supported_virtual_circuit_types(mut self, value: Option<Vec<FastConnectProviderServiceSupportedVirtualCircuitTypes>>) -> Self {
         self.supported_virtual_circuit_types = value;
         self
     }
 
     /// Set customer_asn_management
-    pub fn set_customer_asn_management(
-        mut self,
-        value: FastConnectProviderServiceCustomerAsnManagement,
-    ) -> Self {
+    pub fn set_customer_asn_management(mut self, value: FastConnectProviderServiceCustomerAsnManagement) -> Self {
         self.customer_asn_management = value;
         self
     }
 
     /// Set provider_service_key_management
-    pub fn set_provider_service_key_management(
-        mut self,
-        value: FastConnectProviderServiceProviderServiceKeyManagement,
-    ) -> Self {
+    pub fn set_provider_service_key_management(mut self, value: FastConnectProviderServiceProviderServiceKeyManagement) -> Self {
         self.provider_service_key_management = value;
         self
     }
 
     /// Set bandwith_shape_management
-    pub fn set_bandwith_shape_management(
-        mut self,
-        value: FastConnectProviderServiceBandwithShapeManagement,
-    ) -> Self {
+    pub fn set_bandwith_shape_management(mut self, value: FastConnectProviderServiceBandwithShapeManagement) -> Self {
         self.bandwith_shape_management = value;
         self
     }
@@ -207,11 +189,10 @@ impl FastConnectProviderService {
     }
 
     /// Set supported_virtual_circuit_types (unwraps Option)
-    pub fn with_supported_virtual_circuit_types(
-        mut self,
-        value: Vec<FastConnectProviderServiceSupportedVirtualCircuitTypes>,
-    ) -> Self {
+    pub fn with_supported_virtual_circuit_types(mut self, value: Vec<FastConnectProviderServiceSupportedVirtualCircuitTypes>) -> Self {
         self.supported_virtual_circuit_types = Some(value);
         self
     }
 }
+
+

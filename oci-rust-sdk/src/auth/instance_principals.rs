@@ -23,7 +23,7 @@ struct SessionState {
 /// # Example
 ///
 /// ```no_run
-/// use oci_rust_sdk::core::auth::InstancePrincipalsAuthProvider;
+/// use oci_rust_sdk::auth::InstancePrincipalsAuthProvider;
 /// use std::sync::Arc;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {

@@ -21,6 +21,7 @@ pub struct CreateMacsecProperties {
     pub is_unprotected_traffic_allowed: Option<bool>,
 }
 
+
 /// Required fields for CreateMacsecProperties
 pub struct CreateMacsecPropertiesRequired {
     /// Indicates whether or not MACsec is enabled.
@@ -38,7 +39,7 @@ impl CreateMacsecProperties {
             encryption_cipher: None,
 
             is_unprotected_traffic_allowed: None,
-        }
+}
     }
 
     /// Set state
@@ -83,3 +84,5 @@ impl CreateMacsecProperties {
         self
     }
 }
+
+

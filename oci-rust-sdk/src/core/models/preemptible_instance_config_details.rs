@@ -9,6 +9,7 @@ pub struct PreemptibleInstanceConfigDetails {
     pub preemption_action: TerminatePreemptionAction,
 }
 
+
 /// Required fields for PreemptibleInstanceConfigDetails
 pub struct PreemptibleInstanceConfigDetailsRequired {
     pub preemption_action: TerminatePreemptionAction,
@@ -19,7 +20,7 @@ impl PreemptibleInstanceConfigDetails {
     pub fn new(required: PreemptibleInstanceConfigDetailsRequired) -> Self {
         Self {
             preemption_action: required.preemption_action,
-        }
+}
     }
 
     /// Set preemption_action
@@ -28,3 +29,5 @@ impl PreemptibleInstanceConfigDetails {
         self
     }
 }
+
+

@@ -1,21 +1,21 @@
 use oci_rust_sdk::{
-    compute::{
-        self, LifecycleState, ListInstancesRequest, ListInstancesRequestRequiredFields, SortBy,
-        SortOrder,
-    },
-    core::{ClientConfig, RetryConfiguration, auth::ConfigFileAuthProvider, region::Region},
+    auth::ConfigFileAuthProvider,
+    core::{self, region::Region, Retrier, ListInstancesRequest, ListInstancesRequestRequired},
 };
+use std::sync::Arc;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let auth = ConfigFileAuthProvider::from_default()?;
+    // Set up authentication from default OCI config file
+    let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
 
-    let client = compute::client(ClientConfig {
+    // Create a Core client
+    let client = core::client(core::ClientConfig {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(30),
-        retry: RetryConfiguration::no_retry(),
+        retry: Retrier::new(),
     })?;
 
     // IMPORTANT: Replace this with your actual compartment OCID
@@ -23,11 +23,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "ocid1.compartment.oc1..aaaaaaaxxxxx".to_string());
 
     println!("=== Example 1: List All Instances ===");
-    let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
+    let request = ListInstancesRequest::new(ListInstancesRequestRequired {
         compartment_id: compartment_id.clone(),
     })
-    .limit(10)
-    .build();
+    .with_limit(10);
 
     match client.list_instances(request).await {
         Ok(response) => {
@@ -58,11 +57,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Example 2: List Running Instances Only ===");
-    let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
+    let request = ListInstancesRequest::new(ListInstancesRequestRequired {
         compartment_id: compartment_id.clone(),
     })
-    .lifecycle_state(LifecycleState::Running)
-    .build();
+    .with_lifecycle_state("RUNNING");
 
     match client.list_instances(request).await {
         Ok(response) => {
@@ -80,36 +78,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== Example 3: List Instances Sorted by Display Name ===");
-    let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
+    println!("\n=== Example 3: Filter by Display Name ===");
+    let request = ListInstancesRequest::new(ListInstancesRequestRequired {
         compartment_id: compartment_id.clone(),
     })
-    .sort_by(SortBy::DisplayName)
-    .sort_order(SortOrder::Asc)
-    .limit(5)
-    .build();
-
-    match client.list_instances(request).await {
-        Ok(response) => {
-            println!("Found {} instances (sorted by name)", response.items.len());
-            for instance in &response.items {
-                println!(
-                    "  - {}",
-                    instance.display_name.as_deref().unwrap_or("(unnamed)")
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-        }
-    }
-
-    println!("\n=== Example 4: Filter by Display Name ===");
-    let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
-        compartment_id: compartment_id.clone(),
-    })
-    .display_name("my-instance")
-    .build();
+    .with_display_name("my-instance");
 
     match client.list_instances(request).await {
         Ok(response) => {
@@ -118,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 response.items.len()
             );
             for instance in &response.items {
-                println!("  - {} ({})", instance.id, instance.lifecycle_state);
+                println!("  - {} ({:?})", instance.id, instance.lifecycle_state);
             }
         }
         Err(e) => {
@@ -126,49 +99,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== Example 4.5: Filter by Different Lifecycle States ===");
-    let states_to_check = vec![
-        LifecycleState::Running,
-        LifecycleState::Stopped,
-        LifecycleState::Terminating,
-    ];
-
-    for state in states_to_check {
-        let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
-            compartment_id: compartment_id.clone(),
-        })
-        .lifecycle_state(state)
-        .limit(5)
-        .build();
-
-        match client.list_instances(request).await {
-            Ok(response) => {
-                println!("  {} state: {} instances", state, response.items.len());
-            }
-            Err(e) => {
-                eprintln!("Error checking {} state: {}", state, e);
-            }
-        }
-    }
-
-    println!("\n=== Example 5: Pagination Example ===");
+    println!("\n=== Example 4: Pagination Example ===");
     let mut page_token: Option<String> = None;
     let mut page_number = 1;
     let max_pages = 3;
     let mut total_instances = 0;
 
     loop {
-        let mut request_builder =
-            ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
-                compartment_id: compartment_id.clone(),
-            })
-            .limit(2);
+        let mut request = ListInstancesRequest::new(ListInstancesRequestRequired {
+            compartment_id: compartment_id.clone(),
+        })
+        .with_limit(2); // Small limit to demonstrate pagination
 
         if let Some(ref token) = page_token {
-            request_builder = request_builder.page(token);
+            request = request.with_page(token);
         }
-
-        let request = request_builder.build();
 
         match client.list_instances(request).await {
             Ok(response) => {

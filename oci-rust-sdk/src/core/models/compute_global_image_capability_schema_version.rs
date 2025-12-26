@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -23,6 +23,7 @@ pub struct ComputeGlobalImageCapabilitySchemaVersion {
     /// The date and time the compute global image capability schema version was created, in the format defined by [RFC3339](https://tools.ietf.org/html/rfc3339). <p> Example: {@code 2016-08-25T21:10:29.600Z}
     pub time_created: DateTime<Utc>,
 }
+
 
 /// Required fields for ComputeGlobalImageCapabilitySchemaVersion
 pub struct ComputeGlobalImageCapabilitySchemaVersionRequired {
@@ -48,15 +49,14 @@ impl ComputeGlobalImageCapabilitySchemaVersion {
         Self {
             name: required.name,
 
-            compute_global_image_capability_schema_id: required
-                .compute_global_image_capability_schema_id,
+            compute_global_image_capability_schema_id: required.compute_global_image_capability_schema_id,
 
             display_name: required.display_name,
 
             schema_data: required.schema_data,
 
             time_created: required.time_created,
-        }
+}
     }
 
     /// Set name
@@ -78,10 +78,7 @@ impl ComputeGlobalImageCapabilitySchemaVersion {
     }
 
     /// Set schema_data
-    pub fn set_schema_data(
-        mut self,
-        value: HashMap<String, ImageCapabilitySchemaDescriptor>,
-    ) -> Self {
+    pub fn set_schema_data(mut self, value: HashMap<String, ImageCapabilitySchemaDescriptor>) -> Self {
         self.schema_data = value;
         self
     }
@@ -92,3 +89,5 @@ impl ComputeGlobalImageCapabilitySchemaVersion {
         self
     }
 }
+
+

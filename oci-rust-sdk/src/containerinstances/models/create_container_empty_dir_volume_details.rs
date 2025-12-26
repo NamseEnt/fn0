@@ -13,6 +13,7 @@ pub struct CreateContainerEmptyDirVolumeDetails {
     pub backing_store: Option<String>,
 }
 
+
 /// Required fields for CreateContainerEmptyDirVolumeDetails
 pub struct CreateContainerEmptyDirVolumeDetailsRequired {
     pub volume_type: String,
@@ -25,7 +26,7 @@ impl CreateContainerEmptyDirVolumeDetails {
             volume_type: required.volume_type,
 
             backing_store: None,
-        }
+}
     }
 
     /// Set backing_store
@@ -46,3 +47,5 @@ impl CreateContainerEmptyDirVolumeDetails {
         self
     }
 }
+
+

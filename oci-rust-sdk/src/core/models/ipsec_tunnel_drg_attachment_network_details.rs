@@ -18,6 +18,7 @@ pub struct IpsecTunnelDrgAttachmentNetworkDetails {
     pub transport_attachment_id: Option<String>,
 }
 
+
 /// Required fields for IpsecTunnelDrgAttachmentNetworkDetails
 pub struct IpsecTunnelDrgAttachmentNetworkDetailsRequired {
     pub r#type: String,
@@ -32,7 +33,7 @@ impl IpsecTunnelDrgAttachmentNetworkDetails {
             ipsec_connection_id: None,
 
             transport_attachment_id: None,
-        }
+}
     }
 
     /// Set ipsec_connection_id
@@ -65,3 +66,5 @@ impl IpsecTunnelDrgAttachmentNetworkDetails {
         self
     }
 }
+
+

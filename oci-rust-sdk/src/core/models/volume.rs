@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -24,7 +24,7 @@ pub struct Volume {
     pub lifecycle_state: VolumeLifecycleState,
 
     /// The size of the volume in MBs. This field is deprecated. Use sizeInGBs instead. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_m_bs: i64,
+    pub size_in_mbs: i64,
 
     /// The date and time the volume was created. Format defined by [RFC3339](https://tools.ietf.org/html/rfc3339).
     pub time_created: DateTime<Utc>,
@@ -51,7 +51,7 @@ pub struct Volume {
 
     /// The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See [Block Volume Performance Levels](https://docs.oracle.com/iaas/Content/Block/Concepts/blockvolumeperformance.htm#perf_levels) for more information. <p> Allowed values: <p> {@code 0}: Represents Lower Cost option. <p> {@code 10}: Represents Balanced option. <p> {@code 20}: Represents Higher Performance option. <p> {@code 30}-{@code 120}: Represents the Ultra High Performance option. <p> For performance autotune enabled volumes, It would be the Default(Minimum) VPUs/GB. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub vpus_per_g_b: Option<i64>,
+    pub vpus_per_gb: Option<i64>,
 
     /// The clusterPlacementGroup Id of the volume for volume placement.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -59,7 +59,7 @@ pub struct Volume {
 
     /// The size of the volume in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_g_bs: Option<i64>,
+    pub size_in_gbs: Option<i64>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_details: Option<VolumeSourceFromBlockVolumeReplicaDetails>,
@@ -74,7 +74,7 @@ pub struct Volume {
 
     /// The number of Volume Performance Units per GB that this volume is effectively tuned to. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub auto_tuned_vpus_per_g_b: Option<i64>,
+    pub auto_tuned_vpus_per_gb: Option<i64>,
 
     /// The list of block volume replicas of this volume.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -88,6 +88,7 @@ pub struct Volume {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_reservations_enabled: Option<bool>,
 }
+
 
 /// Required fields for Volume
 pub struct VolumeRequired {
@@ -107,7 +108,7 @@ pub struct VolumeRequired {
     pub lifecycle_state: VolumeLifecycleState,
 
     /// The size of the volume in MBs. This field is deprecated. Use sizeInGBs instead. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_m_bs: i64,
+    pub size_in_mbs: i64,
 
     /// The date and time the volume was created. Format defined by [RFC3339](https://tools.ietf.org/html/rfc3339).
     pub time_created: DateTime<Utc>,
@@ -127,7 +128,7 @@ impl Volume {
 
             lifecycle_state: required.lifecycle_state,
 
-            size_in_m_bs: required.size_in_m_bs,
+            size_in_mbs: required.size_in_mbs,
 
             time_created: required.time_created,
 
@@ -141,11 +142,11 @@ impl Volume {
 
             kms_key_id: None,
 
-            vpus_per_g_b: None,
+            vpus_per_gb: None,
 
             cluster_placement_group_id: None,
 
-            size_in_g_bs: None,
+            size_in_gbs: None,
 
             source_details: None,
 
@@ -153,14 +154,14 @@ impl Volume {
 
             is_auto_tune_enabled: None,
 
-            auto_tuned_vpus_per_g_b: None,
+            auto_tuned_vpus_per_gb: None,
 
             block_volume_replicas: None,
 
             autotune_policies: None,
 
             is_reservations_enabled: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -176,10 +177,7 @@ impl Volume {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -197,10 +195,7 @@ impl Volume {
     }
 
     /// Set system_tags
-    pub fn set_system_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.system_tags = value;
         self
     }
@@ -229,9 +224,9 @@ impl Volume {
         self
     }
 
-    /// Set vpus_per_g_b
-    pub fn set_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.vpus_per_g_b = value;
+    /// Set vpus_per_gb
+    pub fn set_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.vpus_per_gb = value;
         self
     }
 
@@ -241,23 +236,20 @@ impl Volume {
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
-    /// Set size_in_m_bs
-    pub fn set_size_in_m_bs(mut self, value: i64) -> Self {
-        self.size_in_m_bs = value;
+    /// Set size_in_mbs
+    pub fn set_size_in_mbs(mut self, value: i64) -> Self {
+        self.size_in_mbs = value;
         self
     }
 
     /// Set source_details
-    pub fn set_source_details(
-        mut self,
-        value: Option<VolumeSourceFromBlockVolumeReplicaDetails>,
-    ) -> Self {
+    pub fn set_source_details(mut self, value: Option<VolumeSourceFromBlockVolumeReplicaDetails>) -> Self {
         self.source_details = value;
         self
     }
@@ -280,9 +272,9 @@ impl Volume {
         self
     }
 
-    /// Set auto_tuned_vpus_per_g_b
-    pub fn set_auto_tuned_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.auto_tuned_vpus_per_g_b = value;
+    /// Set auto_tuned_vpus_per_gb
+    pub fn set_auto_tuned_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.auto_tuned_vpus_per_gb = value;
         self
     }
 
@@ -305,10 +297,7 @@ impl Volume {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -320,10 +309,7 @@ impl Volume {
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -340,9 +326,9 @@ impl Volume {
         self
     }
 
-    /// Set vpus_per_g_b (unwraps Option)
-    pub fn with_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.vpus_per_g_b = Some(value);
+    /// Set vpus_per_gb (unwraps Option)
+    pub fn with_vpus_per_gb(mut self, value: i64) -> Self {
+        self.vpus_per_gb = Some(value);
         self
     }
 
@@ -352,9 +338,9 @@ impl Volume {
         self
     }
 
-    /// Set size_in_g_bs (unwraps Option)
-    pub fn with_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = Some(value);
+    /// Set size_in_gbs (unwraps Option)
+    pub fn with_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = Some(value);
         self
     }
 
@@ -376,9 +362,9 @@ impl Volume {
         self
     }
 
-    /// Set auto_tuned_vpus_per_g_b (unwraps Option)
-    pub fn with_auto_tuned_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.auto_tuned_vpus_per_g_b = Some(value);
+    /// Set auto_tuned_vpus_per_gb (unwraps Option)
+    pub fn with_auto_tuned_vpus_per_gb(mut self, value: i64) -> Self {
+        self.auto_tuned_vpus_per_gb = Some(value);
         self
     }
 
@@ -400,3 +386,5 @@ impl Volume {
         self
     }
 }
+
+

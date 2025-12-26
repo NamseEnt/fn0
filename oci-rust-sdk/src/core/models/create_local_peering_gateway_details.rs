@@ -34,6 +34,7 @@ pub struct CreateLocalPeeringGatewayDetails {
     pub route_table_id: Option<String>,
 }
 
+
 /// Required fields for CreateLocalPeeringGatewayDetails
 pub struct CreateLocalPeeringGatewayDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the local peering gateway (LPG).
@@ -60,7 +61,7 @@ impl CreateLocalPeeringGatewayDetails {
             security_attributes: None,
 
             route_table_id: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -70,10 +71,7 @@ impl CreateLocalPeeringGatewayDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -91,10 +89,7 @@ impl CreateLocalPeeringGatewayDetails {
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.security_attributes = value;
         self
     }
@@ -112,10 +107,7 @@ impl CreateLocalPeeringGatewayDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -133,10 +125,7 @@ impl CreateLocalPeeringGatewayDetails {
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.security_attributes = Some(value);
         self
     }
@@ -147,3 +136,5 @@ impl CreateLocalPeeringGatewayDetails {
         self
     }
 }
+
+

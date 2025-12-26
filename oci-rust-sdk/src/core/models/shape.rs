@@ -27,7 +27,7 @@ pub struct Shape {
 
     /// The default amount of memory available for this shape, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_in_g_bs: Option<i64>,
+    pub memory_in_gbs: Option<i64>,
 
     /// The number of physical network interface card (NIC) ports available for this shape. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -55,7 +55,7 @@ pub struct Shape {
 
     /// The aggregate size of the local disks available for this shape, in gigabytes. <p> If the shape does not have any local disks, this field is {@code null}. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub local_disks_total_size_in_g_bs: Option<i64>,
+    pub local_disks_total_size_in_gbs: Option<i64>,
 
     /// A short description of the local disks available for this shape. <p> If the shape does not have any local disks, this field is {@code null}.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,6 +117,7 @@ pub struct Shape {
     pub recommended_alternatives: Option<Vec<ShapeAlternativeObject>>,
 }
 
+
 /// Required fields for Shape
 pub struct ShapeRequired {
     /// The name of the shape. You can enumerate all available shapes by calling {@link #listShapes(ListShapesRequest) listShapes}.
@@ -137,7 +138,7 @@ impl Shape {
 
             ocpus: None,
 
-            memory_in_g_bs: None,
+            memory_in_gbs: None,
 
             network_ports: None,
 
@@ -151,7 +152,7 @@ impl Shape {
 
             local_disks: None,
 
-            local_disks_total_size_in_g_bs: None,
+            local_disks_total_size_in_gbs: None,
 
             local_disk_description: None,
 
@@ -184,14 +185,11 @@ impl Shape {
             resize_compatible_shapes: None,
 
             recommended_alternatives: None,
-        }
+}
     }
 
     /// Set baseline_ocpu_utilizations
-    pub fn set_baseline_ocpu_utilizations(
-        mut self,
-        value: Option<Vec<ShapeBaselineOcpuUtilizations>>,
-    ) -> Self {
+    pub fn set_baseline_ocpu_utilizations(mut self, value: Option<Vec<ShapeBaselineOcpuUtilizations>>) -> Self {
         self.baseline_ocpu_utilizations = value;
         self
     }
@@ -220,9 +218,9 @@ impl Shape {
         self
     }
 
-    /// Set memory_in_g_bs
-    pub fn set_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.memory_in_g_bs = value;
+    /// Set memory_in_gbs
+    pub fn set_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.memory_in_gbs = value;
         self
     }
 
@@ -262,9 +260,9 @@ impl Shape {
         self
     }
 
-    /// Set local_disks_total_size_in_g_bs
-    pub fn set_local_disks_total_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.local_disks_total_size_in_g_bs = value;
+    /// Set local_disks_total_size_in_gbs
+    pub fn set_local_disks_total_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.local_disks_total_size_in_gbs = value;
         self
     }
 
@@ -305,28 +303,19 @@ impl Shape {
     }
 
     /// Set networking_bandwidth_options
-    pub fn set_networking_bandwidth_options(
-        mut self,
-        value: Option<ShapeNetworkingBandwidthOptions>,
-    ) -> Self {
+    pub fn set_networking_bandwidth_options(mut self, value: Option<ShapeNetworkingBandwidthOptions>) -> Self {
         self.networking_bandwidth_options = value;
         self
     }
 
     /// Set max_vnic_attachment_options
-    pub fn set_max_vnic_attachment_options(
-        mut self,
-        value: Option<ShapeMaxVnicAttachmentOptions>,
-    ) -> Self {
+    pub fn set_max_vnic_attachment_options(mut self, value: Option<ShapeMaxVnicAttachmentOptions>) -> Self {
         self.max_vnic_attachment_options = value;
         self
     }
 
     /// Set platform_config_options
-    pub fn set_platform_config_options(
-        mut self,
-        value: Option<ShapePlatformConfigOptions>,
-    ) -> Self {
+    pub fn set_platform_config_options(mut self, value: Option<ShapePlatformConfigOptions>) -> Self {
         self.platform_config_options = value;
         self
     }
@@ -368,19 +357,13 @@ impl Shape {
     }
 
     /// Set recommended_alternatives
-    pub fn set_recommended_alternatives(
-        mut self,
-        value: Option<Vec<ShapeAlternativeObject>>,
-    ) -> Self {
+    pub fn set_recommended_alternatives(mut self, value: Option<Vec<ShapeAlternativeObject>>) -> Self {
         self.recommended_alternatives = value;
         self
     }
 
     /// Set baseline_ocpu_utilizations (unwraps Option)
-    pub fn with_baseline_ocpu_utilizations(
-        mut self,
-        value: Vec<ShapeBaselineOcpuUtilizations>,
-    ) -> Self {
+    pub fn with_baseline_ocpu_utilizations(mut self, value: Vec<ShapeBaselineOcpuUtilizations>) -> Self {
         self.baseline_ocpu_utilizations = Some(value);
         self
     }
@@ -403,9 +386,9 @@ impl Shape {
         self
     }
 
-    /// Set memory_in_g_bs (unwraps Option)
-    pub fn with_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.memory_in_g_bs = Some(value);
+    /// Set memory_in_gbs (unwraps Option)
+    pub fn with_memory_in_gbs(mut self, value: i64) -> Self {
+        self.memory_in_gbs = Some(value);
         self
     }
 
@@ -445,9 +428,9 @@ impl Shape {
         self
     }
 
-    /// Set local_disks_total_size_in_g_bs (unwraps Option)
-    pub fn with_local_disks_total_size_in_g_bs(mut self, value: i64) -> Self {
-        self.local_disks_total_size_in_g_bs = Some(value);
+    /// Set local_disks_total_size_in_gbs (unwraps Option)
+    pub fn with_local_disks_total_size_in_gbs(mut self, value: i64) -> Self {
+        self.local_disks_total_size_in_gbs = Some(value);
         self
     }
 
@@ -488,19 +471,13 @@ impl Shape {
     }
 
     /// Set networking_bandwidth_options (unwraps Option)
-    pub fn with_networking_bandwidth_options(
-        mut self,
-        value: ShapeNetworkingBandwidthOptions,
-    ) -> Self {
+    pub fn with_networking_bandwidth_options(mut self, value: ShapeNetworkingBandwidthOptions) -> Self {
         self.networking_bandwidth_options = Some(value);
         self
     }
 
     /// Set max_vnic_attachment_options (unwraps Option)
-    pub fn with_max_vnic_attachment_options(
-        mut self,
-        value: ShapeMaxVnicAttachmentOptions,
-    ) -> Self {
+    pub fn with_max_vnic_attachment_options(mut self, value: ShapeMaxVnicAttachmentOptions) -> Self {
         self.max_vnic_attachment_options = Some(value);
         self
     }
@@ -553,3 +530,5 @@ impl Shape {
         self
     }
 }
+
+

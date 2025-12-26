@@ -10,6 +10,7 @@ pub struct ChangePublicIpPoolCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangePublicIpPoolCompartmentDetails
 pub struct ChangePublicIpPoolCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the destination compartment for the public IP pool move.
@@ -21,7 +22,7 @@ impl ChangePublicIpPoolCompartmentDetails {
     pub fn new(required: ChangePublicIpPoolCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangePublicIpPoolCompartmentDetails {
         self
     }
 }
+
+

@@ -1,8 +1,7 @@
-use crate::models::{ParsedField, ParsedModel};
+use crate::models::{ParsedField, ParsedModel, SourceDir};
 use crate::type_mapper::TypeMapper;
 use anyhow::{Context, Result};
 use serde_json::json;
-use std::collections::HashMap;
 use tera::{Tera, Context as TeraContext};
 
 pub struct CodeGenerator {
@@ -128,6 +127,8 @@ impl CodeGenerator {
         context.insert("has_required_fields", &!required_fields.is_empty());
         context.insert("needs_hashmap", &needs_hashmap);
         context.insert("needs_datetime", &needs_datetime);
+        context.insert("is_request", &(model.source_dir == SourceDir::Request));
+        context.insert("is_response", &(model.source_dir == SourceDir::Response));
 
         self.tera
             .render("model.rs.tera", &context)

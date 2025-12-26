@@ -1,5 +1,5 @@
 use oci_rust_sdk::auth::{AuthProvider, SimpleAuthProvider, SimpleAuthProviderRequiredFields};
-use oci_rust_sdk::core::region::Region;
+use oci_rust_sdk::core::Region;
 
 fn main() {
     println!("SimpleAuthProvider Example\n");
@@ -18,8 +18,8 @@ fn main() {
     println!("Key ID: {}", provider1.get_key_id());
     println!("Region: {:?}\n", provider1.region());
 
-    // Example 2: Using the builder pattern (recommended)
-    println!("=== Example 2: Using builder pattern ===");
+    // Example 2: Using the builder
+    println!("=== Example 2: Using builder ===");
     let required = SimpleAuthProviderRequiredFields {
         tenancy: "ocid1.tenancy.oc1..aaaaaaaexample".to_string(),
         user: "ocid1.user.oc1..aaaaaaaexample".to_string(),
@@ -30,17 +30,13 @@ fn main() {
     };
 
     let provider2 = SimpleAuthProvider::builder(required)
-        .passphrase("my-secret-passphrase")
         .region(Region::ApSeoul1)
-        .auth_type("api_key")
         .build();
 
     println!("Tenancy: {}", provider2.tenancy());
     println!("User: {}", provider2.user());
     println!("Key ID: {}", provider2.get_key_id());
-    println!("Region: {:?}", provider2.region());
-    println!("Auth Type: {:?}", provider2.auth_type());
-    println!("Has Passphrase: {}\n", provider2.get_passphrase().is_some());
+    println!("Region: {:?}\n", provider2.region());
 
     // Example 3: Setting region after creation
     println!("=== Example 3: Setting region dynamically ===");
@@ -63,13 +59,7 @@ fn main() {
         "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99",
         "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----",
     )
-    .with_region(Region::EuFrankfurt1)
-    .with_auth_type("instance_principal")
-    .with_delegation_token("delegation-token-here")
-    .with_session_token("session-token-here");
+    .with_region(Region::EuFrankfurt1);
 
     println!("Region: {:?}", provider4.region());
-    println!("Auth Type: {:?}", provider4.auth_type());
-    println!("Delegation Token: {:?}", provider4.delegation_token());
-    println!("Session Token: {:?}\n", provider4.session_token());
 }

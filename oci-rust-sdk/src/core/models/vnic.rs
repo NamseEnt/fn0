@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -84,6 +84,7 @@ pub struct Vnic {
     pub route_table_id: Option<String>,
 }
 
+
 /// Required fields for Vnic
 pub struct VnicRequired {
     /// The VNIC's availability domain. <p> Example: {@code Uocm:PHX-AD-1}
@@ -145,7 +146,7 @@ impl Vnic {
             ipv6_addresses: None,
 
             route_table_id: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -161,10 +162,7 @@ impl Vnic {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -176,10 +174,7 @@ impl Vnic {
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.security_attributes = value;
         self
     }
@@ -275,10 +270,7 @@ impl Vnic {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -290,10 +282,7 @@ impl Vnic {
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.security_attributes = Some(value);
         self
     }
@@ -370,3 +359,5 @@ impl Vnic {
         self
     }
 }
+
+

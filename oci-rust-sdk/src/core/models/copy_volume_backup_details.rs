@@ -18,6 +18,7 @@ pub struct CopyVolumeBackupDetails {
     pub kms_key_id: Option<String>,
 }
 
+
 /// Required fields for CopyVolumeBackupDetails
 pub struct CopyVolumeBackupDetailsRequired {
     /// The name of the destination region. <p> Example: {@code us-ashburn-1}
@@ -33,7 +34,7 @@ impl CopyVolumeBackupDetails {
             display_name: None,
 
             kms_key_id: None,
-        }
+}
     }
 
     /// Set destination_region
@@ -66,3 +67,5 @@ impl CopyVolumeBackupDetails {
         self
     }
 }
+
+

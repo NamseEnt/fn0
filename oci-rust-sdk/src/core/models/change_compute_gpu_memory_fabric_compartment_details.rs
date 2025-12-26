@@ -10,6 +10,7 @@ pub struct ChangeComputeGpuMemoryFabricCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeComputeGpuMemoryFabricCompartmentDetails
 pub struct ChangeComputeGpuMemoryFabricCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the compute GPU memory fabric to.
@@ -21,7 +22,7 @@ impl ChangeComputeGpuMemoryFabricCompartmentDetails {
     pub fn new(required: ChangeComputeGpuMemoryFabricCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeComputeGpuMemoryFabricCompartmentDetails {
         self
     }
 }
+
+

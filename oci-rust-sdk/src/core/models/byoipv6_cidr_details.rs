@@ -13,6 +13,7 @@ pub struct Byoipv6CidrDetails {
     pub ipv6_cidr_block: String,
 }
 
+
 /// Required fields for Byoipv6CidrDetails
 pub struct Byoipv6CidrDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code ByoipRange} resource to which the CIDR block belongs.
@@ -29,7 +30,7 @@ impl Byoipv6CidrDetails {
             byoipv6_range_id: required.byoipv6_range_id,
 
             ipv6_cidr_block: required.ipv6_cidr_block,
-        }
+}
     }
 
     /// Set byoipv6_range_id
@@ -44,3 +45,5 @@ impl Byoipv6CidrDetails {
         self
     }
 }
+
+

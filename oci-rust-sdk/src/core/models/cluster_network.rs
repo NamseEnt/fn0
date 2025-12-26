@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -51,6 +51,7 @@ pub struct ClusterNetwork {
     pub placement_configuration: Option<ClusterNetworkPlacementConfigurationDetails>,
 }
 
+
 /// Required fields for ClusterNetwork
 pub struct ClusterNetworkRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the cluster network.
@@ -96,7 +97,7 @@ impl ClusterNetwork {
             instance_pools: None,
 
             placement_configuration: None,
-        }
+}
     }
 
     /// Set id
@@ -124,10 +125,7 @@ impl ClusterNetwork {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -151,10 +149,7 @@ impl ClusterNetwork {
     }
 
     /// Set placement_configuration
-    pub fn set_placement_configuration(
-        mut self,
-        value: Option<ClusterNetworkPlacementConfigurationDetails>,
-    ) -> Self {
+    pub fn set_placement_configuration(mut self, value: Option<ClusterNetworkPlacementConfigurationDetails>) -> Self {
         self.placement_configuration = value;
         self
     }
@@ -190,10 +185,7 @@ impl ClusterNetwork {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -217,11 +209,10 @@ impl ClusterNetwork {
     }
 
     /// Set placement_configuration (unwraps Option)
-    pub fn with_placement_configuration(
-        mut self,
-        value: ClusterNetworkPlacementConfigurationDetails,
-    ) -> Self {
+    pub fn with_placement_configuration(mut self, value: ClusterNetworkPlacementConfigurationDetails) -> Self {
         self.placement_configuration = Some(value);
         self
     }
 }
+
+

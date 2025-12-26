@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -58,10 +58,7 @@ impl UpdateInstanceMaintenanceEventDetails {
     }
 
     /// Set alternative_resolution_action
-    pub fn set_alternative_resolution_action(
-        mut self,
-        value: Option<InstanceMaintenanceAlternativeResolutionActions>,
-    ) -> Self {
+    pub fn set_alternative_resolution_action(mut self, value: Option<InstanceMaintenanceAlternativeResolutionActions>) -> Self {
         self.alternative_resolution_action = value;
         self
     }
@@ -79,10 +76,7 @@ impl UpdateInstanceMaintenanceEventDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -100,10 +94,7 @@ impl UpdateInstanceMaintenanceEventDetails {
     }
 
     /// Set alternative_resolution_action (unwraps Option)
-    pub fn with_alternative_resolution_action(
-        mut self,
-        value: InstanceMaintenanceAlternativeResolutionActions,
-    ) -> Self {
+    pub fn with_alternative_resolution_action(mut self, value: InstanceMaintenanceAlternativeResolutionActions) -> Self {
         self.alternative_resolution_action = Some(value);
         self
     }
@@ -121,10 +112,7 @@ impl UpdateInstanceMaintenanceEventDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -141,3 +129,4 @@ impl Default for UpdateInstanceMaintenanceEventDetails {
         Self::new()
     }
 }
+

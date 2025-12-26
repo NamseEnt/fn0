@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -102,6 +102,7 @@ pub struct ComputeHost {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for ComputeHost
 pub struct ComputeHostRequired {
     /// The availability domain of the compute host. <p> Example: {@code Uocm:US-CHICAGO-1-AD-2}
@@ -187,7 +188,7 @@ impl ComputeHost {
             display_name: None,
 
             freeform_tags: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -287,10 +288,7 @@ impl ComputeHost {
     }
 
     /// Set additional_data
-    pub fn set_additional_data(
-        mut self,
-        value: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn set_additional_data(mut self, value: Option<HashMap<String, serde_json::Value>>) -> Self {
         self.additional_data = value;
         self
     }
@@ -302,10 +300,7 @@ impl ComputeHost {
     }
 
     /// Set lifecycle_details
-    pub fn set_lifecycle_details(
-        mut self,
-        value: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn set_lifecycle_details(mut self, value: Option<HashMap<String, serde_json::Value>>) -> Self {
         self.lifecycle_details = value;
         self
     }
@@ -317,10 +312,7 @@ impl ComputeHost {
     }
 
     /// Set impacted_component_details
-    pub fn set_impacted_component_details(
-        mut self,
-        value: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn set_impacted_component_details(mut self, value: Option<HashMap<String, serde_json::Value>>) -> Self {
         self.impacted_component_details = value;
         self
     }
@@ -338,10 +330,7 @@ impl ComputeHost {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -437,19 +426,13 @@ impl ComputeHost {
     }
 
     /// Set impacted_component_details (unwraps Option)
-    pub fn with_impacted_component_details(
-        mut self,
-        value: HashMap<String, serde_json::Value>,
-    ) -> Self {
+    pub fn with_impacted_component_details(mut self, value: HashMap<String, serde_json::Value>) -> Self {
         self.impacted_component_details = Some(value);
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -466,3 +449,5 @@ impl ComputeHost {
         self
     }
 }
+
+

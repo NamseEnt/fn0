@@ -19,6 +19,7 @@ pub struct ImageSourceDetails {
     pub source_image_type: Option<ImageSourceDetailsSourceImageType>,
 }
 
+
 /// Required fields for ImageSourceDetails
 pub struct ImageSourceDetailsRequired {
     pub source_type: String,
@@ -35,7 +36,7 @@ impl ImageSourceDetails {
             operating_system_version: None,
 
             source_image_type: None,
-        }
+}
     }
 
     /// Set operating_system
@@ -51,10 +52,7 @@ impl ImageSourceDetails {
     }
 
     /// Set source_image_type
-    pub fn set_source_image_type(
-        mut self,
-        value: Option<ImageSourceDetailsSourceImageType>,
-    ) -> Self {
+    pub fn set_source_image_type(mut self, value: Option<ImageSourceDetailsSourceImageType>) -> Self {
         self.source_image_type = value;
         self
     }
@@ -83,3 +81,5 @@ impl ImageSourceDetails {
         self
     }
 }
+
+

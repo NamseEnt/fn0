@@ -10,6 +10,7 @@ pub struct ChangeVcnCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeVcnCompartmentDetails
 pub struct ChangeVcnCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the VCN to.
@@ -21,7 +22,7 @@ impl ChangeVcnCompartmentDetails {
     pub fn new(required: ChangeVcnCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeVcnCompartmentDetails {
         self
     }
 }
+
+

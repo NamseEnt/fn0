@@ -14,7 +14,9 @@ pub struct ContainerVnic {
 impl ContainerVnic {
     /// Create a new ContainerVnic
     pub fn new() -> Self {
-        Self { vnic_id: None }
+        Self {
+            vnic_id: None,
+        }
     }
 
     /// Set vnic_id
@@ -35,3 +37,4 @@ impl Default for ContainerVnic {
         Self::new()
     }
 }
+

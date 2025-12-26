@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -93,6 +93,7 @@ pub struct Subnet {
     pub time_created: Option<DateTime<Utc>>,
 }
 
+
 /// Required fields for Subnet
 pub struct SubnetRequired {
     /// The subnet's CIDR block. <p> Example: {@code 10.0.1.0/24}
@@ -169,7 +170,7 @@ impl Subnet {
             subnet_domain_name: None,
 
             time_created: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -197,10 +198,7 @@ impl Subnet {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -326,10 +324,7 @@ impl Subnet {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -406,3 +401,5 @@ impl Subnet {
         self
     }
 }
+
+

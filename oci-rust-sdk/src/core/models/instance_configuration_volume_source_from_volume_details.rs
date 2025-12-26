@@ -14,6 +14,7 @@ pub struct InstanceConfigurationVolumeSourceFromVolumeDetails {
     pub id: Option<String>,
 }
 
+
 /// Required fields for InstanceConfigurationVolumeSourceFromVolumeDetails
 pub struct InstanceConfigurationVolumeSourceFromVolumeDetailsRequired {
     pub r#type: String,
@@ -26,7 +27,7 @@ impl InstanceConfigurationVolumeSourceFromVolumeDetails {
             r#type: required.r#type,
 
             id: None,
-        }
+}
     }
 
     /// Set id
@@ -47,3 +48,5 @@ impl InstanceConfigurationVolumeSourceFromVolumeDetails {
         self
     }
 }
+
+

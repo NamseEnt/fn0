@@ -10,6 +10,7 @@ pub struct LaunchInstanceWindowsLicensingConfig {
     pub r#type: String,
 }
 
+
 /// Required fields for LaunchInstanceWindowsLicensingConfig
 pub struct LaunchInstanceWindowsLicensingConfigRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl LaunchInstanceWindowsLicensingConfig {
     pub fn new(required: LaunchInstanceWindowsLicensingConfigRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl LaunchInstanceWindowsLicensingConfig {
         self
     }
 }
+
+

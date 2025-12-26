@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -21,7 +21,7 @@ pub struct BootVolume {
     pub lifecycle_state: BootVolumeLifecycleState,
 
     /// The size of the volume in MBs. The value must be a multiple of 1024. This field is deprecated. Please use sizeInGBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_m_bs: i64,
+    pub size_in_mbs: i64,
 
     /// The date and time the boot volume was created. Format defined by [RFC3339](https://tools.ietf.org/html/rfc3339).
     pub time_created: DateTime<Utc>,
@@ -56,11 +56,11 @@ pub struct BootVolume {
 
     /// The number of volume performance units (VPUs) that will be applied to this boot volume per GB, representing the Block Volume service's elastic performance options. See [Block Volume Performance Levels](https://docs.oracle.com/iaas/Content/Block/Concepts/blockvolumeperformance.htm#perf_levels) for more information. <p> Allowed values: <p> {@code 10}: Represents Balanced option. <p> {@code 20}: Represents Higher Performance option. <p> {@code 30}-{@code 120}: Represents the Ultra High Performance option. <p> For performance autotune enabled volumes, it would be the Default(Minimum) VPUs/GB. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub vpus_per_g_b: Option<i64>,
+    pub vpus_per_gb: Option<i64>,
 
     /// The size of the boot volume in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_g_bs: Option<i64>,
+    pub size_in_gbs: Option<i64>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_details: Option<BootVolumeSourceFromBootVolumeBackupDetails>,
@@ -79,7 +79,7 @@ pub struct BootVolume {
 
     /// The number of Volume Performance Units per GB that this boot volume is effectively tuned to. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub auto_tuned_vpus_per_g_b: Option<i64>,
+    pub auto_tuned_vpus_per_gb: Option<i64>,
 
     /// The list of boot volume replicas of this boot volume
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -89,6 +89,7 @@ pub struct BootVolume {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub autotune_policies: Option<Vec<AutotunePolicy>>,
 }
+
 
 /// Required fields for BootVolume
 pub struct BootVolumeRequired {
@@ -105,7 +106,7 @@ pub struct BootVolumeRequired {
     pub lifecycle_state: BootVolumeLifecycleState,
 
     /// The size of the volume in MBs. The value must be a multiple of 1024. This field is deprecated. Please use sizeInGBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
-    pub size_in_m_bs: i64,
+    pub size_in_mbs: i64,
 
     /// The date and time the boot volume was created. Format defined by [RFC3339](https://tools.ietf.org/html/rfc3339).
     pub time_created: DateTime<Utc>,
@@ -123,7 +124,7 @@ impl BootVolume {
 
             lifecycle_state: required.lifecycle_state,
 
-            size_in_m_bs: required.size_in_m_bs,
+            size_in_mbs: required.size_in_mbs,
 
             time_created: required.time_created,
 
@@ -141,9 +142,9 @@ impl BootVolume {
 
             cluster_placement_group_id: None,
 
-            vpus_per_g_b: None,
+            vpus_per_gb: None,
 
-            size_in_g_bs: None,
+            size_in_gbs: None,
 
             source_details: None,
 
@@ -153,12 +154,12 @@ impl BootVolume {
 
             is_auto_tune_enabled: None,
 
-            auto_tuned_vpus_per_g_b: None,
+            auto_tuned_vpus_per_gb: None,
 
             boot_volume_replicas: None,
 
             autotune_policies: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -174,19 +175,13 @@ impl BootVolume {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set system_tags
-    pub fn set_system_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.system_tags = value;
         self
     }
@@ -227,9 +222,9 @@ impl BootVolume {
         self
     }
 
-    /// Set vpus_per_g_b
-    pub fn set_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.vpus_per_g_b = value;
+    /// Set vpus_per_gb
+    pub fn set_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.vpus_per_gb = value;
         self
     }
 
@@ -239,23 +234,20 @@ impl BootVolume {
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
-    /// Set size_in_m_bs
-    pub fn set_size_in_m_bs(mut self, value: i64) -> Self {
-        self.size_in_m_bs = value;
+    /// Set size_in_mbs
+    pub fn set_size_in_mbs(mut self, value: i64) -> Self {
+        self.size_in_mbs = value;
         self
     }
 
     /// Set source_details
-    pub fn set_source_details(
-        mut self,
-        value: Option<BootVolumeSourceFromBootVolumeBackupDetails>,
-    ) -> Self {
+    pub fn set_source_details(mut self, value: Option<BootVolumeSourceFromBootVolumeBackupDetails>) -> Self {
         self.source_details = value;
         self
     }
@@ -284,9 +276,9 @@ impl BootVolume {
         self
     }
 
-    /// Set auto_tuned_vpus_per_g_b
-    pub fn set_auto_tuned_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.auto_tuned_vpus_per_g_b = value;
+    /// Set auto_tuned_vpus_per_gb
+    pub fn set_auto_tuned_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.auto_tuned_vpus_per_gb = value;
         self
     }
 
@@ -303,19 +295,13 @@ impl BootVolume {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -350,23 +336,20 @@ impl BootVolume {
         self
     }
 
-    /// Set vpus_per_g_b (unwraps Option)
-    pub fn with_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.vpus_per_g_b = Some(value);
+    /// Set vpus_per_gb (unwraps Option)
+    pub fn with_vpus_per_gb(mut self, value: i64) -> Self {
+        self.vpus_per_gb = Some(value);
         self
     }
 
-    /// Set size_in_g_bs (unwraps Option)
-    pub fn with_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = Some(value);
+    /// Set size_in_gbs (unwraps Option)
+    pub fn with_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = Some(value);
         self
     }
 
     /// Set source_details (unwraps Option)
-    pub fn with_source_details(
-        mut self,
-        value: BootVolumeSourceFromBootVolumeBackupDetails,
-    ) -> Self {
+    pub fn with_source_details(mut self, value: BootVolumeSourceFromBootVolumeBackupDetails) -> Self {
         self.source_details = Some(value);
         self
     }
@@ -389,9 +372,9 @@ impl BootVolume {
         self
     }
 
-    /// Set auto_tuned_vpus_per_g_b (unwraps Option)
-    pub fn with_auto_tuned_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.auto_tuned_vpus_per_g_b = Some(value);
+    /// Set auto_tuned_vpus_per_gb (unwraps Option)
+    pub fn with_auto_tuned_vpus_per_gb(mut self, value: i64) -> Self {
+        self.auto_tuned_vpus_per_gb = Some(value);
         self
     }
 
@@ -407,3 +390,5 @@ impl BootVolume {
         self
     }
 }
+
+

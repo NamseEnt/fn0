@@ -7,6 +7,9 @@ authors = ["namse"]
 license = "AGPL-3.0"
 repository = "https://github.com/namseent/fn0/oci-rust-sdk"
 
+[lints.rust]
+warnings = "deny"
+
 [features]
 default = []
 core = []
@@ -69,7 +72,7 @@ required-features = ["core"]
 
 [[example]]
 name = "using_traits"
-required-features = ["osmanagementhub"]
+required-features = ["containerinstances"]
 
 [[example]]
 name = "list_container_instances"

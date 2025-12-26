@@ -10,7 +10,7 @@ pub struct InstanceConfigurationInstanceSourceViaImageDetails {
 
     /// The size of the boot volume in GBs. The minimum value is 50 GB and the maximum value is 32,768 GB (32 TB). Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub boot_volume_size_in_g_bs: Option<i64>,
+    pub boot_volume_size_in_gbs: Option<i64>,
 
     /// The OCID of the image used to boot the instance.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -22,12 +22,12 @@ pub struct InstanceConfigurationInstanceSourceViaImageDetails {
 
     /// The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See [Block Volume Performance Levels](https://docs.oracle.com/iaas/Content/Block/Concepts/blockvolumeperformance.htm#perf_levels) for more information. <p> Allowed values: <p> {@code 10}: Represents Balanced option. <p> {@code 20}: Represents Higher Performance option. <p> {@code 30}-{@code 120}: Represents the Ultra High Performance option. <p> For performance autotune enabled volumes, it would be the Default(Minimum) VPUs/GB. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub boot_volume_vpus_per_g_b: Option<i64>,
+    pub boot_volume_vpus_per_gb: Option<i64>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instance_source_image_filter_details:
-        Option<InstanceConfigurationInstanceSourceImageFilterDetails>,
+    pub instance_source_image_filter_details: Option<InstanceConfigurationInstanceSourceImageFilterDetails>,
 }
+
 
 /// Required fields for InstanceConfigurationInstanceSourceViaImageDetails
 pub struct InstanceConfigurationInstanceSourceViaImageDetailsRequired {
@@ -40,21 +40,21 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
         Self {
             source_type: required.source_type,
 
-            boot_volume_size_in_g_bs: None,
+            boot_volume_size_in_gbs: None,
 
             image_id: None,
 
             kms_key_id: None,
 
-            boot_volume_vpus_per_g_b: None,
+            boot_volume_vpus_per_gb: None,
 
             instance_source_image_filter_details: None,
-        }
+}
     }
 
-    /// Set boot_volume_size_in_g_bs
-    pub fn set_boot_volume_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.boot_volume_size_in_g_bs = value;
+    /// Set boot_volume_size_in_gbs
+    pub fn set_boot_volume_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.boot_volume_size_in_gbs = value;
         self
     }
 
@@ -70,17 +70,14 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
         self
     }
 
-    /// Set boot_volume_vpus_per_g_b
-    pub fn set_boot_volume_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.boot_volume_vpus_per_g_b = value;
+    /// Set boot_volume_vpus_per_gb
+    pub fn set_boot_volume_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.boot_volume_vpus_per_gb = value;
         self
     }
 
     /// Set instance_source_image_filter_details
-    pub fn set_instance_source_image_filter_details(
-        mut self,
-        value: Option<InstanceConfigurationInstanceSourceImageFilterDetails>,
-    ) -> Self {
+    pub fn set_instance_source_image_filter_details(mut self, value: Option<InstanceConfigurationInstanceSourceImageFilterDetails>) -> Self {
         self.instance_source_image_filter_details = value;
         self
     }
@@ -91,9 +88,9 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
         self
     }
 
-    /// Set boot_volume_size_in_g_bs (unwraps Option)
-    pub fn with_boot_volume_size_in_g_bs(mut self, value: i64) -> Self {
-        self.boot_volume_size_in_g_bs = Some(value);
+    /// Set boot_volume_size_in_gbs (unwraps Option)
+    pub fn with_boot_volume_size_in_gbs(mut self, value: i64) -> Self {
+        self.boot_volume_size_in_gbs = Some(value);
         self
     }
 
@@ -109,18 +106,17 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
         self
     }
 
-    /// Set boot_volume_vpus_per_g_b (unwraps Option)
-    pub fn with_boot_volume_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.boot_volume_vpus_per_g_b = Some(value);
+    /// Set boot_volume_vpus_per_gb (unwraps Option)
+    pub fn with_boot_volume_vpus_per_gb(mut self, value: i64) -> Self {
+        self.boot_volume_vpus_per_gb = Some(value);
         self
     }
 
     /// Set instance_source_image_filter_details (unwraps Option)
-    pub fn with_instance_source_image_filter_details(
-        mut self,
-        value: InstanceConfigurationInstanceSourceImageFilterDetails,
-    ) -> Self {
+    pub fn with_instance_source_image_filter_details(mut self, value: InstanceConfigurationInstanceSourceImageFilterDetails) -> Self {
         self.instance_source_image_filter_details = Some(value);
         self
     }
 }
+
+

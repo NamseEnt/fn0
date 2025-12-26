@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -44,12 +44,13 @@ pub struct DedicatedVmHostSummary {
 
     /// The current total memory of the dedicated VM host, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_memory_in_g_bs: Option<i64>,
+    pub total_memory_in_gbs: Option<i64>,
 
     /// The current available memory of the dedicated VM host, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub remaining_memory_in_g_bs: Option<i64>,
+    pub remaining_memory_in_gbs: Option<i64>,
 }
+
 
 /// Required fields for DedicatedVmHostSummary
 pub struct DedicatedVmHostSummaryRequired {
@@ -107,10 +108,10 @@ impl DedicatedVmHostSummary {
 
             is_memory_encryption_enabled: None,
 
-            total_memory_in_g_bs: None,
+            total_memory_in_gbs: None,
 
-            remaining_memory_in_g_bs: None,
-        }
+            remaining_memory_in_gbs: None,
+}
     }
 
     /// Set availability_domain
@@ -179,15 +180,15 @@ impl DedicatedVmHostSummary {
         self
     }
 
-    /// Set total_memory_in_g_bs
-    pub fn set_total_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.total_memory_in_g_bs = value;
+    /// Set total_memory_in_gbs
+    pub fn set_total_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.total_memory_in_gbs = value;
         self
     }
 
-    /// Set remaining_memory_in_g_bs
-    pub fn set_remaining_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.remaining_memory_in_g_bs = value;
+    /// Set remaining_memory_in_gbs
+    pub fn set_remaining_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.remaining_memory_in_gbs = value;
         self
     }
 
@@ -203,15 +204,17 @@ impl DedicatedVmHostSummary {
         self
     }
 
-    /// Set total_memory_in_g_bs (unwraps Option)
-    pub fn with_total_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.total_memory_in_g_bs = Some(value);
+    /// Set total_memory_in_gbs (unwraps Option)
+    pub fn with_total_memory_in_gbs(mut self, value: i64) -> Self {
+        self.total_memory_in_gbs = Some(value);
         self
     }
 
-    /// Set remaining_memory_in_g_bs (unwraps Option)
-    pub fn with_remaining_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.remaining_memory_in_g_bs = Some(value);
+    /// Set remaining_memory_in_gbs (unwraps Option)
+    pub fn with_remaining_memory_in_gbs(mut self, value: i64) -> Self {
+        self.remaining_memory_in_gbs = Some(value);
         self
     }
 }
+
+

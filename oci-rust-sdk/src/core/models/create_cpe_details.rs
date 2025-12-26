@@ -34,6 +34,7 @@ pub struct CreateCpeDetails {
     pub is_private: Option<bool>,
 }
 
+
 /// Required fields for CreateCpeDetails
 pub struct CreateCpeDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the CPE.
@@ -60,7 +61,7 @@ impl CreateCpeDetails {
             cpe_device_shape_id: None,
 
             is_private: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -70,10 +71,7 @@ impl CreateCpeDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -109,10 +107,7 @@ impl CreateCpeDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -141,3 +136,5 @@ impl CreateCpeDetails {
         self
     }
 }
+
+

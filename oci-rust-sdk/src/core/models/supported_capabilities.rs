@@ -10,6 +10,7 @@ pub struct SupportedCapabilities {
     pub is_memory_encryption_supported: bool,
 }
 
+
 /// Required fields for SupportedCapabilities
 pub struct SupportedCapabilitiesRequired {
     /// Whether the DVMH shape could support confidential VMs or the VM instance shape could be confidential.
@@ -21,7 +22,7 @@ impl SupportedCapabilities {
     pub fn new(required: SupportedCapabilitiesRequired) -> Self {
         Self {
             is_memory_encryption_supported: required.is_memory_encryption_supported,
-        }
+}
     }
 
     /// Set is_memory_encryption_supported
@@ -30,3 +31,5 @@ impl SupportedCapabilities {
         self
     }
 }
+
+

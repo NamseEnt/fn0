@@ -10,6 +10,7 @@ pub struct ChangeDrgCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeDrgCompartmentDetails
 pub struct ChangeDrgCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the DRG to.
@@ -21,7 +22,7 @@ impl ChangeDrgCompartmentDetails {
     pub fn new(required: ChangeDrgCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeDrgCompartmentDetails {
         self
     }
 }
+
+

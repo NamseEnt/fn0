@@ -23,6 +23,7 @@ pub struct CaptureConsoleHistoryDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for CaptureConsoleHistoryDetails
 pub struct CaptureConsoleHistoryDetailsRequired {
     /// The OCID of the instance to get the console history from.
@@ -40,14 +41,11 @@ impl CaptureConsoleHistoryDetails {
             display_name: None,
 
             freeform_tags: None,
-        }
+}
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -71,10 +69,7 @@ impl CaptureConsoleHistoryDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -91,3 +86,5 @@ impl CaptureConsoleHistoryDetails {
         self
     }
 }
+
+

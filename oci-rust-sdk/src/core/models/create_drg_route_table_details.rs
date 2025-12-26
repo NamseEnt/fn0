@@ -31,6 +31,7 @@ pub struct CreateDrgRouteTableDetails {
     pub is_ecmp_enabled: Option<bool>,
 }
 
+
 /// Required fields for CreateDrgRouteTableDetails
 pub struct CreateDrgRouteTableDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG the DRG route table belongs to.
@@ -52,14 +53,11 @@ impl CreateDrgRouteTableDetails {
             import_drg_route_distribution_id: None,
 
             is_ecmp_enabled: None,
-        }
+}
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -95,10 +93,7 @@ impl CreateDrgRouteTableDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -127,3 +122,5 @@ impl CreateDrgRouteTableDetails {
         self
     }
 }
+
+

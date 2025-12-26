@@ -9,6 +9,7 @@ pub struct EmulatedVolumeAttachment {
     pub attachment_type: String,
 }
 
+
 /// Required fields for EmulatedVolumeAttachment
 pub struct EmulatedVolumeAttachmentRequired {
     pub attachment_type: String,
@@ -19,7 +20,7 @@ impl EmulatedVolumeAttachment {
     pub fn new(required: EmulatedVolumeAttachmentRequired) -> Self {
         Self {
             attachment_type: required.attachment_type,
-        }
+}
     }
 
     /// Set attachment_type
@@ -28,3 +29,5 @@ impl EmulatedVolumeAttachment {
         self
     }
 }
+
+

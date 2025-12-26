@@ -37,3 +37,4 @@ impl Default for InstancePoolPlacementIpv6AddressIpv6SubnetCidrDetails {
         Self::new()
     }
 }
+

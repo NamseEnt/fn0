@@ -13,6 +13,7 @@ pub struct VolumeSourceFromBlockVolumeReplicaDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for VolumeSourceFromBlockVolumeReplicaDetails
 pub struct VolumeSourceFromBlockVolumeReplicaDetailsRequired {
     /// The OCID of the block volume replica.
@@ -28,7 +29,7 @@ impl VolumeSourceFromBlockVolumeReplicaDetails {
             id: required.id,
 
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set id
@@ -43,3 +44,5 @@ impl VolumeSourceFromBlockVolumeReplicaDetails {
         self
     }
 }
+
+

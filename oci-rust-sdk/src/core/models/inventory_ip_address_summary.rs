@@ -91,3 +91,4 @@ impl Default for InventoryIpAddressSummary {
         Self::new()
     }
 }
+

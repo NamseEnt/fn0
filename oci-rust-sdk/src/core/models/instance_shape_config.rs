@@ -12,7 +12,7 @@ pub struct InstanceShapeConfig {
 
     /// The total amount of memory available to the instance, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_in_g_bs: Option<i64>,
+    pub memory_in_gbs: Option<i64>,
 
     /// The baseline OCPU utilization for a subcore burstable VM instance. Leave this attribute blank for a non-burstable instance, or explicitly specify non-burstable with {@code BASELINE_1_1}. <p> The following values are supported: - {@code BASELINE_1_8} - baseline usage is 1/8 of an OCPU. - {@code BASELINE_1_2} - baseline usage is 1/2 of an OCPU. - {@code BASELINE_1_1} - baseline usage is the entire OCPU. This represents a non-burstable instance.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -44,7 +44,7 @@ pub struct InstanceShapeConfig {
 
     /// The aggregate size of all local disks, in gigabytes. <p> If the instance does not have any local disks, this field is {@code null}. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub local_disks_total_size_in_g_bs: Option<i64>,
+    pub local_disks_total_size_in_gbs: Option<i64>,
 
     /// A short description of the local disks available to this instance. <p> If the instance does not have any local disks, this field is {@code null}.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -65,7 +65,7 @@ impl InstanceShapeConfig {
         Self {
             ocpus: None,
 
-            memory_in_g_bs: None,
+            memory_in_gbs: None,
 
             baseline_ocpu_utilization: None,
 
@@ -81,7 +81,7 @@ impl InstanceShapeConfig {
 
             local_disks: None,
 
-            local_disks_total_size_in_g_bs: None,
+            local_disks_total_size_in_gbs: None,
 
             local_disk_description: None,
 
@@ -97,17 +97,14 @@ impl InstanceShapeConfig {
         self
     }
 
-    /// Set memory_in_g_bs
-    pub fn set_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.memory_in_g_bs = value;
+    /// Set memory_in_gbs
+    pub fn set_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.memory_in_gbs = value;
         self
     }
 
     /// Set baseline_ocpu_utilization
-    pub fn set_baseline_ocpu_utilization(
-        mut self,
-        value: Option<InstanceShapeConfigBaselineOcpuUtilization>,
-    ) -> Self {
+    pub fn set_baseline_ocpu_utilization(mut self, value: Option<InstanceShapeConfigBaselineOcpuUtilization>) -> Self {
         self.baseline_ocpu_utilization = value;
         self
     }
@@ -148,9 +145,9 @@ impl InstanceShapeConfig {
         self
     }
 
-    /// Set local_disks_total_size_in_g_bs
-    pub fn set_local_disks_total_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.local_disks_total_size_in_g_bs = value;
+    /// Set local_disks_total_size_in_gbs
+    pub fn set_local_disks_total_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.local_disks_total_size_in_gbs = value;
         self
     }
 
@@ -167,10 +164,7 @@ impl InstanceShapeConfig {
     }
 
     /// Set resource_management
-    pub fn set_resource_management(
-        mut self,
-        value: Option<InstanceShapeConfigResourceManagement>,
-    ) -> Self {
+    pub fn set_resource_management(mut self, value: Option<InstanceShapeConfigResourceManagement>) -> Self {
         self.resource_management = value;
         self
     }
@@ -181,17 +175,14 @@ impl InstanceShapeConfig {
         self
     }
 
-    /// Set memory_in_g_bs (unwraps Option)
-    pub fn with_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.memory_in_g_bs = Some(value);
+    /// Set memory_in_gbs (unwraps Option)
+    pub fn with_memory_in_gbs(mut self, value: i64) -> Self {
+        self.memory_in_gbs = Some(value);
         self
     }
 
     /// Set baseline_ocpu_utilization (unwraps Option)
-    pub fn with_baseline_ocpu_utilization(
-        mut self,
-        value: InstanceShapeConfigBaselineOcpuUtilization,
-    ) -> Self {
+    pub fn with_baseline_ocpu_utilization(mut self, value: InstanceShapeConfigBaselineOcpuUtilization) -> Self {
         self.baseline_ocpu_utilization = Some(value);
         self
     }
@@ -232,9 +223,9 @@ impl InstanceShapeConfig {
         self
     }
 
-    /// Set local_disks_total_size_in_g_bs (unwraps Option)
-    pub fn with_local_disks_total_size_in_g_bs(mut self, value: i64) -> Self {
-        self.local_disks_total_size_in_g_bs = Some(value);
+    /// Set local_disks_total_size_in_gbs (unwraps Option)
+    pub fn with_local_disks_total_size_in_gbs(mut self, value: i64) -> Self {
+        self.local_disks_total_size_in_gbs = Some(value);
         self
     }
 
@@ -251,10 +242,7 @@ impl InstanceShapeConfig {
     }
 
     /// Set resource_management (unwraps Option)
-    pub fn with_resource_management(
-        mut self,
-        value: InstanceShapeConfigResourceManagement,
-    ) -> Self {
+    pub fn with_resource_management(mut self, value: InstanceShapeConfigResourceManagement) -> Self {
         self.resource_management = Some(value);
         self
     }
@@ -265,3 +253,4 @@ impl Default for InstanceShapeConfig {
         Self::new()
     }
 }
+

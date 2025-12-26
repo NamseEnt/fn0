@@ -10,6 +10,7 @@ pub struct ChangeCpeCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeCpeCompartmentDetails
 pub struct ChangeCpeCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the CPE object to.
@@ -21,7 +22,7 @@ impl ChangeCpeCompartmentDetails {
     pub fn new(required: ChangeCpeCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeCpeCompartmentDetails {
         self
     }
 }
+
+

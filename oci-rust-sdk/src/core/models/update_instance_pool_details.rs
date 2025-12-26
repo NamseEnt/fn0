@@ -68,10 +68,7 @@ impl UpdateInstancePoolDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -95,10 +92,7 @@ impl UpdateInstancePoolDetails {
     }
 
     /// Set placement_configurations
-    pub fn set_placement_configurations(
-        mut self,
-        value: Option<Vec<UpdateInstancePoolPlacementConfigurationDetails>>,
-    ) -> Self {
+    pub fn set_placement_configurations(mut self, value: Option<Vec<UpdateInstancePoolPlacementConfigurationDetails>>) -> Self {
         self.placement_configurations = value;
         self
     }
@@ -122,19 +116,13 @@ impl UpdateInstancePoolDetails {
     }
 
     /// Set lifecycle_management
-    pub fn set_lifecycle_management(
-        mut self,
-        value: Option<InstancePoolLifecycleManagementDetails>,
-    ) -> Self {
+    pub fn set_lifecycle_management(mut self, value: Option<InstancePoolLifecycleManagementDetails>) -> Self {
         self.lifecycle_management = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -158,10 +146,7 @@ impl UpdateInstancePoolDetails {
     }
 
     /// Set placement_configurations (unwraps Option)
-    pub fn with_placement_configurations(
-        mut self,
-        value: Vec<UpdateInstancePoolPlacementConfigurationDetails>,
-    ) -> Self {
+    pub fn with_placement_configurations(mut self, value: Vec<UpdateInstancePoolPlacementConfigurationDetails>) -> Self {
         self.placement_configurations = Some(value);
         self
     }
@@ -185,10 +170,7 @@ impl UpdateInstancePoolDetails {
     }
 
     /// Set lifecycle_management (unwraps Option)
-    pub fn with_lifecycle_management(
-        mut self,
-        value: InstancePoolLifecycleManagementDetails,
-    ) -> Self {
+    pub fn with_lifecycle_management(mut self, value: InstancePoolLifecycleManagementDetails) -> Self {
         self.lifecycle_management = Some(value);
         self
     }
@@ -199,3 +181,4 @@ impl Default for UpdateInstancePoolDetails {
         Self::new()
     }
 }
+

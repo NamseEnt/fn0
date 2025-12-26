@@ -1,0 +1,2067 @@
+
+> oci-sdk-discovery@1.0.0 discover
+> ts-node discover.ts
+
+OCI SDK Service Discovery
+==========================
+
+Found 160 services
+  accessgovernancecp: 1 clients, 13 models (priority 3)
+  adm: 1 clients, 74 models (priority 3)
+  aidataplatform: 1 clients, 19 models (priority 3)
+  aidocument: 1 clients, 118 models (priority 3)
+  ailanguage: 1 clients, 147 models (priority 3)
+  aispeech: 1 clients, 68 models (priority 3)
+  aivision: 1 clients, 157 models (priority 3)
+  analytics: 1 clients, 42 models (priority 3)
+  announcementsservice: 4 clients, 33 models (priority 3)
+  apiaccesscontrol: 4 clients, 36 models (priority 3)
+  apigateway: 6 clients, 161 models (priority 3)
+  apiplatform: 1 clients, 21 models (priority 3)
+  apmconfig: 1 clients, 65 models (priority 3)
+  apmcontrolplane: 1 clients, 21 models (priority 3)
+  apmsynthetics: 1 clients, 97 models (priority 3)
+  apmtraces: 4 clients, 74 models (priority 3)
+  appmgmtcontrol: 1 clients, 15 models (priority 3)
+  artifacts: 1 clients, 38 models (priority 3)
+  audit: 1 clients, 8 models (priority 2)
+  autoscaling: 1 clients, 30 models (priority 3)
+  bastion: 1 clients, 31 models (priority 3)
+  bds: 1 clients, 158 models (priority 3)
+  blockchain: 1 clients, 41 models (priority 3)
+  budget: 1 clients, 16 models (priority 3)
+  capacitymanagement: 3 clients, 85 models (priority 3)
+  certificates: 1 clients, 13 models (priority 3)
+  certificatesmanagement: 1 clients, 69 models (priority 3)
+  cims: 1 clients, 53 models (priority 3)
+  cloudbridge: 4 clients, 127 models (priority 3)
+  cloudguard: 1 clients, 319 models (priority 3)
+  cloudmigrations: 1 clients, 102 models (priority 3)
+  clusterplacementgroups: 1 clients, 23 models (priority 3)
+  computecloudatcustomer: 1 clients, 23 models (priority 3)
+  computeinstanceagent: 3 clients, 23 models (priority 3)
+  containerengine: 1 clients, 110 models (priority 1)
+  containerinstances: 1 clients, 69 models (priority 3)
+  core: 4 clients, 678 models (priority 1)
+  dashboardservice: 2 clients, 16 models (priority 3)
+  database: 1 clients, 519 models (priority 1)
+  databasemanagement: 5 clients, 703 models (priority 3)
+  databasemigration: 1 clients, 210 models (priority 3)
+  databasetools: 1 clients, 173 models (priority 3)
+  datacatalog: 1 clients, 198 models (priority 3)
+  dataflow: 1 clients, 71 models (priority 3)
+  dataintegration: 1 clients, 593 models (priority 3)
+  datalabelingservice: 1 clients, 46 models (priority 3)
+  datalabelingservicedataplane: 1 clients, 51 models (priority 3)
+  datasafe: 1 clients, 569 models (priority 3)
+  datascience: 1 clients, 321 models (priority 3)
+  dblm: 1 clients, 47 models (priority 3)
+  dbmulticloud: 10 clients, 89 models (priority 3)
+  delegateaccesscontrol: 2 clients, 54 models (priority 3)
+  demandsignal: 1 clients, 19 models (priority 3)
+  desktops: 1 clients, 41 models (priority 3)
+  devops: 1 clients, 551 models (priority 3)
+  dif: 1 clients, 57 models (priority 3)
+  disasterrecovery: 1 clients, 247 models (priority 3)
+  distributeddatabase: 4 clients, 88 models (priority 3)
+  dns: 1 clients, 87 models (priority 3)
+  email: 1 clients, 52 models (priority 3)
+  emaildataplane: 1 clients, 6 models (priority 3)
+  emwarehouse: 1 clients, 23 models (priority 3)
+  events: 1 clients, 15 models (priority 3)
+  filestorage: 1 clients, 64 models (priority 3)
+  fleetappsmanagement: 8 clients, 512 models (priority 3)
+  fleetsoftwareupdate: 1 clients, 240 models (priority 3)
+  functions: 2 clients, 41 models (priority 3)
+  fusionapps: 1 clients, 72 models (priority 3)
+  generativeai: 1 clients, 61 models (priority 3)
+  generativeaiagent: 1 clients, 99 models (priority 3)
+  generativeaiagentruntime: 1 clients, 44 models (priority 3)
+  generativeaiinference: 1 clients, 103 models (priority 3)
+  genericartifactscontent: 1 clients, 1 models (priority 3)
+  globallydistributeddatabase: 1 clients, 51 models (priority 3)
+  goldengate: 1 clients, 377 models (priority 3)
+  governancerulescontrolplane: 2 clients, 42 models (priority 3)
+  healthchecks: 1 clients, 25 models (priority 3)
+  identity: 1 clients, 136 models (priority 1)
+  identitydataplane: 1 clients, 46 models (priority 3)
+  identitydomains: 1 clients, 467 models (priority 3)
+  integration: 1 clients, 28 models (priority 3)
+  iot: 1 clients, 63 models (priority 3)
+  jms: 1 clients, 243 models (priority 3)
+  jmsjavadownloads: 1 clients, 52 models (priority 3)
+  jmsutils: 1 clients, 38 models (priority 3)
+  keymanagement: 5 clients, 75 models (priority 3)
+  licensemanager: 1 clients, 33 models (priority 3)
+  limits: 2 clients, 11 models (priority 3)
+  loadbalancer: 1 clients, 87 models (priority 3)
+  lockbox: 1 clients, 43 models (priority 3)
+  loganalytics: 1 clients, 434 models (priority 3)
+  logging: 1 clients, 99 models (priority 2)
+  loggingingestion: 1 clients, 3 models (priority 3)
+  loggingsearch: 1 clients, 5 models (priority 3)
+  lustrefilestorage: 1 clients, 32 models (priority 3)
+  managedkafka: 1 clients, 32 models (priority 3)
+  managementagent: 1 clients, 71 models (priority 3)
+  managementdashboard: 1 clients, 20 models (priority 3)
+  marketplace: 2 clients, 81 models (priority 3)
+  marketplaceprivateoffer: 2 clients, 20 models (priority 3)
+  marketplacepublisher: 1 clients, 175 models (priority 3)
+  mediaservices: 2 clients, 79 models (priority 3)
+  mngdmac: 2 clients, 29 models (priority 3)
+  modeldeployment: 1 clients, 1 models (priority 3)
+  monitoring: 1 clients, 35 models (priority 2)
+  multicloud: 6 clients, 38 models (priority 3)
+  mysql: 6 clients, 118 models (priority 3)
+  networkfirewall: 1 clients, 144 models (priority 3)
+  networkloadbalancer: 1 clients, 65 models (priority 3)
+  nosql: 1 clients, 43 models (priority 3)
+  objectstorage: 1 clients, 61 models (priority 1)
+  oce: 1 clients, 15 models (priority 3)
+  ocicontrolcenter: 1 clients, 8 models (priority 3)
+  ocvp: 6 clients, 74 models (priority 3)
+  oda: 3 clients, 195 models (priority 3)
+  onesubscription: 8 clients, 37 models (priority 3)
+  ons: 2 clients, 14 models (priority 3)
+  opa: 1 clients, 20 models (priority 3)
+  opensearch: 3 clients, 75 models (priority 3)
+  operatoraccesscontrol: 4 clients, 44 models (priority 3)
+  opsi: 1 clients, 553 models (priority 3)
+  optimizer: 1 clients, 63 models (priority 3)
+  osmanagementhub: 10 clients, 295 models (priority 3)
+  ospgateway: 4 clients, 45 models (priority 3)
+  osubbillingschedule: 1 clients, 2 models (priority 3)
+  osuborganizationsubscription: 1 clients, 2 models (priority 3)
+  osubsubscription: 3 clients, 10 models (priority 3)
+  osubusage: 1 clients, 5 models (priority 3)
+  psa: 1 clients, 21 models (priority 3)
+  psql: 1 clients, 89 models (priority 3)
+  queue: 2 clients, 39 models (priority 3)
+  recovery: 1 clients, 41 models (priority 3)
+  redis: 5 clients, 52 models (priority 3)
+  resourceanalytics: 3 clients, 34 models (priority 3)
+  resourcemanager: 1 clients, 127 models (priority 3)
+  resourcescheduler: 1 clients, 33 models (priority 3)
+  resourcesearch: 1 clients, 8 models (priority 3)
+  rover: 6 clients, 66 models (priority 3)
+  sch: 2 clients, 72 models (priority 3)
+  secrets: 1 clients, 4 models (priority 3)
+  securityattribute: 1 clients, 24 models (priority 3)
+  servicecatalog: 1 clients, 44 models (priority 3)
+  servicemanagerproxy: 1 clients, 7 models (priority 3)
+  stackmonitoring: 1 clients, 222 models (priority 3)
+  streaming: 2 clients, 31 models (priority 3)
+  tenantmanagercontrolplane: 10 clients, 86 models (priority 3)
+  threatintelligence: 1 clients, 22 models (priority 3)
+  usage: 3 clients, 18 models (priority 3)
+  usageapi: 1 clients, 55 models (priority 3)
+  vault: 1 clients, 25 models (priority 3)
+  vbsinst: 1 clients, 19 models (priority 3)
+  visualbuilder: 1 clients, 28 models (priority 3)
+  vnmonitoring: 1 clients, 270 models (priority 3)
+  vulnerabilityscanning: 1 clients, 118 models (priority 3)
+  waa: 2 clients, 30 models (priority 3)
+  waas: 2 clients, 83 models (priority 3)
+  waf: 1 clients, 67 models (priority 3)
+  wlms: 2 clients, 70 models (priority 3)
+  workrequests: 1 clients, 5 models (priority 3)
+  zpr: 1 clients, 20 models (priority 3)
+
+Discovered 160 services
+Priority 1 (high): 5
+Priority 2 (medium): 3
+Priority 3 (low): 152
+[
+  {
+    "name": "containerengine",
+    "path": "lib/containerengine",
+    "clients": [
+      "ContainerEngineClient"
+    ],
+    "modelCount": 110,
+    "requestCount": 46,
+    "responseCount": 46,
+    "priority": 1
+  },
+  {
+    "name": "core",
+    "path": "lib/core",
+    "clients": [
+      "BlockstorageClient",
+      "ComputeClient",
+      "ComputeManagementClient",
+      "VirtualNetworkClient"
+    ],
+    "modelCount": 678,
+    "requestCount": 479,
+    "responseCount": 479,
+    "priority": 1
+  },
+  {
+    "name": "database",
+    "path": "lib/database",
+    "clients": [
+      "DatabaseClient"
+    ],
+    "modelCount": 519,
+    "requestCount": 435,
+    "responseCount": 435,
+    "priority": 1
+  },
+  {
+    "name": "identity",
+    "path": "lib/identity",
+    "clients": [
+      "IdentityClient"
+    ],
+    "modelCount": 136,
+    "requestCount": 145,
+    "responseCount": 145,
+    "priority": 1
+  },
+  {
+    "name": "objectstorage",
+    "path": "lib/objectstorage",
+    "clients": [
+      "ObjectStorageClient"
+    ],
+    "modelCount": 61,
+    "requestCount": 56,
+    "responseCount": 56,
+    "priority": 1
+  },
+  {
+    "name": "audit",
+    "path": "lib/audit",
+    "clients": [
+      "AuditClient"
+    ],
+    "modelCount": 8,
+    "requestCount": 3,
+    "responseCount": 3,
+    "priority": 2
+  },
+  {
+    "name": "logging",
+    "path": "lib/logging",
+    "clients": [
+      "LoggingManagementClient"
+    ],
+    "modelCount": 99,
+    "requestCount": 30,
+    "responseCount": 30,
+    "priority": 2
+  },
+  {
+    "name": "monitoring",
+    "path": "lib/monitoring",
+    "clients": [
+      "MonitoringClient"
+    ],
+    "modelCount": 35,
+    "requestCount": 18,
+    "responseCount": 18,
+    "priority": 2
+  },
+  {
+    "name": "accessgovernancecp",
+    "path": "lib/accessgovernancecp",
+    "clients": [
+      "AccessGovernanceCPClient"
+    ],
+    "modelCount": 13,
+    "requestCount": 8,
+    "responseCount": 8,
+    "priority": 3
+  },
+  {
+    "name": "adm",
+    "path": "lib/adm",
+    "clients": [
+      "ApplicationDependencyManagementClient"
+    ],
+    "modelCount": 74,
+    "requestCount": 36,
+    "responseCount": 36,
+    "priority": 3
+  },
+  {
+    "name": "aidataplatform",
+    "path": "lib/aidataplatform",
+    "clients": [
+      "AiDataPlatformClient"
+    ],
+    "modelCount": 19,
+    "requestCount": 11,
+    "responseCount": 11,
+    "priority": 3
+  },
+  {
+    "name": "aidocument",
+    "path": "lib/aidocument",
+    "clients": [
+      "AIServiceDocumentClient"
+    ],
+    "modelCount": 118,
+    "requestCount": 27,
+    "responseCount": 27,
+    "priority": 3
+  },
+  {
+    "name": "ailanguage",
+    "path": "lib/ailanguage",
+    "clients": [
+      "AIServiceLanguageClient"
+    ],
+    "modelCount": 147,
+    "requestCount": 44,
+    "responseCount": 44,
+    "priority": 3
+  },
+  {
+    "name": "aispeech",
+    "path": "lib/aispeech",
+    "clients": [
+      "AIServiceSpeechClient"
+    ],
+    "modelCount": 68,
+    "requestCount": 19,
+    "responseCount": 19,
+    "priority": 3
+  },
+  {
+    "name": "aivision",
+    "path": "lib/aivision",
+    "clients": [
+      "AIServiceVisionClient"
+    ],
+    "modelCount": 157,
+    "requestCount": 54,
+    "responseCount": 54,
+    "priority": 3
+  },
+  {
+    "name": "analytics",
+    "path": "lib/analytics",
+    "clients": [
+      "AnalyticsClient"
+    ],
+    "modelCount": 42,
+    "requestCount": 24,
+    "responseCount": 24,
+    "priority": 3
+  },
+  {
+    "name": "announcementsservice",
+    "path": "lib/announcementsservice",
+    "clients": [
+      "AnnouncementClient",
+      "AnnouncementSubscriptionClient",
+      "AnnouncementsPreferencesClient",
+      "ServiceClient"
+    ],
+    "modelCount": 33,
+    "requestCount": 19,
+    "responseCount": 19,
+    "priority": 3
+  },
+  {
+    "name": "apiaccesscontrol",
+    "path": "lib/apiaccesscontrol",
+    "clients": [
+      "ApiMetadataClient",
+      "PrivilegedApiControlClient",
+      "PrivilegedApiRequestsClient",
+      "PrivilegedApiWorkRequestClient"
+    ],
+    "modelCount": 36,
+    "requestCount": 21,
+    "responseCount": 21,
+    "priority": 3
+  },
+  {
+    "name": "apigateway",
+    "path": "lib/apigateway",
+    "clients": [
+      "ApiGatewayClient",
+      "DeploymentClient",
+      "GatewayClient",
+      "SubscribersClient",
+      "UsagePlansClient",
+      "WorkRequestsClient"
+    ],
+    "modelCount": 161,
+    "requestCount": 64,
+    "responseCount": 64,
+    "priority": 3
+  },
+  {
+    "name": "apiplatform",
+    "path": "lib/apiplatform",
+    "clients": [
+      "ApiPlatformClient"
+    ],
+    "modelCount": 21,
+    "requestCount": 10,
+    "responseCount": 10,
+    "priority": 3
+  },
+  {
+    "name": "apmconfig",
+    "path": "lib/apmconfig",
+    "clients": [
+      "ConfigClient"
+    ],
+    "modelCount": 65,
+    "requestCount": 14,
+    "responseCount": 14,
+    "priority": 3
+  },
+  {
+    "name": "apmcontrolplane",
+    "path": "lib/apmcontrolplane",
+    "clients": [
+      "ApmDomainClient"
+    ],
+    "modelCount": 21,
+    "requestCount": 14,
+    "responseCount": 14,
+    "priority": 3
+  },
+  {
+    "name": "apmsynthetics",
+    "path": "lib/apmsynthetics",
+    "clients": [
+      "ApmSyntheticClient"
+    ],
+    "modelCount": 97,
+    "requestCount": 28,
+    "responseCount": 28,
+    "priority": 3
+  },
+  {
+    "name": "apmtraces",
+    "path": "lib/apmtraces",
+    "clients": [
+      "AttributesClient",
+      "QueryClient",
+      "ScheduledQueryClient",
+      "TraceClient"
+    ],
+    "modelCount": 74,
+    "requestCount": 20,
+    "responseCount": 20,
+    "priority": 3
+  },
+  {
+    "name": "appmgmtcontrol",
+    "path": "lib/appmgmtcontrol",
+    "clients": [
+      "AppmgmtControlClient"
+    ],
+    "modelCount": 15,
+    "requestCount": 8,
+    "responseCount": 8,
+    "priority": 3
+  },
+  {
+    "name": "artifacts",
+    "path": "lib/artifacts",
+    "clients": [
+      "ArtifactsClient"
+    ],
+    "modelCount": 38,
+    "requestCount": 33,
+    "responseCount": 33,
+    "priority": 3
+  },
+  {
+    "name": "autoscaling",
+    "path": "lib/autoscaling",
+    "clients": [
+      "AutoScalingClient"
+    ],
+    "modelCount": 30,
+    "requestCount": 11,
+    "responseCount": 11,
+    "priority": 3
+  },
+  {
+    "name": "bastion",
+    "path": "lib/bastion",
+    "clients": [
+      "BastionClient"
+    ],
+    "modelCount": 31,
+    "requestCount": 15,
+    "responseCount": 15,
+    "priority": 3
+  },
+  {
+    "name": "bds",
+    "path": "lib/bds",
+    "clients": [
+      "BdsClient"
+    ],
+    "modelCount": 158,
+    "requestCount": 88,
+    "responseCount": 88,
+    "priority": 3
+  },
+  {
+    "name": "blockchain",
+    "path": "lib/blockchain",
+    "clients": [
+      "BlockchainPlatformClient"
+    ],
+    "modelCount": 41,
+    "requestCount": 27,
+    "responseCount": 27,
+    "priority": 3
+  },
+  {
+    "name": "budget",
+    "path": "lib/budget",
+    "clients": [
+      "BudgetClient"
+    ],
+    "modelCount": 16,
+    "requestCount": 10,
+    "responseCount": 10,
+    "priority": 3
+  },
+  {
+    "name": "capacitymanagement",
+    "path": "lib/capacitymanagement",
+    "clients": [
+      "CapacityManagementClient",
+      "DemandSignalClient",
+      "InternalDemandSignalClient"
+    ],
+    "modelCount": 85,
+    "requestCount": 57,
+    "responseCount": 57,
+    "priority": 3
+  },
+  {
+    "name": "certificates",
+    "path": "lib/certificates",
+    "clients": [
+      "CertificatesClient"
+    ],
+    "modelCount": 13,
+    "requestCount": 5,
+    "responseCount": 5,
+    "priority": 3
+  },
+  {
+    "name": "certificatesmanagement",
+    "path": "lib/certificatesmanagement",
+    "clients": [
+      "CertificatesManagementClient"
+    ],
+    "modelCount": 69,
+    "requestCount": 32,
+    "responseCount": 32,
+    "priority": 3
+  },
+  {
+    "name": "cims",
+    "path": "lib/cims",
+    "clients": [
+      "IncidentClient"
+    ],
+    "modelCount": 53,
+    "requestCount": 7,
+    "responseCount": 7,
+    "priority": 3
+  },
+  {
+    "name": "cloudbridge",
+    "path": "lib/cloudbridge",
+    "clients": [
+      "CommonClient",
+      "DiscoveryClient",
+      "InventoryClient",
+      "OcbAgentSvcClient"
+    ],
+    "modelCount": 127,
+    "requestCount": 59,
+    "responseCount": 59,
+    "priority": 3
+  },
+  {
+    "name": "cloudguard",
+    "path": "lib/cloudguard",
+    "clients": [
+      "CloudGuardClient"
+    ],
+    "modelCount": 319,
+    "requestCount": 155,
+    "responseCount": 155,
+    "priority": 3
+  },
+  {
+    "name": "cloudmigrations",
+    "path": "lib/cloudmigrations",
+    "clients": [
+      "MigrationClient"
+    ],
+    "modelCount": 102,
+    "requestCount": 43,
+    "responseCount": 43,
+    "priority": 3
+  },
+  {
+    "name": "clusterplacementgroups",
+    "path": "lib/clusterplacementgroups",
+    "clients": [
+      "ClusterPlacementGroupsCPClient"
+    ],
+    "modelCount": 23,
+    "requestCount": 13,
+    "responseCount": 13,
+    "priority": 3
+  },
+  {
+    "name": "computecloudatcustomer",
+    "path": "lib/computecloudatcustomer",
+    "clients": [
+      "ComputeCloudAtCustomerClient"
+    ],
+    "modelCount": 23,
+    "requestCount": 12,
+    "responseCount": 12,
+    "priority": 3
+  },
+  {
+    "name": "computeinstanceagent",
+    "path": "lib/computeinstanceagent",
+    "clients": [
+      "ComputeInstanceAgentClient",
+      "PluginClient",
+      "PluginconfigClient"
+    ],
+    "modelCount": 23,
+    "requestCount": 9,
+    "responseCount": 9,
+    "priority": 3
+  },
+  {
+    "name": "containerinstances",
+    "path": "lib/containerinstances",
+    "clients": [
+      "ContainerInstanceClient"
+    ],
+    "modelCount": 69,
+    "requestCount": 18,
+    "responseCount": 18,
+    "priority": 3
+  },
+  {
+    "name": "dashboardservice",
+    "path": "lib/dashboardservice",
+    "clients": [
+      "DashboardClient",
+      "DashboardGroupClient"
+    ],
+    "modelCount": 16,
+    "requestCount": 12,
+    "responseCount": 12,
+    "priority": 3
+  },
+  {
+    "name": "databasemanagement",
+    "path": "lib/databasemanagement",
+    "clients": [
+      "DbManagementClient",
+      "DiagnosabilityClient",
+      "ManagedMySqlDatabasesClient",
+      "PerfhubClient",
+      "SqlTuningClient"
+    ],
+    "modelCount": 703,
+    "requestCount": 318,
+    "responseCount": 318,
+    "priority": 3
+  },
+  {
+    "name": "databasemigration",
+    "path": "lib/databasemigration",
+    "clients": [
+      "DatabaseMigrationClient"
+    ],
+    "modelCount": 210,
+    "requestCount": 43,
+    "responseCount": 43,
+    "priority": 3
+  },
+  {
+    "name": "databasetools",
+    "path": "lib/databasetools",
+    "clients": [
+      "DatabaseToolsClient"
+    ],
+    "modelCount": 173,
+    "requestCount": 33,
+    "responseCount": 33,
+    "priority": 3
+  },
+  {
+    "name": "datacatalog",
+    "path": "lib/datacatalog",
+    "clients": [
+      "DataCatalogClient"
+    ],
+    "modelCount": 198,
+    "requestCount": 149,
+    "responseCount": 149,
+    "priority": 3
+  },
+  {
+    "name": "dataflow",
+    "path": "lib/dataflow",
+    "clients": [
+      "DataFlowClient"
+    ],
+    "modelCount": 71,
+    "requestCount": 45,
+    "responseCount": 45,
+    "priority": 3
+  },
+  {
+    "name": "dataintegration",
+    "path": "lib/dataintegration",
+    "clients": [
+      "DataIntegrationClient"
+    ],
+    "modelCount": 593,
+    "requestCount": 163,
+    "responseCount": 163,
+    "priority": 3
+  },
+  {
+    "name": "datalabelingservice",
+    "path": "lib/datalabelingservice",
+    "clients": [
+      "DataLabelingManagementClient"
+    ],
+    "modelCount": 46,
+    "requestCount": 17,
+    "responseCount": 17,
+    "priority": 3
+  },
+  {
+    "name": "datalabelingservicedataplane",
+    "path": "lib/datalabelingservicedataplane",
+    "clients": [
+      "DataLabelingClient"
+    ],
+    "modelCount": 51,
+    "requestCount": 15,
+    "responseCount": 15,
+    "priority": 3
+  },
+  {
+    "name": "datasafe",
+    "path": "lib/datasafe",
+    "clients": [
+      "DataSafeClient"
+    ],
+    "modelCount": 569,
+    "requestCount": 367,
+    "responseCount": 367,
+    "priority": 3
+  },
+  {
+    "name": "datascience",
+    "path": "lib/datascience",
+    "clients": [
+      "DataScienceClient"
+    ],
+    "modelCount": 321,
+    "requestCount": 164,
+    "responseCount": 164,
+    "priority": 3
+  },
+  {
+    "name": "dblm",
+    "path": "lib/dblm",
+    "clients": [
+      "DbLifeCycleManagementClient"
+    ],
+    "modelCount": 47,
+    "requestCount": 14,
+    "responseCount": 14,
+    "priority": 3
+  },
+  {
+    "name": "dbmulticloud",
+    "path": "lib/dbmulticloud",
+    "clients": [
+      "DbMulticloudAwsProviderClient",
+      "DbMulticloudGCPProviderClient",
+      "MultiCloudResourceDiscoveryClient",
+      "OracleDBAzureBlobContainerClient",
+      "OracleDBAzureBlobMountClient",
+      "OracleDBAzureConnectorClient",
+      "OracleDbAzureKeyClient",
+      "OracleDbAzureVaultClient",
+      "OracleDbAzureVaultAssociationClient",
+      "WorkRequestClient"
+    ],
+    "modelCount": 89,
+    "requestCount": 77,
+    "responseCount": 77,
+    "priority": 3
+  },
+  {
+    "name": "delegateaccesscontrol",
+    "path": "lib/delegateaccesscontrol",
+    "clients": [
+      "DelegateAccessControlClient",
+      "WorkRequestClient"
+    ],
+    "modelCount": 54,
+    "requestCount": 30,
+    "responseCount": 30,
+    "priority": 3
+  },
+  {
+    "name": "demandsignal",
+    "path": "lib/demandsignal",
+    "clients": [
+      "OccDemandSignalClient"
+    ],
+    "modelCount": 19,
+    "requestCount": 7,
+    "responseCount": 7,
+    "priority": 3
+  },
+  {
+    "name": "desktops",
+    "path": "lib/desktops",
+    "clients": [
+      "DesktopServiceClient"
+    ],
+    "modelCount": 41,
+    "requestCount": 21,
+    "responseCount": 21,
+    "priority": 3
+  },
+  {
+    "name": "devops",
+    "path": "lib/devops",
+    "clients": [
+      "DevopsClient"
+    ],
+    "modelCount": 551,
+    "requestCount": 144,
+    "responseCount": 144,
+    "priority": 3
+  },
+  {
+    "name": "dif",
+    "path": "lib/dif",
+    "clients": [
+      "StackClient"
+    ],
+    "modelCount": 57,
+    "requestCount": 13,
+    "responseCount": 13,
+    "priority": 3
+  },
+  {
+    "name": "disasterrecovery",
+    "path": "lib/disasterrecovery",
+    "clients": [
+      "DisasterRecoveryClient"
+    ],
+    "modelCount": 247,
+    "requestCount": 36,
+    "responseCount": 36,
+    "priority": 3
+  },
+  {
+    "name": "distributeddatabase",
+    "path": "lib/distributeddatabase",
+    "clients": [
+      "DistributedAutonomousDbServiceClient",
+      "DistributedDbPrivateEndpointServiceClient",
+      "DistributedDbServiceClient",
+      "DistributedDbWorkRequestServiceClient"
+    ],
+    "modelCount": 88,
+    "requestCount": 49,
+    "responseCount": 49,
+    "priority": 3
+  },
+  {
+    "name": "dns",
+    "path": "lib/dns",
+    "clients": [
+      "DnsClient"
+    ],
+    "modelCount": 87,
+    "requestCount": 54,
+    "responseCount": 54,
+    "priority": 3
+  },
+  {
+    "name": "email",
+    "path": "lib/email",
+    "clients": [
+      "EmailClient"
+    ],
+    "modelCount": 52,
+    "requestCount": 48,
+    "responseCount": 48,
+    "priority": 3
+  },
+  {
+    "name": "emaildataplane",
+    "path": "lib/emaildataplane",
+    "clients": [
+      "EmailDPClient"
+    ],
+    "modelCount": 6,
+    "requestCount": 2,
+    "responseCount": 2,
+    "priority": 3
+  },
+  {
+    "name": "emwarehouse",
+    "path": "lib/emwarehouse",
+    "clients": [
+      "EmWarehouseClient"
+    ],
+    "modelCount": 23,
+    "requestCount": 13,
+    "responseCount": 13,
+    "priority": 3
+  },
+  {
+    "name": "events",
+    "path": "lib/events",
+    "clients": [
+      "EventsClient"
+    ],
+    "modelCount": 15,
+    "requestCount": 6,
+    "responseCount": 6,
+    "priority": 3
+  },
+  {
+    "name": "filestorage",
+    "path": "lib/filestorage",
+    "clients": [
+      "FileStorageClient"
+    ],
+    "modelCount": 64,
+    "requestCount": 74,
+    "responseCount": 74,
+    "priority": 3
+  },
+  {
+    "name": "fleetappsmanagement",
+    "path": "lib/fleetappsmanagement",
+    "clients": [
+      "FleetAppsManagementClient",
+      "FleetAppsManagementAdminClient",
+      "FleetAppsManagementCatalogClient",
+      "FleetAppsManagementMaintenanceWindowClient",
+      "FleetAppsManagementOperationsClient",
+      "FleetAppsManagementProvisionClient",
+      "FleetAppsManagementRunbooksClient",
+      "FleetAppsManagementWorkRequestClient"
+    ],
+    "modelCount": 512,
+    "requestCount": 149,
+    "responseCount": 149,
+    "priority": 3
+  },
+  {
+    "name": "fleetsoftwareupdate",
+    "path": "lib/fleetsoftwareupdate",
+    "clients": [
+      "FleetSoftwareUpdateClient"
+    ],
+    "modelCount": 240,
+    "requestCount": 46,
+    "responseCount": 46,
+    "priority": 3
+  },
+  {
+    "name": "functions",
+    "path": "lib/functions",
+    "clients": [
+      "FunctionsInvokeClient",
+      "FunctionsManagementClient"
+    ],
+    "modelCount": 41,
+    "requestCount": 17,
+    "responseCount": 17,
+    "priority": 3
+  },
+  {
+    "name": "fusionapps",
+    "path": "lib/fusionapps",
+    "clients": [
+      "FusionApplicationsClient"
+    ],
+    "modelCount": 72,
+    "requestCount": 41,
+    "responseCount": 41,
+    "priority": 3
+  },
+  {
+    "name": "generativeai",
+    "path": "lib/generativeai",
+    "clients": [
+      "GenerativeAiClient"
+    ],
+    "modelCount": 61,
+    "requestCount": 34,
+    "responseCount": 34,
+    "priority": 3
+  },
+  {
+    "name": "generativeaiagent",
+    "path": "lib/generativeaiagent",
+    "clients": [
+      "GenerativeAiAgentClient"
+    ],
+    "modelCount": 99,
+    "requestCount": 38,
+    "responseCount": 38,
+    "priority": 3
+  },
+  {
+    "name": "generativeaiagentruntime",
+    "path": "lib/generativeaiagentruntime",
+    "clients": [
+      "GenerativeAiAgentRuntimeClient"
+    ],
+    "modelCount": 44,
+    "requestCount": 6,
+    "responseCount": 6,
+    "priority": 3
+  },
+  {
+    "name": "generativeaiinference",
+    "path": "lib/generativeaiinference",
+    "clients": [
+      "GenerativeAiInferenceClient"
+    ],
+    "modelCount": 103,
+    "requestCount": 6,
+    "responseCount": 6,
+    "priority": 3
+  },
+  {
+    "name": "genericartifactscontent",
+    "path": "lib/genericartifactscontent",
+    "clients": [
+      "GenericArtifactsContentClient"
+    ],
+    "modelCount": 1,
+    "requestCount": 3,
+    "responseCount": 3,
+    "priority": 3
+  },
+  {
+    "name": "globallydistributeddatabase",
+    "path": "lib/globallydistributeddatabase",
+    "clients": [
+      "ShardedDatabaseServiceClient"
+    ],
+    "modelCount": 51,
+    "requestCount": 30,
+    "responseCount": 30,
+    "priority": 3
+  },
+  {
+    "name": "goldengate",
+    "path": "lib/goldengate",
+    "clients": [
+      "GoldenGateClient"
+    ],
+    "modelCount": 377,
+    "requestCount": 92,
+    "responseCount": 92,
+    "priority": 3
+  },
+  {
+    "name": "governancerulescontrolplane",
+    "path": "lib/governancerulescontrolplane",
+    "clients": [
+      "GovernanceRuleClient",
+      "WorkRequestClient"
+    ],
+    "modelCount": 42,
+    "requestCount": 20,
+    "responseCount": 20,
+    "priority": 3
+  },
+  {
+    "name": "healthchecks",
+    "path": "lib/healthchecks",
+    "clients": [
+      "HealthChecksClient"
+    ],
+    "modelCount": 25,
+    "requestCount": 17,
+    "responseCount": 17,
+    "priority": 3
+  },
+  {
+    "name": "identitydataplane",
+    "path": "lib/identitydataplane",
+    "clients": [
+      "DataplaneClient"
+    ],
+    "modelCount": 46,
+    "requestCount": 2,
+    "responseCount": 2,
+    "priority": 3
+  },
+  {
+    "name": "identitydomains",
+    "path": "lib/identitydomains",
+    "clients": [
+      "IdentityDomainsClient"
+    ],
+    "modelCount": 467,
+    "requestCount": 311,
+    "responseCount": 311,
+    "priority": 3
+  },
+  {
+    "name": "integration",
+    "path": "lib/integration",
+    "clients": [
+      "IntegrationInstanceClient"
+    ],
+    "modelCount": 28,
+    "requestCount": 19,
+    "responseCount": 19,
+    "priority": 3
+  },
+  {
+    "name": "iot",
+    "path": "lib/iot",
+    "clients": [
+      "IotClient"
+    ],
+    "modelCount": 63,
+    "requestCount": 42,
+    "responseCount": 42,
+    "priority": 3
+  },
+  {
+    "name": "jms",
+    "path": "lib/jms",
+    "clients": [
+      "JavaManagementServiceClient"
+    ],
+    "modelCount": 243,
+    "requestCount": 91,
+    "responseCount": 91,
+    "priority": 3
+  },
+  {
+    "name": "jmsjavadownloads",
+    "path": "lib/jmsjavadownloads",
+    "clients": [
+      "JavaDownloadClient"
+    ],
+    "modelCount": 52,
+    "requestCount": 25,
+    "responseCount": 25,
+    "priority": 3
+  },
+  {
+    "name": "jmsutils",
+    "path": "lib/jmsutils",
+    "clients": [
+      "JmsUtilsClient"
+    ],
+    "modelCount": 38,
+    "requestCount": 18,
+    "responseCount": 18,
+    "priority": 3
+  },
+  {
+    "name": "keymanagement",
+    "path": "lib/keymanagement",
+    "clients": [
+      "EkmClient",
+      "KmsCryptoClient",
+      "KmsHsmClusterClient",
+      "KmsManagementClient",
+      "KmsVaultClient"
+    ],
+    "modelCount": 75,
+    "requestCount": 58,
+    "responseCount": 58,
+    "priority": 3
+  },
+  {
+    "name": "licensemanager",
+    "path": "lib/licensemanager",
+    "clients": [
+      "LicenseManagerClient"
+    ],
+    "modelCount": 33,
+    "requestCount": 18,
+    "responseCount": 18,
+    "priority": 3
+  },
+  {
+    "name": "limits",
+    "path": "lib/limits",
+    "clients": [
+      "LimitsClient",
+      "QuotasClient"
+    ],
+    "modelCount": 11,
+    "requestCount": 11,
+    "responseCount": 11,
+    "priority": 3
+  },
+  {
+    "name": "loadbalancer",
+    "path": "lib/loadbalancer",
+    "clients": [
+      "LoadBalancerClient"
+    ],
+    "modelCount": 87,
+    "requestCount": 61,
+    "responseCount": 61,
+    "priority": 3
+  },
+  {
+    "name": "lockbox",
+    "path": "lib/lockbox",
+    "clients": [
+      "LockboxClient"
+    ],
+    "modelCount": 43,
+    "requestCount": 24,
+    "responseCount": 24,
+    "priority": 3
+  },
+  {
+    "name": "loganalytics",
+    "path": "lib/loganalytics",
+    "clients": [
+      "LogAnalyticsClient"
+    ],
+    "modelCount": 434,
+    "requestCount": 200,
+    "responseCount": 200,
+    "priority": 3
+  },
+  {
+    "name": "loggingingestion",
+    "path": "lib/loggingingestion",
+    "clients": [
+      "LoggingClient"
+    ],
+    "modelCount": 3,
+    "requestCount": 1,
+    "responseCount": 1,
+    "priority": 3
+  },
+  {
+    "name": "loggingsearch",
+    "path": "lib/loggingsearch",
+    "clients": [
+      "LogSearchClient"
+    ],
+    "modelCount": 5,
+    "requestCount": 1,
+    "responseCount": 1,
+    "priority": 3
+  },
+  {
+    "name": "lustrefilestorage",
+    "path": "lib/lustrefilestorage",
+    "clients": [
+      "LustreFileStorageClient"
+    ],
+    "modelCount": 32,
+    "requestCount": 23,
+    "responseCount": 23,
+    "priority": 3
+  },
+  {
+    "name": "managedkafka",
+    "path": "lib/managedkafka",
+    "clients": [
+      "KafkaClusterClient"
+    ],
+    "modelCount": 32,
+    "requestCount": 22,
+    "responseCount": 22,
+    "priority": 3
+  },
+  {
+    "name": "managementagent",
+    "path": "lib/managementagent",
+    "clients": [
+      "ManagementAgentClient"
+    ],
+    "modelCount": 71,
+    "requestCount": 34,
+    "responseCount": 34,
+    "priority": 3
+  },
+  {
+    "name": "managementdashboard",
+    "path": "lib/managementdashboard",
+    "clients": [
+      "DashxApisClient"
+    ],
+    "modelCount": 20,
+    "requestCount": 18,
+    "responseCount": 18,
+    "priority": 3
+  },
+  {
+    "name": "marketplace",
+    "path": "lib/marketplace",
+    "clients": [
+      "AccountClient",
+      "MarketplaceClient"
+    ],
+    "modelCount": 81,
+    "requestCount": 34,
+    "responseCount": 34,
+    "priority": 3
+  },
+  {
+    "name": "marketplaceprivateoffer",
+    "path": "lib/marketplaceprivateoffer",
+    "clients": [
+      "AttachmentClient",
+      "OfferClient"
+    ],
+    "modelCount": 20,
+    "requestCount": 11,
+    "responseCount": 11,
+    "priority": 3
+  },
+  {
+    "name": "marketplacepublisher",
+    "path": "lib/marketplacepublisher",
+    "clients": [
+      "MarketplacePublisherClient"
+    ],
+    "modelCount": 175,
+    "requestCount": 85,
+    "responseCount": 85,
+    "priority": 3
+  },
+  {
+    "name": "mediaservices",
+    "path": "lib/mediaservices",
+    "clients": [
+      "MediaServicesClient",
+      "MediaStreamClient"
+    ],
+    "modelCount": 79,
+    "requestCount": 62,
+    "responseCount": 62,
+    "priority": 3
+  },
+  {
+    "name": "mngdmac",
+    "path": "lib/mngdmac",
+    "clients": [
+      "MacDeviceClient",
+      "MacOrderClient"
+    ],
+    "modelCount": 29,
+    "requestCount": 14,
+    "responseCount": 14,
+    "priority": 3
+  },
+  {
+    "name": "modeldeployment",
+    "path": "lib/modeldeployment",
+    "clients": [
+      "ModelDeploymentClient"
+    ],
+    "modelCount": 1,
+    "requestCount": 2,
+    "responseCount": 2,
+    "priority": 3
+  },
+  {
+    "name": "multicloud",
+    "path": "lib/multicloud",
+    "clients": [
+      "MetadataClient",
+      "MultiCloudsMetadataClient",
+      "MulticloudResourcesClient",
+      "MulticloudsubscriptionsClient",
+      "OmhubNetworkAnchorClient",
+      "OmhubResourceAnchorClient"
+    ],
+    "modelCount": 38,
+    "requestCount": 11,
+    "responseCount": 11,
+    "priority": 3
+  },
+  {
+    "name": "mysql",
+    "path": "lib/mysql",
+    "clients": [
+      "ChannelsClient",
+      "DbBackupsClient",
+      "DbSystemClient",
+      "MysqlaasClient",
+      "ReplicasClient",
+      "WorkRequestsClient"
+    ],
+    "modelCount": 118,
+    "requestCount": 49,
+    "responseCount": 49,
+    "priority": 3
+  },
+  {
+    "name": "networkfirewall",
+    "path": "lib/networkfirewall",
+    "clients": [
+      "NetworkFirewallClient"
+    ],
+    "modelCount": 144,
+    "requestCount": 92,
+    "responseCount": 92,
+    "priority": 3
+  },
+  {
+    "name": "networkloadbalancer",
+    "path": "lib/networkloadbalancer",
+    "clients": [
+      "NetworkLoadBalancerClient"
+    ],
+    "modelCount": 65,
+    "requestCount": 35,
+    "responseCount": 35,
+    "priority": 3
+  },
+  {
+    "name": "nosql",
+    "path": "lib/nosql",
+    "clients": [
+      "NosqlClient"
+    ],
+    "modelCount": 43,
+    "requestCount": 27,
+    "responseCount": 27,
+    "priority": 3
+  },
+  {
+    "name": "oce",
+    "path": "lib/oce",
+    "clients": [
+      "OceInstanceClient"
+    ],
+    "modelCount": 15,
+    "requestCount": 10,
+    "responseCount": 10,
+    "priority": 3
+  },
+  {
+    "name": "ocicontrolcenter",
+    "path": "lib/ocicontrolcenter",
+    "clients": [
+      "OccMetricsClient"
+    ],
+    "modelCount": 8,
+    "requestCount": 3,
+    "responseCount": 3,
+    "priority": 3
+  },
+  {
+    "name": "ocvp",
+    "path": "lib/ocvp",
+    "clients": [
+      "ClusterClient",
+      "DatastoreClient",
+      "DatastoreClusterClient",
+      "EsxiHostClient",
+      "SddcClient",
+      "WorkRequestClient"
+    ],
+    "modelCount": 74,
+    "requestCount": 50,
+    "responseCount": 50,
+    "priority": 3
+  },
+  {
+    "name": "oda",
+    "path": "lib/oda",
+    "clients": [
+      "ManagementClient",
+      "OdaClient",
+      "OdapackageClient"
+    ],
+    "modelCount": 195,
+    "requestCount": 83,
+    "responseCount": 83,
+    "priority": 3
+  },
+  {
+    "name": "onesubscription",
+    "path": "lib/onesubscription",
+    "clients": [
+      "BillingScheduleClient",
+      "CommitmentClient",
+      "ComputedUsageClient",
+      "InvoiceSummaryClient",
+      "OrganizationSubscriptionClient",
+      "RatecardClient",
+      "SubscribedServiceClient",
+      "SubscriptionClient"
+    ],
+    "modelCount": 37,
+    "requestCount": 13,
+    "responseCount": 13,
+    "priority": 3
+  },
+  {
+    "name": "ons",
+    "path": "lib/ons",
+    "clients": [
+      "NotificationControlPlaneClient",
+      "NotificationDataPlaneClient"
+    ],
+    "modelCount": 14,
+    "requestCount": 16,
+    "responseCount": 16,
+    "priority": 3
+  },
+  {
+    "name": "opa",
+    "path": "lib/opa",
+    "clients": [
+      "OpaInstanceClient"
+    ],
+    "modelCount": 20,
+    "requestCount": 13,
+    "responseCount": 13,
+    "priority": 3
+  },
+  {
+    "name": "opensearch",
+    "path": "lib/opensearch",
+    "clients": [
+      "OpensearchClusterClient",
+      "OpensearchClusterBackupClient",
+      "OpensearchClusterPipelineClient"
+    ],
+    "modelCount": 75,
+    "requestCount": 26,
+    "responseCount": 26,
+    "priority": 3
+  },
+  {
+    "name": "operatoraccesscontrol",
+    "path": "lib/operatoraccesscontrol",
+    "clients": [
+      "AccessRequestsClient",
+      "OperatorActionsClient",
+      "OperatorControlClient",
+      "OperatorControlAssignmentClient"
+    ],
+    "modelCount": 44,
+    "requestCount": 26,
+    "responseCount": 26,
+    "priority": 3
+  },
+  {
+    "name": "opsi",
+    "path": "lib/opsi",
+    "clients": [
+      "OperationsInsightsClient"
+    ],
+    "modelCount": 553,
+    "requestCount": 184,
+    "responseCount": 184,
+    "priority": 3
+  },
+  {
+    "name": "optimizer",
+    "path": "lib/optimizer",
+    "clients": [
+      "OptimizerClient"
+    ],
+    "modelCount": 63,
+    "requestCount": 26,
+    "responseCount": 26,
+    "priority": 3
+  },
+  {
+    "name": "osmanagementhub",
+    "path": "lib/osmanagementhub",
+    "clients": [
+      "EventClient",
+      "LifecycleEnvironmentClient",
+      "ManagedInstanceClient",
+      "ManagedInstanceGroupClient",
+      "ManagementStationClient",
+      "OnboardingClient",
+      "ReportingManagedInstanceClient",
+      "ScheduledJobClient",
+      "SoftwareSourceClient",
+      "WorkRequestClient"
+    ],
+    "modelCount": 295,
+    "requestCount": 151,
+    "responseCount": 151,
+    "priority": 3
+  },
+  {
+    "name": "ospgateway",
+    "path": "lib/ospgateway",
+    "clients": [
+      "AddressRuleServiceClient",
+      "AddressServiceClient",
+      "InvoiceServiceClient",
+      "SubscriptionServiceClient"
+    ],
+    "modelCount": 45,
+    "requestCount": 13,
+    "responseCount": 13,
+    "priority": 3
+  },
+  {
+    "name": "osubbillingschedule",
+    "path": "lib/osubbillingschedule",
+    "clients": [
+      "BillingScheduleClient"
+    ],
+    "modelCount": 2,
+    "requestCount": 1,
+    "responseCount": 1,
+    "priority": 3
+  },
+  {
+    "name": "osuborganizationsubscription",
+    "path": "lib/osuborganizationsubscription",
+    "clients": [
+      "OrganizationSubscriptionClient"
+    ],
+    "modelCount": 2,
+    "requestCount": 1,
+    "responseCount": 1,
+    "priority": 3
+  },
+  {
+    "name": "osubsubscription",
+    "path": "lib/osubsubscription",
+    "clients": [
+      "CommitmentClient",
+      "RatecardClient",
+      "SubscriptionClient"
+    ],
+    "modelCount": 10,
+    "requestCount": 4,
+    "responseCount": 4,
+    "priority": 3
+  },
+  {
+    "name": "osubusage",
+    "path": "lib/osubusage",
+    "clients": [
+      "ComputedUsageClient"
+    ],
+    "modelCount": 5,
+    "requestCount": 3,
+    "responseCount": 3,
+    "priority": 3
+  },
+  {
+    "name": "psa",
+    "path": "lib/psa",
+    "clients": [
+      "PrivateServiceAccessClient"
+    ],
+    "modelCount": 21,
+    "requestCount": 12,
+    "responseCount": 12,
+    "priority": 3
+  },
+  {
+    "name": "psql",
+    "path": "lib/psql",
+    "clients": [
+      "PostgresqlClient"
+    ],
+    "modelCount": 89,
+    "requestCount": 34,
+    "responseCount": 34,
+    "priority": 3
+  },
+  {
+    "name": "queue",
+    "path": "lib/queue",
+    "clients": [
+      "QueueClient",
+      "QueueAdminClient"
+    ],
+    "modelCount": 39,
+    "requestCount": 19,
+    "responseCount": 19,
+    "priority": 3
+  },
+  {
+    "name": "recovery",
+    "path": "lib/recovery",
+    "clients": [
+      "DatabaseRecoveryClient"
+    ],
+    "modelCount": 41,
+    "requestCount": 26,
+    "responseCount": 26,
+    "priority": 3
+  },
+  {
+    "name": "redis",
+    "path": "lib/redis",
+    "clients": [
+      "OciCacheConfigSetClient",
+      "OciCacheDefaultConfigSetClient",
+      "OciCacheUserClient",
+      "RedisClusterClient",
+      "RedisIdentityClient"
+    ],
+    "modelCount": 52,
+    "requestCount": 32,
+    "responseCount": 32,
+    "priority": 3
+  },
+  {
+    "name": "resourceanalytics",
+    "path": "lib/resourceanalytics",
+    "clients": [
+      "MonitoredRegionClient",
+      "ResourceAnalyticsInstanceClient",
+      "TenancyAttachmentClient"
+    ],
+    "modelCount": 34,
+    "requestCount": 22,
+    "responseCount": 22,
+    "priority": 3
+  },
+  {
+    "name": "resourcemanager",
+    "path": "lib/resourcemanager",
+    "clients": [
+      "ResourceManagerClient"
+    ],
+    "modelCount": 127,
+    "requestCount": 52,
+    "responseCount": 52,
+    "priority": 3
+  },
+  {
+    "name": "resourcescheduler",
+    "path": "lib/resourcescheduler",
+    "clients": [
+      "ScheduleClient"
+    ],
+    "modelCount": 33,
+    "requestCount": 14,
+    "responseCount": 14,
+    "priority": 3
+  },
+  {
+    "name": "resourcesearch",
+    "path": "lib/resourcesearch",
+    "clients": [
+      "ResourceSearchClient"
+    ],
+    "modelCount": 8,
+    "requestCount": 3,
+    "responseCount": 3,
+    "priority": 3
+  },
+  {
+    "name": "rover",
+    "path": "lib/rover",
+    "clients": [
+      "RoverBundleClient",
+      "RoverClusterClient",
+      "RoverEntitlementClient",
+      "RoverNodeClient",
+      "ShapeClient",
+      "WorkRequestsClient"
+    ],
+    "modelCount": 66,
+    "requestCount": 43,
+    "responseCount": 43,
+    "priority": 3
+  },
+  {
+    "name": "sch",
+    "path": "lib/sch",
+    "clients": [
+      "ConnectorPluginsClient",
+      "ServiceConnectorClient"
+    ],
+    "modelCount": 72,
+    "requestCount": 14,
+    "responseCount": 14,
+    "priority": 3
+  },
+  {
+    "name": "secrets",
+    "path": "lib/secrets",
+    "clients": [
+      "SecretsClient"
+    ],
+    "modelCount": 4,
+    "requestCount": 3,
+    "responseCount": 3,
+    "priority": 3
+  },
+  {
+    "name": "securityattribute",
+    "path": "lib/securityattribute",
+    "clients": [
+      "SecurityAttributeClient"
+    ],
+    "modelCount": 24,
+    "requestCount": 18,
+    "responseCount": 18,
+    "priority": 3
+  },
+  {
+    "name": "servicecatalog",
+    "path": "lib/servicecatalog",
+    "clients": [
+      "ServiceCatalogClient"
+    ],
+    "modelCount": 44,
+    "requestCount": 28,
+    "responseCount": 28,
+    "priority": 3
+  },
+  {
+    "name": "servicemanagerproxy",
+    "path": "lib/servicemanagerproxy",
+    "clients": [
+      "ServiceManagerProxyClient"
+    ],
+    "modelCount": 7,
+    "requestCount": 2,
+    "responseCount": 2,
+    "priority": 3
+  },
+  {
+    "name": "stackmonitoring",
+    "path": "lib/stackmonitoring",
+    "clients": [
+      "StackMonitoringClient"
+    ],
+    "modelCount": 222,
+    "requestCount": 87,
+    "responseCount": 87,
+    "priority": 3
+  },
+  {
+    "name": "streaming",
+    "path": "lib/streaming",
+    "clients": [
+      "StreamClient",
+      "StreamAdminClient"
+    ],
+    "modelCount": 31,
+    "requestCount": 26,
+    "responseCount": 26,
+    "priority": 3
+  },
+  {
+    "name": "tenantmanagercontrolplane",
+    "path": "lib/tenantmanagercontrolplane",
+    "clients": [
+      "DomainClient",
+      "DomainGovernanceClient",
+      "GovernanceClient",
+      "LinkClient",
+      "OrdersClient",
+      "OrganizationClient",
+      "RecipientInvitationClient",
+      "SenderInvitationClient",
+      "SubscriptionClient",
+      "WorkRequestClient"
+    ],
+    "modelCount": 86,
+    "requestCount": 52,
+    "responseCount": 52,
+    "priority": 3
+  },
+  {
+    "name": "threatintelligence",
+    "path": "lib/threatintelligence",
+    "clients": [
+      "ThreatintelClient"
+    ],
+    "modelCount": 22,
+    "requestCount": 5,
+    "responseCount": 5,
+    "priority": 3
+  },
+  {
+    "name": "usage",
+    "path": "lib/usage",
+    "clients": [
+      "ResourcesClient",
+      "RewardsClient",
+      "UsagelimitsClient"
+    ],
+    "modelCount": 18,
+    "requestCount": 9,
+    "responseCount": 9,
+    "priority": 3
+  },
+  {
+    "name": "usageapi",
+    "path": "lib/usageapi",
+    "clients": [
+      "UsageapiClient"
+    ],
+    "modelCount": 55,
+    "requestCount": 33,
+    "responseCount": 33,
+    "priority": 3
+  },
+  {
+    "name": "vault",
+    "path": "lib/vault",
+    "clients": [
+      "VaultsClient"
+    ],
+    "modelCount": 25,
+    "requestCount": 13,
+    "responseCount": 13,
+    "priority": 3
+  },
+  {
+    "name": "vbsinst",
+    "path": "lib/vbsinst",
+    "clients": [
+      "VbsInstanceClient"
+    ],
+    "modelCount": 19,
+    "requestCount": 10,
+    "responseCount": 10,
+    "priority": 3
+  },
+  {
+    "name": "visualbuilder",
+    "path": "lib/visualbuilder",
+    "clients": [
+      "VbInstanceClient"
+    ],
+    "modelCount": 28,
+    "requestCount": 14,
+    "responseCount": 14,
+    "priority": 3
+  },
+  {
+    "name": "vnmonitoring",
+    "path": "lib/vnmonitoring",
+    "clients": [
+      "VnMonitoringClient"
+    ],
+    "modelCount": 270,
+    "requestCount": 12,
+    "responseCount": 12,
+    "priority": 3
+  },
+  {
+    "name": "vulnerabilityscanning",
+    "path": "lib/vulnerabilityscanning",
+    "clients": [
+      "VulnerabilityScanningClient"
+    ],
+    "modelCount": 118,
+    "requestCount": 58,
+    "responseCount": 58,
+    "priority": 3
+  },
+  {
+    "name": "waa",
+    "path": "lib/waa",
+    "clients": [
+      "WaaClient",
+      "WorkRequestClient"
+    ],
+    "modelCount": 30,
+    "requestCount": 17,
+    "responseCount": 17,
+    "priority": 3
+  },
+  {
+    "name": "waas",
+    "path": "lib/waas",
+    "clients": [
+      "RedirectClient",
+      "WaasClient"
+    ],
+    "modelCount": 83,
+    "requestCount": 72,
+    "responseCount": 72,
+    "priority": 3
+  },
+  {
+    "name": "waf",
+    "path": "lib/waf",
+    "clients": [
+      "WafClient"
+    ],
+    "modelCount": 67,
+    "requestCount": 24,
+    "responseCount": 24,
+    "priority": 3
+  },
+  {
+    "name": "wlms",
+    "path": "lib/wlms",
+    "clients": [
+      "WeblogicManagementServiceClient",
+      "WeblogicManagementServiceConfigurationClient"
+    ],
+    "modelCount": 70,
+    "requestCount": 43,
+    "responseCount": 43,
+    "priority": 3
+  },
+  {
+    "name": "workrequests",
+    "path": "lib/workrequests",
+    "clients": [
+      "WorkRequestClient"
+    ],
+    "modelCount": 5,
+    "requestCount": 4,
+    "responseCount": 4,
+    "priority": 3
+  },
+  {
+    "name": "zpr",
+    "path": "lib/zpr",
+    "clients": [
+      "ZprClient"
+    ],
+    "modelCount": 20,
+    "requestCount": 15,
+    "responseCount": 15,
+    "priority": 3
+  }
+]

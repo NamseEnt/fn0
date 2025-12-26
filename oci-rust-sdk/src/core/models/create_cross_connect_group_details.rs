@@ -30,6 +30,7 @@ pub struct CreateCrossConnectGroupDetails {
     pub macsec_properties: Option<CreateMacsecProperties>,
 }
 
+
 /// Required fields for CreateCrossConnectGroupDetails
 pub struct CreateCrossConnectGroupDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the cross-connect group.
@@ -51,7 +52,7 @@ impl CreateCrossConnectGroupDetails {
             freeform_tags: None,
 
             macsec_properties: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -61,10 +62,7 @@ impl CreateCrossConnectGroupDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -94,10 +92,7 @@ impl CreateCrossConnectGroupDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -126,3 +121,5 @@ impl CreateCrossConnectGroupDetails {
         self
     }
 }
+
+

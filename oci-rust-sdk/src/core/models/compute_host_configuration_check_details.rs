@@ -57,10 +57,7 @@ impl ComputeHostConfigurationCheckDetails {
     }
 
     /// Set recycle_level
-    pub fn set_recycle_level(
-        mut self,
-        value: Option<ComputeHostConfigurationCheckDetailsRecycleLevel>,
-    ) -> Self {
+    pub fn set_recycle_level(mut self, value: Option<ComputeHostConfigurationCheckDetailsRecycleLevel>) -> Self {
         self.recycle_level = value;
         self
     }
@@ -84,10 +81,7 @@ impl ComputeHostConfigurationCheckDetails {
     }
 
     /// Set recycle_level (unwraps Option)
-    pub fn with_recycle_level(
-        mut self,
-        value: ComputeHostConfigurationCheckDetailsRecycleLevel,
-    ) -> Self {
+    pub fn with_recycle_level(mut self, value: ComputeHostConfigurationCheckDetailsRecycleLevel) -> Self {
         self.recycle_level = Some(value);
         self
     }
@@ -98,3 +92,4 @@ impl Default for ComputeHostConfigurationCheckDetails {
         Self::new()
     }
 }
+

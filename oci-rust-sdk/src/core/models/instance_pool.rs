@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -57,6 +57,7 @@ pub struct InstancePool {
     pub lifecycle_management: Option<InstancePoolLifecycleManagementDetails>,
 }
 
+
 /// Required fields for InstancePool
 pub struct InstancePoolRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance pool.
@@ -112,7 +113,7 @@ impl InstancePool {
             instance_hostname_formatter: None,
 
             lifecycle_management: None,
-        }
+}
     }
 
     /// Set id
@@ -128,10 +129,7 @@ impl InstancePool {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -161,10 +159,7 @@ impl InstancePool {
     }
 
     /// Set placement_configurations
-    pub fn set_placement_configurations(
-        mut self,
-        value: Vec<InstancePoolPlacementConfiguration>,
-    ) -> Self {
+    pub fn set_placement_configurations(mut self, value: Vec<InstancePoolPlacementConfiguration>) -> Self {
         self.placement_configurations = value;
         self
     }
@@ -182,10 +177,7 @@ impl InstancePool {
     }
 
     /// Set load_balancers
-    pub fn set_load_balancers(
-        mut self,
-        value: Option<Vec<InstancePoolLoadBalancerAttachment>>,
-    ) -> Self {
+    pub fn set_load_balancers(mut self, value: Option<Vec<InstancePoolLoadBalancerAttachment>>) -> Self {
         self.load_balancers = value;
         self
     }
@@ -203,19 +195,13 @@ impl InstancePool {
     }
 
     /// Set lifecycle_management
-    pub fn set_lifecycle_management(
-        mut self,
-        value: Option<InstancePoolLifecycleManagementDetails>,
-    ) -> Self {
+    pub fn set_lifecycle_management(mut self, value: Option<InstancePoolLifecycleManagementDetails>) -> Self {
         self.lifecycle_management = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -251,11 +237,10 @@ impl InstancePool {
     }
 
     /// Set lifecycle_management (unwraps Option)
-    pub fn with_lifecycle_management(
-        mut self,
-        value: InstancePoolLifecycleManagementDetails,
-    ) -> Self {
+    pub fn with_lifecycle_management(mut self, value: InstancePoolLifecycleManagementDetails) -> Self {
         self.lifecycle_management = Some(value);
         self
     }
 }
+
+

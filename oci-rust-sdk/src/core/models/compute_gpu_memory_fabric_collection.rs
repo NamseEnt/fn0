@@ -10,6 +10,7 @@ pub struct ComputeGpuMemoryFabricCollection {
     pub items: Vec<ComputeGpuMemoryFabricSummary>,
 }
 
+
 /// Required fields for ComputeGpuMemoryFabricCollection
 pub struct ComputeGpuMemoryFabricCollectionRequired {
     /// The list of compute GPU memory fabrics.
@@ -21,7 +22,7 @@ impl ComputeGpuMemoryFabricCollection {
     pub fn new(required: ComputeGpuMemoryFabricCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ComputeGpuMemoryFabricCollection {
         self
     }
 }
+
+

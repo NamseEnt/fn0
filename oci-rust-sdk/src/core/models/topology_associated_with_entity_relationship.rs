@@ -13,6 +13,7 @@ pub struct TopologyAssociatedWithEntityRelationship {
     pub associated_with_details: Option<TopologyAssociatedWithRelationshipDetails>,
 }
 
+
 /// Required fields for TopologyAssociatedWithEntityRelationship
 pub struct TopologyAssociatedWithEntityRelationshipRequired {
     pub r#type: String,
@@ -25,14 +26,11 @@ impl TopologyAssociatedWithEntityRelationship {
             r#type: required.r#type,
 
             associated_with_details: None,
-        }
+}
     }
 
     /// Set associated_with_details
-    pub fn set_associated_with_details(
-        mut self,
-        value: Option<TopologyAssociatedWithRelationshipDetails>,
-    ) -> Self {
+    pub fn set_associated_with_details(mut self, value: Option<TopologyAssociatedWithRelationshipDetails>) -> Self {
         self.associated_with_details = value;
         self
     }
@@ -44,11 +42,10 @@ impl TopologyAssociatedWithEntityRelationship {
     }
 
     /// Set associated_with_details (unwraps Option)
-    pub fn with_associated_with_details(
-        mut self,
-        value: TopologyAssociatedWithRelationshipDetails,
-    ) -> Self {
+    pub fn with_associated_with_details(mut self, value: TopologyAssociatedWithRelationshipDetails) -> Self {
         self.associated_with_details = Some(value);
         self
     }
 }
+
+

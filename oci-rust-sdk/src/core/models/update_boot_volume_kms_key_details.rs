@@ -14,7 +14,9 @@ pub struct UpdateBootVolumeKmsKeyDetails {
 impl UpdateBootVolumeKmsKeyDetails {
     /// Create a new UpdateBootVolumeKmsKeyDetails
     pub fn new() -> Self {
-        Self { kms_key_id: None }
+        Self {
+            kms_key_id: None,
+        }
     }
 
     /// Set kms_key_id
@@ -35,3 +37,4 @@ impl Default for UpdateBootVolumeKmsKeyDetails {
         Self::new()
     }
 }
+

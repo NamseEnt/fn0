@@ -18,6 +18,8 @@ pub struct ParsedModel {
     #[serde(rename = "fileName")]
     pub file_name: String,      // kebab-case
     pub kind: ModelKind,
+    #[serde(rename = "sourceDir")]
+    pub source_dir: SourceDir,  // Track which directory this came from
     pub documentation: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<ParsedField>>,
@@ -27,6 +29,14 @@ pub struct ParsedModel {
     pub discriminator: Option<String>,
     #[serde(rename = "baseType", skip_serializing_if = "Option::is_none")]
     pub base_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceDir {
+    Model,
+    Request,
+    Response,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

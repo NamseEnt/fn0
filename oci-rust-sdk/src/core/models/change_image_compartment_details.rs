@@ -10,6 +10,7 @@ pub struct ChangeImageCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeImageCompartmentDetails
 pub struct ChangeImageCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the image to.
@@ -21,7 +22,7 @@ impl ChangeImageCompartmentDetails {
     pub fn new(required: ChangeImageCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeImageCompartmentDetails {
         self
     }
 }
+
+

@@ -22,6 +22,7 @@ pub struct ShapeMemoryOptions {
     pub max_per_ocpu_in_g_bs: i64,
 }
 
+
 /// Required fields for ShapeMemoryOptions
 pub struct ShapeMemoryOptionsRequired {
     /// The minimum amount of memory (GB). Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -53,7 +54,7 @@ impl ShapeMemoryOptions {
             min_per_ocpu_in_g_bs: required.min_per_ocpu_in_g_bs,
 
             max_per_ocpu_in_g_bs: required.max_per_ocpu_in_g_bs,
-        }
+}
     }
 
     /// Set min_in_g_bs
@@ -86,3 +87,5 @@ impl ShapeMemoryOptions {
         self
     }
 }
+
+

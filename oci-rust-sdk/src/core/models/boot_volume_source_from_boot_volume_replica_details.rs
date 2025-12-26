@@ -13,6 +13,7 @@ pub struct BootVolumeSourceFromBootVolumeReplicaDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for BootVolumeSourceFromBootVolumeReplicaDetails
 pub struct BootVolumeSourceFromBootVolumeReplicaDetailsRequired {
     /// The OCID of the boot volume replica.
@@ -28,7 +29,7 @@ impl BootVolumeSourceFromBootVolumeReplicaDetails {
             id: required.id,
 
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set id
@@ -43,3 +44,5 @@ impl BootVolumeSourceFromBootVolumeReplicaDetails {
         self
     }
 }
+
+

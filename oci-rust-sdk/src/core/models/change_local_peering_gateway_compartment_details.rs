@@ -10,6 +10,7 @@ pub struct ChangeLocalPeeringGatewayCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeLocalPeeringGatewayCompartmentDetails
 pub struct ChangeLocalPeeringGatewayCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the local peering gateway to.
@@ -21,7 +22,7 @@ impl ChangeLocalPeeringGatewayCompartmentDetails {
     pub fn new(required: ChangeLocalPeeringGatewayCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeLocalPeeringGatewayCompartmentDetails {
         self
     }
 }
+
+

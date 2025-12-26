@@ -10,6 +10,7 @@ pub struct PlacementConstraintDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for PlacementConstraintDetails
 pub struct PlacementConstraintDetailsRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl PlacementConstraintDetails {
     pub fn new(required: PlacementConstraintDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl PlacementConstraintDetails {
         self
     }
 }
+
+

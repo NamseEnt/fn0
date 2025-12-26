@@ -22,6 +22,7 @@ pub struct ByoasnByoipRange {
     pub as_path_prepend_length: Option<i64>,
 }
 
+
 /// Required fields for ByoasnByoipRange
 pub struct ByoasnByoipRangeRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code ByoipRange} resource to which the CIDR block belongs.
@@ -39,7 +40,7 @@ impl ByoasnByoipRange {
             ipv6_cidr_block: None,
 
             as_path_prepend_length: None,
-        }
+}
     }
 
     /// Set cidr_block
@@ -84,3 +85,5 @@ impl ByoasnByoipRange {
         self
     }
 }
+
+

@@ -30,6 +30,7 @@ pub struct RouteRule {
     pub route_type: Option<RouteRuleRouteType>,
 }
 
+
 /// Required fields for RouteRule
 pub struct RouteRuleRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) for the route rule's target. For information about the type of targets you can specify, see [Route Tables](https://docs.oracle.com/iaas/Content/Network/Tasks/managingroutetables.htm).
@@ -51,7 +52,7 @@ impl RouteRule {
             description: None,
 
             route_type: None,
-        }
+}
     }
 
     /// Set cidr_block
@@ -120,3 +121,5 @@ impl RouteRule {
         self
     }
 }
+
+

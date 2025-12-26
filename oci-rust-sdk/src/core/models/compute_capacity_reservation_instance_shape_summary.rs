@@ -13,6 +13,7 @@ pub struct ComputeCapacityReservationInstanceShapeSummary {
     pub instance_shape: String,
 }
 
+
 /// Required fields for ComputeCapacityReservationInstanceShapeSummary
 pub struct ComputeCapacityReservationInstanceShapeSummaryRequired {
     /// The shape's availability domain.
@@ -29,7 +30,7 @@ impl ComputeCapacityReservationInstanceShapeSummary {
             availability_domain: required.availability_domain,
 
             instance_shape: required.instance_shape,
-        }
+}
     }
 
     /// Set availability_domain
@@ -44,3 +45,5 @@ impl ComputeCapacityReservationInstanceShapeSummary {
         self
     }
 }
+
+

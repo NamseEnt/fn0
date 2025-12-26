@@ -13,6 +13,7 @@ pub struct Device {
     pub is_available: bool,
 }
 
+
 /// Required fields for Device
 pub struct DeviceRequired {
     /// The device name.
@@ -29,7 +30,7 @@ impl Device {
             name: required.name,
 
             is_available: required.is_available,
-        }
+}
     }
 
     /// Set name
@@ -44,3 +45,5 @@ impl Device {
         self
     }
 }
+
+

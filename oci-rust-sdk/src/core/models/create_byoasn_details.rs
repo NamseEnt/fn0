@@ -25,6 +25,7 @@ pub struct CreateByoasnDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for CreateByoasnDetails
 pub struct CreateByoasnDetailsRequired {
     /// The Autonomous System Number (ASN) you are importing to the Oracle cloud. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -50,7 +51,7 @@ impl CreateByoasnDetails {
             defined_tags: None,
 
             freeform_tags: None,
-        }
+}
     }
 
     /// Set asn
@@ -66,10 +67,7 @@ impl CreateByoasnDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -87,10 +85,7 @@ impl CreateByoasnDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -101,3 +96,5 @@ impl CreateByoasnDetails {
         self
     }
 }
+
+

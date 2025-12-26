@@ -10,6 +10,7 @@ pub struct ChangeRouteTableCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeRouteTableCompartmentDetails
 pub struct ChangeRouteTableCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the route table to.
@@ -21,7 +22,7 @@ impl ChangeRouteTableCompartmentDetails {
     pub fn new(required: ChangeRouteTableCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeRouteTableCompartmentDetails {
         self
     }
 }
+
+

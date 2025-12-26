@@ -111,10 +111,7 @@ impl UpdateVtapDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -156,10 +153,7 @@ impl UpdateVtapDetails {
     }
 
     /// Set encapsulation_protocol
-    pub fn set_encapsulation_protocol(
-        mut self,
-        value: Option<UpdateVtapDetailsEncapsulationProtocol>,
-    ) -> Self {
+    pub fn set_encapsulation_protocol(mut self, value: Option<UpdateVtapDetailsEncapsulationProtocol>) -> Self {
         self.encapsulation_protocol = value;
         self
     }
@@ -213,10 +207,7 @@ impl UpdateVtapDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -258,10 +249,7 @@ impl UpdateVtapDetails {
     }
 
     /// Set encapsulation_protocol (unwraps Option)
-    pub fn with_encapsulation_protocol(
-        mut self,
-        value: UpdateVtapDetailsEncapsulationProtocol,
-    ) -> Self {
+    pub fn with_encapsulation_protocol(mut self, value: UpdateVtapDetailsEncapsulationProtocol) -> Self {
         self.encapsulation_protocol = Some(value);
         self
     }
@@ -320,3 +308,4 @@ impl Default for UpdateVtapDetails {
         Self::new()
     }
 }
+

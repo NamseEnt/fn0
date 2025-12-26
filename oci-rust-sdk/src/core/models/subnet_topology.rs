@@ -14,6 +14,7 @@ pub struct SubnetTopology {
     pub subnet_id: Option<String>,
 }
 
+
 /// Required fields for SubnetTopology
 pub struct SubnetTopologyRequired {
     pub r#type: String,
@@ -26,7 +27,7 @@ impl SubnetTopology {
             r#type: required.r#type,
 
             subnet_id: None,
-        }
+}
     }
 
     /// Set subnet_id
@@ -47,3 +48,5 @@ impl SubnetTopology {
         self
     }
 }
+
+

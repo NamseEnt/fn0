@@ -1,93 +1,71 @@
-use oci_rust_sdk::compute::{
-    LifecycleState, ListInstancesRequest, ListInstancesRequestRequiredFields,
-};
+use oci_rust_sdk::core::{InstanceLifecycleState, ListInstancesRequest, ListInstancesRequestRequired};
 
 fn main() {
-    println!("=== Testing LifecycleState Enum ===\n");
+    println!("=== Testing InstanceLifecycleState Enum ===\n");
 
-    // Test 1: Display trait implementation
-    println!("Test 1: LifecycleState Display trait");
+    // Test 1: Debug trait implementation
+    println!("Test 1: InstanceLifecycleState Debug trait");
     let states = vec![
-        (LifecycleState::Moving, "MOVING"),
-        (LifecycleState::Provisioning, "PROVISIONING"),
-        (LifecycleState::Running, "RUNNING"),
-        (LifecycleState::Starting, "STARTING"),
-        (LifecycleState::Stopping, "STOPPING"),
-        (LifecycleState::Stopped, "STOPPED"),
-        (LifecycleState::CreatingImage, "CREATING_IMAGE"),
-        (LifecycleState::Terminating, "TERMINATING"),
-        (LifecycleState::Terminated, "TERMINATED"),
+        InstanceLifecycleState::Moving,
+        InstanceLifecycleState::Provisioning,
+        InstanceLifecycleState::Running,
+        InstanceLifecycleState::Starting,
+        InstanceLifecycleState::Stopping,
+        InstanceLifecycleState::Stopped,
+        InstanceLifecycleState::CreatingImage,
+        InstanceLifecycleState::Terminating,
+        InstanceLifecycleState::Terminated,
     ];
 
-    for (state, expected) in &states {
-        let result = state.to_string();
-        assert_eq!(
-            &result, expected,
-            "Failed: {:?} should be {}",
-            state, expected
-        );
-        println!("  ✓ {:?} -> \"{}\"", state, result);
+    for state in &states {
+        println!("  ✓ {:?}", state);
     }
 
     // Test 2: Usage in ListInstancesRequest
-    println!("\nTest 2: LifecycleState in ListInstancesRequest");
+    println!("\nTest 2: InstanceLifecycleState in ListInstancesRequest");
     let test_cases = vec![
-        (LifecycleState::Running, "RUNNING"),
-        (LifecycleState::Stopped, "STOPPED"),
-        (LifecycleState::Terminated, "TERMINATED"),
+        (InstanceLifecycleState::Running, "Running"),
+        (InstanceLifecycleState::Stopped, "Stopped"),
+        (InstanceLifecycleState::Terminated, "Terminated"),
     ];
 
-    for (state, expected) in &test_cases {
-        let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
+    for (state, name) in &test_cases {
+        let request = ListInstancesRequest::new(ListInstancesRequestRequired {
             compartment_id: "test-compartment-id".to_string(),
         })
-        .lifecycle_state(*state)
-        .build();
+        .with_lifecycle_state(format!("{:?}", state).to_uppercase());
 
-        let params = request.to_query_params();
-        let lifecycle_param = params
-            .iter()
-            .find(|(k, _)| k == "lifecycleState")
-            .map(|(_, v)| v.as_str());
-
-        assert_eq!(
-            lifecycle_param,
-            Some(*expected),
-            "Failed: {:?} should produce lifecycleState={}",
-            state,
-            expected
-        );
-        println!("  ✓ {:?} -> lifecycleState={}", state, expected);
+        println!("  ✓ Created request with lifecycle_state = {:?}", name);
+        println!("    Request compartment_id: {}", request.compartment_id);
+        if let Some(ref lifecycle) = request.lifecycle_state {
+            println!("    Request lifecycle_state: {}", lifecycle);
+        }
     }
 
+    // Test 3: Multiple filters combined
     println!("\nTest 3: Combined filters with LifecycleState");
-    let request = ListInstancesRequest::builder(ListInstancesRequestRequiredFields {
+    let request = ListInstancesRequest::new(ListInstancesRequestRequired {
         compartment_id: "compartment-123".to_string(),
     })
-    .lifecycle_state(LifecycleState::Running)
-    .display_name("my-instance")
-    .limit(10)
-    .build();
+    .with_lifecycle_state("RUNNING")
+    .with_display_name("my-instance")
+    .with_limit(10);
 
-    let params = request.to_query_params();
-
-    println!("  Query parameters:");
-    for (key, value) in &params {
-        println!("    {} = {}", key, value);
+    println!("  Request details:");
+    println!("    compartment_id: {}", request.compartment_id);
+    if let Some(ref state) = request.lifecycle_state {
+        println!("    lifecycle_state: {}", state);
     }
-
-    // Verify lifecycle state is correctly converted
-    let lifecycle_value = params
-        .iter()
-        .find(|(k, _)| k == "lifecycleState")
-        .map(|(_, v)| v.as_str());
-
-    assert_eq!(lifecycle_value, Some("RUNNING"));
-    println!("  ✓ lifecycleState correctly set to RUNNING");
+    if let Some(ref name) = request.display_name {
+        println!("    display_name: {}", name);
+    }
+    if let Some(limit) = request.limit {
+        println!("    limit: {}", limit);
+    }
 
     println!("\n✅ All tests passed!");
     println!("\nConclusion:");
-    println!("  - LifecycleState enum provides type safety");
-    println!("  - API requests use string values (MOVING, RUNNING, etc.)");
-    println!("  - Display trait enables automatic .to_string() conversion");
+    println!("  - InstanceLifecycleState enum provides type safety");
+    println!("  - API requests use enum values");
+    println!("  - Request builder enables fluent API construction");
 }

@@ -9,6 +9,7 @@ pub struct UpdateCapacitySourceDetails {
     pub capacity_type: String,
 }
 
+
 /// Required fields for UpdateCapacitySourceDetails
 pub struct UpdateCapacitySourceDetailsRequired {
     pub capacity_type: String,
@@ -19,7 +20,7 @@ impl UpdateCapacitySourceDetails {
     pub fn new(required: UpdateCapacitySourceDetailsRequired) -> Self {
         Self {
             capacity_type: required.capacity_type,
-        }
+}
     }
 
     /// Set capacity_type
@@ -28,3 +29,5 @@ impl UpdateCapacitySourceDetails {
         self
     }
 }
+
+

@@ -27,8 +27,7 @@ pub struct ShapePlatformConfigOptions {
     pub memory_encryption_options: Option<ShapeMemoryEncryptionOptions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub symmetric_multi_threading_options:
-        Option<ShapeSymmetricMultiThreadingEnabledPlatformOptions>,
+    pub symmetric_multi_threading_options: Option<ShapeSymmetricMultiThreadingEnabledPlatformOptions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_control_service_options: Option<ShapeAccessControlServiceEnabledPlatformOptions>,
@@ -37,8 +36,7 @@ pub struct ShapePlatformConfigOptions {
     pub virtual_instructions_options: Option<ShapeVirtualInstructionsEnabledPlatformOptions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_output_memory_management_unit_options:
-        Option<ShapeInputOutputMemoryManagementUnitEnabledPlatformOptions>,
+    pub input_output_memory_management_unit_options: Option<ShapeInputOutputMemoryManagementUnitEnabledPlatformOptions>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub percentage_of_cores_enabled_options: Option<PercentageOfCoresEnabledOptions>,
@@ -91,73 +89,49 @@ impl ShapePlatformConfigOptions {
     }
 
     /// Set trusted_platform_module_options
-    pub fn set_trusted_platform_module_options(
-        mut self,
-        value: Option<ShapeTrustedPlatformModuleOptions>,
-    ) -> Self {
+    pub fn set_trusted_platform_module_options(mut self, value: Option<ShapeTrustedPlatformModuleOptions>) -> Self {
         self.trusted_platform_module_options = value;
         self
     }
 
     /// Set numa_nodes_per_socket_platform_options
-    pub fn set_numa_nodes_per_socket_platform_options(
-        mut self,
-        value: Option<ShapeNumaNodesPerSocketPlatformOptions>,
-    ) -> Self {
+    pub fn set_numa_nodes_per_socket_platform_options(mut self, value: Option<ShapeNumaNodesPerSocketPlatformOptions>) -> Self {
         self.numa_nodes_per_socket_platform_options = value;
         self
     }
 
     /// Set memory_encryption_options
-    pub fn set_memory_encryption_options(
-        mut self,
-        value: Option<ShapeMemoryEncryptionOptions>,
-    ) -> Self {
+    pub fn set_memory_encryption_options(mut self, value: Option<ShapeMemoryEncryptionOptions>) -> Self {
         self.memory_encryption_options = value;
         self
     }
 
     /// Set symmetric_multi_threading_options
-    pub fn set_symmetric_multi_threading_options(
-        mut self,
-        value: Option<ShapeSymmetricMultiThreadingEnabledPlatformOptions>,
-    ) -> Self {
+    pub fn set_symmetric_multi_threading_options(mut self, value: Option<ShapeSymmetricMultiThreadingEnabledPlatformOptions>) -> Self {
         self.symmetric_multi_threading_options = value;
         self
     }
 
     /// Set access_control_service_options
-    pub fn set_access_control_service_options(
-        mut self,
-        value: Option<ShapeAccessControlServiceEnabledPlatformOptions>,
-    ) -> Self {
+    pub fn set_access_control_service_options(mut self, value: Option<ShapeAccessControlServiceEnabledPlatformOptions>) -> Self {
         self.access_control_service_options = value;
         self
     }
 
     /// Set virtual_instructions_options
-    pub fn set_virtual_instructions_options(
-        mut self,
-        value: Option<ShapeVirtualInstructionsEnabledPlatformOptions>,
-    ) -> Self {
+    pub fn set_virtual_instructions_options(mut self, value: Option<ShapeVirtualInstructionsEnabledPlatformOptions>) -> Self {
         self.virtual_instructions_options = value;
         self
     }
 
     /// Set input_output_memory_management_unit_options
-    pub fn set_input_output_memory_management_unit_options(
-        mut self,
-        value: Option<ShapeInputOutputMemoryManagementUnitEnabledPlatformOptions>,
-    ) -> Self {
+    pub fn set_input_output_memory_management_unit_options(mut self, value: Option<ShapeInputOutputMemoryManagementUnitEnabledPlatformOptions>) -> Self {
         self.input_output_memory_management_unit_options = value;
         self
     }
 
     /// Set percentage_of_cores_enabled_options
-    pub fn set_percentage_of_cores_enabled_options(
-        mut self,
-        value: Option<PercentageOfCoresEnabledOptions>,
-    ) -> Self {
+    pub fn set_percentage_of_cores_enabled_options(mut self, value: Option<PercentageOfCoresEnabledOptions>) -> Self {
         self.percentage_of_cores_enabled_options = value;
         self
     }
@@ -181,19 +155,13 @@ impl ShapePlatformConfigOptions {
     }
 
     /// Set trusted_platform_module_options (unwraps Option)
-    pub fn with_trusted_platform_module_options(
-        mut self,
-        value: ShapeTrustedPlatformModuleOptions,
-    ) -> Self {
+    pub fn with_trusted_platform_module_options(mut self, value: ShapeTrustedPlatformModuleOptions) -> Self {
         self.trusted_platform_module_options = Some(value);
         self
     }
 
     /// Set numa_nodes_per_socket_platform_options (unwraps Option)
-    pub fn with_numa_nodes_per_socket_platform_options(
-        mut self,
-        value: ShapeNumaNodesPerSocketPlatformOptions,
-    ) -> Self {
+    pub fn with_numa_nodes_per_socket_platform_options(mut self, value: ShapeNumaNodesPerSocketPlatformOptions) -> Self {
         self.numa_nodes_per_socket_platform_options = Some(value);
         self
     }
@@ -205,46 +173,31 @@ impl ShapePlatformConfigOptions {
     }
 
     /// Set symmetric_multi_threading_options (unwraps Option)
-    pub fn with_symmetric_multi_threading_options(
-        mut self,
-        value: ShapeSymmetricMultiThreadingEnabledPlatformOptions,
-    ) -> Self {
+    pub fn with_symmetric_multi_threading_options(mut self, value: ShapeSymmetricMultiThreadingEnabledPlatformOptions) -> Self {
         self.symmetric_multi_threading_options = Some(value);
         self
     }
 
     /// Set access_control_service_options (unwraps Option)
-    pub fn with_access_control_service_options(
-        mut self,
-        value: ShapeAccessControlServiceEnabledPlatformOptions,
-    ) -> Self {
+    pub fn with_access_control_service_options(mut self, value: ShapeAccessControlServiceEnabledPlatformOptions) -> Self {
         self.access_control_service_options = Some(value);
         self
     }
 
     /// Set virtual_instructions_options (unwraps Option)
-    pub fn with_virtual_instructions_options(
-        mut self,
-        value: ShapeVirtualInstructionsEnabledPlatformOptions,
-    ) -> Self {
+    pub fn with_virtual_instructions_options(mut self, value: ShapeVirtualInstructionsEnabledPlatformOptions) -> Self {
         self.virtual_instructions_options = Some(value);
         self
     }
 
     /// Set input_output_memory_management_unit_options (unwraps Option)
-    pub fn with_input_output_memory_management_unit_options(
-        mut self,
-        value: ShapeInputOutputMemoryManagementUnitEnabledPlatformOptions,
-    ) -> Self {
+    pub fn with_input_output_memory_management_unit_options(mut self, value: ShapeInputOutputMemoryManagementUnitEnabledPlatformOptions) -> Self {
         self.input_output_memory_management_unit_options = Some(value);
         self
     }
 
     /// Set percentage_of_cores_enabled_options (unwraps Option)
-    pub fn with_percentage_of_cores_enabled_options(
-        mut self,
-        value: PercentageOfCoresEnabledOptions,
-    ) -> Self {
+    pub fn with_percentage_of_cores_enabled_options(mut self, value: PercentageOfCoresEnabledOptions) -> Self {
         self.percentage_of_cores_enabled_options = Some(value);
         self
     }
@@ -255,3 +208,4 @@ impl Default for ShapePlatformConfigOptions {
         Self::new()
     }
 }
+

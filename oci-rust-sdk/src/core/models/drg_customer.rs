@@ -22,6 +22,7 @@ pub struct DrgCustomer {
     pub ipsec_connections: Option<Vec<DrgCustomerResource>>,
 }
 
+
 /// Required fields for DrgCustomer
 pub struct DrgCustomerRequired {
     /// OCID of the DRG
@@ -39,7 +40,7 @@ impl DrgCustomer {
             virtual_circuits: None,
 
             ipsec_connections: None,
-        }
+}
     }
 
     /// Set drg_id
@@ -49,10 +50,7 @@ impl DrgCustomer {
     }
 
     /// Set remote_peering_connections
-    pub fn set_remote_peering_connections(
-        mut self,
-        value: Option<Vec<DrgCustomerResource>>,
-    ) -> Self {
+    pub fn set_remote_peering_connections(mut self, value: Option<Vec<DrgCustomerResource>>) -> Self {
         self.remote_peering_connections = value;
         self
     }
@@ -87,3 +85,5 @@ impl DrgCustomer {
         self
     }
 }
+
+

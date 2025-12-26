@@ -33,6 +33,7 @@ pub struct LaunchAttachVolumeDetails {
     pub launch_create_volume_details: Option<LaunchCreateVolumeFromAttributes>,
 }
 
+
 /// Required fields for LaunchAttachVolumeDetails
 pub struct LaunchAttachVolumeDetailsRequired {
     pub r#type: String,
@@ -55,7 +56,7 @@ impl LaunchAttachVolumeDetails {
             volume_id: None,
 
             launch_create_volume_details: None,
-        }
+}
     }
 
     /// Set device
@@ -89,10 +90,7 @@ impl LaunchAttachVolumeDetails {
     }
 
     /// Set launch_create_volume_details
-    pub fn set_launch_create_volume_details(
-        mut self,
-        value: Option<LaunchCreateVolumeFromAttributes>,
-    ) -> Self {
+    pub fn set_launch_create_volume_details(mut self, value: Option<LaunchCreateVolumeFromAttributes>) -> Self {
         self.launch_create_volume_details = value;
         self
     }
@@ -134,11 +132,10 @@ impl LaunchAttachVolumeDetails {
     }
 
     /// Set launch_create_volume_details (unwraps Option)
-    pub fn with_launch_create_volume_details(
-        mut self,
-        value: LaunchCreateVolumeFromAttributes,
-    ) -> Self {
+    pub fn with_launch_create_volume_details(mut self, value: LaunchCreateVolumeFromAttributes) -> Self {
         self.launch_create_volume_details = Some(value);
         self
     }
 }
+
+

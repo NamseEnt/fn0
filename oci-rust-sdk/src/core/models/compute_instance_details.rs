@@ -20,6 +20,7 @@ pub struct ComputeInstanceDetails {
     pub secondary_vnics: Option<Vec<InstanceConfigurationAttachVnicDetails>>,
 }
 
+
 /// Required fields for ComputeInstanceDetails
 pub struct ComputeInstanceDetailsRequired {
     pub instance_type: String,
@@ -36,32 +37,23 @@ impl ComputeInstanceDetails {
             launch_details: None,
 
             secondary_vnics: None,
-        }
+}
     }
 
     /// Set block_volumes
-    pub fn set_block_volumes(
-        mut self,
-        value: Option<Vec<InstanceConfigurationBlockVolumeDetails>>,
-    ) -> Self {
+    pub fn set_block_volumes(mut self, value: Option<Vec<InstanceConfigurationBlockVolumeDetails>>) -> Self {
         self.block_volumes = value;
         self
     }
 
     /// Set launch_details
-    pub fn set_launch_details(
-        mut self,
-        value: Option<InstanceConfigurationLaunchInstanceDetails>,
-    ) -> Self {
+    pub fn set_launch_details(mut self, value: Option<InstanceConfigurationLaunchInstanceDetails>) -> Self {
         self.launch_details = value;
         self
     }
 
     /// Set secondary_vnics
-    pub fn set_secondary_vnics(
-        mut self,
-        value: Option<Vec<InstanceConfigurationAttachVnicDetails>>,
-    ) -> Self {
+    pub fn set_secondary_vnics(mut self, value: Option<Vec<InstanceConfigurationAttachVnicDetails>>) -> Self {
         self.secondary_vnics = value;
         self
     }
@@ -73,29 +65,22 @@ impl ComputeInstanceDetails {
     }
 
     /// Set block_volumes (unwraps Option)
-    pub fn with_block_volumes(
-        mut self,
-        value: Vec<InstanceConfigurationBlockVolumeDetails>,
-    ) -> Self {
+    pub fn with_block_volumes(mut self, value: Vec<InstanceConfigurationBlockVolumeDetails>) -> Self {
         self.block_volumes = Some(value);
         self
     }
 
     /// Set launch_details (unwraps Option)
-    pub fn with_launch_details(
-        mut self,
-        value: InstanceConfigurationLaunchInstanceDetails,
-    ) -> Self {
+    pub fn with_launch_details(mut self, value: InstanceConfigurationLaunchInstanceDetails) -> Self {
         self.launch_details = Some(value);
         self
     }
 
     /// Set secondary_vnics (unwraps Option)
-    pub fn with_secondary_vnics(
-        mut self,
-        value: Vec<InstanceConfigurationAttachVnicDetails>,
-    ) -> Self {
+    pub fn with_secondary_vnics(mut self, value: Vec<InstanceConfigurationAttachVnicDetails>) -> Self {
         self.secondary_vnics = Some(value);
         self
     }
 }
+
+

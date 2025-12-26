@@ -13,6 +13,7 @@ pub struct CrossConnectPortSpeedShape {
     pub port_speed_in_gbps: i64,
 }
 
+
 /// Required fields for CrossConnectPortSpeedShape
 pub struct CrossConnectPortSpeedShapeRequired {
     /// The name of the port speed shape. <p> Example: {@code 10 Gbps}
@@ -29,7 +30,7 @@ impl CrossConnectPortSpeedShape {
             name: required.name,
 
             port_speed_in_gbps: required.port_speed_in_gbps,
-        }
+}
     }
 
     /// Set name
@@ -44,3 +45,5 @@ impl CrossConnectPortSpeedShape {
         self
     }
 }
+
+

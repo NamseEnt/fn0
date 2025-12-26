@@ -19,6 +19,7 @@ pub struct ImageShapeCompatibilityEntry {
     pub ocpu_constraints: Option<ImageOcpuConstraints>,
 }
 
+
 /// Required fields for ImageShapeCompatibilityEntry
 pub struct ImageShapeCompatibilityEntryRequired {
     /// The image OCID.
@@ -39,7 +40,7 @@ impl ImageShapeCompatibilityEntry {
             memory_constraints: None,
 
             ocpu_constraints: None,
-        }
+}
     }
 
     /// Set image_id
@@ -78,3 +79,5 @@ impl ImageShapeCompatibilityEntry {
         self
     }
 }
+
+

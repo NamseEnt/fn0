@@ -31,6 +31,7 @@ pub struct IntelIcelakeBmLaunchInstancePlatformConfig {
     pub config_map: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for IntelIcelakeBmLaunchInstancePlatformConfig
 pub struct IntelIcelakeBmLaunchInstancePlatformConfigRequired {
     pub r#type: String,
@@ -51,14 +52,11 @@ impl IntelIcelakeBmLaunchInstancePlatformConfig {
             percentage_of_cores_enabled: None,
 
             config_map: None,
-        }
+}
     }
 
     /// Set numa_nodes_per_socket
-    pub fn set_numa_nodes_per_socket(
-        mut self,
-        value: Option<IntelIcelakeBmLaunchInstancePlatformConfigNumaNodesPerSocket>,
-    ) -> Self {
+    pub fn set_numa_nodes_per_socket(mut self, value: Option<IntelIcelakeBmLaunchInstancePlatformConfigNumaNodesPerSocket>) -> Self {
         self.numa_nodes_per_socket = value;
         self
     }
@@ -70,10 +68,7 @@ impl IntelIcelakeBmLaunchInstancePlatformConfig {
     }
 
     /// Set is_input_output_memory_management_unit_enabled
-    pub fn set_is_input_output_memory_management_unit_enabled(
-        mut self,
-        value: Option<bool>,
-    ) -> Self {
+    pub fn set_is_input_output_memory_management_unit_enabled(mut self, value: Option<bool>) -> Self {
         self.is_input_output_memory_management_unit_enabled = value;
         self
     }
@@ -97,10 +92,7 @@ impl IntelIcelakeBmLaunchInstancePlatformConfig {
     }
 
     /// Set numa_nodes_per_socket (unwraps Option)
-    pub fn with_numa_nodes_per_socket(
-        mut self,
-        value: IntelIcelakeBmLaunchInstancePlatformConfigNumaNodesPerSocket,
-    ) -> Self {
+    pub fn with_numa_nodes_per_socket(mut self, value: IntelIcelakeBmLaunchInstancePlatformConfigNumaNodesPerSocket) -> Self {
         self.numa_nodes_per_socket = Some(value);
         self
     }
@@ -129,3 +121,5 @@ impl IntelIcelakeBmLaunchInstancePlatformConfig {
         self
     }
 }
+
+

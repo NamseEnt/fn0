@@ -11,6 +11,7 @@ pub struct CreateInstanceConfigurationDetails {
     pub source: String,
 }
 
+
 /// Required fields for CreateInstanceConfigurationDetails
 pub struct CreateInstanceConfigurationDetailsRequired {
     pub instance_details: ComputeInstanceOptions,
@@ -25,7 +26,7 @@ impl CreateInstanceConfigurationDetails {
             instance_details: required.instance_details,
 
             source: required.source,
-        }
+}
     }
 
     /// Set instance_details
@@ -40,3 +41,5 @@ impl CreateInstanceConfigurationDetails {
         self
     }
 }
+
+

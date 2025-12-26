@@ -80,10 +80,7 @@ impl InventorySubnetSummary {
     }
 
     /// Set inventory_subnet_cidr_collection
-    pub fn set_inventory_subnet_cidr_collection(
-        mut self,
-        value: Option<Vec<InventorySubnetCidrBlockSummary>>,
-    ) -> Self {
+    pub fn set_inventory_subnet_cidr_collection(mut self, value: Option<Vec<InventorySubnetCidrBlockSummary>>) -> Self {
         self.inventory_subnet_cidr_collection = value;
         self
     }
@@ -107,10 +104,7 @@ impl InventorySubnetSummary {
     }
 
     /// Set inventory_resource_summary
-    pub fn set_inventory_resource_summary(
-        mut self,
-        value: Option<Vec<InventoryResourceSummary>>,
-    ) -> Self {
+    pub fn set_inventory_resource_summary(mut self, value: Option<Vec<InventoryResourceSummary>>) -> Self {
         self.inventory_resource_summary = value;
         self
     }
@@ -134,10 +128,7 @@ impl InventorySubnetSummary {
     }
 
     /// Set inventory_subnet_cidr_collection (unwraps Option)
-    pub fn with_inventory_subnet_cidr_collection(
-        mut self,
-        value: Vec<InventorySubnetCidrBlockSummary>,
-    ) -> Self {
+    pub fn with_inventory_subnet_cidr_collection(mut self, value: Vec<InventorySubnetCidrBlockSummary>) -> Self {
         self.inventory_subnet_cidr_collection = Some(value);
         self
     }
@@ -172,3 +163,4 @@ impl Default for InventorySubnetSummary {
         Self::new()
     }
 }
+

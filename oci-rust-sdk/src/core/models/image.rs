@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -60,12 +60,13 @@ pub struct Image {
 
     /// The boot volume size for an instance launched from this image (1 MB = 1,048,576 bytes). Note this is not the same as the size of the image when it was exported or the actual size of the image. <p> Example: {@code 47694} Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_m_bs: Option<i64>,
+    pub size_in_mbs: Option<i64>,
 
     /// The size of the internal storage for this image that is subject to billing (1 GB = 1,073,741,824 bytes). <p> Example: {@code 100} Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub billable_size_in_g_bs: Option<i64>,
+    pub billable_size_in_gbs: Option<i64>,
 }
+
 
 /// Required fields for Image
 pub struct ImageRequired {
@@ -124,10 +125,10 @@ impl Image {
 
             listing_type: None,
 
-            size_in_m_bs: None,
+            size_in_mbs: None,
 
-            billable_size_in_g_bs: None,
-        }
+            billable_size_in_gbs: None,
+}
     }
 
     /// Set base_image_id
@@ -149,10 +150,7 @@ impl Image {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -217,15 +215,15 @@ impl Image {
         self
     }
 
-    /// Set size_in_m_bs
-    pub fn set_size_in_m_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_m_bs = value;
+    /// Set size_in_mbs
+    pub fn set_size_in_mbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_mbs = value;
         self
     }
 
-    /// Set billable_size_in_g_bs
-    pub fn set_billable_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.billable_size_in_g_bs = value;
+    /// Set billable_size_in_gbs
+    pub fn set_billable_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.billable_size_in_gbs = value;
         self
     }
 
@@ -242,10 +240,7 @@ impl Image {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -286,15 +281,17 @@ impl Image {
         self
     }
 
-    /// Set size_in_m_bs (unwraps Option)
-    pub fn with_size_in_m_bs(mut self, value: i64) -> Self {
-        self.size_in_m_bs = Some(value);
+    /// Set size_in_mbs (unwraps Option)
+    pub fn with_size_in_mbs(mut self, value: i64) -> Self {
+        self.size_in_mbs = Some(value);
         self
     }
 
-    /// Set billable_size_in_g_bs (unwraps Option)
-    pub fn with_billable_size_in_g_bs(mut self, value: i64) -> Self {
-        self.billable_size_in_g_bs = Some(value);
+    /// Set billable_size_in_gbs (unwraps Option)
+    pub fn with_billable_size_in_gbs(mut self, value: i64) -> Self {
+        self.billable_size_in_gbs = Some(value);
         self
     }
 }
+
+

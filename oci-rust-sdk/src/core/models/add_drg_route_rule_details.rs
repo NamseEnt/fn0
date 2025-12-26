@@ -16,6 +16,7 @@ pub struct AddDrgRouteRuleDetails {
     pub next_hop_drg_attachment_id: String,
 }
 
+
 /// Required fields for AddDrgRouteRuleDetails
 pub struct AddDrgRouteRuleDetailsRequired {
     /// Type of destination for the rule. Allowed values: * {@code CIDR_BLOCK}: If the rule's {@code destination} is an IP address range in CIDR notation.
@@ -37,7 +38,7 @@ impl AddDrgRouteRuleDetails {
             destination: required.destination,
 
             next_hop_drg_attachment_id: required.next_hop_drg_attachment_id,
-        }
+}
     }
 
     /// Set destination_type
@@ -58,3 +59,5 @@ impl AddDrgRouteRuleDetails {
         self
     }
 }
+
+

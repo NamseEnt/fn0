@@ -10,6 +10,7 @@ pub struct ComputeCapacityTopologyCollection {
     pub items: Vec<ComputeCapacityTopologySummary>,
 }
 
+
 /// Required fields for ComputeCapacityTopologyCollection
 pub struct ComputeCapacityTopologyCollectionRequired {
     /// The list of compute capacity topologies.
@@ -21,7 +22,7 @@ impl ComputeCapacityTopologyCollection {
     pub fn new(required: ComputeCapacityTopologyCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ComputeCapacityTopologyCollection {
         self
     }
 }
+
+

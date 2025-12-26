@@ -16,6 +16,7 @@ pub struct EnumIntegerImageCapabilityDescriptor {
     pub default_value: Option<i64>,
 }
 
+
 /// Required fields for EnumIntegerImageCapabilityDescriptor
 pub struct EnumIntegerImageCapabilityDescriptorRequired {
     /// the list of values for the enum
@@ -33,7 +34,7 @@ impl EnumIntegerImageCapabilityDescriptor {
             descriptor_type: required.descriptor_type,
 
             default_value: None,
-        }
+}
     }
 
     /// Set values
@@ -60,3 +61,5 @@ impl EnumIntegerImageCapabilityDescriptor {
         self
     }
 }
+
+

@@ -12,6 +12,7 @@ pub struct CreateContainerTcpHealthCheckDetails {
     pub health_check_type: String,
 }
 
+
 /// Required fields for CreateContainerTcpHealthCheckDetails
 pub struct CreateContainerTcpHealthCheckDetailsRequired {
     /// Container health check port. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -27,7 +28,7 @@ impl CreateContainerTcpHealthCheckDetails {
             port: required.port,
 
             health_check_type: required.health_check_type,
-        }
+}
     }
 
     /// Set port
@@ -42,3 +43,5 @@ impl CreateContainerTcpHealthCheckDetails {
         self
     }
 }
+
+

@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -50,6 +50,7 @@ pub struct VnicAttachment {
     pub vnic_id: Option<String>,
 }
 
+
 /// Required fields for VnicAttachment
 pub struct VnicAttachmentRequired {
     /// The availability domain of the instance. <p> Example: {@code Uocm:PHX-AD-1}
@@ -98,7 +99,7 @@ impl VnicAttachment {
             vlan_tag: None,
 
             vnic_id: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -209,3 +210,5 @@ impl VnicAttachment {
         self
     }
 }
+
+

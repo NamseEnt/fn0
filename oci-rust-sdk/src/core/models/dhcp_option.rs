@@ -10,6 +10,7 @@ pub struct DhcpOption {
     pub r#type: String,
 }
 
+
 /// Required fields for DhcpOption
 pub struct DhcpOptionRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl DhcpOption {
     pub fn new(required: DhcpOptionRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl DhcpOption {
         self
     }
 }
+
+

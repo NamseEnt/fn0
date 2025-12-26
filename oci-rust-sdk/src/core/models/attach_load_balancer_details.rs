@@ -19,6 +19,7 @@ pub struct AttachLoadBalancerDetails {
     pub vnic_selection: String,
 }
 
+
 /// Required fields for AttachLoadBalancerDetails
 pub struct AttachLoadBalancerDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the load balancer to attach to the instance pool.
@@ -45,7 +46,7 @@ impl AttachLoadBalancerDetails {
             port: required.port,
 
             vnic_selection: required.vnic_selection,
-        }
+}
     }
 
     /// Set load_balancer_id
@@ -72,3 +73,5 @@ impl AttachLoadBalancerDetails {
         self
     }
 }
+
+

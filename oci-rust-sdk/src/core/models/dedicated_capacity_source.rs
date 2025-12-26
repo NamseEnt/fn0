@@ -13,6 +13,7 @@ pub struct DedicatedCapacitySource {
     pub compartment_id: Option<String>,
 }
 
+
 /// Required fields for DedicatedCapacitySource
 pub struct DedicatedCapacitySourceRequired {
     pub capacity_type: String,
@@ -25,7 +26,7 @@ impl DedicatedCapacitySource {
             capacity_type: required.capacity_type,
 
             compartment_id: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -46,3 +47,5 @@ impl DedicatedCapacitySource {
         self
     }
 }
+
+

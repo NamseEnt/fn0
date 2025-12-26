@@ -55,10 +55,7 @@ impl CapacityReportShapeAvailability {
     }
 
     /// Set instance_shape_config
-    pub fn set_instance_shape_config(
-        mut self,
-        value: Option<CapacityReportInstanceShapeConfig>,
-    ) -> Self {
+    pub fn set_instance_shape_config(mut self, value: Option<CapacityReportInstanceShapeConfig>) -> Self {
         self.instance_shape_config = value;
         self
     }
@@ -70,10 +67,7 @@ impl CapacityReportShapeAvailability {
     }
 
     /// Set availability_status
-    pub fn set_availability_status(
-        mut self,
-        value: Option<CapacityReportShapeAvailabilityAvailabilityStatus>,
-    ) -> Self {
+    pub fn set_availability_status(mut self, value: Option<CapacityReportShapeAvailabilityAvailabilityStatus>) -> Self {
         self.availability_status = value;
         self
     }
@@ -103,10 +97,7 @@ impl CapacityReportShapeAvailability {
     }
 
     /// Set availability_status (unwraps Option)
-    pub fn with_availability_status(
-        mut self,
-        value: CapacityReportShapeAvailabilityAvailabilityStatus,
-    ) -> Self {
+    pub fn with_availability_status(mut self, value: CapacityReportShapeAvailabilityAvailabilityStatus) -> Self {
         self.availability_status = Some(value);
         self
     }
@@ -117,3 +108,4 @@ impl Default for CapacityReportShapeAvailability {
         Self::new()
     }
 }
+

@@ -10,6 +10,7 @@ pub struct RemoveSubnetIpv6CidrDetails {
     pub ipv6_cidr_block: String,
 }
 
+
 /// Required fields for RemoveSubnetIpv6CidrDetails
 pub struct RemoveSubnetIpv6CidrDetailsRequired {
     /// This field is not required and should only be specified when removing an IPv6 prefix from a subnet's IPv6 address space. See[IPv6 Addresses](https://docs.oracle.com/iaas/Content/Network/Concepts/ipv6.htm). <p> Example: {@code 2001:0db8:0123::/64}
@@ -21,7 +22,7 @@ impl RemoveSubnetIpv6CidrDetails {
     pub fn new(required: RemoveSubnetIpv6CidrDetailsRequired) -> Self {
         Self {
             ipv6_cidr_block: required.ipv6_cidr_block,
-        }
+}
     }
 
     /// Set ipv6_cidr_block
@@ -30,3 +31,5 @@ impl RemoveSubnetIpv6CidrDetails {
         self
     }
 }
+
+

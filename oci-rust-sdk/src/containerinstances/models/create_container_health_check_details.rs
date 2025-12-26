@@ -37,6 +37,7 @@ pub struct CreateContainerHealthCheckDetails {
     pub failure_action: Option<ContainerHealthCheckFailureAction>,
 }
 
+
 /// Required fields for CreateContainerHealthCheckDetails
 pub struct CreateContainerHealthCheckDetailsRequired {
     pub health_check_type: String,
@@ -61,7 +62,7 @@ impl CreateContainerHealthCheckDetails {
             timeout_in_seconds: None,
 
             failure_action: None,
-        }
+}
     }
 
     /// Set name
@@ -154,3 +155,5 @@ impl CreateContainerHealthCheckDetails {
         self
     }
 }
+
+

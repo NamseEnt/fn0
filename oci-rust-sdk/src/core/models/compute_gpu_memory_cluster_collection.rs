@@ -10,6 +10,7 @@ pub struct ComputeGpuMemoryClusterCollection {
     pub items: Vec<ComputeGpuMemoryClusterSummary>,
 }
 
+
 /// Required fields for ComputeGpuMemoryClusterCollection
 pub struct ComputeGpuMemoryClusterCollectionRequired {
     /// The list of compute GPU memory clusters.
@@ -21,7 +22,7 @@ impl ComputeGpuMemoryClusterCollection {
     pub fn new(required: ComputeGpuMemoryClusterCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ComputeGpuMemoryClusterCollection {
         self
     }
 }
+
+

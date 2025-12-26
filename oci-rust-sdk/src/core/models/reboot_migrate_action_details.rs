@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -18,6 +18,7 @@ pub struct RebootMigrateActionDetails {
     pub time_scheduled: Option<DateTime<Utc>>,
 }
 
+
 /// Required fields for RebootMigrateActionDetails
 pub struct RebootMigrateActionDetailsRequired {
     pub action_type: String,
@@ -32,7 +33,7 @@ impl RebootMigrateActionDetails {
             delete_local_storage: None,
 
             time_scheduled: None,
-        }
+}
     }
 
     /// Set delete_local_storage
@@ -65,3 +66,5 @@ impl RebootMigrateActionDetails {
         self
     }
 }
+
+

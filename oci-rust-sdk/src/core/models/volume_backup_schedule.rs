@@ -44,6 +44,7 @@ pub struct VolumeBackupSchedule {
     pub time_zone: Option<VolumeBackupScheduleTimeZone>,
 }
 
+
 /// Required fields for VolumeBackupSchedule
 pub struct VolumeBackupScheduleRequired {
     /// The type of volume backup to create.
@@ -79,7 +80,7 @@ impl VolumeBackupSchedule {
             month: None,
 
             time_zone: None,
-        }
+}
     }
 
     /// Set backup_type
@@ -184,3 +185,5 @@ impl VolumeBackupSchedule {
         self
     }
 }
+
+

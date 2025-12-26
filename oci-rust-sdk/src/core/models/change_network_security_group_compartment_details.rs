@@ -10,6 +10,7 @@ pub struct ChangeNetworkSecurityGroupCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeNetworkSecurityGroupCompartmentDetails
 pub struct ChangeNetworkSecurityGroupCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the network security group to.
@@ -21,7 +22,7 @@ impl ChangeNetworkSecurityGroupCompartmentDetails {
     pub fn new(required: ChangeNetworkSecurityGroupCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeNetworkSecurityGroupCompartmentDetails {
         self
     }
 }
+
+

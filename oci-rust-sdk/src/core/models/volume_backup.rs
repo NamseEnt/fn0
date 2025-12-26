@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -49,11 +49,11 @@ pub struct VolumeBackup {
 
     /// The size of the volume, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_g_bs: Option<i64>,
+    pub size_in_gbs: Option<i64>,
 
     /// The size of the volume in MBs. The value must be a multiple of 1024. This field is deprecated. Please use sizeInGBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_m_bs: Option<i64>,
+    pub size_in_mbs: Option<i64>,
 
     /// Specifies whether the backup was created manually, or via scheduled backup policy.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -69,7 +69,7 @@ pub struct VolumeBackup {
 
     /// The size used by the backup, in GBs. It is typically smaller than sizeInGBs, depending on the space consumed on the volume and whether the backup is full or incremental. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unique_size_in_g_bs: Option<i64>,
+    pub unique_size_in_gbs: Option<i64>,
 
     /// The size used by the backup, in MBs. It is typically smaller than sizeInMBs, depending on the space consumed on the volume and whether the backup is full or incremental. This field is deprecated. Please use uniqueSizeInGBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -79,6 +79,7 @@ pub struct VolumeBackup {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub volume_id: Option<String>,
 }
+
 
 /// Required fields for VolumeBackup
 pub struct VolumeBackupRequired {
@@ -127,9 +128,9 @@ impl VolumeBackup {
 
             kms_key_id: None,
 
-            size_in_g_bs: None,
+            size_in_gbs: None,
 
-            size_in_m_bs: None,
+            size_in_mbs: None,
 
             source_type: None,
 
@@ -137,12 +138,12 @@ impl VolumeBackup {
 
             time_request_received: None,
 
-            unique_size_in_g_bs: None,
+            unique_size_in_gbs: None,
 
             unique_size_in_mbs: None,
 
             volume_id: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -152,19 +153,13 @@ impl VolumeBackup {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set system_tags
-    pub fn set_system_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.system_tags = value;
         self
     }
@@ -205,15 +200,15 @@ impl VolumeBackup {
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
-    /// Set size_in_m_bs
-    pub fn set_size_in_m_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_m_bs = value;
+    /// Set size_in_mbs
+    pub fn set_size_in_mbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_mbs = value;
         self
     }
 
@@ -247,9 +242,9 @@ impl VolumeBackup {
         self
     }
 
-    /// Set unique_size_in_g_bs
-    pub fn set_unique_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.unique_size_in_g_bs = value;
+    /// Set unique_size_in_gbs
+    pub fn set_unique_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.unique_size_in_gbs = value;
         self
     }
 
@@ -266,19 +261,13 @@ impl VolumeBackup {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -301,15 +290,15 @@ impl VolumeBackup {
         self
     }
 
-    /// Set size_in_g_bs (unwraps Option)
-    pub fn with_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = Some(value);
+    /// Set size_in_gbs (unwraps Option)
+    pub fn with_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = Some(value);
         self
     }
 
-    /// Set size_in_m_bs (unwraps Option)
-    pub fn with_size_in_m_bs(mut self, value: i64) -> Self {
-        self.size_in_m_bs = Some(value);
+    /// Set size_in_mbs (unwraps Option)
+    pub fn with_size_in_mbs(mut self, value: i64) -> Self {
+        self.size_in_mbs = Some(value);
         self
     }
 
@@ -331,9 +320,9 @@ impl VolumeBackup {
         self
     }
 
-    /// Set unique_size_in_g_bs (unwraps Option)
-    pub fn with_unique_size_in_g_bs(mut self, value: i64) -> Self {
-        self.unique_size_in_g_bs = Some(value);
+    /// Set unique_size_in_gbs (unwraps Option)
+    pub fn with_unique_size_in_gbs(mut self, value: i64) -> Self {
+        self.unique_size_in_gbs = Some(value);
         self
     }
 
@@ -349,3 +338,5 @@ impl VolumeBackup {
         self
     }
 }
+
+

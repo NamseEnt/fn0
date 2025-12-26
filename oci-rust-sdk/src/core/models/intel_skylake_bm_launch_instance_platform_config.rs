@@ -31,6 +31,7 @@ pub struct IntelSkylakeBmLaunchInstancePlatformConfig {
     pub config_map: Option<HashMap<String, String>>,
 }
 
+
 /// Required fields for IntelSkylakeBmLaunchInstancePlatformConfig
 pub struct IntelSkylakeBmLaunchInstancePlatformConfigRequired {
     pub r#type: String,
@@ -51,14 +52,11 @@ impl IntelSkylakeBmLaunchInstancePlatformConfig {
             percentage_of_cores_enabled: None,
 
             config_map: None,
-        }
+}
     }
 
     /// Set numa_nodes_per_socket
-    pub fn set_numa_nodes_per_socket(
-        mut self,
-        value: Option<IntelSkylakeBmLaunchInstancePlatformConfigNumaNodesPerSocket>,
-    ) -> Self {
+    pub fn set_numa_nodes_per_socket(mut self, value: Option<IntelSkylakeBmLaunchInstancePlatformConfigNumaNodesPerSocket>) -> Self {
         self.numa_nodes_per_socket = value;
         self
     }
@@ -70,10 +68,7 @@ impl IntelSkylakeBmLaunchInstancePlatformConfig {
     }
 
     /// Set is_input_output_memory_management_unit_enabled
-    pub fn set_is_input_output_memory_management_unit_enabled(
-        mut self,
-        value: Option<bool>,
-    ) -> Self {
+    pub fn set_is_input_output_memory_management_unit_enabled(mut self, value: Option<bool>) -> Self {
         self.is_input_output_memory_management_unit_enabled = value;
         self
     }
@@ -97,10 +92,7 @@ impl IntelSkylakeBmLaunchInstancePlatformConfig {
     }
 
     /// Set numa_nodes_per_socket (unwraps Option)
-    pub fn with_numa_nodes_per_socket(
-        mut self,
-        value: IntelSkylakeBmLaunchInstancePlatformConfigNumaNodesPerSocket,
-    ) -> Self {
+    pub fn with_numa_nodes_per_socket(mut self, value: IntelSkylakeBmLaunchInstancePlatformConfigNumaNodesPerSocket) -> Self {
         self.numa_nodes_per_socket = Some(value);
         self
     }
@@ -129,3 +121,5 @@ impl IntelSkylakeBmLaunchInstancePlatformConfig {
         self
     }
 }
+
+

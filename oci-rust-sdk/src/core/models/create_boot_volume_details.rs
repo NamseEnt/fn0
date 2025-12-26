@@ -38,7 +38,7 @@ pub struct CreateBootVolumeDetails {
 
     /// The size of the volume in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size_in_g_bs: Option<i64>,
+    pub size_in_gbs: Option<i64>,
 
     /// The clusterPlacementGroup Id of the volume for volume placement.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -46,7 +46,7 @@ pub struct CreateBootVolumeDetails {
 
     /// The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See [Block Volume Performance Levels](https://docs.oracle.com/iaas/Content/Block/Concepts/blockvolumeperformance.htm#perf_levels) for more information. <p> Allowed values: <p> {@code 10}: Represents the Balanced option. <p> {@code 20}: Represents the Higher Performance option. <p> {@code 30}-{@code 120}: Represents the Ultra High Performance option. <p> For performance autotune enabled volumes, it would be the Default(Minimum) VPUs/GB. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub vpus_per_g_b: Option<i64>,
+    pub vpus_per_gb: Option<i64>,
 
     /// Specifies whether the auto-tune performance is enabled for this boot volume. This field is deprecated. Use the {@code DetachedVolumeAutotunePolicy} instead to enable the volume for detached autotune.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -64,6 +64,7 @@ pub struct CreateBootVolumeDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xrc_kms_key_id: Option<String>,
 }
+
 
 /// Required fields for CreateBootVolumeDetails
 pub struct CreateBootVolumeDetailsRequired {
@@ -93,11 +94,11 @@ impl CreateBootVolumeDetails {
 
             kms_key_id: None,
 
-            size_in_g_bs: None,
+            size_in_gbs: None,
 
             cluster_placement_group_id: None,
 
-            vpus_per_g_b: None,
+            vpus_per_gb: None,
 
             is_auto_tune_enabled: None,
 
@@ -106,7 +107,7 @@ impl CreateBootVolumeDetails {
             autotune_policies: None,
 
             xrc_kms_key_id: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -128,10 +129,7 @@ impl CreateBootVolumeDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -154,9 +152,9 @@ impl CreateBootVolumeDetails {
         self
     }
 
-    /// Set size_in_g_bs
-    pub fn set_size_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.size_in_g_bs = value;
+    /// Set size_in_gbs
+    pub fn set_size_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.size_in_gbs = value;
         self
     }
 
@@ -166,17 +164,14 @@ impl CreateBootVolumeDetails {
         self
     }
 
-    /// Set vpus_per_g_b
-    pub fn set_vpus_per_g_b(mut self, value: Option<i64>) -> Self {
-        self.vpus_per_g_b = value;
+    /// Set vpus_per_gb
+    pub fn set_vpus_per_gb(mut self, value: Option<i64>) -> Self {
+        self.vpus_per_gb = value;
         self
     }
 
     /// Set source_details
-    pub fn set_source_details(
-        mut self,
-        value: BootVolumeSourceFromBootVolumeBackupDetails,
-    ) -> Self {
+    pub fn set_source_details(mut self, value: BootVolumeSourceFromBootVolumeBackupDetails) -> Self {
         self.source_details = value;
         self
     }
@@ -188,10 +183,7 @@ impl CreateBootVolumeDetails {
     }
 
     /// Set boot_volume_replicas
-    pub fn set_boot_volume_replicas(
-        mut self,
-        value: Option<Vec<BootVolumeReplicaDetails>>,
-    ) -> Self {
+    pub fn set_boot_volume_replicas(mut self, value: Option<Vec<BootVolumeReplicaDetails>>) -> Self {
         self.boot_volume_replicas = value;
         self
     }
@@ -221,10 +213,7 @@ impl CreateBootVolumeDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -247,9 +236,9 @@ impl CreateBootVolumeDetails {
         self
     }
 
-    /// Set size_in_g_bs (unwraps Option)
-    pub fn with_size_in_g_bs(mut self, value: i64) -> Self {
-        self.size_in_g_bs = Some(value);
+    /// Set size_in_gbs (unwraps Option)
+    pub fn with_size_in_gbs(mut self, value: i64) -> Self {
+        self.size_in_gbs = Some(value);
         self
     }
 
@@ -259,9 +248,9 @@ impl CreateBootVolumeDetails {
         self
     }
 
-    /// Set vpus_per_g_b (unwraps Option)
-    pub fn with_vpus_per_g_b(mut self, value: i64) -> Self {
-        self.vpus_per_g_b = Some(value);
+    /// Set vpus_per_gb (unwraps Option)
+    pub fn with_vpus_per_gb(mut self, value: i64) -> Self {
+        self.vpus_per_gb = Some(value);
         self
     }
 
@@ -289,3 +278,5 @@ impl CreateBootVolumeDetails {
         self
     }
 }
+
+

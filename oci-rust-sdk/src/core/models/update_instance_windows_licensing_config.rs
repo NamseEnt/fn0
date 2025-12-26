@@ -10,6 +10,7 @@ pub struct UpdateInstanceWindowsLicensingConfig {
     pub r#type: String,
 }
 
+
 /// Required fields for UpdateInstanceWindowsLicensingConfig
 pub struct UpdateInstanceWindowsLicensingConfigRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl UpdateInstanceWindowsLicensingConfig {
     pub fn new(required: UpdateInstanceWindowsLicensingConfigRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl UpdateInstanceWindowsLicensingConfig {
         self
     }
 }
+
+

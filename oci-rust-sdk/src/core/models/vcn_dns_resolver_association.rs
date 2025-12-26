@@ -17,6 +17,7 @@ pub struct VcnDnsResolverAssociation {
     pub dns_resolver_id: Option<String>,
 }
 
+
 /// Required fields for VcnDnsResolverAssociation
 pub struct VcnDnsResolverAssociationRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VCN in the association.
@@ -35,7 +36,7 @@ impl VcnDnsResolverAssociation {
             lifecycle_state: required.lifecycle_state,
 
             dns_resolver_id: None,
-        }
+}
     }
 
     /// Set vcn_id
@@ -62,3 +63,5 @@ impl VcnDnsResolverAssociation {
         self
     }
 }
+
+

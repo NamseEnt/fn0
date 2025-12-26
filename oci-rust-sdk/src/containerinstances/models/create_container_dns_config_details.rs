@@ -73,3 +73,4 @@ impl Default for CreateContainerDnsConfigDetails {
         Self::new()
     }
 }
+

@@ -14,6 +14,7 @@ pub struct LoopBackDrgAttachmentNetworkDetails {
     pub ids: Option<Vec<String>>,
 }
 
+
 /// Required fields for LoopBackDrgAttachmentNetworkDetails
 pub struct LoopBackDrgAttachmentNetworkDetailsRequired {
     pub r#type: String,
@@ -26,7 +27,7 @@ impl LoopBackDrgAttachmentNetworkDetails {
             r#type: required.r#type,
 
             ids: None,
-        }
+}
     }
 
     /// Set ids
@@ -47,3 +48,5 @@ impl LoopBackDrgAttachmentNetworkDetails {
         self
     }
 }
+
+

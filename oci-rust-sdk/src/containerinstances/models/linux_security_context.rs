@@ -28,6 +28,7 @@ pub struct LinuxSecurityContext {
     pub capabilities: Option<ContainerCapabilities>,
 }
 
+
 /// Required fields for LinuxSecurityContext
 pub struct LinuxSecurityContextRequired {
     pub security_context_type: String,
@@ -48,7 +49,7 @@ impl LinuxSecurityContext {
             is_root_file_system_readonly: None,
 
             capabilities: None,
-        }
+}
     }
 
     /// Set run_as_user
@@ -117,3 +118,5 @@ impl LinuxSecurityContext {
         self
     }
 }
+
+

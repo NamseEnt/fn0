@@ -10,6 +10,7 @@ pub struct ChangeByoipRangeCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeByoipRangeCompartmentDetails
 pub struct ChangeByoipRangeCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the destination compartment for the BYOIP CIDR block move.
@@ -21,7 +22,7 @@ impl ChangeByoipRangeCompartmentDetails {
     pub fn new(required: ChangeByoipRangeCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeByoipRangeCompartmentDetails {
         self
     }
 }
+
+

@@ -10,6 +10,7 @@ pub struct InstanceConfigurationPlacementConstraintDetails {
     pub r#type: String,
 }
 
+
 /// Required fields for InstanceConfigurationPlacementConstraintDetails
 pub struct InstanceConfigurationPlacementConstraintDetailsRequired {
     pub r#type: String,
@@ -20,7 +21,7 @@ impl InstanceConfigurationPlacementConstraintDetails {
     pub fn new(required: InstanceConfigurationPlacementConstraintDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-        }
+}
     }
 
     /// Set r#type
@@ -29,3 +30,5 @@ impl InstanceConfigurationPlacementConstraintDetails {
         self
     }
 }
+
+

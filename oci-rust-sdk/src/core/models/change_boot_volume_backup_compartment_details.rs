@@ -10,6 +10,7 @@ pub struct ChangeBootVolumeBackupCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeBootVolumeBackupCompartmentDetails
 pub struct ChangeBootVolumeBackupCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the boot volume backup to.
@@ -21,7 +22,7 @@ impl ChangeBootVolumeBackupCompartmentDetails {
     pub fn new(required: ChangeBootVolumeBackupCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeBootVolumeBackupCompartmentDetails {
         self
     }
 }
+
+

@@ -10,6 +10,7 @@ pub struct ChangeComputeHostGroupCompartmentDetails {
     pub compartment_id: String,
 }
 
+
 /// Required fields for ChangeComputeHostGroupCompartmentDetails
 pub struct ChangeComputeHostGroupCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the compute host group to.
@@ -21,7 +22,7 @@ impl ChangeComputeHostGroupCompartmentDetails {
     pub fn new(required: ChangeComputeHostGroupCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-        }
+}
     }
 
     /// Set compartment_id
@@ -30,3 +31,5 @@ impl ChangeComputeHostGroupCompartmentDetails {
         self
     }
 }
+
+

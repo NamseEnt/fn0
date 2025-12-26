@@ -10,6 +10,7 @@ pub struct ContainerInstanceCollection {
     pub items: Vec<ContainerInstanceSummary>,
 }
 
+
 /// Required fields for ContainerInstanceCollection
 pub struct ContainerInstanceCollectionRequired {
     /// List of container instances.
@@ -21,7 +22,7 @@ impl ContainerInstanceCollection {
     pub fn new(required: ContainerInstanceCollectionRequired) -> Self {
         Self {
             items: required.items,
-        }
+}
     }
 
     /// Set items
@@ -30,3 +31,5 @@ impl ContainerInstanceCollection {
         self
     }
 }
+
+

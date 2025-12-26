@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -16,6 +16,7 @@ pub struct WorkRequestError {
     /// The time the error occured, in the format defined by [RFC 3339](https://tools.ietf.org/rfc/rfc3339).
     pub timestamp: DateTime<Utc>,
 }
+
 
 /// Required fields for WorkRequestError
 pub struct WorkRequestErrorRequired {
@@ -38,7 +39,7 @@ impl WorkRequestError {
             message: required.message,
 
             timestamp: required.timestamp,
-        }
+}
     }
 
     /// Set code
@@ -59,3 +60,5 @@ impl WorkRequestError {
         self
     }
 }
+
+

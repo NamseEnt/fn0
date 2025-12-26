@@ -10,6 +10,7 @@ pub struct AttachInstancePoolInstanceDetails {
     pub instance_id: String,
 }
 
+
 /// Required fields for AttachInstancePoolInstanceDetails
 pub struct AttachInstancePoolInstanceDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance.
@@ -21,7 +22,7 @@ impl AttachInstancePoolInstanceDetails {
     pub fn new(required: AttachInstancePoolInstanceDetailsRequired) -> Self {
         Self {
             instance_id: required.instance_id,
-        }
+}
     }
 
     /// Set instance_id
@@ -30,3 +31,5 @@ impl AttachInstancePoolInstanceDetails {
         self
     }
 }
+
+

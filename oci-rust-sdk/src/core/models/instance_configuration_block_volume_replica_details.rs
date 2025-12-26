@@ -14,6 +14,7 @@ pub struct InstanceConfigurationBlockVolumeReplicaDetails {
     pub display_name: Option<String>,
 }
 
+
 /// Required fields for InstanceConfigurationBlockVolumeReplicaDetails
 pub struct InstanceConfigurationBlockVolumeReplicaDetailsRequired {
     /// The availability domain of the block volume replica. <p> Example: {@code Uocm:PHX-AD-1}
@@ -27,7 +28,7 @@ impl InstanceConfigurationBlockVolumeReplicaDetails {
             availability_domain: required.availability_domain,
 
             display_name: None,
-        }
+}
     }
 
     /// Set display_name
@@ -48,3 +49,5 @@ impl InstanceConfigurationBlockVolumeReplicaDetails {
         self
     }
 }
+
+

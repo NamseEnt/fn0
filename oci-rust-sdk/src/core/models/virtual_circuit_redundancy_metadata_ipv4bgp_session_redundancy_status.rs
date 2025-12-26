@@ -4,13 +4,14 @@ use serde::{Deserialize, Serialize};
 pub enum VirtualCircuitRedundancyMetadataIpv4bgpSessionRedundancyStatus {
     #[serde(rename = "CONFIGURATION_MATCH")]
     ConfigurationMatch,
-
+    
     #[serde(rename = "CONFIGURATION_MISMATCH")]
     ConfigurationMismatch,
-
+    
     #[serde(rename = "NOT_MET_SLA")]
     NotMetSla,
-
+    
+    
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

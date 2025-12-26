@@ -1,40 +1,42 @@
 use oci_rust_sdk::{
-    container_instances::{
-        self,
-        models::{
-            ContainerInstanceLifecycleState, CreateContainerDetails,
-            CreateContainerDetailsRequired, CreateContainerInstanceDetails,
-            CreateContainerInstanceDetailsRequired, CreateContainerInstanceShapeConfigDetails,
-            CreateContainerVnicDetails, CreateContainerVnicDetailsRequired,
-        },
-        requests::{
-            CreateContainerInstanceRequest, CreateContainerInstanceRequestRequiredFields,
-            DeleteContainerInstanceRequest, DeleteContainerInstanceRequestRequiredFields,
-            ListContainerInstancesRequest, ListContainerInstancesRequestRequiredFields,
-        },
+    containerinstances::{
+        self, ContainerInstanceLifecycleState, CreateContainerDetails,
+        CreateContainerDetailsRequired, CreateContainerInstanceDetails,
+        CreateContainerInstanceDetailsRequired, CreateContainerInstanceRequest,
+        CreateContainerInstanceRequestRequired, CreateContainerInstanceShapeConfigDetails,
+        CreateContainerInstanceShapeConfigDetailsRequired, CreateContainerVnicDetails,
+        CreateContainerVnicDetailsRequired, DeleteContainerInstanceRequest,
+        DeleteContainerInstanceRequestRequired, GetContainerInstanceRequest,
+        GetContainerInstanceRequestRequired, ListContainerInstancesRequest,
+        ListContainerInstancesRequestRequired, RestartContainerInstanceRequest,
+        RestartContainerInstanceRequestRequired, StartContainerInstanceRequest,
+        StartContainerInstanceRequestRequired, StopContainerInstanceRequest,
+        StopContainerInstanceRequestRequired,
     },
-    core::{auth::ConfigFileAuthProvider, region::Region, ClientConfig, RetryConfig},
+    auth::ConfigFileAuthProvider,
+    core::{region::Region, Retrier},
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== OCI Container Instance Lifecycle Example ===\n");
 
-    let auth = ConfigFileAuthProvider::from_default()?;
+    let auth = Arc::new(ConfigFileAuthProvider::from_default()?);
 
-    let client = container_instances::client(ClientConfig {
+    let client = containerinstances::client(containerinstances::ClientConfig {
         auth_provider: auth,
         region: Region::ApSeoul1,
         timeout: Duration::from_secs(60),
-        retry: RetryConfig::no_retry(),
+        retry: Retrier::new(),
     })?;
 
     let compartment_id = std::env::var("OCI_COMPARTMENT_ID")
         .expect("OCI_COMPARTMENT_ID environment variable must be set");
-    let subnet_id =
-        std::env::var("OCI_SUBNET_ID").expect("OCI_SUBNET_ID environment variable must be set");
+    let subnet_id = std::env::var("OCI_SUBNET_ID")
+        .expect("OCI_SUBNET_ID environment variable must be set");
     let availability_domain = std::env::var("OCI_AVAILABILITY_DOMAIN")
         .expect("OCI_AVAILABILITY_DOMAIN environment variable must be set");
 
@@ -62,15 +64,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_hostname_label("nginx-host")
     .with_is_public_ip_assigned(true);
 
+    let shape_config = CreateContainerInstanceShapeConfigDetails::new(
+        CreateContainerInstanceShapeConfigDetailsRequired { ocpus: 1 },
+    )
+    .with_memory_in_gbs(4);
+
     let create_details = CreateContainerInstanceDetails::new(
         CreateContainerInstanceDetailsRequired {
             compartment_id: compartment_id.clone(),
             availability_domain: availability_domain.clone(),
             shape: "CI.Standard.E4.Flex".to_string(),
-            shape_config: CreateContainerInstanceShapeConfigDetails {
-                ocpus: 1.0,
-                memory_in_gbs: 4.0,
-            },
+            shape_config,
             containers: vec![container],
             vnics: vec![vnic],
         },
@@ -79,11 +83,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_graceful_shutdown_timeout_in_seconds(30)
     .with_container_restart_policy("ALWAYS");
 
-    let create_request =
-        CreateContainerInstanceRequest::builder(CreateContainerInstanceRequestRequiredFields {
+    let create_request = CreateContainerInstanceRequest::new(
+        CreateContainerInstanceRequestRequired {
             create_container_instance_details: create_details,
-        })
-        .build();
+        },
+    );
 
     let container_instance_id = match client.create_container_instance(create_request).await {
         Ok(response) => {
@@ -93,13 +97,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "  Display Name: {}",
                 response.container_instance.display_name
             );
-            println!("  State: {:?}", response.container_instance.lifecycle_state);
+            println!(
+                "  State: {:?}",
+                response.container_instance.lifecycle_state
+            );
 
             if let Some(work_request_id) = response.opc_work_request_id {
                 println!("  Work Request ID: {}", work_request_id);
             }
 
-            response.container_instance.id
+            response.container_instance.id.clone()
         }
         Err(e) => {
             eprintln!("✗ Error creating container instance: {}", e);
@@ -117,43 +124,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(Duration::from_secs(5)).await;
         poll_count += 1;
 
-        let list_request =
-            ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
-                compartment_id: compartment_id.clone(),
-            })
-            .display_name("example-container-instance")
-            .build();
+        let get_request = GetContainerInstanceRequest::new(
+            GetContainerInstanceRequestRequired {
+                container_instance_id: container_instance_id.clone(),
+            },
+        );
 
-        match client.list_container_instances(list_request).await {
+        match client.get_container_instance(get_request).await {
             Ok(response) => {
-                if let Some(instance) = response.items.first() {
-                    println!(
-                        "  Poll {}: State = {:?}",
-                        poll_count, instance.lifecycle_state
-                    );
+                println!(
+                    "  Poll {}: State = {:?}",
+                    poll_count, response.container_instance.lifecycle_state
+                );
 
-                    match instance.lifecycle_state {
-                        ContainerInstanceLifecycleState::Active => {
-                            println!("\n✓ Container instance is now ACTIVE!");
-                            if let Some(ref vnics) = instance.vnics {
-                                println!("  VNICs: {}", vnics.len());
-                            }
-                            break;
+                match response.container_instance.lifecycle_state {
+                    ContainerInstanceLifecycleState::Active => {
+                        println!("\n✓ Container instance is now ACTIVE!");
+                        println!("  VNICs: {}", response.container_instance.vnics.len());
+                        break;
+                    }
+                    ContainerInstanceLifecycleState::Failed => {
+                        eprintln!("\n✗ Container instance creation FAILED!");
+                        if let Some(ref details) = response.container_instance.lifecycle_details {
+                            eprintln!("  Details: {}", details);
                         }
-                        ContainerInstanceLifecycleState::Failed => {
-                            eprintln!("\n✗ Container instance creation FAILED!");
-                            if let Some(ref details) = instance.lifecycle_details {
-                                eprintln!("  Details: {}", details);
-                            }
-                            return Err("Container instance creation failed".into());
-                        }
-                        _ => {
-                            if poll_count >= max_polls {
-                                eprintln!(
-                                    "\n✗ Timeout waiting for container instance to become active"
-                                );
-                                return Err("Timeout".into());
-                            }
+                        return Err("Container instance creation failed".into());
+                    }
+                    _ => {
+                        if poll_count >= max_polls {
+                            eprintln!("\n✗ Timeout waiting for container instance to become active");
+                            return Err("Timeout".into());
                         }
                     }
                 }
@@ -164,12 +164,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== Step 3: List All Container Instances ===");
-    let list_request =
-        ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
+    println!("\n=== Step 3: Stop Container Instance ===");
+    let stop_request = StopContainerInstanceRequest::new(StopContainerInstanceRequestRequired {
+        container_instance_id: container_instance_id.clone(),
+    });
+
+    match client.stop_container_instance(stop_request).await {
+        Ok(response) => {
+            println!("✓ Stop request sent successfully!");
+            if let Some(work_request_id) = response.opc_work_request_id {
+                println!("  Work Request ID: {}", work_request_id);
+            }
+        }
+        Err(e) => {
+            eprintln!("✗ Error stopping container instance: {}", e);
+        }
+    }
+
+    // Wait a bit for the stop operation
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    println!("\n=== Step 4: Start Container Instance ===");
+    let start_request = StartContainerInstanceRequest::new(StartContainerInstanceRequestRequired {
+        container_instance_id: container_instance_id.clone(),
+    });
+
+    match client.start_container_instance(start_request).await {
+        Ok(response) => {
+            println!("✓ Start request sent successfully!");
+            if let Some(work_request_id) = response.opc_work_request_id {
+                println!("  Work Request ID: {}", work_request_id);
+            }
+        }
+        Err(e) => {
+            eprintln!("✗ Error starting container instance: {}", e);
+        }
+    }
+
+    // Wait a bit for the start operation
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    println!("\n=== Step 5: Restart Container Instance ===");
+    let restart_request =
+        RestartContainerInstanceRequest::new(RestartContainerInstanceRequestRequired {
+            container_instance_id: container_instance_id.clone(),
+        });
+
+    match client.restart_container_instance(restart_request).await {
+        Ok(response) => {
+            println!("✓ Restart request sent successfully!");
+            if let Some(work_request_id) = response.opc_work_request_id {
+                println!("  Work Request ID: {}", work_request_id);
+            }
+        }
+        Err(e) => {
+            eprintln!("✗ Error restarting container instance: {}", e);
+        }
+    }
+
+    println!("\n=== Step 6: List All Container Instances ===");
+    let list_request = ListContainerInstancesRequest::new(
+        ListContainerInstancesRequestRequired {
             compartment_id: compartment_id.clone(),
-        })
-        .build();
+        },
+    );
 
     match client.list_container_instances(list_request).await {
         Ok(response) => {
@@ -184,14 +242,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== Step 4: Delete Container Instance ===");
+    println!("\n=== Step 7: Delete Container Instance ===");
     println!("Deleting container instance: {}", container_instance_id);
 
-    let delete_request =
-        DeleteContainerInstanceRequest::builder(DeleteContainerInstanceRequestRequiredFields {
+    let delete_request = DeleteContainerInstanceRequest::new(
+        DeleteContainerInstanceRequestRequired {
             container_instance_id: container_instance_id.clone(),
-        })
-        .build();
+        },
+    );
 
     match client.delete_container_instance(delete_request).await {
         Ok(response) => {
@@ -206,19 +264,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== Step 5: Wait for Container Instance to be Deleted ===");
+    println!("\n=== Step 8: Wait for Container Instance to be Deleted ===");
     poll_count = 0;
 
     loop {
         tokio::time::sleep(Duration::from_secs(5)).await;
         poll_count += 1;
 
-        let list_request =
-            ListContainerInstancesRequest::builder(ListContainerInstancesRequestRequiredFields {
+        let list_request = ListContainerInstancesRequest::new(
+            ListContainerInstancesRequestRequired {
                 compartment_id: compartment_id.clone(),
-            })
-            .display_name("example-container-instance")
-            .build();
+            },
+        )
+        .with_display_name("example-container-instance");
 
         match client.list_container_instances(list_request).await {
             Ok(response) => {
@@ -232,7 +290,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         poll_count, instance.lifecycle_state
                     );
 
-                    if instance.lifecycle_state == ContainerInstanceLifecycleState::Deleted {
+                    if instance.lifecycle_state == "DELETED" {
                         println!("\n✓ Container instance has been DELETED!");
                         break;
                     }
@@ -253,7 +311,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Lifecycle Complete ===");
-    println!("✓ Successfully created and deleted a container instance!");
+    println!("✓ Successfully demonstrated complete container instance lifecycle!");
+    println!("  Operations performed:");
+    println!("    - Create instance");
+    println!("    - Stop instance");
+    println!("    - Start instance");
+    println!("    - Restart instance");
+    println!("    - Delete instance");
 
     Ok(())
 }

@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -60,11 +60,11 @@ pub struct DedicatedVmHost {
 
     /// The total memory of the dedicated VM host, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_memory_in_g_bs: Option<i64>,
+    pub total_memory_in_gbs: Option<i64>,
 
     /// The remaining memory of the dedicated VM host, in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub remaining_memory_in_g_bs: Option<i64>,
+    pub remaining_memory_in_gbs: Option<i64>,
 
     /// A list of total and remaining CPU and memory per capacity bucket.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,6 +74,7 @@ pub struct DedicatedVmHost {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compute_bare_metal_host_id: Option<String>,
 }
+
 
 /// Required fields for DedicatedVmHost
 pub struct DedicatedVmHostRequired {
@@ -139,14 +140,14 @@ impl DedicatedVmHost {
 
             is_memory_encryption_enabled: None,
 
-            total_memory_in_g_bs: None,
+            total_memory_in_gbs: None,
 
-            remaining_memory_in_g_bs: None,
+            remaining_memory_in_gbs: None,
 
             capacity_bins: None,
 
             compute_bare_metal_host_id: None,
-        }
+}
     }
 
     /// Set availability_domain
@@ -168,10 +169,7 @@ impl DedicatedVmHost {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -195,10 +193,7 @@ impl DedicatedVmHost {
     }
 
     /// Set placement_constraint_details
-    pub fn set_placement_constraint_details(
-        mut self,
-        value: Option<HostGroupPlacementConstraintDetails>,
-    ) -> Self {
+    pub fn set_placement_constraint_details(mut self, value: Option<HostGroupPlacementConstraintDetails>) -> Self {
         self.placement_constraint_details = value;
         self
     }
@@ -245,15 +240,15 @@ impl DedicatedVmHost {
         self
     }
 
-    /// Set total_memory_in_g_bs
-    pub fn set_total_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.total_memory_in_g_bs = value;
+    /// Set total_memory_in_gbs
+    pub fn set_total_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.total_memory_in_gbs = value;
         self
     }
 
-    /// Set remaining_memory_in_g_bs
-    pub fn set_remaining_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.remaining_memory_in_g_bs = value;
+    /// Set remaining_memory_in_gbs
+    pub fn set_remaining_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.remaining_memory_in_gbs = value;
         self
     }
 
@@ -270,10 +265,7 @@ impl DedicatedVmHost {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -291,10 +283,7 @@ impl DedicatedVmHost {
     }
 
     /// Set placement_constraint_details (unwraps Option)
-    pub fn with_placement_constraint_details(
-        mut self,
-        value: HostGroupPlacementConstraintDetails,
-    ) -> Self {
+    pub fn with_placement_constraint_details(mut self, value: HostGroupPlacementConstraintDetails) -> Self {
         self.placement_constraint_details = Some(value);
         self
     }
@@ -311,15 +300,15 @@ impl DedicatedVmHost {
         self
     }
 
-    /// Set total_memory_in_g_bs (unwraps Option)
-    pub fn with_total_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.total_memory_in_g_bs = Some(value);
+    /// Set total_memory_in_gbs (unwraps Option)
+    pub fn with_total_memory_in_gbs(mut self, value: i64) -> Self {
+        self.total_memory_in_gbs = Some(value);
         self
     }
 
-    /// Set remaining_memory_in_g_bs (unwraps Option)
-    pub fn with_remaining_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.remaining_memory_in_g_bs = Some(value);
+    /// Set remaining_memory_in_gbs (unwraps Option)
+    pub fn with_remaining_memory_in_gbs(mut self, value: i64) -> Self {
+        self.remaining_memory_in_gbs = Some(value);
         self
     }
 
@@ -335,3 +324,5 @@ impl DedicatedVmHost {
         self
     }
 }
+
+

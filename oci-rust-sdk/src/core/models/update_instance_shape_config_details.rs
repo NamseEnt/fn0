@@ -16,7 +16,7 @@ pub struct UpdateInstanceShapeConfigDetails {
 
     /// The total amount of memory available to the instance, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_in_g_bs: Option<i64>,
+    pub memory_in_gbs: Option<i64>,
 
     /// The baseline OCPU utilization for a subcore burstable VM instance. Leave this attribute blank for a non-burstable instance, or explicitly specify non-burstable with {@code BASELINE_1_1}. <p> The following values are supported: - {@code BASELINE_1_8} - baseline usage is 1/8 of an OCPU. - {@code BASELINE_1_2} - baseline usage is 1/2 of an OCPU. - {@code BASELINE_1_1} - baseline usage is an entire OCPU. This represents a non-burstable instance.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,7 +39,7 @@ impl UpdateInstanceShapeConfigDetails {
 
             vcpus: None,
 
-            memory_in_g_bs: None,
+            memory_in_gbs: None,
 
             baseline_ocpu_utilization: None,
 
@@ -61,17 +61,14 @@ impl UpdateInstanceShapeConfigDetails {
         self
     }
 
-    /// Set memory_in_g_bs
-    pub fn set_memory_in_g_bs(mut self, value: Option<i64>) -> Self {
-        self.memory_in_g_bs = value;
+    /// Set memory_in_gbs
+    pub fn set_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+        self.memory_in_gbs = value;
         self
     }
 
     /// Set baseline_ocpu_utilization
-    pub fn set_baseline_ocpu_utilization(
-        mut self,
-        value: Option<UpdateInstanceShapeConfigDetailsBaselineOcpuUtilization>,
-    ) -> Self {
+    pub fn set_baseline_ocpu_utilization(mut self, value: Option<UpdateInstanceShapeConfigDetailsBaselineOcpuUtilization>) -> Self {
         self.baseline_ocpu_utilization = value;
         self
     }
@@ -83,10 +80,7 @@ impl UpdateInstanceShapeConfigDetails {
     }
 
     /// Set resource_management
-    pub fn set_resource_management(
-        mut self,
-        value: Option<UpdateInstanceShapeConfigDetailsResourceManagement>,
-    ) -> Self {
+    pub fn set_resource_management(mut self, value: Option<UpdateInstanceShapeConfigDetailsResourceManagement>) -> Self {
         self.resource_management = value;
         self
     }
@@ -103,17 +97,14 @@ impl UpdateInstanceShapeConfigDetails {
         self
     }
 
-    /// Set memory_in_g_bs (unwraps Option)
-    pub fn with_memory_in_g_bs(mut self, value: i64) -> Self {
-        self.memory_in_g_bs = Some(value);
+    /// Set memory_in_gbs (unwraps Option)
+    pub fn with_memory_in_gbs(mut self, value: i64) -> Self {
+        self.memory_in_gbs = Some(value);
         self
     }
 
     /// Set baseline_ocpu_utilization (unwraps Option)
-    pub fn with_baseline_ocpu_utilization(
-        mut self,
-        value: UpdateInstanceShapeConfigDetailsBaselineOcpuUtilization,
-    ) -> Self {
+    pub fn with_baseline_ocpu_utilization(mut self, value: UpdateInstanceShapeConfigDetailsBaselineOcpuUtilization) -> Self {
         self.baseline_ocpu_utilization = Some(value);
         self
     }
@@ -125,10 +116,7 @@ impl UpdateInstanceShapeConfigDetails {
     }
 
     /// Set resource_management (unwraps Option)
-    pub fn with_resource_management(
-        mut self,
-        value: UpdateInstanceShapeConfigDetailsResourceManagement,
-    ) -> Self {
+    pub fn with_resource_management(mut self, value: UpdateInstanceShapeConfigDetailsResourceManagement) -> Self {
         self.resource_management = Some(value);
         self
     }
@@ -139,3 +127,4 @@ impl Default for UpdateInstanceShapeConfigDetails {
         Self::new()
     }
 }
+

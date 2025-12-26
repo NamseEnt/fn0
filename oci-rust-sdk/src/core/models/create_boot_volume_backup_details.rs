@@ -32,6 +32,7 @@ pub struct CreateBootVolumeBackupDetails {
     pub kms_key_id: Option<String>,
 }
 
+
 /// Required fields for CreateBootVolumeBackupDetails
 pub struct CreateBootVolumeBackupDetailsRequired {
     /// The OCID of the boot volume that needs to be backed up.
@@ -53,7 +54,7 @@ impl CreateBootVolumeBackupDetails {
             r#type: None,
 
             kms_key_id: None,
-        }
+}
     }
 
     /// Set boot_volume_id
@@ -63,10 +64,7 @@ impl CreateBootVolumeBackupDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
@@ -96,10 +94,7 @@ impl CreateBootVolumeBackupDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -128,3 +123,5 @@ impl CreateBootVolumeBackupDetails {
         self
     }
 }
+
+

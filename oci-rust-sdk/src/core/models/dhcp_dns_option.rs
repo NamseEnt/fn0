@@ -17,6 +17,7 @@ pub struct DhcpDnsOption {
     pub custom_dns_servers: Option<Vec<String>>,
 }
 
+
 /// Required fields for DhcpDnsOption
 pub struct DhcpDnsOptionRequired {
     /// * **VcnLocal:** Reserved for future use. <p> **VcnLocalPlusInternet:** Also referred to as \"Internet and VCN Resolver\". Instances can resolve internet hostnames (no internet gateway is required), and can resolve hostnames of instances in the VCN. This is the default value in the default set of DHCP options in the VCN. For the Internet and VCN Resolver to work across the VCN, there must also be a DNS label set for the VCN, a DNS label set for each subnet, and a hostname for each instance. The Internet and VCN Resolver also enables reverse DNS lookup, which lets you determine the hostname corresponding to the private IP address. For more information, see [DNS in Your Virtual Cloud Network](https://docs.oracle.com/iaas/Content/Network/Concepts/dns.htm). <p> **CustomDnsServer:** Instances use a DNS server of your choice (three maximum).
@@ -34,7 +35,7 @@ impl DhcpDnsOption {
             r#type: required.r#type,
 
             custom_dns_servers: None,
-        }
+}
     }
 
     /// Set custom_dns_servers
@@ -61,3 +62,5 @@ impl DhcpDnsOption {
         self
     }
 }
+
+

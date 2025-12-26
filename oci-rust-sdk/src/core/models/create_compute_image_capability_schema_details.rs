@@ -32,6 +32,7 @@ pub struct CreateComputeImageCapabilitySchemaDetails {
     pub defined_tags: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
 }
 
+
 /// Required fields for CreateComputeImageCapabilitySchemaDetails
 pub struct CreateComputeImageCapabilitySchemaDetailsRequired {
     /// The OCID of the compartment that contains the resource.
@@ -53,8 +54,7 @@ impl CreateComputeImageCapabilitySchemaDetails {
         Self {
             compartment_id: required.compartment_id,
 
-            compute_global_image_capability_schema_version_name: required
-                .compute_global_image_capability_schema_version_name,
+            compute_global_image_capability_schema_version_name: required.compute_global_image_capability_schema_version_name,
 
             image_id: required.image_id,
 
@@ -65,7 +65,7 @@ impl CreateComputeImageCapabilitySchemaDetails {
             display_name: None,
 
             defined_tags: None,
-        }
+}
     }
 
     /// Set compartment_id
@@ -75,10 +75,7 @@ impl CreateComputeImageCapabilitySchemaDetails {
     }
 
     /// Set compute_global_image_capability_schema_version_name
-    pub fn set_compute_global_image_capability_schema_version_name(
-        mut self,
-        value: String,
-    ) -> Self {
+    pub fn set_compute_global_image_capability_schema_version_name(mut self, value: String) -> Self {
         self.compute_global_image_capability_schema_version_name = value;
         self
     }
@@ -102,19 +99,13 @@ impl CreateComputeImageCapabilitySchemaDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(
-        mut self,
-        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
-    ) -> Self {
+    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set schema_data
-    pub fn set_schema_data(
-        mut self,
-        value: HashMap<String, ImageCapabilitySchemaDescriptor>,
-    ) -> Self {
+    pub fn set_schema_data(mut self, value: HashMap<String, ImageCapabilitySchemaDescriptor>) -> Self {
         self.schema_data = value;
         self
     }
@@ -132,11 +123,10 @@ impl CreateComputeImageCapabilitySchemaDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(
-        mut self,
-        value: HashMap<String, HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
         self.defined_tags = Some(value);
         self
     }
 }
+
+
