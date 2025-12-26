@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct UpdatePublicIpPoolRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdatePublicIpPoolRequest
 pub struct UpdatePublicIpPoolRequestRequired {
@@ -44,7 +43,7 @@ impl UpdatePublicIpPoolRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set public_ip_pool_id
@@ -83,5 +82,3 @@ impl UpdatePublicIpPoolRequest {
         self
     }
 }
-
-

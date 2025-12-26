@@ -91,4 +91,3 @@ impl Default for ByoipRangeVcnIpv6AllocationSummary {
         Self::new()
     }
 }
-

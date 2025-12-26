@@ -10,7 +10,6 @@ pub struct ChangeIPSecConnectionCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeIPSecConnectionCompartmentDetails
 pub struct ChangeIPSecConnectionCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the IPSec connection to.
@@ -22,7 +21,7 @@ impl ChangeIPSecConnectionCompartmentDetails {
     pub fn new(required: ChangeIPSecConnectionCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeIPSecConnectionCompartmentDetails {
         self
     }
 }
-
-

@@ -20,7 +20,6 @@ pub struct BootVolumeSourceFromBootVolumeBackupDeltaDetails {
     pub change_block_size_in_bytes: Option<i64>,
 }
 
-
 /// Required fields for BootVolumeSourceFromBootVolumeBackupDeltaDetails
 pub struct BootVolumeSourceFromBootVolumeBackupDeltaDetailsRequired {
     /// The OCID of the first boot volume backup.
@@ -43,7 +42,7 @@ impl BootVolumeSourceFromBootVolumeBackupDeltaDetails {
             r#type: required.r#type,
 
             change_block_size_in_bytes: None,
-}
+        }
     }
 
     /// Set first_backup_id
@@ -76,5 +75,3 @@ impl BootVolumeSourceFromBootVolumeBackupDeltaDetails {
         self
     }
 }
-
-

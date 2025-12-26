@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateComputeHostGroupRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateComputeHostGroupRequest
 pub struct CreateComputeHostGroupRequestRequired {
     /// Details for creating a new host group.
@@ -36,11 +35,14 @@ impl CreateComputeHostGroupRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_compute_host_group_details
-    pub fn set_create_compute_host_group_details(mut self, value: CreateComputeHostGroupDetails) -> Self {
+    pub fn set_create_compute_host_group_details(
+        mut self,
+        value: CreateComputeHostGroupDetails,
+    ) -> Self {
         self.create_compute_host_group_details = value;
         self
     }
@@ -69,5 +71,3 @@ impl CreateComputeHostGroupRequest {
         self
     }
 }
-
-

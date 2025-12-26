@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -10,7 +10,6 @@ pub struct InstanceMaintenanceReboot {
     /// The maximum extension date and time for the maintenance reboot, in the format defined by [RFC3339](https://tools.ietf.org/html/rfc3339). The range for the maintenance extension is between 1 and 14 days from the initial scheduled maintenance date. Example: {@code 2018-05-25T21:10:29.600Z}
     pub time_maintenance_reboot_due_max: DateTime<Utc>,
 }
-
 
 /// Required fields for InstanceMaintenanceReboot
 pub struct InstanceMaintenanceRebootRequired {
@@ -23,7 +22,7 @@ impl InstanceMaintenanceReboot {
     pub fn new(required: InstanceMaintenanceRebootRequired) -> Self {
         Self {
             time_maintenance_reboot_due_max: required.time_maintenance_reboot_due_max,
-}
+        }
     }
 
     /// Set time_maintenance_reboot_due_max
@@ -32,5 +31,3 @@ impl InstanceMaintenanceReboot {
         self
     }
 }
-
-

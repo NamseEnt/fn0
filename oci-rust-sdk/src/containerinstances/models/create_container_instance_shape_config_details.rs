@@ -11,10 +11,8 @@ pub struct CreateContainerInstanceShapeConfigDetails {
 
     /// The total amount of memory available to the container instance (GB). Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "memoryInGBs")]
     pub memory_in_gbs: Option<i64>,
 }
-
 
 /// Required fields for CreateContainerInstanceShapeConfigDetails
 pub struct CreateContainerInstanceShapeConfigDetailsRequired {
@@ -29,7 +27,7 @@ impl CreateContainerInstanceShapeConfigDetails {
             ocpus: required.ocpus,
 
             memory_in_gbs: None,
-}
+        }
     }
 
     /// Set ocpus
@@ -38,17 +36,15 @@ impl CreateContainerInstanceShapeConfigDetails {
         self
     }
 
-    /// Set memory_in_g_bs
+    /// Set memory_in_gbs
     pub fn set_memory_in_gbs(mut self, value: Option<i64>) -> Self {
         self.memory_in_gbs = value;
         self
     }
 
-    /// Set memory_in_g_bs (unwraps Option)
+    /// Set memory_in_gbs (unwraps Option)
     pub fn with_memory_in_gbs(mut self, value: i64) -> Self {
         self.memory_in_gbs = Some(value);
         self
     }
 }
-
-

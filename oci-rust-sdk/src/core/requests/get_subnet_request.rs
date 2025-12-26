@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetSubnetRequest {
     /// Specify the [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the subnet.
     pub subnet_id: String,
 }
-
 
 /// Required fields for GetSubnetRequest
 pub struct GetSubnetRequestRequired {
@@ -24,7 +23,7 @@ impl GetSubnetRequest {
     pub fn new(required: GetSubnetRequestRequired) -> Self {
         Self {
             subnet_id: required.subnet_id,
-}
+        }
     }
 
     /// Set subnet_id
@@ -33,5 +32,3 @@ impl GetSubnetRequest {
         self
     }
 }
-
-

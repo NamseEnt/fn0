@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateNatGatewayRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateNatGatewayRequest
 pub struct CreateNatGatewayRequestRequired {
@@ -30,7 +29,7 @@ impl CreateNatGatewayRequest {
             create_nat_gateway_details: required.create_nat_gateway_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_nat_gateway_details
@@ -51,5 +50,3 @@ impl CreateNatGatewayRequest {
         self
     }
 }
-
-

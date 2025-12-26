@@ -55,4 +55,3 @@ impl Default for InventoryVcnCidrBlockSummary {
         Self::new()
     }
 }
-

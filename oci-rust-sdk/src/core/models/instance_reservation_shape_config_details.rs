@@ -55,4 +55,3 @@ impl Default for InstanceReservationShapeConfigDetails {
         Self::new()
     }
 }
-

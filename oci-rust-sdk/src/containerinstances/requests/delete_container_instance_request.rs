@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteContainerInstanceRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for DeleteContainerInstanceRequest
 pub struct DeleteContainerInstanceRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance.
@@ -36,7 +35,7 @@ impl DeleteContainerInstanceRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set container_instance_id
@@ -70,15 +69,6 @@ impl DeleteContainerInstanceRequest {
     }
     /// Convert this request's query parameters to a vector of key-value pairs.
     pub fn to_query_params(&self) -> Vec<(String, String)> {
-        let mut params = Vec::new();
-
-        if let Some(ref if_match) = self.if_match {
-            params.push(("if_match".to_string(), if_match.clone()));
-        }
-
-        params
+        Vec::new()
     }
-
 }
-
-

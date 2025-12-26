@@ -1,6 +1,6 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
-    core::{region::Region, Retrier},
+    core::{Retrier, region::Region},
     resourcesearch::{
         self, SearchDetails, SearchDetailsMatchingContextType, SearchDetailsRequired,
         SearchResourcesRequest, SearchResourcesRequestRequired,

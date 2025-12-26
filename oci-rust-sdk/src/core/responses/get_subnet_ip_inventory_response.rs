@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetSubnetIpInventoryResponse {
     /// The returned model.IpInventorySubnetResourceCollection instance.
     pub ip_inventory_subnet_resource_collection: IpInventorySubnetResourceCollection,
 }
-
 
 /// Required fields for GetSubnetIpInventoryResponse
 pub struct GetSubnetIpInventoryResponseRequired {
@@ -39,8 +38,9 @@ impl GetSubnetIpInventoryResponse {
 
             opc_request_id: required.opc_request_id,
 
-            ip_inventory_subnet_resource_collection: required.ip_inventory_subnet_resource_collection,
-}
+            ip_inventory_subnet_resource_collection: required
+                .ip_inventory_subnet_resource_collection,
+        }
     }
 
     /// Set etag
@@ -56,10 +56,11 @@ impl GetSubnetIpInventoryResponse {
     }
 
     /// Set ip_inventory_subnet_resource_collection
-    pub fn set_ip_inventory_subnet_resource_collection(mut self, value: IpInventorySubnetResourceCollection) -> Self {
+    pub fn set_ip_inventory_subnet_resource_collection(
+        mut self,
+        value: IpInventorySubnetResourceCollection,
+    ) -> Self {
         self.ip_inventory_subnet_resource_collection = value;
         self
     }
 }
-
-

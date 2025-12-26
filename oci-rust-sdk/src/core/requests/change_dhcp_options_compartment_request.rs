@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeDhcpOptionsCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeDhcpOptionsCompartmentRequest
 pub struct ChangeDhcpOptionsCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) for the set of DHCP options.
@@ -39,12 +38,13 @@ impl ChangeDhcpOptionsCompartmentRequest {
         Self {
             dhcp_id: required.dhcp_id,
 
-            change_dhcp_options_compartment_details: required.change_dhcp_options_compartment_details,
+            change_dhcp_options_compartment_details: required
+                .change_dhcp_options_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set dhcp_id
@@ -54,7 +54,10 @@ impl ChangeDhcpOptionsCompartmentRequest {
     }
 
     /// Set change_dhcp_options_compartment_details
-    pub fn set_change_dhcp_options_compartment_details(mut self, value: ChangeDhcpOptionsCompartmentDetails) -> Self {
+    pub fn set_change_dhcp_options_compartment_details(
+        mut self,
+        value: ChangeDhcpOptionsCompartmentDetails,
+    ) -> Self {
         self.change_dhcp_options_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangeDhcpOptionsCompartmentRequest {
         self
     }
 }
-
-

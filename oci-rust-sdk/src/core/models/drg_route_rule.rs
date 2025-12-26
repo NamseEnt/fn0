@@ -38,7 +38,6 @@ pub struct DrgRouteRule {
     pub attributes: Option<serde_json::Value>,
 }
 
-
 /// Required fields for DrgRouteRule
 pub struct DrgRouteRuleRequired {
     /// Represents the range of IP addresses to match against when routing traffic. <p> Potential values: * An IP address range (IPv4 or IPv6) in CIDR notation. For example: {@code 192.168.1.0/24} or {@code 2001:0db8:0123:45::/56}. * When you're setting up a security rule for traffic destined for a particular {@code Service} through a service gateway, this is the {@code cidrBlock} value associated with that {@link Service}. For example: {@code oci-phx-objectstorage}.
@@ -78,7 +77,7 @@ impl DrgRouteRule {
             is_blackhole: None,
 
             attributes: None,
-}
+        }
     }
 
     /// Set destination
@@ -159,5 +158,3 @@ impl DrgRouteRule {
         self
     }
 }
-
-

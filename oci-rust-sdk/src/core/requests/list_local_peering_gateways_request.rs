@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,6 @@ pub struct ListLocalPeeringGatewaysRequest {
     pub vcn_id: Option<String>,
 }
 
-
 /// Required fields for ListLocalPeeringGatewaysRequest
 pub struct ListLocalPeeringGatewaysRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -42,7 +41,7 @@ impl ListLocalPeeringGatewaysRequest {
             page: None,
 
             vcn_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -87,5 +86,3 @@ impl ListLocalPeeringGatewaysRequest {
         self
     }
 }
-
-

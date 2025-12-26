@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct SetOriginAsnResponse {
     /// Unique Oracle-assigned identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID.
     pub opc_request_id: String,
 }
-
 
 /// Required fields for SetOriginAsnResponse
 pub struct SetOriginAsnResponseRequired {
@@ -32,7 +31,7 @@ impl SetOriginAsnResponse {
             opc_work_request_id: required.opc_work_request_id,
 
             opc_request_id: required.opc_request_id,
-}
+        }
     }
 
     /// Set opc_work_request_id
@@ -47,5 +46,3 @@ impl SetOriginAsnResponse {
         self
     }
 }
-
-

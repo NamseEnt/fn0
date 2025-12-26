@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateVolumeBackupPolicyRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpdateVolumeBackupPolicyRequest
 pub struct UpdateVolumeBackupPolicyRequestRequired {
     /// The OCID of the volume backup policy.
@@ -50,7 +49,7 @@ impl UpdateVolumeBackupPolicyRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set policy_id
@@ -60,7 +59,10 @@ impl UpdateVolumeBackupPolicyRequest {
     }
 
     /// Set update_volume_backup_policy_details
-    pub fn set_update_volume_backup_policy_details(mut self, value: UpdateVolumeBackupPolicyDetails) -> Self {
+    pub fn set_update_volume_backup_policy_details(
+        mut self,
+        value: UpdateVolumeBackupPolicyDetails,
+    ) -> Self {
         self.update_volume_backup_policy_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl UpdateVolumeBackupPolicyRequest {
         self
     }
 }
-
-

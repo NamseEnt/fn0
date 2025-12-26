@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct UpdateInstanceConfigurationRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateInstanceConfigurationRequest
 pub struct UpdateInstanceConfigurationRequestRequired {
@@ -44,7 +43,7 @@ impl UpdateInstanceConfigurationRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set instance_configuration_id
@@ -54,7 +53,10 @@ impl UpdateInstanceConfigurationRequest {
     }
 
     /// Set update_instance_configuration_details
-    pub fn set_update_instance_configuration_details(mut self, value: UpdateInstanceConfigurationDetails) -> Self {
+    pub fn set_update_instance_configuration_details(
+        mut self,
+        value: UpdateInstanceConfigurationDetails,
+    ) -> Self {
         self.update_instance_configuration_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl UpdateInstanceConfigurationRequest {
         self
     }
 }
-
-

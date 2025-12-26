@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CaptureConsoleHistoryRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CaptureConsoleHistoryRequest
 pub struct CaptureConsoleHistoryRequestRequired {
@@ -30,11 +29,14 @@ impl CaptureConsoleHistoryRequest {
             capture_console_history_details: required.capture_console_history_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set capture_console_history_details
-    pub fn set_capture_console_history_details(mut self, value: CaptureConsoleHistoryDetails) -> Self {
+    pub fn set_capture_console_history_details(
+        mut self,
+        value: CaptureConsoleHistoryDetails,
+    ) -> Self {
         self.capture_console_history_details = value;
         self
     }
@@ -51,5 +53,3 @@ impl CaptureConsoleHistoryRequest {
         self
     }
 }
-
-

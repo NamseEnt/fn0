@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetSecurityListRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the security list.
     pub security_list_id: String,
 }
-
 
 /// Required fields for GetSecurityListRequest
 pub struct GetSecurityListRequestRequired {
@@ -24,7 +23,7 @@ impl GetSecurityListRequest {
     pub fn new(required: GetSecurityListRequestRequired) -> Self {
         Self {
             security_list_id: required.security_list_id,
-}
+        }
     }
 
     /// Set security_list_id
@@ -33,5 +32,3 @@ impl GetSecurityListRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetCrossConnectStatusResponse {
     /// The returned model.CrossConnectStatus instance.
     pub cross_connect_status: CrossConnectStatus,
 }
-
 
 /// Required fields for GetCrossConnectStatusResponse
 pub struct GetCrossConnectStatusResponseRequired {
@@ -32,7 +31,7 @@ impl GetCrossConnectStatusResponse {
             opc_request_id: required.opc_request_id,
 
             cross_connect_status: required.cross_connect_status,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetCrossConnectStatusResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DeleteDedicatedVmHostRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for DeleteDedicatedVmHostRequest
 pub struct DeleteDedicatedVmHostRequestRequired {
@@ -30,7 +29,7 @@ impl DeleteDedicatedVmHostRequest {
             dedicated_vm_host_id: required.dedicated_vm_host_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set dedicated_vm_host_id
@@ -51,5 +50,3 @@ impl DeleteDedicatedVmHostRequest {
         self
     }
 }
-
-

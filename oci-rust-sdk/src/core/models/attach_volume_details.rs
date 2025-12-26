@@ -32,7 +32,6 @@ pub struct AttachVolumeDetails {
     pub is_shareable: Option<bool>,
 }
 
-
 /// Required fields for AttachVolumeDetails
 pub struct AttachVolumeDetailsRequired {
     /// The OCID of the instance. For AttachVolume operation, this is a required field for the request, see {@link #attachVolume(AttachVolumeRequest) attachVolume}.
@@ -61,7 +60,7 @@ impl AttachVolumeDetails {
             is_read_only: None,
 
             is_shareable: None,
-}
+        }
     }
 
     /// Set device
@@ -130,5 +129,3 @@ impl AttachVolumeDetails {
         self
     }
 }
-
-

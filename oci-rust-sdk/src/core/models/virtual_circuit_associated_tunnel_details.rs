@@ -17,7 +17,6 @@ pub struct VirtualCircuitAssociatedTunnelDetails {
     pub ipsec_connection_id: Option<String>,
 }
 
-
 /// Required fields for VirtualCircuitAssociatedTunnelDetails
 pub struct VirtualCircuitAssociatedTunnelDetailsRequired {
     /// The type of the tunnel associated with the virtual circuit.
@@ -36,11 +35,14 @@ impl VirtualCircuitAssociatedTunnelDetails {
             tunnel_id: required.tunnel_id,
 
             ipsec_connection_id: None,
-}
+        }
     }
 
     /// Set tunnel_type
-    pub fn set_tunnel_type(mut self, value: VirtualCircuitAssociatedTunnelDetailsTunnelType) -> Self {
+    pub fn set_tunnel_type(
+        mut self,
+        value: VirtualCircuitAssociatedTunnelDetailsTunnelType,
+    ) -> Self {
         self.tunnel_type = value;
         self
     }
@@ -63,5 +65,3 @@ impl VirtualCircuitAssociatedTunnelDetails {
         self
     }
 }
-
-

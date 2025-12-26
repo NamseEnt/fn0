@@ -12,7 +12,8 @@ pub struct InstanceConfigurationGenericBmLaunchInstancePlatformConfig {
 
     /// The number of NUMA nodes per socket (NPS).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub numa_nodes_per_socket: Option<InstanceConfigurationGenericBmLaunchInstancePlatformConfigNumaNodesPerSocket>,
+    pub numa_nodes_per_socket:
+        Option<InstanceConfigurationGenericBmLaunchInstancePlatformConfigNumaNodesPerSocket>,
 
     /// Whether symmetric multithreading is enabled on the instance. Symmetric multithreading is also called simultaneous multithreading (SMT) or Intel Hyper-Threading. <p> Intel and AMD processors have two hardware execution threads per core (OCPU). SMT permits multiple independent threads of execution, to better use the resources and increase the efficiency of the CPU. When multithreading is disabled, only one thread is permitted to run on each core, which can provide higher or more predictable performance for some workloads.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,7 +40,6 @@ pub struct InstanceConfigurationGenericBmLaunchInstancePlatformConfig {
     pub config_map: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for InstanceConfigurationGenericBmLaunchInstancePlatformConfig
 pub struct InstanceConfigurationGenericBmLaunchInstancePlatformConfigRequired {
     pub r#type: String,
@@ -47,7 +47,9 @@ pub struct InstanceConfigurationGenericBmLaunchInstancePlatformConfigRequired {
 
 impl InstanceConfigurationGenericBmLaunchInstancePlatformConfig {
     /// Create a new InstanceConfigurationGenericBmLaunchInstancePlatformConfig with required fields
-    pub fn new(required: InstanceConfigurationGenericBmLaunchInstancePlatformConfigRequired) -> Self {
+    pub fn new(
+        required: InstanceConfigurationGenericBmLaunchInstancePlatformConfigRequired,
+    ) -> Self {
         Self {
             r#type: required.r#type,
 
@@ -64,11 +66,14 @@ impl InstanceConfigurationGenericBmLaunchInstancePlatformConfig {
             percentage_of_cores_enabled: None,
 
             config_map: None,
-}
+        }
     }
 
     /// Set numa_nodes_per_socket
-    pub fn set_numa_nodes_per_socket(mut self, value: Option<InstanceConfigurationGenericBmLaunchInstancePlatformConfigNumaNodesPerSocket>) -> Self {
+    pub fn set_numa_nodes_per_socket(
+        mut self,
+        value: Option<InstanceConfigurationGenericBmLaunchInstancePlatformConfigNumaNodesPerSocket>,
+    ) -> Self {
         self.numa_nodes_per_socket = value;
         self
     }
@@ -92,7 +97,10 @@ impl InstanceConfigurationGenericBmLaunchInstancePlatformConfig {
     }
 
     /// Set is_input_output_memory_management_unit_enabled
-    pub fn set_is_input_output_memory_management_unit_enabled(mut self, value: Option<bool>) -> Self {
+    pub fn set_is_input_output_memory_management_unit_enabled(
+        mut self,
+        value: Option<bool>,
+    ) -> Self {
         self.is_input_output_memory_management_unit_enabled = value;
         self
     }
@@ -116,7 +124,10 @@ impl InstanceConfigurationGenericBmLaunchInstancePlatformConfig {
     }
 
     /// Set numa_nodes_per_socket (unwraps Option)
-    pub fn with_numa_nodes_per_socket(mut self, value: InstanceConfigurationGenericBmLaunchInstancePlatformConfigNumaNodesPerSocket) -> Self {
+    pub fn with_numa_nodes_per_socket(
+        mut self,
+        value: InstanceConfigurationGenericBmLaunchInstancePlatformConfigNumaNodesPerSocket,
+    ) -> Self {
         self.numa_nodes_per_socket = Some(value);
         self
     }
@@ -157,5 +168,3 @@ impl InstanceConfigurationGenericBmLaunchInstancePlatformConfig {
         self
     }
 }
-
-

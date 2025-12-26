@@ -1,13 +1,13 @@
 use oci_rust_sdk::{
+    auth::ConfigFileAuthProvider,
     containerinstances::{
         self, ClientConfig as ContainerInstancesConfig, CreateContainerDetails,
         CreateContainerDetailsRequired, CreateContainerInstanceDetails,
-        CreateContainerInstanceDetailsRequired, CreateContainerInstanceShapeConfigDetails,
+        CreateContainerInstanceDetailsRequired, CreateContainerInstanceRequest,
+        CreateContainerInstanceRequestRequired, CreateContainerInstanceShapeConfigDetails,
         CreateContainerInstanceShapeConfigDetailsRequired, CreateContainerVnicDetails,
-        CreateContainerVnicDetailsRequired, CreateContainerInstanceRequest,
-        CreateContainerInstanceRequestRequired,
+        CreateContainerVnicDetailsRequired,
     },
-    auth::ConfigFileAuthProvider,
     core::{region::Region, retry::Retrier},
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -49,19 +49,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .with_memory_in_gbs(4);
 
-    let create_details = CreateContainerInstanceDetails::new(
-        CreateContainerInstanceDetailsRequired {
+    let create_details =
+        CreateContainerInstanceDetails::new(CreateContainerInstanceDetailsRequired {
             compartment_id,
             availability_domain,
             shape: "CI.Standard.E4.Flex".to_string(),
             shape_config,
             containers: vec![container],
             vnics: vec![vnic],
-        },
-    )
-    .with_display_name("my-nginx-instance")
-    .with_graceful_shutdown_timeout_in_seconds(30)
-    .with_container_restart_policy("ALWAYS");
+        })
+        .with_display_name("my-nginx-instance")
+        .with_graceful_shutdown_timeout_in_seconds(30)
+        .with_container_restart_policy("ALWAYS");
 
     let request = CreateContainerInstanceRequest::new(CreateContainerInstanceRequestRequired {
         create_container_instance_details: create_details,

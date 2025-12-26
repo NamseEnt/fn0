@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeDedicatedVmHostCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeDedicatedVmHostCompartmentRequest
 pub struct ChangeDedicatedVmHostCompartmentRequestRequired {
     /// The OCID of the dedicated VM host.
@@ -43,14 +42,15 @@ impl ChangeDedicatedVmHostCompartmentRequest {
         Self {
             dedicated_vm_host_id: required.dedicated_vm_host_id,
 
-            change_dedicated_vm_host_compartment_details: required.change_dedicated_vm_host_compartment_details,
+            change_dedicated_vm_host_compartment_details: required
+                .change_dedicated_vm_host_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set dedicated_vm_host_id
@@ -60,7 +60,10 @@ impl ChangeDedicatedVmHostCompartmentRequest {
     }
 
     /// Set change_dedicated_vm_host_compartment_details
-    pub fn set_change_dedicated_vm_host_compartment_details(mut self, value: ChangeDedicatedVmHostCompartmentDetails) -> Self {
+    pub fn set_change_dedicated_vm_host_compartment_details(
+        mut self,
+        value: ChangeDedicatedVmHostCompartmentDetails,
+    ) -> Self {
         self.change_dedicated_vm_host_compartment_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl ChangeDedicatedVmHostCompartmentRequest {
         self
     }
 }
-
-

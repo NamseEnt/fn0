@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateComputeGpuMemoryClusterRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for CreateComputeGpuMemoryClusterRequest
 pub struct CreateComputeGpuMemoryClusterRequestRequired {
     /// The configuration details of a GPU memory cluster
@@ -31,16 +30,20 @@ impl CreateComputeGpuMemoryClusterRequest {
     /// Create a new CreateComputeGpuMemoryClusterRequest with required fields
     pub fn new(required: CreateComputeGpuMemoryClusterRequestRequired) -> Self {
         Self {
-            create_compute_gpu_memory_cluster_details: required.create_compute_gpu_memory_cluster_details,
+            create_compute_gpu_memory_cluster_details: required
+                .create_compute_gpu_memory_cluster_details,
 
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set create_compute_gpu_memory_cluster_details
-    pub fn set_create_compute_gpu_memory_cluster_details(mut self, value: CreateComputeGpuMemoryClusterDetails) -> Self {
+    pub fn set_create_compute_gpu_memory_cluster_details(
+        mut self,
+        value: CreateComputeGpuMemoryClusterDetails,
+    ) -> Self {
         self.create_compute_gpu_memory_cluster_details = value;
         self
     }
@@ -69,5 +72,3 @@ impl CreateComputeGpuMemoryClusterRequest {
         self
     }
 }
-
-

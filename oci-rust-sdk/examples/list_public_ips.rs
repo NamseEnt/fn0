@@ -1,8 +1,8 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
     core::{
-        self, region::Region, Retrier, ListPublicIpsRequest, ListPublicIpsRequestLifetime,
-        ListPublicIpsRequestRequired, ListPublicIpsRequestScope,
+        self, ListPublicIpsRequest, ListPublicIpsRequestLifetime, ListPublicIpsRequestRequired,
+        ListPublicIpsRequestScope, Retrier, region::Region,
     },
 };
 use std::sync::Arc;

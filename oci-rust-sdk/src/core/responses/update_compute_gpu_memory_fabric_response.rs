@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateComputeGpuMemoryFabricResponse {
     /// The returned model.ComputeGpuMemoryFabric instance.
     pub compute_gpu_memory_fabric: ComputeGpuMemoryFabric,
 }
-
 
 /// Required fields for UpdateComputeGpuMemoryFabricResponse
 pub struct UpdateComputeGpuMemoryFabricResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateComputeGpuMemoryFabricResponse {
             opc_request_id: required.opc_request_id,
 
             compute_gpu_memory_fabric: required.compute_gpu_memory_fabric,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateComputeGpuMemoryFabricResponse {
         self
     }
 }
-
-

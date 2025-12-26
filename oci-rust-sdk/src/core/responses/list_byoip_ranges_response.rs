@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListByoipRangesResponse {
     /// The returned model.ByoipRangeCollection instance.
     pub byoip_range_collection: ByoipRangeCollection,
 }
-
 
 /// Required fields for ListByoipRangesResponse
 pub struct ListByoipRangesResponseRequired {
@@ -40,7 +39,7 @@ impl ListByoipRangesResponse {
             opc_request_id: required.opc_request_id,
 
             byoip_range_collection: required.byoip_range_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListByoipRangesResponse {
         self
     }
 }
-
-

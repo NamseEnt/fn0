@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,6 @@ pub struct ListNetworkSecurityGroupVnicsRequest {
     pub sort_order: Option<ListNetworkSecurityGroupVnicsRequestSortOrder>,
 }
 
-
 /// Required fields for ListNetworkSecurityGroupVnicsRequest
 pub struct ListNetworkSecurityGroupVnicsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the network security group.
@@ -48,7 +47,7 @@ impl ListNetworkSecurityGroupVnicsRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set network_security_group_id
@@ -70,13 +69,19 @@ impl ListNetworkSecurityGroupVnicsRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListNetworkSecurityGroupVnicsRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListNetworkSecurityGroupVnicsRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListNetworkSecurityGroupVnicsRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListNetworkSecurityGroupVnicsRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -105,5 +110,3 @@ impl ListNetworkSecurityGroupVnicsRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct ChangeVolumeGroupBackupCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for ChangeVolumeGroupBackupCompartmentRequest
 pub struct ChangeVolumeGroupBackupCompartmentRequestRequired {
@@ -35,10 +34,11 @@ impl ChangeVolumeGroupBackupCompartmentRequest {
         Self {
             volume_group_backup_id: required.volume_group_backup_id,
 
-            change_volume_group_backup_compartment_details: required.change_volume_group_backup_compartment_details,
+            change_volume_group_backup_compartment_details: required
+                .change_volume_group_backup_compartment_details,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set volume_group_backup_id
@@ -48,7 +48,10 @@ impl ChangeVolumeGroupBackupCompartmentRequest {
     }
 
     /// Set change_volume_group_backup_compartment_details
-    pub fn set_change_volume_group_backup_compartment_details(mut self, value: ChangeVolumeGroupBackupCompartmentDetails) -> Self {
+    pub fn set_change_volume_group_backup_compartment_details(
+        mut self,
+        value: ChangeVolumeGroupBackupCompartmentDetails,
+    ) -> Self {
         self.change_volume_group_backup_compartment_details = value;
         self
     }
@@ -65,5 +68,3 @@ impl ChangeVolumeGroupBackupCompartmentRequest {
         self
     }
 }
-
-

@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -37,7 +37,6 @@ pub struct VolumeBackupPolicy {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for VolumeBackupPolicy
 pub struct VolumeBackupPolicyRequired {
     /// A user-friendly name. Does not have to be unique, and it's changeable. Avoid entering confidential information.
@@ -72,7 +71,7 @@ impl VolumeBackupPolicy {
             defined_tags: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set display_name
@@ -112,7 +111,10 @@ impl VolumeBackupPolicy {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -136,7 +138,10 @@ impl VolumeBackupPolicy {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -147,5 +152,3 @@ impl VolumeBackupPolicy {
         self
     }
 }
-
-

@@ -50,6 +50,11 @@ for SERVICE in ${SERVICES//,/ }; do
     INTERFACES=$(grep -c '"kind": "interface"' "$PARSED_DIR/${SERVICE}-models.json" || echo "0")
     ENUMS=$(grep -c '"kind": "enum"' "$PARSED_DIR/${SERVICE}-models.json" || echo "0")
     echo "  ✓ Parsed $INTERFACES interfaces, $ENUMS enums"
+
+    # Parse client methods
+    npx ts-node parse-client.ts --service="$SERVICE" 2>/dev/null > "$PARSED_DIR/${SERVICE}-client.json"
+    METHODS=$(grep -c '"methodName":' "$PARSED_DIR/${SERVICE}-client.json" || echo "0")
+    echo "  ✓ Parsed $METHODS client methods"
 done
 echo ""
 
@@ -80,6 +85,16 @@ for SERVICE in ${SERVICES//,/ }; do
             echo "  ✓ Generated $SUBDIR/mod.rs with $COUNT modules"
         fi
     done
+
+    # Generate service-level mod.rs (client code)
+    echo "  Generating service mod.rs..."
+    cd "$SCRIPT_DIR/tools/parser"
+    npx ts-node generate-client.ts \
+        --service="$SERVICE" \
+        --api-version="/20210410" \
+        --endpoint="$SERVICE" \
+        2>/dev/null > "$SERVICE_OUTPUT_BASE/mod.rs"
+    echo "  ✓ Generated service mod.rs with client methods"
 done
 echo ""
 

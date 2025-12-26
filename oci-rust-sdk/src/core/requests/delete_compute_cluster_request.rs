@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteComputeClusterRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for DeleteComputeClusterRequest
 pub struct DeleteComputeClusterRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute cluster. A [compute cluster](https://docs.oracle.com/iaas/Content/Compute/Tasks/compute-clusters.htm) is a remote direct memory access (RDMA) network group.
@@ -36,7 +35,7 @@ impl DeleteComputeClusterRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set compute_cluster_id
@@ -69,5 +68,3 @@ impl DeleteComputeClusterRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct RemoveExportDrgRouteDistributionResponse {
     /// The returned model.DrgAttachment instance.
     pub drg_attachment: DrgAttachment,
 }
-
 
 /// Required fields for RemoveExportDrgRouteDistributionResponse
 pub struct RemoveExportDrgRouteDistributionResponseRequired {
@@ -40,7 +39,7 @@ impl RemoveExportDrgRouteDistributionResponse {
             opc_request_id: required.opc_request_id,
 
             drg_attachment: required.drg_attachment,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl RemoveExportDrgRouteDistributionResponse {
         self
     }
 }
-
-

@@ -1,8 +1,8 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
     core::{
-        self, region::Region, LaunchInstanceDetails, LaunchInstanceDetailsRequired,
-        LaunchInstanceRequest, LaunchInstanceRequestRequired, Retrier,
+        self, LaunchInstanceDetails, LaunchInstanceDetailsRequired, LaunchInstanceRequest,
+        LaunchInstanceRequestRequired, Retrier, region::Region,
     },
 };
 use std::sync::Arc;
@@ -64,7 +64,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             println!("  Shape: {}", response.instance.shape);
             println!("  Lifecycle State: {:?}", response.instance.lifecycle_state);
-            println!("  Availability Domain: {}", response.instance.availability_domain);
+            println!(
+                "  Availability Domain: {}",
+                response.instance.availability_domain
+            );
 
             if let Some(work_request_id) = response.opc_work_request_id {
                 println!("\n  Work Request ID: {}", work_request_id);

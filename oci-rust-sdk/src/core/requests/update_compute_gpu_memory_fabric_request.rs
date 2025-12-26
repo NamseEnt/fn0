@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateComputeGpuMemoryFabricRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpdateComputeGpuMemoryFabricRequest
 pub struct UpdateComputeGpuMemoryFabricRequestRequired {
     /// The OCID of the compute GPU memory fabric.
@@ -43,14 +42,15 @@ impl UpdateComputeGpuMemoryFabricRequest {
         Self {
             compute_gpu_memory_fabric_id: required.compute_gpu_memory_fabric_id,
 
-            update_compute_gpu_memory_fabric_details: required.update_compute_gpu_memory_fabric_details,
+            update_compute_gpu_memory_fabric_details: required
+                .update_compute_gpu_memory_fabric_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_gpu_memory_fabric_id
@@ -60,7 +60,10 @@ impl UpdateComputeGpuMemoryFabricRequest {
     }
 
     /// Set update_compute_gpu_memory_fabric_details
-    pub fn set_update_compute_gpu_memory_fabric_details(mut self, value: UpdateComputeGpuMemoryFabricDetails) -> Self {
+    pub fn set_update_compute_gpu_memory_fabric_details(
+        mut self,
+        value: UpdateComputeGpuMemoryFabricDetails,
+    ) -> Self {
         self.update_compute_gpu_memory_fabric_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl UpdateComputeGpuMemoryFabricRequest {
         self
     }
 }
-
-

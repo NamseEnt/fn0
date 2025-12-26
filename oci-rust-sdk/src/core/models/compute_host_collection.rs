@@ -10,7 +10,6 @@ pub struct ComputeHostCollection {
     pub items: Vec<ComputeHostSummary>,
 }
 
-
 /// Required fields for ComputeHostCollection
 pub struct ComputeHostCollectionRequired {
     /// The list of compute hosts.
@@ -22,7 +21,7 @@ impl ComputeHostCollection {
     pub fn new(required: ComputeHostCollectionRequired) -> Self {
         Self {
             items: required.items,
-}
+        }
     }
 
     /// Set items
@@ -31,5 +30,3 @@ impl ComputeHostCollection {
         self
     }
 }
-
-

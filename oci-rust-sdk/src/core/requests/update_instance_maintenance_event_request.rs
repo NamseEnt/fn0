@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateInstanceMaintenanceEventRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpdateInstanceMaintenanceEventRequest
 pub struct UpdateInstanceMaintenanceEventRequestRequired {
     /// The OCID of the instance maintenance event.
@@ -43,14 +42,15 @@ impl UpdateInstanceMaintenanceEventRequest {
         Self {
             instance_maintenance_event_id: required.instance_maintenance_event_id,
 
-            update_instance_maintenance_event_details: required.update_instance_maintenance_event_details,
+            update_instance_maintenance_event_details: required
+                .update_instance_maintenance_event_details,
 
             opc_request_id: None,
 
             if_match: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set instance_maintenance_event_id
@@ -60,7 +60,10 @@ impl UpdateInstanceMaintenanceEventRequest {
     }
 
     /// Set update_instance_maintenance_event_details
-    pub fn set_update_instance_maintenance_event_details(mut self, value: UpdateInstanceMaintenanceEventDetails) -> Self {
+    pub fn set_update_instance_maintenance_event_details(
+        mut self,
+        value: UpdateInstanceMaintenanceEventDetails,
+    ) -> Self {
         self.update_instance_maintenance_event_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl UpdateInstanceMaintenanceEventRequest {
         self
     }
 }
-
-

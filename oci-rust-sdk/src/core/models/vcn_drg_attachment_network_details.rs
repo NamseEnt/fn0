@@ -18,7 +18,6 @@ pub struct VcnDrgAttachmentNetworkDetails {
     pub vcn_route_type: Option<VcnDrgAttachmentNetworkDetailsVcnRouteType>,
 }
 
-
 /// Required fields for VcnDrgAttachmentNetworkDetails
 pub struct VcnDrgAttachmentNetworkDetailsRequired {
     pub r#type: String,
@@ -33,7 +32,7 @@ impl VcnDrgAttachmentNetworkDetails {
             route_table_id: None,
 
             vcn_route_type: None,
-}
+        }
     }
 
     /// Set route_table_id
@@ -43,7 +42,10 @@ impl VcnDrgAttachmentNetworkDetails {
     }
 
     /// Set vcn_route_type
-    pub fn set_vcn_route_type(mut self, value: Option<VcnDrgAttachmentNetworkDetailsVcnRouteType>) -> Self {
+    pub fn set_vcn_route_type(
+        mut self,
+        value: Option<VcnDrgAttachmentNetworkDetailsVcnRouteType>,
+    ) -> Self {
         self.vcn_route_type = value;
         self
     }
@@ -61,10 +63,11 @@ impl VcnDrgAttachmentNetworkDetails {
     }
 
     /// Set vcn_route_type (unwraps Option)
-    pub fn with_vcn_route_type(mut self, value: VcnDrgAttachmentNetworkDetailsVcnRouteType) -> Self {
+    pub fn with_vcn_route_type(
+        mut self,
+        value: VcnDrgAttachmentNetworkDetailsVcnRouteType,
+    ) -> Self {
         self.vcn_route_type = Some(value);
         self
     }
 }
-
-

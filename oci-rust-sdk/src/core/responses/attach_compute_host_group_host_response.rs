@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct AttachComputeHostGroupHostResponse {
     /// The returned model.ComputeHost instance.
     pub compute_host: ComputeHost,
 }
-
 
 /// Required fields for AttachComputeHostGroupHostResponse
 pub struct AttachComputeHostGroupHostResponseRequired {
@@ -56,7 +55,7 @@ impl AttachComputeHostGroupHostResponse {
             opc_work_request_id: required.opc_work_request_id,
 
             compute_host: required.compute_host,
-}
+        }
     }
 
     /// Set etag
@@ -89,5 +88,3 @@ impl AttachComputeHostGroupHostResponse {
         self
     }
 }
-
-

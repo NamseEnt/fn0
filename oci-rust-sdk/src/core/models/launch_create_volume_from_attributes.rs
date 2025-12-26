@@ -28,7 +28,6 @@ pub struct LaunchCreateVolumeFromAttributes {
     pub vpus_per_gb: Option<i64>,
 }
 
-
 /// Required fields for LaunchCreateVolumeFromAttributes
 pub struct LaunchCreateVolumeFromAttributesRequired {
     /// The size of the volume in GBs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -52,7 +51,7 @@ impl LaunchCreateVolumeFromAttributes {
             kms_key_id: None,
 
             vpus_per_gb: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -115,5 +114,3 @@ impl LaunchCreateVolumeFromAttributes {
         self
     }
 }
-
-

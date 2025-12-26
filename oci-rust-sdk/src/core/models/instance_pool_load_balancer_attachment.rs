@@ -28,7 +28,6 @@ pub struct InstancePoolLoadBalancerAttachment {
     pub lifecycle_state: InstancePoolLoadBalancerAttachmentLifecycleState,
 }
 
-
 /// Required fields for InstancePoolLoadBalancerAttachment
 pub struct InstancePoolLoadBalancerAttachmentRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the load balancer attachment.
@@ -70,7 +69,7 @@ impl InstancePoolLoadBalancerAttachment {
             vnic_selection: required.vnic_selection,
 
             lifecycle_state: required.lifecycle_state,
-}
+        }
     }
 
     /// Set id
@@ -110,10 +109,11 @@ impl InstancePoolLoadBalancerAttachment {
     }
 
     /// Set lifecycle_state
-    pub fn set_lifecycle_state(mut self, value: InstancePoolLoadBalancerAttachmentLifecycleState) -> Self {
+    pub fn set_lifecycle_state(
+        mut self,
+        value: InstancePoolLoadBalancerAttachmentLifecycleState,
+    ) -> Self {
         self.lifecycle_state = value;
         self
     }
 }
-
-

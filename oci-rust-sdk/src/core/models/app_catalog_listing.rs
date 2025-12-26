@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -164,4 +164,3 @@ impl Default for AppCatalogListing {
         Self::new()
     }
 }
-

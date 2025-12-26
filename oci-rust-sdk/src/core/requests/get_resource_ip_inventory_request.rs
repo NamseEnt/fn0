@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetResourceIpInventoryRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetResourceIpInventoryRequest
 pub struct GetResourceIpInventoryRequestRequired {
@@ -30,7 +29,7 @@ impl GetResourceIpInventoryRequest {
             data_request_id: required.data_request_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set data_request_id
@@ -51,5 +50,3 @@ impl GetResourceIpInventoryRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteComputeCapacityReservationRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for DeleteComputeCapacityReservationRequest
 pub struct DeleteComputeCapacityReservationRequestRequired {
     /// The OCID of the compute capacity reservation.
@@ -36,7 +35,7 @@ impl DeleteComputeCapacityReservationRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set capacity_reservation_id
@@ -69,5 +68,3 @@ impl DeleteComputeCapacityReservationRequest {
         self
     }
 }
-
-

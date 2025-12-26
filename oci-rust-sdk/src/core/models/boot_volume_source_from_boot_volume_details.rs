@@ -13,7 +13,6 @@ pub struct BootVolumeSourceFromBootVolumeDetails {
     pub r#type: String,
 }
 
-
 /// Required fields for BootVolumeSourceFromBootVolumeDetails
 pub struct BootVolumeSourceFromBootVolumeDetailsRequired {
     /// The OCID of the boot volume.
@@ -29,7 +28,7 @@ impl BootVolumeSourceFromBootVolumeDetails {
             id: required.id,
 
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set id
@@ -44,5 +43,3 @@ impl BootVolumeSourceFromBootVolumeDetails {
         self
     }
 }
-
-

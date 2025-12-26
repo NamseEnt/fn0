@@ -5,23 +5,22 @@ use serde::{Deserialize, Serialize};
 pub enum ConfigurationState {
     #[serde(rename = "CONFORMANT")]
     Conformant,
-    
+
     #[serde(rename = "NON_CONFORMANT")]
     NonConformant,
-    
+
     #[serde(rename = "CHECKING")]
     Checking,
-    
+
     #[serde(rename = "PRE_APPLYING")]
     PreApplying,
-    
+
     #[serde(rename = "APPLYING")]
     Applying,
-    
+
     #[serde(rename = "UNKNOWN")]
     Unknown,
-    
-    
+
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +12,8 @@ pub struct ChangeNetworkSecurityGroupCompartmentRequest {
     pub network_security_group_id: String,
 
     /// Request to change the compartment of a network security group.
-    pub change_network_security_group_compartment_details: ChangeNetworkSecurityGroupCompartmentDetails,
+    pub change_network_security_group_compartment_details:
+        ChangeNetworkSecurityGroupCompartmentDetails,
 
     /// Unique identifier for the request. If you need to contact Oracle about a particular request, please provide the request ID.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -23,14 +24,14 @@ pub struct ChangeNetworkSecurityGroupCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeNetworkSecurityGroupCompartmentRequest
 pub struct ChangeNetworkSecurityGroupCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the network security group.
     pub network_security_group_id: String,
 
     /// Request to change the compartment of a network security group.
-    pub change_network_security_group_compartment_details: ChangeNetworkSecurityGroupCompartmentDetails,
+    pub change_network_security_group_compartment_details:
+        ChangeNetworkSecurityGroupCompartmentDetails,
 }
 
 impl ChangeNetworkSecurityGroupCompartmentRequest {
@@ -39,12 +40,13 @@ impl ChangeNetworkSecurityGroupCompartmentRequest {
         Self {
             network_security_group_id: required.network_security_group_id,
 
-            change_network_security_group_compartment_details: required.change_network_security_group_compartment_details,
+            change_network_security_group_compartment_details: required
+                .change_network_security_group_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set network_security_group_id
@@ -54,7 +56,10 @@ impl ChangeNetworkSecurityGroupCompartmentRequest {
     }
 
     /// Set change_network_security_group_compartment_details
-    pub fn set_change_network_security_group_compartment_details(mut self, value: ChangeNetworkSecurityGroupCompartmentDetails) -> Self {
+    pub fn set_change_network_security_group_compartment_details(
+        mut self,
+        value: ChangeNetworkSecurityGroupCompartmentDetails,
+    ) -> Self {
         self.change_network_security_group_compartment_details = value;
         self
     }
@@ -83,5 +88,3 @@ impl ChangeNetworkSecurityGroupCompartmentRequest {
         self
     }
 }
-
-

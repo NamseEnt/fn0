@@ -10,7 +10,6 @@ pub struct ServiceIdRequestDetails {
     pub service_id: String,
 }
 
-
 /// Required fields for ServiceIdRequestDetails
 pub struct ServiceIdRequestDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@link Service}.
@@ -22,7 +21,7 @@ impl ServiceIdRequestDetails {
     pub fn new(required: ServiceIdRequestDetailsRequired) -> Self {
         Self {
             service_id: required.service_id,
-}
+        }
     }
 
     /// Set service_id
@@ -31,5 +30,3 @@ impl ServiceIdRequestDetails {
         self
     }
 }
-
-

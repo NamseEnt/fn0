@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,7 +29,6 @@ pub struct GetVcnOverlapResponse {
     /// The returned model.IpInventoryVcnOverlapCollection instance.
     pub ip_inventory_vcn_overlap_collection: IpInventoryVcnOverlapCollection,
 }
-
 
 /// Required fields for GetVcnOverlapResponse
 pub struct GetVcnOverlapResponseRequired {
@@ -72,7 +71,7 @@ impl GetVcnOverlapResponse {
             data_request_id: required.data_request_id,
 
             ip_inventory_vcn_overlap_collection: required.ip_inventory_vcn_overlap_collection,
-}
+        }
     }
 
     /// Set etag
@@ -112,10 +111,11 @@ impl GetVcnOverlapResponse {
     }
 
     /// Set ip_inventory_vcn_overlap_collection
-    pub fn set_ip_inventory_vcn_overlap_collection(mut self, value: IpInventoryVcnOverlapCollection) -> Self {
+    pub fn set_ip_inventory_vcn_overlap_collection(
+        mut self,
+        value: IpInventoryVcnOverlapCollection,
+    ) -> Self {
         self.ip_inventory_vcn_overlap_collection = value;
         self
     }
 }
-
-

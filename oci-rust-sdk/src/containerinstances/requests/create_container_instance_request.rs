@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateContainerInstanceRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for CreateContainerInstanceRequest
 pub struct CreateContainerInstanceRequestRequired {
     /// Details for the new container instance.
@@ -36,11 +35,14 @@ impl CreateContainerInstanceRequest {
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set create_container_instance_details
-    pub fn set_create_container_instance_details(mut self, value: CreateContainerInstanceDetails) -> Self {
+    pub fn set_create_container_instance_details(
+        mut self,
+        value: CreateContainerInstanceDetails,
+    ) -> Self {
         self.create_container_instance_details = value;
         self
     }
@@ -72,7 +74,4 @@ impl CreateContainerInstanceRequest {
     pub fn to_query_params(&self) -> Vec<(String, String)> {
         Vec::new()
     }
-
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateByoipRangeRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateByoipRangeRequest
 pub struct CreateByoipRangeRequestRequired {
     /// Details needed to create a BYOIP CIDR block subrange.
@@ -36,7 +35,7 @@ impl CreateByoipRangeRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_byoip_range_details
@@ -69,5 +68,3 @@ impl CreateByoipRangeRequest {
         self
     }
 }
-
-

@@ -14,7 +14,6 @@ pub struct MemberReplica {
     pub membership_state: Option<MemberReplicaMembershipState>,
 }
 
-
 /// Required fields for MemberReplica
 pub struct MemberReplicaRequired {
     /// The volume replica ID.
@@ -28,7 +27,7 @@ impl MemberReplica {
             volume_replica_id: required.volume_replica_id,
 
             membership_state: None,
-}
+        }
     }
 
     /// Set volume_replica_id
@@ -49,5 +48,3 @@ impl MemberReplica {
         self
     }
 }
-
-

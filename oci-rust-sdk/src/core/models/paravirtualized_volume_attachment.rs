@@ -9,7 +9,6 @@ pub struct ParavirtualizedVolumeAttachment {
     pub attachment_type: String,
 }
 
-
 /// Required fields for ParavirtualizedVolumeAttachment
 pub struct ParavirtualizedVolumeAttachmentRequired {
     pub attachment_type: String,
@@ -20,7 +19,7 @@ impl ParavirtualizedVolumeAttachment {
     pub fn new(required: ParavirtualizedVolumeAttachmentRequired) -> Self {
         Self {
             attachment_type: required.attachment_type,
-}
+        }
     }
 
     /// Set attachment_type
@@ -29,5 +28,3 @@ impl ParavirtualizedVolumeAttachment {
         self
     }
 }
-
-

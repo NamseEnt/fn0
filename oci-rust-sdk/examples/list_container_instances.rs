@@ -1,9 +1,9 @@
 use oci_rust_sdk::{
+    auth::ConfigFileAuthProvider,
     containerinstances::{
         self, ClientConfig as ContainerInstancesConfig, ContainerInstanceLifecycleState,
         ListContainerInstancesRequest, ListContainerInstancesRequestRequired,
     },
-    auth::ConfigFileAuthProvider,
     core::{region::Region, retry::Retrier},
 };
 use std::{sync::Arc, time::Duration};

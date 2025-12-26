@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteByoasnRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for DeleteByoasnRequest
 pub struct DeleteByoasnRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code Byoasn} resource.
@@ -36,7 +35,7 @@ impl DeleteByoasnRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set byoasn_id
@@ -69,5 +68,3 @@ impl DeleteByoasnRequest {
         self
     }
 }
-
-

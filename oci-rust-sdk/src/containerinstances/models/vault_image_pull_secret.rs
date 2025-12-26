@@ -12,7 +12,6 @@ pub struct VaultImagePullSecret {
     pub secret_type: String,
 }
 
-
 /// Required fields for VaultImagePullSecret
 pub struct VaultImagePullSecretRequired {
     /// The OCID of the secret for registry credentials.
@@ -28,7 +27,7 @@ impl VaultImagePullSecret {
             secret_id: required.secret_id,
 
             secret_type: required.secret_type,
-}
+        }
     }
 
     /// Set secret_id
@@ -43,5 +42,3 @@ impl VaultImagePullSecret {
         self
     }
 }
-
-

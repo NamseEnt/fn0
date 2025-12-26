@@ -56,7 +56,10 @@ impl LaunchInstanceAgentConfigDetails {
     }
 
     /// Set plugins_config
-    pub fn set_plugins_config(mut self, value: Option<Vec<InstanceAgentPluginConfigDetails>>) -> Self {
+    pub fn set_plugins_config(
+        mut self,
+        value: Option<Vec<InstanceAgentPluginConfigDetails>>,
+    ) -> Self {
         self.plugins_config = value;
         self
     }
@@ -91,4 +94,3 @@ impl Default for LaunchInstanceAgentConfigDetails {
         Self::new()
     }
 }
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetFastConnectProviderServiceKeyRequest {
     /// The provider service key that the provider gives you when you set up a virtual circuit connection from the provider to Oracle Cloud Infrastructure. You can set up that connection and get your provider service key at the provider's website or portal. For the portal location, see the {@code description} attribute of the {@link FastConnectProviderService}.
     pub provider_service_key_name: String,
 }
-
 
 /// Required fields for GetFastConnectProviderServiceKeyRequest
 pub struct GetFastConnectProviderServiceKeyRequestRequired {
@@ -32,7 +31,7 @@ impl GetFastConnectProviderServiceKeyRequest {
             provider_service_id: required.provider_service_id,
 
             provider_service_key_name: required.provider_service_key_name,
-}
+        }
     }
 
     /// Set provider_service_id
@@ -47,5 +46,3 @@ impl GetFastConnectProviderServiceKeyRequest {
         self
     }
 }
-
-

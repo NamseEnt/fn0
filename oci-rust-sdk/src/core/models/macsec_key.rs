@@ -21,7 +21,6 @@ pub struct MacsecKey {
     pub connectivity_association_key_secret_version: Option<i64>,
 }
 
-
 /// Required fields for MacsecKey
 pub struct MacsecKeyRequired {
     /// Secret [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) containing the Connectivity association Key Name (CKN) of this MACsec key.
@@ -35,14 +34,15 @@ impl MacsecKey {
     /// Create a new MacsecKey with required fields
     pub fn new(required: MacsecKeyRequired) -> Self {
         Self {
-            connectivity_association_name_secret_id: required.connectivity_association_name_secret_id,
+            connectivity_association_name_secret_id: required
+                .connectivity_association_name_secret_id,
 
             connectivity_association_key_secret_id: required.connectivity_association_key_secret_id,
 
             connectivity_association_name_secret_version: None,
 
             connectivity_association_key_secret_version: None,
-}
+        }
     }
 
     /// Set connectivity_association_name_secret_id
@@ -81,5 +81,3 @@ impl MacsecKey {
         self
     }
 }
-
-

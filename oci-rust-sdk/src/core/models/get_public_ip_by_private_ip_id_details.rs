@@ -10,7 +10,6 @@ pub struct GetPublicIpByPrivateIpIdDetails {
     pub private_ip_id: String,
 }
 
-
 /// Required fields for GetPublicIpByPrivateIpIdDetails
 pub struct GetPublicIpByPrivateIpIdDetailsRequired {
     /// [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the private IP.
@@ -22,7 +21,7 @@ impl GetPublicIpByPrivateIpIdDetails {
     pub fn new(required: GetPublicIpByPrivateIpIdDetailsRequired) -> Self {
         Self {
             private_ip_id: required.private_ip_id,
-}
+        }
     }
 
     /// Set private_ip_id
@@ -31,5 +30,3 @@ impl GetPublicIpByPrivateIpIdDetails {
         self
     }
 }
-
-

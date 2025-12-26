@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct ListWorkRequestErrorsRequest {
     pub sort_order: Option<SortOrder>,
 }
 
-
 /// Required fields for ListWorkRequestErrorsRequest
 pub struct ListWorkRequestErrorsRequestRequired {
     /// The ID of the asynchronous request.
@@ -54,7 +53,7 @@ impl ListWorkRequestErrorsRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set work_request_id
@@ -122,6 +121,8 @@ impl ListWorkRequestErrorsRequest {
         self.sort_order = Some(value);
         self
     }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
-
-

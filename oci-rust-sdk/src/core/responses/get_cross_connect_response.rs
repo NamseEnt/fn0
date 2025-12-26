@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetCrossConnectResponse {
     /// The returned model.CrossConnect instance.
     pub cross_connect: CrossConnect,
 }
-
 
 /// Required fields for GetCrossConnectResponse
 pub struct GetCrossConnectResponseRequired {
@@ -40,7 +39,7 @@ impl GetCrossConnectResponse {
             opc_request_id: required.opc_request_id,
 
             cross_connect: required.cross_connect,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetCrossConnectResponse {
         self
     }
 }
-
-

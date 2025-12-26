@@ -13,7 +13,6 @@ pub struct MeasuredBootReport {
     pub measurements: Option<MeasuredBootReportMeasurements>,
 }
 
-
 /// Required fields for MeasuredBootReport
 pub struct MeasuredBootReportRequired {
     /// Whether the verification succeeded, and the new values match the expected values.
@@ -27,7 +26,7 @@ impl MeasuredBootReport {
             is_policy_verification_successful: required.is_policy_verification_successful,
 
             measurements: None,
-}
+        }
     }
 
     /// Set is_policy_verification_successful
@@ -48,5 +47,3 @@ impl MeasuredBootReport {
         self
     }
 }
-
-

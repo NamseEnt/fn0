@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct GetAllDrgAttachmentsRequest {
     pub is_cross_tenancy: Option<bool>,
 }
 
-
 /// Required fields for GetAllDrgAttachmentsRequest
 pub struct GetAllDrgAttachmentsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG.
@@ -54,7 +53,7 @@ impl GetAllDrgAttachmentsRequest {
             attachment_type: None,
 
             is_cross_tenancy: None,
-}
+        }
     }
 
     /// Set drg_id
@@ -82,7 +81,10 @@ impl GetAllDrgAttachmentsRequest {
     }
 
     /// Set attachment_type
-    pub fn set_attachment_type(mut self, value: Option<GetAllDrgAttachmentsRequestAttachmentType>) -> Self {
+    pub fn set_attachment_type(
+        mut self,
+        value: Option<GetAllDrgAttachmentsRequestAttachmentType>,
+    ) -> Self {
         self.attachment_type = value;
         self
     }
@@ -112,7 +114,10 @@ impl GetAllDrgAttachmentsRequest {
     }
 
     /// Set attachment_type (unwraps Option)
-    pub fn with_attachment_type(mut self, value: GetAllDrgAttachmentsRequestAttachmentType) -> Self {
+    pub fn with_attachment_type(
+        mut self,
+        value: GetAllDrgAttachmentsRequestAttachmentType,
+    ) -> Self {
         self.attachment_type = Some(value);
         self
     }
@@ -123,5 +128,3 @@ impl GetAllDrgAttachmentsRequest {
         self
     }
 }
-
-

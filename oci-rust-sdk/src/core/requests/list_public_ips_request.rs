@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +35,6 @@ pub struct ListPublicIpsRequest {
     pub public_ip_pool_id: Option<String>,
 }
 
-
 /// Required fields for ListPublicIpsRequest
 pub struct ListPublicIpsRequestRequired {
     /// Whether the public IP is regional or specific to a particular availability domain. <p> {@code REGION}: The public IP exists within a region and is assigned to a regional entity (such as a {@link NatGateway}), or can be assigned to a private IP in any availability domain in the region. Reserved public IPs have {@code scope} = {@code REGION}, as do ephemeral public IPs assigned to a regional entity. <p> {@code AVAILABILITY_DOMAIN}: The public IP exists within the availability domain of the entity it's assigned to, which is specified by the {@code availabilityDomain} property of the public IP object. Ephemeral public IPs that are assigned to private IPs have {@code scope} = {@code AVAILABILITY_DOMAIN}.
@@ -62,7 +61,7 @@ impl ListPublicIpsRequest {
             lifetime: None,
 
             public_ip_pool_id: None,
-}
+        }
     }
 
     /// Set scope
@@ -137,5 +136,3 @@ impl ListPublicIpsRequest {
         self
     }
 }
-
-

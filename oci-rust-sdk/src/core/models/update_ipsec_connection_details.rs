@@ -51,7 +51,10 @@ impl UpdateIPSecConnectionDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -75,7 +78,10 @@ impl UpdateIPSecConnectionDetails {
     }
 
     /// Set cpe_local_identifier_type
-    pub fn set_cpe_local_identifier_type(mut self, value: Option<UpdateIPSecConnectionDetailsCpeLocalIdentifierType>) -> Self {
+    pub fn set_cpe_local_identifier_type(
+        mut self,
+        value: Option<UpdateIPSecConnectionDetailsCpeLocalIdentifierType>,
+    ) -> Self {
         self.cpe_local_identifier_type = value;
         self
     }
@@ -87,7 +93,10 @@ impl UpdateIPSecConnectionDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -111,7 +120,10 @@ impl UpdateIPSecConnectionDetails {
     }
 
     /// Set cpe_local_identifier_type (unwraps Option)
-    pub fn with_cpe_local_identifier_type(mut self, value: UpdateIPSecConnectionDetailsCpeLocalIdentifierType) -> Self {
+    pub fn with_cpe_local_identifier_type(
+        mut self,
+        value: UpdateIPSecConnectionDetailsCpeLocalIdentifierType,
+    ) -> Self {
         self.cpe_local_identifier_type = Some(value);
         self
     }
@@ -128,4 +140,3 @@ impl Default for UpdateIPSecConnectionDetails {
         Self::new()
     }
 }
-

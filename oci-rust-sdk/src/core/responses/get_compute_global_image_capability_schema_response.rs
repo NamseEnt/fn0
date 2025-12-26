@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetComputeGlobalImageCapabilitySchemaResponse {
     /// The returned model.ComputeGlobalImageCapabilitySchema instance.
     pub compute_global_image_capability_schema: ComputeGlobalImageCapabilitySchema,
 }
-
 
 /// Required fields for GetComputeGlobalImageCapabilitySchemaResponse
 pub struct GetComputeGlobalImageCapabilitySchemaResponseRequired {
@@ -40,7 +39,7 @@ impl GetComputeGlobalImageCapabilitySchemaResponse {
             opc_request_id: required.opc_request_id,
 
             compute_global_image_capability_schema: required.compute_global_image_capability_schema,
-}
+        }
     }
 
     /// Set etag
@@ -56,10 +55,11 @@ impl GetComputeGlobalImageCapabilitySchemaResponse {
     }
 
     /// Set compute_global_image_capability_schema
-    pub fn set_compute_global_image_capability_schema(mut self, value: ComputeGlobalImageCapabilitySchema) -> Self {
+    pub fn set_compute_global_image_capability_schema(
+        mut self,
+        value: ComputeGlobalImageCapabilitySchema,
+    ) -> Self {
         self.compute_global_image_capability_schema = value;
         self
     }
 }
-
-

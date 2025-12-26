@@ -40,7 +40,6 @@ pub struct CreateComputeGpuMemoryClusterDetails {
     pub display_name: Option<String>,
 }
 
-
 /// Required fields for CreateComputeGpuMemoryClusterDetails
 pub struct CreateComputeGpuMemoryClusterDetailsRequired {
     /// The availability domain of the GPU memory cluster.
@@ -77,7 +76,7 @@ impl CreateComputeGpuMemoryClusterDetails {
             freeform_tags: None,
 
             display_name: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -117,7 +116,10 @@ impl CreateComputeGpuMemoryClusterDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -147,7 +149,10 @@ impl CreateComputeGpuMemoryClusterDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -164,5 +169,3 @@ impl CreateComputeGpuMemoryClusterDetails {
         self
     }
 }
-
-

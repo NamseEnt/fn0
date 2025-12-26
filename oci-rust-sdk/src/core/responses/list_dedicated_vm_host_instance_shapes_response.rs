@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListDedicatedVmHostInstanceShapesResponse {
     /// A list of DedicatedVmHostInstanceShapeSummary instances.
     pub items: Vec<DedicatedVmHostInstanceShapeSummary>,
 }
-
 
 /// Required fields for ListDedicatedVmHostInstanceShapesResponse
 pub struct ListDedicatedVmHostInstanceShapesResponseRequired {
@@ -40,7 +39,7 @@ impl ListDedicatedVmHostInstanceShapesResponse {
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListDedicatedVmHostInstanceShapesResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct RemoveIpv4SubnetCidrRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for RemoveIpv4SubnetCidrRequest
 pub struct RemoveIpv4SubnetCidrRequestRequired {
     /// Specify the [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the subnet.
@@ -50,7 +49,7 @@ impl RemoveIpv4SubnetCidrRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set subnet_id
@@ -60,7 +59,10 @@ impl RemoveIpv4SubnetCidrRequest {
     }
 
     /// Set remove_ipv4_subnet_cidr_details
-    pub fn set_remove_ipv4_subnet_cidr_details(mut self, value: RemoveIpv4SubnetCidrDetails) -> Self {
+    pub fn set_remove_ipv4_subnet_cidr_details(
+        mut self,
+        value: RemoveIpv4SubnetCidrDetails,
+    ) -> Self {
         self.remove_ipv4_subnet_cidr_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl RemoveIpv4SubnetCidrRequest {
         self
     }
 }
-
-

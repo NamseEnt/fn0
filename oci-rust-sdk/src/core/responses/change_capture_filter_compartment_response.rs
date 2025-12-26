@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ChangeCaptureFilterCompartmentResponse {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the work request. Use [GetWorkRequest](https://docs.oracle.com/iaas/api/#/en/workrequests/latest/WorkRequest/GetWorkRequest) with this ID to track the status of the request.
     pub opc_work_request_id: String,
 }
-
 
 /// Required fields for ChangeCaptureFilterCompartmentResponse
 pub struct ChangeCaptureFilterCompartmentResponseRequired {
@@ -40,7 +39,7 @@ impl ChangeCaptureFilterCompartmentResponse {
             opc_request_id: required.opc_request_id,
 
             opc_work_request_id: required.opc_work_request_id,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl ChangeCaptureFilterCompartmentResponse {
         self
     }
 }
-
-

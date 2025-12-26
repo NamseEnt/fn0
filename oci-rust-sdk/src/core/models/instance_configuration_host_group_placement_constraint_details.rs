@@ -13,7 +13,6 @@ pub struct InstanceConfigurationHostGroupPlacementConstraintDetails {
     pub r#type: String,
 }
 
-
 /// Required fields for InstanceConfigurationHostGroupPlacementConstraintDetails
 pub struct InstanceConfigurationHostGroupPlacementConstraintDetailsRequired {
     /// The OCID of the compute host group. This is only available for dedicated capacity customers.
@@ -29,7 +28,7 @@ impl InstanceConfigurationHostGroupPlacementConstraintDetails {
             compute_host_group_id: required.compute_host_group_id,
 
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set compute_host_group_id
@@ -44,5 +43,3 @@ impl InstanceConfigurationHostGroupPlacementConstraintDetails {
         self
     }
 }
-
-

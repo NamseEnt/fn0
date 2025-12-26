@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct UpdateComputeCapacityTopologyRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for UpdateComputeCapacityTopologyRequest
 pub struct UpdateComputeCapacityTopologyRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute capacity topology.
@@ -39,12 +38,13 @@ impl UpdateComputeCapacityTopologyRequest {
         Self {
             compute_capacity_topology_id: required.compute_capacity_topology_id,
 
-            update_compute_capacity_topology_details: required.update_compute_capacity_topology_details,
+            update_compute_capacity_topology_details: required
+                .update_compute_capacity_topology_details,
 
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compute_capacity_topology_id
@@ -54,7 +54,10 @@ impl UpdateComputeCapacityTopologyRequest {
     }
 
     /// Set update_compute_capacity_topology_details
-    pub fn set_update_compute_capacity_topology_details(mut self, value: UpdateComputeCapacityTopologyDetails) -> Self {
+    pub fn set_update_compute_capacity_topology_details(
+        mut self,
+        value: UpdateComputeCapacityTopologyDetails,
+    ) -> Self {
         self.update_compute_capacity_topology_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl UpdateComputeCapacityTopologyRequest {
         self
     }
 }
-
-

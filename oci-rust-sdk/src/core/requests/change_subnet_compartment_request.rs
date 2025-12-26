@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct ChangeSubnetCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for ChangeSubnetCompartmentRequest
 pub struct ChangeSubnetCompartmentRequestRequired {
@@ -44,7 +43,7 @@ impl ChangeSubnetCompartmentRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set subnet_id
@@ -54,7 +53,10 @@ impl ChangeSubnetCompartmentRequest {
     }
 
     /// Set change_subnet_compartment_details
-    pub fn set_change_subnet_compartment_details(mut self, value: ChangeSubnetCompartmentDetails) -> Self {
+    pub fn set_change_subnet_compartment_details(
+        mut self,
+        value: ChangeSubnetCompartmentDetails,
+    ) -> Self {
         self.change_subnet_compartment_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl ChangeSubnetCompartmentRequest {
         self
     }
 }
-
-

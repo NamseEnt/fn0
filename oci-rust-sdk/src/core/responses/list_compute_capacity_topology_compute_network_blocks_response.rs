@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeCapacityTopologyComputeNetworkBlocksResponse {
     /// The returned model.ComputeNetworkBlockCollection instance.
     pub compute_network_block_collection: ComputeNetworkBlockCollection,
 }
-
 
 /// Required fields for ListComputeCapacityTopologyComputeNetworkBlocksResponse
 pub struct ListComputeCapacityTopologyComputeNetworkBlocksResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeCapacityTopologyComputeNetworkBlocksResponse {
             opc_request_id: required.opc_request_id,
 
             compute_network_block_collection: required.compute_network_block_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -56,10 +55,11 @@ impl ListComputeCapacityTopologyComputeNetworkBlocksResponse {
     }
 
     /// Set compute_network_block_collection
-    pub fn set_compute_network_block_collection(mut self, value: ComputeNetworkBlockCollection) -> Self {
+    pub fn set_compute_network_block_collection(
+        mut self,
+        value: ComputeNetworkBlockCollection,
+    ) -> Self {
         self.compute_network_block_collection = value;
         self
     }
 }
-
-

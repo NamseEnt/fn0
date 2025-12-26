@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct AttachVnicResponse {
     /// The returned model.VnicAttachment instance.
     pub vnic_attachment: VnicAttachment,
 }
-
 
 /// Required fields for AttachVnicResponse
 pub struct AttachVnicResponseRequired {
@@ -40,7 +39,7 @@ impl AttachVnicResponse {
             opc_request_id: required.opc_request_id,
 
             vnic_attachment: required.vnic_attachment,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl AttachVnicResponse {
         self
     }
 }
-
-

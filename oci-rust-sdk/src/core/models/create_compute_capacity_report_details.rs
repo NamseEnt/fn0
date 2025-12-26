@@ -16,7 +16,6 @@ pub struct CreateComputeCapacityReportDetails {
     pub shape_availabilities: Vec<CreateCapacityReportShapeAvailabilityDetails>,
 }
 
-
 /// Required fields for CreateComputeCapacityReportDetails
 pub struct CreateComputeCapacityReportDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) for the compartment. This should always be the root compartment.
@@ -38,7 +37,7 @@ impl CreateComputeCapacityReportDetails {
             availability_domain: required.availability_domain,
 
             shape_availabilities: required.shape_availabilities,
-}
+        }
     }
 
     /// Set compartment_id
@@ -54,10 +53,11 @@ impl CreateComputeCapacityReportDetails {
     }
 
     /// Set shape_availabilities
-    pub fn set_shape_availabilities(mut self, value: Vec<CreateCapacityReportShapeAvailabilityDetails>) -> Self {
+    pub fn set_shape_availabilities(
+        mut self,
+        value: Vec<CreateCapacityReportShapeAvailabilityDetails>,
+    ) -> Self {
         self.shape_availabilities = value;
         self
     }
 }
-
-

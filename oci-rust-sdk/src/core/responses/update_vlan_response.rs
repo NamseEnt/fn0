@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateVlanResponse {
     /// The returned model.Vlan instance.
     pub vlan: Vlan,
 }
-
 
 /// Required fields for UpdateVlanResponse
 pub struct UpdateVlanResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateVlanResponse {
             opc_request_id: required.opc_request_id,
 
             vlan: required.vlan,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateVlanResponse {
         self
     }
 }
-
-

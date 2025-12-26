@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeClustersResponse {
     /// The returned model.ComputeClusterCollection instance.
     pub compute_cluster_collection: ComputeClusterCollection,
 }
-
 
 /// Required fields for ListComputeClustersResponse
 pub struct ListComputeClustersResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeClustersResponse {
             opc_request_id: required.opc_request_id,
 
             compute_cluster_collection: required.compute_cluster_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListComputeClustersResponse {
         self
     }
 }
-
-

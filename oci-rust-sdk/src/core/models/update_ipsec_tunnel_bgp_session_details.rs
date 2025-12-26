@@ -109,4 +109,3 @@ impl Default for UpdateIPSecTunnelBgpSessionDetails {
         Self::new()
     }
 }
-

@@ -45,7 +45,10 @@ impl UpdateVolumeGroupDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -69,13 +72,19 @@ impl UpdateVolumeGroupDetails {
     }
 
     /// Set volume_group_replicas
-    pub fn set_volume_group_replicas(mut self, value: Option<Vec<VolumeGroupReplicaDetails>>) -> Self {
+    pub fn set_volume_group_replicas(
+        mut self,
+        value: Option<Vec<VolumeGroupReplicaDetails>>,
+    ) -> Self {
         self.volume_group_replicas = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -110,4 +119,3 @@ impl Default for UpdateVolumeGroupDetails {
         Self::new()
     }
 }
-

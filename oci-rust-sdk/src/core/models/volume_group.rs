@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -55,7 +55,6 @@ pub struct VolumeGroup {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub volume_group_replicas: Option<Vec<VolumeGroupReplicaInfo>>,
 }
-
 
 /// Required fields for VolumeGroup
 pub struct VolumeGroupRequired {
@@ -115,7 +114,7 @@ impl VolumeGroup {
             is_hydrated: None,
 
             volume_group_replicas: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -131,7 +130,10 @@ impl VolumeGroup {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -173,7 +175,10 @@ impl VolumeGroup {
     }
 
     /// Set source_details
-    pub fn set_source_details(mut self, value: Option<VolumeGroupSourceFromVolumeGroupReplicaDetails>) -> Self {
+    pub fn set_source_details(
+        mut self,
+        value: Option<VolumeGroupSourceFromVolumeGroupReplicaDetails>,
+    ) -> Self {
         self.source_details = value;
         self
     }
@@ -203,7 +208,10 @@ impl VolumeGroup {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -221,7 +229,10 @@ impl VolumeGroup {
     }
 
     /// Set source_details (unwraps Option)
-    pub fn with_source_details(mut self, value: VolumeGroupSourceFromVolumeGroupReplicaDetails) -> Self {
+    pub fn with_source_details(
+        mut self,
+        value: VolumeGroupSourceFromVolumeGroupReplicaDetails,
+    ) -> Self {
         self.source_details = Some(value);
         self
     }
@@ -238,5 +249,3 @@ impl VolumeGroup {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateServiceGatewayResponse {
     /// The returned model.ServiceGateway instance.
     pub service_gateway: ServiceGateway,
 }
-
 
 /// Required fields for UpdateServiceGatewayResponse
 pub struct UpdateServiceGatewayResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateServiceGatewayResponse {
             opc_request_id: required.opc_request_id,
 
             service_gateway: required.service_gateway,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateServiceGatewayResponse {
         self
     }
 }
-
-

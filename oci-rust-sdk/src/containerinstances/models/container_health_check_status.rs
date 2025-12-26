@@ -4,14 +4,13 @@ use serde::{Deserialize, Serialize};
 pub enum ContainerHealthCheckStatus {
     #[serde(rename = "HEALTHY")]
     Healthy,
-    
+
     #[serde(rename = "UNHEALTHY")]
     Unhealthy,
-    
+
     #[serde(rename = "UNKNOWN")]
     Unknown,
-    
-    
+
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

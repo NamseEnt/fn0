@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct ListComputeGpuMemoryClusterInstancesRequest {
     pub limit: Option<i64>,
 }
 
-
 /// Required fields for ListComputeGpuMemoryClusterInstancesRequest
 pub struct ListComputeGpuMemoryClusterInstancesRequestRequired {
     /// The OCID of the compute GPU memory cluster.
@@ -54,7 +53,7 @@ impl ListComputeGpuMemoryClusterInstancesRequest {
             sort_order: None,
 
             limit: None,
-}
+        }
     }
 
     /// Set compute_gpu_memory_cluster_id
@@ -76,13 +75,19 @@ impl ListComputeGpuMemoryClusterInstancesRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeGpuMemoryClusterInstancesRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeGpuMemoryClusterInstancesRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeGpuMemoryClusterInstancesRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeGpuMemoryClusterInstancesRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -106,13 +111,19 @@ impl ListComputeGpuMemoryClusterInstancesRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListComputeGpuMemoryClusterInstancesRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListComputeGpuMemoryClusterInstancesRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeGpuMemoryClusterInstancesRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeGpuMemoryClusterInstancesRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
@@ -123,5 +134,3 @@ impl ListComputeGpuMemoryClusterInstancesRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeIPSecConnectionCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeIPSecConnectionCompartmentRequest
 pub struct ChangeIPSecConnectionCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the IPSec connection.
@@ -39,12 +38,13 @@ impl ChangeIPSecConnectionCompartmentRequest {
         Self {
             ipsc_id: required.ipsc_id,
 
-            change_ipsec_connection_compartment_details: required.change_ipsec_connection_compartment_details,
+            change_ipsec_connection_compartment_details: required
+                .change_ipsec_connection_compartment_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set ipsc_id
@@ -54,7 +54,10 @@ impl ChangeIPSecConnectionCompartmentRequest {
     }
 
     /// Set change_ipsec_connection_compartment_details
-    pub fn set_change_ipsec_connection_compartment_details(mut self, value: ChangeIPSecConnectionCompartmentDetails) -> Self {
+    pub fn set_change_ipsec_connection_compartment_details(
+        mut self,
+        value: ChangeIPSecConnectionCompartmentDetails,
+    ) -> Self {
         self.change_ipsec_connection_compartment_details = value;
         self
     }
@@ -83,5 +86,3 @@ impl ChangeIPSecConnectionCompartmentRequest {
         self
     }
 }
-
-

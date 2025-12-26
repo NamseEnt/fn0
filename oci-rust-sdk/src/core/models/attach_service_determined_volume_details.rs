@@ -10,7 +10,6 @@ pub struct AttachServiceDeterminedVolumeDetails {
     pub r#type: String,
 }
 
-
 /// Required fields for AttachServiceDeterminedVolumeDetails
 pub struct AttachServiceDeterminedVolumeDetailsRequired {
     pub r#type: String,
@@ -21,7 +20,7 @@ impl AttachServiceDeterminedVolumeDetails {
     pub fn new(required: AttachServiceDeterminedVolumeDetailsRequired) -> Self {
         Self {
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set r#type
@@ -30,5 +29,3 @@ impl AttachServiceDeterminedVolumeDetails {
         self
     }
 }
-
-

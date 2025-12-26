@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ModifyIpv4SubnetCidrRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for ModifyIpv4SubnetCidrRequest
 pub struct ModifyIpv4SubnetCidrRequestRequired {
     /// Specify the [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the subnet.
@@ -50,7 +49,7 @@ impl ModifyIpv4SubnetCidrRequest {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set subnet_id
@@ -60,7 +59,10 @@ impl ModifyIpv4SubnetCidrRequest {
     }
 
     /// Set modify_ipv4_subnet_cidr_details
-    pub fn set_modify_ipv4_subnet_cidr_details(mut self, value: ModifyIpv4SubnetCidrDetails) -> Self {
+    pub fn set_modify_ipv4_subnet_cidr_details(
+        mut self,
+        value: ModifyIpv4SubnetCidrDetails,
+    ) -> Self {
         self.modify_ipv4_subnet_cidr_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl ModifyIpv4SubnetCidrRequest {
         self
     }
 }
-
-

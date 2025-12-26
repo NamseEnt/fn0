@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateCaptureFilterRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for CreateCaptureFilterRequest
 pub struct CreateCaptureFilterRequestRequired {
     /// Details for creating a capture filter.
@@ -36,7 +35,7 @@ impl CreateCaptureFilterRequest {
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set create_capture_filter_details
@@ -69,5 +68,3 @@ impl CreateCaptureFilterRequest {
         self
     }
 }
-
-

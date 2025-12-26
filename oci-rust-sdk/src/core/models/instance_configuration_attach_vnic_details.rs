@@ -31,7 +31,10 @@ impl InstanceConfigurationAttachVnicDetails {
     }
 
     /// Set create_vnic_details
-    pub fn set_create_vnic_details(mut self, value: Option<InstanceConfigurationCreateVnicDetails>) -> Self {
+    pub fn set_create_vnic_details(
+        mut self,
+        value: Option<InstanceConfigurationCreateVnicDetails>,
+    ) -> Self {
         self.create_vnic_details = value;
         self
     }
@@ -49,7 +52,10 @@ impl InstanceConfigurationAttachVnicDetails {
     }
 
     /// Set create_vnic_details (unwraps Option)
-    pub fn with_create_vnic_details(mut self, value: InstanceConfigurationCreateVnicDetails) -> Self {
+    pub fn with_create_vnic_details(
+        mut self,
+        value: InstanceConfigurationCreateVnicDetails,
+    ) -> Self {
         self.create_vnic_details = Some(value);
         self
     }
@@ -72,4 +78,3 @@ impl Default for InstanceConfigurationAttachVnicDetails {
         Self::new()
     }
 }
-

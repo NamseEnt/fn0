@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct ListNetworkSecurityGroupSecurityRulesRequest {
     pub sort_order: Option<ListNetworkSecurityGroupSecurityRulesRequestSortOrder>,
 }
 
-
 /// Required fields for ListNetworkSecurityGroupSecurityRulesRequest
 pub struct ListNetworkSecurityGroupSecurityRulesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the network security group.
@@ -54,7 +53,7 @@ impl ListNetworkSecurityGroupSecurityRulesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set network_security_group_id
@@ -64,7 +63,10 @@ impl ListNetworkSecurityGroupSecurityRulesRequest {
     }
 
     /// Set direction
-    pub fn set_direction(mut self, value: Option<ListNetworkSecurityGroupSecurityRulesRequestDirection>) -> Self {
+    pub fn set_direction(
+        mut self,
+        value: Option<ListNetworkSecurityGroupSecurityRulesRequestDirection>,
+    ) -> Self {
         self.direction = value;
         self
     }
@@ -82,19 +84,28 @@ impl ListNetworkSecurityGroupSecurityRulesRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListNetworkSecurityGroupSecurityRulesRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListNetworkSecurityGroupSecurityRulesRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListNetworkSecurityGroupSecurityRulesRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListNetworkSecurityGroupSecurityRulesRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
 
     /// Set direction (unwraps Option)
-    pub fn with_direction(mut self, value: ListNetworkSecurityGroupSecurityRulesRequestDirection) -> Self {
+    pub fn with_direction(
+        mut self,
+        value: ListNetworkSecurityGroupSecurityRulesRequestDirection,
+    ) -> Self {
         self.direction = Some(value);
         self
     }
@@ -112,16 +123,20 @@ impl ListNetworkSecurityGroupSecurityRulesRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListNetworkSecurityGroupSecurityRulesRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListNetworkSecurityGroupSecurityRulesRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListNetworkSecurityGroupSecurityRulesRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListNetworkSecurityGroupSecurityRulesRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

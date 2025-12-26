@@ -37,4 +37,3 @@ impl Default for RemoveDrgRouteRulesDetails {
         Self::new()
     }
 }
-

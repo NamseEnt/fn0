@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct RetrieveLogsRequest {
     pub is_previous: Option<bool>,
 }
 
-
 /// Required fields for RetrieveLogsRequest
 pub struct RetrieveLogsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container.
@@ -36,7 +35,7 @@ impl RetrieveLogsRequest {
             opc_request_id: None,
 
             is_previous: None,
-}
+        }
     }
 
     /// Set container_id
@@ -68,6 +67,8 @@ impl RetrieveLogsRequest {
         self.is_previous = Some(value);
         self
     }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
-
-

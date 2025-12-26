@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct DetachComputeHostGroupHostRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for DetachComputeHostGroupHostRequest
 pub struct DetachComputeHostGroupHostRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute host.
@@ -50,7 +49,7 @@ impl DetachComputeHostGroupHostRequest {
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set compute_host_id
@@ -60,7 +59,10 @@ impl DetachComputeHostGroupHostRequest {
     }
 
     /// Set detach_compute_host_group_host_details
-    pub fn set_detach_compute_host_group_host_details(mut self, value: DetachComputeHostGroupHostDetails) -> Self {
+    pub fn set_detach_compute_host_group_host_details(
+        mut self,
+        value: DetachComputeHostGroupHostDetails,
+    ) -> Self {
         self.detach_compute_host_group_host_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl DetachComputeHostGroupHostRequest {
         self
     }
 }
-
-

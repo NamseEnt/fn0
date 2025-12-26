@@ -56,13 +56,19 @@ impl PhaseTwoConfigDetails {
     }
 
     /// Set authentication_algorithm
-    pub fn set_authentication_algorithm(mut self, value: Option<PhaseTwoConfigDetailsAuthenticationAlgorithm>) -> Self {
+    pub fn set_authentication_algorithm(
+        mut self,
+        value: Option<PhaseTwoConfigDetailsAuthenticationAlgorithm>,
+    ) -> Self {
         self.authentication_algorithm = value;
         self
     }
 
     /// Set encryption_algorithm
-    pub fn set_encryption_algorithm(mut self, value: Option<PhaseTwoConfigDetailsEncryptionAlgorithm>) -> Self {
+    pub fn set_encryption_algorithm(
+        mut self,
+        value: Option<PhaseTwoConfigDetailsEncryptionAlgorithm>,
+    ) -> Self {
         self.encryption_algorithm = value;
         self
     }
@@ -92,13 +98,19 @@ impl PhaseTwoConfigDetails {
     }
 
     /// Set authentication_algorithm (unwraps Option)
-    pub fn with_authentication_algorithm(mut self, value: PhaseTwoConfigDetailsAuthenticationAlgorithm) -> Self {
+    pub fn with_authentication_algorithm(
+        mut self,
+        value: PhaseTwoConfigDetailsAuthenticationAlgorithm,
+    ) -> Self {
         self.authentication_algorithm = Some(value);
         self
     }
 
     /// Set encryption_algorithm (unwraps Option)
-    pub fn with_encryption_algorithm(mut self, value: PhaseTwoConfigDetailsEncryptionAlgorithm) -> Self {
+    pub fn with_encryption_algorithm(
+        mut self,
+        value: PhaseTwoConfigDetailsEncryptionAlgorithm,
+    ) -> Self {
         self.encryption_algorithm = Some(value);
         self
     }
@@ -127,4 +139,3 @@ impl Default for PhaseTwoConfigDetails {
         Self::new()
     }
 }
-

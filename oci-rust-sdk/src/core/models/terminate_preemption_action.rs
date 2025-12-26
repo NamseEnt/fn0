@@ -14,7 +14,6 @@ pub struct TerminatePreemptionAction {
     pub preserve_boot_volume: Option<bool>,
 }
 
-
 /// Required fields for TerminatePreemptionAction
 pub struct TerminatePreemptionActionRequired {
     pub r#type: String,
@@ -27,7 +26,7 @@ impl TerminatePreemptionAction {
             r#type: required.r#type,
 
             preserve_boot_volume: None,
-}
+        }
     }
 
     /// Set preserve_boot_volume
@@ -48,5 +47,3 @@ impl TerminatePreemptionAction {
         self
     }
 }
-
-

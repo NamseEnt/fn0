@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeCapacityTopologyComputeBareMetalHostsResponse {
     /// The returned model.ComputeBareMetalHostCollection instance.
     pub compute_bare_metal_host_collection: ComputeBareMetalHostCollection,
 }
-
 
 /// Required fields for ListComputeCapacityTopologyComputeBareMetalHostsResponse
 pub struct ListComputeCapacityTopologyComputeBareMetalHostsResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeCapacityTopologyComputeBareMetalHostsResponse {
             opc_request_id: required.opc_request_id,
 
             compute_bare_metal_host_collection: required.compute_bare_metal_host_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -56,10 +55,11 @@ impl ListComputeCapacityTopologyComputeBareMetalHostsResponse {
     }
 
     /// Set compute_bare_metal_host_collection
-    pub fn set_compute_bare_metal_host_collection(mut self, value: ComputeBareMetalHostCollection) -> Self {
+    pub fn set_compute_bare_metal_host_collection(
+        mut self,
+        value: ComputeBareMetalHostCollection,
+    ) -> Self {
         self.compute_bare_metal_host_collection = value;
         self
     }
 }
-
-

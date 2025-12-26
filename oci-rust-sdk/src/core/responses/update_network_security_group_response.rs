@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateNetworkSecurityGroupResponse {
     /// The returned model.NetworkSecurityGroup instance.
     pub network_security_group: NetworkSecurityGroup,
 }
-
 
 /// Required fields for UpdateNetworkSecurityGroupResponse
 pub struct UpdateNetworkSecurityGroupResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateNetworkSecurityGroupResponse {
             opc_request_id: required.opc_request_id,
 
             network_security_group: required.network_security_group,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateNetworkSecurityGroupResponse {
         self
     }
 }
-
-

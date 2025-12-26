@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateDedicatedVmHostRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpdateDedicatedVmHostRequest
 pub struct UpdateDedicatedVmHostRequestRequired {
     /// The OCID of the dedicated VM host.
@@ -50,7 +49,7 @@ impl UpdateDedicatedVmHostRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set dedicated_vm_host_id
@@ -60,7 +59,10 @@ impl UpdateDedicatedVmHostRequest {
     }
 
     /// Set update_dedicated_vm_host_details
-    pub fn set_update_dedicated_vm_host_details(mut self, value: UpdateDedicatedVmHostDetails) -> Self {
+    pub fn set_update_dedicated_vm_host_details(
+        mut self,
+        value: UpdateDedicatedVmHostDetails,
+    ) -> Self {
         self.update_dedicated_vm_host_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl UpdateDedicatedVmHostRequest {
         self
     }
 }
-
-

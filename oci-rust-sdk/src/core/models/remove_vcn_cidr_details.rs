@@ -10,7 +10,6 @@ pub struct RemoveVcnCidrDetails {
     pub cidr_block: String,
 }
 
-
 /// Required fields for RemoveVcnCidrDetails
 pub struct RemoveVcnCidrDetailsRequired {
     /// The CIDR block to remove.
@@ -22,7 +21,7 @@ impl RemoveVcnCidrDetails {
     pub fn new(required: RemoveVcnCidrDetailsRequired) -> Self {
         Self {
             cidr_block: required.cidr_block,
-}
+        }
     }
 
     /// Set cidr_block
@@ -31,5 +30,3 @@ impl RemoveVcnCidrDetails {
         self
     }
 }
-
-

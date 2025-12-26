@@ -23,7 +23,6 @@ pub struct InstanceSourceImageFilterDetails {
     pub operating_system_version: Option<String>,
 }
 
-
 /// Required fields for InstanceSourceImageFilterDetails
 pub struct InstanceSourceImageFilterDetailsRequired {
     /// The OCID of the compartment containing images to search
@@ -41,7 +40,7 @@ impl InstanceSourceImageFilterDetails {
             operating_system: None,
 
             operating_system_version: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -51,7 +50,10 @@ impl InstanceSourceImageFilterDetails {
     }
 
     /// Set defined_tags_filter
-    pub fn set_defined_tags_filter(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags_filter(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags_filter = value;
         self
     }
@@ -69,7 +71,10 @@ impl InstanceSourceImageFilterDetails {
     }
 
     /// Set defined_tags_filter (unwraps Option)
-    pub fn with_defined_tags_filter(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags_filter(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags_filter = Some(value);
         self
     }
@@ -86,5 +91,3 @@ impl InstanceSourceImageFilterDetails {
         self
     }
 }
-
-

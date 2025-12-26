@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,7 +39,6 @@ pub struct ListVolumeGroupReplicasRequest {
     pub lifecycle_state: Option<String>,
 }
 
-
 /// Required fields for ListVolumeGroupReplicasRequest
 pub struct ListVolumeGroupReplicasRequestRequired {
     /// The name of the availability domain. <p> Example: {@code Uocm:PHX-AD-1}
@@ -68,7 +67,7 @@ impl ListVolumeGroupReplicasRequest {
             sort_order: None,
 
             lifecycle_state: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -108,7 +107,10 @@ impl ListVolumeGroupReplicasRequest {
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListVolumeGroupReplicasRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListVolumeGroupReplicasRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -155,5 +157,3 @@ impl ListVolumeGroupReplicasRequest {
         self
     }
 }
-
-

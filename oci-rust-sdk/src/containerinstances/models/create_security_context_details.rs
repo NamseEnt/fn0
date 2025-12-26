@@ -9,7 +9,6 @@ pub struct CreateSecurityContextDetails {
     pub security_context_type: String,
 }
 
-
 /// Required fields for CreateSecurityContextDetails
 pub struct CreateSecurityContextDetailsRequired {
     pub security_context_type: String,
@@ -20,7 +19,7 @@ impl CreateSecurityContextDetails {
     pub fn new(required: CreateSecurityContextDetailsRequired) -> Self {
         Self {
             security_context_type: required.security_context_type,
-}
+        }
     }
 
     /// Set security_context_type
@@ -29,5 +28,3 @@ impl CreateSecurityContextDetails {
         self
     }
 }
-
-

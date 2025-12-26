@@ -9,7 +9,6 @@ pub struct InstancePoolLifecycleManagementDetails {
     pub lifecycle_actions: InstancePoolLifecycleActionsDetails,
 }
 
-
 /// Required fields for InstancePoolLifecycleManagementDetails
 pub struct InstancePoolLifecycleManagementDetailsRequired {
     pub lifecycle_actions: InstancePoolLifecycleActionsDetails,
@@ -20,7 +19,7 @@ impl InstancePoolLifecycleManagementDetails {
     pub fn new(required: InstancePoolLifecycleManagementDetailsRequired) -> Self {
         Self {
             lifecycle_actions: required.lifecycle_actions,
-}
+        }
     }
 
     /// Set lifecycle_actions
@@ -29,5 +28,3 @@ impl InstancePoolLifecycleManagementDetails {
         self
     }
 }
-
-

@@ -4,11 +4,10 @@ use serde::{Deserialize, Serialize};
 pub enum IngressSecurityRuleSourceType {
     #[serde(rename = "CIDR_BLOCK")]
     CidrBlock,
-    
+
     #[serde(rename = "SERVICE_CIDR_BLOCK")]
     ServiceCidrBlock,
-    
-    
+
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

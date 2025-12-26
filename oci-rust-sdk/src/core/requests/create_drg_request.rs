@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct CreateDrgRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for CreateDrgRequest
 pub struct CreateDrgRequestRequired {
@@ -30,7 +29,7 @@ impl CreateDrgRequest {
             create_drg_details: required.create_drg_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_drg_details
@@ -51,5 +50,3 @@ impl CreateDrgRequest {
         self
     }
 }
-
-

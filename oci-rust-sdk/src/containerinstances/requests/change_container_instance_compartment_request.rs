@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct ChangeContainerInstanceCompartmentRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for ChangeContainerInstanceCompartmentRequest
 pub struct ChangeContainerInstanceCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the container instance.
@@ -39,12 +38,13 @@ impl ChangeContainerInstanceCompartmentRequest {
         Self {
             container_instance_id: required.container_instance_id,
 
-            change_container_instance_compartment_details: required.change_container_instance_compartment_details,
+            change_container_instance_compartment_details: required
+                .change_container_instance_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set container_instance_id
@@ -54,7 +54,10 @@ impl ChangeContainerInstanceCompartmentRequest {
     }
 
     /// Set change_container_instance_compartment_details
-    pub fn set_change_container_instance_compartment_details(mut self, value: ChangeContainerInstanceCompartmentDetails) -> Self {
+    pub fn set_change_container_instance_compartment_details(
+        mut self,
+        value: ChangeContainerInstanceCompartmentDetails,
+    ) -> Self {
         self.change_container_instance_compartment_details = value;
         self
     }
@@ -82,6 +85,8 @@ impl ChangeContainerInstanceCompartmentRequest {
         self.opc_request_id = Some(value.into());
         self
     }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
-
-

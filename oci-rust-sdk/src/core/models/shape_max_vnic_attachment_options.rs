@@ -73,4 +73,3 @@ impl Default for ShapeMaxVnicAttachmentOptions {
         Self::new()
     }
 }
-

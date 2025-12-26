@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeClusterNetworkCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeClusterNetworkCompartmentRequest
 pub struct ChangeClusterNetworkCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the cluster network.
@@ -43,14 +42,15 @@ impl ChangeClusterNetworkCompartmentRequest {
         Self {
             cluster_network_id: required.cluster_network_id,
 
-            change_cluster_network_compartment_details: required.change_cluster_network_compartment_details,
+            change_cluster_network_compartment_details: required
+                .change_cluster_network_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set cluster_network_id
@@ -60,7 +60,10 @@ impl ChangeClusterNetworkCompartmentRequest {
     }
 
     /// Set change_cluster_network_compartment_details
-    pub fn set_change_cluster_network_compartment_details(mut self, value: ChangeClusterNetworkCompartmentDetails) -> Self {
+    pub fn set_change_cluster_network_compartment_details(
+        mut self,
+        value: ChangeClusterNetworkCompartmentDetails,
+    ) -> Self {
         self.change_cluster_network_compartment_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl ChangeClusterNetworkCompartmentRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +40,6 @@ pub struct ListInstanceDevicesRequest {
     pub sort_order: Option<ListInstanceDevicesRequestSortOrder>,
 }
 
-
 /// Required fields for ListInstanceDevicesRequest
 pub struct ListInstanceDevicesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance.
@@ -66,7 +65,7 @@ impl ListInstanceDevicesRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set instance_id
@@ -159,5 +158,3 @@ impl ListInstanceDevicesRequest {
         self
     }
 }
-
-

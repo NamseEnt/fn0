@@ -19,7 +19,10 @@ impl InstancePoolLifecycleActionsDetails {
     }
 
     /// Set pre_termination
-    pub fn set_pre_termination(mut self, value: Option<InstancePoolPreTerminationActionDetails>) -> Self {
+    pub fn set_pre_termination(
+        mut self,
+        value: Option<InstancePoolPreTerminationActionDetails>,
+    ) -> Self {
         self.pre_termination = value;
         self
     }
@@ -36,4 +39,3 @@ impl Default for InstancePoolLifecycleActionsDetails {
         Self::new()
     }
 }
-

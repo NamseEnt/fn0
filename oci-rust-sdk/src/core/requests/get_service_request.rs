@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetServiceRequest {
     /// The service's [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm).
     pub service_id: String,
 }
-
 
 /// Required fields for GetServiceRequest
 pub struct GetServiceRequestRequired {
@@ -24,7 +23,7 @@ impl GetServiceRequest {
     pub fn new(required: GetServiceRequestRequired) -> Self {
         Self {
             service_id: required.service_id,
-}
+        }
     }
 
     /// Set service_id
@@ -33,5 +32,3 @@ impl GetServiceRequest {
         self
     }
 }
-
-

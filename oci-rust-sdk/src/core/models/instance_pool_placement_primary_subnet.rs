@@ -15,9 +15,9 @@ pub struct InstancePoolPlacementPrimarySubnet {
 
     /// A list of IPv6 prefix ranges from which the VNIC should be assigned an IPv6 address. You can provide only the prefix ranges and OCI will select an available address from the range. You can optionally choose to leave the prefix range empty and instead provide the specific IPv6 address that should be used from within that range.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ipv6_address_ipv6_subnet_cidr_pair_details: Option<Vec<InstancePoolPlacementIpv6AddressIpv6SubnetCidrDetails>>,
+    pub ipv6_address_ipv6_subnet_cidr_pair_details:
+        Option<Vec<InstancePoolPlacementIpv6AddressIpv6SubnetCidrDetails>>,
 }
-
 
 /// Required fields for InstancePoolPlacementPrimarySubnet
 pub struct InstancePoolPlacementPrimarySubnetRequired {
@@ -34,7 +34,7 @@ impl InstancePoolPlacementPrimarySubnet {
             is_assign_ipv6_ip: None,
 
             ipv6_address_ipv6_subnet_cidr_pair_details: None,
-}
+        }
     }
 
     /// Set is_assign_ipv6_ip
@@ -44,7 +44,10 @@ impl InstancePoolPlacementPrimarySubnet {
     }
 
     /// Set ipv6_address_ipv6_subnet_cidr_pair_details
-    pub fn set_ipv6_address_ipv6_subnet_cidr_pair_details(mut self, value: Option<Vec<InstancePoolPlacementIpv6AddressIpv6SubnetCidrDetails>>) -> Self {
+    pub fn set_ipv6_address_ipv6_subnet_cidr_pair_details(
+        mut self,
+        value: Option<Vec<InstancePoolPlacementIpv6AddressIpv6SubnetCidrDetails>>,
+    ) -> Self {
         self.ipv6_address_ipv6_subnet_cidr_pair_details = value;
         self
     }
@@ -62,10 +65,11 @@ impl InstancePoolPlacementPrimarySubnet {
     }
 
     /// Set ipv6_address_ipv6_subnet_cidr_pair_details (unwraps Option)
-    pub fn with_ipv6_address_ipv6_subnet_cidr_pair_details(mut self, value: Vec<InstancePoolPlacementIpv6AddressIpv6SubnetCidrDetails>) -> Self {
+    pub fn with_ipv6_address_ipv6_subnet_cidr_pair_details(
+        mut self,
+        value: Vec<InstancePoolPlacementIpv6AddressIpv6SubnetCidrDetails>,
+    ) -> Self {
         self.ipv6_address_ipv6_subnet_cidr_pair_details = Some(value);
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetVolumeRequest {
     /// The OCID of the volume.
     pub volume_id: String,
 }
-
 
 /// Required fields for GetVolumeRequest
 pub struct GetVolumeRequestRequired {
@@ -24,7 +23,7 @@ impl GetVolumeRequest {
     pub fn new(required: GetVolumeRequestRequired) -> Self {
         Self {
             volume_id: required.volume_id,
-}
+        }
     }
 
     /// Set volume_id
@@ -33,5 +32,3 @@ impl GetVolumeRequest {
         self
     }
 }
-
-

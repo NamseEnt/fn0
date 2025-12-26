@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetCrossConnectRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the cross-connect.
     pub cross_connect_id: String,
 }
-
 
 /// Required fields for GetCrossConnectRequest
 pub struct GetCrossConnectRequestRequired {
@@ -24,7 +23,7 @@ impl GetCrossConnectRequest {
     pub fn new(required: GetCrossConnectRequestRequired) -> Self {
         Self {
             cross_connect_id: required.cross_connect_id,
-}
+        }
     }
 
     /// Set cross_connect_id
@@ -33,5 +32,3 @@ impl GetCrossConnectRequest {
         self
     }
 }
-
-

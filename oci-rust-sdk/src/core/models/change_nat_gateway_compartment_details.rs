@@ -10,7 +10,6 @@ pub struct ChangeNatGatewayCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeNatGatewayCompartmentDetails
 pub struct ChangeNatGatewayCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the NAT gateway to.
@@ -22,7 +21,7 @@ impl ChangeNatGatewayCompartmentDetails {
     pub fn new(required: ChangeNatGatewayCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeNatGatewayCompartmentDetails {
         self
     }
 }
-
-

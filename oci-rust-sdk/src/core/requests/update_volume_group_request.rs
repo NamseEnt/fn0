@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct UpdateVolumeGroupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preserve_volume_replica: Option<bool>,
 }
-
 
 /// Required fields for UpdateVolumeGroupRequest
 pub struct UpdateVolumeGroupRequestRequired {
@@ -44,7 +43,7 @@ impl UpdateVolumeGroupRequest {
             if_match: None,
 
             preserve_volume_replica: None,
-}
+        }
     }
 
     /// Set volume_group_id
@@ -83,5 +82,3 @@ impl UpdateVolumeGroupRequest {
         self
     }
 }
-
-

@@ -33,7 +33,6 @@ pub struct CreateServiceGatewayDetails {
     pub route_table_id: Option<String>,
 }
 
-
 /// Required fields for CreateServiceGatewayDetails
 pub struct CreateServiceGatewayDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the service gateway.
@@ -63,7 +62,7 @@ impl CreateServiceGatewayDetails {
             freeform_tags: None,
 
             route_table_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -73,7 +72,10 @@ impl CreateServiceGatewayDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -109,7 +111,10 @@ impl CreateServiceGatewayDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -132,5 +137,3 @@ impl CreateServiceGatewayDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetBootVolumeReplicaRequest {
     /// The OCID of the boot volume replica.
     pub boot_volume_replica_id: String,
 }
-
 
 /// Required fields for GetBootVolumeReplicaRequest
 pub struct GetBootVolumeReplicaRequestRequired {
@@ -24,7 +23,7 @@ impl GetBootVolumeReplicaRequest {
     pub fn new(required: GetBootVolumeReplicaRequestRequired) -> Self {
         Self {
             boot_volume_replica_id: required.boot_volume_replica_id,
-}
+        }
     }
 
     /// Set boot_volume_replica_id
@@ -33,5 +32,3 @@ impl GetBootVolumeReplicaRequest {
         self
     }
 }
-
-

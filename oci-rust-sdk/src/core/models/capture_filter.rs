@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -46,7 +46,6 @@ pub struct CaptureFilter {
     pub flow_log_capture_filter_rules: Option<Vec<FlowLogCaptureFilterRuleDetails>>,
 }
 
-
 /// Required fields for CaptureFilter
 pub struct CaptureFilterRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing the capture filter.
@@ -82,7 +81,7 @@ impl CaptureFilter {
             vtap_capture_filter_rules: None,
 
             flow_log_capture_filter_rules: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -92,7 +91,10 @@ impl CaptureFilter {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -134,19 +136,28 @@ impl CaptureFilter {
     }
 
     /// Set vtap_capture_filter_rules
-    pub fn set_vtap_capture_filter_rules(mut self, value: Option<Vec<VtapCaptureFilterRuleDetails>>) -> Self {
+    pub fn set_vtap_capture_filter_rules(
+        mut self,
+        value: Option<Vec<VtapCaptureFilterRuleDetails>>,
+    ) -> Self {
         self.vtap_capture_filter_rules = value;
         self
     }
 
     /// Set flow_log_capture_filter_rules
-    pub fn set_flow_log_capture_filter_rules(mut self, value: Option<Vec<FlowLogCaptureFilterRuleDetails>>) -> Self {
+    pub fn set_flow_log_capture_filter_rules(
+        mut self,
+        value: Option<Vec<FlowLogCaptureFilterRuleDetails>>,
+    ) -> Self {
         self.flow_log_capture_filter_rules = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -176,16 +187,20 @@ impl CaptureFilter {
     }
 
     /// Set vtap_capture_filter_rules (unwraps Option)
-    pub fn with_vtap_capture_filter_rules(mut self, value: Vec<VtapCaptureFilterRuleDetails>) -> Self {
+    pub fn with_vtap_capture_filter_rules(
+        mut self,
+        value: Vec<VtapCaptureFilterRuleDetails>,
+    ) -> Self {
         self.vtap_capture_filter_rules = Some(value);
         self
     }
 
     /// Set flow_log_capture_filter_rules (unwraps Option)
-    pub fn with_flow_log_capture_filter_rules(mut self, value: Vec<FlowLogCaptureFilterRuleDetails>) -> Self {
+    pub fn with_flow_log_capture_filter_rules(
+        mut self,
+        value: Vec<FlowLogCaptureFilterRuleDetails>,
+    ) -> Self {
         self.flow_log_capture_filter_rules = Some(value);
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateVlanRequest {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for CreateVlanRequest
 pub struct CreateVlanRequestRequired {
     /// Details for creating a VLAN
@@ -36,7 +35,7 @@ impl CreateVlanRequest {
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set create_vlan_details
@@ -69,5 +68,3 @@ impl CreateVlanRequest {
         self
     }
 }
-
-

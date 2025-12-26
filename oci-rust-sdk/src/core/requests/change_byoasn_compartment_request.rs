@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeByoasnCompartmentRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for ChangeByoasnCompartmentRequest
 pub struct ChangeByoasnCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code Byoasn} resource.
@@ -50,7 +49,7 @@ impl ChangeByoasnCompartmentRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set byoasn_id
@@ -60,7 +59,10 @@ impl ChangeByoasnCompartmentRequest {
     }
 
     /// Set change_byoasn_compartment_details
-    pub fn set_change_byoasn_compartment_details(mut self, value: ChangeByoasnCompartmentDetails) -> Self {
+    pub fn set_change_byoasn_compartment_details(
+        mut self,
+        value: ChangeByoasnCompartmentDetails,
+    ) -> Self {
         self.change_byoasn_compartment_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl ChangeByoasnCompartmentRequest {
         self
     }
 }
-
-

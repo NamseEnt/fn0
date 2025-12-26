@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateVolumeBackupPolicyResponse {
     /// The returned model.VolumeBackupPolicy instance.
     pub volume_backup_policy: VolumeBackupPolicy,
 }
-
 
 /// Required fields for UpdateVolumeBackupPolicyResponse
 pub struct UpdateVolumeBackupPolicyResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateVolumeBackupPolicyResponse {
             opc_request_id: required.opc_request_id,
 
             volume_backup_policy: required.volume_backup_policy,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateVolumeBackupPolicyResponse {
         self
     }
 }
-
-

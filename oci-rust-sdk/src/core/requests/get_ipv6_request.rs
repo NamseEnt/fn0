@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetIpv6Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetIpv6Request
 pub struct GetIpv6RequestRequired {
@@ -30,7 +29,7 @@ impl GetIpv6Request {
             ipv6_id: required.ipv6_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set ipv6_id
@@ -51,5 +50,3 @@ impl GetIpv6Request {
         self
     }
 }
-
-

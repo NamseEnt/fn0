@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,6 @@ pub struct ListDrgRouteRulesRequest {
     pub route_type: Option<ListDrgRouteRulesRequestRouteType>,
 }
 
-
 /// Required fields for ListDrgRouteRulesRequest
 pub struct ListDrgRouteRulesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG route table.
@@ -42,7 +41,7 @@ impl ListDrgRouteRulesRequest {
             page: None,
 
             route_type: None,
-}
+        }
     }
 
     /// Set drg_route_table_id
@@ -87,5 +86,3 @@ impl ListDrgRouteRulesRequest {
         self
     }
 }
-
-

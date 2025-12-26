@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +35,6 @@ pub struct GetVcnTopologyRequest {
     pub cache_control: Option<String>,
 }
 
-
 /// Required fields for GetVcnTopologyRequest
 pub struct GetVcnTopologyRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -62,7 +61,7 @@ impl GetVcnTopologyRequest {
             if_none_match: None,
 
             cache_control: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -137,5 +136,3 @@ impl GetVcnTopologyRequest {
         self
     }
 }
-
-

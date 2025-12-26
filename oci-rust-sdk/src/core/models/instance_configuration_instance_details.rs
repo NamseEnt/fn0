@@ -9,7 +9,6 @@ pub struct InstanceConfigurationInstanceDetails {
     pub instance_type: String,
 }
 
-
 /// Required fields for InstanceConfigurationInstanceDetails
 pub struct InstanceConfigurationInstanceDetailsRequired {
     pub instance_type: String,
@@ -20,7 +19,7 @@ impl InstanceConfigurationInstanceDetails {
     pub fn new(required: InstanceConfigurationInstanceDetailsRequired) -> Self {
         Self {
             instance_type: required.instance_type,
-}
+        }
     }
 
     /// Set instance_type
@@ -29,5 +28,3 @@ impl InstanceConfigurationInstanceDetails {
         self
     }
 }
-
-

@@ -37,7 +37,8 @@ pub struct InstanceConfigurationCreateVnicDetails {
 
     /// A list of IPv6 prefixes from which the VNIC should be assigned an IPv6 address. You can provide only the prefix and OCI selects an available address from the range. You can optionally choose to leave the prefix range empty and instead provide the specific IPv6 address that should be used from within that range.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ipv6_address_ipv6_subnet_cidr_pair_details: Option<Vec<InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>>,
+    pub ipv6_address_ipv6_subnet_cidr_pair_details:
+        Option<Vec<InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>>,
 
     /// The hostname for the VNIC's primary private IP. See the {@code hostnameLabel} attribute of {@link CreateVnicDetails} for more information.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,7 +118,10 @@ impl InstanceConfigurationCreateVnicDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -135,13 +139,19 @@ impl InstanceConfigurationCreateVnicDetails {
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_security_attributes(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.security_attributes = value;
         self
     }
 
     /// Set ipv6_address_ipv6_subnet_cidr_pair_details
-    pub fn set_ipv6_address_ipv6_subnet_cidr_pair_details(mut self, value: Option<Vec<InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>>) -> Self {
+    pub fn set_ipv6_address_ipv6_subnet_cidr_pair_details(
+        mut self,
+        value: Option<Vec<InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>>,
+    ) -> Self {
         self.ipv6_address_ipv6_subnet_cidr_pair_details = value;
         self
     }
@@ -201,7 +211,10 @@ impl InstanceConfigurationCreateVnicDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -219,13 +232,19 @@ impl InstanceConfigurationCreateVnicDetails {
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_security_attributes(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.security_attributes = Some(value);
         self
     }
 
     /// Set ipv6_address_ipv6_subnet_cidr_pair_details (unwraps Option)
-    pub fn with_ipv6_address_ipv6_subnet_cidr_pair_details(mut self, value: Vec<InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>) -> Self {
+    pub fn with_ipv6_address_ipv6_subnet_cidr_pair_details(
+        mut self,
+        value: Vec<InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails>,
+    ) -> Self {
         self.ipv6_address_ipv6_subnet_cidr_pair_details = Some(value);
         self
     }
@@ -272,4 +291,3 @@ impl Default for InstanceConfigurationCreateVnicDetails {
         Self::new()
     }
 }
-

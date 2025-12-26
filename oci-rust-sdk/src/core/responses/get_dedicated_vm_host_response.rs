@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetDedicatedVmHostResponse {
     /// The returned model.DedicatedVmHost instance.
     pub dedicated_vm_host: DedicatedVmHost,
 }
-
 
 /// Required fields for GetDedicatedVmHostResponse
 pub struct GetDedicatedVmHostResponseRequired {
@@ -40,7 +39,7 @@ impl GetDedicatedVmHostResponse {
             opc_request_id: required.opc_request_id,
 
             dedicated_vm_host: required.dedicated_vm_host,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetDedicatedVmHostResponse {
         self
     }
 }
-
-

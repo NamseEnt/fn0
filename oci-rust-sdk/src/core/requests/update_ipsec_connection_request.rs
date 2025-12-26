@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateIPSecConnectionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateIPSecConnectionRequest
 pub struct UpdateIPSecConnectionRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateIPSecConnectionRequest {
             update_ipsec_connection_details: required.update_ipsec_connection_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set ipsc_id
@@ -48,7 +47,10 @@ impl UpdateIPSecConnectionRequest {
     }
 
     /// Set update_ipsec_connection_details
-    pub fn set_update_ipsec_connection_details(mut self, value: UpdateIPSecConnectionDetails) -> Self {
+    pub fn set_update_ipsec_connection_details(
+        mut self,
+        value: UpdateIPSecConnectionDetails,
+    ) -> Self {
         self.update_ipsec_connection_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateIPSecConnectionRequest {
         self
     }
 }
-
-

@@ -4,14 +4,13 @@ use serde::{Deserialize, Serialize};
 pub enum MemoryFabricPreferencesDescriptorFabricRecycleLevel {
     #[serde(rename = "FULL_RECYCLE")]
     FullRecycle,
-    
+
     #[serde(rename = "SKIP_RECYCLE")]
     SkipRecycle,
-    
+
     #[serde(rename = "OPPORTUNISTIC_FULL_RECYCLE")]
     OpportunisticFullRecycle,
-    
-    
+
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

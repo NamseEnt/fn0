@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateVolumeResponse {
     /// The returned model.Volume instance.
     pub volume: Volume,
 }
-
 
 /// Required fields for CreateVolumeResponse
 pub struct CreateVolumeResponseRequired {
@@ -40,7 +39,7 @@ impl CreateVolumeResponse {
             opc_request_id: required.opc_request_id,
 
             volume: required.volume,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateVolumeResponse {
         self
     }
 }
-
-

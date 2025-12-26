@@ -21,7 +21,6 @@ pub struct AttachBootVolumeDetails {
     pub encryption_in_transit_type: Option<EncryptionInTransitType>,
 }
 
-
 /// Required fields for AttachBootVolumeDetails
 pub struct AttachBootVolumeDetailsRequired {
     /// The OCID of the  boot volume.
@@ -42,7 +41,7 @@ impl AttachBootVolumeDetails {
             display_name: None,
 
             encryption_in_transit_type: None,
-}
+        }
     }
 
     /// Set boot_volume_id
@@ -64,7 +63,10 @@ impl AttachBootVolumeDetails {
     }
 
     /// Set encryption_in_transit_type
-    pub fn set_encryption_in_transit_type(mut self, value: Option<EncryptionInTransitType>) -> Self {
+    pub fn set_encryption_in_transit_type(
+        mut self,
+        value: Option<EncryptionInTransitType>,
+    ) -> Self {
         self.encryption_in_transit_type = value;
         self
     }
@@ -81,5 +83,3 @@ impl AttachBootVolumeDetails {
         self
     }
 }
-
-

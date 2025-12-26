@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -38,7 +38,6 @@ pub struct PublicIpPool {
     pub lifecycle_state: Option<PublicIpPoolLifecycleState>,
 }
 
-
 /// Required fields for PublicIpPool
 pub struct PublicIpPoolRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment containing this pool.
@@ -70,7 +69,7 @@ impl PublicIpPool {
             freeform_tags: None,
 
             lifecycle_state: None,
-}
+        }
     }
 
     /// Set cidr_blocks
@@ -86,7 +85,10 @@ impl PublicIpPool {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -128,7 +130,10 @@ impl PublicIpPool {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -151,5 +156,3 @@ impl PublicIpPool {
         self
     }
 }
-
-

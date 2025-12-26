@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateVolumeGroupResponse {
     /// The returned model.VolumeGroup instance.
     pub volume_group: VolumeGroup,
 }
-
 
 /// Required fields for UpdateVolumeGroupResponse
 pub struct UpdateVolumeGroupResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateVolumeGroupResponse {
             opc_request_id: required.opc_request_id,
 
             volume_group: required.volume_group,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateVolumeGroupResponse {
         self
     }
 }
-
-

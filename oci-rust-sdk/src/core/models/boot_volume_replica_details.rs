@@ -18,7 +18,6 @@ pub struct BootVolumeReplicaDetails {
     pub xrr_kms_key_id: Option<String>,
 }
 
-
 /// Required fields for BootVolumeReplicaDetails
 pub struct BootVolumeReplicaDetailsRequired {
     /// The availability domain of the boot volume replica. <p> Example: {@code Uocm:PHX-AD-1}
@@ -34,7 +33,7 @@ impl BootVolumeReplicaDetails {
             display_name: None,
 
             xrr_kms_key_id: None,
-}
+        }
     }
 
     /// Set display_name
@@ -67,5 +66,3 @@ impl BootVolumeReplicaDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,7 +48,6 @@ pub struct ListWorkRequestsRequest {
     pub resource_id: Option<String>,
 }
 
-
 /// Required fields for ListWorkRequestsRequest
 pub struct ListWorkRequestsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources.
@@ -78,7 +77,7 @@ impl ListWorkRequestsRequest {
             sort_order: None,
 
             resource_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -194,6 +193,8 @@ impl ListWorkRequestsRequest {
         self.resource_id = Some(value.into());
         self
     }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
-
-

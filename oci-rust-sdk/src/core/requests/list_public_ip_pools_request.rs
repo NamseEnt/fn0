@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +40,6 @@ pub struct ListPublicIpPoolsRequest {
     pub sort_order: Option<ListPublicIpPoolsRequestSortOrder>,
 }
 
-
 /// Required fields for ListPublicIpPoolsRequest
 pub struct ListPublicIpPoolsRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -66,7 +65,7 @@ impl ListPublicIpPoolsRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -159,5 +158,3 @@ impl ListPublicIpPoolsRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetAllowedIkeIPSecParametersResponse {
     /// The returned model.AllowedIkeIPSecParameters instance.
     pub allowed_ike_ipsec_parameters: AllowedIkeIPSecParameters,
 }
-
 
 /// Required fields for GetAllowedIkeIPSecParametersResponse
 pub struct GetAllowedIkeIPSecParametersResponseRequired {
@@ -32,7 +31,7 @@ impl GetAllowedIkeIPSecParametersResponse {
             opc_request_id: required.opc_request_id,
 
             allowed_ike_ipsec_parameters: required.allowed_ike_ipsec_parameters,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetAllowedIkeIPSecParametersResponse {
         self
     }
 }
-
-

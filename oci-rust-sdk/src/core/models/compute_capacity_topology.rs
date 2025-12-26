@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -40,7 +40,6 @@ pub struct ComputeCapacityTopology {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub freeform_tags: Option<HashMap<String, String>>,
 }
-
 
 /// Required fields for ComputeCapacityTopology
 pub struct ComputeCapacityTopologyRequired {
@@ -88,7 +87,7 @@ impl ComputeCapacityTopology {
             display_name: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -110,7 +109,10 @@ impl ComputeCapacityTopology {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -152,7 +154,10 @@ impl ComputeCapacityTopology {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -169,5 +174,3 @@ impl ComputeCapacityTopology {
         self
     }
 }
-
-

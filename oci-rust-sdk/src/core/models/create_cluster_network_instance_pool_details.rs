@@ -26,7 +26,6 @@ pub struct CreateClusterNetworkInstancePoolDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for CreateClusterNetworkInstancePoolDetails
 pub struct CreateClusterNetworkInstancePoolDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance configuration associated with the instance pool.
@@ -49,11 +48,14 @@ impl CreateClusterNetworkInstancePoolDetails {
             display_name: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -83,7 +85,10 @@ impl CreateClusterNetworkInstancePoolDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -100,5 +105,3 @@ impl CreateClusterNetworkInstancePoolDetails {
         self
     }
 }
-
-

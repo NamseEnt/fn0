@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeHostGroupsResponse {
     /// The returned model.ComputeHostGroupCollection instance.
     pub compute_host_group_collection: ComputeHostGroupCollection,
 }
-
 
 /// Required fields for ListComputeHostGroupsResponse
 pub struct ListComputeHostGroupsResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeHostGroupsResponse {
             opc_request_id: required.opc_request_id,
 
             compute_host_group_collection: required.compute_host_group_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListComputeHostGroupsResponse {
         self
     }
 }
-
-

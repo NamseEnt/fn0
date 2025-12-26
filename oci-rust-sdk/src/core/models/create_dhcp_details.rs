@@ -33,7 +33,6 @@ pub struct CreateDhcpDetails {
     pub domain_name_type: Option<CreateDhcpDetailsDomainNameType>,
 }
 
-
 /// Required fields for CreateDhcpDetails
 pub struct CreateDhcpDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the set of DHCP options.
@@ -63,7 +62,7 @@ impl CreateDhcpDetails {
             freeform_tags: None,
 
             domain_name_type: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -73,7 +72,10 @@ impl CreateDhcpDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -109,7 +111,10 @@ impl CreateDhcpDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -132,5 +137,3 @@ impl CreateDhcpDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DetachVnicRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for DetachVnicRequest
 pub struct DetachVnicRequestRequired {
@@ -30,7 +29,7 @@ impl DetachVnicRequest {
             vnic_attachment_id: required.vnic_attachment_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set vnic_attachment_id
@@ -51,5 +50,3 @@ impl DetachVnicRequest {
         self
     }
 }
-
-

@@ -20,7 +20,6 @@ pub struct TopologyRoutesToRelationshipDetails {
     pub route_type: Option<TopologyRoutesToRelationshipDetailsRouteType>,
 }
 
-
 /// Required fields for TopologyRoutesToRelationshipDetails
 pub struct TopologyRoutesToRelationshipDetailsRequired {
     /// The destinationType can be set to one of two values: <p> Use {@code CIDR_BLOCK} if the rule's {@code destination} is an IP address range in CIDR notation. <p> Use {@code SERVICE_CIDR_BLOCK} if the rule's {@code destination} is the {@code cidrBlock} value for a {@link Service}.
@@ -44,7 +43,7 @@ impl TopologyRoutesToRelationshipDetails {
             route_table_id: required.route_table_id,
 
             route_type: None,
-}
+        }
     }
 
     /// Set destination_type
@@ -66,7 +65,10 @@ impl TopologyRoutesToRelationshipDetails {
     }
 
     /// Set route_type
-    pub fn set_route_type(mut self, value: Option<TopologyRoutesToRelationshipDetailsRouteType>) -> Self {
+    pub fn set_route_type(
+        mut self,
+        value: Option<TopologyRoutesToRelationshipDetailsRouteType>,
+    ) -> Self {
         self.route_type = value;
         self
     }
@@ -77,5 +79,3 @@ impl TopologyRoutesToRelationshipDetails {
         self
     }
 }
-
-

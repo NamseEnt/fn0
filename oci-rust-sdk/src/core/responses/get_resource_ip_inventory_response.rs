@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct GetResourceIpInventoryResponse {
     /// The returned model.IpInventoryCollection instance.
     pub ip_inventory_collection: IpInventoryCollection,
 }
-
 
 /// Required fields for GetResourceIpInventoryResponse
 pub struct GetResourceIpInventoryResponseRequired {
@@ -56,7 +55,7 @@ impl GetResourceIpInventoryResponse {
             opc_total_items: required.opc_total_items,
 
             ip_inventory_collection: required.ip_inventory_collection,
-}
+        }
     }
 
     /// Set etag
@@ -89,5 +88,3 @@ impl GetResourceIpInventoryResponse {
         self
     }
 }
-
-

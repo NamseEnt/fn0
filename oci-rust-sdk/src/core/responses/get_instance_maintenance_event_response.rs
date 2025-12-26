@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetInstanceMaintenanceEventResponse {
     /// The returned model.InstanceMaintenanceEvent instance.
     pub instance_maintenance_event: InstanceMaintenanceEvent,
 }
-
 
 /// Required fields for GetInstanceMaintenanceEventResponse
 pub struct GetInstanceMaintenanceEventResponseRequired {
@@ -40,7 +39,7 @@ impl GetInstanceMaintenanceEventResponse {
             opc_request_id: required.opc_request_id,
 
             instance_maintenance_event: required.instance_maintenance_event,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetInstanceMaintenanceEventResponse {
         self
     }
 }
-
-

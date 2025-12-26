@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetClusterNetworkRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the cluster network.
     pub cluster_network_id: String,
 }
-
 
 /// Required fields for GetClusterNetworkRequest
 pub struct GetClusterNetworkRequestRequired {
@@ -24,7 +23,7 @@ impl GetClusterNetworkRequest {
     pub fn new(required: GetClusterNetworkRequestRequired) -> Self {
         Self {
             cluster_network_id: required.cluster_network_id,
-}
+        }
     }
 
     /// Set cluster_network_id
@@ -33,5 +32,3 @@ impl GetClusterNetworkRequest {
         self
     }
 }
-
-

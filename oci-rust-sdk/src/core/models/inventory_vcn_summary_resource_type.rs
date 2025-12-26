@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum InventoryVcnSummaryResourceType {
     #[serde(rename = "VCN")]
     Vcn,
-    
-    
+
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

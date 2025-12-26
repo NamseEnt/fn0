@@ -4,16 +4,16 @@ use serde::{Deserialize, Serialize};
 pub enum CreateImageDetailsLaunchMode {
     #[serde(rename = "NATIVE")]
     Native,
-    
+
     #[serde(rename = "EMULATED")]
     Emulated,
-    
+
     #[serde(rename = "PARAVIRTUALIZED")]
     Paravirtualized,
-    
+
     #[serde(rename = "CUSTOM")]
     Custom,
-    
+
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,

@@ -15,7 +15,6 @@ pub struct AllowedIkeIPSecParameters {
     pub default_phase_two_parameters: DefaultPhaseTwoParameters,
 }
 
-
 /// Required fields for AllowedIkeIPSecParameters
 pub struct AllowedIkeIPSecParametersRequired {
     pub allowed_phase_one_parameters: AllowedPhaseOneParameters,
@@ -38,7 +37,7 @@ impl AllowedIkeIPSecParameters {
             default_phase_one_parameters: required.default_phase_one_parameters,
 
             default_phase_two_parameters: required.default_phase_two_parameters,
-}
+        }
     }
 
     /// Set allowed_phase_one_parameters
@@ -65,5 +64,3 @@ impl AllowedIkeIPSecParameters {
         self
     }
 }
-
-

@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -56,7 +56,6 @@ pub struct ComputeCapacityReservation {
     pub used_instance_count: Option<i64>,
 }
 
-
 /// Required fields for ComputeCapacityReservation
 pub struct ComputeCapacityReservationRequired {
     /// The availability domain of the compute capacity reservation. <p> Example: {@code Uocm:PHX-AD-1}
@@ -104,7 +103,7 @@ impl ComputeCapacityReservation {
             time_updated: None,
 
             used_instance_count: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -120,7 +119,10 @@ impl ComputeCapacityReservation {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -150,7 +152,10 @@ impl ComputeCapacityReservation {
     }
 
     /// Set instance_reservation_configs
-    pub fn set_instance_reservation_configs(mut self, value: Option<Vec<InstanceReservationConfig>>) -> Self {
+    pub fn set_instance_reservation_configs(
+        mut self,
+        value: Option<Vec<InstanceReservationConfig>>,
+    ) -> Self {
         self.instance_reservation_configs = value;
         self
     }
@@ -186,7 +191,10 @@ impl ComputeCapacityReservation {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -210,7 +218,10 @@ impl ComputeCapacityReservation {
     }
 
     /// Set instance_reservation_configs (unwraps Option)
-    pub fn with_instance_reservation_configs(mut self, value: Vec<InstanceReservationConfig>) -> Self {
+    pub fn with_instance_reservation_configs(
+        mut self,
+        value: Vec<InstanceReservationConfig>,
+    ) -> Self {
         self.instance_reservation_configs = Some(value);
         self
     }
@@ -233,5 +244,3 @@ impl ComputeCapacityReservation {
         self
     }
 }
-
-

@@ -18,7 +18,6 @@ pub struct DetachInstancePoolInstanceDetails {
     pub is_auto_terminate: Option<bool>,
 }
 
-
 /// Required fields for DetachInstancePoolInstanceDetails
 pub struct DetachInstancePoolInstanceDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance.
@@ -34,7 +33,7 @@ impl DetachInstancePoolInstanceDetails {
             is_decrement_size: None,
 
             is_auto_terminate: None,
-}
+        }
     }
 
     /// Set instance_id
@@ -67,5 +66,3 @@ impl DetachInstancePoolInstanceDetails {
         self
     }
 }
-
-

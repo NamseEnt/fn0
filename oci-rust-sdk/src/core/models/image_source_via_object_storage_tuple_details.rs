@@ -18,7 +18,6 @@ pub struct ImageSourceViaObjectStorageTupleDetails {
     pub source_type: String,
 }
 
-
 /// Required fields for ImageSourceViaObjectStorageTupleDetails
 pub struct ImageSourceViaObjectStorageTupleDetailsRequired {
     /// The Object Storage bucket for the image.
@@ -44,7 +43,7 @@ impl ImageSourceViaObjectStorageTupleDetails {
             object_name: required.object_name,
 
             source_type: required.source_type,
-}
+        }
     }
 
     /// Set bucket_name
@@ -71,5 +70,3 @@ impl ImageSourceViaObjectStorageTupleDetails {
         self
     }
 }
-
-

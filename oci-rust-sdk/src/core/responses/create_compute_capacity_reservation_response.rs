@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct CreateComputeCapacityReservationResponse {
     /// The returned model.ComputeCapacityReservation instance.
     pub compute_capacity_reservation: ComputeCapacityReservation,
 }
-
 
 /// Required fields for CreateComputeCapacityReservationResponse
 pub struct CreateComputeCapacityReservationResponseRequired {
@@ -56,7 +55,7 @@ impl CreateComputeCapacityReservationResponse {
             location: required.location,
 
             compute_capacity_reservation: required.compute_capacity_reservation,
-}
+        }
     }
 
     /// Set etag
@@ -89,5 +88,3 @@ impl CreateComputeCapacityReservationResponse {
         self
     }
 }
-
-

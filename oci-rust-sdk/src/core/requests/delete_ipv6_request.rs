@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteIpv6Request {
     pub opc_request_id: Option<String>,
 }
 
-
 /// Required fields for DeleteIpv6Request
 pub struct DeleteIpv6RequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the IPv6.
@@ -36,7 +35,7 @@ impl DeleteIpv6Request {
             if_match: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set ipv6_id
@@ -69,5 +68,3 @@ impl DeleteIpv6Request {
         self
     }
 }
-
-

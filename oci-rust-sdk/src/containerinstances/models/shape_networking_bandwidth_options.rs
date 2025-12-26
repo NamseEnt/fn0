@@ -16,7 +16,6 @@ pub struct ShapeNetworkingBandwidthOptions {
     pub default_per_ocpu_in_gbps: i64,
 }
 
-
 /// Required fields for ShapeNetworkingBandwidthOptions
 pub struct ShapeNetworkingBandwidthOptionsRequired {
     /// The minimum amount of networking bandwidth, in gigabits per second. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -38,7 +37,7 @@ impl ShapeNetworkingBandwidthOptions {
             max_in_gbps: required.max_in_gbps,
 
             default_per_ocpu_in_gbps: required.default_per_ocpu_in_gbps,
-}
+        }
     }
 
     /// Set min_in_gbps
@@ -59,5 +58,3 @@ impl ShapeNetworkingBandwidthOptions {
         self
     }
 }
-
-

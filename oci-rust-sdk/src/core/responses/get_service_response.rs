@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetServiceResponse {
     /// The returned model.Service instance.
     pub service: Service,
 }
-
 
 /// Required fields for GetServiceResponse
 pub struct GetServiceResponseRequired {
@@ -40,7 +39,7 @@ impl GetServiceResponse {
             opc_request_id: required.opc_request_id,
 
             service: required.service,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetServiceResponse {
         self
     }
 }
-
-

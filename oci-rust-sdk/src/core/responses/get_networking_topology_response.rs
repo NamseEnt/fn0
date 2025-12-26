@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetNetworkingTopologyResponse {
     /// The returned model.NetworkingTopology instance.
     pub networking_topology: NetworkingTopology,
 }
-
 
 /// Required fields for GetNetworkingTopologyResponse
 pub struct GetNetworkingTopologyResponseRequired {
@@ -40,7 +39,7 @@ impl GetNetworkingTopologyResponse {
             opc_request_id: required.opc_request_id,
 
             networking_topology: required.networking_topology,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetNetworkingTopologyResponse {
         self
     }
 }
-
-

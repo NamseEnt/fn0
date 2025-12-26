@@ -10,7 +10,6 @@ pub struct TopologyContainsEntityRelationship {
     pub r#type: String,
 }
 
-
 /// Required fields for TopologyContainsEntityRelationship
 pub struct TopologyContainsEntityRelationshipRequired {
     pub r#type: String,
@@ -21,7 +20,7 @@ impl TopologyContainsEntityRelationship {
     pub fn new(required: TopologyContainsEntityRelationshipRequired) -> Self {
         Self {
             r#type: required.r#type,
-}
+        }
     }
 
     /// Set r#type
@@ -30,5 +29,3 @@ impl TopologyContainsEntityRelationship {
         self
     }
 }
-
-

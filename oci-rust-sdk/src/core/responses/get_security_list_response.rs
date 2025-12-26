@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetSecurityListResponse {
     /// The returned model.SecurityList instance.
     pub security_list: SecurityList,
 }
-
 
 /// Required fields for GetSecurityListResponse
 pub struct GetSecurityListResponseRequired {
@@ -40,7 +39,7 @@ impl GetSecurityListResponse {
             opc_request_id: required.opc_request_id,
 
             security_list: required.security_list,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetSecurityListResponse {
         self
     }
 }
-
-

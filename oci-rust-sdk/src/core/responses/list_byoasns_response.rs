@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListByoasnsResponse {
     /// The returned model.ByoasnCollection instance.
     pub byoasn_collection: ByoasnCollection,
 }
-
 
 /// Required fields for ListByoasnsResponse
 pub struct ListByoasnsResponseRequired {
@@ -40,7 +39,7 @@ impl ListByoasnsResponse {
             opc_request_id: required.opc_request_id,
 
             byoasn_collection: required.byoasn_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -61,5 +60,3 @@ impl ListByoasnsResponse {
         self
     }
 }
-
-

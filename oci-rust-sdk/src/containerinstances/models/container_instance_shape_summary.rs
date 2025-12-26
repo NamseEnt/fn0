@@ -22,7 +22,6 @@ pub struct ContainerInstanceShapeSummary {
     pub networking_bandwidth_options: Option<ShapeNetworkingBandwidthOptions>,
 }
 
-
 /// Required fields for ContainerInstanceShapeSummary
 pub struct ContainerInstanceShapeSummaryRequired {
     /// The name identifying the shape.
@@ -45,7 +44,7 @@ impl ContainerInstanceShapeSummary {
             memory_options: None,
 
             networking_bandwidth_options: None,
-}
+        }
     }
 
     /// Set name
@@ -73,7 +72,10 @@ impl ContainerInstanceShapeSummary {
     }
 
     /// Set networking_bandwidth_options
-    pub fn set_networking_bandwidth_options(mut self, value: Option<ShapeNetworkingBandwidthOptions>) -> Self {
+    pub fn set_networking_bandwidth_options(
+        mut self,
+        value: Option<ShapeNetworkingBandwidthOptions>,
+    ) -> Self {
         self.networking_bandwidth_options = value;
         self
     }
@@ -91,10 +93,11 @@ impl ContainerInstanceShapeSummary {
     }
 
     /// Set networking_bandwidth_options (unwraps Option)
-    pub fn with_networking_bandwidth_options(mut self, value: ShapeNetworkingBandwidthOptions) -> Self {
+    pub fn with_networking_bandwidth_options(
+        mut self,
+        value: ShapeNetworkingBandwidthOptions,
+    ) -> Self {
         self.networking_bandwidth_options = Some(value);
         self
     }
 }
-
-

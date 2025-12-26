@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,7 +44,6 @@ pub struct ListComputeCapacityTopologyComputeNetworkBlocksRequest {
     pub sort_order: Option<ListComputeCapacityTopologyComputeNetworkBlocksRequestSortOrder>,
 }
 
-
 /// Required fields for ListComputeCapacityTopologyComputeNetworkBlocksRequest
 pub struct ListComputeCapacityTopologyComputeNetworkBlocksRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute capacity topology.
@@ -72,7 +71,7 @@ impl ListComputeCapacityTopologyComputeNetworkBlocksRequest {
             sort_by: None,
 
             sort_order: None,
-}
+        }
     }
 
     /// Set compute_capacity_topology_id
@@ -118,13 +117,19 @@ impl ListComputeCapacityTopologyComputeNetworkBlocksRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeCapacityTopologyComputeNetworkBlocksRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeCapacityTopologyComputeNetworkBlocksRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeCapacityTopologyComputeNetworkBlocksRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeCapacityTopologyComputeNetworkBlocksRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -166,16 +171,20 @@ impl ListComputeCapacityTopologyComputeNetworkBlocksRequest {
     }
 
     /// Set sort_by (unwraps Option)
-    pub fn with_sort_by(mut self, value: ListComputeCapacityTopologyComputeNetworkBlocksRequestSortBy) -> Self {
+    pub fn with_sort_by(
+        mut self,
+        value: ListComputeCapacityTopologyComputeNetworkBlocksRequestSortBy,
+    ) -> Self {
         self.sort_by = Some(value);
         self
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeCapacityTopologyComputeNetworkBlocksRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeCapacityTopologyComputeNetworkBlocksRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
 }
-
-

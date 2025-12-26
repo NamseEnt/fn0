@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -44,7 +44,6 @@ pub struct InstanceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub load_balancer_backends: Option<Vec<InstancePoolInstanceLoadBalancerBackend>>,
 }
-
 
 /// Required fields for InstanceSummary
 pub struct InstanceSummaryRequired {
@@ -95,7 +94,7 @@ impl InstanceSummary {
             shape: None,
 
             load_balancer_backends: None,
-}
+        }
     }
 
     /// Set id
@@ -159,7 +158,10 @@ impl InstanceSummary {
     }
 
     /// Set load_balancer_backends
-    pub fn set_load_balancer_backends(mut self, value: Option<Vec<InstancePoolInstanceLoadBalancerBackend>>) -> Self {
+    pub fn set_load_balancer_backends(
+        mut self,
+        value: Option<Vec<InstancePoolInstanceLoadBalancerBackend>>,
+    ) -> Self {
         self.load_balancer_backends = value;
         self
     }
@@ -183,10 +185,11 @@ impl InstanceSummary {
     }
 
     /// Set load_balancer_backends (unwraps Option)
-    pub fn with_load_balancer_backends(mut self, value: Vec<InstancePoolInstanceLoadBalancerBackend>) -> Self {
+    pub fn with_load_balancer_backends(
+        mut self,
+        value: Vec<InstancePoolInstanceLoadBalancerBackend>,
+    ) -> Self {
         self.load_balancer_backends = Some(value);
         self
     }
 }
-
-

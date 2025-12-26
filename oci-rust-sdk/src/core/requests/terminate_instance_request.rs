@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,6 @@ pub struct TerminateInstanceRequest {
     pub recycle_level: Option<TerminateInstanceRequestRecycleLevel>,
 }
 
-
 /// Required fields for TerminateInstanceRequest
 pub struct TerminateInstanceRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance.
@@ -48,7 +47,7 @@ impl TerminateInstanceRequest {
             preserve_data_volumes_created_at_launch: None,
 
             recycle_level: None,
-}
+        }
     }
 
     /// Set instance_id
@@ -76,7 +75,10 @@ impl TerminateInstanceRequest {
     }
 
     /// Set recycle_level
-    pub fn set_recycle_level(mut self, value: Option<TerminateInstanceRequestRecycleLevel>) -> Self {
+    pub fn set_recycle_level(
+        mut self,
+        value: Option<TerminateInstanceRequestRecycleLevel>,
+    ) -> Self {
         self.recycle_level = value;
         self
     }
@@ -105,5 +107,3 @@ impl TerminateInstanceRequest {
         self
     }
 }
-
-

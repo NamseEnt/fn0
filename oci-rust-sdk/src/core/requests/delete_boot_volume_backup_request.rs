@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DeleteBootVolumeBackupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for DeleteBootVolumeBackupRequest
 pub struct DeleteBootVolumeBackupRequestRequired {
@@ -30,7 +29,7 @@ impl DeleteBootVolumeBackupRequest {
             boot_volume_backup_id: required.boot_volume_backup_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set boot_volume_backup_id
@@ -51,5 +50,3 @@ impl DeleteBootVolumeBackupRequest {
         self
     }
 }
-
-

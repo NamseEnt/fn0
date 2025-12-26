@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateBootVolumeRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateBootVolumeRequest
 pub struct UpdateBootVolumeRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateBootVolumeRequest {
             update_boot_volume_details: required.update_boot_volume_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set boot_volume_id
@@ -65,5 +64,3 @@ impl UpdateBootVolumeRequest {
         self
     }
 }
-
-

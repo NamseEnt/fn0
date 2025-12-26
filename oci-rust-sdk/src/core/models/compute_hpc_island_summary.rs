@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -25,7 +25,6 @@ pub struct ComputeHpcIslandSummary {
     /// The total number of compute bare metal hosts located in this compute HPC island. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     pub total_compute_bare_metal_host_count: i64,
 }
-
 
 /// Required fields for ComputeHpcIslandSummary
 pub struct ComputeHpcIslandSummaryRequired {
@@ -63,7 +62,7 @@ impl ComputeHpcIslandSummary {
             time_updated: required.time_updated,
 
             total_compute_bare_metal_host_count: required.total_compute_bare_metal_host_count,
-}
+        }
     }
 
     /// Set compute_capacity_topology_id
@@ -102,5 +101,3 @@ impl ComputeHpcIslandSummary {
         self
     }
 }
-
-

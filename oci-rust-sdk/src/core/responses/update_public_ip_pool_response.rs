@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdatePublicIpPoolResponse {
     /// The returned model.PublicIpPool instance.
     pub public_ip_pool: PublicIpPool,
 }
-
 
 /// Required fields for UpdatePublicIpPoolResponse
 pub struct UpdatePublicIpPoolResponseRequired {
@@ -40,7 +39,7 @@ impl UpdatePublicIpPoolResponse {
             opc_request_id: required.opc_request_id,
 
             public_ip_pool: required.public_ip_pool,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdatePublicIpPoolResponse {
         self
     }
 }
-
-

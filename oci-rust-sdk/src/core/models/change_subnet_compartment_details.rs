@@ -10,7 +10,6 @@ pub struct ChangeSubnetCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeSubnetCompartmentDetails
 pub struct ChangeSubnetCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the subnet to.
@@ -22,7 +21,7 @@ impl ChangeSubnetCompartmentDetails {
     pub fn new(required: ChangeSubnetCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeSubnetCompartmentDetails {
         self
     }
 }
-
-

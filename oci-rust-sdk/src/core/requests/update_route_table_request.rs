@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateRouteTableRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateRouteTableRequest
 pub struct UpdateRouteTableRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateRouteTableRequest {
             update_route_table_details: required.update_route_table_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set rt_id
@@ -65,5 +64,3 @@ impl UpdateRouteTableRequest {
         self
     }
 }
-
-

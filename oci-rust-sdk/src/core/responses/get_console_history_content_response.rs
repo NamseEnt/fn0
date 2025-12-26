@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetConsoleHistoryContentResponse {
     /// The returned string instance.
     pub value: String,
 }
-
 
 /// Required fields for GetConsoleHistoryContentResponse
 pub struct GetConsoleHistoryContentResponseRequired {
@@ -40,7 +39,7 @@ impl GetConsoleHistoryContentResponse {
             opc_request_id: required.opc_request_id,
 
             value: required.value,
-}
+        }
     }
 
     /// Set opc_bytes_remaining
@@ -61,5 +60,3 @@ impl GetConsoleHistoryContentResponse {
         self
     }
 }
-
-

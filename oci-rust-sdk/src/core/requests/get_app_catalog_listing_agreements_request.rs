@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetAppCatalogListingAgreementsRequest {
     /// Listing Resource Version.
     pub resource_version: String,
 }
-
 
 /// Required fields for GetAppCatalogListingAgreementsRequest
 pub struct GetAppCatalogListingAgreementsRequestRequired {
@@ -32,7 +31,7 @@ impl GetAppCatalogListingAgreementsRequest {
             listing_id: required.listing_id,
 
             resource_version: required.resource_version,
-}
+        }
     }
 
     /// Set listing_id
@@ -47,5 +46,3 @@ impl GetAppCatalogListingAgreementsRequest {
         self
     }
 }
-
-

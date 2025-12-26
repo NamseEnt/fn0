@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,6 @@ pub struct ListByoipAllocatedRangesRequest {
     pub page: Option<String>,
 }
 
-
 /// Required fields for ListByoipAllocatedRangesRequest
 pub struct ListByoipAllocatedRangesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code ByoipRange} resource containing the BYOIP CIDR block.
@@ -42,7 +41,7 @@ impl ListByoipAllocatedRangesRequest {
             limit: None,
 
             page: None,
-}
+        }
     }
 
     /// Set byoip_range_id
@@ -87,5 +86,3 @@ impl ListByoipAllocatedRangesRequest {
         self
     }
 }
-
-

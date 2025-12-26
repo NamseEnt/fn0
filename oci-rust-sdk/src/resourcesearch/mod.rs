@@ -9,7 +9,7 @@ pub use requests::*;
 pub use responses::*;
 
 use crate::auth::provider::AuthProvider;
-use crate::core::{client::http_client::OciClient, region::Region, retry::Retrier, Result};
+use crate::core::{Result, client::http_client::OciClient, region::Region, retry::Retrier};
 use std::sync::Arc;
 
 /// Client configuration for resource search service
@@ -23,8 +23,7 @@ pub struct ClientConfig {
 /// Create a new resource search client
 pub fn client(config: ClientConfig) -> Result<ResourceSearchClient> {
     let endpoint = format!("https://query.{}.oci.oraclecloud.com", config.region.id());
-    let client = OciClient::new(config.auth_provider, endpoint)?
-        .with_retrier(config.retry);
+    let client = OciClient::new(config.auth_provider, endpoint)?.with_retrier(config.retry);
 
     Ok(ResourceSearchClient { client })
 }

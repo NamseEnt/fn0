@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -52,7 +52,6 @@ pub struct ComputeGpuMemoryCluster {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
 }
-
 
 /// Required fields for ComputeGpuMemoryCluster
 pub struct ComputeGpuMemoryClusterRequired {
@@ -110,7 +109,7 @@ impl ComputeGpuMemoryCluster {
             system_tags: None,
 
             display_name: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -162,7 +161,10 @@ impl ComputeGpuMemoryCluster {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -174,7 +176,10 @@ impl ComputeGpuMemoryCluster {
     }
 
     /// Set system_tags
-    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_system_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.system_tags = value;
         self
     }
@@ -198,7 +203,10 @@ impl ComputeGpuMemoryCluster {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -210,7 +218,10 @@ impl ComputeGpuMemoryCluster {
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_system_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -221,5 +232,3 @@ impl ComputeGpuMemoryCluster {
         self
     }
 }
-
-

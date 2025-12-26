@@ -18,7 +18,6 @@ pub struct UpdateDrgRouteDistributionStatementDetails {
     pub priority: Option<i64>,
 }
 
-
 /// Required fields for UpdateDrgRouteDistributionStatementDetails
 pub struct UpdateDrgRouteDistributionStatementDetailsRequired {
     /// The Oracle-assigned ID of each route distribution statement to be updated.
@@ -34,7 +33,7 @@ impl UpdateDrgRouteDistributionStatementDetails {
             match_criteria: None,
 
             priority: None,
-}
+        }
     }
 
     /// Set id
@@ -44,7 +43,10 @@ impl UpdateDrgRouteDistributionStatementDetails {
     }
 
     /// Set match_criteria
-    pub fn set_match_criteria(mut self, value: Option<Vec<DrgRouteDistributionMatchCriteria>>) -> Self {
+    pub fn set_match_criteria(
+        mut self,
+        value: Option<Vec<DrgRouteDistributionMatchCriteria>>,
+    ) -> Self {
         self.match_criteria = value;
         self
     }
@@ -67,5 +69,3 @@ impl UpdateDrgRouteDistributionStatementDetails {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct ChangeByoipRangeCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for ChangeByoipRangeCompartmentRequest
 pub struct ChangeByoipRangeCompartmentRequestRequired {
@@ -44,7 +43,7 @@ impl ChangeByoipRangeCompartmentRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set byoip_range_id
@@ -54,7 +53,10 @@ impl ChangeByoipRangeCompartmentRequest {
     }
 
     /// Set change_byoip_range_compartment_details
-    pub fn set_change_byoip_range_compartment_details(mut self, value: ChangeByoipRangeCompartmentDetails) -> Self {
+    pub fn set_change_byoip_range_compartment_details(
+        mut self,
+        value: ChangeByoipRangeCompartmentDetails,
+    ) -> Self {
         self.change_byoip_range_compartment_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl ChangeByoipRangeCompartmentRequest {
         self
     }
 }
-
-

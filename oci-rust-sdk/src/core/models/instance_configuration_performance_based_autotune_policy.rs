@@ -12,7 +12,6 @@ pub struct InstanceConfigurationPerformanceBasedAutotunePolicy {
     pub autotune_type: String,
 }
 
-
 /// Required fields for InstanceConfigurationPerformanceBasedAutotunePolicy
 pub struct InstanceConfigurationPerformanceBasedAutotunePolicyRequired {
     /// This will be the maximum VPUs/GB performance level that the volume will be auto-tuned temporarily based on performance monitoring. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -28,7 +27,7 @@ impl InstanceConfigurationPerformanceBasedAutotunePolicy {
             max_vpus_per_gb: required.max_vpus_per_gb,
 
             autotune_type: required.autotune_type,
-}
+        }
     }
 
     /// Set max_vpus_per_gb
@@ -43,5 +42,3 @@ impl InstanceConfigurationPerformanceBasedAutotunePolicy {
         self
     }
 }
-
-

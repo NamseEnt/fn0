@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +32,6 @@ pub struct GetNetworkingTopologyRequest {
     pub cache_control: Option<String>,
 }
 
-
 /// Required fields for GetNetworkingTopologyRequest
 pub struct GetNetworkingTopologyRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment.
@@ -54,7 +53,7 @@ impl GetNetworkingTopologyRequest {
             if_none_match: None,
 
             cache_control: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -64,7 +63,10 @@ impl GetNetworkingTopologyRequest {
     }
 
     /// Set access_level
-    pub fn set_access_level(mut self, value: Option<GetNetworkingTopologyRequestAccessLevel>) -> Self {
+    pub fn set_access_level(
+        mut self,
+        value: Option<GetNetworkingTopologyRequestAccessLevel>,
+    ) -> Self {
         self.access_level = value;
         self
     }
@@ -123,5 +125,3 @@ impl GetNetworkingTopologyRequest {
         self
     }
 }
-
-

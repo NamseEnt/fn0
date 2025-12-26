@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,6 @@ pub struct AddIpv6VcnCidrRequest {
     pub add_vcn_ipv6_cidr_details: Option<AddVcnIpv6CidrDetails>,
 }
 
-
 /// Required fields for AddIpv6VcnCidrRequest
 pub struct AddIpv6VcnCidrRequestRequired {
     /// Specify the [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VCN.
@@ -48,7 +47,7 @@ impl AddIpv6VcnCidrRequest {
             if_match: None,
 
             add_vcn_ipv6_cidr_details: None,
-}
+        }
     }
 
     /// Set vcn_id
@@ -105,5 +104,3 @@ impl AddIpv6VcnCidrRequest {
         self
     }
 }
-
-

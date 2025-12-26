@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct ListIPSecConnectionTunnelRoutesResponse {
     /// A list of TunnelRouteSummary instances.
     pub items: Vec<TunnelRouteSummary>,
 }
-
 
 /// Required fields for ListIPSecConnectionTunnelRoutesResponse
 pub struct ListIPSecConnectionTunnelRoutesResponseRequired {
@@ -48,7 +47,7 @@ impl ListIPSecConnectionTunnelRoutesResponse {
             opc_total_items: required.opc_total_items,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -75,5 +74,3 @@ impl ListIPSecConnectionTunnelRoutesResponse {
         self
     }
 }
-
-

@@ -25,9 +25,9 @@ pub struct InstanceConfigurationInstanceSourceViaImageDetails {
     pub boot_volume_vpus_per_gb: Option<i64>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instance_source_image_filter_details: Option<InstanceConfigurationInstanceSourceImageFilterDetails>,
+    pub instance_source_image_filter_details:
+        Option<InstanceConfigurationInstanceSourceImageFilterDetails>,
 }
-
 
 /// Required fields for InstanceConfigurationInstanceSourceViaImageDetails
 pub struct InstanceConfigurationInstanceSourceViaImageDetailsRequired {
@@ -49,7 +49,7 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
             boot_volume_vpus_per_gb: None,
 
             instance_source_image_filter_details: None,
-}
+        }
     }
 
     /// Set boot_volume_size_in_gbs
@@ -77,7 +77,10 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
     }
 
     /// Set instance_source_image_filter_details
-    pub fn set_instance_source_image_filter_details(mut self, value: Option<InstanceConfigurationInstanceSourceImageFilterDetails>) -> Self {
+    pub fn set_instance_source_image_filter_details(
+        mut self,
+        value: Option<InstanceConfigurationInstanceSourceImageFilterDetails>,
+    ) -> Self {
         self.instance_source_image_filter_details = value;
         self
     }
@@ -113,10 +116,11 @@ impl InstanceConfigurationInstanceSourceViaImageDetails {
     }
 
     /// Set instance_source_image_filter_details (unwraps Option)
-    pub fn with_instance_source_image_filter_details(mut self, value: InstanceConfigurationInstanceSourceImageFilterDetails) -> Self {
+    pub fn with_instance_source_image_filter_details(
+        mut self,
+        value: InstanceConfigurationInstanceSourceImageFilterDetails,
+    ) -> Self {
         self.instance_source_image_filter_details = Some(value);
         self
     }
 }
-
-

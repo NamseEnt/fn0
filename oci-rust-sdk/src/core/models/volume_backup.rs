@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -80,7 +80,6 @@ pub struct VolumeBackup {
     pub volume_id: Option<String>,
 }
 
-
 /// Required fields for VolumeBackup
 pub struct VolumeBackupRequired {
     /// The OCID of the compartment that contains the volume backup.
@@ -143,7 +142,7 @@ impl VolumeBackup {
             unique_size_in_mbs: None,
 
             volume_id: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -153,13 +152,19 @@ impl VolumeBackup {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
 
     /// Set system_tags
-    pub fn set_system_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_system_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.system_tags = value;
         self
     }
@@ -261,13 +266,19 @@ impl VolumeBackup {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
 
     /// Set system_tags (unwraps Option)
-    pub fn with_system_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_system_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.system_tags = Some(value);
         self
     }
@@ -338,5 +349,3 @@ impl VolumeBackup {
         self
     }
 }
-
-

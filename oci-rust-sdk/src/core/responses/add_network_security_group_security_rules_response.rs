@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct AddNetworkSecurityGroupSecurityRulesResponse {
     /// The returned model.AddedNetworkSecurityGroupSecurityRules instance.
     pub added_network_security_group_security_rules: AddedNetworkSecurityGroupSecurityRules,
 }
-
 
 /// Required fields for AddNetworkSecurityGroupSecurityRulesResponse
 pub struct AddNetworkSecurityGroupSecurityRulesResponseRequired {
@@ -31,8 +30,9 @@ impl AddNetworkSecurityGroupSecurityRulesResponse {
         Self {
             opc_request_id: required.opc_request_id,
 
-            added_network_security_group_security_rules: required.added_network_security_group_security_rules,
-}
+            added_network_security_group_security_rules: required
+                .added_network_security_group_security_rules,
+        }
     }
 
     /// Set opc_request_id
@@ -42,10 +42,11 @@ impl AddNetworkSecurityGroupSecurityRulesResponse {
     }
 
     /// Set added_network_security_group_security_rules
-    pub fn set_added_network_security_group_security_rules(mut self, value: AddedNetworkSecurityGroupSecurityRules) -> Self {
+    pub fn set_added_network_security_group_security_rules(
+        mut self,
+        value: AddedNetworkSecurityGroupSecurityRules,
+    ) -> Self {
         self.added_network_security_group_security_rules = value;
         self
     }
 }
-
-

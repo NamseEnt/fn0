@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateIPSecConnectionResponse {
     /// The returned model.IPSecConnection instance.
     pub i_psec_connection: IPSecConnection,
 }
-
 
 /// Required fields for UpdateIPSecConnectionResponse
 pub struct UpdateIPSecConnectionResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateIPSecConnectionResponse {
             opc_request_id: required.opc_request_id,
 
             i_psec_connection: required.i_psec_connection,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateIPSecConnectionResponse {
         self
     }
 }
-
-

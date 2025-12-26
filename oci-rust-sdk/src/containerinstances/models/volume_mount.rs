@@ -25,7 +25,6 @@ pub struct VolumeMount {
     pub partition: Option<i64>,
 }
 
-
 /// Required fields for VolumeMount
 pub struct VolumeMountRequired {
     /// Describes the volume access path.
@@ -48,7 +47,7 @@ impl VolumeMount {
             is_read_only: None,
 
             partition: None,
-}
+        }
     }
 
     /// Set mount_path
@@ -99,5 +98,3 @@ impl VolumeMount {
         self
     }
 }
-
-

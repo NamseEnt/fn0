@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdatePrivateIpRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdatePrivateIpRequest
 pub struct UpdatePrivateIpRequestRequired {
@@ -38,7 +37,7 @@ impl UpdatePrivateIpRequest {
             update_private_ip_details: required.update_private_ip_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set private_ip_id
@@ -65,5 +64,3 @@ impl UpdatePrivateIpRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct SetOriginAsnRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for SetOriginAsnRequest
 pub struct SetOriginAsnRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the {@code ByoipRange} resource containing the BYOIP CIDR block.
@@ -50,7 +49,7 @@ impl SetOriginAsnRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set byoip_range_id
@@ -101,5 +100,3 @@ impl SetOriginAsnRequest {
         self
     }
 }
-
-

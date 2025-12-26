@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -21,7 +21,6 @@ pub struct ComputeGlobalImageCapabilitySchemaVersionSummary {
     pub display_name: Option<String>,
 }
 
-
 /// Required fields for ComputeGlobalImageCapabilitySchemaVersionSummary
 pub struct ComputeGlobalImageCapabilitySchemaVersionSummaryRequired {
     /// The compute global image capability schema version name
@@ -40,12 +39,13 @@ impl ComputeGlobalImageCapabilitySchemaVersionSummary {
         Self {
             name: required.name,
 
-            compute_global_image_capability_schema_id: required.compute_global_image_capability_schema_id,
+            compute_global_image_capability_schema_id: required
+                .compute_global_image_capability_schema_id,
 
             time_created: required.time_created,
 
             display_name: None,
-}
+        }
     }
 
     /// Set name
@@ -78,5 +78,3 @@ impl ComputeGlobalImageCapabilitySchemaVersionSummary {
         self
     }
 }
-
-

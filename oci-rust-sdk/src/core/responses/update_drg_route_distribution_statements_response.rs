@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct UpdateDrgRouteDistributionStatementsResponse {
     /// A list of DrgRouteDistributionStatement instances.
     pub items: Vec<DrgRouteDistributionStatement>,
 }
-
 
 /// Required fields for UpdateDrgRouteDistributionStatementsResponse
 pub struct UpdateDrgRouteDistributionStatementsResponseRequired {
@@ -32,7 +31,7 @@ impl UpdateDrgRouteDistributionStatementsResponse {
             opc_request_id: required.opc_request_id,
 
             items: required.items,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl UpdateDrgRouteDistributionStatementsResponse {
         self
     }
 }
-
-

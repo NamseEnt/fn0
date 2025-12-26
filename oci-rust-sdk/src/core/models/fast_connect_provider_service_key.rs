@@ -18,7 +18,6 @@ pub struct FastConnectProviderServiceKey {
     pub peering_location: Option<String>,
 }
 
-
 /// Required fields for FastConnectProviderServiceKey
 pub struct FastConnectProviderServiceKeyRequired {
     /// The service key that the provider gives you when you set up a virtual circuit connection from the provider to Oracle Cloud Infrastructure. Use this value as the {@code providerServiceKeyName} query parameter for {@link #getFastConnectProviderServiceKey(GetFastConnectProviderServiceKeyRequest) getFastConnectProviderServiceKey}.
@@ -34,7 +33,7 @@ impl FastConnectProviderServiceKey {
             bandwidth_shape_name: None,
 
             peering_location: None,
-}
+        }
     }
 
     /// Set name
@@ -67,5 +66,3 @@ impl FastConnectProviderServiceKey {
         self
     }
 }
-
-

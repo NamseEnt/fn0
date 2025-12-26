@@ -14,7 +14,6 @@ pub struct ContainerInstanceContainer {
     pub display_name: Option<String>,
 }
 
-
 /// Required fields for ContainerInstanceContainer
 pub struct ContainerInstanceContainerRequired {
     /// The OCID of the container.
@@ -28,7 +27,7 @@ impl ContainerInstanceContainer {
             container_id: required.container_id,
 
             display_name: None,
-}
+        }
     }
 
     /// Set container_id
@@ -49,5 +48,3 @@ impl ContainerInstanceContainer {
         self
     }
 }
-
-

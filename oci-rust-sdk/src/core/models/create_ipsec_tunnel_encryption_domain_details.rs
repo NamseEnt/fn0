@@ -55,4 +55,3 @@ impl Default for CreateIPSecTunnelEncryptionDomainDetails {
         Self::new()
     }
 }
-

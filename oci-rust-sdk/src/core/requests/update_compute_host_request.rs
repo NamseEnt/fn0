@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct UpdateComputeHostRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for UpdateComputeHostRequest
 pub struct UpdateComputeHostRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute host.
@@ -50,7 +49,7 @@ impl UpdateComputeHostRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_host_id
@@ -101,5 +100,3 @@ impl UpdateComputeHostRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct ExportImageRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for ExportImageRequest
 pub struct ExportImageRequestRequired {
@@ -44,7 +43,7 @@ impl ExportImageRequest {
             opc_retry_token: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set image_id
@@ -54,7 +53,10 @@ impl ExportImageRequest {
     }
 
     /// Set export_image_details
-    pub fn set_export_image_details(mut self, value: ExportImageViaObjectStorageUriDetails) -> Self {
+    pub fn set_export_image_details(
+        mut self,
+        value: ExportImageViaObjectStorageUriDetails,
+    ) -> Self {
         self.export_image_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl ExportImageRequest {
         self
     }
 }
-
-

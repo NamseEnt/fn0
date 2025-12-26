@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateVolumeBackupPolicyAssignmentResponse {
     /// The returned model.VolumeBackupPolicyAssignment instance.
     pub volume_backup_policy_assignment: VolumeBackupPolicyAssignment,
 }
-
 
 /// Required fields for CreateVolumeBackupPolicyAssignmentResponse
 pub struct CreateVolumeBackupPolicyAssignmentResponseRequired {
@@ -40,7 +39,7 @@ impl CreateVolumeBackupPolicyAssignmentResponse {
             opc_request_id: required.opc_request_id,
 
             volume_backup_policy_assignment: required.volume_backup_policy_assignment,
-}
+        }
     }
 
     /// Set etag
@@ -56,10 +55,11 @@ impl CreateVolumeBackupPolicyAssignmentResponse {
     }
 
     /// Set volume_backup_policy_assignment
-    pub fn set_volume_backup_policy_assignment(mut self, value: VolumeBackupPolicyAssignment) -> Self {
+    pub fn set_volume_backup_policy_assignment(
+        mut self,
+        value: VolumeBackupPolicyAssignment,
+    ) -> Self {
         self.volume_backup_policy_assignment = value;
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetIPSecConnectionTunnelErrorRequest {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the tunnel.
     pub tunnel_id: String,
 }
-
 
 /// Required fields for GetIPSecConnectionTunnelErrorRequest
 pub struct GetIPSecConnectionTunnelErrorRequestRequired {
@@ -32,7 +31,7 @@ impl GetIPSecConnectionTunnelErrorRequest {
             ipsc_id: required.ipsc_id,
 
             tunnel_id: required.tunnel_id,
-}
+        }
     }
 
     /// Set ipsc_id
@@ -47,5 +46,3 @@ impl GetIPSecConnectionTunnelErrorRequest {
         self
     }
 }
-
-

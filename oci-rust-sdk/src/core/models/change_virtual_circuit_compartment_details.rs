@@ -10,7 +10,6 @@ pub struct ChangeVirtualCircuitCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeVirtualCircuitCompartmentDetails
 pub struct ChangeVirtualCircuitCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the virtual circuit to.
@@ -22,7 +21,7 @@ impl ChangeVirtualCircuitCompartmentDetails {
     pub fn new(required: ChangeVirtualCircuitCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeVirtualCircuitCompartmentDetails {
         self
     }
 }
-
-

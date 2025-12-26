@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +12,8 @@ pub struct ChangeComputeGpuMemoryFabricCompartmentRequest {
     pub compute_gpu_memory_fabric_id: String,
 
     /// The configuration details for the move operation.
-    pub change_compute_gpu_memory_fabric_compartment_details: ChangeComputeGpuMemoryFabricCompartmentDetails,
+    pub change_compute_gpu_memory_fabric_compartment_details:
+        ChangeComputeGpuMemoryFabricCompartmentDetails,
 
     /// For optimistic concurrency control. In the PUT or DELETE call for a resource, set the {@code if-match} parameter to the value of the etag from a previous GET or POST response for that resource. The resource will be updated or deleted only if the etag you provide matches the resource's current etag value.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -27,14 +28,14 @@ pub struct ChangeComputeGpuMemoryFabricCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeComputeGpuMemoryFabricCompartmentRequest
 pub struct ChangeComputeGpuMemoryFabricCompartmentRequestRequired {
     /// The OCID of the compute GPU memory fabric.
     pub compute_gpu_memory_fabric_id: String,
 
     /// The configuration details for the move operation.
-    pub change_compute_gpu_memory_fabric_compartment_details: ChangeComputeGpuMemoryFabricCompartmentDetails,
+    pub change_compute_gpu_memory_fabric_compartment_details:
+        ChangeComputeGpuMemoryFabricCompartmentDetails,
 }
 
 impl ChangeComputeGpuMemoryFabricCompartmentRequest {
@@ -43,14 +44,15 @@ impl ChangeComputeGpuMemoryFabricCompartmentRequest {
         Self {
             compute_gpu_memory_fabric_id: required.compute_gpu_memory_fabric_id,
 
-            change_compute_gpu_memory_fabric_compartment_details: required.change_compute_gpu_memory_fabric_compartment_details,
+            change_compute_gpu_memory_fabric_compartment_details: required
+                .change_compute_gpu_memory_fabric_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_gpu_memory_fabric_id
@@ -60,7 +62,10 @@ impl ChangeComputeGpuMemoryFabricCompartmentRequest {
     }
 
     /// Set change_compute_gpu_memory_fabric_compartment_details
-    pub fn set_change_compute_gpu_memory_fabric_compartment_details(mut self, value: ChangeComputeGpuMemoryFabricCompartmentDetails) -> Self {
+    pub fn set_change_compute_gpu_memory_fabric_compartment_details(
+        mut self,
+        value: ChangeComputeGpuMemoryFabricCompartmentDetails,
+    ) -> Self {
         self.change_compute_gpu_memory_fabric_compartment_details = value;
         self
     }
@@ -101,5 +106,3 @@ impl ChangeComputeGpuMemoryFabricCompartmentRequest {
         self
     }
 }
-
-

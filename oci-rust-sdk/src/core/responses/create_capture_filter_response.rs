@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateCaptureFilterResponse {
     /// The returned model.CaptureFilter instance.
     pub capture_filter: CaptureFilter,
 }
-
 
 /// Required fields for CreateCaptureFilterResponse
 pub struct CreateCaptureFilterResponseRequired {
@@ -40,7 +39,7 @@ impl CreateCaptureFilterResponse {
             opc_request_id: required.opc_request_id,
 
             capture_filter: required.capture_filter,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateCaptureFilterResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DeleteComputeImageCapabilitySchemaRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for DeleteComputeImageCapabilitySchemaRequest
 pub struct DeleteComputeImageCapabilitySchemaRequestRequired {
@@ -30,7 +29,7 @@ impl DeleteComputeImageCapabilitySchemaRequest {
             compute_image_capability_schema_id: required.compute_image_capability_schema_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set compute_image_capability_schema_id
@@ -51,5 +50,3 @@ impl DeleteComputeImageCapabilitySchemaRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateByoipRangeResponse {
     /// The returned model.ByoipRange instance.
     pub byoip_range: ByoipRange,
 }
-
 
 /// Required fields for UpdateByoipRangeResponse
 pub struct UpdateByoipRangeResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateByoipRangeResponse {
             opc_request_id: required.opc_request_id,
 
             byoip_range: required.byoip_range,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateByoipRangeResponse {
         self
     }
 }
-
-

@@ -20,7 +20,6 @@ pub struct VolumeSourceFromVolumeBackupDeltaDetails {
     pub change_block_size_in_bytes: Option<i64>,
 }
 
-
 /// Required fields for VolumeSourceFromVolumeBackupDeltaDetails
 pub struct VolumeSourceFromVolumeBackupDeltaDetailsRequired {
     /// The OCID of the first volume backup.
@@ -43,7 +42,7 @@ impl VolumeSourceFromVolumeBackupDeltaDetails {
             r#type: required.r#type,
 
             change_block_size_in_bytes: None,
-}
+        }
     }
 
     /// Set first_backup_id
@@ -76,5 +75,3 @@ impl VolumeSourceFromVolumeBackupDeltaDetails {
         self
     }
 }
-
-

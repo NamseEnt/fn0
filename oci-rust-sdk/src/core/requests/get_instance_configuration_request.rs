@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,7 +11,6 @@ pub struct GetInstanceConfigurationRequest {
     /// The OCID of the instance configuration.
     pub instance_configuration_id: String,
 }
-
 
 /// Required fields for GetInstanceConfigurationRequest
 pub struct GetInstanceConfigurationRequestRequired {
@@ -24,7 +23,7 @@ impl GetInstanceConfigurationRequest {
     pub fn new(required: GetInstanceConfigurationRequestRequired) -> Self {
         Self {
             instance_configuration_id: required.instance_configuration_id,
-}
+        }
     }
 
     /// Set instance_configuration_id
@@ -33,5 +32,3 @@ impl GetInstanceConfigurationRequest {
         self
     }
 }
-
-

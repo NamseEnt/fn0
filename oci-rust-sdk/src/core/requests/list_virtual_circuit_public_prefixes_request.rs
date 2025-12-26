@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct ListVirtualCircuitPublicPrefixesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification_state: Option<String>,
 }
-
 
 /// Required fields for ListVirtualCircuitPublicPrefixesRequest
 pub struct ListVirtualCircuitPublicPrefixesRequestRequired {
@@ -30,7 +29,7 @@ impl ListVirtualCircuitPublicPrefixesRequest {
             virtual_circuit_id: required.virtual_circuit_id,
 
             verification_state: None,
-}
+        }
     }
 
     /// Set virtual_circuit_id
@@ -51,5 +50,3 @@ impl ListVirtualCircuitPublicPrefixesRequest {
         self
     }
 }
-
-

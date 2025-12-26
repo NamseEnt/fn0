@@ -26,7 +26,6 @@ pub struct CreateDrgRouteDistributionDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for CreateDrgRouteDistributionDetails
 pub struct CreateDrgRouteDistributionDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the DRG the DRG route table belongs to.
@@ -49,11 +48,14 @@ impl CreateDrgRouteDistributionDetails {
             display_name: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -77,13 +79,19 @@ impl CreateDrgRouteDistributionDetails {
     }
 
     /// Set distribution_type
-    pub fn set_distribution_type(mut self, value: CreateDrgRouteDistributionDetailsDistributionType) -> Self {
+    pub fn set_distribution_type(
+        mut self,
+        value: CreateDrgRouteDistributionDetailsDistributionType,
+    ) -> Self {
         self.distribution_type = value;
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -100,5 +108,3 @@ impl CreateDrgRouteDistributionDetails {
         self
     }
 }
-
-

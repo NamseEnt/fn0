@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeleteComputeHostGroupRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for DeleteComputeHostGroupRequest
 pub struct DeleteComputeHostGroupRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute host group.
@@ -36,7 +35,7 @@ impl DeleteComputeHostGroupRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set compute_host_group_id
@@ -69,5 +68,3 @@ impl DeleteComputeHostGroupRequest {
         self
     }
 }
-
-

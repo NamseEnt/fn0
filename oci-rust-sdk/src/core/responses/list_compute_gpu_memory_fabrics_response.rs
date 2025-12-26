@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct ListComputeGpuMemoryFabricsResponse {
     /// The returned model.ComputeGpuMemoryFabricCollection instance.
     pub compute_gpu_memory_fabric_collection: ComputeGpuMemoryFabricCollection,
 }
-
 
 /// Required fields for ListComputeGpuMemoryFabricsResponse
 pub struct ListComputeGpuMemoryFabricsResponseRequired {
@@ -40,7 +39,7 @@ impl ListComputeGpuMemoryFabricsResponse {
             opc_request_id: required.opc_request_id,
 
             compute_gpu_memory_fabric_collection: required.compute_gpu_memory_fabric_collection,
-}
+        }
     }
 
     /// Set opc_next_page
@@ -56,10 +55,11 @@ impl ListComputeGpuMemoryFabricsResponse {
     }
 
     /// Set compute_gpu_memory_fabric_collection
-    pub fn set_compute_gpu_memory_fabric_collection(mut self, value: ComputeGpuMemoryFabricCollection) -> Self {
+    pub fn set_compute_gpu_memory_fabric_collection(
+        mut self,
+        value: ComputeGpuMemoryFabricCollection,
+    ) -> Self {
         self.compute_gpu_memory_fabric_collection = value;
         self
     }
 }
-
-

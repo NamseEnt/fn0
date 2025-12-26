@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetMeasuredBootReportResponse {
     /// The returned model.MeasuredBootReport instance.
     pub measured_boot_report: MeasuredBootReport,
 }
-
 
 /// Required fields for GetMeasuredBootReportResponse
 pub struct GetMeasuredBootReportResponseRequired {
@@ -40,7 +39,7 @@ impl GetMeasuredBootReportResponse {
             opc_request_id: required.opc_request_id,
 
             measured_boot_report: required.measured_boot_report,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetMeasuredBootReportResponse {
         self
     }
 }
-
-

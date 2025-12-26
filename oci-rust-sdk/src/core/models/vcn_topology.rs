@@ -14,7 +14,6 @@ pub struct VcnTopology {
     pub vcn_id: Option<String>,
 }
 
-
 /// Required fields for VcnTopology
 pub struct VcnTopologyRequired {
     pub r#type: String,
@@ -27,7 +26,7 @@ impl VcnTopology {
             r#type: required.r#type,
 
             vcn_id: None,
-}
+        }
     }
 
     /// Set vcn_id
@@ -48,5 +47,3 @@ impl VcnTopology {
         self
     }
 }
-
-

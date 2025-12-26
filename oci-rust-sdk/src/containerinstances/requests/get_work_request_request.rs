@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct GetWorkRequestRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for GetWorkRequestRequest
 pub struct GetWorkRequestRequestRequired {
@@ -30,7 +29,7 @@ impl GetWorkRequestRequest {
             work_request_id: required.work_request_id,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set work_request_id
@@ -50,6 +49,8 @@ impl GetWorkRequestRequest {
         self.opc_request_id = Some(value.into());
         self
     }
+    /// Convert this request's query parameters to a vector of key-value pairs.
+    pub fn to_query_params(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
-
-

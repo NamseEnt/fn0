@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeVlanCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeVlanCompartmentRequest
 pub struct ChangeVlanCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the VLAN.
@@ -50,7 +49,7 @@ impl ChangeVlanCompartmentRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set vlan_id
@@ -60,7 +59,10 @@ impl ChangeVlanCompartmentRequest {
     }
 
     /// Set change_vlan_compartment_details
-    pub fn set_change_vlan_compartment_details(mut self, value: ChangeVlanCompartmentDetails) -> Self {
+    pub fn set_change_vlan_compartment_details(
+        mut self,
+        value: ChangeVlanCompartmentDetails,
+    ) -> Self {
         self.change_vlan_compartment_details = value;
         self
     }
@@ -101,5 +103,3 @@ impl ChangeVlanCompartmentRequest {
         self
     }
 }
-
-

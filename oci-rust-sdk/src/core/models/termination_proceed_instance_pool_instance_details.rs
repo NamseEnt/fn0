@@ -10,7 +10,6 @@ pub struct TerminationProceedInstancePoolInstanceDetails {
     pub instance_id: String,
 }
 
-
 /// Required fields for TerminationProceedInstancePoolInstanceDetails
 pub struct TerminationProceedInstancePoolInstanceDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance.
@@ -22,7 +21,7 @@ impl TerminationProceedInstancePoolInstanceDetails {
     pub fn new(required: TerminationProceedInstancePoolInstanceDetailsRequired) -> Self {
         Self {
             instance_id: required.instance_id,
-}
+        }
     }
 
     /// Set instance_id
@@ -31,5 +30,3 @@ impl TerminationProceedInstancePoolInstanceDetails {
         self
     }
 }
-
-

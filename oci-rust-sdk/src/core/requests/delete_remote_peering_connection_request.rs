@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,6 @@ pub struct DeleteRemotePeeringConnectionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for DeleteRemotePeeringConnectionRequest
 pub struct DeleteRemotePeeringConnectionRequestRequired {
@@ -30,7 +29,7 @@ impl DeleteRemotePeeringConnectionRequest {
             remote_peering_connection_id: required.remote_peering_connection_id,
 
             if_match: None,
-}
+        }
     }
 
     /// Set remote_peering_connection_id
@@ -51,5 +50,3 @@ impl DeleteRemotePeeringConnectionRequest {
         self
     }
 }
-
-

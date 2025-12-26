@@ -10,7 +10,6 @@ pub struct AddVcnCidrDetails {
     pub cidr_block: String,
 }
 
-
 /// Required fields for AddVcnCidrDetails
 pub struct AddVcnCidrDetailsRequired {
     /// The CIDR block to add.
@@ -22,7 +21,7 @@ impl AddVcnCidrDetails {
     pub fn new(required: AddVcnCidrDetailsRequired) -> Self {
         Self {
             cidr_block: required.cidr_block,
-}
+        }
     }
 
     /// Set cidr_block
@@ -31,5 +30,3 @@ impl AddVcnCidrDetails {
         self
     }
 }
-
-

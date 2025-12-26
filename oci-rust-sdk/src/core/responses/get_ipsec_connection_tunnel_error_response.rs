@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetIPSecConnectionTunnelErrorResponse {
     /// The returned model.IPSecConnectionTunnelErrorDetails instance.
     pub i_psec_connection_tunnel_error_details: IPSecConnectionTunnelErrorDetails,
 }
-
 
 /// Required fields for GetIPSecConnectionTunnelErrorResponse
 pub struct GetIPSecConnectionTunnelErrorResponseRequired {
@@ -32,7 +31,7 @@ impl GetIPSecConnectionTunnelErrorResponse {
             opc_request_id: required.opc_request_id,
 
             i_psec_connection_tunnel_error_details: required.i_psec_connection_tunnel_error_details,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -42,10 +41,11 @@ impl GetIPSecConnectionTunnelErrorResponse {
     }
 
     /// Set i_psec_connection_tunnel_error_details
-    pub fn set_i_psec_connection_tunnel_error_details(mut self, value: IPSecConnectionTunnelErrorDetails) -> Self {
+    pub fn set_i_psec_connection_tunnel_error_details(
+        mut self,
+        value: IPSecConnectionTunnelErrorDetails,
+    ) -> Self {
         self.i_psec_connection_tunnel_error_details = value;
         self
     }
 }
-
-

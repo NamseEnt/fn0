@@ -10,7 +10,6 @@ pub struct ChangeServiceGatewayCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeServiceGatewayCompartmentDetails
 pub struct ChangeServiceGatewayCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to move the service gateway to.
@@ -22,7 +21,7 @@ impl ChangeServiceGatewayCompartmentDetails {
     pub fn new(required: ChangeServiceGatewayCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeServiceGatewayCompartmentDetails {
         self
     }
 }
-
-

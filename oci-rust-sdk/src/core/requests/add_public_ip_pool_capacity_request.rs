@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct AddPublicIpPoolCapacityRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for AddPublicIpPoolCapacityRequest
 pub struct AddPublicIpPoolCapacityRequestRequired {
@@ -44,7 +43,7 @@ impl AddPublicIpPoolCapacityRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set public_ip_pool_id
@@ -54,7 +53,10 @@ impl AddPublicIpPoolCapacityRequest {
     }
 
     /// Set add_public_ip_pool_capacity_details
-    pub fn set_add_public_ip_pool_capacity_details(mut self, value: AddPublicIpPoolCapacityDetails) -> Self {
+    pub fn set_add_public_ip_pool_capacity_details(
+        mut self,
+        value: AddPublicIpPoolCapacityDetails,
+    ) -> Self {
         self.add_public_ip_pool_capacity_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl AddPublicIpPoolCapacityRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct CopyVolumeBackupRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for CopyVolumeBackupRequest
 pub struct CopyVolumeBackupRequestRequired {
@@ -44,7 +43,7 @@ impl CopyVolumeBackupRequest {
             opc_retry_token: None,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set volume_backup_id
@@ -83,5 +82,3 @@ impl CopyVolumeBackupRequest {
         self
     }
 }
-
-

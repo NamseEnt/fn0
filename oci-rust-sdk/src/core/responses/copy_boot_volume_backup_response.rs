@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,7 +26,6 @@ pub struct CopyBootVolumeBackupResponse {
     /// The returned model.BootVolumeBackup instance.
     pub boot_volume_backup: BootVolumeBackup,
 }
-
 
 /// Required fields for CopyBootVolumeBackupResponse
 pub struct CopyBootVolumeBackupResponseRequired {
@@ -64,7 +63,7 @@ impl CopyBootVolumeBackupResponse {
             content_location: required.content_location,
 
             boot_volume_backup: required.boot_volume_backup,
-}
+        }
     }
 
     /// Set etag
@@ -103,5 +102,3 @@ impl CopyBootVolumeBackupResponse {
         self
     }
 }
-
-

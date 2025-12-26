@@ -73,4 +73,3 @@ impl Default for HostGroupConfiguration {
         Self::new()
     }
 }
-

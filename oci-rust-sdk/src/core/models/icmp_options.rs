@@ -15,7 +15,6 @@ pub struct IcmpOptions {
     pub code: Option<i64>,
 }
 
-
 /// Required fields for IcmpOptions
 pub struct IcmpOptionsRequired {
     /// The ICMP type. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -29,7 +28,7 @@ impl IcmpOptions {
             r#type: required.r#type,
 
             code: None,
-}
+        }
     }
 
     /// Set code
@@ -50,5 +49,3 @@ impl IcmpOptions {
         self
     }
 }
-
-

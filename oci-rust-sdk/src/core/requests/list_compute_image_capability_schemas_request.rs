@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,13 +88,19 @@ impl ListComputeImageCapabilitySchemasRequest {
     }
 
     /// Set sort_by
-    pub fn set_sort_by(mut self, value: Option<ListComputeImageCapabilitySchemasRequestSortBy>) -> Self {
+    pub fn set_sort_by(
+        mut self,
+        value: Option<ListComputeImageCapabilitySchemasRequestSortBy>,
+    ) -> Self {
         self.sort_by = value;
         self
     }
 
     /// Set sort_order
-    pub fn set_sort_order(mut self, value: Option<ListComputeImageCapabilitySchemasRequestSortOrder>) -> Self {
+    pub fn set_sort_order(
+        mut self,
+        value: Option<ListComputeImageCapabilitySchemasRequestSortOrder>,
+    ) -> Self {
         self.sort_order = value;
         self
     }
@@ -136,7 +142,10 @@ impl ListComputeImageCapabilitySchemasRequest {
     }
 
     /// Set sort_order (unwraps Option)
-    pub fn with_sort_order(mut self, value: ListComputeImageCapabilitySchemasRequestSortOrder) -> Self {
+    pub fn with_sort_order(
+        mut self,
+        value: ListComputeImageCapabilitySchemasRequestSortOrder,
+    ) -> Self {
         self.sort_order = Some(value);
         self
     }
@@ -147,4 +156,3 @@ impl Default for ListComputeImageCapabilitySchemasRequest {
         Self::new()
     }
 }
-

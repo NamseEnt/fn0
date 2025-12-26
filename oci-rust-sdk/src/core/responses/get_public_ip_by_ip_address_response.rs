@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetPublicIpByIpAddressResponse {
     /// The returned model.PublicIp instance.
     pub public_ip: PublicIp,
 }
-
 
 /// Required fields for GetPublicIpByIpAddressResponse
 pub struct GetPublicIpByIpAddressResponseRequired {
@@ -40,7 +39,7 @@ impl GetPublicIpByIpAddressResponse {
             opc_request_id: required.opc_request_id,
 
             public_ip: required.public_ip,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetPublicIpByIpAddressResponse {
         self
     }
 }
-
-

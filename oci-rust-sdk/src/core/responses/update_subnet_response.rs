@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateSubnetResponse {
     /// The returned model.Subnet instance.
     pub subnet: Subnet,
 }
-
 
 /// Required fields for UpdateSubnetResponse
 pub struct UpdateSubnetResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateSubnetResponse {
             opc_request_id: required.opc_request_id,
 
             subnet: required.subnet,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateSubnetResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct ChangeBootVolumeBackupCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_request_id: Option<String>,
 }
-
 
 /// Required fields for ChangeBootVolumeBackupCompartmentRequest
 pub struct ChangeBootVolumeBackupCompartmentRequestRequired {
@@ -35,10 +34,11 @@ impl ChangeBootVolumeBackupCompartmentRequest {
         Self {
             boot_volume_backup_id: required.boot_volume_backup_id,
 
-            change_boot_volume_backup_compartment_details: required.change_boot_volume_backup_compartment_details,
+            change_boot_volume_backup_compartment_details: required
+                .change_boot_volume_backup_compartment_details,
 
             opc_request_id: None,
-}
+        }
     }
 
     /// Set boot_volume_backup_id
@@ -48,7 +48,10 @@ impl ChangeBootVolumeBackupCompartmentRequest {
     }
 
     /// Set change_boot_volume_backup_compartment_details
-    pub fn set_change_boot_volume_backup_compartment_details(mut self, value: ChangeBootVolumeBackupCompartmentDetails) -> Self {
+    pub fn set_change_boot_volume_backup_compartment_details(
+        mut self,
+        value: ChangeBootVolumeBackupCompartmentDetails,
+    ) -> Self {
         self.change_boot_volume_backup_compartment_details = value;
         self
     }
@@ -65,5 +68,3 @@ impl ChangeBootVolumeBackupCompartmentRequest {
         self
     }
 }
-
-

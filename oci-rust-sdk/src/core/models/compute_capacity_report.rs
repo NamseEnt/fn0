@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -19,7 +19,6 @@ pub struct ComputeCapacityReport {
     /// The date and time the capacity report was created, in the format defined by [RFC3339](https://tools.ietf.org/html/rfc3339). <p> Example: {@code 2016-08-25T21:10:29.600Z}
     pub time_created: DateTime<Utc>,
 }
-
 
 /// Required fields for ComputeCapacityReport
 pub struct ComputeCapacityReportRequired {
@@ -47,7 +46,7 @@ impl ComputeCapacityReport {
             shape_availabilities: required.shape_availabilities,
 
             time_created: required.time_created,
-}
+        }
     }
 
     /// Set compartment_id
@@ -74,5 +73,3 @@ impl ComputeCapacityReport {
         self
     }
 }
-
-

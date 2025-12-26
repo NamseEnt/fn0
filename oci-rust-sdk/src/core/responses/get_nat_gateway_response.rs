@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetNatGatewayResponse {
     /// The returned model.NatGateway instance.
     pub nat_gateway: NatGateway,
 }
-
 
 /// Required fields for GetNatGatewayResponse
 pub struct GetNatGatewayResponseRequired {
@@ -40,7 +39,7 @@ impl GetNatGatewayResponse {
             opc_request_id: required.opc_request_id,
 
             nat_gateway: required.nat_gateway,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetNatGatewayResponse {
         self
     }
 }
-
-

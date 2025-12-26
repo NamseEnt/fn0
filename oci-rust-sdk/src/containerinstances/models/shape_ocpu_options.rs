@@ -13,7 +13,6 @@ pub struct ShapeOcpuOptions {
     pub max: i64,
 }
 
-
 /// Required fields for ShapeOcpuOptions
 pub struct ShapeOcpuOptionsRequired {
     /// The minimum number of OCPUs. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
@@ -30,7 +29,7 @@ impl ShapeOcpuOptions {
             min: required.min,
 
             max: required.max,
-}
+        }
     }
 
     /// Set min
@@ -45,5 +44,3 @@ impl ShapeOcpuOptions {
         self
     }
 }
-
-

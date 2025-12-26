@@ -55,4 +55,3 @@ impl Default for ShapeSymmetricMultiThreadingEnabledPlatformOptions {
         Self::new()
     }
 }
-

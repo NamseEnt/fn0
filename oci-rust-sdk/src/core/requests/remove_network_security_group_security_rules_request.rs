@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,9 +12,9 @@ pub struct RemoveNetworkSecurityGroupSecurityRulesRequest {
     pub network_security_group_id: String,
 
     /// Request with one or more security rules associated with the network security group that will be removed.
-    pub remove_network_security_group_security_rules_details: RemoveNetworkSecurityGroupSecurityRulesDetails,
+    pub remove_network_security_group_security_rules_details:
+        RemoveNetworkSecurityGroupSecurityRulesDetails,
 }
-
 
 /// Required fields for RemoveNetworkSecurityGroupSecurityRulesRequest
 pub struct RemoveNetworkSecurityGroupSecurityRulesRequestRequired {
@@ -22,7 +22,8 @@ pub struct RemoveNetworkSecurityGroupSecurityRulesRequestRequired {
     pub network_security_group_id: String,
 
     /// Request with one or more security rules associated with the network security group that will be removed.
-    pub remove_network_security_group_security_rules_details: RemoveNetworkSecurityGroupSecurityRulesDetails,
+    pub remove_network_security_group_security_rules_details:
+        RemoveNetworkSecurityGroupSecurityRulesDetails,
 }
 
 impl RemoveNetworkSecurityGroupSecurityRulesRequest {
@@ -31,8 +32,9 @@ impl RemoveNetworkSecurityGroupSecurityRulesRequest {
         Self {
             network_security_group_id: required.network_security_group_id,
 
-            remove_network_security_group_security_rules_details: required.remove_network_security_group_security_rules_details,
-}
+            remove_network_security_group_security_rules_details: required
+                .remove_network_security_group_security_rules_details,
+        }
     }
 
     /// Set network_security_group_id
@@ -42,10 +44,11 @@ impl RemoveNetworkSecurityGroupSecurityRulesRequest {
     }
 
     /// Set remove_network_security_group_security_rules_details
-    pub fn set_remove_network_security_group_security_rules_details(mut self, value: RemoveNetworkSecurityGroupSecurityRulesDetails) -> Self {
+    pub fn set_remove_network_security_group_security_rules_details(
+        mut self,
+        value: RemoveNetworkSecurityGroupSecurityRulesDetails,
+    ) -> Self {
         self.remove_network_security_group_security_rules_details = value;
         self
     }
 }
-
-

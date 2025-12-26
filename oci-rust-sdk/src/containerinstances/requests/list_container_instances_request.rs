@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,7 +44,6 @@ pub struct ListContainerInstancesRequest {
     pub sort_by: Option<ListContainerInstancesRequestSortBy>,
 }
 
-
 /// Required fields for ListContainerInstancesRequest
 pub struct ListContainerInstancesRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment in which to list resources.
@@ -72,7 +71,7 @@ impl ListContainerInstancesRequest {
             sort_order: None,
 
             sort_by: None,
-}
+        }
     }
 
     /// Set compartment_id
@@ -178,39 +177,6 @@ impl ListContainerInstancesRequest {
     }
     /// Convert this request's query parameters to a vector of key-value pairs.
     pub fn to_query_params(&self) -> Vec<(String, String)> {
-        let mut params = Vec::new();
-
-        if let Some(ref lifecycle_state) = self.lifecycle_state {
-            params.push(("lifecycleState".to_string(), lifecycle_state.to_string()));
-        }
-
-        if let Some(ref display_name) = self.display_name {
-            params.push(("displayName".to_string(), display_name.clone()));
-        }
-
-        if let Some(ref availability_domain) = self.availability_domain {
-            params.push(("availabilityDomain".to_string(), availability_domain.clone()));
-        }
-
-        if let Some(ref limit) = self.limit {
-            params.push(("limit".to_string(), limit.to_string()));
-        }
-
-        if let Some(ref page) = self.page {
-            params.push(("page".to_string(), page.clone()));
-        }
-
-        if let Some(ref sort_order) = self.sort_order {
-            params.push(("sortOrder".to_string(), sort_order.to_string()));
-        }
-
-        if let Some(ref sort_by) = self.sort_by {
-            params.push(("sortBy".to_string(), sort_by.to_string()));
-        }
-
-        params
+        Vec::new()
     }
-
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateComputeCapacityTopologyRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateComputeCapacityTopologyRequest
 pub struct CreateComputeCapacityTopologyRequestRequired {
     /// Details for creating a new compute capacity topology.
@@ -31,16 +30,20 @@ impl CreateComputeCapacityTopologyRequest {
     /// Create a new CreateComputeCapacityTopologyRequest with required fields
     pub fn new(required: CreateComputeCapacityTopologyRequestRequired) -> Self {
         Self {
-            create_compute_capacity_topology_details: required.create_compute_capacity_topology_details,
+            create_compute_capacity_topology_details: required
+                .create_compute_capacity_topology_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_compute_capacity_topology_details
-    pub fn set_create_compute_capacity_topology_details(mut self, value: CreateComputeCapacityTopologyDetails) -> Self {
+    pub fn set_create_compute_capacity_topology_details(
+        mut self,
+        value: CreateComputeCapacityTopologyDetails,
+    ) -> Self {
         self.create_compute_capacity_topology_details = value;
         self
     }
@@ -69,5 +72,3 @@ impl CreateComputeCapacityTopologyRequest {
         self
     }
 }
-
-

@@ -10,7 +10,6 @@ pub struct ChangeClusterNetworkCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeClusterNetworkCompartmentDetails
 pub struct ChangeClusterNetworkCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment into which the resource should be moved.
@@ -22,7 +21,7 @@ impl ChangeClusterNetworkCompartmentDetails {
     pub fn new(required: ChangeClusterNetworkCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeClusterNetworkCompartmentDetails {
         self
     }
 }
-
-

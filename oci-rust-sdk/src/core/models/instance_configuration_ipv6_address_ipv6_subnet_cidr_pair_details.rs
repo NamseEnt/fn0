@@ -55,4 +55,3 @@ impl Default for InstanceConfigurationIpv6AddressIpv6SubnetCidrPairDetails {
         Self::new()
     }
 }
-

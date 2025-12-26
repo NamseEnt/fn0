@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 #[allow(unused_imports)]
 use super::*;
@@ -46,7 +46,6 @@ pub struct ComputeImageCapabilitySchema {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for ComputeImageCapabilitySchema
 pub struct ComputeImageCapabilitySchemaRequired {
     /// The id of the compute global image capability schema version
@@ -77,9 +76,11 @@ impl ComputeImageCapabilitySchema {
         Self {
             id: required.id,
 
-            compute_global_image_capability_schema_id: required.compute_global_image_capability_schema_id,
+            compute_global_image_capability_schema_id: required
+                .compute_global_image_capability_schema_id,
 
-            compute_global_image_capability_schema_version_name: required.compute_global_image_capability_schema_version_name,
+            compute_global_image_capability_schema_version_name: required
+                .compute_global_image_capability_schema_version_name,
 
             image_id: required.image_id,
 
@@ -96,7 +97,7 @@ impl ComputeImageCapabilitySchema {
             defined_tags: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set id
@@ -118,7 +119,10 @@ impl ComputeImageCapabilitySchema {
     }
 
     /// Set compute_global_image_capability_schema_version_name
-    pub fn set_compute_global_image_capability_schema_version_name(mut self, value: String) -> Self {
+    pub fn set_compute_global_image_capability_schema_version_name(
+        mut self,
+        value: String,
+    ) -> Self {
         self.compute_global_image_capability_schema_version_name = value;
         self
     }
@@ -130,13 +134,19 @@ impl ComputeImageCapabilitySchema {
     }
 
     /// Set lifecycle_state
-    pub fn set_lifecycle_state(mut self, value: Option<ComputeImageCapabilitySchemaLifecycleState>) -> Self {
+    pub fn set_lifecycle_state(
+        mut self,
+        value: Option<ComputeImageCapabilitySchemaLifecycleState>,
+    ) -> Self {
         self.lifecycle_state = value;
         self
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -154,7 +164,10 @@ impl ComputeImageCapabilitySchema {
     }
 
     /// Set schema_data
-    pub fn set_schema_data(mut self, value: HashMap<String, ImageCapabilitySchemaDescriptor>) -> Self {
+    pub fn set_schema_data(
+        mut self,
+        value: HashMap<String, ImageCapabilitySchemaDescriptor>,
+    ) -> Self {
         self.schema_data = value;
         self
     }
@@ -172,13 +185,19 @@ impl ComputeImageCapabilitySchema {
     }
 
     /// Set lifecycle_state (unwraps Option)
-    pub fn with_lifecycle_state(mut self, value: ComputeImageCapabilitySchemaLifecycleState) -> Self {
+    pub fn with_lifecycle_state(
+        mut self,
+        value: ComputeImageCapabilitySchemaLifecycleState,
+    ) -> Self {
         self.lifecycle_state = Some(value);
         self
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -189,5 +208,3 @@ impl ComputeImageCapabilitySchema {
         self
     }
 }
-
-

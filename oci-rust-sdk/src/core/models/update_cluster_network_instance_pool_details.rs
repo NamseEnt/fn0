@@ -31,7 +31,6 @@ pub struct UpdateClusterNetworkInstancePoolDetails {
     pub instance_configuration_id: Option<String>,
 }
 
-
 /// Required fields for UpdateClusterNetworkInstancePoolDetails
 pub struct UpdateClusterNetworkInstancePoolDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the instance pool.
@@ -53,7 +52,7 @@ impl UpdateClusterNetworkInstancePoolDetails {
             size: None,
 
             instance_configuration_id: None,
-}
+        }
     }
 
     /// Set id
@@ -63,7 +62,10 @@ impl UpdateClusterNetworkInstancePoolDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -93,7 +95,10 @@ impl UpdateClusterNetworkInstancePoolDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -122,5 +127,3 @@ impl UpdateClusterNetworkInstancePoolDetails {
         self
     }
 }
-
-

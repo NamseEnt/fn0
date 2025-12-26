@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetWindowsInstanceInitialCredentialsResponse {
     /// The returned model.InstanceCredentials instance.
     pub instance_credentials: InstanceCredentials,
 }
-
 
 /// Required fields for GetWindowsInstanceInitialCredentialsResponse
 pub struct GetWindowsInstanceInitialCredentialsResponseRequired {
@@ -32,7 +31,7 @@ impl GetWindowsInstanceInitialCredentialsResponse {
             opc_request_id: required.opc_request_id,
 
             instance_credentials: required.instance_credentials,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetWindowsInstanceInitialCredentialsResponse {
         self
     }
 }
-
-

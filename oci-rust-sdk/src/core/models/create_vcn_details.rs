@@ -59,7 +59,6 @@ pub struct CreateVcnDetails {
     pub is_zpr_only: Option<bool>,
 }
 
-
 /// Required fields for CreateVcnDetails
 pub struct CreateVcnDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compartment to contain the VCN.
@@ -95,7 +94,7 @@ impl CreateVcnDetails {
             is_ipv6_enabled: None,
 
             is_zpr_only: None,
-}
+        }
     }
 
     /// Set cidr_block
@@ -135,7 +134,10 @@ impl CreateVcnDetails {
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -159,7 +161,10 @@ impl CreateVcnDetails {
     }
 
     /// Set security_attributes
-    pub fn set_security_attributes(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_security_attributes(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.security_attributes = value;
         self
     }
@@ -207,7 +212,10 @@ impl CreateVcnDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -231,7 +239,10 @@ impl CreateVcnDetails {
     }
 
     /// Set security_attributes (unwraps Option)
-    pub fn with_security_attributes(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_security_attributes(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.security_attributes = Some(value);
         self
     }
@@ -248,5 +259,3 @@ impl CreateVcnDetails {
         self
     }
 }
-
-

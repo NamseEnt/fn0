@@ -13,7 +13,6 @@ pub struct InstanceConfigurationInstanceSourceViaBootVolumeDetails {
     pub boot_volume_id: Option<String>,
 }
 
-
 /// Required fields for InstanceConfigurationInstanceSourceViaBootVolumeDetails
 pub struct InstanceConfigurationInstanceSourceViaBootVolumeDetailsRequired {
     pub source_type: String,
@@ -26,7 +25,7 @@ impl InstanceConfigurationInstanceSourceViaBootVolumeDetails {
             source_type: required.source_type,
 
             boot_volume_id: None,
-}
+        }
     }
 
     /// Set boot_volume_id
@@ -47,5 +46,3 @@ impl InstanceConfigurationInstanceSourceViaBootVolumeDetails {
         self
     }
 }
-
-

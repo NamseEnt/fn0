@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateDedicatedVmHostRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateDedicatedVmHostRequest
 pub struct CreateDedicatedVmHostRequestRequired {
     /// The details for creating a new dedicated virtual machine host.
@@ -36,11 +35,14 @@ impl CreateDedicatedVmHostRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_dedicated_vm_host_details
-    pub fn set_create_dedicated_vm_host_details(mut self, value: CreateDedicatedVmHostDetails) -> Self {
+    pub fn set_create_dedicated_vm_host_details(
+        mut self,
+        value: CreateDedicatedVmHostDetails,
+    ) -> Self {
         self.create_dedicated_vm_host_details = value;
         self
     }
@@ -69,5 +71,3 @@ impl CreateDedicatedVmHostRequest {
         self
     }
 }
-
-

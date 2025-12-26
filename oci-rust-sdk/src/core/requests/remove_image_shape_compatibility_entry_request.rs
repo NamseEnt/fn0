@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct RemoveImageShapeCompatibilityEntryRequest {
     /// Shape name.
     pub shape_name: String,
 }
-
 
 /// Required fields for RemoveImageShapeCompatibilityEntryRequest
 pub struct RemoveImageShapeCompatibilityEntryRequestRequired {
@@ -32,7 +31,7 @@ impl RemoveImageShapeCompatibilityEntryRequest {
             image_id: required.image_id,
 
             shape_name: required.shape_name,
-}
+        }
     }
 
     /// Set image_id
@@ -47,5 +46,3 @@ impl RemoveImageShapeCompatibilityEntryRequest {
         self
     }
 }
-
-

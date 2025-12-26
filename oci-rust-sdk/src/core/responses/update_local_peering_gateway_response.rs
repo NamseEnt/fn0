@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct UpdateLocalPeeringGatewayResponse {
     /// The returned model.LocalPeeringGateway instance.
     pub local_peering_gateway: LocalPeeringGateway,
 }
-
 
 /// Required fields for UpdateLocalPeeringGatewayResponse
 pub struct UpdateLocalPeeringGatewayResponseRequired {
@@ -40,7 +39,7 @@ impl UpdateLocalPeeringGatewayResponse {
             opc_request_id: required.opc_request_id,
 
             local_peering_gateway: required.local_peering_gateway,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl UpdateLocalPeeringGatewayResponse {
         self
     }
 }
-
-

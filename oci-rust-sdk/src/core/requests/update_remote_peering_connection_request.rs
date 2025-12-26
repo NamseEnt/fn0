@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateRemotePeeringConnectionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateRemotePeeringConnectionRequest
 pub struct UpdateRemotePeeringConnectionRequestRequired {
@@ -35,10 +34,11 @@ impl UpdateRemotePeeringConnectionRequest {
         Self {
             remote_peering_connection_id: required.remote_peering_connection_id,
 
-            update_remote_peering_connection_details: required.update_remote_peering_connection_details,
+            update_remote_peering_connection_details: required
+                .update_remote_peering_connection_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set remote_peering_connection_id
@@ -48,7 +48,10 @@ impl UpdateRemotePeeringConnectionRequest {
     }
 
     /// Set update_remote_peering_connection_details
-    pub fn set_update_remote_peering_connection_details(mut self, value: UpdateRemotePeeringConnectionDetails) -> Self {
+    pub fn set_update_remote_peering_connection_details(
+        mut self,
+        value: UpdateRemotePeeringConnectionDetails,
+    ) -> Self {
         self.update_remote_peering_connection_details = value;
         self
     }
@@ -65,5 +68,3 @@ impl UpdateRemotePeeringConnectionRequest {
         self
     }
 }
-
-

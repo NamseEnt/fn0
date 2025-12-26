@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct DeletePublicIpPoolRequest {
     pub if_match: Option<String>,
 }
 
-
 /// Required fields for DeletePublicIpPoolRequest
 pub struct DeletePublicIpPoolRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the public IP pool.
@@ -36,7 +35,7 @@ impl DeletePublicIpPoolRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set public_ip_pool_id
@@ -69,5 +68,3 @@ impl DeletePublicIpPoolRequest {
         self
     }
 }
-
-

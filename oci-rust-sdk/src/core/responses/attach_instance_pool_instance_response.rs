@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct AttachInstancePoolInstanceResponse {
     /// The returned model.InstancePoolInstance instance.
     pub instance_pool_instance: InstancePoolInstance,
 }
-
 
 /// Required fields for AttachInstancePoolInstanceResponse
 pub struct AttachInstancePoolInstanceResponseRequired {
@@ -56,7 +55,7 @@ impl AttachInstancePoolInstanceResponse {
             location: required.location,
 
             instance_pool_instance: required.instance_pool_instance,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -89,5 +88,3 @@ impl AttachInstancePoolInstanceResponse {
         self
     }
 }
-
-

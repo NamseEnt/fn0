@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetIPSecConnectionDeviceConfigResponse {
     /// The returned model.IPSecConnectionDeviceConfig instance.
     pub i_psec_connection_device_config: IPSecConnectionDeviceConfig,
 }
-
 
 /// Required fields for GetIPSecConnectionDeviceConfigResponse
 pub struct GetIPSecConnectionDeviceConfigResponseRequired {
@@ -40,7 +39,7 @@ impl GetIPSecConnectionDeviceConfigResponse {
             opc_request_id: required.opc_request_id,
 
             i_psec_connection_device_config: required.i_psec_connection_device_config,
-}
+        }
     }
 
     /// Set etag
@@ -56,10 +55,11 @@ impl GetIPSecConnectionDeviceConfigResponse {
     }
 
     /// Set i_psec_connection_device_config
-    pub fn set_i_psec_connection_device_config(mut self, value: IPSecConnectionDeviceConfig) -> Self {
+    pub fn set_i_psec_connection_device_config(
+        mut self,
+        value: IPSecConnectionDeviceConfig,
+    ) -> Self {
         self.i_psec_connection_device_config = value;
         self
     }
 }
-
-

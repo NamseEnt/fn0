@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetUpgradeStatusResponse {
     /// The returned model.UpgradeStatus instance.
     pub upgrade_status: UpgradeStatus,
 }
-
 
 /// Required fields for GetUpgradeStatusResponse
 pub struct GetUpgradeStatusResponseRequired {
@@ -32,7 +31,7 @@ impl GetUpgradeStatusResponse {
             opc_request_id: required.opc_request_id,
 
             upgrade_status: required.upgrade_status,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -47,5 +46,3 @@ impl GetUpgradeStatusResponse {
         self
     }
 }
-
-

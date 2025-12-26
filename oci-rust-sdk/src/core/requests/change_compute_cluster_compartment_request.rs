@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +27,6 @@ pub struct ChangeComputeClusterCompartmentRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for ChangeComputeClusterCompartmentRequest
 pub struct ChangeComputeClusterCompartmentRequestRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the compute cluster. A [compute cluster](https://docs.oracle.com/iaas/Content/Compute/Tasks/compute-clusters.htm) is a remote direct memory access (RDMA) network group.
@@ -43,14 +42,15 @@ impl ChangeComputeClusterCompartmentRequest {
         Self {
             compute_cluster_id: required.compute_cluster_id,
 
-            change_compute_cluster_compartment_details: required.change_compute_cluster_compartment_details,
+            change_compute_cluster_compartment_details: required
+                .change_compute_cluster_compartment_details,
 
             if_match: None,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set compute_cluster_id
@@ -60,7 +60,10 @@ impl ChangeComputeClusterCompartmentRequest {
     }
 
     /// Set change_compute_cluster_compartment_details
-    pub fn set_change_compute_cluster_compartment_details(mut self, value: ChangeComputeClusterCompartmentDetails) -> Self {
+    pub fn set_change_compute_cluster_compartment_details(
+        mut self,
+        value: ChangeComputeClusterCompartmentDetails,
+    ) -> Self {
         self.change_compute_cluster_compartment_details = value;
         self
     }
@@ -101,5 +104,3 @@ impl ChangeComputeClusterCompartmentRequest {
         self
     }
 }
-
-

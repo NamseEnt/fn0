@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct UpdateVolumeAttachmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateVolumeAttachmentRequest
 pub struct UpdateVolumeAttachmentRequestRequired {
@@ -44,7 +43,7 @@ impl UpdateVolumeAttachmentRequest {
             opc_request_id: None,
 
             if_match: None,
-}
+        }
     }
 
     /// Set volume_attachment_id
@@ -54,7 +53,10 @@ impl UpdateVolumeAttachmentRequest {
     }
 
     /// Set update_volume_attachment_details
-    pub fn set_update_volume_attachment_details(mut self, value: UpdateVolumeAttachmentDetails) -> Self {
+    pub fn set_update_volume_attachment_details(
+        mut self,
+        value: UpdateVolumeAttachmentDetails,
+    ) -> Self {
         self.update_volume_attachment_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl UpdateVolumeAttachmentRequest {
         self
     }
 }
-
-

@@ -13,7 +13,6 @@ pub struct DetachLoadBalancerDetails {
     pub backend_set_name: String,
 }
 
-
 /// Required fields for DetachLoadBalancerDetails
 pub struct DetachLoadBalancerDetailsRequired {
     /// The OCID of the load balancer to detach from the instance pool.
@@ -30,7 +29,7 @@ impl DetachLoadBalancerDetails {
             load_balancer_id: required.load_balancer_id,
 
             backend_set_name: required.backend_set_name,
-}
+        }
     }
 
     /// Set load_balancer_id
@@ -45,5 +44,3 @@ impl DetachLoadBalancerDetails {
         self
     }
 }
-
-

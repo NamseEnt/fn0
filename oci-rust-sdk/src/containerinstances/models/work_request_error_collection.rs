@@ -10,7 +10,6 @@ pub struct WorkRequestErrorCollection {
     pub items: Vec<WorkRequestError>,
 }
 
-
 /// Required fields for WorkRequestErrorCollection
 pub struct WorkRequestErrorCollectionRequired {
     /// List of workRequestError objects.
@@ -22,7 +21,7 @@ impl WorkRequestErrorCollection {
     pub fn new(required: WorkRequestErrorCollectionRequired) -> Self {
         Self {
             items: required.items,
-}
+        }
     }
 
     /// Set items
@@ -31,5 +30,3 @@ impl WorkRequestErrorCollection {
         self
     }
 }
-
-

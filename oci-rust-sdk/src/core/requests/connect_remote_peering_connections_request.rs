@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct ConnectRemotePeeringConnectionsRequest {
     /// Details to connect peering connection with peering connection from remote region
     pub connect_remote_peering_connections_details: ConnectRemotePeeringConnectionsDetails,
 }
-
 
 /// Required fields for ConnectRemotePeeringConnectionsRequest
 pub struct ConnectRemotePeeringConnectionsRequestRequired {
@@ -31,8 +30,9 @@ impl ConnectRemotePeeringConnectionsRequest {
         Self {
             remote_peering_connection_id: required.remote_peering_connection_id,
 
-            connect_remote_peering_connections_details: required.connect_remote_peering_connections_details,
-}
+            connect_remote_peering_connections_details: required
+                .connect_remote_peering_connections_details,
+        }
     }
 
     /// Set remote_peering_connection_id
@@ -42,10 +42,11 @@ impl ConnectRemotePeeringConnectionsRequest {
     }
 
     /// Set connect_remote_peering_connections_details
-    pub fn set_connect_remote_peering_connections_details(mut self, value: ConnectRemotePeeringConnectionsDetails) -> Self {
+    pub fn set_connect_remote_peering_connections_details(
+        mut self,
+        value: ConnectRemotePeeringConnectionsDetails,
+    ) -> Self {
         self.connect_remote_peering_connections_details = value;
         self
     }
 }
-
-

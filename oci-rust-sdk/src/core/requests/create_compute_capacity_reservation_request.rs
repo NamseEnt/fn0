@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateComputeCapacityReservationRequest {
     pub opc_retry_token: Option<String>,
 }
 
-
 /// Required fields for CreateComputeCapacityReservationRequest
 pub struct CreateComputeCapacityReservationRequestRequired {
     /// Details for creating a new compute capacity reservation. <p> *Caution:** Avoid using any confidential information when you use the API to supply string values.
@@ -31,16 +30,20 @@ impl CreateComputeCapacityReservationRequest {
     /// Create a new CreateComputeCapacityReservationRequest with required fields
     pub fn new(required: CreateComputeCapacityReservationRequestRequired) -> Self {
         Self {
-            create_compute_capacity_reservation_details: required.create_compute_capacity_reservation_details,
+            create_compute_capacity_reservation_details: required
+                .create_compute_capacity_reservation_details,
 
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set create_compute_capacity_reservation_details
-    pub fn set_create_compute_capacity_reservation_details(mut self, value: CreateComputeCapacityReservationDetails) -> Self {
+    pub fn set_create_compute_capacity_reservation_details(
+        mut self,
+        value: CreateComputeCapacityReservationDetails,
+    ) -> Self {
         self.create_compute_capacity_reservation_details = value;
         self
     }
@@ -69,5 +72,3 @@ impl CreateComputeCapacityReservationRequest {
         self
     }
 }
-
-

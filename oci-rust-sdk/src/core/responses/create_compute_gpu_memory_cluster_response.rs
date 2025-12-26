@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateComputeGpuMemoryClusterResponse {
     /// The returned model.ComputeGpuMemoryCluster instance.
     pub compute_gpu_memory_cluster: ComputeGpuMemoryCluster,
 }
-
 
 /// Required fields for CreateComputeGpuMemoryClusterResponse
 pub struct CreateComputeGpuMemoryClusterResponseRequired {
@@ -48,7 +47,7 @@ impl CreateComputeGpuMemoryClusterResponse {
             opc_work_request_id: required.opc_work_request_id,
 
             compute_gpu_memory_cluster: required.compute_gpu_memory_cluster,
-}
+        }
     }
 
     /// Set etag
@@ -75,5 +74,3 @@ impl CreateComputeGpuMemoryClusterResponse {
         self
     }
 }
-
-

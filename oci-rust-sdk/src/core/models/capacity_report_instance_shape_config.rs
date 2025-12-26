@@ -73,4 +73,3 @@ impl Default for CapacityReportInstanceShapeConfig {
         Self::new()
     }
 }
-

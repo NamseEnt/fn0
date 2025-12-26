@@ -22,7 +22,6 @@ pub struct CreateInstanceConsoleConnectionDetails {
     pub freeform_tags: Option<HashMap<String, String>>,
 }
 
-
 /// Required fields for CreateInstanceConsoleConnectionDetails
 pub struct CreateInstanceConsoleConnectionDetailsRequired {
     /// The OCID of the instance to create the console connection to.
@@ -43,11 +42,14 @@ impl CreateInstanceConsoleConnectionDetails {
             defined_tags: None,
 
             freeform_tags: None,
-}
+        }
     }
 
     /// Set defined_tags
-    pub fn set_defined_tags(mut self, value: Option<HashMap<String, HashMap<String, serde_json::Value>>>) -> Self {
+    pub fn set_defined_tags(
+        mut self,
+        value: Option<HashMap<String, HashMap<String, serde_json::Value>>>,
+    ) -> Self {
         self.defined_tags = value;
         self
     }
@@ -71,7 +73,10 @@ impl CreateInstanceConsoleConnectionDetails {
     }
 
     /// Set defined_tags (unwraps Option)
-    pub fn with_defined_tags(mut self, value: HashMap<String, HashMap<String, serde_json::Value>>) -> Self {
+    pub fn with_defined_tags(
+        mut self,
+        value: HashMap<String, HashMap<String, serde_json::Value>>,
+    ) -> Self {
         self.defined_tags = Some(value);
         self
     }
@@ -82,5 +87,3 @@ impl CreateInstanceConsoleConnectionDetails {
         self
     }
 }
-
-

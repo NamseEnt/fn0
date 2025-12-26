@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct UpdateVtapResponse {
     /// The returned model.Vtap instance.
     pub vtap: Vtap,
 }
-
 
 /// Required fields for UpdateVtapResponse
 pub struct UpdateVtapResponseRequired {
@@ -48,7 +47,7 @@ impl UpdateVtapResponse {
             opc_work_request_id: required.opc_work_request_id,
 
             vtap: required.vtap,
-}
+        }
     }
 
     /// Set etag
@@ -75,5 +74,3 @@ impl UpdateVtapResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct DetachInstancePoolInstanceRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for DetachInstancePoolInstanceRequest
 pub struct DetachInstancePoolInstanceRequestRequired {
@@ -38,7 +37,7 @@ impl DetachInstancePoolInstanceRequest {
             detach_instance_pool_instance_details: required.detach_instance_pool_instance_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set instance_pool_id
@@ -48,7 +47,10 @@ impl DetachInstancePoolInstanceRequest {
     }
 
     /// Set detach_instance_pool_instance_details
-    pub fn set_detach_instance_pool_instance_details(mut self, value: DetachInstancePoolInstanceDetails) -> Self {
+    pub fn set_detach_instance_pool_instance_details(
+        mut self,
+        value: DetachInstancePoolInstanceDetails,
+    ) -> Self {
         self.detach_instance_pool_instance_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl DetachInstancePoolInstanceRequest {
         self
     }
 }
-
-

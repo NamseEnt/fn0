@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct GetVcnOverlapRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for GetVcnOverlapRequest
 pub struct GetVcnOverlapRequestRequired {
@@ -44,7 +43,7 @@ impl GetVcnOverlapRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set vcn_id
@@ -83,5 +82,3 @@ impl GetVcnOverlapRequest {
         self
     }
 }
-
-

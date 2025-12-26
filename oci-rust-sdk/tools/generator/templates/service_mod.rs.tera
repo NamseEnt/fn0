@@ -1,0 +1,125 @@
+//! {{ service_name }} service module
+pub mod models;
+pub mod requests;
+pub mod responses;
+
+// Re-export commonly used types
+pub use models::*;
+pub use requests::*;
+pub use responses::*;
+
+use crate::auth::provider::AuthProvider;
+use crate::core::{
+    Result,
+    client::http_client::{OciClient, OciResponse},
+    region::Region,
+    retry::Retrier,
+};
+use std::sync::Arc;
+
+/// Client configuration for {{ service_name }} service
+pub struct ClientConfig {
+    pub auth_provider: Arc<dyn AuthProvider>,
+    pub region: Region,
+    pub timeout: std::time::Duration,
+    pub retry: Retrier,
+}
+
+/// Create a new {{ service_name }} client
+pub fn client(config: ClientConfig) -> Result<{{ client_name}}> {
+    let endpoint = format!(
+        "https://{{ endpoint_prefix }}.{}.oci.oraclecloud.com",
+        config.region.id()
+    );
+    let client = OciClient::new(config.auth_provider, endpoint)?.with_retrier(config.retry);
+
+    Ok({{ client_name }} { client })
+}
+
+/// {{ service_display_name }} API client
+pub struct {{ client_name }} {
+    client: OciClient,
+}
+
+impl {{ client_name }} {
+{%- for method in methods %}
+    /// {{ method.documentation }}
+    pub async fn {{ method.rust_name }}(
+        &self,
+        request: {{ method.request_type }},
+    ) -> Result<{{ method.response_type }}> {
+        let query_params = request.to_query_params();
+        let query_string = if query_params.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "?{}",
+                query_params
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", urlencoding::encode(k), urlencoding::encode(v)))
+                    .collect::<Vec<_>>()
+                    .join("&")
+            )
+        };
+
+        let path = format!(
+            "{{ method.api_version }}{{ method.http_path_template }}{}",{% for param in method.path_params %}
+            request.{{ param }},{% endfor %}
+            query_string
+        );
+        {% if method.http_method == "GET" -%}
+        let response = self.client.get(&path).await?;
+        {% elif method.http_method == "POST" -%}
+        {% if method.body_param -%}
+        let response = self
+            .client
+            .post(&path, Some(&request.{{ method.body_param }}))
+            .await?;
+        {% else -%}
+        let response: OciResponse<serde_json::Value> = self
+            .client
+            .post(&path, None::<&serde_json::Value>)
+            .await?;
+        {% endif -%}
+        {% elif method.http_method == "PUT" -%}
+        {% if method.body_param -%}
+        let response = self
+            .client
+            .put(&path, Some(&request.{{ method.body_param }}))
+            .await?;
+        {% else -%}
+        let response: OciResponse<serde_json::Value> = self
+            .client
+            .put(&path, None::<&serde_json::Value>)
+            .await?;
+        {% endif -%}
+        {% elif method.http_method == "DELETE" -%}
+        let response: OciResponse<serde_json::Value> = self.client.delete(&path).await?;
+        {% elif method.http_method == "PATCH" -%}
+        {% if method.body_param -%}
+        let response = self
+            .client
+            .patch(&path, Some(&request.{{ method.body_param }}))
+            .await?;
+        {% else -%}
+        let response: OciResponse<serde_json::Value> = self
+            .client
+            .patch(&path, None::<&serde_json::Value>)
+            .await?;
+        {% endif -%}
+        {% endif %}
+        {% for header in method.response_headers -%}
+        let {{ header.rust_name }} = response.get_header("{{ header.header_name }}");
+        {% endfor %}
+        Ok({{ method.response_type }} {
+            {% if method.response_body_field -%}
+            {{ method.response_body_field }}: response.body,
+            {% endif -%}
+            {% for header in method.response_headers -%}
+            {{ header.rust_name }},
+            {% endfor -%}
+        })
+    }
+
+{% endfor -%}
+}

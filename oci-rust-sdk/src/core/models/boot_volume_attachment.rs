@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
 use super::*;
@@ -44,7 +44,6 @@ pub struct BootVolumeAttachment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encryption_in_transit_type: Option<EncryptionInTransitType>,
 }
-
 
 /// Required fields for BootVolumeAttachment
 pub struct BootVolumeAttachmentRequired {
@@ -95,7 +94,7 @@ impl BootVolumeAttachment {
             is_pv_encryption_in_transit_enabled: None,
 
             encryption_in_transit_type: None,
-}
+        }
     }
 
     /// Set availability_domain
@@ -159,7 +158,10 @@ impl BootVolumeAttachment {
     }
 
     /// Set encryption_in_transit_type
-    pub fn set_encryption_in_transit_type(mut self, value: Option<EncryptionInTransitType>) -> Self {
+    pub fn set_encryption_in_transit_type(
+        mut self,
+        value: Option<EncryptionInTransitType>,
+    ) -> Self {
         self.encryption_in_transit_type = value;
         self
     }
@@ -188,5 +190,3 @@ impl BootVolumeAttachment {
         self
     }
 }
-
-

@@ -10,7 +10,6 @@ pub struct ChangeVtapCompartmentDetails {
     pub compartment_id: String,
 }
 
-
 /// Required fields for ChangeVtapCompartmentDetails
 pub struct ChangeVtapCompartmentDetailsRequired {
     /// The [OCID](https://docs.oracle.com/iaas/Content/General/Concepts/identifiers.htm) of the destination compartment for the VTAP move.
@@ -22,7 +21,7 @@ impl ChangeVtapCompartmentDetails {
     pub fn new(required: ChangeVtapCompartmentDetailsRequired) -> Self {
         Self {
             compartment_id: required.compartment_id,
-}
+        }
     }
 
     /// Set compartment_id
@@ -31,5 +30,3 @@ impl ChangeVtapCompartmentDetails {
         self
     }
 }
-
-

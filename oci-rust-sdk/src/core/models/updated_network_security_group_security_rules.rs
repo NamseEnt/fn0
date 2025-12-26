@@ -37,4 +37,3 @@ impl Default for UpdatedNetworkSecurityGroupSecurityRules {
         Self::new()
     }
 }
-

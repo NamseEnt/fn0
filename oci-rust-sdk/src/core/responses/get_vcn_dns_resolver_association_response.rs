@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct GetVcnDnsResolverAssociationResponse {
     /// The returned model.VcnDnsResolverAssociation instance.
     pub vcn_dns_resolver_association: VcnDnsResolverAssociation,
 }
-
 
 /// Required fields for GetVcnDnsResolverAssociationResponse
 pub struct GetVcnDnsResolverAssociationResponseRequired {
@@ -40,7 +39,7 @@ impl GetVcnDnsResolverAssociationResponse {
             opc_request_id: required.opc_request_id,
 
             vcn_dns_resolver_association: required.vcn_dns_resolver_association,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl GetVcnDnsResolverAssociationResponse {
         self
     }
 }
-
-

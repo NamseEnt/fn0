@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct AddDrgRouteRulesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for AddDrgRouteRulesRequest
 pub struct AddDrgRouteRulesRequestRequired {
@@ -38,7 +37,7 @@ impl AddDrgRouteRulesRequest {
             add_drg_route_rules_details: required.add_drg_route_rules_details,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set drg_route_table_id
@@ -65,5 +64,3 @@ impl AddDrgRouteRulesRequest {
         self
     }
 }
-
-

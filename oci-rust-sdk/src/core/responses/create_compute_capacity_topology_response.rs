@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,6 @@ pub struct CreateComputeCapacityTopologyResponse {
     /// The returned model.ComputeCapacityTopology instance.
     pub compute_capacity_topology: ComputeCapacityTopology,
 }
-
 
 /// Required fields for CreateComputeCapacityTopologyResponse
 pub struct CreateComputeCapacityTopologyResponseRequired {
@@ -56,7 +55,7 @@ impl CreateComputeCapacityTopologyResponse {
             opc_work_request_id: required.opc_work_request_id,
 
             compute_capacity_topology: required.compute_capacity_topology,
-}
+        }
     }
 
     /// Set etag
@@ -89,5 +88,3 @@ impl CreateComputeCapacityTopologyResponse {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +14,6 @@ pub struct GetImageShapeCompatibilityEntryResponse {
     /// The returned model.ImageShapeCompatibilityEntry instance.
     pub image_shape_compatibility_entry: ImageShapeCompatibilityEntry,
 }
-
 
 /// Required fields for GetImageShapeCompatibilityEntryResponse
 pub struct GetImageShapeCompatibilityEntryResponseRequired {
@@ -32,7 +31,7 @@ impl GetImageShapeCompatibilityEntryResponse {
             opc_request_id: required.opc_request_id,
 
             image_shape_compatibility_entry: required.image_shape_compatibility_entry,
-}
+        }
     }
 
     /// Set opc_request_id
@@ -42,10 +41,11 @@ impl GetImageShapeCompatibilityEntryResponse {
     }
 
     /// Set image_shape_compatibility_entry
-    pub fn set_image_shape_compatibility_entry(mut self, value: ImageShapeCompatibilityEntry) -> Self {
+    pub fn set_image_shape_compatibility_entry(
+        mut self,
+        value: ImageShapeCompatibilityEntry,
+    ) -> Self {
         self.image_shape_compatibility_entry = value;
         self
     }
 }
-
-

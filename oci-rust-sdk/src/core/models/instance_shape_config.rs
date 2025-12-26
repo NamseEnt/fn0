@@ -104,7 +104,10 @@ impl InstanceShapeConfig {
     }
 
     /// Set baseline_ocpu_utilization
-    pub fn set_baseline_ocpu_utilization(mut self, value: Option<InstanceShapeConfigBaselineOcpuUtilization>) -> Self {
+    pub fn set_baseline_ocpu_utilization(
+        mut self,
+        value: Option<InstanceShapeConfigBaselineOcpuUtilization>,
+    ) -> Self {
         self.baseline_ocpu_utilization = value;
         self
     }
@@ -164,7 +167,10 @@ impl InstanceShapeConfig {
     }
 
     /// Set resource_management
-    pub fn set_resource_management(mut self, value: Option<InstanceShapeConfigResourceManagement>) -> Self {
+    pub fn set_resource_management(
+        mut self,
+        value: Option<InstanceShapeConfigResourceManagement>,
+    ) -> Self {
         self.resource_management = value;
         self
     }
@@ -182,7 +188,10 @@ impl InstanceShapeConfig {
     }
 
     /// Set baseline_ocpu_utilization (unwraps Option)
-    pub fn with_baseline_ocpu_utilization(mut self, value: InstanceShapeConfigBaselineOcpuUtilization) -> Self {
+    pub fn with_baseline_ocpu_utilization(
+        mut self,
+        value: InstanceShapeConfigBaselineOcpuUtilization,
+    ) -> Self {
         self.baseline_ocpu_utilization = Some(value);
         self
     }
@@ -242,7 +251,10 @@ impl InstanceShapeConfig {
     }
 
     /// Set resource_management (unwraps Option)
-    pub fn with_resource_management(mut self, value: InstanceShapeConfigResourceManagement) -> Self {
+    pub fn with_resource_management(
+        mut self,
+        value: InstanceShapeConfigResourceManagement,
+    ) -> Self {
         self.resource_management = Some(value);
         self
     }
@@ -253,4 +265,3 @@ impl Default for InstanceShapeConfig {
         Self::new()
     }
 }
-

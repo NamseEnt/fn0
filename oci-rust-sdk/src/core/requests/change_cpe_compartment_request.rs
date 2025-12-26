@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,6 @@ pub struct ChangeCpeCompartmentRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opc_retry_token: Option<String>,
 }
-
 
 /// Required fields for ChangeCpeCompartmentRequest
 pub struct ChangeCpeCompartmentRequestRequired {
@@ -44,7 +43,7 @@ impl ChangeCpeCompartmentRequest {
             opc_request_id: None,
 
             opc_retry_token: None,
-}
+        }
     }
 
     /// Set cpe_id
@@ -54,7 +53,10 @@ impl ChangeCpeCompartmentRequest {
     }
 
     /// Set change_cpe_compartment_details
-    pub fn set_change_cpe_compartment_details(mut self, value: ChangeCpeCompartmentDetails) -> Self {
+    pub fn set_change_cpe_compartment_details(
+        mut self,
+        value: ChangeCpeCompartmentDetails,
+    ) -> Self {
         self.change_cpe_compartment_details = value;
         self
     }
@@ -83,5 +85,3 @@ impl ChangeCpeCompartmentRequest {
         self
     }
 }
-
-

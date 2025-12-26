@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct UpdateInternetGatewayRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub if_match: Option<String>,
 }
-
 
 /// Required fields for UpdateInternetGatewayRequest
 pub struct UpdateInternetGatewayRequestRequired {
@@ -38,7 +37,7 @@ impl UpdateInternetGatewayRequest {
             update_internet_gateway_details: required.update_internet_gateway_details,
 
             if_match: None,
-}
+        }
     }
 
     /// Set ig_id
@@ -48,7 +47,10 @@ impl UpdateInternetGatewayRequest {
     }
 
     /// Set update_internet_gateway_details
-    pub fn set_update_internet_gateway_details(mut self, value: UpdateInternetGatewayDetails) -> Self {
+    pub fn set_update_internet_gateway_details(
+        mut self,
+        value: UpdateInternetGatewayDetails,
+    ) -> Self {
         self.update_internet_gateway_details = value;
         self
     }
@@ -65,5 +67,3 @@ impl UpdateInternetGatewayRequest {
         self
     }
 }
-
-

@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,6 @@ pub struct CreateClusterNetworkResponse {
     /// The returned model.ClusterNetwork instance.
     pub cluster_network: ClusterNetwork,
 }
-
 
 /// Required fields for CreateClusterNetworkResponse
 pub struct CreateClusterNetworkResponseRequired {
@@ -48,7 +47,7 @@ impl CreateClusterNetworkResponse {
             opc_work_request_id: required.opc_work_request_id,
 
             cluster_network: required.cluster_network,
-}
+        }
     }
 
     /// Set etag
@@ -75,5 +74,3 @@ impl CreateClusterNetworkResponse {
         self
     }
 }
-
-

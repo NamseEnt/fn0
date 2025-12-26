@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use super::super::models::*;
+#[allow(unused_imports)]
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,6 @@ pub struct CreateInstancePoolResponse {
     /// The returned model.InstancePool instance.
     pub instance_pool: InstancePool,
 }
-
 
 /// Required fields for CreateInstancePoolResponse
 pub struct CreateInstancePoolResponseRequired {
@@ -40,7 +39,7 @@ impl CreateInstancePoolResponse {
             opc_request_id: required.opc_request_id,
 
             instance_pool: required.instance_pool,
-}
+        }
     }
 
     /// Set etag
@@ -61,5 +60,3 @@ impl CreateInstancePoolResponse {
         self
     }
 }
-
-

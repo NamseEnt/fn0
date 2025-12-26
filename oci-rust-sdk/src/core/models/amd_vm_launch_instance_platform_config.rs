@@ -14,7 +14,6 @@ pub struct AmdVmLaunchInstancePlatformConfig {
     pub is_symmetric_multi_threading_enabled: Option<bool>,
 }
 
-
 /// Required fields for AmdVmLaunchInstancePlatformConfig
 pub struct AmdVmLaunchInstancePlatformConfigRequired {
     pub r#type: String,
@@ -27,7 +26,7 @@ impl AmdVmLaunchInstancePlatformConfig {
             r#type: required.r#type,
 
             is_symmetric_multi_threading_enabled: None,
-}
+        }
     }
 
     /// Set is_symmetric_multi_threading_enabled
@@ -48,5 +47,3 @@ impl AmdVmLaunchInstancePlatformConfig {
         self
     }
 }
-
-
