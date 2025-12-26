@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 {% if documentation %}/// {{ documentation | replace(from="\n", to="\n/// ") }}
 {% endif %}#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -11,4 +12,16 @@ pub enum {{ name }} {
     /// This value is used if a service returns a value for this enum that is not recognized by this version of the SDK.
     #[serde(other)]
     UnknownValue,
+}
+
+impl fmt::Display for {{ name }} {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+{%- for variant in variants %}
+            {% if variant.name != "UnknownValue" %}Self::{{ variant.name }} => write!(f, "{{ variant.value }}"),
+            {% endif %}
+{%- endfor %}
+            Self::UnknownValue => write!(f, "UNKNOWN"),
+        }
+    }
 }
