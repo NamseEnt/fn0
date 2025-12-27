@@ -378,7 +378,17 @@ const RouterContext = React.createContext<RouterContextValue | null>(null);
 
 export function useRouter() {
   const context = React.useContext(RouterContext);
+  const isServer = typeof window === 'undefined';
+
   if (!context) {
+    // On server, return no-op router
+    if (isServer) {
+      return {
+        navigate: async () => {},
+        prefetch: async () => {},
+        currentPath: '/'
+      };
+    }
     throw new Error('useRouter must be used within a RouterProvider');
   }
   return context;
@@ -390,12 +400,16 @@ interface RouterProviderProps {
 }
 
 export function RouterProvider({ children, initialPath }: RouterProviderProps) {
+  const isServer = typeof window === 'undefined';
   const [currentPath, setCurrentPath] = React.useState(
-    initialPath || (typeof window !== 'undefined' ? window.location.pathname : '/')
+    initialPath || (!isServer ? window.location.pathname : '/')
   );
   const prefetchCache = React.useRef<Map<string, any>>(new Map());
 
   const prefetch = React.useCallback(async (href: string) => {
+    // Skip on server
+    if (isServer) return;
+
     // Skip if already in cache
     if (prefetchCache.current.has(href)) {
       return;
@@ -414,9 +428,12 @@ export function RouterProvider({ children, initialPath }: RouterProviderProps) {
       // Ignore prefetch errors
       console.warn('[Forte Router] Prefetch failed for:', href, err);
     }
-  }, []);
+  }, [isServer]);
 
   const navigate = React.useCallback(async (href: string) => {
+    // Skip on server
+    if (isServer) return;
+
     try {
       // Check cache first
       let pageProps = prefetchCache.current.get(href);
@@ -454,10 +471,13 @@ export function RouterProvider({ children, initialPath }: RouterProviderProps) {
       // Fall back to full page navigation
       window.location.href = href;
     }
-  }, []);
+  }, [isServer]);
 
   // Handle browser back/forward
   React.useEffect(() => {
+    // Skip on server
+    if (isServer) return;
+
     const handlePopState = () => {
       setCurrentPath(window.location.pathname);
       window.dispatchEvent(new CustomEvent('forte:navigate', {
@@ -467,7 +487,7 @@ export function RouterProvider({ children, initialPath }: RouterProviderProps) {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [isServer]);
 
   const value = React.useMemo(() => ({
     navigate,

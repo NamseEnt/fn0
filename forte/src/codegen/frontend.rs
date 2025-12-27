@@ -46,6 +46,7 @@ fn generate_ssr_server(routes: &[RouteInfo]) -> Result<String> {
 import express from 'express';
 import * as React from 'react';
 import { renderToString } from 'react-dom/server';
+import { RouterProvider } from '../../frontend/src/forte/Router.tsx';
 import { routes } from './routes.js';
 import type { RouteConfig } from './routes.js';
 import { fileURLToPath } from 'url';
@@ -123,6 +124,12 @@ async function startServer() {
       }
     }
 
+    // Check if client wants JSON (client-side navigation)
+    const acceptHeader = req.get('Accept') || '';
+    if (acceptHeader.includes('application/json')) {
+      return res.json(pageProps);
+    }
+
     // Dynamically import the page component
     const pageModule = await import(route.componentPath);
     const Page = pageModule.default;
@@ -156,6 +163,13 @@ async function startServer() {
     if (RootLayout) {
       component = React.createElement(RootLayout, { children: component });
     }
+
+    // Wrap with RouterProvider for SSR
+    component = React.createElement(
+      RouterProvider,
+      { initialPath: req.path },
+      component
+    );
 
     // Render to string
     const html = renderToString(component);
@@ -212,13 +226,16 @@ startServer().catch(err => {
 fn generate_client_hydration() -> String {
     r#"// [Generated] Client-side hydration
 import * as React from 'react';
-import { hydrateRoot } from 'react-dom/client';
+import { hydrateRoot, createRoot } from 'react-dom/client';
+import { RouterProvider } from '../../frontend/src/forte/Router.tsx';
 import { routes } from './routes.js';
 
-async function hydrate() {
+let root = null;
+
+async function renderApp(pageProps = null) {
   try {
-    // Get initial props from server
-    const initialProps = window.__INITIAL_PROPS__ || {};
+    // Use provided props or get from window
+    const initialProps = pageProps || window.__INITIAL_PROPS__ || {};
 
     // Find matching route
     const currentPath = window.location.pathname;
@@ -233,8 +250,6 @@ async function hydrate() {
       console.error('[Forte] No route found for', currentPath);
       return;
     }
-
-    console.log('[Forte] Hydrating route:', currentPath);
 
     // Dynamically import the page component
     const pageModule = await import(route.componentPath);
@@ -270,17 +285,42 @@ async function hydrate() {
       component = React.createElement(RootLayout, { children: component });
     }
 
-    // Hydrate the root
+    // Wrap with RouterProvider for client-side navigation
+    component = React.createElement(
+      RouterProvider,
+      { initialPath: currentPath },
+      component
+    );
+
+    // Hydrate or render the root
     const rootElement = document.getElementById('root');
     if (rootElement) {
-      hydrateRoot(rootElement, component);
-      console.log('[Forte] Hydration complete');
+      if (!root) {
+        // Initial hydration
+        root = hydrateRoot(rootElement, component);
+        console.log('[Forte] Hydration complete');
+      } else {
+        // Client-side navigation - re-render
+        root.render(component);
+        console.log('[Forte] Navigation render complete');
+      }
     } else {
       console.error('[Forte] Root element not found');
     }
   } catch (err) {
-    console.error('[Forte] Hydration failed:', err);
+    console.error('[Forte] Render failed:', err);
   }
+}
+
+async function hydrate() {
+  // Initial hydration
+  await renderApp();
+
+  // Listen for client-side navigation
+  window.addEventListener('forte:navigate', async (e) => {
+    const { pageProps } = e.detail;
+    await renderApp(pageProps);
+  });
 }
 
 // Start hydration when DOM is ready
