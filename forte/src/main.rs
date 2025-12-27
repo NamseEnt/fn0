@@ -1,5 +1,6 @@
 mod codegen;
 mod commands;
+mod config;
 mod generator;
 mod parser;
 mod templates;
@@ -23,11 +24,11 @@ enum Commands {
         /// Project name
         project_name: String,
     },
-    /// Start development server (not implemented yet)
+    /// Start development server
     Dev,
-    /// Build for production (not implemented yet)
+    /// Build for production
     Build,
-    /// Run tests (not implemented yet)
+    /// Run tests
     Test,
 }
 
@@ -43,10 +44,10 @@ async fn main() -> Result<()> {
             commands::dev::execute()?;
         }
         Commands::Build => {
-            println!("⚠️  'build' command not implemented yet (Phase 5)");
+            commands::build::execute()?;
         }
         Commands::Test => {
-            println!("⚠️  'test' command not implemented yet (Phase 5)");
+            commands::test::execute()?;
         }
     }
 

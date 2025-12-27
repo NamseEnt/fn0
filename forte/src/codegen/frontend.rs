@@ -7,6 +7,10 @@ pub fn generate_frontend_code(project_root: &Path, routes: &[RouteInfo]) -> Resu
     let gen_dir = project_root.join(".generated/frontend");
     std::fs::create_dir_all(&gen_dir).context("Failed to create .generated/frontend")?;
 
+    // Generate ErrorBoundary.tsx
+    let error_boundary_ts = crate::templates::error_boundary::ERROR_BOUNDARY_TEMPLATE;
+    std::fs::write(gen_dir.join("ErrorBoundary.tsx"), error_boundary_ts)?;
+
     // Generate server.ts
     let server_ts = generate_ssr_server(routes)?;
     std::fs::write(gen_dir.join("server.ts"), server_ts)?;
@@ -49,6 +53,7 @@ import { renderToString } from 'react-dom/server';
 import { RouterProvider } from '../../frontend/src/forte/Router.tsx';
 import { routes } from './routes.js';
 import type { RouteConfig } from './routes.js';
+import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -144,6 +149,16 @@ async function startServer() {
       // No layout, that's ok
     }
 
+    // Try importing error.tsx for this route
+    let ErrorPage: any = null;
+    try {
+      const errorPath = route.componentPath.replace('/page.tsx', '/error.tsx');
+      const errorModule = await import(errorPath);
+      ErrorPage = errorModule.default;
+    } catch (e) {
+      // No custom error page
+    }
+
     // Also try root layout
     let RootLayout: any = null;
     try {
@@ -158,6 +173,22 @@ async function startServer() {
 
     if (Layout) {
       component = React.createElement(Layout, { children: component });
+    }
+
+    // Wrap with error boundary if custom error page exists
+    if (ErrorPage) {
+      component = React.createElement(
+        ErrorBoundary,
+        { fallback: ErrorPage },
+        component
+      );
+    } else {
+      // Use default error boundary
+      component = React.createElement(
+        ErrorBoundary,
+        {},
+        component
+      );
     }
 
     if (RootLayout) {
@@ -228,6 +259,7 @@ fn generate_client_hydration() -> String {
 import * as React from 'react';
 import { hydrateRoot, createRoot } from 'react-dom/client';
 import { RouterProvider } from '../../frontend/src/forte/Router.tsx';
+import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { routes } from './routes.js';
 
 let root = null;
@@ -265,6 +297,16 @@ async function renderApp(pageProps = null) {
       // No route-specific layout
     }
 
+    // Try importing error.tsx for this route
+    let ErrorPage = null;
+    try {
+      const errorPath = route.componentPath.replace('/page.tsx', '/error.tsx');
+      const errorModule = await import(errorPath);
+      ErrorPage = errorModule.default;
+    } catch (e) {
+      // No custom error page
+    }
+
     // Import root layout
     let RootLayout = null;
     try {
@@ -279,6 +321,22 @@ async function renderApp(pageProps = null) {
 
     if (Layout) {
       component = React.createElement(Layout, { children: component });
+    }
+
+    // Wrap with error boundary if custom error page exists
+    if (ErrorPage) {
+      component = React.createElement(
+        ErrorBoundary,
+        { fallback: ErrorPage },
+        component
+      );
+    } else {
+      // Use default error boundary
+      component = React.createElement(
+        ErrorBoundary,
+        {},
+        component
+      );
     }
 
     if (RootLayout) {

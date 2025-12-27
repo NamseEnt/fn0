@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
 use std::env;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 
+use crate::config;
 use crate::watcher;
 
 pub fn execute() -> Result<()> {
@@ -19,6 +20,13 @@ pub fn execute() -> Result<()> {
         );
     }
 
+    // Load config
+    let forte_config = config::ForteConfig::load(&current_dir)?;
+
+    // Load and validate environment variables
+    let env_vars = config::load_env_vars(&current_dir, "development")?;
+    config::validate_env(&forte_config, &env_vars)?;
+
     // Initial code generation
     println!("Generating initial code...");
     let routes = watcher::scan_routes(&current_dir)?;
@@ -27,7 +35,7 @@ pub fn execute() -> Result<()> {
             eprintln!("Error processing {}: {}", route.props_path.display(), e);
         }
     }
-    crate::codegen::generate_backend_code(&current_dir, &routes)?;
+    crate::codegen::generate_backend_code(&current_dir, &routes, &forte_config)?;
     crate::codegen::generate_frontend_code(&current_dir, &routes)?;
 
     // Build backend
@@ -105,7 +113,7 @@ pub fn execute() -> Result<()> {
 
     // Watch for file changes
     println!();
-    watcher::watch_routes(&current_dir)?;
+    watcher::watch_routes(&current_dir, &forte_config)?;
 
     // Clean up
     if let Some(mut child) = backend_handle.lock().unwrap().take() {

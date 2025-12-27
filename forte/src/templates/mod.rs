@@ -1,3 +1,4 @@
+pub mod error_boundary;
 pub mod frontend_ssr;
 
 // Root configuration files
@@ -161,6 +162,7 @@ tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
+validator = { version = "0.18", features = ["derive"] }
 "#.to_string()
 }
 

@@ -15,6 +15,7 @@ pub struct RouteInfo {
     pub frontend_dir: PathBuf,     // frontend/src/app/product/[id]
     pub gen_ts_path: PathBuf,      // frontend/src/app/product/[id]/props.gen.ts
     pub has_action_input: bool,    // Whether this route has ActionInput struct (for POST actions)
+    pub has_error_page: bool,      // Whether this route has an error.tsx file
 }
 
 /// Scan the backend/src/routes directory and find all props.rs files
@@ -69,11 +70,16 @@ fn build_route_info(project_root: &Path, props_path: &Path) -> Result<RouteInfo>
         Err(_) => false,  // If parsing fails, assume no action input
     };
 
+    // Check if error.tsx exists in the frontend directory
+    let error_tsx_path = frontend_dir.join("error.tsx");
+    let has_error_page = error_tsx_path.exists();
+
     Ok(RouteInfo {
         props_path: props_path.to_path_buf(),
         frontend_dir,
         gen_ts_path,
         has_action_input,
+        has_error_page,
     })
 }
 
@@ -128,8 +134,9 @@ pub fn process_props_file(route_info: &RouteInfo) -> Result<()> {
 }
 
 /// Watch for file changes and trigger code generation
-pub fn watch_routes(project_root: &Path) -> Result<()> {
+pub fn watch_routes(project_root: &Path, config: &crate::config::ForteConfig) -> Result<()> {
     let project_root = project_root.to_path_buf();
+    let config = config.clone();
 
     // Initial scan and generation
     println!("Scanning routes...");
@@ -144,7 +151,7 @@ pub fn watch_routes(project_root: &Path) -> Result<()> {
 
     // Generate backend code
     println!("\nGenerating backend code...");
-    if let Err(e) = crate::codegen::generate_backend_code(&project_root, &routes) {
+    if let Err(e) = crate::codegen::generate_backend_code(&project_root, &routes, &config) {
         eprintln!("Error generating backend code: {}", e);
     }
 
@@ -207,7 +214,7 @@ pub fn watch_routes(project_root: &Path) -> Result<()> {
                         }
 
                         // Regenerate backend code
-                        if let Err(e) = crate::codegen::generate_backend_code(&project_root, &routes) {
+                        if let Err(e) = crate::codegen::generate_backend_code(&project_root, &routes, &config) {
                             eprintln!("Error generating backend code: {}", e);
                         }
 

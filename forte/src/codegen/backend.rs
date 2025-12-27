@@ -1,9 +1,10 @@
+use crate::config::ForteConfig;
 use crate::watcher::RouteInfo;
 use anyhow::{Context, Result};
 use std::path::Path;
 
 /// Generate all backend code files (.generated/backend/*)
-pub fn generate_backend_code(project_root: &Path, routes: &[RouteInfo]) -> Result<()> {
+pub fn generate_backend_code(project_root: &Path, routes: &[RouteInfo], config: &ForteConfig) -> Result<()> {
     let gen_dir = project_root.join(".generated/backend");
     std::fs::create_dir_all(&gen_dir).context("Failed to create .generated/backend")?;
 
@@ -18,6 +19,10 @@ pub fn generate_backend_code(project_root: &Path, routes: &[RouteInfo]) -> Resul
     // Generate main.rs
     let main_rs = generate_main_module();
     std::fs::write(gen_dir.join("main.rs"), main_rs)?;
+
+    // Generate env.rs
+    let env_rs = generate_env_module(config);
+    std::fs::write(gen_dir.join("env.rs"), env_rs)?;
 
     // Update backend/src/routes/mod.rs
     let routes_mod = generate_routes_mod(routes)?;
@@ -58,14 +63,30 @@ fn generate_error_module() -> String {
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
 pub enum AppError {
-    NotFound(String),
-    BadRequest(String),
-    Unauthorized(String),
-    Forbidden(String),
-    Internal(String),
+    NotFound(ErrorBody),
+    BadRequest(ErrorBody),
+    Validation(ValidationErrorBody),
+    Unauthorized(ErrorBody),
+    Forbidden(ErrorBody),
+    Internal(ErrorBody),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ErrorBody {
+    pub error: String,
+    pub status: u16,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ValidationErrorBody {
+    pub error: String,
+    pub status: u16,
+    pub fields: HashMap<String, Vec<String>>,
 }
 
 // ActionResult for post_action functions
@@ -77,23 +98,56 @@ pub enum ActionResult<T> {
 }
 
 impl AppError {
+    pub fn not_found(msg: impl Into<String>) -> Self {
+        Self::NotFound(ErrorBody {
+            error: msg.into(),
+            status: 404,
+        })
+    }
+
+    pub fn bad_request(msg: impl Into<String>) -> Self {
+        Self::BadRequest(ErrorBody {
+            error: msg.into(),
+            status: 400,
+        })
+    }
+
+    pub fn validation(fields: HashMap<String, Vec<String>>) -> Self {
+        Self::Validation(ValidationErrorBody {
+            error: "Validation failed".to_string(),
+            status: 400,
+            fields,
+        })
+    }
+
+    pub fn unauthorized(msg: impl Into<String>) -> Self {
+        Self::Unauthorized(ErrorBody {
+            error: msg.into(),
+            status: 401,
+        })
+    }
+
+    pub fn forbidden(msg: impl Into<String>) -> Self {
+        Self::Forbidden(ErrorBody {
+            error: msg.into(),
+            status: 403,
+        })
+    }
+
+    pub fn internal(msg: impl Into<String>) -> Self {
+        Self::Internal(ErrorBody {
+            error: msg.into(),
+            status: 500,
+        })
+    }
+
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::NotFound(_) => StatusCode::NOT_FOUND,
-            Self::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Self::BadRequest(_) | Self::Validation(_) => StatusCode::BAD_REQUEST,
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
-
-    pub fn message(&self) -> &str {
-        match self {
-            Self::NotFound(msg) => msg,
-            Self::BadRequest(msg) => msg,
-            Self::Unauthorized(msg) => msg,
-            Self::Forbidden(msg) => msg,
-            Self::Internal(msg) => msg,
         }
     }
 }
@@ -101,22 +155,69 @@ impl AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = self.status_code();
-        let body = serde_json::json!({
-            "error": self.message(),
-            "status": status.as_u16(),
-        });
-
-        (status, axum::Json(body)).into_response()
+        (status, axum::Json(&self)).into_response()
     }
 }
 
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message())
+        match self {
+            Self::NotFound(e) => write!(f, "{}", e.error),
+            Self::BadRequest(e) => write!(f, "{}", e.error),
+            Self::Validation(e) => write!(f, "{}", e.error),
+            Self::Unauthorized(e) => write!(f, "{}", e.error),
+            Self::Forbidden(e) => write!(f, "{}", e.error),
+            Self::Internal(e) => write!(f, "{}", e.error),
+        }
     }
 }
 
 impl std::error::Error for AppError {}
+
+// ValidatedJson extractor for automatic validation
+// This wraps Axum's Json extractor and adds validation support
+use axum::{
+    async_trait,
+    extract::{FromRequest, Request},
+    http::StatusCode as HttpStatusCode,
+};
+
+pub struct ValidatedJson<T>(pub T);
+
+#[async_trait]
+impl<T, S> FromRequest<S> for ValidatedJson<T>
+where
+    T: serde::de::DeserializeOwned + validator::Validate,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        // First, extract JSON
+        let axum::Json(value) = axum::Json::<T>::from_request(req, state)
+            .await
+            .map_err(|_| AppError::bad_request("Invalid JSON body"))?;
+
+        // Then validate
+        value.validate().map_err(|e| {
+            let mut field_errors = HashMap::new();
+
+            for (field, errors) in e.field_errors() {
+                let messages: Vec<String> = errors
+                    .iter()
+                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .collect();
+                if !messages.is_empty() {
+                    field_errors.insert(field.to_string(), messages);
+                }
+            }
+
+            AppError::validation(field_errors)
+        })?;
+
+        Ok(ValidatedJson(value))
+    }
+}
 "#
     .to_string()
 }
@@ -159,7 +260,14 @@ fn generate_router_module(routes: &[RouteInfo]) -> Result<String> {
         output.push_str("use backend::ActionResult;\n");
     }
 
-    output.push_str("use super::error::AppError;\n\n");
+    output.push_str("use super::error::AppError;\n");
+
+    // Import ValidatedJson if there are actions
+    if has_actions {
+        output.push_str("use super::error::ValidatedJson;\n");
+    }
+
+    output.push_str("\n");
 
     // Generate route handlers
     for route in routes {
@@ -211,7 +319,7 @@ fn generate_router_module(routes: &[RouteInfo]) -> Result<String> {
                 // No path parameters
                 output.push_str(&format!("// POST handler for: {}\n", route_path));
                 output.push_str(&format!(
-                    "async fn {}(Json(input): Json<routes::{}::ActionInput>) -> Result<Json<ActionResult<routes::{}::PageProps>>, AppError> {{\n",
+                    "async fn {}(ValidatedJson(input): ValidatedJson<routes::{}::ActionInput>) -> Result<Json<ActionResult<routes::{}::PageProps>>, AppError> {{\n",
                     action_handler_name, module_path, module_path
                 ));
                 output.push_str(&format!(
@@ -225,7 +333,7 @@ fn generate_router_module(routes: &[RouteInfo]) -> Result<String> {
                 let path_struct_name = get_path_struct_name(&route_path);
                 output.push_str(&format!("// POST handler for: {}\n", route_path));
                 output.push_str(&format!(
-                    "async fn {}(Path(path): Path<routes::{}::{}>, Json(input): Json<routes::{}::ActionInput>) -> Result<Json<ActionResult<routes::{}::PageProps>>, AppError> {{\n",
+                    "async fn {}(Path(path): Path<routes::{}::{}>, ValidatedJson(input): ValidatedJson<routes::{}::ActionInput>) -> Result<Json<ActionResult<routes::{}::PageProps>>, AppError> {{\n",
                     action_handler_name, module_path, path_struct_name, module_path, module_path
                 ));
                 output.push_str(&format!(
@@ -452,4 +560,78 @@ mod tests {
             "handler_product_id"
         );
     }
+}
+
+fn generate_env_module(config: &ForteConfig) -> String {
+    let mut output = String::new();
+
+    output.push_str("// [Generated] Do not edit manually\n");
+    output.push_str("// Environment variables with type safety\n\n");
+    output.push_str("use std::sync::OnceLock;\n\n");
+
+    // Generate Env struct
+    output.push_str("pub struct Env {\n");
+
+    // Add required fields
+    for var in &config.env.required {
+        let field_name = var.to_lowercase();
+        output.push_str(&format!("    pub {}: String,\n", field_name));
+    }
+
+    // Add optional fields
+    for var in &config.env.optional {
+        let field_name = var.to_lowercase();
+        output.push_str(&format!("    pub {}: Option<String>,\n", field_name));
+    }
+
+    output.push_str("}\n\n");
+
+    // Generate load function
+    output.push_str("impl Env {\n");
+    output.push_str("    fn load() -> Self {\n");
+    output.push_str("        Self {\n");
+
+    // Load required vars
+    for var in &config.env.required {
+        let field_name = var.to_lowercase();
+        if let Some(default) = config.env.defaults.get(var) {
+            output.push_str(&format!(
+                "            {}: std::env::var(\"{}\").unwrap_or_else(|_| \"{}\".to_string()),\n",
+                field_name, var, default
+            ));
+        } else {
+            output.push_str(&format!(
+                "            {}: std::env::var(\"{}\").expect(\"Missing required env var: {}\"),\n",
+                field_name, var, var
+            ));
+        }
+    }
+
+    // Load optional vars
+    for var in &config.env.optional {
+        let field_name = var.to_lowercase();
+        if let Some(default) = config.env.defaults.get(var) {
+            output.push_str(&format!(
+                "            {}: Some(std::env::var(\"{}\").unwrap_or_else(|_| \"{}\".to_string())),\n",
+                field_name, var, default
+            ));
+        } else {
+            output.push_str(&format!(
+                "            {}: std::env::var(\"{}\").ok(),\n",
+                field_name, var
+            ));
+        }
+    }
+
+    output.push_str("        }\n");
+    output.push_str("    }\n");
+    output.push_str("}\n\n");
+
+    // Global static
+    output.push_str("static ENV: OnceLock<Env> = OnceLock::new();\n\n");
+    output.push_str("pub fn env() -> &'static Env {\n");
+    output.push_str("    ENV.get_or_init(|| Env::load())\n");
+    output.push_str("}\n");
+
+    output
 }
