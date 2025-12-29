@@ -1,0 +1,33 @@
+[package]
+name = "ski"
+version = "0.1.0"
+edition = "2024"
+description = "Minimal Winter CG Compatible Runtime"
+
+[dependencies]
+bytes = "1.10"
+deno_core = "0.376"
+deno_error = "0.7"
+deno_web = { path = "../deno/ext/web" }
+deno_fetch = { path = "../deno/ext/fetch" }
+deno_webidl = "0.225"
+encoding_rs = "0.8"
+futures = "0.3"
+http = "1.3"
+hyper = "1.8"
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.48", features = ["full"] }
+tokio-util = "0.7.17"
+http-body-util = "0.1.3"
+
+[build-dependencies]
+deno_core = "0.376"
+deno_error = "0.7"
+deno_web = { path = "../deno/ext/web" }
+deno_fetch = { path = "../deno/ext/fetch" }
+deno_webidl = "0.225"

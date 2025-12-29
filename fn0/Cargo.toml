@@ -6,7 +6,8 @@ edition = "2024"
 [dependencies]
 adapt-cache = { path = "../adapt-cache" }
 measure-cpu-time = { path = "../measure-cpu-time" }
-wasmtime = { version = "39.0.1", default-features = false, features = [
+ski = { path = "../ski/ski" }
+wasmtime = { version = "41.0.0", path = "../wasmtime/crates/wasmtime", default-features = false, features = [
     "runtime",
     "component-model",
     "component-model-async",
@@ -15,8 +16,8 @@ wasmtime = { version = "39.0.1", default-features = false, features = [
     "parallel-compilation",
     "cache",
 ] }
-wasmtime-wasi = { version = "39" }
-wasmtime-wasi-http = "39"
+wasmtime-wasi = { version = "41", path = "../wasmtime/crates/wasi" }
+wasmtime-wasi-http = { version = "41", path = "../wasmtime/crates/wasi-http" }
 tokio = { version = "1" }
 memberlist = { version = "0.7", features = ["snappy", "tokio", "quinn"] }
 hyper = { version = "1", features = ["server"] }
@@ -24,10 +25,9 @@ hyper-util = { version = "0.1", features = ["service"] }
 tower = { version = "0.5.2", features = ["timeout", "util"] }
 tower-http = { version = "0.6.7", features = ["timeout"] }
 bytes = "1"
-color-eyre = "0.6.5"
 http-body-util = "0.1"
 sysinfo = "0.37.2"
-oci-rust-sdk = { path = "../oci-rust-sdk", features = ["virtual_network"] }
+oci-rust-sdk = { version = "0.4" }
 reqwest = { version = "0.12.24", default-features = false, features = [
     "http2",
     "rustls-tls",
@@ -46,11 +46,4 @@ opentelemetry-otlp = { version = "0.31.0", features = [
 tracing-opentelemetry = "0.32.0"
 tracing-subscriber = "0.3.22"
 tracing = "0.1.43"
-
-[dev-dependencies]
-wasmtime = { version = "39", features = [
-    "runtime",
-    "component-model",
-    "component-model-async",
-    "memory-protection-keys",
-] }
+anyhow = "1.0.100"
