@@ -3,6 +3,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn main() {
+    if env::var("INSIDE_BUILD_SCRIPT_ANALYSIS").is_ok() {
+        return;
+    }
+    genearte_route();
+}
+
+fn genearte_route() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_path = Path::new(&manifest_dir).join("src").join("pages");
 

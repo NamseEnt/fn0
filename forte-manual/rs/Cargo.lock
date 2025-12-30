@@ -21,6 +21,7 @@ dependencies = [
  "anyhow",
  "http",
  "http-body-util",
+ "rustdoc-types",
  "serde",
  "serde_json",
  "wit-bindgen-rt",
@@ -163,6 +164,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a338cc41d27e6cc6dce6cefc13a0729dfbb81c262b1f519331575dd80ef3067f"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "rustdoc-types"
+version = "0.57.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97a32214c8a67cec971ddea507040fb3d8ac485a2cbf29ecb0a502264ab3a873"
+dependencies = [
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
