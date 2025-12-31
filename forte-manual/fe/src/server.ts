@@ -1,6 +1,8 @@
 import { renderToReadableStream } from "react-dom/server";
 
-export async function handler(req: Request): Promise<Response> {
+(globalThis as any).hander = async function handler(
+  req: Request
+): Promise<Response> {
   const props = await req.json();
 
   const url = new URL(req.url);
@@ -23,4 +25,4 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   return new Response("Not Found", { status: 404 });
-}
+};

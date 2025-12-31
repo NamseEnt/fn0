@@ -1,0 +1,17 @@
+[package]
+name = "forte"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fn0 = { path = "../fn0" }
+adapt-cache = { path = "../adapt-cache" }
+tokio = { version = "1", features = ["full"] }
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["service"] }
+bytes = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+http-body-util = "0.1"
+tower = "0.5"

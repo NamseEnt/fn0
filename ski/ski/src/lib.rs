@@ -19,71 +19,71 @@ static RUNTIME_SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/RUNJS
 static RUN_JS: FastStaticString = ascii_str_include!("../run.js");
 
 pub async fn run(code: &str, request: Request) -> Result<Response> {
-    let mut runtime_options = runtime_options();
-    runtime_options.startup_snapshot = Some(RUNTIME_SNAPSHOT);
+    let code = code.to_string();
 
-    let mut runtime = JsRuntime::new(runtime_options);
-    runtime.execute_script("[user code]", code.to_string())?;
+    tokio::task::spawn_blocking(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async move {
+            let mut runtime_options = runtime_options();
+            runtime_options.startup_snapshot = Some(RUNTIME_SNAPSHOT);
 
-    {
-        let op_state = runtime.op_state();
-        let mut state = op_state.borrow_mut();
-        let (url, method, headers, rid) = register_hyper_request(&mut state, request);
-        state.put(RequestParts {
-            url,
-            method,
-            headers,
-            rid,
-        });
-    }
+            let mut runtime = JsRuntime::new(runtime_options);
+            runtime.execute_script("[user code]", code.to_string())?;
 
-    {
-        let script_result = runtime.execute_script("[run]", RUN_JS)?;
-        let run_future = runtime.resolve(script_result);
-        runtime.run_event_loop(Default::default()).await?;
-        run_future.await?;
-    }
+            register_hyper_request(&mut runtime, request);
 
-    let op_state = runtime.op_state();
+            let script_result = runtime.execute_script("[run]", RUN_JS)?;
+            let run_future = runtime.resolve(script_result);
+            runtime.run_event_loop(Default::default()).await?;
+            run_future.await?;
 
-    let response_parts = op_state
-        .borrow_mut()
-        .try_take::<ResponseParts>()
-        .ok_or_else(|| anyhow!("Did not get a response from JavaScript"))?;
+            let op_state = runtime.op_state();
 
-    let mut builder =
-        hyper::Response::builder().status(StatusCode::from_u16(response_parts.status)?);
+            let response_parts = op_state
+                .borrow_mut()
+                .try_take::<ResponseParts>()
+                .ok_or_else(|| anyhow!("Did not get a response from JavaScript"))?;
 
-    for (key, value) in response_parts.headers {
-        if let Ok(name) = HeaderName::from_bytes(key.as_bytes()) {
-            builder = builder.header(name, value);
-        }
-    }
+            let mut builder =
+                hyper::Response::builder().status(StatusCode::from_u16(response_parts.status)?);
 
-    let Some(rid) = response_parts.rid else {
-        let body = BodyExt::boxed_unsync(Empty::<Bytes>::new().map_err(|never| match never {}));
-        return Ok(builder.body(body)?);
-    };
+            for (key, value) in response_parts.headers {
+                if let Ok(name) = HeaderName::from_bytes(key.as_bytes()) {
+                    builder = builder.header(name, value);
+                }
+            }
 
-    let resource = op_state
-        .borrow_mut()
-        .resource_table
-        .take::<HttpBodyResource>(rid)
-        .map_err(|_| anyhow!("Resource not found"))?;
-    let body = Rc::try_unwrap(resource)
-        .map_err(|_| anyhow!("Failed to unwrap resource"))?
-        .body;
-    let body = Rc::try_unwrap(body)
-        .map_err(|_| anyhow!("Failed to unwrap body"))?
-        .into_inner();
+            let Some(rid) = response_parts.rid else {
+                let body =
+                    BodyExt::boxed_unsync(Empty::<Bytes>::new().map_err(|never| match never {}));
+                return Ok(builder.body(body)?);
+            };
 
-    Ok(builder.body(body)?)
+            let resource = op_state
+                .borrow_mut()
+                .resource_table
+                .take::<HttpBodyResource>(rid)
+                .map_err(|_| anyhow!("Resource not found"))?;
+            let body = Rc::try_unwrap(resource)
+                .map_err(|_| anyhow!("Failed to unwrap resource"))?
+                .body;
+            let body = Rc::try_unwrap(body)
+                .map_err(|_| anyhow!("Failed to unwrap body"))?
+                .into_inner();
+
+            Ok(builder.body(body)?)
+        })
+    })
+    .await?
 }
 
-fn register_hyper_request(
-    state: &mut OpState,
-    req: Request,
-) -> (String, String, Vec<(String, String)>, Option<ResourceId>) {
+fn register_hyper_request(runtime: &mut JsRuntime, req: Request) {
+    let op_state = runtime.op_state();
+    let mut state = op_state.borrow_mut();
+
     let (parts, body) = req.into_parts();
 
     let url = parts.uri.to_string();
@@ -100,6 +100,22 @@ fn register_hyper_request(
         let resource = HttpBodyResource::new(body);
         Some(state.resource_table.add(resource))
     };
+    state.put(RequestParts {
+        url,
+        method,
+        headers,
+        rid,
+    });
+}
 
-    (url, method, headers, rid)
+#[tokio::test]
+async fn test() {
+    run(
+        "new MessageChannel();",
+        Request::new(UnsyncBoxBody::new(
+            http_body_util::Empty::new().map_err(|never| match never {}),
+        )),
+    )
+    .await
+    .unwrap();
 }

@@ -11,10 +11,10 @@
 
     const request = new Request(url, { method, headers, body });
 
-    if (typeof handle !== "function") {
-      throw new Error("User code must define a global 'handle' function.");
+    if (typeof handler !== "function") {
+      throw new Error("User code must define a global 'handler' function.");
     }
-    const response = await handle(request);
+    const response = await handler(request);
 
     const responseBody = response.body;
     const responseRid = responseBody
