@@ -11,3 +11,6 @@ This program analyzes Rust code that,
    - For example, `rs/src/pages/foo/mod.rs` -> `ts/pages/foo/.props.ts`
    - `rs/src/pages/product/[id]/mod.rs` -> `ts/pages/product/[id]/.props.ts`
    - All interfaces are exported like `export interface Bar` in ts files.
+
+For example, check ../forte-manual directory. there are rs and ts directories.
+You have to test this program with ../forte-manual directory.
