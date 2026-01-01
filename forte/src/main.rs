@@ -1,5 +1,7 @@
+use adapt_cache::AdaptCache;
 use anyhow::Result;
 use bytes::Bytes;
+use fn0::{CodeKind, DeploymentMap, Fn0};
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use hyper::Request;
 use hyper::server::conn::http1;
@@ -11,81 +13,8 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
-use adapt_cache::AdaptCache;
-use fn0::{CodeKind, DeploymentMap, Fn0};
-
-/// Simple in-memory + file cache for forte
-#[derive(Clone)]
-pub struct SimpleCache {
-    memory: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-}
-
-impl SimpleCache {
-    pub fn new() -> Self {
-        Self {
-            memory: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    async fn load_file(&self, path: &str) -> Result<Vec<u8>> {
-        tokio::fs::read(path).await.map_err(|e| anyhow::anyhow!(e))
-    }
-}
-
-// Generic cache implementation for both WASM and JS
-// Works for any T and E since convert function handles the transformation
-impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for SimpleCache {
-    async fn get(
-        &self,
-        id: &str,
-        convert: impl FnOnce(Bytes) -> std::result::Result<(T, usize), E> + Send,
-    ) -> std::result::Result<T, adapt_cache::Error<E>> {
-        let mut cache = self.memory.lock().await;
-
-        let bytes = if let Some(data) = cache.get(id) {
-            Bytes::copy_from_slice(data)
-        } else {
-            // Load from file based on code_id
-            let path = match id {
-                "backend" => {
-                    "../forte-manual/rs/target/wasm32-wasip2/release/backend.wasm"
-                }
-                "frontend" => "../forte-manual/fe/dist/server.js",
-                _ => return Err(adapt_cache::Error::NotFound),
-            };
-
-            let mut data = self
-                .load_file(path)
-                .await
-                .map_err(|e| adapt_cache::Error::StorageError(anyhow::anyhow!(e)))?;
-
-            // Compile WASM to CWASM if it's the backend
-            if id == "backend" {
-                eprintln!("Compiling backend WASM ({} bytes) to CWASM...", data.len());
-                match fn0::compile(&data) {
-                    Ok(cwasm) => {
-                        eprintln!("Compilation successful: {} bytes -> {} bytes", data.len(), cwasm.len());
-                        data = cwasm;
-                    }
-                    Err(e) => {
-                        eprintln!("Compilation failed: {:?}", e);
-                        return Err(adapt_cache::Error::StorageError(e));
-                    }
-                }
-            }
-
-            cache.insert(id.to_string(), data.clone());
-            Bytes::from(data)
-        };
-
-        let (converted, _) = convert(bytes).map_err(adapt_cache::Error::ConvertError)?;
-        Ok(converted)
-    }
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    // fn0 초기화
     let mut deployment_map = DeploymentMap::new();
     deployment_map.register_code("backend", CodeKind::Wasm);
     deployment_map.register_code("frontend", CodeKind::Js);
@@ -94,7 +23,6 @@ async fn main() -> Result<()> {
 
     let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map));
 
-    // HTTP 서버 시작
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = TcpListener::bind(addr).await?;
     println!("Forte SSR server listening on http://{}", addr);
@@ -148,16 +76,30 @@ async fn handle_request(
 
     let backend_status = backend_response.status();
 
-    println!("Backend response status: {}", backend_status,);
+    println!("Backend response status: {}", backend_status);
 
-    // Step 2: Response body를 Request body로 변환
+    if !backend_status.is_success() {
+        let (parts, body) = backend_response.into_parts();
+        let body_bytes = body.collect().await?.to_bytes();
+        let body_str = String::from_utf8_lossy(&body_bytes);
+        eprintln!("Backend error response body: {}", body_str);
+
+        return Ok(fn0::Response::from_parts(
+            parts,
+            UnsyncBoxBody::new(body_str.to_string())
+                .map_err(|e| anyhow::anyhow!(e))
+                .boxed_unsync(),
+        ));
+    }
+
+    println!("Preparing frontend request with backend response body");
     let frontend_request = Request::builder()
         .method("POST")
         .uri(uri)
         .header("content-type", "application/json")
         .body(backend_response.into_body())?;
 
-    // Step 3: Frontend JS 실행 - HTML 생성
+    println!("Calling frontend (ski::run)");
     match fn0.run("frontend", frontend_request).await {
         Ok(resp) => {
             println!("Frontend response status: {}", resp.status());
@@ -167,5 +109,71 @@ async fn handle_request(
             eprintln!("Frontend error: {:?}", e);
             Err(e)
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct SimpleCache {
+    memory: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+}
+
+impl SimpleCache {
+    pub fn new() -> Self {
+        Self {
+            memory: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    async fn load_file(&self, path: &str) -> Result<Vec<u8>> {
+        tokio::fs::read(path).await.map_err(|e| anyhow::anyhow!(e))
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for SimpleCache {
+    async fn get(
+        &self,
+        id: &str,
+        convert: impl FnOnce(Bytes) -> std::result::Result<(T, usize), E> + Send,
+    ) -> std::result::Result<T, adapt_cache::Error<E>> {
+        let mut cache = self.memory.lock().await;
+
+        let bytes = if let Some(data) = cache.get(id) {
+            Bytes::copy_from_slice(data)
+        } else {
+            let path = match id {
+                "backend" => "../forte-manual/rs/target/wasm32-wasip2/release/backend.wasm",
+                "frontend" => "../forte-manual/fe/dist/server.js",
+                _ => return Err(adapt_cache::Error::NotFound),
+            };
+
+            let mut data = self
+                .load_file(path)
+                .await
+                .map_err(|e| adapt_cache::Error::StorageError(anyhow::anyhow!(e)))?;
+
+            if id == "backend" {
+                eprintln!("Compiling backend WASM ({} bytes) to CWASM...", data.len());
+                match fn0::compile(&data) {
+                    Ok(cwasm) => {
+                        eprintln!(
+                            "Compilation successful: {} bytes -> {} bytes",
+                            data.len(),
+                            cwasm.len()
+                        );
+                        data = cwasm;
+                    }
+                    Err(e) => {
+                        eprintln!("Compilation failed: {:?}", e);
+                        return Err(adapt_cache::Error::StorageError(e));
+                    }
+                }
+            }
+
+            cache.insert(id.to_string(), data.clone());
+            Bytes::from(data)
+        };
+
+        let (converted, _) = convert(bytes).map_err(adapt_cache::Error::ConvertError)?;
+        Ok(converted)
     }
 }

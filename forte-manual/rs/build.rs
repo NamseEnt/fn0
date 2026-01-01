@@ -151,14 +151,22 @@ fn generate_route_block(route: &RouteInfo) -> String {
         }
     }
 
-    block.push_str("        return Ok(Response::new(\n");
-    block.push_str(&format!(
-        "            Body::from_stream(forte_json::to_stream(&{}::handler({})",
-        route.mod_name,
-        args.join(", ")
-    ));
-    block.push_str(".await?)),\n");
-    block.push_str("        ));\n");
+    block.push_str(&format!("        println!(\"Calling {}::handler\");\n", route.mod_name));
+    block.push_str(&format!("        match {}::handler({}).await {{\n", route.mod_name, args.join(", ")));
+    block.push_str("            Ok(props) => {\n");
+    block.push_str("                println!(\"Handler succeeded, converting to stream\");\n");
+    block.push_str("                let stream = forte_json::to_stream(&props);\n");
+    block.push_str("                println!(\"Stream conversion completed\");\n");
+    block.push_str("                return Ok(Response::new(Body::from_stream(stream)));\n");
+    block.push_str("            }\n");
+    block.push_str("            Err(e) => {\n");
+    block.push_str(&format!("                eprintln!(\"{}::handler failed: {{:?}}\", e);\n", route.mod_name));
+    block.push_str("                return Ok(Response::builder()\n");
+    block.push_str("                    .status(StatusCode::INTERNAL_SERVER_ERROR)\n");
+    block.push_str("                    .body(Body::from(format!(\"Handler error: {:?}\", e)))\n");
+    block.push_str("                    .unwrap());\n");
+    block.push_str("            }\n");
+    block.push_str("        }\n");
     block.push_str("    }\n");
 
     block

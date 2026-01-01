@@ -222,7 +222,7 @@ where
         |context| {
             let state = context.data();
             let cpu_time = state.time_tracker.duration();
-            if cpu_time > Duration::from_millis(10) {
+            if cpu_time > Duration::from_millis(1000) {
                 telemetry::cpu_timeout(&state.code_id, cpu_time);
                 state.is_timeout.store(true, Ordering::Relaxed);
                 return Ok(wasmtime::UpdateDeadline::Interrupt);

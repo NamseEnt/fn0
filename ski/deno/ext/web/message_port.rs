@@ -97,13 +97,6 @@ impl MessagePort {
     }
     Ok(None)
   }
-
-  /// This forcefully disconnects the message port from its paired port. This
-  /// will wake up the `.recv` on the paired port, which will return `Ok(None)`.
-  pub fn disentangle(&self) {
-    let mut tx = self.tx.borrow_mut();
-    tx.take();
-  }
 }
 
 pub fn create_entangled_message_port() -> (MessagePort, MessagePort) {

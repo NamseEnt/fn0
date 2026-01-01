@@ -9,14 +9,12 @@ use http_body_resource::*;
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Empty};
 use runtime_options::*;
-use std::rc::Rc;
 
 type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 type Request = hyper::Request<Body>;
 type Response = hyper::Response<Body>;
 
 static RUNTIME_SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/RUNJS_SNAPSHOT.bin"));
-static RUN_JS: FastStaticString = ascii_str_include!("../run.js");
 
 pub async fn run(code: &str, request: Request) -> Result<Response> {
     let code = code.to_string();
@@ -35,17 +33,27 @@ pub async fn run(code: &str, request: Request) -> Result<Response> {
 
             register_hyper_request(&mut runtime, request);
 
-            let script_result = runtime.execute_script("[run]", RUN_JS)?;
+            eprintln!("[ski/lib.rs] Executing __ski_runHandler()...");
+            let script_result = runtime.execute_script(
+                "[run]",
+                ascii_str!("globalThis.__ski_runHandler();"),
+            )?;
+            eprintln!("[ski/lib.rs] Script executed, resolving future...");
             let run_future = runtime.resolve(script_result);
-            runtime.run_event_loop(Default::default()).await?;
-            run_future.await?;
+            eprintln!("[ski/lib.rs] Awaiting run_future with event loop...");
+            runtime.with_event_loop_future(run_future, Default::default()).await?;
+            eprintln!("[ski/lib.rs] Handler completed");
 
+            eprintln!("[ski/lib.rs] Getting op_state...");
             let op_state = runtime.op_state();
 
+            eprintln!("[ski/lib.rs] Extracting ResponseParts...");
             let response_parts = op_state
                 .borrow_mut()
                 .try_take::<ResponseParts>()
                 .ok_or_else(|| anyhow!("Did not get a response from JavaScript"))?;
+
+            eprintln!("[ski/lib.rs] Got ResponseParts: status={}, rid={:?}", response_parts.status, response_parts.rid);
 
             let mut builder =
                 hyper::Response::builder().status(StatusCode::from_u16(response_parts.status)?);
@@ -57,23 +65,28 @@ pub async fn run(code: &str, request: Request) -> Result<Response> {
             }
 
             let Some(rid) = response_parts.rid else {
+                eprintln!("[ski/lib.rs] No RID, returning empty body");
                 let body =
                     BodyExt::boxed_unsync(Empty::<Bytes>::new().map_err(|never| match never {}));
                 return Ok(builder.body(body)?);
             };
 
+            eprintln!("[ski/lib.rs] Getting resource from table, RID: {}", rid);
+
+            // Get the resource that was created by resourceForReadableStream() or is Deno-backed
             let resource = op_state
                 .borrow_mut()
                 .resource_table
-                .take::<HttpBodyResource>(rid)
+                .get_any(rid)
                 .map_err(|_| anyhow!("Resource not found"))?;
-            let body = Rc::try_unwrap(resource)
-                .map_err(|_| anyhow!("Failed to unwrap resource"))?
-                .body;
-            let body = Rc::try_unwrap(body)
-                .map_err(|_| anyhow!("Failed to unwrap body"))?
-                .into_inner();
 
+            eprintln!("[ski/lib.rs] Creating body from resource using ResourceToBodyAdapter...");
+
+            // Use Deno's ResourceToBodyAdapter to convert Resource to Hyper Body
+            let body_adapter = deno_fetch::ResourceToBodyAdapter::new(resource);
+            let body = BodyExt::boxed_unsync(body_adapter.map_err(|e| anyhow::anyhow!(e)));
+
+            eprintln!("[ski/lib.rs] Body created, building response...");
             Ok(builder.body(body)?)
         })
     })
@@ -86,7 +99,12 @@ fn register_hyper_request(runtime: &mut JsRuntime, req: Request) {
 
     let (parts, body) = req.into_parts();
 
-    let url = parts.uri.to_string();
+    // Convert URI to full URL
+    let url = if parts.uri.scheme().is_some() {
+        parts.uri.to_string()
+    } else {
+        format!("http://localhost{}", parts.uri)
+    };
     let method = parts.method.to_string();
     let headers: Vec<(String, String)> = parts
         .headers

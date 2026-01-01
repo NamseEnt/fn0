@@ -2,6 +2,17 @@ import { core } from "ext:core/mod.js";
 
 import * as webidl from "ext:deno_webidl/00_webidl.js";
 
+// Import run.js to ensure it's evaluated during snapshot creation
+import { runHandler } from "ext:bootstrap/run.js";
+
+// Expose runHandler to globalThis for runtime execution
+Object.defineProperty(globalThis, "__ski_runHandler", {
+  value: runHandler,
+  enumerable: false,
+  configurable: false,
+  writable: false,
+});
+
 import "ext:deno_web/00_infra.js";
 import * as url from "ext:deno_web/00_url.js";
 import * as console from "ext:deno_web/01_console.js";
