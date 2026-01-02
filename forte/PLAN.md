@@ -380,29 +380,118 @@ let debounce_duration = Duration::from_millis(100);
 
 ---
 
+## E2E 테스트 전략
+
+### 원칙
+
+- **모든 명령어는 E2E 테스트로 검증**
+- 수동 테스트 금지, 코드로 자동화
+- `forte init`으로 생성한 프로젝트를 다른 명령어 테스트에 사용
+
+### 테스트 구조
+
+```
+forte/
+├── tests/
+│   └── e2e/
+│       ├── mod.rs
+│       ├── init_test.rs      # forte init 테스트
+│       ├── dev_test.rs       # forte dev 테스트
+│       ├── add_test.rs       # forte add 테스트
+│       └── build_test.rs     # forte build 테스트
+```
+
+### 테스트 의존성
+
+```toml
+[dev-dependencies]
+assert_cmd = "2"      # CLI 실행 및 검증
+predicates = "3"      # 출력 검증
+tempfile = "3"        # 임시 디렉토리
+reqwest = { version = "0.12", features = ["blocking"] }  # HTTP 요청
+```
+
+### 테스트 시나리오
+
+**`forte init` 테스트:**
+```rust
+#[test]
+fn test_init_creates_project_structure() {
+    let temp = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("forte").unwrap()
+        .args(["init", "my-app"])
+        .current_dir(&temp)
+        .assert()
+        .success();
+
+    // 디렉토리 구조 검증
+    assert!(temp.path().join("my-app/Forte.toml").exists());
+    assert!(temp.path().join("my-app/rs/Cargo.toml").exists());
+    assert!(temp.path().join("my-app/fe/package.json").exists());
+}
+```
+
+**`forte dev` 테스트:**
+```rust
+#[tokio::test]
+async fn test_dev_server_responds() {
+    let temp = tempfile::tempdir().unwrap();
+
+    // 1. forte init으로 프로젝트 생성
+    Command::cargo_bin("forte").unwrap()
+        .args(["init", "test-app"])
+        .current_dir(&temp)
+        .assert()
+        .success();
+
+    // 2. forte dev 백그라운드 실행
+    let mut child = Command::cargo_bin("forte").unwrap()
+        .args(["dev"])
+        .current_dir(temp.path().join("test-app"))
+        .spawn()
+        .unwrap();
+
+    // 3. 서버 시작 대기 후 HTTP 요청
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    let resp = reqwest::get("http://127.0.0.1:3000").await.unwrap();
+    assert!(resp.status().is_success());
+
+    // 4. 정리
+    child.kill().unwrap();
+}
+```
+
+---
+
 ## 구현 순서
+
+### 원칙
+
+- **테스트 코드 먼저 작성, 구현은 그 다음**
+- 각 단계는 E2E 테스트 통과로 완료 판정
 
 ### 1차 (MVP)
 
-| 순서 | 작업 | 복잡도 |
-|------|------|--------|
-| 1 | 프로젝트 구조 리팩토링 (CLI + 서버 분리) | 중 |
-| 2 | `forte dev` 기본 (codegen + build + server) | 상 |
-| 3 | 프론트엔드 라우터 자동 생성 | 중 |
-| 4 | Watch 모드 + 핫 스왑 | 중 |
-| 5 | `forte init` | 중 |
-| 6 | `forte add page` | 하 |
-| 7 | `forte add action` + Action codegen | 중 |
-| 8 | 정적 에셋 서빙 (`fe/public/`) | 하 |
-| 9 | `forte build` (프로덕션 빌드) | 중 |
+| 순서 | 작업 | 테스트 검증 항목 |
+|------|------|-----------------|
+| 1 | 프로젝트 구조 리팩토링 ✅ | - |
+| 2 | `forte init` | 디렉토리 구조, 필수 파일 생성 |
+| 3 | `forte dev` E2E 테스트 | init → dev → HTTP 200 응답 |
+| 4 | 프론트엔드 라우터 자동 생성 | routes.generated.ts 파일 검증 |
+| 5 | `forte add page` | 페이지 파일 생성, codegen 실행 |
+| 6 | Watch 모드 + 핫 스왑 | 파일 변경 → 재빌드 → 응답 변경 |
+| 7 | `forte add action` | Action 파일 생성, 타입 생성 |
+| 8 | 정적 에셋 서빙 | /static/* 경로 응답 |
+| 9 | `forte build` | dist/ 디렉토리 생성, 파일 검증 |
 
 ### 2차 (향후)
 
-| 작업 | 복잡도 |
-|------|--------|
-| 클라이언트 HMR (React Fast Refresh) | 상 |
-| 프로덕션 에셋 해싱 + CDN 경로 | 중 |
-| Hydration 지원 | 상 |
+| 작업 | 테스트 검증 항목 |
+|------|-----------------|
+| 클라이언트 HMR | WebSocket 연결, 모듈 교체 |
+| 프로덕션 에셋 해싱 | 해시 포함 파일명, manifest |
+| Hydration 지원 | 클라이언트 JS 실행 검증 |
 
 ---
 

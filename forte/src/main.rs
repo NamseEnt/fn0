@@ -13,14 +13,13 @@ async fn main() -> Result<()> {
         Commands::Dev { project, port } => {
             let options = cli::dev::DevOptions {
                 project_dir: project.unwrap_or_else(|| ".".into()),
-                port, // None = auto-select from 3000
+                port,
             };
             cli::dev::run(options).await?;
         }
 
         Commands::Init { name } => {
-            println!("TODO: Initialize project '{}'", name);
-            // TODO: Implement init
+            cli::init::run(&name)?;
         }
 
         Commands::Add { command } => match command {

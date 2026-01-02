@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::net::{SocketAddr, TcpListener};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::server::{self, ServerConfig};
@@ -30,12 +30,19 @@ fn find_available_port(start: u16) -> Option<u16> {
     (start..=65535).find(|&port| is_port_available(port))
 }
 
-fn run_codegen(project_dir: &PathBuf) -> Result<()> {
+fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
 
+    // TODO: Use cargo binstall (github releases) instead of hardcoded path
+    let forte_rs_to_ts_dir = "/home/namse/fn0/forte-rs-to-ts";
+
     println!("[codegen] Running forte-rs-to-ts...");
-    let status = Command::new("forte-rs-to-ts")
+    let status = Command::new("cargo")
+        .arg("run")
+        .arg("--release")
+        .arg("--")
         .arg(&rs_dir)
+        .current_dir(forte_rs_to_ts_dir)
         .status()
         .context("Failed to run forte-rs-to-ts. Is it installed?")?;
 
@@ -48,7 +55,7 @@ fn run_codegen(project_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn build_backend(project_dir: &PathBuf) -> Result<()> {
+fn build_backend(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
 
     println!("[build] Building backend...");
@@ -66,7 +73,7 @@ fn build_backend(project_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn build_frontend(project_dir: &PathBuf) -> Result<()> {
+fn build_frontend(project_dir: &Path) -> Result<()> {
     let fe_dir = project_dir.join("fe");
 
     println!("[build] Building frontend...");
@@ -96,9 +103,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
             p
         }
         None => {
-            let p = find_available_port(3000).ok_or_else(|| {
-                anyhow::anyhow!("No available port found starting from 3000")
-            })?;
+            let p = find_available_port(3000)
+                .ok_or_else(|| anyhow::anyhow!("No available port found starting from 3000"))?;
             if p != 3000 {
                 println!("Port 3000 in use, using port {} instead", p);
             }

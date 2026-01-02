@@ -1,11 +1,12 @@
 pub mod dev;
+pub mod init;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "forte")]
-#[command(about = "Forte - Fullstack Rust + TypeScript Framework", long_about = None)]
+#[command(about = "Forte - Fullstack Framework", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
