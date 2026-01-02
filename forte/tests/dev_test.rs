@@ -1,15 +1,17 @@
 use assert_cmd::Command;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Stdio};
+use std::sync::mpsc;
 use std::time::Duration;
 
 fn get_forte_bin_path() -> std::path::PathBuf {
-    Command::cargo_bin("forte").unwrap().get_program().to_path_buf()
+    std::path::PathBuf::from(Command::cargo_bin("forte").unwrap().get_program())
 }
 
 struct DevServer {
     child: Child,
     port: u16,
+    _stdout_thread: std::thread::JoinHandle<()>,
 }
 
 impl DevServer {
@@ -25,21 +27,31 @@ impl DevServer {
             .expect("Failed to start forte dev");
 
         let stdout = child.stdout.take().expect("Failed to get stdout");
-        let reader = BufReader::new(stdout);
+        let (tx, rx) = mpsc::channel::<u16>();
 
-        let mut port = 3000u16;
-        for line in reader.lines() {
-            let line = line.expect("Failed to read line");
-            eprintln!("[dev server] {}", line);
-            if line.contains("listening on") {
-                if let Some(port_str) = line.split(':').last() {
-                    port = port_str.trim().parse().unwrap_or(3000);
+        let stdout_thread = std::thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            let mut sent = false;
+            for line in reader.lines() {
+                let Ok(line) = line else { break };
+                eprintln!("[dev server] {}", line);
+                if !sent && line.contains("listening on") {
+                    if let Some(port_str) = line.split(':').last() {
+                        let port = port_str.trim().parse().unwrap_or(3000);
+                        let _ = tx.send(port);
+                        sent = true;
+                    }
                 }
-                break;
             }
-        }
+        });
 
-        Self { child, port }
+        let port = rx.recv_timeout(Duration::from_secs(120)).expect("Timeout waiting for server to start");
+
+        Self {
+            child,
+            port,
+            _stdout_thread: stdout_thread,
+        }
     }
 
     fn url(&self) -> String {

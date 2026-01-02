@@ -33,8 +33,10 @@ fn find_available_port(start: u16) -> Option<u16> {
 fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
 
-    // TODO: Use cargo binstall (github releases) instead of hardcoded path
-    let forte_rs_to_ts_dir = "/home/namse/fn0/forte-rs-to-ts";
+    let forte_rs_to_ts_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("Failed to get parent of CARGO_MANIFEST_DIR")
+        .join("forte-rs-to-ts");
 
     println!("[codegen] Running forte-rs-to-ts...");
     let status = Command::new("cargo")
@@ -42,7 +44,8 @@ fn run_codegen(project_dir: &Path) -> Result<()> {
         .arg("--release")
         .arg("--")
         .arg(&rs_dir)
-        .current_dir(forte_rs_to_ts_dir)
+        .current_dir(&forte_rs_to_ts_dir)
+        .env_remove("RUSTUP_TOOLCHAIN")
         .status()
         .context("Failed to run forte-rs-to-ts. Is it installed?")?;
 

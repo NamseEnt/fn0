@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::fs;
 use std::path::Path;
 
@@ -20,7 +20,7 @@ pub fn run(name: &str) -> Result<()> {
 
     fs::write(
         project_dir.join("rs/Cargo.toml"),
-        generate_cargo_toml(name),
+        generate_cargo_toml(),
     )?;
 
     fs::write(
@@ -54,8 +54,13 @@ pub fn run(name: &str) -> Result<()> {
     )?;
 
     fs::write(
-        project_dir.join("fe/src/server.ts"),
-        generate_server_ts(),
+        project_dir.join("fe/rolldown.config.ts"),
+        generate_rolldown_config(),
+    )?;
+
+    fs::write(
+        project_dir.join("fe/src/server.tsx"),
+        generate_server_tsx(),
     )?;
 
     fs::write(
@@ -87,10 +92,15 @@ frontend = "fe"
     )
 }
 
-fn generate_cargo_toml(name: &str) -> String {
+fn generate_cargo_toml() -> String {
+    let forte_json_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("Failed to get parent of CARGO_MANIFEST_DIR")
+        .join("forte-json");
+
     format!(
         r#"[package]
-name = "{name}"
+name = "backend"
 version = "0.1.0"
 edition = "2024"
 
@@ -103,8 +113,9 @@ serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
 http = "1"
 wstd = "0.6"
-forte-json = {{ git = "https://github.com/aspect-build/aspect-rs.git" }}
-"#
+forte-json = {{ path = "{}" }}
+"#,
+        forte_json_path.display()
     )
 }
 
@@ -240,17 +251,29 @@ fn generate_tsconfig() -> &'static str {
 "#
 }
 
-fn generate_server_ts() -> &'static str {
+fn generate_rolldown_config() -> &'static str {
+    r#"import { defineConfig } from "rolldown";
+
+export default defineConfig({
+  input: "src/server.tsx",
+  output: {
+    file: "dist/server.js",
+    inlineDynamicImports: true,
+  },
+});
+"#
+}
+
+fn generate_server_tsx() -> &'static str {
     r#"import { renderToString } from "react-dom/server";
 import IndexPage from "./pages/index/page";
 
-export async function handler(request: Request): Promise<Response> {
+(globalThis as any).handler = async function handler(request: Request): Promise<Response> {
+    const props = await request.json();
+
     const url = new URL(request.url);
 
     if (url.pathname === "/") {
-        const propsResponse = await (globalThis as any).FORTE_BACKEND_FETCH(request);
-        const props = await propsResponse.json();
-
         const html = renderToString(<IndexPage {...props} />);
 
         return new Response(
@@ -271,7 +294,7 @@ export async function handler(request: Request): Promise<Response> {
     }
 
     return new Response("Not Found", { status: 404 });
-}
+};
 "#
 }
 
