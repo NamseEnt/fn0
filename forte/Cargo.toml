@@ -7,11 +7,25 @@ edition = "2024"
 fn0 = { path = "../fn0" }
 adapt-cache = { path = "../adapt-cache" }
 tokio = { version = "1", features = ["full"] }
-hyper = { version = "1", features = ["server", "http1"] }
-hyper-util = { version = "0.1", features = ["service"] }
+hyper = { version = "1", features = ["server", "http1", "client"] }
+hyper-util = { version = "0.1", features = ["service", "client-legacy", "http1", "tokio"] }
 bytes = "1"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 http-body-util = "0.1"
 tower = "0.5"
+clap = { version = "4", features = ["derive"] }
+notify = "8"
+notify-debouncer-mini = "0.6"
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+http = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde_json = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
