@@ -1,12 +1,13 @@
 use crate::server::{self, ServerConfig, ServerHandle};
 use anyhow::{Context, Result};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
+use std::collections::HashMap;
 use std::fs;
 use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc::channel;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug)]
 pub struct DevOptions {
@@ -210,6 +211,25 @@ fn build_backend(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+fn collect_rs_file_mtimes(dir: &Path) -> HashMap<PathBuf, SystemTime> {
+    let mut mtimes = HashMap::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                mtimes.extend(collect_rs_file_mtimes(&path));
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                if let Ok(metadata) = fs::metadata(&path) {
+                    if let Ok(mtime) = metadata.modified() {
+                        mtimes.insert(path, mtime);
+                    }
+                }
+            }
+        }
+    }
+    mtimes
+}
+
 #[allow(dead_code)]
 fn build_server_js(project_dir: &Path) -> Result<()> {
     let fe_dir = project_dir.join("fe");
@@ -303,33 +323,47 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     println!("[watch] Watching for backend changes in rs/src...");
     println!("[watch] Frontend HMR handled by Vite");
 
-    let mut is_rebuilding = false;
+    // Track file mtimes after build to ignore cargo-induced mtime changes
+    let mut known_mtimes = collect_rs_file_mtimes(&rs_dir);
 
     loop {
         match rx.recv() {
             Ok(Ok(events)) => {
-                // Skip events during rebuild (cargo check touches file metadata)
-                if is_rebuilding {
-                    continue;
-                }
+                // Filter to only .rs files that have actually changed (newer mtime than recorded)
+                let changed_files: Vec<_> = events
+                    .iter()
+                    .filter(|e| {
+                        e.path.starts_with(&rs_dir)
+                            && e.path.extension().is_some_and(|ext| ext == "rs")
+                            && !e.path.ends_with("route_generated.rs")
+                    })
+                    .filter(|e| {
+                        // Check if the file's current mtime is newer than what we recorded
+                        let current_mtime = fs::metadata(&e.path)
+                            .ok()
+                            .and_then(|m| m.modified().ok());
+                        match (current_mtime, known_mtimes.get(&e.path)) {
+                            (Some(current), Some(known)) => current > *known,
+                            (Some(_), None) => true, // New file
+                            _ => false,
+                        }
+                    })
+                    .collect();
 
-                let backend_changed = events.iter().any(|e| {
-                    e.path.starts_with(&rs_dir)
-                        && e.path.extension().is_some_and(|ext| ext == "rs")
-                        && !e.path.ends_with("route_generated.rs")
-                });
-
-                if backend_changed {
+                if !changed_files.is_empty() {
+                    for e in &changed_files {
+                        println!("[watch] Changed file: {:?}", e.path);
+                    }
                     println!();
                     println!("[watch] Backend changes detected, rebuilding...");
 
-                    is_rebuilding = true;
                     let result = rebuild_backend(project_dir, &handle).await;
+
+                    // Update known mtimes after rebuild
+                    known_mtimes = collect_rs_file_mtimes(&rs_dir);
 
                     // Drain any pending events that occurred during rebuild
                     while rx.try_recv().is_ok() {}
-
-                    is_rebuilding = false;
 
                     if let Err(e) = result {
                         eprintln!("[watch] Backend rebuild failed: {}", e);

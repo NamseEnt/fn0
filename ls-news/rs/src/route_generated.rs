@@ -7,6 +7,8 @@ mod pages_index;
 mod pages_post__id_;
 #[path = "pages/write.rs"]
 mod pages_write;
+#[path = "hooks/me.rs"]
+mod hooks_me;
 use forte_sdk::anyhow::Result;
 use forte_sdk::http::{Error, Request, Response, StatusCode, body::Body, HeaderMap};
 use forte_sdk::http_header::{COOKIE, LOCATION, SET_COOKIE};
@@ -42,11 +44,14 @@ impl std::fmt::Display for Redirect {
 impl std::error::Error for Redirect {}
 #[forte_sdk::wstd::http_server]
 pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
-    let (parts, _body) = request.into_parts();
+    let (parts, body) = request.into_parts();
     let headers = parts.headers;
     let path = parts.uri.path();
     let query = parts.uri.query().unwrap_or("");
     let mut cookie_jar = make_cookie_jar(&headers);
+    if let Some(hook_name) = path.strip_prefix("/__forte_hook/") {
+        return handle_hook(hook_name, &headers, &mut cookie_jar, body).await;
+    }
     let query_params: HashMap<String, String> = query
         .split('&')
         .filter(|s| !s.is_empty())
@@ -235,6 +240,54 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                 .body(Body::empty())
                 .unwrap(),
         )
+    }
+}
+async fn handle_hook(
+    hook_name: &str,
+    headers: &HeaderMap,
+    cookie_jar: &mut cookie::CookieJar,
+    mut body: Body,
+) -> Result<Response<Body>, Error> {
+    let Some(host) = headers.get(http_header::HOST).and_then(|v| v.to_str().ok()) else {
+        return Ok(
+            Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("Missing Host header"))
+                .unwrap(),
+        );
+    };
+    let body_bytes = body.contents().await?;
+    match hook_name {
+        "me" => {
+            let input: hooks_me::Input = serde_json::from_slice(body_bytes)
+                .map_err(|e| Error::msg(e.to_string()))?;
+            let req = HookRequest {
+                host,
+                headers,
+                jar: cookie_jar,
+                body: input,
+            };
+            let output = hooks_me::handler(req);
+            let json = forte_json::to_vec(&output);
+            Ok(
+                build_response_with_cookies(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("content-type", "application/json")
+                        .body(Body::from(json))
+                        .unwrap(),
+                    cookie_jar,
+                ),
+            )
+        }
+        _ => {
+            Ok(
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from(format!("Hook '{}' not found", hook_name)))
+                    .unwrap(),
+            )
+        }
     }
 }
 fn make_cookie_jar(headers: &HeaderMap) -> cookie::CookieJar {

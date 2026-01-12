@@ -1,8 +1,10 @@
 mod cache;
+mod fetch_handler;
 mod hmr;
 
 use anyhow::{Context, Result};
 pub use cache::SimpleCache;
+use fetch_handler::ForteFetchHandler;
 use fn0::{CodeKind, DeploymentMap, Fn0};
 use futures_util::{SinkExt, StreamExt};
 pub use hmr::HmrBroadcaster;
@@ -56,6 +58,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
 
     let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map));
     let public_dir = Arc::new(config.public_dir);
+    let forte_port = config.port;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     let listener = TcpListener::bind(addr).await?;
@@ -82,7 +85,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let fn0 = fn0_clone.clone();
                         let public_dir = public_dir_clone.clone();
                         let hmr = hmr_clone.clone();
-                        handle_request(req, fn0, public_dir, hmr, vite_ssr_port)
+                        handle_request(req, fn0, public_dir, hmr, vite_ssr_port, forte_port)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -101,6 +104,7 @@ async fn handle_request(
     public_dir: Arc<PathBuf>,
     hmr: HmrBroadcaster,
     vite_ssr_port: Option<u16>,
+    forte_port: u16,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
@@ -128,6 +132,7 @@ async fn handle_request(
                     .map_err(|e| anyhow::anyhow!(e))
                     .boxed_unsync()
             }),
+            None,
         )
         .await
     {
@@ -156,9 +161,13 @@ async fn handle_request(
         ));
     }
 
+    if path.starts_with("/__forte_hook/") {
+        return Ok(backend_response);
+    }
+
     if let Some(vite_ssr_port) = vite_ssr_port {
         println!("Calling Vite SSR adapter on port {}", vite_ssr_port);
-        return call_ssr_adapter(vite_ssr_port, &uri, backend_response).await;
+        return call_ssr_adapter(vite_ssr_port, forte_port, &uri, backend_response).await;
     }
 
     println!("Preparing frontend request with backend response body");
@@ -169,7 +178,8 @@ async fn handle_request(
         .body(backend_response.into_body())?;
 
     println!("Calling frontend (ski::run)");
-    match fn0.run("frontend", frontend_request).await {
+    let fetch_handler = Arc::new(ForteFetchHandler::new(fn0.clone()));
+    match fn0.run("frontend", frontend_request, Some(fetch_handler)).await {
         Ok(resp) => {
             println!("Frontend response status: {}", resp.status());
             Ok(resp)
@@ -411,23 +421,34 @@ fn start_vite_ssr_adapter(fe_dir: &Path) -> Result<(u16, std::process::Child)> {
         .context("Failed to start Vite SSR adapter")?;
 
     let stdout = child.stdout.take().unwrap();
-    let reader = BufReader::new(stdout);
+    let mut reader = BufReader::new(stdout);
 
-    for line in reader.lines() {
-        let line = line?;
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            anyhow::bail!("Vite SSR adapter exited before reporting port");
+        }
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line)
             && let Some(port) = json.get("port").and_then(|p| p.as_u64())
         {
             println!("[vite-ssr] Vite SSR adapter ready on port {}", port);
+
+            // Spawn a thread to consume remaining stdout to prevent EPIPE
+            std::thread::spawn(move || {
+                use std::io::Read;
+                let mut buf = [0u8; 1024];
+                while reader.read(&mut buf).unwrap_or(0) > 0 {}
+            });
+
             return Ok((port as u16, child));
         }
     }
-
-    anyhow::bail!("Failed to get Vite SSR adapter port")
 }
 
 async fn call_ssr_adapter(
     port: u16,
+    forte_port: u16,
     uri: &hyper::Uri,
     backend_response: fn0::Response,
 ) -> Result<fn0::Response> {
@@ -440,6 +461,7 @@ async fn call_ssr_adapter(
     let payload = serde_json::json!({
         "url": uri.to_string(),
         "props": props,
+        "forteBaseUrl": format!("http://127.0.0.1:{}", forte_port),
     });
 
     let client = reqwest::Client::new();

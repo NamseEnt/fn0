@@ -21,3 +21,10 @@ pub use wstd::{self, future, http, io, iter, net, rand, runtime, task};
 pub fn now() -> DateTime {
     chrono::Utc::now()
 }
+
+pub struct HookRequest<'a, Body> {
+    pub host: &'a str,
+    pub headers: &'a http::HeaderMap,
+    pub jar: &'a mut CookieJar,
+    pub body: Body,
+}

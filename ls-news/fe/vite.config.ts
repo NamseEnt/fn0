@@ -17,6 +17,8 @@ function exitOnStdinClose(): Plugin {
 
 export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react(), tailwindcss(), exitOnStdinClose()],
+  envDir: path.resolve(__dirname, ".."),
+  envPrefix: "PUBLIC_",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -36,7 +36,6 @@ export const PropsSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
     rows: z.array(RowSchema),
-    me: UserSchema.optional(),
   }),
     z.object({
     t: z.literal("DbErr"),

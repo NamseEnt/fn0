@@ -8,18 +8,14 @@ use serde::Serialize;
 #[derive(Serialize)]
 pub enum Props {
     Ok {},
+    NotLoggedIn { oauth_nonce: String },
 }
 
 pub async fn handler(_headers: HeaderMap, jar: &mut CookieJar) -> Result<Props> {
-    let user = crate::common::auth::get_me(jar);
-    if user.is_some() {
+    if crate::common::auth::get_me(jar).is_some() {
         return Ok(Props::Ok {});
     }
 
-    let github_auth_url = crate::common::auth::create_github_auth_url(jar, "", Redirect::Write);
-
-    Err(Redirect::External {
-        url: github_auth_url,
-    }
-    .into())
+    let oauth_nonce = crate::common::auth::prepare_github_login(jar, Redirect::Write);
+    Ok(Props::NotLoggedIn { oauth_nonce })
 }

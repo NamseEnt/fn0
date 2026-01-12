@@ -12,7 +12,7 @@ pub struct SearchParams {
 
 #[derive(Serialize)]
 pub enum Props {
-    Ok { rows: Vec<Row>, me: Option<User> },
+    Ok { rows: Vec<Row> },
     DbErr { message: String },
 }
 
@@ -47,16 +47,7 @@ pub async fn handler(
         }
     };
 
-    let me = crate::common::auth::get_me(jar);
-
-    Ok(Props::Ok {
-        rows,
-        me: me.map(|me| User {
-            id: me.user_id,
-            username: me.username,
-            avatar_url: me.avatar_url,
-        }),
-    })
+    Ok(Props::Ok { rows })
 }
 
 async fn get_rows(after: Option<String>, is_admin: bool) -> Result<Vec<Row>> {

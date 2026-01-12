@@ -4,6 +4,24 @@ use rustc_middle::ty::{AdtDef, GenericArgsRef, Ty, TyCtxt};
 use rustc_span::def_id::DefId;
 use std::collections::HashSet;
 
+fn snake_to_camel(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut capitalize_next = false;
+
+    for ch in s.chars() {
+        if ch == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(ch.to_ascii_uppercase());
+            capitalize_next = false;
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
 pub struct TypeConverter<'tcx> {
     tcx: TyCtxt<'tcx>,
     visited: HashSet<DefId>,
@@ -163,7 +181,6 @@ impl<'tcx> TypeConverter<'tcx> {
             .all_fields()
             .map(|field| {
                 let field_name = self.tcx.item_name(field.did).to_string();
-                let field_name_camel = snake_to_camel(&field_name);
                 let field_ty = field.ty(self.tcx, substs);
                 let field_context = format!("{}.{}", context, field_name);
 
@@ -180,7 +197,7 @@ impl<'tcx> TypeConverter<'tcx> {
                     };
 
                 TsField {
-                    name: field_name_camel,
+                    name: snake_to_camel(&field_name),
                     ty: actual_ty,
                     is_optional,
                 }
@@ -216,8 +233,7 @@ impl<'tcx> TypeConverter<'tcx> {
                         let field_name = if is_tuple_variant {
                             format!("_{}", i)
                         } else {
-                            let rust_name = self.tcx.item_name(field.did).to_string();
-                            snake_to_camel(&rust_name)
+                            self.tcx.item_name(field.did).to_string()
                         };
                         let field_ty = field.ty(self.tcx, substs);
                         let field_context = format!("{}::{}.{}", context, variant.name, field_name);
@@ -236,7 +252,7 @@ impl<'tcx> TypeConverter<'tcx> {
                             };
 
                         TsField {
-                            name: field_name.clone(),
+                            name: snake_to_camel(&field_name),
                             ty: actual_ty,
                             is_optional,
                         }
@@ -293,20 +309,3 @@ impl<'tcx> TypeConverter<'tcx> {
     }
 }
 
-fn snake_to_camel(s: &str) -> String {
-    let mut result = String::new();
-    let mut capitalize_next = false;
-
-    for ch in s.chars() {
-        if ch == '_' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.push(ch.to_ascii_uppercase());
-            capitalize_next = false;
-        } else {
-            result.push(ch);
-        }
-    }
-
-    result
-}

@@ -115,10 +115,8 @@ pub fn verify_oauth_state(jar: &mut CookieJar, state_from_url: &str) -> Result<R
     Ok(redirect)
 }
 
-pub fn create_github_auth_url(jar: &mut CookieJar, origin: &str, redirect: Redirect) -> String {
-    let state = create_oauth_state(jar, redirect);
-    let client_id = std::env::var("GITHUB_CLIENT_ID").expect("GITHUB_CLIENT_ID not set");
-    format!(
-        "https://github.com/login/oauth/authorize?client_id={client_id}&redirect_uri={origin}/api/auth/callback/github&scope=read:user%20user:email&state={state}"
-    )
+/// GitHub OAuth 로그인 준비. 쿠키에 state 저장하고 nonce 반환.
+pub fn prepare_github_login(jar: &mut CookieJar, redirect: Redirect) -> String {
+    let oauth_nonce = create_oauth_state(jar, redirect);
+    oauth_nonce
 }

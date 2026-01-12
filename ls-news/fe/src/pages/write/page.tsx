@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Props } from "./.props";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,29 @@ import { Label } from "@/components/ui/label";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { PostType } from "@/types";
 
-export default function WritePage(_props: Props) {
+function buildGithubAuthUrl(oauthNonce: string): string {
+  const clientId = import.meta.env.PUBLIC_GITHUB_CLIENT_ID;
+  const redirectUri = `${window.location.origin}/api/auth/callback/github`;
+  return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20user:email&state=${oauthNonce}`;
+}
+
+export default function WritePage(props: Props) {
+  if (props.t === "NotLoggedIn") {
+    return <RedirectToLogin oauthNonce={props.oauthNonce} />;
+  }
+
+  return <WriteForm />;
+}
+
+function RedirectToLogin({ oauthNonce }: { oauthNonce: string }) {
+  useEffect(() => {
+    window.location.href = buildGithubAuthUrl(oauthNonce);
+  }, [oauthNonce]);
+
+  return <div>ログイン中...</div>;
+}
+
+function WriteForm() {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [content, setContent] = useState("");

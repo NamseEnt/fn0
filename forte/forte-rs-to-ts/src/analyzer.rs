@@ -12,6 +12,7 @@ use std::sync::Mutex;
 
 pub struct Analyzer {
     pub ts_output_dir: String,
+    pub hooks_output_dir: String,
 }
 
 fn get_module_actual_span<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> rustc_span::Span {
@@ -351,6 +352,239 @@ impl Callbacks for Analyzer {
                 std::process::exit(1);
             }
         }
+
+        // Process hooks
+        let hook_modules = Mutex::new(Vec::new());
+        let _ = items.par_items(|item_id| {
+            let owner_id = item_id.owner_id;
+            let def_id: DefId = owner_id.to_def_id();
+            if tcx.def_kind(def_id) == DefKind::Mod {
+                let span = get_module_actual_span(tcx, def_id);
+                let source_map = tcx.sess.source_map();
+                let filename = source_map.span_to_filename(span);
+                if let rustc_span::FileName::Real(path) = filename
+                    && let Some(local_path) = path.into_local_path()
+                {
+                    let path_str = local_path.to_string_lossy();
+                    if path_str.contains("src/hooks/")
+                        && path_str.ends_with(".rs")
+                        && !path_str.ends_with("mod.rs")
+                    {
+                        let mut modules = hook_modules.lock().unwrap();
+                        modules.push(def_id);
+                    }
+                }
+            }
+            Ok(())
+        });
+
+        let hook_modules = hook_modules.lock().unwrap();
+        for def_id in hook_modules.iter() {
+            let def_id = *def_id;
+            let span = get_module_actual_span(tcx, def_id);
+            let filename = source_map.span_to_filename(span);
+            if let rustc_span::FileName::Real(ref path) = filename
+                && let Some(local_path) = path.clone().into_local_path()
+            {
+                let path_str = local_path.to_string_lossy();
+                println!("Found hook: {}", path_str);
+            }
+
+            let local_def_id = match def_id.as_local() {
+                Some(id) => id,
+                None => continue,
+            };
+            let hir_id = tcx.local_def_id_to_hir_id(local_def_id);
+
+            let mut input_def_id: Option<DefId> = None;
+            let mut output_def_id: Option<DefId> = None;
+            let mut handler_found = false;
+
+            if let rustc_hir::Node::Item(item) = tcx.hir_node(hir_id)
+                && let rustc_hir::ItemKind::Mod(_, mod_ref) = &item.kind
+            {
+                for item_id in mod_ref.item_ids {
+                    let item_hir_id = item_id.hir_id();
+                    if let rustc_hir::Node::Item(child_item) = tcx.hir_node(item_hir_id) {
+                        let child_def_id = child_item.owner_id.to_def_id();
+                        let item_name_str = tcx.def_path_str(child_def_id);
+                        if let Some((_, name)) = item_name_str.rsplit_once("::") {
+                            match name {
+                                "Input" => {
+                                    let kind = tcx.def_kind(child_def_id);
+                                    if kind == DefKind::Struct {
+                                        input_def_id = Some(child_def_id);
+                                    }
+                                }
+                                "Output" => {
+                                    let kind = tcx.def_kind(child_def_id);
+                                    if kind == DefKind::Struct || kind == DefKind::Enum {
+                                        output_def_id = Some(child_def_id);
+                                    }
+                                }
+                                "handler" => {
+                                    if tcx.def_kind(child_def_id) == DefKind::Fn
+                                        && matches!(tcx.visibility(child_def_id), Visibility::Public)
+                                    {
+                                        handler_found = true;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !handler_found || input_def_id.is_none() || output_def_id.is_none() {
+                continue;
+            }
+
+            let input_id = input_def_id.unwrap();
+            let output_id = output_def_id.unwrap();
+
+            let rust_source_path = if let rustc_span::FileName::Real(ref path) = filename
+                && let Some(local_path) = path.clone().into_local_path()
+            {
+                local_path.to_string_lossy().to_string()
+            } else {
+                continue;
+            };
+
+            let hook_name = rust_source_path
+                .rsplit('/')
+                .next()
+                .unwrap_or("unknown")
+                .trim_end_matches(".rs");
+
+            let mut converter = TypeConverter::new(tcx);
+
+            let input_ty = tcx.type_of(input_id).instantiate_identity();
+            let mut input_ts_type = converter.convert_type(input_ty, &rust_source_path);
+
+            let output_ty = tcx.type_of(output_id).instantiate_identity();
+            let mut output_ts_type = converter.convert_type(output_ty, &rust_source_path);
+
+            let name_map = resolve_type_names(&converter.definitions);
+
+            for def in &mut converter.definitions {
+                if let Some(resolved) = name_map.get(&def.full_path) {
+                    def.namespace = resolved.namespace.clone();
+                    def.type_name = resolved.type_name.clone();
+                }
+            }
+
+            for def in &mut converter.definitions {
+                apply_name_resolution_to_type(&mut def.ty, &name_map);
+            }
+
+            apply_name_resolution_to_type(&mut input_ts_type, &name_map);
+            apply_name_resolution_to_type(&mut output_ts_type, &name_map);
+
+            if let TsType::Reference(ref root_ref_string) = input_ts_type {
+                let found_idx = converter.definitions.iter().position(|def| {
+                    let def_ref = if def.namespace.is_empty() {
+                        def.type_name.clone()
+                    } else {
+                        format!("{}.{}", def.namespace.join("."), def.type_name)
+                    };
+                    &def_ref == root_ref_string
+                });
+                if let Some(idx) = found_idx {
+                    let root_def = converter.definitions.remove(idx);
+                    input_ts_type = root_def.ty;
+                }
+            }
+
+            if let TsType::Reference(ref root_ref_string) = output_ts_type {
+                let found_idx = converter.definitions.iter().position(|def| {
+                    let def_ref = if def.namespace.is_empty() {
+                        def.type_name.clone()
+                    } else {
+                        format!("{}.{}", def.namespace.join("."), def.type_name)
+                    };
+                    &def_ref == root_ref_string
+                });
+                if let Some(idx) = found_idx {
+                    let root_def = converter.definitions.remove(idx);
+                    output_ts_type = root_def.ty;
+                }
+            }
+
+            let file_content = generate_hook_file_content(
+                &rust_source_path,
+                hook_name,
+                &input_ts_type,
+                &output_ts_type,
+                &converter.definitions,
+            );
+
+            let mut output_path = PathBuf::from(&self.hooks_output_dir);
+            let use_hook_name = format!(
+                "use{}{}.ts",
+                hook_name.chars().next().unwrap().to_uppercase(),
+                &hook_name[1..]
+            );
+            output_path.push(&use_hook_name);
+
+            if let Some(parent) = output_path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                eprintln!("Error creating directory {}: {}", parent.display(), e);
+                std::process::exit(1);
+            }
+
+            if let Err(e) = std::fs::write(&output_path, &file_content) {
+                eprintln!("Error writing file {}: {}", output_path.display(), e);
+                std::process::exit(1);
+            }
+
+            println!(
+                "Generated hook: {} -> {}",
+                rust_source_path,
+                output_path.canonicalize().unwrap().display()
+            );
+        }
+
         Compilation::Stop
     }
+}
+
+fn generate_hook_file_content(
+    rust_source_path: &str,
+    hook_name: &str,
+    input_type: &TsType,
+    output_type: &TsType,
+    definitions: &[TsDefinition],
+) -> String {
+    let mut file_content = String::new();
+    file_content.push_str(&format!("// Auto-generated from {}\n\n", rust_source_path));
+    file_content.push_str("import { z } from \"zod\";\n");
+    file_content.push_str("import { useForteHook } from \"@/lib/forte-react\";\n\n");
+
+    for def in definitions {
+        if def.namespace.is_empty() {
+            let zod_schema = to_zod(&def.ty);
+            file_content.push_str(&format!("const {}Schema = {};\n\n", def.type_name, zod_schema));
+        }
+    }
+
+    let input_zod = to_zod(input_type);
+    file_content.push_str(&format!("const InputSchema = {};\n\n", input_zod));
+
+    let output_zod = to_zod(output_type);
+    file_content.push_str(&format!("const OutputSchema = {};\n\n", output_zod));
+
+    let capitalized_name = format!(
+        "{}{}",
+        hook_name.chars().next().unwrap().to_uppercase(),
+        &hook_name[1..]
+    );
+
+    file_content.push_str(&format!(
+        "export function use{}(input: z.infer<typeof InputSchema>) {{\n  return useForteHook(\"{}\", input, OutputSchema);\n}}\n",
+        capitalized_name, hook_name
+    ));
+
+    file_content
 }

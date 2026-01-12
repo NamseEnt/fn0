@@ -11,8 +11,11 @@ use execute::*;
 use http_body_util::combinators::UnsyncBoxBody;
 use measure_cpu_time::SystemClock;
 use std::string::FromUtf8Error;
+use std::sync::Arc;
 use wasmtime::Engine;
 use wasmtime_wasi_http::bindings::ProxyPre;
+
+pub use ski::{FetchHandler, FetchHandlerFuture};
 
 pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
@@ -41,7 +44,12 @@ where
             wasm_executor: WasmExecutor::new(wasm_proxy_cache, SystemClock),
         }
     }
-    pub async fn run(&self, code_id: &str, request: Request) -> Result<Response> {
+    pub async fn run(
+        &self,
+        code_id: &str,
+        request: Request,
+        fetch_handler: Option<Arc<dyn FetchHandler>>,
+    ) -> Result<Response> {
         let Some(code_kind) = self.deployment_map.code_kind(code_id) else {
             return Err(anyhow!("code_id not found"));
         };
@@ -55,7 +63,7 @@ where
                     })
                     .await
                     .map_err(|err| anyhow!("Failed to get JS code: {:?}", err))?;
-                let response = ski::run(&js_code, request).await?;
+                let response = ski::run(&js_code, request, fetch_handler).await?;
                 Ok(response)
             }
         }

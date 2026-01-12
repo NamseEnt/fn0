@@ -1,5 +1,7 @@
-import { renderToString } from "react-dom/server";
+import { renderToPipeableStream } from "react-dom/server";
 import { routes } from "./routes.generated";
+import { PassThrough } from "stream";
+import { serializeHookCache, clearHookCache, setSSRBaseUrl } from "./lib/forte-react";
 
 function matchRoute(
   pathname: string
@@ -35,7 +37,16 @@ function escapeJsonForScript(json: string): string {
 
 const isDev = (import.meta as any).env?.DEV ?? false;
 
-export async function render(url: string, rawProps: any): Promise<string> {
+function streamToString(stream: PassThrough): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+    stream.on("error", reject);
+  });
+}
+
+export async function render(url: string, rawProps: any, forteBaseUrl: string): Promise<string> {
   const urlObj = new URL(url, "http://localhost");
   const matched = matchRoute(urlObj.pathname);
 
@@ -43,17 +54,38 @@ export async function render(url: string, rawProps: any): Promise<string> {
     return "Not Found";
   }
 
+  // Set base URL for SSR hook requests
+  setSSRBaseUrl(forteBaseUrl);
+
+  // Clear hook cache for fresh request
+  clearHookCache();
+
   const [pageModule, schemaModule] = await Promise.all([
     matched.route.component(),
     matched.route.schema(),
   ]);
   const props = schemaModule.PropsSchema.parse(rawProps);
   const allProps = { ...props, params: matched.params };
-  const html = renderToString(pageModule.default(allProps));
   const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
   const viteScripts = `<script type="module" src="/@vite/client"></script>`;
   const clientScript = `/src/client.tsx`;
+
+  const html = await new Promise<string>((resolve, reject) => {
+    const passThrough = new PassThrough();
+    const { pipe } = renderToPipeableStream(pageModule.default(allProps), {
+      onAllReady() {
+        pipe(passThrough);
+        streamToString(passThrough).then(resolve).catch(reject);
+      },
+      onError(error) {
+        reject(error);
+      },
+    });
+  });
+
+  // Serialize hook cache for client hydration
+  const hookCacheJson = serializeHookCache();
 
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -67,6 +99,7 @@ export async function render(url: string, rawProps: any): Promise<string> {
 <body>
     <div id="root">${html}</div>
     <script>window.__FORTE_PROPS__ = ${propsJson};</script>
+    <script>window.__FORTE_HOOK_CACHE__ = ${hookCacheJson};</script>
     <script type="module" src="${clientScript}"></script>
 </body>
 </html>`;
@@ -80,13 +113,15 @@ export async function render(url: string, rawProps: any): Promise<string> {
 
   const matched = matchRoute(url.pathname);
   if (matched) {
+    // Clear hook cache for fresh request
+    clearHookCache();
+
     const [pageModule, schemaModule] = await Promise.all([
       matched.route.component(),
       matched.route.schema(),
     ]);
     const props = schemaModule.PropsSchema.parse(rawProps);
     const allProps = { ...props, params: matched.params };
-    const html = renderToString(pageModule.default(allProps));
     const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
     const viteScripts = isDev
@@ -97,6 +132,22 @@ export async function render(url: string, rawProps: any): Promise<string> {
     const cssLink = isDev
       ? `<link rel="stylesheet" href="/src/styles/globals.css" />`
       : `<link rel="stylesheet" href="/public/globals.css" />`;
+
+    const html = await new Promise<string>((resolve, reject) => {
+      const passThrough = new PassThrough();
+      const { pipe } = renderToPipeableStream(pageModule.default(allProps), {
+        onAllReady() {
+          pipe(passThrough);
+          streamToString(passThrough).then(resolve).catch(reject);
+        },
+        onError(error) {
+          reject(error);
+        },
+      });
+    });
+
+    // Serialize hook cache for client hydration
+    const hookCacheJson = serializeHookCache();
 
     return new Response(
       `<!DOCTYPE html>
@@ -111,6 +162,7 @@ export async function render(url: string, rawProps: any): Promise<string> {
 <body>
     <div id="root">${html}</div>
     <script>window.__FORTE_PROPS__ = ${propsJson};</script>
+    <script>window.__FORTE_HOOK_CACHE__ = ${hookCacheJson};</script>
     <script type="module" src="${clientScript}"></script>
 </body>
 </html>`,

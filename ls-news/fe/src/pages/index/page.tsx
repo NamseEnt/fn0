@@ -26,7 +26,7 @@ export default function IndexPage(props: Props) {
   const hasMore = displayedItems.length === 10;
 
   return (
-    <Layout me={props.me}>
+    <Layout>
       {displayedItems.map((item) => (
         <NewsItem key={item.id} item={item} />
       ))}

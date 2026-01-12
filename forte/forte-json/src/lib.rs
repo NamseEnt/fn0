@@ -26,6 +26,12 @@ pub fn to_stream<T: Serialize + ?Sized>(value: &T) -> impl Stream<Item = Bytes> 
     ser.into_stream()
 }
 
+pub fn to_vec<T: Serialize + ?Sized>(value: &T) -> Vec<u8> {
+    let mut ser = Serializer::new();
+    value.serialize(&mut ser).unwrap();
+    ser.into_vec()
+}
+
 const CHUNK_SIZE: usize = 8192;
 
 struct Serializer {
@@ -114,6 +120,16 @@ impl Serializer {
             self.completed_chunks.push(self.current_buffer.freeze());
         }
         futures::stream::iter(self.completed_chunks)
+    }
+
+    fn into_vec(mut self) -> Vec<u8> {
+        if !self.current_buffer.is_empty() {
+            self.completed_chunks.push(self.current_buffer.freeze());
+        }
+        self.completed_chunks
+            .into_iter()
+            .flat_map(|b| b.to_vec())
+            .collect()
     }
 }
 
@@ -396,6 +412,16 @@ impl<'a> ser::SerializeStruct for Compound<'a> {
         key: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error> {
+        // Serialize value to temporary buffer first to check if it's null
+        let mut temp = Serializer::new();
+        value.serialize(&mut temp)?;
+        let value_bytes = temp.into_vec();
+
+        // Skip None fields (serialized as "null")
+        if value_bytes == b"null" {
+            return Ok(());
+        }
+
         let state = match self {
             Compound::Struct { state, .. } => state,
             _ => unreachable!(),
@@ -422,7 +448,7 @@ impl<'a> ser::SerializeStruct for Compound<'a> {
         let camel_key = to_camel_case(key);
         ser.write_string_value(&camel_key);
         ser.write_bytes(b":");
-        value.serialize(&mut **ser)?;
+        ser.write_bytes(&value_bytes);
         Ok(())
     }
 
@@ -444,6 +470,16 @@ impl<'a> ser::SerializeStructVariant for Compound<'a> {
         key: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error> {
+        // Serialize value to temporary buffer first to check if it's null
+        let mut temp = Serializer::new();
+        value.serialize(&mut temp)?;
+        let value_bytes = temp.into_vec();
+
+        // Skip None fields (serialized as "null")
+        if value_bytes == b"null" {
+            return Ok(());
+        }
+
         let state = match self {
             Compound::StructVariant { state, .. } => state,
             _ => unreachable!(),
@@ -470,7 +506,7 @@ impl<'a> ser::SerializeStructVariant for Compound<'a> {
         let camel_key = to_camel_case(key);
         ser.write_string_value(&camel_key);
         ser.write_bytes(b":");
-        value.serialize(&mut **ser)?;
+        ser.write_bytes(&value_bytes);
         Ok(())
     }
 
