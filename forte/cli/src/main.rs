@@ -1,5 +1,9 @@
 mod cli;
+mod deps;
+mod module_graph;
 mod server;
+mod ssr;
+mod transform;
 
 use anyhow::Result;
 use clap::Parser;

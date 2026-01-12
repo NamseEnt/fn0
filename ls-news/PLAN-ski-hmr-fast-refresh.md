@@ -621,91 +621,205 @@ impl SsrRenderer {
 
 ## 7. 단계별 구현 계획
 
-### Phase 1: 기본 인프라 (1단계)
+> **핵심 원칙:** 최종 아키텍처는 처음부터 확정하고, 구현만 단계별로 진행한다.
+> 이렇게 하면 리팩토링 없이 기능만 "켜면" 되고, 각 단계에서 검증이 가능하다.
 
-**목표:** Vite 없이 .tsx 파일 서빙
+```rust
+// 예: Phase 1에서도 최종 구조로 만들어둠
+pub struct TransformPipeline {
+    swc_compiler: SwcCompiler,
+    module_graph: Arc<RwLock<ModuleGraph>>,  // Phase 1에서 구현
+    refresh_enabled: bool,                    // Phase 2에서 true로 변경
+}
+```
 
-1. **SWC 통합**
-   - `swc_core` crate 추가
-   - 기본 TypeScript/JSX 트랜스파일 구현
-   - 테스트: 단일 .tsx 파일 변환
+---
 
-2. **기본 파일 서버**
-   - `/src/**/*.tsx` 요청 처리
-   - 트랜스파일 + 응답
-   - 캐시 구현
+### Phase 1: Transform + Module Graph + HMR
 
-3. **의존성 Pre-bundling**
-   - esbuild로 node_modules 번들링
-   - `/.forte/deps/` 서빙
-   - import rewrite 구현
+**목표:** 파일 변경 시 해당 모듈만 교체 (상태는 초기화됨)
 
-**완료 조건:** 브라우저에서 React 앱이 (새로고침으로) 동작
+#### 1.1 SWC 통합 + Transform Pipeline
 
-### Phase 2: 모듈 그래프 + HMR (2단계)
+```
+작업 내용:
+├── swc_core crate 추가
+├── TypeScript/JSX → JavaScript 변환
+├── 트랜스파일 캐시 구현 (hash 기반)
+└── 테스트: 단일 .tsx 파일이 브라우저에서 실행되는지 확인
+```
 
-**목표:** 파일 변경 시 해당 모듈만 교체
+- `forte/cli/src/transform/mod.rs` 생성
+- `forte/cli/src/transform/swc.rs` 생성
+- React Refresh 변환은 **비활성화** 상태로 구조만 준비
 
-1. **Module Graph 구현**
-   - 모듈 간 관계 추적
-   - 변환 시 import 분석
-   - HMR boundary 계산
+#### 1.2 의존성 Pre-bundling
 
-2. **HMR Client 구현**
-   - WebSocket 연결
-   - `import.meta.hot` API
-   - 모듈 교체 로직
+```
+작업 내용:
+├── package.json 파싱 → 의존성 목록 추출
+├── esbuild로 각 의존성 ESM 번들링
+├── .forte/deps/ 디렉토리에 캐시
+├── import rewrite 구현 ('react' → '/.forte/deps/react-xxx.js')
+└── 테스트: import React from 'react'가 동작하는지 확인
+```
 
-3. **HMR Engine 구현**
-   - 파일 변경 감지 연동
-   - HMR payload 생성
-   - WebSocket 브로드캐스트
+- `forte/cli/src/deps/mod.rs` 생성
+- `forte/cli/src/transform/import_rewrite.rs` 생성
 
-**완료 조건:** 파일 변경 시 해당 모듈만 다시 로드 (상태는 초기화됨)
+#### 1.3 Module Graph
 
-### Phase 3: React Fast Refresh (3단계)
+```
+작업 내용:
+├── 모듈 간 import 관계 추적 자료구조
+├── 변환 시 import 분석 → 그래프 업데이트
+├── HMR boundary 계산 로직 (importers 따라 올라가기)
+└── 테스트: 파일 변경 시 영향받는 모듈 목록이 정확한지 확인
+```
 
-**목표:** React 컴포넌트 상태 유지
+- `forte/cli/src/module_graph/mod.rs` 생성
 
-1. **SWC React Refresh 플러그인 활성화**
-   - `$RefreshReg$`, `$RefreshSig$` 코드 주입
-   - Hook 시그니처 추적
+#### 1.4 HMR Engine + Client
 
-2. **React Refresh Runtime 통합**
-   - `react-refresh/runtime` 번들링
-   - 전역 함수 등록
-   - HMR 업데이트 시 `performReactRefresh()` 호출
+```
+작업 내용:
+├── 서버: 파일 변경 → Module Graph 조회 → WebSocket payload 전송
+├── 클라이언트: WebSocket 연결 + import.meta.hot API
+├── 모듈 교체: dynamic import로 새 모듈 fetch
+├── HMR 코드 주입 (각 모듈에 accept/dispose 추가)
+└── 테스트: .tsx 수정 시 해당 모듈만 다시 로드되는지 확인
+```
 
-3. **모듈별 HMR 코드 주입**
-   - 각 React 컴포넌트 파일에 accept/dispose 코드 주입
-   - 컴포넌트 감지 로직
+- `forte/cli/src/hmr/engine.rs` 생성
+- `forte/cli/src/hmr/protocol.rs` 생성
+- `forte/cli/assets/hmr-client.js` 생성
+- `forte/cli/src/transform/inject.rs` 생성
 
-**완료 조건:** 컴포넌트 코드 수정 시 상태 유지되며 업데이트
+#### 1.5 SSR 기본 동작
 
-### Phase 4: CSS + 안정화 (4단계)
+```
+작업 내용:
+├── server.tsx → server.js 번들링 (esbuild)
+├── ski로 SSR 실행
+├── 파일 변경 시 재번들링
+└── 테스트: 페이지 새로고침 시 SSR이 동작하는지 확인
+```
 
-**목표:** 완전한 dev 경험
+**Phase 1 완료 조건:**
+- 브라우저에서 React 앱 동작
+- .tsx 파일 수정 시 해당 모듈만 교체 (full reload 아님)
+- 단, React 컴포넌트 상태는 초기화됨
 
-1. **Tailwind CSS 통합**
-   - tailwindcss CLI 실행
-   - 파일 변경 시 재빌드
-   - CSS HMR
+---
 
-2. **SSR 지원**
-   - server.tsx 번들링
-   - ski로 SSR 실행
-   - SSR 코드 변경 시 재번들링
+### Phase 2: React Fast Refresh
 
-3. **에러 처리**
-   - 컴파일 에러 overlay
-   - 런타임 에러 표시
-   - 에러 복구
+**목표:** React 컴포넌트 상태 유지하며 업데이트
 
-4. **소스맵**
-   - 변환 시 소스맵 생성
-   - 브라우저 DevTools 지원
+#### 2.1 SWC React Refresh 플러그인 활성화
 
-**완료 조건:** Vite와 동등한 DX
+```
+작업 내용:
+├── swc transform에 refresh 옵션 활성화
+├── $RefreshReg$, $RefreshSig$ 코드 자동 주입
+├── Hook 시그니처 추적 코드 생성
+└── 테스트: 변환된 코드에 Refresh 관련 코드가 포함되는지 확인
+```
+
+- `transform/swc.rs` 수정: `refresh_enabled: true`
+
+#### 2.2 React Refresh Runtime 통합
+
+```
+작업 내용:
+├── react-refresh/runtime 번들링 (pre-bundle에 포함)
+├── HTML에 runtime 초기화 스크립트 주입
+├── 전역 함수 등록: $RefreshReg$, $RefreshSig$, $RefreshRuntime$
+└── 테스트: 브라우저 콘솔에서 window.$RefreshRuntime$ 접근 가능한지 확인
+```
+
+- `forte/cli/assets/react-refresh-setup.js` 생성
+
+#### 2.3 HMR + Fast Refresh 연동
+
+```
+작업 내용:
+├── 모듈 업데이트 후 performReactRefresh() 호출
+├── 컴포넌트 감지 로직 (React 컴포넌트인 경우만 Fast Refresh)
+├── 비-컴포넌트 파일 변경 시 적절한 boundary로 전파
+└── 테스트: useState 상태가 유지되면서 UI가 업데이트되는지 확인
+```
+
+- `hmr-client.js` 수정: Fast Refresh 트리거 로직 추가
+
+**Phase 2 완료 조건:**
+- 컴포넌트 코드 수정 시 상태 유지되며 업데이트
+- Hook 변경 시 적절히 remount
+- 비-컴포넌트 파일 변경 시 관련 컴포넌트만 업데이트
+
+---
+
+### Phase 3: CSS + 안정화
+
+**목표:** Vite와 동등한 개발 경험
+
+#### 3.1 Tailwind CSS 통합
+
+```
+작업 내용:
+├── tailwindcss CLI 프로세스 관리
+├── .tsx 파일 변경 시 tailwind 재빌드 트리거
+├── CSS 파일 변경 감지 + HMR
+└── 테스트: 클래스 추가 시 스타일이 즉시 반영되는지 확인
+```
+
+- `forte/cli/src/css/mod.rs` 생성
+
+#### 3.2 CSS HMR
+
+```
+작업 내용:
+├── CSS import를 동적 link 태그로 변환
+├── CSS 변경 시 link href 업데이트 (새로고침 없이)
+├── dispose 시 기존 link 제거
+└── 테스트: CSS 수정 시 페이지 새로고침 없이 스타일 변경
+```
+
+#### 3.3 에러 처리 + Overlay
+
+```
+작업 내용:
+├── 컴파일 에러 발생 시 브라우저에 overlay 표시
+├── 런타임 에러 캐치 + 표시
+├── 에러 수정 후 자동 복구
+└── 테스트: 문법 에러 → overlay → 수정 → 정상 동작
+```
+
+#### 3.4 소스맵
+
+```
+작업 내용:
+├── SWC 변환 시 sourcemap 생성
+├── 브라우저 DevTools에서 원본 .tsx 표시
+└── 테스트: 에러 스택트레이스가 원본 파일:라인 표시
+```
+
+**Phase 3 완료 조건:**
+- Tailwind 클래스 변경 시 즉시 반영
+- 컴파일 에러 시 명확한 에러 메시지
+- DevTools에서 원본 소스 디버깅 가능
+
+---
+
+### 구현 순서 요약
+
+| Phase | 핵심 결과물 | 검증 방법 |
+|-------|------------|----------|
+| **1** | HMR 동작 (상태 초기화) | 파일 수정 → 모듈만 교체 (full reload 아님) |
+| **2** | Fast Refresh (상태 유지) | useState 값이 유지되면서 UI 업데이트 |
+| **3** | 완전한 DX | CSS HMR + 에러 overlay + 소스맵 |
+
+각 Phase가 끝날 때마다 동작하는 결과물이 있어 디버깅과 검증이 용이하다.
 
 ---
 

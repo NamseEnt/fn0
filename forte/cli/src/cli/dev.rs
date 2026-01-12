@@ -1,4 +1,6 @@
-use crate::server::{self, ServerConfig, ServerHandle};
+use crate::deps::DependencyPrebundler;
+use crate::server::{self, HmrModuleUpdate, ServerConfig, ServerHandle};
+use crate::ssr::SsrBundler;
 use anyhow::{Context, Result};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
 use std::collections::HashMap;
@@ -12,7 +14,6 @@ use std::time::{Duration, SystemTime};
 #[derive(Debug)]
 pub struct DevOptions {
     pub project_dir: PathBuf,
-    /// None means auto-select starting from 3000
     pub port: Option<u16>,
 }
 
@@ -95,7 +96,6 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
     output.push_str("export const routes: Array<{ path: string; component: () => Promise<{ default: (props: any) => any }>; schema: () => Promise<{ PropsSchema: any }> }> = [\n");
 
     for route in &routes {
-        // Replace only the trailing "/page" with "/.props"
         let fe_props_path = route.fe_page_path
             .strip_suffix("/page")
             .map(|s| format!("{}/.props", s))
@@ -211,48 +211,25 @@ fn build_backend(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn collect_rs_file_mtimes(dir: &Path) -> HashMap<PathBuf, SystemTime> {
+fn collect_file_mtimes(dir: &Path, extensions: &[&str]) -> HashMap<PathBuf, SystemTime> {
     let mut mtimes = HashMap::new();
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                mtimes.extend(collect_rs_file_mtimes(&path));
-            } else if path.extension().is_some_and(|ext| ext == "rs") {
-                if let Ok(metadata) = fs::metadata(&path) {
-                    if let Ok(mtime) = metadata.modified() {
-                        mtimes.insert(path, mtime);
+                mtimes.extend(collect_file_mtimes(&path, extensions));
+            } else if let Some(ext) = path.extension() {
+                if extensions.iter().any(|e| ext == *e) {
+                    if let Ok(metadata) = fs::metadata(&path) {
+                        if let Ok(mtime) = metadata.modified() {
+                            mtimes.insert(path, mtime);
+                        }
                     }
                 }
             }
         }
     }
     mtimes
-}
-
-#[allow(dead_code)]
-fn build_server_js(project_dir: &Path) -> Result<()> {
-    let fe_dir = project_dir.join("fe");
-
-    println!("[build] Building server.js for SSR (dev mode)...");
-    let status = Command::new("npx")
-        .arg("vite")
-        .arg("build")
-        .arg("--ssr")
-        .arg("src/server.tsx")
-        .arg("--outDir")
-        .arg("dist")
-        .arg("--mode")
-        .arg("development")
-        .current_dir(&fe_dir)
-        .status()
-        .context("Failed to build server.js")?;
-
-    if !status.success() {
-        anyhow::bail!("vite build --ssr failed with status: {}", status);
-    }
-
-    Ok(())
 }
 
 pub async fn run(options: DevOptions) -> Result<()> {
@@ -282,26 +259,31 @@ pub async fn run(options: DevOptions) -> Result<()> {
     run_codegen(&project_dir)?;
     build_backend(&project_dir)?;
 
+    println!("[deps] Pre-bundling dependencies...");
+    let prebundler = DependencyPrebundler::new(&project_dir);
+    let dep_map = prebundler.prebundle()?;
+    println!("[deps] Pre-bundled {} dependencies", dep_map.entries.len());
+
+    println!("[ssr] Building SSR bundle...");
+    let ssr_bundler = SsrBundler::new(&project_dir);
+    ssr_bundler.build()?;
+
     let backend_path = project_dir
         .join("target/wasm32-wasip2/release/backend.wasm")
         .to_string_lossy()
         .to_string();
 
-    let frontend_path = project_dir
-        .join("fe/dist/server.js")
-        .to_string_lossy()
-        .to_string();
-
+    let frontend_path = ssr_bundler.output_path().to_string_lossy().to_string();
     let public_dir = project_dir.join("fe/public");
-    let fe_dir = project_dir.join("fe");
 
     let config = ServerConfig {
         port,
         backend_path,
         frontend_path,
         public_dir,
-        fe_dir,
+        project_root: project_dir.clone(),
         dev_mode: true,
+        dep_map,
     };
 
     let handle = server::run(config).await?;
@@ -312,25 +294,27 @@ pub async fn run(options: DevOptions) -> Result<()> {
 async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> {
     let (tx, rx) = channel();
 
-    let mut debouncer = new_debouncer(Duration::from_millis(500), tx)?;
+    let mut debouncer = new_debouncer(Duration::from_millis(100), tx)?;
 
     let rs_dir = project_dir.join("rs/src");
+    let fe_src_dir = project_dir.join("fe/src");
 
     debouncer
         .watcher()
         .watch(&rs_dir, RecursiveMode::Recursive)?;
+    debouncer
+        .watcher()
+        .watch(&fe_src_dir, RecursiveMode::Recursive)?;
 
-    println!("[watch] Watching for backend changes in rs/src...");
-    println!("[watch] Frontend HMR handled by Vite");
+    println!("[watch] Watching for changes in rs/src and fe/src...");
 
-    // Track file mtimes after build to ignore cargo-induced mtime changes
-    let mut known_mtimes = collect_rs_file_mtimes(&rs_dir);
+    let mut known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
+    let mut known_fe_mtimes = collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
 
     loop {
         match rx.recv() {
             Ok(Ok(events)) => {
-                // Filter to only .rs files that have actually changed (newer mtime than recorded)
-                let changed_files: Vec<_> = events
+                let rs_changes: Vec<_> = events
                     .iter()
                     .filter(|e| {
                         e.path.starts_with(&rs_dir)
@@ -338,41 +322,63 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                             && !e.path.ends_with("route_generated.rs")
                     })
                     .filter(|e| {
-                        // Check if the file's current mtime is newer than what we recorded
                         let current_mtime = fs::metadata(&e.path)
                             .ok()
                             .and_then(|m| m.modified().ok());
-                        match (current_mtime, known_mtimes.get(&e.path)) {
+                        match (current_mtime, known_rs_mtimes.get(&e.path)) {
                             (Some(current), Some(known)) => current > *known,
-                            (Some(_), None) => true, // New file
+                            (Some(_), None) => true,
                             _ => false,
                         }
                     })
                     .collect();
 
-                if !changed_files.is_empty() {
-                    for e in &changed_files {
-                        println!("[watch] Changed file: {:?}", e.path);
+                let fe_changes: Vec<_> = events
+                    .iter()
+                    .filter(|e| {
+                        e.path.starts_with(&fe_src_dir)
+                            && e.path.extension().is_some_and(|ext| {
+                                ext == "tsx" || ext == "ts" || ext == "jsx" || ext == "js" || ext == "css"
+                            })
+                            && !is_generated_file(&e.path)
+                    })
+                    .filter(|e| {
+                        let current_mtime = fs::metadata(&e.path)
+                            .ok()
+                            .and_then(|m| m.modified().ok());
+                        match (current_mtime, known_fe_mtimes.get(&e.path)) {
+                            (Some(current), Some(known)) => current > *known,
+                            (Some(_), None) => true,
+                            _ => false,
+                        }
+                    })
+                    .collect();
+
+                if !rs_changes.is_empty() {
+                    for e in &rs_changes {
+                        println!("[watch] Backend changed: {:?}", e.path);
                     }
-                    println!();
-                    println!("[watch] Backend changes detected, rebuilding...");
+                    println!("[watch] Rebuilding backend...");
 
                     let result = rebuild_backend(project_dir, &handle).await;
+                    known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
 
-                    // Update known mtimes after rebuild
-                    known_mtimes = collect_rs_file_mtimes(&rs_dir);
-
-                    // Drain any pending events that occurred during rebuild
                     while rx.try_recv().is_ok() {}
 
                     if let Err(e) = result {
                         eprintln!("[watch] Backend rebuild failed: {}", e);
                     } else {
                         handle.hmr.send_reload();
-                        println!("[watch] Sent reload signal to browser");
+                        println!("[watch] Sent reload signal");
                     }
+                }
 
-                    println!("[watch] Ready for requests");
+                if !fe_changes.is_empty() {
+                    for e in &fe_changes {
+                        println!("[watch] Frontend changed: {:?}", e.path);
+                        handle_frontend_change(&e.path, &handle);
+                    }
+                    known_fe_mtimes = collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
                 }
             }
             Ok(Err(error)) => {
@@ -388,6 +394,31 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     Ok(())
 }
 
+fn handle_frontend_change(file_path: &Path, handle: &ServerHandle) {
+    if let Some(ts) = &handle.transform_server {
+        ts.invalidate_module(file_path);
+
+        if let Some(update) = ts.get_hmr_update(file_path) {
+            if update.needs_full_reload {
+                println!("[hmr] No HMR boundary found, sending full reload");
+                handle.hmr.send_reload();
+            } else {
+                println!("[hmr] Sending HMR update for {}", update.boundary);
+                handle.hmr.send_update(vec![
+                    HmrModuleUpdate {
+                        id: update.boundary.clone(),
+                        accepted_by: update.boundary,
+                    }
+                ]);
+            }
+        } else {
+            handle.hmr.send_reload();
+        }
+    } else {
+        handle.hmr.send_reload();
+    }
+}
+
 async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()> {
     println!("[rebuild] Running codegen...");
     run_codegen(project_dir)?;
@@ -399,4 +430,11 @@ async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()
     println!("[rebuild] Backend cache invalidated");
 
     Ok(())
+}
+
+fn is_generated_file(path: &Path) -> bool {
+    let path_str = path.to_string_lossy();
+    path_str.contains(".generated/")
+        || path_str.ends_with(".props.ts")
+        || path_str.ends_with("routes.generated.ts")
 }

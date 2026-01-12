@@ -1,38 +1,43 @@
 mod cache;
 mod fetch_handler;
 mod hmr;
+mod transform_server;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 pub use cache::SimpleCache;
 use fetch_handler::ForteFetchHandler;
 use fn0::{CodeKind, DeploymentMap, Fn0};
 use futures_util::{SinkExt, StreamExt};
-pub use hmr::HmrBroadcaster;
+pub use hmr::{HmrBroadcaster, HmrModuleUpdate};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
+pub use transform_server::TransformServer;
+
+use crate::deps::DependencyMap;
 
 pub struct ServerConfig {
     pub port: u16,
     pub backend_path: String,
     pub frontend_path: String,
     pub public_dir: PathBuf,
-    pub fe_dir: PathBuf,
+    pub project_root: PathBuf,
     pub dev_mode: bool,
+    pub dep_map: DependencyMap,
 }
 
 pub struct ServerHandle {
     pub cache: SimpleCache,
     pub hmr: HmrBroadcaster,
-    _vite_ssr_child: Option<std::process::Child>,
+    pub transform_server: Option<Arc<TransformServer>>,
 }
 
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
@@ -43,26 +48,24 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let cache = SimpleCache::new(config.backend_path.clone(), config.frontend_path.clone());
     let hmr = HmrBroadcaster::new();
 
-    let (vite_ssr_port, vite_ssr_child) = if config.dev_mode {
-        let (port, child) = start_vite_ssr_adapter(&config.fe_dir)?;
-        (Some(port), Some(child))
+    let transform_server = if config.dev_mode {
+        Some(Arc::new(TransformServer::new(&config.project_root, config.dep_map.clone())))
     } else {
-        (None, None)
+        None
     };
 
     let handle = ServerHandle {
         cache: cache.clone(),
         hmr: hmr.clone(),
-        _vite_ssr_child: vite_ssr_child,
+        transform_server: transform_server.clone(),
     };
 
     let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map));
     let public_dir = Arc::new(config.public_dir);
-    let forte_port = config.port;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     let listener = TcpListener::bind(addr).await?;
-    println!("Forte SSR server listening on http://{}", addr);
+    println!("Forte dev server listening on http://{}", addr);
 
     tokio::spawn(async move {
         loop {
@@ -76,6 +79,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
             let fn0_clone = fn0.clone();
             let public_dir_clone = public_dir.clone();
             let hmr_clone = hmr.clone();
+            let transform_server_clone = transform_server.clone();
 
             tokio::spawn(async move {
                 let io = TokioIo::new(socket);
@@ -85,7 +89,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let fn0 = fn0_clone.clone();
                         let public_dir = public_dir_clone.clone();
                         let hmr = hmr_clone.clone();
-                        handle_request(req, fn0, public_dir, hmr, vite_ssr_port, forte_port)
+                        let ts = transform_server_clone.clone();
+                        handle_request(req, fn0, public_dir, hmr, ts)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -103,8 +108,7 @@ async fn handle_request(
     fn0: Arc<Fn0<SimpleCache>>,
     public_dir: Arc<PathBuf>,
     hmr: HmrBroadcaster,
-    vite_ssr_port: Option<u16>,
-    forte_port: u16,
+    transform_server: Option<Arc<TransformServer>>,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
@@ -114,10 +118,10 @@ async fn handle_request(
         return handle_hmr_upgrade(req, hmr).await;
     }
 
-    if let Some(vite_ssr_port) = vite_ssr_port
-        && should_proxy_to_vite(path)
-    {
-        return proxy_to_vite(req, vite_ssr_port).await;
+    if let Some(ts) = &transform_server {
+        if should_transform(path) {
+            return serve_transformed(ts, path).await;
+        }
     }
 
     if let Some(static_response) = try_serve_static(&public_dir, path).await {
@@ -165,11 +169,6 @@ async fn handle_request(
         return Ok(backend_response);
     }
 
-    if let Some(vite_ssr_port) = vite_ssr_port {
-        println!("Calling Vite SSR adapter on port {}", vite_ssr_port);
-        return call_ssr_adapter(vite_ssr_port, forte_port, &uri, backend_response).await;
-    }
-
     println!("Preparing frontend request with backend response body");
     let frontend_request = Request::builder()
         .method("POST")
@@ -187,6 +186,39 @@ async fn handle_request(
         Err(e) => {
             eprintln!("Frontend error: {:?}", e);
             Err(e)
+        }
+    }
+}
+
+fn should_transform(path: &str) -> bool {
+    path.starts_with("/src/")
+        || path.starts_with("/.forte/deps/")
+        || path == "/__hmr-client.js"
+        || path == "/__react-refresh.js"
+        || path == "/__error-overlay.js"
+}
+
+async fn serve_transformed(
+    ts: &TransformServer,
+    path: &str,
+) -> Result<fn0::Response> {
+    match ts.serve_module(path).await {
+        Ok(resp) => {
+            let (parts, body) = resp.into_parts();
+            Ok(Response::from_parts(
+                parts,
+                UnsyncBoxBody::new(body).boxed_unsync(),
+            ))
+        }
+        Err(e) => {
+            eprintln!("[transform] Error serving {}: {:?}", path, e);
+            Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(
+                    Full::new(bytes::Bytes::from(format!("Transform error: {}", e)))
+                        .map_err(|e| anyhow::anyhow!("{e}"))
+                        .boxed_unsync(),
+                )?)
         }
     }
 }
@@ -297,6 +329,8 @@ async fn handle_hmr_upgrade(
 
     let accept_key = derive_accept_key(ws_key.as_bytes());
 
+    hmr.send_connected();
+
     tokio::spawn(async move {
         match hyper::upgrade::on(req).await {
             Ok(upgraded) => {
@@ -347,139 +381,6 @@ async fn handle_hmr_upgrade(
         .header("sec-websocket-accept", accept_key)
         .body(
             Full::new(bytes::Bytes::new())
-                .map_err(|e| anyhow::anyhow!("{e}"))
-                .boxed_unsync(),
-        )?)
-}
-
-fn should_proxy_to_vite(path: &str) -> bool {
-    path.starts_with("/@vite/")
-        || path.starts_with("/@react-refresh")
-        || path.starts_with("/src/")
-        || path.starts_with("/node_modules/")
-}
-
-async fn proxy_to_vite(
-    req: Request<hyper::body::Incoming>,
-    vite_port: u16,
-) -> Result<fn0::Response> {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    let headers = req.headers().clone();
-
-    let url = format!(
-        "http://127.0.0.1:{}{}",
-        vite_port,
-        uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/")
-    );
-
-    let client = reqwest::Client::new();
-    let mut builder = client.request(method.clone(), &url);
-
-    for (name, value) in headers.iter() {
-        if name != "host"
-            && let Ok(v) = value.to_str()
-        {
-            builder = builder.header(name.as_str(), v);
-        }
-    }
-
-    let body_bytes = req.collect().await?.to_bytes();
-    if !body_bytes.is_empty() {
-        builder = builder.body(body_bytes.to_vec());
-    }
-
-    let resp = builder.send().await.context("Failed to proxy to Vite")?;
-
-    let status = StatusCode::from_u16(resp.status().as_u16())?;
-    let mut response_builder = Response::builder().status(status);
-
-    for (name, value) in resp.headers().iter() {
-        response_builder = response_builder.header(name.as_str(), value.as_bytes());
-    }
-
-    let body = resp.bytes().await?;
-    Ok(response_builder.body(
-        Full::new(body)
-            .map_err(|e| anyhow::anyhow!("{e}"))
-            .boxed_unsync(),
-    )?)
-}
-
-fn start_vite_ssr_adapter(fe_dir: &Path) -> Result<(u16, std::process::Child)> {
-    use std::io::{BufRead, BufReader};
-    use std::process::{Command, Stdio};
-
-    println!("[vite-ssr] Starting Vite SSR adapter...");
-    let mut child = Command::new("node")
-        .arg("dev-server.mjs")
-        .current_dir(fe_dir)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .context("Failed to start Vite SSR adapter")?;
-
-    let stdout = child.stdout.take().unwrap();
-    let mut reader = BufReader::new(stdout);
-
-    let mut line = String::new();
-    loop {
-        line.clear();
-        if reader.read_line(&mut line)? == 0 {
-            anyhow::bail!("Vite SSR adapter exited before reporting port");
-        }
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line)
-            && let Some(port) = json.get("port").and_then(|p| p.as_u64())
-        {
-            println!("[vite-ssr] Vite SSR adapter ready on port {}", port);
-
-            // Spawn a thread to consume remaining stdout to prevent EPIPE
-            std::thread::spawn(move || {
-                use std::io::Read;
-                let mut buf = [0u8; 1024];
-                while reader.read(&mut buf).unwrap_or(0) > 0 {}
-            });
-
-            return Ok((port as u16, child));
-        }
-    }
-}
-
-async fn call_ssr_adapter(
-    port: u16,
-    forte_port: u16,
-    uri: &hyper::Uri,
-    backend_response: fn0::Response,
-) -> Result<fn0::Response> {
-    let url = format!("http://127.0.0.1:{}/__ssr_render", port);
-
-    let (_, body) = backend_response.into_parts();
-    let body_bytes = body.collect().await?.to_bytes();
-    let props: serde_json::Value = serde_json::from_slice(&body_bytes)?;
-
-    let payload = serde_json::json!({
-        "url": uri.to_string(),
-        "props": props,
-        "forteBaseUrl": format!("http://127.0.0.1:{}", forte_port),
-    });
-
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(&url)
-        .json(&payload)
-        .send()
-        .await
-        .context("Failed to call SSR adapter")?;
-
-    let status = StatusCode::from_u16(resp.status().as_u16())?;
-    let html = resp.bytes().await?;
-
-    Ok(Response::builder()
-        .status(status)
-        .header("content-type", "text/html; charset=utf-8")
-        .body(
-            Full::new(html)
                 .map_err(|e| anyhow::anyhow!("{e}"))
                 .boxed_unsync(),
         )?)
