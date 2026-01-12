@@ -1,12 +1,12 @@
-#[path = "pages/api/auth/callback/github.rs"]
-mod pages_api_auth_callback_github;
-#[path = "pages/index/mod.rs"]
-mod pages_index;
 #[allow(non_snake_case)]
 #[path = "pages/post/[id]/mod.rs"]
 mod pages_post__id_;
 #[path = "pages/write.rs"]
 mod pages_write;
+#[path = "pages/api/auth/callback/github.rs"]
+mod pages_api_auth_callback_github;
+#[path = "pages/index/mod.rs"]
+mod pages_index;
 #[path = "hooks/me.rs"]
 mod hooks_me;
 use forte_sdk::anyhow::Result;
@@ -18,21 +18,21 @@ use std::collections::HashMap;
 #[allow(non_camel_case_types)]
 pub enum Redirect {
     External { url: String },
-    ApiAuthCallbackGithub,
-    Index,
     Post_id_ { id: String },
     Write,
+    ApiAuthCallbackGithub,
+    Index,
 }
 impl Redirect {
     pub fn to_path(&self) -> String {
         match self {
             Redirect::External { url } => url.clone(),
-            Redirect::ApiAuthCallbackGithub => "/api/auth/callback/github".to_string(),
-            Redirect::Index => "/".to_string(),
             Redirect::Post_id_ { id } => {
                 format!("/{}", ["post".to_string(), id.to_string()].join("/"))
             }
             Redirect::Write => "/write".to_string(),
+            Redirect::ApiAuthCallbackGithub => "/api/auth/callback/github".to_string(),
+            Redirect::Index => "/".to_string(),
         }
     }
 }
@@ -63,7 +63,75 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
         })
         .collect();
     let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
-    if path == "/api/auth/callback/github" {
+    if path_segments.len() == 2usize && path_segments.first() == Some(&"post") {
+        let id: String = path_segments[1usize].to_string();
+        let path_params = pages_post__id_::PathParams { id };
+        match pages_post__id_::handler(headers, &mut cookie_jar, path_params).await {
+            Ok(props) => {
+                let stream = forte_json::to_stream(&props);
+                Ok(
+                    build_response_with_cookies(
+                        Response::new(Body::from_stream(stream)),
+                        &cookie_jar,
+                    ),
+                )
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(
+                        build_response_with_cookies(
+                            Response::builder()
+                                .status(StatusCode::FOUND)
+                                .header(LOCATION, redirect.to_path())
+                                .body(Body::empty())
+                                .unwrap(),
+                            &cookie_jar,
+                        ),
+                    )
+                } else {
+                    Ok(
+                        Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Body::from(format!("Error: {:?}", e)))
+                            .unwrap(),
+                    )
+                }
+            }
+        }
+    } else if path == "/write" {
+        match pages_write::handler(headers, &mut cookie_jar).await {
+            Ok(props) => {
+                let stream = forte_json::to_stream(&props);
+                Ok(
+                    build_response_with_cookies(
+                        Response::new(Body::from_stream(stream)),
+                        &cookie_jar,
+                    ),
+                )
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(
+                        build_response_with_cookies(
+                            Response::builder()
+                                .status(StatusCode::FOUND)
+                                .header(LOCATION, redirect.to_path())
+                                .body(Body::empty())
+                                .unwrap(),
+                            &cookie_jar,
+                        ),
+                    )
+                } else {
+                    Ok(
+                        Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Body::from(format!("Error: {:?}", e)))
+                            .unwrap(),
+                    )
+                }
+            }
+        }
+    } else if path == "/api/auth/callback/github" {
         let Some(code) = query_params.get("code").cloned() else {
             return Ok(
                 Response::builder()
@@ -134,74 +202,6 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
         let after: Option<String> = query_params.get("after").cloned();
         let search_params = pages_index::SearchParams { after };
         match pages_index::handler(headers, &mut cookie_jar, search_params).await {
-            Ok(props) => {
-                let stream = forte_json::to_stream(&props);
-                Ok(
-                    build_response_with_cookies(
-                        Response::new(Body::from_stream(stream)),
-                        &cookie_jar,
-                    ),
-                )
-            }
-            Err(e) => {
-                if let Some(redirect) = e.downcast_ref::<Redirect>() {
-                    Ok(
-                        build_response_with_cookies(
-                            Response::builder()
-                                .status(StatusCode::FOUND)
-                                .header(LOCATION, redirect.to_path())
-                                .body(Body::empty())
-                                .unwrap(),
-                            &cookie_jar,
-                        ),
-                    )
-                } else {
-                    Ok(
-                        Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from(format!("Error: {:?}", e)))
-                            .unwrap(),
-                    )
-                }
-            }
-        }
-    } else if path_segments.len() == 2usize && path_segments.first() == Some(&"post") {
-        let id: String = path_segments[1usize].to_string();
-        let path_params = pages_post__id_::PathParams { id };
-        match pages_post__id_::handler(headers, &mut cookie_jar, path_params).await {
-            Ok(props) => {
-                let stream = forte_json::to_stream(&props);
-                Ok(
-                    build_response_with_cookies(
-                        Response::new(Body::from_stream(stream)),
-                        &cookie_jar,
-                    ),
-                )
-            }
-            Err(e) => {
-                if let Some(redirect) = e.downcast_ref::<Redirect>() {
-                    Ok(
-                        build_response_with_cookies(
-                            Response::builder()
-                                .status(StatusCode::FOUND)
-                                .header(LOCATION, redirect.to_path())
-                                .body(Body::empty())
-                                .unwrap(),
-                            &cookie_jar,
-                        ),
-                    )
-                } else {
-                    Ok(
-                        Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from(format!("Error: {:?}", e)))
-                            .unwrap(),
-                    )
-                }
-            }
-        }
-    } else if path == "/write" {
-        match pages_write::handler(headers, &mut cookie_jar).await {
             Ok(props) => {
                 let stream = forte_json::to_stream(&props);
                 Ok(
