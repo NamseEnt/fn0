@@ -23,7 +23,7 @@ pub fn now() -> DateTime {
 }
 
 pub struct HookRequest<'a, Body> {
-    pub host: &'a str,
+    pub uri_authority: &'a str,
     pub headers: &'a http::HeaderMap,
     pub jar: &'a mut CookieJar,
     pub body: Body,

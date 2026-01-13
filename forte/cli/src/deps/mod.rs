@@ -67,7 +67,9 @@ impl DependencyPrebundler {
                 "/.forte/deps/{}",
                 output_path.file_name().unwrap().to_string_lossy()
             );
-            dep_map.entries.insert("react-refresh/runtime".to_string(), url_path);
+            dep_map
+                .entries
+                .insert("react-refresh/runtime".to_string(), url_path);
         }
 
         // Write dependency map for later use
@@ -95,13 +97,12 @@ export * from 'react-refresh/runtime';
         let fe_dir = self.project_root.join("fe");
         let result = Command::new("npx")
             .args([
-                "esbuild",
+                "rolldown",
                 entry_path.to_str().unwrap(),
-                "--bundle",
-                "--format=esm",
-                "--platform=browser",
-                "--target=es2020",
-                &format!("--outfile={}", output_path.to_str().unwrap()),
+                "-o",
+                output_path.to_str().unwrap(),
+                "-f",
+                "esm",
             ])
             .current_dir(&fe_dir)
             .output()
@@ -138,34 +139,27 @@ export default defaultExport;"#,
         let entry_path = self.cache_dir.join(format!("_entry_{}.js", hash));
         std::fs::write(&entry_path, &entry_content)?;
 
-        // Run esbuild
+        // Run rolldown
         let fe_dir = self.project_root.join("fe");
         let result = Command::new("npx")
             .args([
-                "esbuild",
+                "rolldown",
                 entry_path.to_str().unwrap(),
-                "--bundle",
-                "--format=esm",
-                "--platform=browser",
-                "--target=es2020",
-                &format!("--outfile={}", output_path.to_str().unwrap()),
-                // Mark external packages that shouldn't be bundled
-                "--external:*.node",
+                "-o",
+                output_path.to_str().unwrap(),
+                "-f",
+                "esm",
             ])
             .current_dir(&fe_dir)
             .output()
-            .with_context(|| format!("Failed to run esbuild for {}", package_name))?;
+            .with_context(|| format!("Failed to run rolldown for {}", package_name))?;
 
         // Clean up entry file
         let _ = std::fs::remove_file(&entry_path);
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            anyhow::bail!(
-                "esbuild failed for {}: {}",
-                package_name,
-                stderr.trim()
-            );
+            anyhow::bail!("rolldown failed for {}: {}", package_name, stderr.trim());
         }
 
         Ok(output_path)

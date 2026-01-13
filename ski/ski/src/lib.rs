@@ -135,30 +135,19 @@ pub async fn run(
 
             register_hyper_request(&mut runtime, request, fetch_handler);
 
-            eprintln!("[ski/lib.rs] Executing __ski_runHandler()...");
             let script_result =
                 runtime.execute_script("[run]", ascii_str!("globalThis.__ski_runHandler();"))?;
-            eprintln!("[ski/lib.rs] Script executed, resolving future...");
             let run_future = runtime.resolve(script_result);
-            eprintln!("[ski/lib.rs] Awaiting run_future with event loop...");
             runtime
                 .with_event_loop_future(run_future, Default::default())
                 .await?;
-            eprintln!("[ski/lib.rs] Handler completed");
 
-            eprintln!("[ski/lib.rs] Getting op_state...");
             let op_state = runtime.op_state();
 
-            eprintln!("[ski/lib.rs] Extracting ResponseParts...");
             let response_parts = op_state
                 .borrow_mut()
                 .try_take::<ResponseParts>()
                 .ok_or_else(|| anyhow!("Did not get a response from JavaScript"))?;
-
-            eprintln!(
-                "[ski/lib.rs] Got ResponseParts: status={}, rid={:?}",
-                response_parts.status, response_parts.rid
-            );
 
             let mut builder =
                 hyper::Response::builder().status(StatusCode::from_u16(response_parts.status)?);
@@ -170,13 +159,10 @@ pub async fn run(
             }
 
             let Some(rid) = response_parts.rid else {
-                eprintln!("[ski/lib.rs] No RID, returning empty body");
                 let body =
                     BodyExt::boxed_unsync(Empty::<Bytes>::new().map_err(|never| match never {}));
                 return Ok(builder.body(body)?);
             };
-
-            eprintln!("[ski/lib.rs] Getting resource from table, RID: {}", rid);
 
             let resource = op_state
                 .borrow_mut()
@@ -184,12 +170,9 @@ pub async fn run(
                 .get_any(rid)
                 .map_err(|_| anyhow!("Resource not found"))?;
 
-            eprintln!("[ski/lib.rs] Creating body from resource using ResourceToBodyAdapter...");
-
             let body_adapter = deno_fetch::ResourceToBodyAdapter::new(resource);
             let body = BodyExt::boxed_unsync(body_adapter.map_err(|e| anyhow::anyhow!(e)));
 
-            eprintln!("[ski/lib.rs] Body created, building response...");
             Ok(builder.body(body)?)
         })
     })

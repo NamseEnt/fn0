@@ -68,7 +68,13 @@ impl ModuleGraph {
         }
     }
 
-    pub fn update_module(&mut self, module_id: &str, file_path: &Path, imports: Vec<String>, hash: &str) {
+    pub fn update_module(
+        &mut self,
+        module_id: &str,
+        file_path: &Path,
+        imports: Vec<String>,
+        hash: &str,
+    ) {
         // Remove old import relationships
         if let Some(old_module) = self.modules.get(module_id) {
             let old_imports = old_module.imports.clone();
@@ -80,9 +86,10 @@ impl ModuleGraph {
         }
 
         // Get or create module
-        let module = self.modules.entry(module_id.to_string()).or_insert_with(|| {
-            Module::new(module_id.to_string(), file_path.to_path_buf())
-        });
+        let module = self
+            .modules
+            .entry(module_id.to_string())
+            .or_insert_with(|| Module::new(module_id.to_string(), file_path.to_path_buf()));
 
         // Update module info
         module.file_path = file_path.to_path_buf();
@@ -99,9 +106,10 @@ impl ModuleGraph {
         for import in &imports {
             // Create imported module if it doesn't exist
             let file_path = self.module_id_to_file(import).unwrap_or_default();
-            let imported = self.modules.entry(import.clone()).or_insert_with(|| {
-                Module::new(import.clone(), file_path.clone())
-            });
+            let imported = self
+                .modules
+                .entry(import.clone())
+                .or_insert_with(|| Module::new(import.clone(), file_path.clone()));
             imported.importers.insert(module_id_owned.clone());
         }
     }
@@ -197,8 +205,17 @@ impl SharedModuleGraph {
         }
     }
 
-    pub fn update_module(&self, module_id: &str, file_path: &Path, imports: Vec<String>, hash: &str) {
-        self.inner.write().unwrap().update_module(module_id, file_path, imports, hash);
+    pub fn update_module(
+        &self,
+        module_id: &str,
+        file_path: &Path,
+        imports: Vec<String>,
+        hash: &str,
+    ) {
+        self.inner
+            .write()
+            .unwrap()
+            .update_module(module_id, file_path, imports, hash);
     }
 
     pub fn get_hmr_update(&self, changed_module_id: &str) -> HmrUpdate {

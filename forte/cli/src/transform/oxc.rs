@@ -57,11 +57,7 @@ pub fn transform_with_oxc(
             .iter()
             .map(|e| format!("{:?}", e))
             .collect();
-        anyhow::bail!(
-            "Semantic errors in {:?}:\n{}",
-            file_path,
-            errors.join("\n")
-        );
+        anyhow::bail!("Semantic errors in {:?}:\n{}", file_path, errors.join("\n"));
     }
 
     let scoping = semantic_ret.semantic.into_scoping();
@@ -215,8 +211,8 @@ mod tests {
             }
         "#;
 
-        let result =
-            transform_with_oxc(Path::new("Counter.tsx"), source, &config).expect("transform failed");
+        let result = transform_with_oxc(Path::new("Counter.tsx"), source, &config)
+            .expect("transform failed");
 
         assert!(
             result.code.contains("$RefreshReg$") || result.code.contains("_s"),

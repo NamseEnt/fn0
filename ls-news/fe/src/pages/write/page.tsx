@@ -7,6 +7,9 @@ import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { PostType } from "@/types";
 
 function buildGithubAuthUrl(oauthNonce: string): string {
+  if (typeof window === "undefined") {
+    return "#";
+  }
   const clientId = import.meta.env.PUBLIC_GITHUB_CLIENT_ID;
   const redirectUri = `${window.location.origin}/api/auth/callback/github`;
   return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20user:email&state=${oauthNonce}`;

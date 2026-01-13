@@ -49,7 +49,10 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let hmr = HmrBroadcaster::new();
 
     let transform_server = if config.dev_mode {
-        Some(Arc::new(TransformServer::new(&config.project_root, config.dep_map.clone())))
+        Some(Arc::new(TransformServer::new(
+            &config.project_root,
+            config.dep_map.clone(),
+        )))
     } else {
         None
     };
@@ -112,7 +115,10 @@ async fn handle_request(
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
-    println!("Received {} {path}", req.method());
+    let path_with_query = uri
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or(path);
 
     if path == "/__hmr" {
         return handle_hmr_upgrade(req, hmr).await;
@@ -120,13 +126,16 @@ async fn handle_request(
 
     if let Some(ts) = &transform_server {
         if should_transform(path) {
-            return serve_transformed(ts, path).await;
+            return serve_transformed(ts, path_with_query).await;
         }
     }
 
     if let Some(static_response) = try_serve_static(&public_dir, path).await {
         return Ok(static_response);
     }
+
+    // Clone headers before consuming the request (needed for hook forwarding)
+    let original_headers = req.headers().clone();
 
     let backend_response = match fn0
         .run(
@@ -149,8 +158,6 @@ async fn handle_request(
 
     let backend_status = backend_response.status();
 
-    println!("Backend response status: {}", backend_status);
-
     if !backend_status.is_success() {
         let (parts, body) = backend_response.into_parts();
         let body_bytes = body.collect().await?.to_bytes();
@@ -169,25 +176,15 @@ async fn handle_request(
         return Ok(backend_response);
     }
 
-    println!("Preparing frontend request with backend response body");
     let frontend_request = Request::builder()
         .method("POST")
         .uri(uri)
         .header("content-type", "application/json")
         .body(backend_response.into_body())?;
 
-    println!("Calling frontend (ski::run)");
-    let fetch_handler = Arc::new(ForteFetchHandler::new(fn0.clone()));
-    match fn0.run("frontend", frontend_request, Some(fetch_handler)).await {
-        Ok(resp) => {
-            println!("Frontend response status: {}", resp.status());
-            Ok(resp)
-        }
-        Err(e) => {
-            eprintln!("Frontend error: {:?}", e);
-            Err(e)
-        }
-    }
+    let fetch_handler = Arc::new(ForteFetchHandler::new(fn0.clone(), original_headers));
+    fn0.run("frontend", frontend_request, Some(fetch_handler))
+        .await
 }
 
 fn should_transform(path: &str) -> bool {
@@ -198,10 +195,7 @@ fn should_transform(path: &str) -> bool {
         || path == "/__error-overlay.js"
 }
 
-async fn serve_transformed(
-    ts: &TransformServer,
-    path: &str,
-) -> Result<fn0::Response> {
+async fn serve_transformed(ts: &TransformServer, path: &str) -> Result<fn0::Response> {
     match ts.serve_module(path).await {
         Ok(resp) => {
             let (parts, body) = resp.into_parts();
@@ -249,12 +243,6 @@ async fn try_serve_static(public_dir: &PathBuf, path: &str) -> Option<fn0::Respo
     match tokio::fs::read(&file_path).await {
         Ok(contents) => {
             let content_type = get_content_type(&file_path);
-            println!(
-                "[static] Serving {} ({})",
-                file_path.display(),
-                content_type
-            );
-
             Some(
                 Response::builder()
                     .status(StatusCode::OK)

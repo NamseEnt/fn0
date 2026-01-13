@@ -7,11 +7,6 @@ type CacheEntry<T> = {
 };
 
 const isSSR = typeof window === "undefined";
-let ssrBaseUrl = "http://localhost:3000";
-
-export function setSSRBaseUrl(url: string) {
-  ssrBaseUrl = url;
-}
 
 const hookCache = new Map<string, CacheEntry<unknown>>();
 
@@ -50,7 +45,9 @@ export function useForteHook<T>(
     throw cached.promise;
   }
 
-  const promise = fetch(`${ssrBaseUrl}/__forte_hook/${hookName}`, {
+  // Hooks are only fetched during SSR, never in browser (browser uses cached results)
+  // ski requires absolute URLs, so we use a placeholder host that ForteFetchHandler intercepts
+  const promise = fetch(`http://ssr-internal/__forte_hook/${hookName}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

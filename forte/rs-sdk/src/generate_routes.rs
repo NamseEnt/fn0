@@ -404,7 +404,13 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo]) -> TokenStream {
             let mut cookie_jar = make_cookie_jar(&headers);
 
             if let Some(hook_name) = path.strip_prefix("/__forte_hook/") {
-                return handle_hook(hook_name, &headers, &mut cookie_jar, body).await;
+                let Some(uri_authority) = parts.uri.authority() else {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from("Missing authority in request URI"))
+                        .unwrap());
+                };
+                return handle_hook(hook_name, uri_authority.as_str(), &headers, &mut cookie_jar, body).await;
             }
 
             let query_params: HashMap<String, String> = query
@@ -856,7 +862,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                     let input: #module_name::Input = serde_json::from_slice(body_bytes)
                         .map_err(|e| Error::msg(e.to_string()))?;
                     let req = HookRequest {
-                        host,
+                        uri_authority,
                         headers,
                         jar: cookie_jar,
                         body: input,
@@ -879,17 +885,11 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
     quote! {
         async fn handle_hook(
             hook_name: &str,
+            uri_authority: &str,
             headers: &HeaderMap,
             cookie_jar: &mut cookie::CookieJar,
             mut body: Body,
         ) -> Result<Response<Body>, Error> {
-            let Some(host) = headers.get(http_header::HOST).and_then(|v| v.to_str().ok()) else {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("Missing Host header"))
-                    .unwrap());
-            };
-
             let body_bytes = body.contents().await?;
 
             match hook_name {

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -17,40 +18,89 @@ impl SsrBundler {
         }
     }
 
+    fn load_env_vars(&self) -> HashMap<String, String> {
+        let mut env_vars = HashMap::new();
+        let env_path = self.project_root.join(".env");
+
+        if let Ok(content) = std::fs::read_to_string(&env_path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                if let Some((key, value)) = line.split_once('=') {
+                    let key = key.trim();
+                    let value = value.trim();
+                    if key.starts_with("PUBLIC_") {
+                        env_vars.insert(key.to_string(), value.to_string());
+                    }
+                }
+            }
+        }
+
+        env_vars
+    }
+
+    fn generate_define_config(&self, env_vars: &HashMap<String, String>) -> String {
+        let mut defines = vec![
+            r#""import.meta.env.SSR": "true""#.to_string(),
+            r#""import.meta.env.DEV": "true""#.to_string(),
+        ];
+
+        for (key, value) in env_vars {
+            let escaped = value.replace('\\', "\\\\").replace('\'', "\\'");
+            defines.push(format!(
+                r#""import.meta.env.{}": "'{}'""#,
+                key, escaped
+            ));
+        }
+
+        format!(
+            "  transform: {{\n    define: {{\n      {}\n    }}\n  }},",
+            defines.join(",\n      ")
+        )
+    }
+
     pub fn build(&self) -> Result<PathBuf> {
         let fe_dir = self.project_root.join("fe");
         let entry_path = fe_dir.join("src/server.tsx");
 
-        // Create output directory
         if let Some(parent) = self.output_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
 
         println!("[ssr] Building server bundle...");
 
+        let env_vars = self.load_env_vars();
+        let define_config = self.generate_define_config(&env_vars);
+
+        let config_path = self.output_path.parent().unwrap().join("rolldown.config.mjs");
+        let config_content = format!(
+            r#"export default {{
+  input: "{}",
+  output: {{
+    file: "{}",
+    format: "iife",
+    inlineDynamicImports: true,
+  }},
+  tsconfig: "tsconfig.json",
+{define_config}
+}};
+"#,
+            entry_path.to_str().unwrap(),
+            self.output_path.to_str().unwrap()
+        );
+        std::fs::write(&config_path, &config_content)?;
+
         let result = Command::new("npx")
-            .args([
-                "esbuild",
-                entry_path.to_str().unwrap(),
-                "--bundle",
-                "--format=esm",
-                "--platform=browser", // ski uses browser-like environment
-                "--target=es2020",
-                &format!("--outfile={}", self.output_path.to_str().unwrap()),
-                // External packages that ski provides
-                "--external:react",
-                "--external:react-dom",
-                "--external:react-dom/server",
-                // Don't bundle node_modules that should be handled separately
-                "--packages=external",
-            ])
+            .args(["rolldown", "-c", config_path.to_str().unwrap()])
             .current_dir(&fe_dir)
             .output()
-            .context("Failed to run esbuild for SSR bundle")?;
+            .context("Failed to run rolldown for SSR bundle")?;
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            anyhow::bail!("esbuild SSR bundle failed: {}", stderr.trim());
+            anyhow::bail!("rolldown SSR bundle failed: {}", stderr.trim());
         }
 
         println!("[ssr] Server bundle built: {}", self.output_path.display());
@@ -80,6 +130,11 @@ mod tests {
     #[test]
     fn test_ssr_bundler_paths() {
         let bundler = SsrBundler::new("/tmp/project");
-        assert!(bundler.output_path().to_string_lossy().contains(".forte/ssr/server.js"));
+        assert!(
+            bundler
+                .output_path()
+                .to_string_lossy()
+                .contains(".forte/ssr/server.js")
+        );
     }
 }

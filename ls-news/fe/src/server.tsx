@@ -1,7 +1,6 @@
-import { renderToPipeableStream } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server";
 import { routes } from "./routes.generated";
-import { PassThrough } from "stream";
-import { serializeHookCache, clearHookCache, setSSRBaseUrl } from "./lib/forte-react";
+import { serializeHookCache, clearHookCache } from "./lib/forte-react";
 
 function matchRoute(
   pathname: string
@@ -35,27 +34,36 @@ function escapeJsonForScript(json: string): string {
   return json.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 }
 
-const isDev = (import.meta as any).env?.DEV ?? false;
+const isDev = import.meta.env.DEV;
 
-function streamToString(stream: PassThrough): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-    stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-    stream.on("error", reject);
-  });
+async function streamToString(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return new TextDecoder().decode(result);
 }
 
-export async function render(url: string, rawProps: any, forteBaseUrl: string): Promise<string> {
+export async function render(url: string, rawProps: any): Promise<string> {
   const urlObj = new URL(url, "http://localhost");
   const matched = matchRoute(urlObj.pathname);
 
   if (!matched) {
     return "Not Found";
   }
-
-  // Set base URL for SSR hook requests
-  setSSRBaseUrl(forteBaseUrl);
 
   // Clear hook cache for fresh request
   clearHookCache();
@@ -68,21 +76,11 @@ export async function render(url: string, rawProps: any, forteBaseUrl: string): 
   const allProps = { ...props, params: matched.params };
   const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
-  const viteScripts = `<script type="module" src="/@vite/client"></script>`;
+  const hmrScript = `<script type="module" src="/__hmr-client.js"></script>`;
   const clientScript = `/src/client.tsx`;
 
-  const html = await new Promise<string>((resolve, reject) => {
-    const passThrough = new PassThrough();
-    const { pipe } = renderToPipeableStream(pageModule.default(allProps), {
-      onAllReady() {
-        pipe(passThrough);
-        streamToString(passThrough).then(resolve).catch(reject);
-      },
-      onError(error) {
-        reject(error);
-      },
-    });
-  });
+  const stream = await renderToReadableStream(pageModule.default(allProps));
+  const html = await streamToString(stream);
 
   // Serialize hook cache for client hydration
   const hookCacheJson = serializeHookCache();
@@ -94,7 +92,7 @@ export async function render(url: string, rawProps: any, forteBaseUrl: string): 
     <meta name="viewport" content="width=device-width" />
     <title>ls-news</title>
     <link rel="stylesheet" href="/src/styles/globals.css" />
-    ${viteScripts}
+    ${hmrScript}
 </head>
 <body>
     <div id="root">${html}</div>
@@ -124,8 +122,8 @@ export async function render(url: string, rawProps: any, forteBaseUrl: string): 
     const allProps = { ...props, params: matched.params };
     const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
-    const viteScripts = isDev
-      ? `<script type="module" src="/@vite/client"></script>`
+    const hmrScript = isDev
+      ? `<script type="module" src="/__hmr-client.js"></script>`
       : "";
     const clientScript = isDev ? `/src/client.tsx` : `/public/client.js`;
 
@@ -133,18 +131,8 @@ export async function render(url: string, rawProps: any, forteBaseUrl: string): 
       ? `<link rel="stylesheet" href="/src/styles/globals.css" />`
       : `<link rel="stylesheet" href="/public/globals.css" />`;
 
-    const html = await new Promise<string>((resolve, reject) => {
-      const passThrough = new PassThrough();
-      const { pipe } = renderToPipeableStream(pageModule.default(allProps), {
-        onAllReady() {
-          pipe(passThrough);
-          streamToString(passThrough).then(resolve).catch(reject);
-        },
-        onError(error) {
-          reject(error);
-        },
-      });
-    });
+    const stream = await renderToReadableStream(pageModule.default(allProps));
+    const html = await streamToString(stream);
 
     // Serialize hook cache for client hydration
     const hookCacheJson = serializeHookCache();
@@ -157,7 +145,7 @@ export async function render(url: string, rawProps: any, forteBaseUrl: string): 
     <meta name="viewport" content="width=device-width" />
     <title>ls-news</title>
     ${cssLink}
-    ${viteScripts}
+    ${hmrScript}
 </head>
 <body>
     <div id="root">${html}</div>

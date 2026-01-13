@@ -31,26 +31,30 @@ impl ImportRewriter {
         // Match: export ... from "specifier"
         // Match: export ... from 'specifier'
         // Match: import("specifier")
+        // Match: import "specifier" (side-effect)
 
         let patterns = [
             (r#"from\s*["']([^"']+)["']"#, "from"),
             (r#"import\s*\(\s*["']([^"']+)["']\s*\)"#, "dynamic"),
+            (r#"import\s+["']([^"']+)["']"#, "sideeffect"),
         ];
 
         for (pattern, kind) in patterns {
             let re = regex::Regex::new(pattern).unwrap();
             let mut offset: i64 = 0;
 
-            let matches: Vec<_> = re.captures_iter(code).collect();
+            let current_code = result.clone();
+            let matches: Vec<_> = re.captures_iter(&current_code).collect();
             for cap in matches {
                 let full_match = cap.get(0).unwrap();
                 let specifier = cap.get(1).unwrap().as_str();
 
                 if let Some(new_path) = self.resolve_specifier(specifier, current_file, timestamp) {
-                    let replacement = if kind == "from" {
-                        format!(r#"from "{}""#, new_path)
-                    } else {
-                        format!(r#"import("{}")"#, new_path)
+                    let replacement = match kind {
+                        "from" => format!(r#"from "{}""#, new_path),
+                        "dynamic" => format!(r#"import("{}")"#, new_path),
+                        "sideeffect" => format!(r#"import "{}""#, new_path),
+                        _ => continue,
                     };
 
                     let start = (full_match.start() as i64 + offset) as usize;
@@ -72,7 +76,8 @@ impl ImportRewriter {
         timestamp: u64,
     ) -> Option<String> {
         // Check if it's a bare import (from node_modules)
-        if !specifier.starts_with('.') && !specifier.starts_with('/') && !specifier.starts_with('@') {
+        if !specifier.starts_with('.') && !specifier.starts_with('/') && !specifier.starts_with('@')
+        {
             // Bare import like 'react', 'react-dom/client'
             let package_name = get_package_name(specifier);
             if let Some(url) = self.dep_map.entries.get(&package_name) {
@@ -150,24 +155,27 @@ fn normalize_path(path: &Path) -> String {
 }
 
 fn add_extension_if_needed(path: &str) -> String {
-    // Split off query string if present
     let (base, query) = if let Some(idx) = path.find('?') {
         (&path[..idx], &path[idx..])
     } else {
         (path, "")
     };
 
-    // Check if it already has a known extension
-    let known_extensions = [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".json", ".css"];
-    if known_extensions.iter().any(|ext| base.ends_with(ext)) {
-        return path.to_string();
+    if base.ends_with(".css") {
+        if query.is_empty() {
+            return format!("{}?import", base);
+        } else {
+            return format!("{}{}&import", base, query);
+        }
     }
 
-    // Add .tsx extension (will be transformed by the server)
-    format!("{}.tsx{}", base, query)
+    path.to_string()
 }
 
-pub fn rewrite_imports(code: &str, dep_entries: &std::collections::HashMap<String, String>) -> String {
+pub fn rewrite_imports(
+    code: &str,
+    dep_entries: &std::collections::HashMap<String, String>,
+) -> String {
     let mut dep_map = DependencyMap::default();
     dep_map.entries = dep_entries.clone();
     let rewriter = ImportRewriter::new(dep_map);
@@ -219,6 +227,9 @@ import { utils } from "@/lib/utils";"#;
         let result = rewriter.rewrite(code, Path::new("components/App.tsx"), 12345);
 
         assert!(result.contains("/.forte/deps/react-abc.js"));
-        assert!(result.contains("./Button.tsx?t=12345") || result.contains("/src/components/Button.tsx?t=12345"));
+        assert!(
+            result.contains("./Button.tsx?t=12345")
+                || result.contains("/src/components/Button.tsx?t=12345")
+        );
     }
 }

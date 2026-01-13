@@ -96,7 +96,8 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
     output.push_str("export const routes: Array<{ path: string; component: () => Promise<{ default: (props: any) => any }>; schema: () => Promise<{ PropsSchema: any }> }> = [\n");
 
     for route in &routes {
-        let fe_props_path = route.fe_page_path
+        let fe_props_path = route
+            .fe_page_path
             .strip_suffix("/page")
             .map(|s| format!("{}/.props", s))
             .unwrap_or_else(|| route.fe_page_path.clone());
@@ -211,6 +212,36 @@ fn build_backend(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+fn build_css(project_dir: &Path) -> Result<()> {
+    let fe_dir = project_dir.join("fe");
+    let input_css = fe_dir.join("src/styles/globals.css");
+    let output_dir = fe_dir.join(".forte/styles");
+    let output_css = output_dir.join("globals.css");
+
+    if !input_css.exists() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(&output_dir)?;
+
+    println!("[css] Building CSS with Tailwind...");
+    let status = Command::new("npx")
+        .arg("@tailwindcss/cli")
+        .arg("-i")
+        .arg(&input_css)
+        .arg("-o")
+        .arg(&output_css)
+        .current_dir(&fe_dir)
+        .status()
+        .context("Failed to run tailwindcss CLI. Is @tailwindcss/cli installed?")?;
+
+    if !status.success() {
+        anyhow::bail!("tailwindcss build failed with status: {}", status);
+    }
+
+    Ok(())
+}
+
 fn collect_file_mtimes(dir: &Path, extensions: &[&str]) -> HashMap<PathBuf, SystemTime> {
     let mut mtimes = HashMap::new();
     if let Ok(entries) = fs::read_dir(dir) {
@@ -258,6 +289,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
 
     run_codegen(&project_dir)?;
     build_backend(&project_dir)?;
+    build_css(&project_dir)?;
 
     println!("[deps] Pre-bundling dependencies...");
     let prebundler = DependencyPrebundler::new(&project_dir);
@@ -322,9 +354,8 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                             && !e.path.ends_with("route_generated.rs")
                     })
                     .filter(|e| {
-                        let current_mtime = fs::metadata(&e.path)
-                            .ok()
-                            .and_then(|m| m.modified().ok());
+                        let current_mtime =
+                            fs::metadata(&e.path).ok().and_then(|m| m.modified().ok());
                         match (current_mtime, known_rs_mtimes.get(&e.path)) {
                             (Some(current), Some(known)) => current > *known,
                             (Some(_), None) => true,
@@ -338,14 +369,17 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                     .filter(|e| {
                         e.path.starts_with(&fe_src_dir)
                             && e.path.extension().is_some_and(|ext| {
-                                ext == "tsx" || ext == "ts" || ext == "jsx" || ext == "js" || ext == "css"
+                                ext == "tsx"
+                                    || ext == "ts"
+                                    || ext == "jsx"
+                                    || ext == "js"
+                                    || ext == "css"
                             })
                             && !is_generated_file(&e.path)
                     })
                     .filter(|e| {
-                        let current_mtime = fs::metadata(&e.path)
-                            .ok()
-                            .and_then(|m| m.modified().ok());
+                        let current_mtime =
+                            fs::metadata(&e.path).ok().and_then(|m| m.modified().ok());
                         match (current_mtime, known_fe_mtimes.get(&e.path)) {
                             (Some(current), Some(known)) => current > *known,
                             (Some(_), None) => true,
@@ -355,11 +389,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                     .collect();
 
                 if !rs_changes.is_empty() {
-                    for e in &rs_changes {
-                        println!("[watch] Backend changed: {:?}", e.path);
-                    }
-                    println!("[watch] Rebuilding backend...");
-
                     let result = rebuild_backend(project_dir, &handle).await;
                     known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
 
@@ -369,16 +398,34 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                         eprintln!("[watch] Backend rebuild failed: {}", e);
                     } else {
                         handle.hmr.send_reload();
-                        println!("[watch] Sent reload signal");
                     }
                 }
 
                 if !fe_changes.is_empty() {
-                    for e in &fe_changes {
-                        println!("[watch] Frontend changed: {:?}", e.path);
+                    let css_changes: Vec<_> = fe_changes
+                        .iter()
+                        .filter(|e| e.path.extension().is_some_and(|ext| ext == "css"))
+                        .collect();
+
+                    let js_changes: Vec<_> = fe_changes
+                        .iter()
+                        .filter(|e| e.path.extension().is_some_and(|ext| ext != "css"))
+                        .collect();
+
+                    if !css_changes.is_empty() {
+                        if let Err(e) = build_css(project_dir) {
+                            eprintln!("[watch] CSS rebuild failed: {}", e);
+                        } else {
+                            handle.hmr.send_reload();
+                        }
+                    }
+
+                    for e in &js_changes {
                         handle_frontend_change(&e.path, &handle);
                     }
-                    known_fe_mtimes = collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
+
+                    known_fe_mtimes =
+                        collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
                 }
             }
             Ok(Err(error)) => {
@@ -400,16 +447,12 @@ fn handle_frontend_change(file_path: &Path, handle: &ServerHandle) {
 
         if let Some(update) = ts.get_hmr_update(file_path) {
             if update.needs_full_reload {
-                println!("[hmr] No HMR boundary found, sending full reload");
                 handle.hmr.send_reload();
             } else {
-                println!("[hmr] Sending HMR update for {}", update.boundary);
-                handle.hmr.send_update(vec![
-                    HmrModuleUpdate {
-                        id: update.boundary.clone(),
-                        accepted_by: update.boundary,
-                    }
-                ]);
+                handle.hmr.send_update(vec![HmrModuleUpdate {
+                    id: update.boundary.clone(),
+                    accepted_by: update.boundary,
+                }]);
             }
         } else {
             handle.hmr.send_reload();
@@ -420,15 +463,9 @@ fn handle_frontend_change(file_path: &Path, handle: &ServerHandle) {
 }
 
 async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()> {
-    println!("[rebuild] Running codegen...");
     run_codegen(project_dir)?;
-
-    println!("[rebuild] Building backend...");
     build_backend(project_dir)?;
-
     handle.cache.invalidate("backend").await;
-    println!("[rebuild] Backend cache invalidated");
-
     Ok(())
 }
 

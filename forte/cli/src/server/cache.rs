@@ -60,18 +60,12 @@ impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for S
                 .map_err(|e| adapt_cache::Error::StorageError(anyhow::anyhow!(e)))?;
 
             if id == "backend" {
-                eprintln!("Compiling backend WASM ({} bytes) to CWASM...", data.len());
                 match fn0::compile(&data) {
                     Ok(cwasm) => {
-                        eprintln!(
-                            "Compilation successful: {} bytes -> {} bytes",
-                            data.len(),
-                            cwasm.len()
-                        );
                         data = cwasm;
                     }
                     Err(e) => {
-                        eprintln!("Compilation failed: {:?}", e);
+                        eprintln!("[wasm] Compilation failed: {:?}", e);
                         return Err(adapt_cache::Error::StorageError(e));
                     }
                 }

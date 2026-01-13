@@ -1,13 +1,13 @@
 use crate::deps::DependencyMap;
 use crate::module_graph::SharedModuleGraph;
 use crate::transform::{
-    get_react_refresh_preamble, inject_hmr_code, inject_react_refresh_code, rewrite_imports,
-    TransformConfig, TransformPipeline,
+    TransformConfig, TransformPipeline, get_react_refresh_preamble, inject_hmr_code,
+    inject_react_refresh_code, rewrite_imports,
 };
 use anyhow::Result;
 use bytes::Bytes;
-use http_body_util::combinators::BoxBody;
 use http_body_util::Full;
+use http_body_util::combinators::BoxBody;
 use hyper::{Response, StatusCode};
 use std::path::{Path, PathBuf};
 
@@ -36,7 +36,10 @@ impl TransformServer {
         }
     }
 
-    pub async fn serve_module(&self, path: &str) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
+    pub async fn serve_module(
+        &self,
+        path: &str,
+    ) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
         if path.starts_with("/.forte/deps/") {
             return self.serve_bundled_dep(path).await;
         }
@@ -54,8 +57,8 @@ impl TransformServer {
         }
 
         if path.starts_with("/src/") {
-            if path.ends_with(".css") {
-                return self.serve_css_module(path).await;
+            if path.contains(".css") {
+                return self.serve_css(path).await;
             }
             return self.serve_transformed_module(path).await;
         }
@@ -69,12 +72,13 @@ impl TransformServer {
         &self,
         path: &str,
     ) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
-        let file_path = self.resolve_path(path)?;
+        let clean_path = path.split('?').next().unwrap_or(path);
+        let file_path = self.resolve_path(clean_path)?;
 
         if !file_path.exists() {
             return Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(full_body(format!("File not found: {}", path)))?);
+                .body(full_body(format!("File not found: {}", clean_path)))?);
         }
 
         let result = self.pipeline.transform(&file_path)?;
@@ -110,28 +114,46 @@ impl TransformServer {
             .body(full_body(code))?)
     }
 
-    async fn serve_css_module(
+    async fn serve_css(
         &self,
         path: &str,
     ) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
-        let file_path = self.resolve_path(path)?;
+        let has_import_query = path.contains("?import");
+        let clean_path = path.split('?').next().unwrap_or(path);
+
+        let file_path = if clean_path == "/src/styles/globals.css" {
+            let built_path = self.cache_dir.join("styles/globals.css");
+            if built_path.exists() {
+                built_path
+            } else {
+                self.resolve_path(clean_path)?
+            }
+        } else {
+            self.resolve_path(clean_path)?
+        };
 
         if !file_path.exists() {
             return Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(full_body(format!("CSS file not found: {}", path)))?);
+                .body(full_body(format!("CSS file not found: {}", clean_path)))?);
         }
 
         let css_content = tokio::fs::read_to_string(&file_path).await?;
-        let module_id = path.to_string();
 
-        let js_code = generate_css_module(&css_content, &module_id);
-
-        Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header("content-type", "application/javascript; charset=utf-8")
-            .header("cache-control", "no-cache")
-            .body(full_body(js_code))?)
+        if has_import_query {
+            let js_code = generate_css_module(&css_content, clean_path);
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", "application/javascript; charset=utf-8")
+                .header("cache-control", "no-cache")
+                .body(full_body(js_code))?)
+        } else {
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", "text/css; charset=utf-8")
+                .header("cache-control", "no-cache")
+                .body(full_body(css_content))?)
+        }
     }
 
     async fn serve_bundled_dep(
@@ -149,10 +171,7 @@ impl TransformServer {
                 .body(full_body_bytes(contents.into()))?),
             Err(_) => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(full_body(format!(
-                    "Bundled dependency not found: {}",
-                    path
-                )))?),
+                .body(full_body(format!("Bundled dependency not found: {}", path)))?),
         }
     }
 
@@ -165,7 +184,9 @@ impl TransformServer {
             .body(full_body(client_code.to_string()))?)
     }
 
-    async fn serve_react_refresh_preamble(&self) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
+    async fn serve_react_refresh_preamble(
+        &self,
+    ) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
         let preamble = get_react_refresh_preamble();
         Ok(Response::builder()
             .status(StatusCode::OK)
@@ -191,9 +212,10 @@ impl TransformServer {
             return Ok(path);
         }
 
-        if !has_extension(&path) {
+        if !has_known_js_extension(&path) {
+            let path_str = path.to_string_lossy();
             for ext in &["tsx", "ts", "jsx", "js"] {
-                let with_ext = path.with_extension(ext);
+                let with_ext = PathBuf::from(format!("{}.{}", path_str, ext));
                 if with_ext.exists() {
                     return Ok(with_ext);
                 }
@@ -264,8 +286,12 @@ fn rewrite_css_imports(code: &str) -> String {
     .to_string()
 }
 
-fn has_extension(path: &Path) -> bool {
-    path.extension().is_some()
+fn has_known_js_extension(path: &Path) -> bool {
+    let known_extensions = ["tsx", "ts", "jsx", "js", "mjs", "cjs", "json"];
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| known_extensions.contains(&e))
+        .unwrap_or(false)
 }
 
 fn full_body(s: impl Into<String>) -> BoxBody<Bytes, anyhow::Error> {
@@ -277,9 +303,7 @@ fn full_body(s: impl Into<String>) -> BoxBody<Bytes, anyhow::Error> {
 
 fn full_body_bytes(bytes: Bytes) -> BoxBody<Bytes, anyhow::Error> {
     use http_body_util::BodyExt;
-    Full::new(bytes)
-        .map_err(|e| anyhow::anyhow!("{e}"))
-        .boxed()
+    Full::new(bytes).map_err(|e| anyhow::anyhow!("{e}")).boxed()
 }
 
 #[cfg(test)]
