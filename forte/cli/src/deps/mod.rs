@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -26,10 +27,8 @@ impl DependencyPrebundler {
     }
 
     pub fn prebundle(&self) -> Result<DependencyMap> {
-        // Create cache directory
         std::fs::create_dir_all(&self.cache_dir)?;
 
-        // Read package.json
         let package_json_path = self.project_root.join("fe/package.json");
         let package_json: PackageJson = serde_json::from_str(
             &std::fs::read_to_string(&package_json_path)
@@ -38,43 +37,40 @@ impl DependencyPrebundler {
 
         let mut dep_map = DependencyMap::default();
 
-        // Collect all dependencies
-        let mut all_deps: Vec<String> = Vec::new();
-        if let Some(deps) = &package_json.dependencies {
-            all_deps.extend(deps.keys().cloned());
-        }
+        let mut all_imports = self.scan_imports_from_source()?;
 
-        // Bundle each dependency
-        for dep_name in all_deps {
-            match self.bundle_dependency(&dep_name) {
-                Ok(output_path) => {
-                    let url_path = format!(
-                        "/.forte/deps/{}",
-                        output_path.file_name().unwrap().to_string_lossy()
-                    );
-                    dep_map.entries.insert(dep_name.clone(), url_path);
-                    tracing::debug!("Bundled dependency: {}", dep_name);
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to bundle {}: {}", dep_name, e);
-                }
+        if let Some(deps) = &package_json.dependencies {
+            for dep_name in deps.keys() {
+                all_imports.insert(dep_name.clone());
             }
         }
 
-        // Bundle react-dom/client separately
-        if dep_map.entries.contains_key("react-dom") {
-            match self.bundle_dependency("react-dom/client") {
+        for import_path in all_imports {
+            if import_path.starts_with('.') || import_path.starts_with('/') {
+                continue;
+            }
+
+            let base_package_name = get_package_name(&import_path);
+            let is_installed = package_json
+                .dependencies
+                .as_ref()
+                .map(|d| d.contains_key(&base_package_name))
+                .unwrap_or(false);
+
+            if !is_installed {
+                continue;
+            }
+
+            match self.bundle_dependency(&import_path) {
                 Ok(output_path) => {
                     let url_path = format!(
                         "/.forte/deps/{}",
                         output_path.file_name().unwrap().to_string_lossy()
                     );
-                    dep_map
-                        .entries
-                        .insert("react-dom/client".to_string(), url_path);
+                    dep_map.entries.insert(import_path.clone(), url_path);
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to bundle react-dom/client: {}", e);
+                    tracing::warn!("Failed to bundle {}: {}", import_path, e);
                 }
             }
         }
@@ -95,6 +91,43 @@ impl DependencyPrebundler {
         std::fs::write(&map_path, serde_json::to_string_pretty(&dep_map)?)?;
 
         Ok(dep_map)
+    }
+
+    fn scan_imports_from_source(&self) -> Result<HashSet<String>> {
+        let mut imports = HashSet::new();
+        let fe_src = self.project_root.join("fe/src");
+
+        if !fe_src.exists() {
+            return Ok(imports);
+        }
+
+        let re = Regex::new(r#"(?:import|export)\s+.*?from\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["']"#).unwrap();
+
+        self.scan_directory(&fe_src, &re, &mut imports)?;
+        Ok(imports)
+    }
+
+    fn scan_directory(&self, dir: &Path, re: &Regex, imports: &mut HashSet<String>) -> Result<()> {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_dir() {
+                self.scan_directory(&path, re, imports)?;
+            } else if let Some(ext) = path.extension() {
+                if ext == "ts" || ext == "tsx" || ext == "js" || ext == "jsx" {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        for cap in re.captures_iter(&content) {
+                            let specifier = cap.get(1).or(cap.get(2)).or(cap.get(3));
+                            if let Some(s) = specifier {
+                                imports.insert(s.as_str().to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     fn bundle_react_refresh_runtime(&self) -> Result<PathBuf> {
@@ -121,6 +154,8 @@ export * from 'react-refresh/runtime';
                 output_path.to_str().unwrap(),
                 "-f",
                 "esm",
+                "--platform",
+                "browser",
             ])
             .current_dir(&fe_dir)
             .output()
@@ -147,20 +182,12 @@ export * from 'react-refresh/runtime';
             return Ok(output_path);
         }
 
-        // Create a temporary entry file that exports the package
-        let entry_content = if package_name == "react-dom/client" {
-            r#"import * as client from "react-dom/client";
-export const { createRoot, hydrateRoot } = client;
-export default client;"#
-                .to_string()
-        } else {
-            format!(
-                r#"export * from "{}";
-import defaultExport from "{}";
-export default defaultExport;"#,
-                package_name, package_name
-            )
-        };
+        let entry_content = format!(
+            r#"export * from "{}";
+import * as _mod from "{}";
+export default _mod.default ?? _mod;"#,
+            package_name, package_name
+        );
         let entry_path = self.cache_dir.join(format!("_entry_{}.js", hash));
         std::fs::write(&entry_path, &entry_content)?;
 
@@ -174,6 +201,8 @@ export default defaultExport;"#,
                 output_path.to_str().unwrap(),
                 "-f",
                 "esm",
+                "--platform",
+                "browser",
             ])
             .current_dir(&fe_dir)
             .output()
@@ -228,6 +257,22 @@ fn compute_short_hash(input: &str) -> String {
 
 fn sanitize_package_name(name: &str) -> String {
     name.replace('/', "__").replace('@', "")
+}
+
+fn get_package_name(specifier: &str) -> String {
+    if specifier.starts_with('@') {
+        let parts: Vec<&str> = specifier.splitn(3, '/').collect();
+        if parts.len() >= 2 {
+            return format!("{}/{}", parts[0], parts[1]);
+        }
+        return specifier.to_string();
+    }
+
+    specifier
+        .split('/')
+        .next()
+        .unwrap_or(specifier)
+        .to_string()
 }
 
 #[cfg(test)]

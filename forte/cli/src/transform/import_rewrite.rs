@@ -78,9 +78,11 @@ impl ImportRewriter {
         // Check if it's a bare import (from node_modules)
         if !specifier.starts_with('.') && !specifier.starts_with('/') && !specifier.starts_with('@')
         {
+            // Try exact match first (for subpath imports like react-dom/client)
             if let Some(url) = self.dep_map.entries.get(specifier) {
                 return Some(url.clone());
             }
+            // Fallback to base package name
             let package_name = get_package_name(specifier);
             if let Some(url) = self.dep_map.entries.get(&package_name) {
                 return Some(url.clone());
@@ -103,7 +105,11 @@ impl ImportRewriter {
                 }
             }
 
-            // Otherwise it's a scoped npm package
+            // Try exact match first (for subpath imports like @scope/package/subpath)
+            if let Some(url) = self.dep_map.entries.get(specifier) {
+                return Some(url.clone());
+            }
+            // Fallback to base package name
             let package_name = get_package_name(specifier);
             if let Some(url) = self.dep_map.entries.get(&package_name) {
                 return Some(url.clone());
@@ -201,14 +207,13 @@ mod tests {
 
     #[test]
     fn test_add_extension() {
-        assert_eq!(add_extension_if_needed("/src/Button"), "/src/Button.tsx");
+        assert_eq!(add_extension_if_needed("/src/Button"), "/src/Button");
+        assert_eq!(add_extension_if_needed("/src/Button?t=123"), "/src/Button?t=123");
+        assert_eq!(add_extension_if_needed("/src/Button.tsx"), "/src/Button.tsx");
+        assert_eq!(add_extension_if_needed("/src/button.css"), "/src/button.css?import");
         assert_eq!(
-            add_extension_if_needed("/src/Button?t=123"),
-            "/src/Button.tsx?t=123"
-        );
-        assert_eq!(
-            add_extension_if_needed("/src/Button.tsx"),
-            "/src/Button.tsx"
+            add_extension_if_needed("/src/button.css?t=123"),
+            "/src/button.css?t=123&import"
         );
     }
 
@@ -228,9 +233,53 @@ import { utils } from "@/lib/utils";"#;
         let result = rewriter.rewrite(code, Path::new("components/App.tsx"), 12345);
 
         assert!(result.contains("/.forte/deps/react-abc.js"));
-        assert!(
-            result.contains("./Button.tsx?t=12345")
-                || result.contains("/src/components/Button.tsx?t=12345")
+        assert!(result.contains("/src/components/Button?t=12345"));
+    }
+
+    #[test]
+    fn test_subpath_imports() {
+        let mut dep_map = DependencyMap::default();
+        dep_map
+            .entries
+            .insert("react".to_string(), "/.forte/deps/react-abc.js".to_string());
+        dep_map.entries.insert(
+            "react-dom/client".to_string(),
+            "/.forte/deps/react-dom__client-def.js".to_string(),
         );
+        dep_map.entries.insert(
+            "jotai/vanilla".to_string(),
+            "/.forte/deps/jotai__vanilla-ghi.js".to_string(),
+        );
+
+        let rewriter = ImportRewriter::new(dep_map);
+        let code = r#"import { createRoot } from "react-dom/client";
+import { atom } from "jotai/vanilla";"#;
+
+        let result = rewriter.rewrite(code, Path::new("main.tsx"), 12345);
+
+        assert!(result.contains("/.forte/deps/react-dom__client-def.js"));
+        assert!(result.contains("/.forte/deps/jotai__vanilla-ghi.js"));
+    }
+
+    #[test]
+    fn test_scoped_subpath_imports() {
+        let mut dep_map = DependencyMap::default();
+        dep_map.entries.insert(
+            "@tanstack/react-query".to_string(),
+            "/.forte/deps/tanstack__react-query-abc.js".to_string(),
+        );
+        dep_map.entries.insert(
+            "@tanstack/react-query/devtools".to_string(),
+            "/.forte/deps/tanstack__react-query__devtools-def.js".to_string(),
+        );
+
+        let rewriter = ImportRewriter::new(dep_map);
+        let code = r#"import { useQuery } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query/devtools";"#;
+
+        let result = rewriter.rewrite(code, Path::new("App.tsx"), 12345);
+
+        assert!(result.contains("/.forte/deps/tanstack__react-query-abc.js"));
+        assert!(result.contains("/.forte/deps/tanstack__react-query__devtools-def.js"));
     }
 }
