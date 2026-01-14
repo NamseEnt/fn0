@@ -108,12 +108,14 @@ pub fn transform_with_oxc(
     let output = codegen.build(&program);
 
     // Check if the file has React components (heuristic: has JSX or imports React)
+    let has_jsx_syntax = {
+        let jsx_pattern = regex::Regex::new(r"<[A-Za-z][A-Za-z0-9]*[\s/>]|<>|</>").unwrap();
+        jsx_pattern.is_match(source_text)
+    };
     let has_react_components = imports
         .iter()
         .any(|i| i.specifier == "react" || i.specifier.starts_with("react/"))
-        || source_text.contains("jsx")
-        || source_text.contains("JSX")
-        || source_text.contains('<');
+        || has_jsx_syntax;
 
     Ok(OxcTransformResult {
         code: output.code,
