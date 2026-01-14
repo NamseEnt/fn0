@@ -78,12 +78,13 @@ impl ImportRewriter {
         // Check if it's a bare import (from node_modules)
         if !specifier.starts_with('.') && !specifier.starts_with('/') && !specifier.starts_with('@')
         {
-            // Bare import like 'react', 'react-dom/client'
+            if let Some(url) = self.dep_map.entries.get(specifier) {
+                return Some(url.clone());
+            }
             let package_name = get_package_name(specifier);
             if let Some(url) = self.dep_map.entries.get(&package_name) {
                 return Some(url.clone());
             }
-            // If not in dep_map, return as-is (might be a built-in or external)
             return None;
         }
 

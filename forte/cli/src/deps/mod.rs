@@ -61,6 +61,24 @@ impl DependencyPrebundler {
             }
         }
 
+        // Bundle react-dom/client separately
+        if dep_map.entries.contains_key("react-dom") {
+            match self.bundle_dependency("react-dom/client") {
+                Ok(output_path) => {
+                    let url_path = format!(
+                        "/.forte/deps/{}",
+                        output_path.file_name().unwrap().to_string_lossy()
+                    );
+                    dep_map
+                        .entries
+                        .insert("react-dom/client".to_string(), url_path);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to bundle react-dom/client: {}", e);
+                }
+            }
+        }
+
         // Bundle react-refresh runtime for Fast Refresh
         if let Ok(output_path) = self.bundle_react_refresh_runtime() {
             let url_path = format!(
@@ -130,12 +148,19 @@ export * from 'react-refresh/runtime';
         }
 
         // Create a temporary entry file that exports the package
-        let entry_content = format!(
-            r#"export * from "{}";
+        let entry_content = if package_name == "react-dom/client" {
+            r#"import * as client from "react-dom/client";
+export const { createRoot, hydrateRoot } = client;
+export default client;"#
+                .to_string()
+        } else {
+            format!(
+                r#"export * from "{}";
 import defaultExport from "{}";
 export default defaultExport;"#,
-            package_name, package_name
-        );
+                package_name, package_name
+            )
+        };
         let entry_path = self.cache_dir.join(format!("_entry_{}.js", hash));
         std::fs::write(&entry_path, &entry_content)?;
 
