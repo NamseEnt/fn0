@@ -107,12 +107,15 @@ pub fn transform_with_oxc(
     let codegen = Codegen::new();
     let output = codegen.build(&program);
 
-    // Check if the file has React components by looking at the transformed output
-    // After OXC transforms JSX, it becomes jsx/jsxDEV/jsxs function calls
+    // Check if the file needs React Refresh by looking at the transformed output
+    // This includes:
+    // 1. JSX files: jsx/jsxDEV/jsxs function calls
+    // 2. Hook files: $RefreshSig$ calls injected by OXC for custom hooks
     let has_react_components = {
         let jsx_runtime_pattern =
             regex::Regex::new(r"\b(jsx|jsxDEV|jsxs|_jsx|_jsxDEV|_jsxs)\s*\(").unwrap();
-        jsx_runtime_pattern.is_match(&output.code)
+        let refresh_sig_pattern = regex::Regex::new(r"\$RefreshSig\$\s*\(").unwrap();
+        jsx_runtime_pattern.is_match(&output.code) || refresh_sig_pattern.is_match(&output.code)
     };
 
     Ok(OxcTransformResult {

@@ -309,14 +309,13 @@ impl ImportRewriter {
         for transform in &sorted_transforms {
             result.push_str(&code[last_end..transform.start]);
 
-            let cjs_var = if processed_specifiers.contains(&transform.specifier) {
-                format!("__cjs_{}__", transform.specifier.replace(['/', '-', '@', '.'], "_"))
-            } else {
+            let is_first_occurrence = !processed_specifiers.contains(&transform.specifier);
+            let cjs_var = format!("__cjs_{}__", transform.specifier.replace(['/', '-', '@', '.'], "_"));
+
+            if is_first_occurrence {
                 cjs_module_counter += 1;
-                let var = format!("__cjs_{}__", transform.specifier.replace(['/', '-', '@', '.'], "_"));
                 processed_specifiers.insert(transform.specifier.clone());
-                var
-            };
+            }
 
             let mut import_parts = Vec::new();
 
@@ -324,7 +323,7 @@ impl ImportRewriter {
                 import_parts.push(default_name.clone());
             }
 
-            if !processed_specifiers.contains(&transform.specifier) || cjs_module_counter == 1 {
+            if is_first_occurrence {
                 let import_stmt = format!(
                     "import {} from \"{}\"",
                     cjs_var, transform.resolved_url
