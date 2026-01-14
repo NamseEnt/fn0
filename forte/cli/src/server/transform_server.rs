@@ -1,9 +1,9 @@
-use crate::deps::DependencyPrebundler;
+use crate::deps::{DependencyMap, DependencyPrebundler};
 use crate::module_graph::SharedModuleGraph;
 use crate::server::HmrBroadcaster;
 use crate::transform::{
-    TransformConfig, TransformPipeline, get_react_refresh_preamble, inject_hmr_code,
-    inject_react_refresh_code,
+    ImportRewriter, TransformConfig, TransformPipeline, get_react_refresh_preamble,
+    inject_hmr_code, inject_react_refresh_code,
 };
 use anyhow::Result;
 use bytes::Bytes;
@@ -19,6 +19,7 @@ pub struct TransformServer {
     module_graph: SharedModuleGraph,
     prebundler: Arc<Mutex<DependencyPrebundler>>,
     hmr: HmrBroadcaster,
+    project_root: PathBuf,
     fe_dir: PathBuf,
     cache_dir: PathBuf,
 }
@@ -40,6 +41,7 @@ impl TransformServer {
             module_graph,
             prebundler,
             hmr,
+            project_root: project_root.to_path_buf(),
             fe_dir,
             cache_dir,
         }
@@ -136,13 +138,21 @@ impl TransformServer {
             self.hmr.send_reload();
         }
 
-        let (dep_entries, cjs_modules) = {
+        let dep_map = {
             let prebundler = self.prebundler.lock().unwrap();
-            let dep_map = prebundler.get_dep_map();
-            (dep_map.entries.clone(), dep_map.cjs_modules.clone())
+            prebundler.get_dep_map().clone()
         };
 
-        let code = rewrite_imports(&result.code, &dep_entries, &cjs_modules);
+        let rewriter = ImportRewriter::new(dep_map, Some(&self.project_root));
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        let relative_path = file_path
+            .strip_prefix(&self.fe_dir.join("src"))
+            .unwrap_or(&file_path);
+        let code = rewriter.rewrite(&result.code, relative_path, timestamp);
         let code = rewrite_css_imports(&code);
 
         let code = if result.has_react_components {
