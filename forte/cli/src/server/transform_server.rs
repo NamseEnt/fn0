@@ -136,12 +136,13 @@ impl TransformServer {
             self.hmr.send_reload();
         }
 
-        let dep_entries = {
+        let (dep_entries, cjs_modules) = {
             let prebundler = self.prebundler.lock().unwrap();
-            prebundler.get_dep_map().entries.clone()
+            let dep_map = prebundler.get_dep_map();
+            (dep_map.entries.clone(), dep_map.cjs_modules.clone())
         };
 
-        let code = rewrite_imports(&result.code, &dep_entries);
+        let code = rewrite_imports(&result.code, &dep_entries, &cjs_modules);
         let code = rewrite_css_imports(&code);
 
         let code = if result.has_react_components {
@@ -392,10 +393,146 @@ fn get_package_name(specifier: &str) -> String {
     specifier.split('/').next().unwrap_or(specifier).to_string()
 }
 
+fn transform_cjs_imports(
+    code: &str,
+    dep_entries: &std::collections::HashMap<String, String>,
+    cjs_modules: &HashSet<String>,
+) -> String {
+    use oxc_allocator::Allocator;
+    use oxc_ast::ast::{ImportDeclarationSpecifier, Statement};
+    use oxc_parser::Parser;
+    use oxc_span::SourceType;
+
+    let allocator = Allocator::default();
+    let source_type = SourceType::from_path("file.tsx").unwrap_or_default();
+    let ret = Parser::new(&allocator, code, source_type).parse();
+
+    if ret.panicked {
+        return code.to_string();
+    }
+
+    struct CjsTransform {
+        start: usize,
+        end: usize,
+        specifier: String,
+        resolved_url: String,
+        named_imports: Vec<(String, String)>,
+        default_import: Option<String>,
+        namespace_import: Option<String>,
+    }
+
+    let mut transforms: Vec<CjsTransform> = Vec::new();
+
+    for stmt in &ret.program.body {
+        if let Statement::ImportDeclaration(decl) = stmt {
+            let specifier = decl.source.value.to_string();
+
+            if !cjs_modules.contains(&specifier) {
+                continue;
+            }
+
+            let resolved_url = if let Some(url) = dep_entries.get(&specifier) {
+                url.clone()
+            } else {
+                let package_name = get_package_name(&specifier);
+                match dep_entries.get(&package_name) {
+                    Some(url) => url.clone(),
+                    None => continue,
+                }
+            };
+
+            let mut named_imports = Vec::new();
+            let mut default_import = None;
+            let mut namespace_import = None;
+
+            if let Some(specifiers) = &decl.specifiers {
+                for spec in specifiers {
+                    match spec {
+                        ImportDeclarationSpecifier::ImportSpecifier(named) => {
+                            let imported = named.imported.name().to_string();
+                            let local = named.local.name.to_string();
+                            named_imports.push((imported, local));
+                        }
+                        ImportDeclarationSpecifier::ImportDefaultSpecifier(def) => {
+                            default_import = Some(def.local.name.to_string());
+                        }
+                        ImportDeclarationSpecifier::ImportNamespaceSpecifier(ns) => {
+                            namespace_import = Some(ns.local.name.to_string());
+                        }
+                    }
+                }
+            }
+
+            if !named_imports.is_empty() || default_import.is_some() || namespace_import.is_some() {
+                transforms.push(CjsTransform {
+                    start: decl.span.start as usize,
+                    end: decl.span.end as usize,
+                    specifier,
+                    resolved_url,
+                    named_imports,
+                    default_import,
+                    namespace_import,
+                });
+            }
+        }
+    }
+
+    if transforms.is_empty() {
+        return code.to_string();
+    }
+
+    let mut result = String::new();
+    let mut last_end = 0;
+
+    transforms.sort_by_key(|t| t.start);
+
+    for transform in &transforms {
+        result.push_str(&code[last_end..transform.start]);
+
+        let cjs_var = format!(
+            "__cjs_{}__",
+            transform.specifier.replace(['/', '-', '@', '.'], "_")
+        );
+
+        result.push_str(&format!("import {} from \"{}\"", cjs_var, transform.resolved_url));
+
+        if let Some(ref default_name) = transform.default_import {
+            result.push_str(&format!(";\nconst {} = {}", default_name, cjs_var));
+        }
+
+        if let Some(ref ns_name) = transform.namespace_import {
+            result.push_str(&format!(";\nconst {} = {}", ns_name, cjs_var));
+        }
+
+        if !transform.named_imports.is_empty() {
+            let destructure: Vec<String> = transform
+                .named_imports
+                .iter()
+                .map(|(imported, local)| {
+                    if imported == local {
+                        local.clone()
+                    } else {
+                        format!("{}: {}", imported, local)
+                    }
+                })
+                .collect();
+            result.push_str(&format!(";\nconst {{ {} }} = {}", destructure.join(", "), cjs_var));
+        }
+
+        last_end = transform.end;
+    }
+
+    result.push_str(&code[last_end..]);
+    result
+}
+
 fn rewrite_imports(
     code: &str,
     dep_entries: &std::collections::HashMap<String, String>,
+    cjs_modules: &HashSet<String>,
 ) -> String {
+    let code = transform_cjs_imports(code, dep_entries, cjs_modules);
+
     let patterns = [
         (r#"from\s*["']([^"']+)["']"#, "from"),
         (r#"import\s*\(\s*["']([^"']+)["']\s*\)"#, "dynamic"),

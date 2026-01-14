@@ -1,4 +1,4 @@
-mod import_rewrite;
+pub mod import_rewrite;
 mod inject;
 mod oxc;
 
