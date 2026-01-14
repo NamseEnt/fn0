@@ -77,6 +77,7 @@ export async function render(url: string, rawProps: any): Promise<string> {
   const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
   const hmrScript = `<script type="module" src="/__hmr-client.js"></script>`;
+  const reactRefreshScript = `<script type="module" src="/__react-refresh.js"></script>`;
   const clientScript = `/src/client.tsx`;
 
   const stream = await renderToReadableStream(pageModule.default(allProps));
@@ -93,6 +94,7 @@ export async function render(url: string, rawProps: any): Promise<string> {
     <title>ls-news</title>
     <link rel="stylesheet" href="/src/styles/globals.css" />
     ${hmrScript}
+    ${reactRefreshScript}
 </head>
 <body>
     <div id="root">${html}</div>
@@ -125,6 +127,9 @@ export async function render(url: string, rawProps: any): Promise<string> {
     const hmrScript = isDev
       ? `<script type="module" src="/__hmr-client.js"></script>`
       : "";
+    const reactRefreshScript = isDev
+      ? `<script type="module" src="/__react-refresh.js"></script>`
+      : "";
     const clientScript = isDev ? `/src/client.tsx` : `/public/client.js`;
 
     const cssLink = isDev
@@ -146,6 +151,7 @@ export async function render(url: string, rawProps: any): Promise<string> {
     <title>ls-news</title>
     ${cssLink}
     ${hmrScript}
+    ${reactRefreshScript}
 </head>
 <body>
     <div id="root">${html}</div>
