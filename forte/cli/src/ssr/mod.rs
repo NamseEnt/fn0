@@ -76,7 +76,20 @@ impl SsrBundler {
 
         let config_path = self.output_path.parent().unwrap().join("rolldown.config.mjs");
         let config_content = format!(
-            r#"export default {{
+            r#"// SSR CSS Plugin - returns empty export for CSS files (no DOM in SSR)
+function ssrCssPlugin() {{
+  return {{
+    name: 'ssr-css',
+    transform(code, id) {{
+      if (id.endsWith('.css')) {{
+        return {{ code: 'export default "";', map: null }};
+      }}
+      return null;
+    }}
+  }};
+}}
+
+export default {{
   input: "{}",
   output: {{
     file: "{}",
@@ -84,6 +97,7 @@ impl SsrBundler {
     inlineDynamicImports: true,
   }},
   tsconfig: "tsconfig.json",
+  plugins: [ssrCssPlugin()],
 {define_config}
 }};
 "#,

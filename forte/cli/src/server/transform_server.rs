@@ -161,11 +161,12 @@ impl TransformServer {
         &self,
         path: &str,
     ) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
-        let has_import_query = path
-            .split('?')
-            .nth(1)
-            .map(|q| q.split('&').any(|p| p == "import" || p.starts_with("import=")))
-            .unwrap_or(false);
+        let query_string = path.split('?').nth(1).unwrap_or("");
+        let query_params: Vec<&str> = query_string.split('&').collect();
+        let has_import_query = query_params
+            .iter()
+            .any(|p| *p == "import" || p.starts_with("import="));
+        let is_ssr = query_params.iter().any(|p| *p == "ssr" || p.starts_with("ssr="));
         let clean_path = path.split('?').next().unwrap_or(path);
 
         let file_path = if clean_path == "/src/styles/globals.css" {
@@ -188,7 +189,7 @@ impl TransformServer {
         let css_content = tokio::fs::read_to_string(&file_path).await?;
 
         if has_import_query {
-            let js_code = generate_css_module(&css_content, clean_path);
+            let js_code = generate_css_module(&css_content, clean_path, is_ssr);
             Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header("content-type", "application/javascript; charset=utf-8")
@@ -287,11 +288,15 @@ impl TransformServer {
     }
 }
 
-fn generate_css_module(css_content: &str, module_id: &str) -> String {
+fn generate_css_module(css_content: &str, module_id: &str, is_ssr: bool) -> String {
     let escaped_css = css_content
         .replace('\\', "\\\\")
         .replace('`', "\\`")
         .replace("${", "\\${");
+
+    if is_ssr {
+        return format!(r#"export default `{escaped_css}`;"#);
+    }
 
     format!(
         r#"const css = `{escaped_css}`;
@@ -328,7 +333,11 @@ fn rewrite_css_imports(code: &str) -> String {
     let re = regex::Regex::new(r#"import\s+["']([^"']+\.css)["']"#).unwrap();
     re.replace_all(code, |caps: &regex::Captures| {
         let css_path = &caps[1];
-        format!(r#"import "{}""#, css_path)
+        if css_path.contains('?') {
+            format!(r#"import "{}&import""#, css_path)
+        } else {
+            format!(r#"import "{}?import""#, css_path)
+        }
     })
     .to_string()
 }
@@ -443,7 +452,7 @@ mod tests {
     #[test]
     fn test_generate_css_module() {
         let css = ".button { color: red; }";
-        let result = generate_css_module(css, "/src/button.css");
+        let result = generate_css_module(css, "/src/button.css", false);
 
         assert!(result.contains(".button { color: red; }"));
         assert!(result.contains("import.meta.hot"));
@@ -451,9 +460,20 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_css_module_ssr() {
+        let css = ".button { color: red; }";
+        let result = generate_css_module(css, "/src/button.css", true);
+
+        assert!(result.contains(".button { color: red; }"));
+        assert!(!result.contains("import.meta.hot"));
+        assert!(!result.contains("document.getElementById"));
+        assert!(result.starts_with("export default `"));
+    }
+
+    #[test]
     fn test_css_escaping() {
         let css = ".icon::before { content: `test`; color: ${var}; }";
-        let result = generate_css_module(css, "/src/icon.css");
+        let result = generate_css_module(css, "/src/icon.css", false);
 
         assert!(result.contains("\\`test\\`"));
         assert!(result.contains("\\${var}"));
