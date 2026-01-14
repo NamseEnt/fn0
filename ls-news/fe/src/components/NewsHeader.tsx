@@ -1,9 +1,19 @@
-import { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { Link } from "@/components/ui/link";
 import { useMe } from "@/hooks/.generated/useMe";
 
 function NewsHeaderContent() {
   const me = useMe({});
+  const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (me.t === "NotLoggedIn") {
+      const clientId = import.meta.env.PUBLIC_GITHUB_CLIENT_ID;
+      const redirectUri = `${window.location.origin}/api/auth/callback/github`;
+      const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20user:email&state=${me.oauthNonce}`;
+      setAuthUrl(url);
+    }
+  }, [me]);
 
   return (
     <header className="border-b bg-background">
@@ -47,25 +57,16 @@ function NewsHeaderContent() {
                   ログアウト
                 </button>
               </>
-            ) : (
-              <a href={buildGithubAuthUrl(me.oauthNonce)} className="text-sm hover:underline">
+            ) : authUrl ? (
+              <a href={authUrl} className="text-sm hover:underline">
                 GitHubでログイン
               </a>
-            )}
+            ) : null}
           </div>
         </div>
       </nav>
     </header>
   );
-}
-
-function buildGithubAuthUrl(oauthNonce: string): string {
-  if (typeof window === "undefined") {
-    return "#";
-  }
-  const clientId = import.meta.env.PUBLIC_GITHUB_CLIENT_ID;
-  const redirectUri = `${window.location.origin}/api/auth/callback/github`;
-  return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20user:email&state=${oauthNonce}`;
 }
 
 function NewsHeaderFallback() {
