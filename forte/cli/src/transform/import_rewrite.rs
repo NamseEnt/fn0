@@ -1,11 +1,26 @@
 use crate::deps::DependencyMap;
-use std::collections::HashMap;
+use oxc_allocator::Allocator;
+use oxc_ast::ast::{ImportDeclarationSpecifier, Statement};
+use oxc_parser::Parser;
+use oxc_span::SourceType;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 pub struct ImportRewriter {
     dep_map: DependencyMap,
     aliases: HashMap<String, String>,
     src_base: String,
+}
+
+#[derive(Debug)]
+struct CjsImportTransform {
+    start: usize,
+    end: usize,
+    specifier: String,
+    resolved_url: String,
+    named_imports: Vec<(String, String)>,
+    default_import: Option<String>,
+    namespace_import: Option<String>,
 }
 
 fn strip_json_comments(content: &str) -> String {
@@ -158,17 +173,18 @@ impl ImportRewriter {
     }
 
     pub fn rewrite(&self, code: &str, current_file: &Path, timestamp: u64) -> String {
+        let cjs_transforms = self.analyze_cjs_imports(code, current_file, timestamp);
+
+        if !cjs_transforms.is_empty() {
+            let transformed = self.apply_cjs_transforms(code, current_file, &cjs_transforms, timestamp);
+            return transformed;
+        }
+
+        self.rewrite_simple(code, current_file, timestamp)
+    }
+
+    fn rewrite_simple(&self, code: &str, current_file: &Path, timestamp: u64) -> String {
         let mut result = code.to_string();
-
-        // Find and replace all import statements
-        // This is a simple regex-based approach. For production, consider using a proper parser.
-
-        // Match: import ... from "specifier"
-        // Match: import ... from 'specifier'
-        // Match: export ... from "specifier"
-        // Match: export ... from 'specifier'
-        // Match: import("specifier")
-        // Match: import "specifier" (side-effect)
 
         let patterns = [
             (r#"from\s*["']([^"']+)["']"#, "from"),
@@ -204,6 +220,184 @@ impl ImportRewriter {
         }
 
         result
+    }
+
+    fn analyze_cjs_imports(
+        &self,
+        code: &str,
+        current_file: &Path,
+        timestamp: u64,
+    ) -> Vec<CjsImportTransform> {
+        let mut transforms = Vec::new();
+
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(current_file).unwrap_or_default();
+        let ret = Parser::new(&allocator, code, source_type).parse();
+
+        if ret.panicked {
+            return transforms;
+        }
+
+        for stmt in &ret.program.body {
+            if let Statement::ImportDeclaration(decl) = stmt {
+                let specifier = decl.source.value.to_string();
+
+                if !self.is_cjs_module(&specifier) {
+                    continue;
+                }
+
+                let resolved_url = match self.resolve_specifier(&specifier, current_file, timestamp) {
+                    Some(url) => url,
+                    None => continue,
+                };
+
+                let mut named_imports = Vec::new();
+                let mut default_import = None;
+                let mut namespace_import = None;
+
+                if let Some(specifiers) = &decl.specifiers {
+                    for spec in specifiers {
+                        match spec {
+                            ImportDeclarationSpecifier::ImportSpecifier(named) => {
+                                let imported = named.imported.name().to_string();
+                                let local = named.local.name.to_string();
+                                named_imports.push((imported, local));
+                            }
+                            ImportDeclarationSpecifier::ImportDefaultSpecifier(def) => {
+                                default_import = Some(def.local.name.to_string());
+                            }
+                            ImportDeclarationSpecifier::ImportNamespaceSpecifier(ns) => {
+                                namespace_import = Some(ns.local.name.to_string());
+                            }
+                        }
+                    }
+                }
+
+                if !named_imports.is_empty() {
+                    transforms.push(CjsImportTransform {
+                        start: decl.span.start as usize,
+                        end: decl.span.end as usize,
+                        specifier,
+                        resolved_url,
+                        named_imports,
+                        default_import,
+                        namespace_import,
+                    });
+                }
+            }
+        }
+
+        transforms
+    }
+
+    fn apply_cjs_transforms(
+        &self,
+        code: &str,
+        current_file: &Path,
+        transforms: &[CjsImportTransform],
+        timestamp: u64,
+    ) -> String {
+        let mut result = String::new();
+        let mut last_end = 0;
+
+        let mut sorted_transforms: Vec<_> = transforms.iter().collect();
+        sorted_transforms.sort_by_key(|t| t.start);
+
+        let mut cjs_module_counter = 0;
+        let mut processed_specifiers: HashSet<String> = HashSet::new();
+
+        for transform in &sorted_transforms {
+            result.push_str(&code[last_end..transform.start]);
+
+            let cjs_var = if processed_specifiers.contains(&transform.specifier) {
+                format!("__cjs_{}__", transform.specifier.replace(['/', '-', '@', '.'], "_"))
+            } else {
+                cjs_module_counter += 1;
+                let var = format!("__cjs_{}__", transform.specifier.replace(['/', '-', '@', '.'], "_"));
+                processed_specifiers.insert(transform.specifier.clone());
+                var
+            };
+
+            let mut import_parts = Vec::new();
+
+            if let Some(ref default_name) = transform.default_import {
+                import_parts.push(default_name.clone());
+            }
+
+            if !processed_specifiers.contains(&transform.specifier) || cjs_module_counter == 1 {
+                let import_stmt = format!(
+                    "import {} from \"{}\"",
+                    cjs_var, transform.resolved_url
+                );
+                result.push_str(&import_stmt);
+
+                if let Some(ref default_name) = transform.default_import {
+                    result.push_str(&format!(";\nconst {} = {}", default_name, cjs_var));
+                }
+
+                if let Some(ref ns_name) = transform.namespace_import {
+                    result.push_str(&format!(";\nconst {} = {}", ns_name, cjs_var));
+                }
+
+                if !transform.named_imports.is_empty() {
+                    let destructure: Vec<String> = transform
+                        .named_imports
+                        .iter()
+                        .map(|(imported, local)| {
+                            if imported == local {
+                                format!("{}", local)
+                            } else {
+                                format!("{}: {}", imported, local)
+                            }
+                        })
+                        .collect();
+                    result.push_str(&format!(
+                        ";\nconst {{ {} }} = {}",
+                        destructure.join(", "),
+                        cjs_var
+                    ));
+                }
+            } else {
+                if let Some(ref default_name) = transform.default_import {
+                    result.push_str(&format!("const {} = {}", default_name, cjs_var));
+                }
+
+                if let Some(ref ns_name) = transform.namespace_import {
+                    if transform.default_import.is_some() {
+                        result.push_str(";\n");
+                    }
+                    result.push_str(&format!("const {} = {}", ns_name, cjs_var));
+                }
+
+                if !transform.named_imports.is_empty() {
+                    if transform.default_import.is_some() || transform.namespace_import.is_some() {
+                        result.push_str(";\n");
+                    }
+                    let destructure: Vec<String> = transform
+                        .named_imports
+                        .iter()
+                        .map(|(imported, local)| {
+                            if imported == local {
+                                format!("{}", local)
+                            } else {
+                                format!("{}: {}", imported, local)
+                            }
+                        })
+                        .collect();
+                    result.push_str(&format!("const {{ {} }} = {}", destructure.join(", "), cjs_var));
+                }
+            }
+
+            last_end = transform.end;
+        }
+
+        result.push_str(&code[last_end..]);
+
+        self.rewrite_simple(&result, current_file, timestamp)
+    }
+
+    fn is_cjs_module(&self, specifier: &str) -> bool {
+        self.dep_map.cjs_modules.contains(specifier)
     }
 
     fn resolve_specifier(
@@ -502,5 +696,60 @@ import { api } from "@/api";"#;
         assert!(result.contains("/src/components/Button?t=12345"));
         assert!(result.contains("/src/lib/utils/format?t=12345"));
         assert!(result.contains("/src/api?t=12345"));
+    }
+
+    #[test]
+    fn test_cjs_named_import_transform() {
+        let mut dep_map = DependencyMap::default();
+        dep_map.entries.insert(
+            "react-dom/client".to_string(),
+            "/.forte/deps/react-dom__client-abc.js".to_string(),
+        );
+        dep_map.cjs_modules.insert("react-dom/client".to_string());
+
+        let rewriter = ImportRewriter::new(dep_map, None);
+        let code = r#"import { hydrateRoot, createRoot } from "react-dom/client";"#;
+
+        let result = rewriter.rewrite(code, Path::new("main.tsx"), 12345);
+
+        assert!(result.contains("import __cjs_react_dom_client__"));
+        assert!(result.contains("/.forte/deps/react-dom__client-abc.js"));
+        assert!(result.contains("const { hydrateRoot, createRoot } = __cjs_react_dom_client__"));
+    }
+
+    #[test]
+    fn test_cjs_mixed_import_transform() {
+        let mut dep_map = DependencyMap::default();
+        dep_map.entries.insert(
+            "some-cjs-lib".to_string(),
+            "/.forte/deps/some-cjs-lib-xyz.js".to_string(),
+        );
+        dep_map.cjs_modules.insert("some-cjs-lib".to_string());
+
+        let rewriter = ImportRewriter::new(dep_map, None);
+        let code = r#"import DefaultExport, { namedOne, namedTwo as alias } from "some-cjs-lib";"#;
+
+        let result = rewriter.rewrite(code, Path::new("app.tsx"), 12345);
+
+        assert!(result.contains("import __cjs_some_cjs_lib__"));
+        assert!(result.contains("const DefaultExport = __cjs_some_cjs_lib__"));
+        assert!(result.contains("const { namedOne, namedTwo: alias } = __cjs_some_cjs_lib__"));
+    }
+
+    #[test]
+    fn test_non_cjs_not_transformed() {
+        let mut dep_map = DependencyMap::default();
+        dep_map.entries.insert(
+            "react".to_string(),
+            "/.forte/deps/react-abc.js".to_string(),
+        );
+
+        let rewriter = ImportRewriter::new(dep_map, None);
+        let code = r#"import { useState, useEffect } from "react";"#;
+
+        let result = rewriter.rewrite(code, Path::new("app.tsx"), 12345);
+
+        assert!(result.contains(r#"from "/.forte/deps/react-abc.js""#));
+        assert!(!result.contains("__cjs_"));
     }
 }

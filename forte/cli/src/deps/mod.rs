@@ -15,6 +15,7 @@ use std::process::Command;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DependencyMap {
     pub entries: HashMap<String, String>,
+    pub cjs_modules: HashSet<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +23,8 @@ struct CacheMetadata {
     lockfile_hash: String,
     config_hash: String,
     entries: HashMap<String, String>,
+    #[serde(default)]
+    cjs_modules: HashSet<String>,
 }
 
 pub struct DependencyPrebundler {
@@ -49,6 +52,7 @@ impl DependencyPrebundler {
                 tracing::info!("[deps] Using cached dependencies");
                 self.dep_map = DependencyMap {
                     entries: metadata.entries,
+                    cjs_modules: metadata.cjs_modules,
                 };
                 return Ok(self.dep_map.clone());
             }
@@ -89,12 +93,15 @@ impl DependencyPrebundler {
             }
 
             match self.bundle_dependency(&import_path) {
-                Ok(output_path) => {
+                Ok((output_path, is_cjs)) => {
                     let url_path = format!(
                         "/.forte/deps/{}",
                         output_path.file_name().unwrap().to_string_lossy()
                     );
                     self.dep_map.entries.insert(import_path.clone(), url_path);
+                    if is_cjs {
+                        self.dep_map.cjs_modules.insert(import_path.clone());
+                    }
                 }
                 Err(e) => {
                     tracing::warn!("Failed to bundle {}: {}", import_path, e);
@@ -119,6 +126,7 @@ impl DependencyPrebundler {
             lockfile_hash: self.compute_lockfile_hash(),
             config_hash: self.compute_config_hash(),
             entries: self.dep_map.entries.clone(),
+            cjs_modules: self.dep_map.cjs_modules.clone(),
         };
         self.save_metadata(&metadata)?;
 
@@ -198,14 +206,14 @@ export * from 'react-refresh/runtime';
         Ok(output_path)
     }
 
-    fn bundle_dependency(&self, package_name: &str) -> Result<PathBuf> {
+    fn bundle_dependency(&self, package_name: &str) -> Result<(PathBuf, bool)> {
         let hash = compute_short_hash(package_name);
         let output_filename = format!("{}-{}.js", sanitize_package_name(package_name), hash);
         let output_path = self.cache_dir.join(&output_filename);
 
-        // Skip if already bundled
         if output_path.exists() {
-            return Ok(output_path);
+            let is_cjs = self.detect_cjs_module(&output_path);
+            return Ok((output_path, is_cjs));
         }
 
         let entry_content = format!(
@@ -217,7 +225,6 @@ export default _mod.default ?? _mod;"#,
         let entry_path = self.cache_dir.join(format!("_entry_{}.js", hash));
         std::fs::write(&entry_path, &entry_content)?;
 
-        // Run rolldown
         let fe_dir = self.project_root.join("fe");
         let result = Command::new("npx")
             .args([
@@ -234,7 +241,6 @@ export default _mod.default ?? _mod;"#,
             .output()
             .with_context(|| format!("Failed to run rolldown for {}", package_name))?;
 
-        // Clean up entry file
         let _ = std::fs::remove_file(&entry_path);
 
         if !result.status.success() {
@@ -242,7 +248,68 @@ export default _mod.default ?? _mod;"#,
             anyhow::bail!("rolldown failed for {}: {}", package_name, stderr.trim());
         }
 
-        Ok(output_path)
+        let is_cjs = self.detect_cjs_module(&output_path);
+        Ok((output_path, is_cjs))
+    }
+
+    fn detect_cjs_module(&self, bundled_path: &Path) -> bool {
+        let content = match std::fs::read_to_string(bundled_path) {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
+
+        let has_named_exports = content.contains("export {")
+            || content.contains("export const ")
+            || content.contains("export function ")
+            || content.contains("export class ")
+            || content.contains("export let ")
+            || content.contains("export var ");
+
+        let has_default_only = content.contains("export { default }") || content.contains("export default");
+
+        if has_default_only && !has_named_exports {
+            return true;
+        }
+
+        let allocator = Allocator::default();
+        let source_type = SourceType::from_path(bundled_path).unwrap_or_default();
+        let ret = Parser::new(&allocator, &content, source_type).parse();
+
+        if ret.panicked {
+            return false;
+        }
+
+        let mut has_real_named_export = false;
+        let mut has_default_export = false;
+
+        for stmt in &ret.program.body {
+            match stmt {
+                Statement::ExportDefaultDeclaration(_) => {
+                    has_default_export = true;
+                }
+                Statement::ExportNamedDeclaration(decl) => {
+                    if decl.declaration.is_some() {
+                        has_real_named_export = true;
+                    } else {
+                        for spec in &decl.specifiers {
+                            let exported_name = spec.exported.name();
+                            if exported_name != "default" {
+                                has_real_named_export = true;
+                                break;
+                            } else {
+                                has_default_export = true;
+                            }
+                        }
+                    }
+                }
+                Statement::ExportAllDeclaration(_) => {
+                    has_real_named_export = true;
+                }
+                _ => {}
+            }
+        }
+
+        has_default_export && !has_real_named_export
     }
 
     pub fn get_dep_url(&self, package_name: &str) -> Option<String> {
@@ -282,7 +349,7 @@ export default _mod.default ?? _mod;"#,
         tracing::info!("[deps] Dynamically bundling new dependency: {}", import_path);
 
         match self.bundle_dependency(import_path) {
-            Ok(output_path) => {
+            Ok((output_path, is_cjs)) => {
                 let url_path = format!(
                     "/.forte/deps/{}",
                     output_path.file_name().unwrap().to_string_lossy()
@@ -290,6 +357,9 @@ export default _mod.default ?? _mod;"#,
                 self.dep_map
                     .entries
                     .insert(import_path.to_string(), url_path.clone());
+                if is_cjs {
+                    self.dep_map.cjs_modules.insert(import_path.to_string());
+                }
 
                 let map_path = self.cache_dir.join("dep-map.json");
                 std::fs::write(&map_path, serde_json::to_string_pretty(&self.dep_map)?)?;
@@ -298,6 +368,7 @@ export default _mod.default ?? _mod;"#,
                     lockfile_hash: self.compute_lockfile_hash(),
                     config_hash: self.compute_config_hash(),
                     entries: self.dep_map.entries.clone(),
+                    cjs_modules: self.dep_map.cjs_modules.clone(),
                 };
                 self.save_metadata(&metadata)?;
 
@@ -1031,6 +1102,7 @@ mod tests {
             lockfile_hash: prebundler.compute_lockfile_hash(),
             config_hash: prebundler.compute_config_hash(),
             entries: HashMap::new(),
+            cjs_modules: HashSet::new(),
         };
         prebundler.save_metadata(&metadata).unwrap();
 
@@ -1061,6 +1133,7 @@ mod tests {
             lockfile_hash: prebundler.compute_lockfile_hash(),
             config_hash: prebundler.compute_config_hash(),
             entries: HashMap::new(),
+            cjs_modules: HashSet::new(),
         };
         prebundler.save_metadata(&metadata).unwrap();
 
@@ -1086,6 +1159,7 @@ mod tests {
             lockfile_hash: "abc123lockfile".to_string(),
             config_hash: "def456config".to_string(),
             entries,
+            cjs_modules: HashSet::new(),
         };
 
         prebundler.save_metadata(&original_metadata).unwrap();
