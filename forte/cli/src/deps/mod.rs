@@ -1,5 +1,11 @@
 use anyhow::{Context, Result};
-use regex::Regex;
+use oxc_allocator::Allocator;
+use oxc_ast::ast::{
+    ArrayExpressionElement, CallExpression, ChainElement, ClassElement, Declaration, Expression,
+    ForStatementInit, ObjectPropertyKind, Program, Statement,
+};
+use oxc_parser::Parser;
+use oxc_span::SourceType;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -11,9 +17,17 @@ pub struct DependencyMap {
     pub entries: HashMap<String, String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CacheMetadata {
+    lockfile_hash: String,
+    config_hash: String,
+    entries: HashMap<String, String>,
+}
+
 pub struct DependencyPrebundler {
     project_root: PathBuf,
     cache_dir: PathBuf,
+    dep_map: DependencyMap,
 }
 
 impl DependencyPrebundler {
@@ -23,11 +37,24 @@ impl DependencyPrebundler {
         Self {
             project_root,
             cache_dir,
+            dep_map: DependencyMap::default(),
         }
     }
 
-    pub fn prebundle(&self) -> Result<DependencyMap> {
+    pub fn prebundle(&mut self) -> Result<DependencyMap> {
         std::fs::create_dir_all(&self.cache_dir)?;
+
+        if !self.should_rebuild() {
+            if let Some(metadata) = self.load_metadata() {
+                tracing::info!("[deps] Using cached dependencies");
+                self.dep_map = DependencyMap {
+                    entries: metadata.entries,
+                };
+                return Ok(self.dep_map.clone());
+            }
+        }
+
+        tracing::info!("[deps] Rebuilding dependency cache");
 
         let package_json_path = self.project_root.join("fe/package.json");
         let package_json: PackageJson = serde_json::from_str(
@@ -35,7 +62,7 @@ impl DependencyPrebundler {
                 .with_context(|| format!("Failed to read {:?}", package_json_path))?,
         )?;
 
-        let mut dep_map = DependencyMap::default();
+        self.dep_map = DependencyMap::default();
 
         let mut all_imports = self.scan_imports_from_source()?;
 
@@ -67,7 +94,7 @@ impl DependencyPrebundler {
                         "/.forte/deps/{}",
                         output_path.file_name().unwrap().to_string_lossy()
                     );
-                    dep_map.entries.insert(import_path.clone(), url_path);
+                    self.dep_map.entries.insert(import_path.clone(), url_path);
                 }
                 Err(e) => {
                     tracing::warn!("Failed to bundle {}: {}", import_path, e);
@@ -75,22 +102,27 @@ impl DependencyPrebundler {
             }
         }
 
-        // Bundle react-refresh runtime for Fast Refresh
         if let Ok(output_path) = self.bundle_react_refresh_runtime() {
             let url_path = format!(
                 "/.forte/deps/{}",
                 output_path.file_name().unwrap().to_string_lossy()
             );
-            dep_map
+            self.dep_map
                 .entries
                 .insert("react-refresh/runtime".to_string(), url_path);
         }
 
-        // Write dependency map for later use
         let map_path = self.cache_dir.join("dep-map.json");
-        std::fs::write(&map_path, serde_json::to_string_pretty(&dep_map)?)?;
+        std::fs::write(&map_path, serde_json::to_string_pretty(&self.dep_map)?)?;
 
-        Ok(dep_map)
+        let metadata = CacheMetadata {
+            lockfile_hash: self.compute_lockfile_hash(),
+            config_hash: self.compute_config_hash(),
+            entries: self.dep_map.entries.clone(),
+        };
+        self.save_metadata(&metadata)?;
+
+        Ok(self.dep_map.clone())
     }
 
     fn scan_imports_from_source(&self) -> Result<HashSet<String>> {
@@ -101,28 +133,22 @@ impl DependencyPrebundler {
             return Ok(imports);
         }
 
-        let re = Regex::new(r#"(?:import|export)\s+.*?from\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["']"#).unwrap();
-
-        self.scan_directory(&fe_src, &re, &mut imports)?;
+        self.scan_directory_ast(&fe_src, &mut imports)?;
         Ok(imports)
     }
 
-    fn scan_directory(&self, dir: &Path, re: &Regex, imports: &mut HashSet<String>) -> Result<()> {
+    fn scan_directory_ast(&self, dir: &Path, imports: &mut HashSet<String>) -> Result<()> {
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
 
             if path.is_dir() {
-                self.scan_directory(&path, re, imports)?;
+                self.scan_directory_ast(&path, imports)?;
             } else if let Some(ext) = path.extension() {
                 if ext == "ts" || ext == "tsx" || ext == "js" || ext == "jsx" {
                     if let Ok(content) = std::fs::read_to_string(&path) {
-                        for cap in re.captures_iter(&content) {
-                            let specifier = cap.get(1).or(cap.get(2)).or(cap.get(3));
-                            if let Some(s) = specifier {
-                                imports.insert(s.as_str().to_string());
-                            }
-                        }
+                        let file_imports = scan_imports_ast(&content, &path);
+                        imports.extend(file_imports);
                     }
                 }
             }
@@ -220,13 +246,68 @@ export default _mod.default ?? _mod;"#,
     }
 
     pub fn get_dep_url(&self, package_name: &str) -> Option<String> {
-        let map_path = self.cache_dir.join("dep-map.json");
-        if let Ok(content) = std::fs::read_to_string(&map_path) {
-            if let Ok(map) = serde_json::from_str::<DependencyMap>(&content) {
-                return map.entries.get(package_name).cloned();
+        self.dep_map.entries.get(package_name).cloned()
+    }
+
+    pub fn get_dep_map(&self) -> &DependencyMap {
+        &self.dep_map
+    }
+
+    pub fn get_dep_map_mut(&mut self) -> &mut DependencyMap {
+        &mut self.dep_map
+    }
+
+    pub fn register_missing_import(&mut self, import_path: &str) -> Result<Option<String>> {
+        if self.dep_map.entries.contains_key(import_path) {
+            return Ok(self.dep_map.entries.get(import_path).cloned());
+        }
+
+        let package_json_path = self.project_root.join("fe/package.json");
+        let package_json: PackageJson = serde_json::from_str(
+            &std::fs::read_to_string(&package_json_path)
+                .with_context(|| format!("Failed to read {:?}", package_json_path))?,
+        )?;
+
+        let base_package_name = get_package_name(import_path);
+        let is_installed = package_json
+            .dependencies
+            .as_ref()
+            .map(|d| d.contains_key(&base_package_name))
+            .unwrap_or(false);
+
+        if !is_installed {
+            return Ok(None);
+        }
+
+        tracing::info!("[deps] Dynamically bundling new dependency: {}", import_path);
+
+        match self.bundle_dependency(import_path) {
+            Ok(output_path) => {
+                let url_path = format!(
+                    "/.forte/deps/{}",
+                    output_path.file_name().unwrap().to_string_lossy()
+                );
+                self.dep_map
+                    .entries
+                    .insert(import_path.to_string(), url_path.clone());
+
+                let map_path = self.cache_dir.join("dep-map.json");
+                std::fs::write(&map_path, serde_json::to_string_pretty(&self.dep_map)?)?;
+
+                let metadata = CacheMetadata {
+                    lockfile_hash: self.compute_lockfile_hash(),
+                    config_hash: self.compute_config_hash(),
+                    entries: self.dep_map.entries.clone(),
+                };
+                self.save_metadata(&metadata)?;
+
+                Ok(Some(url_path))
+            }
+            Err(e) => {
+                tracing::warn!("Failed to bundle {}: {}", import_path, e);
+                Err(e)
             }
         }
-        None
     }
 
     pub fn invalidate_all(&self) -> Result<()> {
@@ -238,6 +319,91 @@ export default _mod.default ?? _mod;"#,
 
     pub fn cache_dir(&self) -> &Path {
         &self.cache_dir
+    }
+
+    fn metadata_path(&self) -> PathBuf {
+        self.cache_dir.join("cache-metadata.json")
+    }
+
+    fn load_metadata(&self) -> Option<CacheMetadata> {
+        let path = self.metadata_path();
+        if !path.exists() {
+            return None;
+        }
+        let content = std::fs::read_to_string(&path).ok()?;
+        serde_json::from_str(&content).ok()
+    }
+
+    fn save_metadata(&self, metadata: &CacheMetadata) -> Result<()> {
+        let path = self.metadata_path();
+        std::fs::write(&path, serde_json::to_string_pretty(metadata)?)?;
+        Ok(())
+    }
+
+    fn compute_lockfile_hash(&self) -> String {
+        let lockfiles = [
+            "fe/package-lock.json",
+            "fe/yarn.lock",
+            "fe/pnpm-lock.yaml",
+            "fe/bun.lock",
+        ];
+
+        for lockfile in lockfiles {
+            let path = self.project_root.join(lockfile);
+            if path.exists() {
+                if let Ok(content) = std::fs::read(&path) {
+                    let mut hasher = Sha256::new();
+                    hasher.update(&content);
+                    return hex::encode(hasher.finalize());
+                }
+            }
+        }
+
+        String::new()
+    }
+
+    fn compute_config_hash(&self) -> String {
+        let package_json_path = self.project_root.join("fe/package.json");
+        if let Ok(content) = std::fs::read(&package_json_path) {
+            let mut hasher = Sha256::new();
+            hasher.update(&content);
+            return hex::encode(hasher.finalize());
+        }
+        String::new()
+    }
+
+    fn should_rebuild(&self) -> bool {
+        let metadata = match self.load_metadata() {
+            Some(m) => m,
+            None => return true,
+        };
+
+        let current_lockfile_hash = self.compute_lockfile_hash();
+        let current_config_hash = self.compute_config_hash();
+
+        if metadata.lockfile_hash != current_lockfile_hash {
+            tracing::info!("[deps] Lockfile changed, rebuilding cache");
+            return true;
+        }
+
+        if metadata.config_hash != current_config_hash {
+            tracing::info!("[deps] Config changed, rebuilding cache");
+            return true;
+        }
+
+        for (_, bundled_path) in &metadata.entries {
+            let file_path = self.cache_dir.join(
+                bundled_path
+                    .strip_prefix("/.forte/deps/")
+                    .unwrap_or(bundled_path),
+            );
+            if !file_path.exists() {
+                tracing::info!("[deps] Cached file missing: {:?}, rebuilding", file_path);
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -275,6 +441,394 @@ fn get_package_name(specifier: &str) -> String {
         .to_string()
 }
 
+fn scan_imports_ast(code: &str, file_path: &Path) -> Vec<String> {
+    let source_type = SourceType::from_path(file_path).unwrap_or_default();
+    let allocator = Allocator::default();
+    let ret = Parser::new(&allocator, code, source_type).parse();
+
+    if ret.panicked {
+        tracing::warn!("Failed to parse {:?}, skipping", file_path);
+        return Vec::new();
+    }
+
+    let mut imports = Vec::new();
+    collect_imports_from_program(&ret.program, &mut imports);
+    imports
+}
+
+fn collect_imports_from_program(program: &Program, imports: &mut Vec<String>) {
+    for stmt in &program.body {
+        match stmt {
+            Statement::ImportDeclaration(decl) => {
+                imports.push(decl.source.value.to_string());
+            }
+            Statement::ExportNamedDeclaration(decl) => {
+                if let Some(source) = &decl.source {
+                    imports.push(source.value.to_string());
+                }
+            }
+            Statement::ExportAllDeclaration(decl) => {
+                imports.push(decl.source.value.to_string());
+            }
+            _ => {}
+        }
+        collect_imports_from_statement(stmt, imports);
+    }
+}
+
+fn collect_imports_from_statement(stmt: &Statement, imports: &mut Vec<String>) {
+    match stmt {
+        Statement::BlockStatement(block) => {
+            for s in &block.body {
+                collect_imports_from_statement(s, imports);
+            }
+        }
+        Statement::ExpressionStatement(expr_stmt) => {
+            collect_imports_from_expression(&expr_stmt.expression, imports);
+        }
+        Statement::IfStatement(if_stmt) => {
+            collect_imports_from_expression(&if_stmt.test, imports);
+            collect_imports_from_statement(&if_stmt.consequent, imports);
+            if let Some(alt) = &if_stmt.alternate {
+                collect_imports_from_statement(alt, imports);
+            }
+        }
+        Statement::WhileStatement(while_stmt) => {
+            collect_imports_from_expression(&while_stmt.test, imports);
+            collect_imports_from_statement(&while_stmt.body, imports);
+        }
+        Statement::DoWhileStatement(do_while) => {
+            collect_imports_from_statement(&do_while.body, imports);
+            collect_imports_from_expression(&do_while.test, imports);
+        }
+        Statement::ForStatement(for_stmt) => {
+            if let Some(init) = &for_stmt.init {
+                match init {
+                    ForStatementInit::VariableDeclaration(decl) => {
+                        for var_decl in &decl.declarations {
+                            if let Some(init) = &var_decl.init {
+                                collect_imports_from_expression(init, imports);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(test) = &for_stmt.test {
+                collect_imports_from_expression(test, imports);
+            }
+            if let Some(update) = &for_stmt.update {
+                collect_imports_from_expression(update, imports);
+            }
+            collect_imports_from_statement(&for_stmt.body, imports);
+        }
+        Statement::ForInStatement(for_in) => {
+            collect_imports_from_expression(&for_in.right, imports);
+            collect_imports_from_statement(&for_in.body, imports);
+        }
+        Statement::ForOfStatement(for_of) => {
+            collect_imports_from_expression(&for_of.right, imports);
+            collect_imports_from_statement(&for_of.body, imports);
+        }
+        Statement::ReturnStatement(ret) => {
+            if let Some(arg) = &ret.argument {
+                collect_imports_from_expression(arg, imports);
+            }
+        }
+        Statement::SwitchStatement(switch) => {
+            collect_imports_from_expression(&switch.discriminant, imports);
+            for case in &switch.cases {
+                if let Some(test) = &case.test {
+                    collect_imports_from_expression(test, imports);
+                }
+                for s in &case.consequent {
+                    collect_imports_from_statement(s, imports);
+                }
+            }
+        }
+        Statement::TryStatement(try_stmt) => {
+            for s in &try_stmt.block.body {
+                collect_imports_from_statement(s, imports);
+            }
+            if let Some(handler) = &try_stmt.handler {
+                for s in &handler.body.body {
+                    collect_imports_from_statement(s, imports);
+                }
+            }
+            if let Some(finalizer) = &try_stmt.finalizer {
+                for s in &finalizer.body {
+                    collect_imports_from_statement(s, imports);
+                }
+            }
+        }
+        Statement::ThrowStatement(throw) => {
+            collect_imports_from_expression(&throw.argument, imports);
+        }
+        Statement::VariableDeclaration(var_decl) => {
+            for decl in &var_decl.declarations {
+                if let Some(init) = &decl.init {
+                    collect_imports_from_expression(init, imports);
+                }
+            }
+        }
+        Statement::FunctionDeclaration(func) => {
+            if let Some(body) = &func.body {
+                for s in &body.statements {
+                    collect_imports_from_statement(s, imports);
+                }
+            }
+        }
+        Statement::ClassDeclaration(class) => {
+            collect_imports_from_class_elements(&class.body.body, imports);
+        }
+        Statement::ExportDefaultDeclaration(export_default) => {
+            match &export_default.declaration {
+                oxc_ast::ast::ExportDefaultDeclarationKind::FunctionDeclaration(func) => {
+                    if let Some(body) = &func.body {
+                        for s in &body.statements {
+                            collect_imports_from_statement(s, imports);
+                        }
+                    }
+                }
+                oxc_ast::ast::ExportDefaultDeclarationKind::ClassDeclaration(class) => {
+                    collect_imports_from_class_elements(&class.body.body, imports);
+                }
+                _ => {}
+            }
+        }
+        Statement::ExportNamedDeclaration(export_named) => {
+            if let Some(decl) = &export_named.declaration {
+                match decl {
+                    Declaration::FunctionDeclaration(func) => {
+                        if let Some(body) = &func.body {
+                            for s in &body.statements {
+                                collect_imports_from_statement(s, imports);
+                            }
+                        }
+                    }
+                    Declaration::ClassDeclaration(class) => {
+                        collect_imports_from_class_elements(&class.body.body, imports);
+                    }
+                    Declaration::VariableDeclaration(var_decl) => {
+                        for decl in &var_decl.declarations {
+                            if let Some(init) = &decl.init {
+                                collect_imports_from_expression(init, imports);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_imports_from_expression(expr: &Expression, imports: &mut Vec<String>) {
+    match expr {
+        Expression::ImportExpression(import_expr) => {
+            if let Expression::StringLiteral(lit) = &import_expr.source {
+                imports.push(lit.value.to_string());
+            }
+        }
+        Expression::CallExpression(call) => {
+            collect_imports_from_call_expression(call, imports);
+        }
+        Expression::ArrowFunctionExpression(arrow) => {
+            if arrow.expression {
+                if let Some(stmt) = arrow.body.statements.first() {
+                    if let Statement::ExpressionStatement(expr_stmt) = stmt {
+                        collect_imports_from_expression(&expr_stmt.expression, imports);
+                    }
+                }
+            } else {
+                for s in &arrow.body.statements {
+                    collect_imports_from_statement(s, imports);
+                }
+            }
+        }
+        Expression::FunctionExpression(func) => {
+            if let Some(body) = &func.body {
+                for s in &body.statements {
+                    collect_imports_from_statement(s, imports);
+                }
+            }
+        }
+        Expression::ConditionalExpression(cond) => {
+            collect_imports_from_expression(&cond.test, imports);
+            collect_imports_from_expression(&cond.consequent, imports);
+            collect_imports_from_expression(&cond.alternate, imports);
+        }
+        Expression::SequenceExpression(seq) => {
+            for e in &seq.expressions {
+                collect_imports_from_expression(e, imports);
+            }
+        }
+        Expression::LogicalExpression(logical) => {
+            collect_imports_from_expression(&logical.left, imports);
+            collect_imports_from_expression(&logical.right, imports);
+        }
+        Expression::BinaryExpression(binary) => {
+            collect_imports_from_expression(&binary.left, imports);
+            collect_imports_from_expression(&binary.right, imports);
+        }
+        Expression::UnaryExpression(unary) => {
+            collect_imports_from_expression(&unary.argument, imports);
+        }
+        Expression::AssignmentExpression(assign) => {
+            collect_imports_from_expression(&assign.right, imports);
+        }
+        Expression::ArrayExpression(arr) => {
+            for element in &arr.elements {
+                match element {
+                    ArrayExpressionElement::SpreadElement(spread) => {
+                        collect_imports_from_expression(&spread.argument, imports);
+                    }
+                    _ => {
+                        if let Some(e) = element.as_expression() {
+                            collect_imports_from_expression(e, imports);
+                        }
+                    }
+                }
+            }
+        }
+        Expression::ObjectExpression(obj) => {
+            for prop in &obj.properties {
+                match prop {
+                    ObjectPropertyKind::ObjectProperty(p) => {
+                        collect_imports_from_expression(&p.value, imports);
+                    }
+                    ObjectPropertyKind::SpreadProperty(spread) => {
+                        collect_imports_from_expression(&spread.argument, imports);
+                    }
+                }
+            }
+        }
+        Expression::ComputedMemberExpression(computed) => {
+            collect_imports_from_expression(&computed.object, imports);
+            collect_imports_from_expression(&computed.expression, imports);
+        }
+        Expression::StaticMemberExpression(static_member) => {
+            collect_imports_from_expression(&static_member.object, imports);
+        }
+        Expression::PrivateFieldExpression(private) => {
+            collect_imports_from_expression(&private.object, imports);
+        }
+        Expression::AwaitExpression(await_expr) => {
+            collect_imports_from_expression(&await_expr.argument, imports);
+        }
+        Expression::YieldExpression(yield_expr) => {
+            if let Some(arg) = &yield_expr.argument {
+                collect_imports_from_expression(arg, imports);
+            }
+        }
+        Expression::ParenthesizedExpression(paren) => {
+            collect_imports_from_expression(&paren.expression, imports);
+        }
+        Expression::NewExpression(new_expr) => {
+            collect_imports_from_expression(&new_expr.callee, imports);
+            for arg in &new_expr.arguments {
+                if let Some(e) = arg.as_expression() {
+                    collect_imports_from_expression(e, imports);
+                }
+            }
+        }
+        Expression::TaggedTemplateExpression(tagged) => {
+            collect_imports_from_expression(&tagged.tag, imports);
+            for expr in &tagged.quasi.expressions {
+                collect_imports_from_expression(expr, imports);
+            }
+        }
+        Expression::TemplateLiteral(template) => {
+            for expr in &template.expressions {
+                collect_imports_from_expression(expr, imports);
+            }
+        }
+        Expression::ChainExpression(chain) => {
+            match &chain.expression {
+                ChainElement::CallExpression(call) => {
+                    collect_imports_from_call_expression(call, imports);
+                }
+                ChainElement::TSNonNullExpression(ts_non_null) => {
+                    collect_imports_from_expression(&ts_non_null.expression, imports);
+                }
+                ChainElement::ComputedMemberExpression(computed) => {
+                    collect_imports_from_expression(&computed.object, imports);
+                    collect_imports_from_expression(&computed.expression, imports);
+                }
+                ChainElement::StaticMemberExpression(static_member) => {
+                    collect_imports_from_expression(&static_member.object, imports);
+                }
+                ChainElement::PrivateFieldExpression(private) => {
+                    collect_imports_from_expression(&private.object, imports);
+                }
+            }
+        }
+        Expression::ClassExpression(class) => {
+            collect_imports_from_class_elements(&class.body.body, imports);
+        }
+        Expression::TSAsExpression(ts_as) => {
+            collect_imports_from_expression(&ts_as.expression, imports);
+        }
+        Expression::TSSatisfiesExpression(ts_satisfies) => {
+            collect_imports_from_expression(&ts_satisfies.expression, imports);
+        }
+        Expression::TSNonNullExpression(ts_non_null) => {
+            collect_imports_from_expression(&ts_non_null.expression, imports);
+        }
+        Expression::TSTypeAssertion(ts_type) => {
+            collect_imports_from_expression(&ts_type.expression, imports);
+        }
+        _ => {}
+    }
+}
+
+fn collect_imports_from_call_expression(call: &CallExpression, imports: &mut Vec<String>) {
+    if let Expression::Identifier(ident) = &call.callee {
+        if ident.name == "require" {
+            if let Some(arg) = call.arguments.first() {
+                if let Some(expr) = arg.as_expression() {
+                    if let Expression::StringLiteral(lit) = expr {
+                        imports.push(lit.value.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    collect_imports_from_expression(&call.callee, imports);
+    for arg in &call.arguments {
+        if let Some(e) = arg.as_expression() {
+            collect_imports_from_expression(e, imports);
+        }
+    }
+}
+
+fn collect_imports_from_class_elements(elements: &oxc_allocator::Vec<ClassElement>, imports: &mut Vec<String>) {
+    for element in elements {
+        match element {
+            ClassElement::MethodDefinition(method) => {
+                if let Some(body) = &method.value.body {
+                    for s in &body.statements {
+                        collect_imports_from_statement(s, imports);
+                    }
+                }
+            }
+            ClassElement::PropertyDefinition(prop) => {
+                if let Some(value) = &prop.value {
+                    collect_imports_from_expression(value, imports);
+                }
+            }
+            ClassElement::StaticBlock(block) => {
+                for s in &block.body {
+                    collect_imports_from_statement(s, imports);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,5 +846,108 @@ mod tests {
         let hash2 = compute_short_hash("react-dom");
         assert_ne!(hash1, hash2);
         assert_eq!(hash1.len(), 8);
+    }
+
+    #[test]
+    fn test_scan_imports_ast_basic() {
+        let code = r#"
+            import React from 'react';
+            import { useState } from 'react';
+            import * as lodash from 'lodash';
+        "#;
+        let path = std::path::Path::new("test.tsx");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"react".to_string()));
+        assert!(imports.contains(&"lodash".to_string()));
+    }
+
+    #[test]
+    fn test_scan_imports_ast_export_from() {
+        let code = r#"
+            export { foo } from 'some-module';
+            export * from 'another-module';
+        "#;
+        let path = std::path::Path::new("test.ts");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"some-module".to_string()));
+        assert!(imports.contains(&"another-module".to_string()));
+    }
+
+    #[test]
+    fn test_scan_imports_ast_dynamic_import() {
+        let code = r#"
+            const module = await import('dynamic-module');
+            import('another-dynamic').then(m => m.default);
+        "#;
+        let path = std::path::Path::new("test.ts");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"dynamic-module".to_string()));
+        assert!(imports.contains(&"another-dynamic".to_string()));
+    }
+
+    #[test]
+    fn test_scan_imports_ast_require() {
+        let code = r#"
+            const fs = require('fs');
+            const path = require('path');
+        "#;
+        let path = std::path::Path::new("test.js");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"fs".to_string()));
+        assert!(imports.contains(&"path".to_string()));
+    }
+
+    #[test]
+    fn test_scan_imports_ast_ignores_comments() {
+        let code = r#"
+            // import fake from 'fake-module';
+            /* import another from 'another-fake'; */
+            import real from 'real-module';
+        "#;
+        let path = std::path::Path::new("test.ts");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"real-module".to_string()));
+        assert!(!imports.contains(&"fake-module".to_string()));
+        assert!(!imports.contains(&"another-fake".to_string()));
+    }
+
+    #[test]
+    fn test_scan_imports_ast_ignores_string_content() {
+        let code = r#"
+            const str = "import fake from 'fake-module'";
+            const template = `import another from 'template-fake'`;
+            import real from 'real-module';
+        "#;
+        let path = std::path::Path::new("test.ts");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"real-module".to_string()));
+        assert!(!imports.contains(&"fake-module".to_string()));
+        assert!(!imports.contains(&"template-fake".to_string()));
+    }
+
+    #[test]
+    fn test_scan_imports_ast_nested_function() {
+        let code = r#"
+            function outer() {
+                const module = await import('nested-dynamic');
+                return module;
+            }
+        "#;
+        let path = std::path::Path::new("test.ts");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"nested-dynamic".to_string()));
+    }
+
+    #[test]
+    fn test_scan_imports_ast_arrow_function() {
+        let code = r#"
+            const loadModule = async () => {
+                const m = await import('arrow-dynamic');
+                return m;
+            };
+        "#;
+        let path = std::path::Path::new("test.ts");
+        let imports = scan_imports_ast(code, path);
+        assert!(imports.contains(&"arrow-dynamic".to_string()));
     }
 }
