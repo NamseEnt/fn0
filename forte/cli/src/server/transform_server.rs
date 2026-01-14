@@ -10,7 +10,7 @@ use bytes::Bytes;
 use http_body_util::Full;
 use http_body_util::combinators::BoxBody;
 use hyper::{Response, StatusCode};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -22,6 +22,7 @@ pub struct TransformServer {
     project_root: PathBuf,
     fe_dir: PathBuf,
     cache_dir: PathBuf,
+    env_vars: HashMap<String, String>,
 }
 
 impl TransformServer {
@@ -35,6 +36,7 @@ impl TransformServer {
         let module_graph = SharedModuleGraph::new(project_root);
         let fe_dir = project_root.join("fe");
         let cache_dir = project_root.join("fe/.forte");
+        let env_vars = load_env_vars(project_root);
 
         Self {
             pipeline,
@@ -44,6 +46,7 @@ impl TransformServer {
             project_root: project_root.to_path_buf(),
             fe_dir,
             cache_dir,
+            env_vars,
         }
     }
 
@@ -154,6 +157,7 @@ impl TransformServer {
             .unwrap_or(&file_path);
         let code = rewriter.rewrite(&result.code, relative_path, timestamp);
         let code = rewrite_css_imports(&code);
+        let code = replace_env_vars(&code, &self.env_vars);
 
         let code = if result.has_react_components {
             inject_react_refresh_code(&code, &module_id)
@@ -587,6 +591,45 @@ fn rewrite_imports(
                 offset += replacement.len() as i64 - full_match.len() as i64;
             }
         }
+    }
+
+    result
+}
+
+fn load_env_vars(project_root: &Path) -> HashMap<String, String> {
+    let mut env_vars = HashMap::new();
+    let env_path = project_root.join(".env");
+
+    if let Ok(content) = std::fs::read_to_string(&env_path) {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((key, value)) = line.split_once('=') {
+                let key = key.trim();
+                let value = value.trim();
+                if key.starts_with("PUBLIC_") {
+                    env_vars.insert(key.to_string(), value.to_string());
+                }
+            }
+        }
+    }
+
+    // Also add standard env vars
+    env_vars.insert("DEV".to_string(), "true".to_string());
+    env_vars.insert("SSR".to_string(), "false".to_string());
+
+    env_vars
+}
+
+fn replace_env_vars(code: &str, env_vars: &HashMap<String, String>) -> String {
+    let mut result = code.to_string();
+
+    for (key, value) in env_vars {
+        let pattern = format!("import.meta.env.{}", key);
+        let replacement = format!("\"{}\"", value);
+        result = result.replace(&pattern, &replacement);
     }
 
     result
