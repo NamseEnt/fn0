@@ -8,10 +8,147 @@ pub struct ImportRewriter {
     src_base: String,
 }
 
+fn strip_json_comments(content: &str) -> String {
+    let mut result = String::with_capacity(content.len());
+    let mut chars = content.chars().peekable();
+    let mut in_string = false;
+    let mut escape_next = false;
+
+    while let Some(c) = chars.next() {
+        if escape_next {
+            result.push(c);
+            escape_next = false;
+            continue;
+        }
+
+        if c == '\\' && in_string {
+            result.push(c);
+            escape_next = true;
+            continue;
+        }
+
+        if c == '"' {
+            in_string = !in_string;
+            result.push(c);
+            continue;
+        }
+
+        if !in_string && c == '/' {
+            if let Some(&next) = chars.peek() {
+                if next == '/' {
+                    chars.next();
+                    while let Some(&ch) = chars.peek() {
+                        if ch == '\n' {
+                            break;
+                        }
+                        chars.next();
+                    }
+                    continue;
+                } else if next == '*' {
+                    chars.next();
+                    while let Some(ch) = chars.next() {
+                        if ch == '*' {
+                            if let Some(&'/') = chars.peek() {
+                                chars.next();
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+
+        result.push(c);
+    }
+
+    result
+}
+
+pub fn load_aliases_from_tsconfig(project_root: &Path) -> HashMap<String, String> {
+    let tsconfig_path = project_root.join("fe/tsconfig.json");
+
+    let content = match std::fs::read_to_string(&tsconfig_path) {
+        Ok(c) => c,
+        Err(_) => return HashMap::new(),
+    };
+
+    let stripped = strip_json_comments(&content);
+
+    let json: serde_json::Value = match serde_json::from_str(&stripped) {
+        Ok(v) => v,
+        Err(_) => return HashMap::new(),
+    };
+
+    let mut aliases = HashMap::new();
+
+    let compiler_options = match json.get("compilerOptions") {
+        Some(co) => co,
+        None => return aliases,
+    };
+
+    let base_url = compiler_options
+        .get("baseUrl")
+        .and_then(|v| v.as_str())
+        .unwrap_or(".");
+
+    let paths = match compiler_options.get("paths") {
+        Some(p) => p,
+        None => return aliases,
+    };
+
+    let paths_obj = match paths.as_object() {
+        Some(o) => o,
+        None => return aliases,
+    };
+
+    for (alias_pattern, targets) in paths_obj {
+        let target_array = match targets.as_array() {
+            Some(a) => a,
+            None => continue,
+        };
+
+        if target_array.is_empty() {
+            continue;
+        }
+
+        let first_target = match target_array[0].as_str() {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let alias_key = alias_pattern.trim_end_matches("/*");
+
+        let mut target_path = first_target.trim_end_matches("/*").to_string();
+
+        if target_path.starts_with("./") {
+            target_path = target_path[2..].to_string();
+        }
+
+        if base_url == "." {
+            target_path = format!("/{}", target_path);
+        } else {
+            let base = base_url.trim_start_matches("./").trim_end_matches('/');
+            target_path = format!("/{}/{}", base, target_path);
+        }
+
+        aliases.insert(alias_key.to_string(), target_path);
+    }
+
+    aliases
+}
+
 impl ImportRewriter {
-    pub fn new(dep_map: DependencyMap) -> Self {
-        let mut aliases = HashMap::new();
-        aliases.insert("@".to_string(), "/src".to_string());
+    pub fn new(dep_map: DependencyMap, project_root: Option<&Path>) -> Self {
+        let mut aliases = if let Some(root) = project_root {
+            load_aliases_from_tsconfig(root)
+        } else {
+            HashMap::new()
+        };
+
+        if aliases.is_empty() {
+            aliases.insert("@".to_string(), "/src".to_string());
+        }
 
         Self {
             dep_map,
@@ -185,7 +322,7 @@ pub fn rewrite_imports(
 ) -> String {
     let mut dep_map = DependencyMap::default();
     dep_map.entries = dep_entries.clone();
-    let rewriter = ImportRewriter::new(dep_map);
+    let rewriter = ImportRewriter::new(dep_map, None);
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
@@ -224,7 +361,7 @@ mod tests {
             .entries
             .insert("react".to_string(), "/.forte/deps/react-abc.js".to_string());
 
-        let rewriter = ImportRewriter::new(dep_map);
+        let rewriter = ImportRewriter::new(dep_map, None);
         let code = r#"import React from "react";
 import { useState } from "react";
 import { Button } from "./Button";
@@ -251,7 +388,7 @@ import { utils } from "@/lib/utils";"#;
             "/.forte/deps/jotai__vanilla-ghi.js".to_string(),
         );
 
-        let rewriter = ImportRewriter::new(dep_map);
+        let rewriter = ImportRewriter::new(dep_map, None);
         let code = r#"import { createRoot } from "react-dom/client";
 import { atom } from "jotai/vanilla";"#;
 
@@ -273,7 +410,7 @@ import { atom } from "jotai/vanilla";"#;
             "/.forte/deps/tanstack__react-query__devtools-def.js".to_string(),
         );
 
-        let rewriter = ImportRewriter::new(dep_map);
+        let rewriter = ImportRewriter::new(dep_map, None);
         let code = r#"import { useQuery } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query/devtools";"#;
 
@@ -281,5 +418,89 @@ import { ReactQueryDevtools } from "@tanstack/react-query/devtools";"#;
 
         assert!(result.contains("/.forte/deps/tanstack__react-query-abc.js"));
         assert!(result.contains("/.forte/deps/tanstack__react-query__devtools-def.js"));
+    }
+
+    #[test]
+    fn test_strip_json_comments() {
+        let json_with_comments = r#"{
+  // single line comment
+  "compilerOptions": {
+    "target": "ES2022", /* inline comment */
+    "baseUrl": ".",
+    /*
+     * multi-line comment
+     */
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}"#;
+
+        let stripped = strip_json_comments(json_with_comments);
+        let parsed: serde_json::Value = serde_json::from_str(&stripped).unwrap();
+
+        assert_eq!(
+            parsed["compilerOptions"]["target"].as_str().unwrap(),
+            "ES2022"
+        );
+        assert!(parsed["compilerOptions"]["paths"]["@/*"].is_array());
+    }
+
+    #[test]
+    fn test_load_aliases_from_tsconfig() {
+        use std::io::Write;
+        let temp_dir = std::env::temp_dir().join(format!("forte_test_{}", std::process::id()));
+        let fe_dir = temp_dir.join("fe");
+        std::fs::create_dir_all(&fe_dir).unwrap();
+
+        let tsconfig = r#"{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@components/*": ["./src/components/*"],
+      "@utils/*": ["./src/lib/utils/*"]
+    }
+  }
+}"#;
+        let mut file = std::fs::File::create(fe_dir.join("tsconfig.json")).unwrap();
+        file.write_all(tsconfig.as_bytes()).unwrap();
+
+        let aliases = load_aliases_from_tsconfig(&temp_dir);
+
+        assert_eq!(aliases.get("@"), Some(&"/src".to_string()));
+        assert_eq!(aliases.get("@components"), Some(&"/src/components".to_string()));
+        assert_eq!(aliases.get("@utils"), Some(&"/src/lib/utils".to_string()));
+
+        std::fs::remove_dir_all(&temp_dir).unwrap();
+    }
+
+    #[test]
+    fn test_custom_alias_rewrite() {
+        let mut dep_map = DependencyMap::default();
+        dep_map
+            .entries
+            .insert("react".to_string(), "/.forte/deps/react-abc.js".to_string());
+
+        let mut aliases = HashMap::new();
+        aliases.insert("@".to_string(), "/src".to_string());
+        aliases.insert("@components".to_string(), "/src/components".to_string());
+        aliases.insert("@utils".to_string(), "/src/lib/utils".to_string());
+
+        let rewriter = ImportRewriter {
+            dep_map,
+            aliases,
+            src_base: "/src".to_string(),
+        };
+
+        let code = r#"import { Button } from "@components/Button";
+import { format } from "@utils/format";
+import { api } from "@/api";"#;
+
+        let result = rewriter.rewrite(code, Path::new("App.tsx"), 12345);
+
+        assert!(result.contains("/src/components/Button?t=12345"));
+        assert!(result.contains("/src/lib/utils/format?t=12345"));
+        assert!(result.contains("/src/api?t=12345"));
     }
 }
