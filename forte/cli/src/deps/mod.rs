@@ -12,6 +12,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+fn flatten_id(id: &str) -> String {
+    id.replace('/', "__").replace('@', "_")
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DependencyMap {
     pub entries: HashMap<String, String>,
@@ -76,6 +80,7 @@ impl DependencyPrebundler {
             }
         }
 
+        let mut packages_to_bundle: Vec<String> = Vec::new();
         for import_path in all_imports {
             if import_path.starts_with('.') || import_path.starts_with('/') {
                 continue;
@@ -88,24 +93,21 @@ impl DependencyPrebundler {
                 .map(|d| d.contains_key(&base_package_name))
                 .unwrap_or(false);
 
-            if !is_installed {
-                continue;
+            if is_installed {
+                packages_to_bundle.push(import_path);
             }
+        }
 
-            match self.bundle_dependency(&import_path) {
-                Ok((output_path, is_cjs)) => {
-                    let url_path = format!(
-                        "/.forte/deps/{}",
-                        output_path.file_name().unwrap().to_string_lossy()
-                    );
-                    self.dep_map.entries.insert(import_path.clone(), url_path);
-                    if is_cjs {
-                        self.dep_map.cjs_modules.insert(import_path.clone());
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to bundle {}: {}", import_path, e);
-                }
+        let bundle_results = self.bundle_all_dependencies(&packages_to_bundle)?;
+
+        for (package_name, (output_path, is_cjs)) in bundle_results {
+            let url_path = format!(
+                "/.forte/deps/bundled/{}",
+                output_path.file_name().unwrap().to_string_lossy()
+            );
+            self.dep_map.entries.insert(package_name.clone(), url_path);
+            if is_cjs {
+                self.dep_map.cjs_modules.insert(package_name);
             }
         }
 
@@ -164,6 +166,83 @@ impl DependencyPrebundler {
         Ok(())
     }
 
+    fn bundle_all_dependencies(
+        &self,
+        packages: &[String],
+    ) -> Result<HashMap<String, (PathBuf, bool)>> {
+        if packages.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let entries_dir = self.cache_dir.join("_entries");
+        std::fs::create_dir_all(&entries_dir)?;
+
+        let output_dir = self.cache_dir.join("bundled");
+        std::fs::create_dir_all(&output_dir)?;
+
+        let mut entry_paths: Vec<String> = Vec::new();
+        let mut package_to_flat_id: HashMap<String, String> = HashMap::new();
+
+        for package_name in packages {
+            let flat_id = flatten_id(package_name);
+            let entry_filename = format!("{}.js", flat_id);
+            let entry_path = entries_dir.join(&entry_filename);
+
+            let entry_content = format!(
+                r#"export * from "{}";
+import * as _mod from "{}";
+export default _mod.default ?? _mod;"#,
+                package_name, package_name
+            );
+            std::fs::write(&entry_path, &entry_content)?;
+
+            entry_paths.push(entry_path.to_str().unwrap().to_string());
+            package_to_flat_id.insert(package_name.clone(), flat_id);
+        }
+
+        let fe_dir = self.project_root.join("fe");
+
+        let mut args = vec!["rolldown".to_string()];
+        args.extend(entry_paths.iter().cloned());
+        args.extend([
+            "-d".to_string(),
+            output_dir.to_str().unwrap().to_string(),
+            "-f".to_string(),
+            "esm".to_string(),
+            "--platform".to_string(),
+            "browser".to_string(),
+        ]);
+
+        let result = Command::new("npx")
+            .args(&args)
+            .current_dir(&fe_dir)
+            .output()
+            .context("Failed to run rolldown for unified bundling")?;
+
+        let _ = std::fs::remove_dir_all(&entries_dir);
+
+        if !result.status.success() {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            anyhow::bail!("rolldown unified bundling failed: {}", stderr.trim());
+        }
+
+        let mut results: HashMap<String, (PathBuf, bool)> = HashMap::new();
+
+        for (package_name, flat_id) in &package_to_flat_id {
+            let output_path = output_dir.join(format!("{}.js", flat_id));
+            if output_path.exists() {
+                let is_cjs = self.detect_cjs_module(&output_path);
+                results.insert(package_name.clone(), (output_path, is_cjs));
+            }
+        }
+
+        println!(
+            "[deps] Pre-bundled {} dependencies (unified)",
+            results.len()
+        );
+        Ok(results)
+    }
+
     fn bundle_react_refresh_runtime(&self) -> Result<PathBuf> {
         let output_path = self.cache_dir.join("react-refresh-runtime.js");
 
@@ -172,9 +251,9 @@ impl DependencyPrebundler {
         }
 
         let entry_content = r#"
-import RefreshRuntime from 'react-refresh/runtime';
-export default RefreshRuntime;
 export * from 'react-refresh/runtime';
+import * as _mod from 'react-refresh/runtime';
+export default _mod.default ?? _mod;
 "#;
         let entry_path = self.cache_dir.join("_entry_react_refresh.js");
         std::fs::write(&entry_path, entry_content)?;
@@ -226,17 +305,20 @@ export default _mod.default ?? _mod;"#,
         std::fs::write(&entry_path, &entry_content)?;
 
         let fe_dir = self.project_root.join("fe");
+
+        let args = vec![
+            "rolldown".to_string(),
+            entry_path.to_str().unwrap().to_string(),
+            "-o".to_string(),
+            output_path.to_str().unwrap().to_string(),
+            "-f".to_string(),
+            "esm".to_string(),
+            "--platform".to_string(),
+            "browser".to_string(),
+        ];
+
         let result = Command::new("npx")
-            .args([
-                "rolldown",
-                entry_path.to_str().unwrap(),
-                "-o",
-                output_path.to_str().unwrap(),
-                "-f",
-                "esm",
-                "--platform",
-                "browser",
-            ])
+            .args(&args)
             .current_dir(&fe_dir)
             .output()
             .with_context(|| format!("Failed to run rolldown for {}", package_name))?;
