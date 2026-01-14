@@ -1,26 +1,34 @@
-use crate::deps::DependencyMap;
+use crate::deps::DependencyPrebundler;
 use crate::module_graph::SharedModuleGraph;
+use crate::server::HmrBroadcaster;
 use crate::transform::{
     TransformConfig, TransformPipeline, get_react_refresh_preamble, inject_hmr_code,
-    inject_react_refresh_code, rewrite_imports,
+    inject_react_refresh_code,
 };
 use anyhow::Result;
 use bytes::Bytes;
 use http_body_util::Full;
 use http_body_util::combinators::BoxBody;
 use hyper::{Response, StatusCode};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 pub struct TransformServer {
     pipeline: TransformPipeline,
     module_graph: SharedModuleGraph,
-    dep_map: DependencyMap,
+    prebundler: Arc<Mutex<DependencyPrebundler>>,
+    hmr: HmrBroadcaster,
     fe_dir: PathBuf,
     cache_dir: PathBuf,
 }
 
 impl TransformServer {
-    pub fn new(project_root: &Path, dep_map: DependencyMap) -> Self {
+    pub fn new(
+        project_root: &Path,
+        prebundler: Arc<Mutex<DependencyPrebundler>>,
+        hmr: HmrBroadcaster,
+    ) -> Self {
         let config = TransformConfig::new(project_root);
         let pipeline = TransformPipeline::new(config);
         let module_graph = SharedModuleGraph::new(project_root);
@@ -30,7 +38,8 @@ impl TransformServer {
         Self {
             pipeline,
             module_graph,
-            dep_map,
+            prebundler,
+            hmr,
             fe_dir,
             cache_dir,
         }
@@ -98,7 +107,41 @@ impl TransformServer {
         self.module_graph
             .update_module(&module_id, &file_path, imports, &result.hash);
 
-        let code = rewrite_imports(&result.code, &self.dep_map.entries);
+        let bare_imports = extract_bare_imports(&result.code);
+        let mut new_deps_bundled = false;
+
+        {
+            let mut prebundler = self.prebundler.lock().unwrap();
+
+            for import_path in &bare_imports {
+                if !prebundler.get_dep_map().entries.contains_key(import_path) {
+                    match prebundler.register_missing_import(import_path) {
+                        Ok(Some(_url)) => {
+                            new_deps_bundled = true;
+                            tracing::info!(
+                                "[deps] Dynamically bundled new dependency: {}",
+                                import_path
+                            );
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            tracing::warn!("Failed to bundle {}: {}", import_path, e);
+                        }
+                    }
+                }
+            }
+        }
+
+        if new_deps_bundled {
+            self.hmr.send_reload();
+        }
+
+        let dep_entries = {
+            let prebundler = self.prebundler.lock().unwrap();
+            prebundler.get_dep_map().entries.clone()
+        };
+
+        let code = rewrite_imports(&result.code, &dep_entries);
         let code = rewrite_css_imports(&code);
 
         let code = if result.has_react_components {
@@ -118,7 +161,11 @@ impl TransformServer {
         &self,
         path: &str,
     ) -> Result<Response<BoxBody<Bytes, anyhow::Error>>> {
-        let has_import_query = path.contains("?import");
+        let has_import_query = path
+            .split('?')
+            .nth(1)
+            .map(|q| q.split('&').any(|p| p == "import" || p.starts_with("import=")))
+            .unwrap_or(false);
         let clean_path = path.split('?').next().unwrap_or(path);
 
         let file_path = if clean_path == "/src/styles/globals.css" {
@@ -304,6 +351,89 @@ fn full_body(s: impl Into<String>) -> BoxBody<Bytes, anyhow::Error> {
 fn full_body_bytes(bytes: Bytes) -> BoxBody<Bytes, anyhow::Error> {
     use http_body_util::BodyExt;
     Full::new(bytes).map_err(|e| anyhow::anyhow!("{e}")).boxed()
+}
+
+fn extract_bare_imports(code: &str) -> HashSet<String> {
+    let mut imports = HashSet::new();
+    let re = regex::Regex::new(
+        r#"(?:import|export)\s+.*?from\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|import\s+["']([^"']+)["']"#,
+    )
+    .unwrap();
+
+    for cap in re.captures_iter(code) {
+        let specifier = cap.get(1).or(cap.get(2)).or(cap.get(3));
+        if let Some(s) = specifier {
+            let import_path = s.as_str();
+            if !import_path.starts_with('.') && !import_path.starts_with('/') {
+                imports.insert(import_path.to_string());
+            }
+        }
+    }
+
+    imports
+}
+
+fn get_package_name(specifier: &str) -> String {
+    if specifier.starts_with('@') {
+        let parts: Vec<&str> = specifier.splitn(3, '/').collect();
+        if parts.len() >= 2 {
+            return format!("{}/{}", parts[0], parts[1]);
+        }
+    }
+    specifier.split('/').next().unwrap_or(specifier).to_string()
+}
+
+fn rewrite_imports(
+    code: &str,
+    dep_entries: &std::collections::HashMap<String, String>,
+) -> String {
+    let patterns = [
+        (r#"from\s*["']([^"']+)["']"#, "from"),
+        (r#"import\s*\(\s*["']([^"']+)["']\s*\)"#, "dynamic"),
+        (r#"import\s+["']([^"']+)["']"#, "sideeffect"),
+    ];
+
+    let mut result = code.to_string();
+
+    for (pattern, kind) in patterns {
+        let re = regex::Regex::new(pattern).unwrap();
+        let mut offset: i64 = 0;
+
+        let current_code = result.clone();
+        let matches: Vec<_> = re.captures_iter(&current_code).collect();
+        for cap in matches {
+            let full_match = cap.get(0).unwrap();
+            let specifier = cap.get(1).unwrap().as_str();
+
+            if specifier.starts_with('.') || specifier.starts_with('/') {
+                continue;
+            }
+
+            let resolved = if let Some(url) = dep_entries.get(specifier) {
+                Some(url.clone())
+            } else {
+                let package_name = get_package_name(specifier);
+                dep_entries.get(&package_name).cloned()
+            };
+
+            if let Some(new_path) = resolved {
+                let replacement = match kind {
+                    "from" => format!(r#"from "{}""#, new_path),
+                    "dynamic" => format!(r#"import("{}")"#, new_path),
+                    "sideeffect" => format!(r#"import "{}""#, new_path),
+                    _ => continue,
+                };
+
+                let start = (full_match.start() as i64 + offset) as usize;
+                let end = (full_match.end() as i64 + offset) as usize;
+
+                result.replace_range(start..end, &replacement);
+                offset += replacement.len() as i64 - full_match.len() as i64;
+            }
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]

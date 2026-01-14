@@ -292,9 +292,10 @@ pub async fn run(options: DevOptions) -> Result<()> {
     build_css(&project_dir)?;
 
     println!("[deps] Pre-bundling dependencies...");
-    let prebundler = DependencyPrebundler::new(&project_dir);
+    let mut prebundler = DependencyPrebundler::new(&project_dir);
     let dep_map = prebundler.prebundle()?;
     println!("[deps] Pre-bundled {} dependencies", dep_map.entries.len());
+    let prebundler = std::sync::Arc::new(std::sync::Mutex::new(prebundler));
 
     println!("[ssr] Building SSR bundle...");
     let ssr_bundler = SsrBundler::new(&project_dir);
@@ -315,7 +316,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
         public_dir,
         project_root: project_dir.clone(),
         dev_mode: true,
-        dep_map,
+        prebundler,
     };
 
     let handle = server::run(config).await?;

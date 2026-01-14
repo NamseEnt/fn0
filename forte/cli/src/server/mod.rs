@@ -22,7 +22,8 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
 pub use transform_server::TransformServer;
 
-use crate::deps::DependencyMap;
+use crate::deps::DependencyPrebundler;
+use std::sync::Mutex;
 
 pub struct ServerConfig {
     pub port: u16,
@@ -31,7 +32,7 @@ pub struct ServerConfig {
     pub public_dir: PathBuf,
     pub project_root: PathBuf,
     pub dev_mode: bool,
-    pub dep_map: DependencyMap,
+    pub prebundler: Arc<Mutex<DependencyPrebundler>>,
 }
 
 pub struct ServerHandle {
@@ -51,7 +52,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let transform_server = if config.dev_mode {
         Some(Arc::new(TransformServer::new(
             &config.project_root,
-            config.dep_map.clone(),
+            config.prebundler.clone(),
+            hmr.clone(),
         )))
     } else {
         None
