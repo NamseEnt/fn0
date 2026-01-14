@@ -27,7 +27,7 @@ impl Default for DevOptions {
 }
 
 fn is_port_available(port: u16) -> bool {
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     TcpListener::bind(addr).is_ok()
 }
 

@@ -68,7 +68,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map));
     let public_dir = Arc::new(config.public_dir);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     println!("Forte dev server listening on http://{}", addr);
 
