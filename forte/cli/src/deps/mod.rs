@@ -950,4 +950,212 @@ mod tests {
         let imports = scan_imports_ast(code, path);
         assert!(imports.contains(&"arrow-dynamic".to_string()));
     }
+
+    #[test]
+    fn test_compute_lockfile_hash() {
+        let temp_dir = std::env::temp_dir().join("forte_test_lockfile_hash");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let lockfile_path = temp_dir.join("fe/package-lock.json");
+        std::fs::write(&lockfile_path, r#"{"lockfileVersion": 1}"#).unwrap();
+
+        let prebundler = DependencyPrebundler::new(&temp_dir);
+        let hash1 = prebundler.compute_lockfile_hash();
+
+        assert!(!hash1.is_empty());
+        assert_eq!(hash1.len(), 64);
+
+        std::fs::write(&lockfile_path, r#"{"lockfileVersion": 2}"#).unwrap();
+        let hash2 = prebundler.compute_lockfile_hash();
+
+        assert_ne!(hash1, hash2);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_compute_config_hash() {
+        let temp_dir = std::env::temp_dir().join("forte_test_config_hash");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let package_json_path = temp_dir.join("fe/package.json");
+        std::fs::write(&package_json_path, r#"{"name": "test", "version": "1.0.0"}"#).unwrap();
+
+        let prebundler = DependencyPrebundler::new(&temp_dir);
+        let hash1 = prebundler.compute_config_hash();
+
+        assert!(!hash1.is_empty());
+        assert_eq!(hash1.len(), 64);
+
+        std::fs::write(&package_json_path, r#"{"name": "test", "version": "2.0.0"}"#).unwrap();
+        let hash2 = prebundler.compute_config_hash();
+
+        assert_ne!(hash1, hash2);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_should_rebuild_no_metadata() {
+        let temp_dir = std::env::temp_dir().join("forte_test_no_metadata");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let prebundler = DependencyPrebundler::new(&temp_dir);
+        assert!(prebundler.should_rebuild());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_should_rebuild_lockfile_changed() {
+        let temp_dir = std::env::temp_dir().join("forte_test_lockfile_changed");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let lockfile_path = temp_dir.join("fe/package-lock.json");
+        let package_json_path = temp_dir.join("fe/package.json");
+
+        std::fs::write(&lockfile_path, r#"{"lockfileVersion": 1}"#).unwrap();
+        std::fs::write(&package_json_path, r#"{"name": "test"}"#).unwrap();
+
+        let prebundler = DependencyPrebundler::new(&temp_dir);
+
+        let metadata = CacheMetadata {
+            lockfile_hash: prebundler.compute_lockfile_hash(),
+            config_hash: prebundler.compute_config_hash(),
+            entries: HashMap::new(),
+        };
+        prebundler.save_metadata(&metadata).unwrap();
+
+        assert!(!prebundler.should_rebuild());
+
+        std::fs::write(&lockfile_path, r#"{"lockfileVersion": 2}"#).unwrap();
+        assert!(prebundler.should_rebuild());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_should_rebuild_cache_valid() {
+        let temp_dir = std::env::temp_dir().join("forte_test_cache_valid");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let lockfile_path = temp_dir.join("fe/package-lock.json");
+        let package_json_path = temp_dir.join("fe/package.json");
+
+        std::fs::write(&lockfile_path, r#"{"lockfileVersion": 1}"#).unwrap();
+        std::fs::write(&package_json_path, r#"{"name": "test"}"#).unwrap();
+
+        let prebundler = DependencyPrebundler::new(&temp_dir);
+
+        let metadata = CacheMetadata {
+            lockfile_hash: prebundler.compute_lockfile_hash(),
+            config_hash: prebundler.compute_config_hash(),
+            entries: HashMap::new(),
+        };
+        prebundler.save_metadata(&metadata).unwrap();
+
+        assert!(!prebundler.should_rebuild());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_cache_metadata_save_load() {
+        let temp_dir = std::env::temp_dir().join("forte_test_metadata_save_load");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let prebundler = DependencyPrebundler::new(&temp_dir);
+
+        let mut entries = HashMap::new();
+        entries.insert("react".to_string(), "/.forte/deps/react-abc123.js".to_string());
+        entries.insert("lodash".to_string(), "/.forte/deps/lodash-def456.js".to_string());
+
+        let original_metadata = CacheMetadata {
+            lockfile_hash: "abc123lockfile".to_string(),
+            config_hash: "def456config".to_string(),
+            entries,
+        };
+
+        prebundler.save_metadata(&original_metadata).unwrap();
+
+        let loaded_metadata = prebundler.load_metadata().expect("Failed to load metadata");
+
+        assert_eq!(loaded_metadata.lockfile_hash, original_metadata.lockfile_hash);
+        assert_eq!(loaded_metadata.config_hash, original_metadata.config_hash);
+        assert_eq!(loaded_metadata.entries.len(), original_metadata.entries.len());
+        assert_eq!(
+            loaded_metadata.entries.get("react"),
+            original_metadata.entries.get("react")
+        );
+        assert_eq!(
+            loaded_metadata.entries.get("lodash"),
+            original_metadata.entries.get("lodash")
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_register_missing_import_not_installed() {
+        let temp_dir = std::env::temp_dir().join("forte_test_not_installed");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let package_json_path = temp_dir.join("fe/package.json");
+        std::fs::write(
+            &package_json_path,
+            r#"{"name": "test", "dependencies": {"react": "^18.0.0"}}"#,
+        )
+        .unwrap();
+
+        let mut prebundler = DependencyPrebundler::new(&temp_dir);
+
+        let result = prebundler.register_missing_import("not-installed-package");
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_register_missing_import_already_bundled() {
+        let temp_dir = std::env::temp_dir().join("forte_test_already_bundled");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("fe/.forte/deps")).unwrap();
+
+        let package_json_path = temp_dir.join("fe/package.json");
+        std::fs::write(
+            &package_json_path,
+            r#"{"name": "test", "dependencies": {"react": "^18.0.0"}}"#,
+        )
+        .unwrap();
+
+        let mut prebundler = DependencyPrebundler::new(&temp_dir);
+
+        let existing_url = "/.forte/deps/react-abc123.js".to_string();
+        prebundler
+            .dep_map
+            .entries
+            .insert("react".to_string(), existing_url.clone());
+
+        let result = prebundler.register_missing_import("react");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(existing_url));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }
