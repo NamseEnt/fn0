@@ -2,7 +2,6 @@ mod cli;
 mod deps;
 mod module_graph;
 mod server;
-mod source_map_utils;
 mod ssr;
 mod transform;
 
