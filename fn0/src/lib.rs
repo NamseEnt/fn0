@@ -8,10 +8,11 @@ use bytes::Bytes;
 use deployment::*;
 pub use deployment::{CodeKind, DeploymentMap};
 use execute::*;
+pub use execute::EnvVars;
 use http_body_util::combinators::UnsyncBoxBody;
 use measure_cpu_time::SystemClock;
 use std::string::FromUtf8Error;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use wasmtime::Engine;
 use wasmtime_wasi_http::bindings::ProxyPre;
 
@@ -28,25 +29,32 @@ where
     js_cache: J,
     deployment_map: DeploymentMap,
     wasm_executor: WasmExecutor,
+    env_vars: EnvVars,
 }
 
 impl<J> Fn0<J>
 where
     J: AdaptCache<String, FromUtf8Error>,
 {
-    pub fn new<W>(wasm_proxy_cache: W, js_cache: J, deployment_map: DeploymentMap) -> Self
+    pub fn new<W>(wasm_proxy_cache: W, js_cache: J, deployment_map: DeploymentMap, env_vars: EnvVars) -> Self
     where
         W: AdaptCache<ProxyPre<ClientState<SystemClock>>, wasmtime::Error>,
     {
         Self {
             js_cache,
             deployment_map,
-            wasm_executor: WasmExecutor::new(wasm_proxy_cache, SystemClock),
+            wasm_executor: WasmExecutor::new(wasm_proxy_cache, SystemClock, env_vars.clone()),
+            env_vars,
         }
+    }
+
+    pub fn update_env(&self, new_vars: Vec<(String, String)>) {
+        self.wasm_executor.update_env(new_vars);
     }
     pub async fn run(
         &self,
         code_id: &str,
+        script_path: &str,
         request: Request,
         fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
@@ -63,7 +71,7 @@ where
                     })
                     .await
                     .map_err(|err| anyhow!("Failed to get JS code: {:?}", err))?;
-                let response = ski::run(&js_code, request, fetch_handler).await?;
+                let response = ski::run(&js_code, script_path, request, fetch_handler).await?;
                 Ok(response)
             }
         }

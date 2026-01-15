@@ -309,6 +309,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let frontend_path = ssr_bundler.output_path().to_string_lossy().to_string();
     let public_dir = project_dir.join("fe/public");
 
+    let env_vars = server::create_env_vars(&project_dir);
+
     let config = ServerConfig {
         port,
         backend_path,
@@ -317,6 +319,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
         project_root: project_dir.clone(),
         dev_mode: true,
         prebundler,
+        env_vars,
     };
 
     let handle = server::run(config).await?;
@@ -331,6 +334,7 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
 
     let rs_dir = project_dir.join("rs/src");
     let fe_src_dir = project_dir.join("fe/src");
+    let env_file = project_dir.join(".env");
 
     debouncer
         .watcher()
@@ -338,11 +342,17 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     debouncer
         .watcher()
         .watch(&fe_src_dir, RecursiveMode::Recursive)?;
+    if env_file.exists() {
+        debouncer
+            .watcher()
+            .watch(&env_file, RecursiveMode::NonRecursive)?;
+    }
 
-    println!("[watch] Watching for changes in rs/src and fe/src...");
+    println!("[watch] Watching for changes in rs/src, fe/src, and .env...");
 
     let mut known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
     let mut known_fe_mtimes = collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
+    let mut known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
 
     loop {
         match rx.recv() {
@@ -388,6 +398,22 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                         }
                     })
                     .collect();
+
+                let env_changed = events.iter().any(|e| e.path == env_file) && {
+                    let current_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
+                    match (current_mtime, known_env_mtime) {
+                        (Some(current), Some(known)) => current > known,
+                        (Some(_), None) => true,
+                        _ => false,
+                    }
+                };
+
+                if env_changed {
+                    known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
+                    let new_vars = server::load_env_file(project_dir);
+                    handle.fn0.update_env(new_vars);
+                    println!("[env] .env reloaded");
+                }
 
                 if !rs_changes.is_empty() {
                     let result = rebuild_backend(project_dir, &handle).await;

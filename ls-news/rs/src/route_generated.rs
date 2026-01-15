@@ -49,22 +49,17 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
     let path = parts.uri.path();
     let query = parts.uri.query().unwrap_or("");
     let mut cookie_jar = make_cookie_jar(&headers);
+    let Some(uri_authority) = parts.uri.authority() else {
+        return Ok(
+            Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("Missing authority in request URI"))
+                .unwrap(),
+        );
+    };
+    let uri_authority = uri_authority.as_str();
     if let Some(hook_name) = path.strip_prefix("/__forte_hook/") {
-        let Some(uri_authority) = parts.uri.authority() else {
-            return Ok(
-                Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("Missing authority in request URI"))
-                    .unwrap(),
-            );
-        };
-        return handle_hook(
-                hook_name,
-                uri_authority.as_str(),
-                &headers,
-                &mut cookie_jar,
-                body,
-            )
+        return handle_hook(hook_name, uri_authority, &headers, &mut cookie_jar, body)
             .await;
     }
     let query_params: HashMap<String, String> = query
@@ -107,13 +102,13 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
             code,
             state,
         };
-        match pages_api_auth_callback_github::handler(
-                headers,
-                &mut cookie_jar,
-                search_params,
-            )
-            .await
-        {
+        let req = ForteRequest {
+            uri_authority,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            body: (),
+        };
+        match pages_api_auth_callback_github::handler(req, search_params).await {
             Ok(props) => {
                 let stream = forte_json::to_stream(&props);
                 Ok(
@@ -136,10 +131,11 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                         ),
                     )
                 } else {
+                    eprintln!("Error at {}: {:?}", path, e);
                     Ok(
                         Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from(format!("Error: {:?}", e)))
+                            .body(Body::from("Internal Server Error"))
                             .unwrap(),
                     )
                 }
@@ -148,7 +144,13 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
     } else if path == "/" {
         let after: Option<String> = query_params.get("after").cloned();
         let search_params = pages_index::SearchParams { after };
-        match pages_index::handler(headers, &mut cookie_jar, search_params).await {
+        let req = ForteRequest {
+            uri_authority,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            body: (),
+        };
+        match pages_index::handler(req, search_params).await {
             Ok(props) => {
                 let stream = forte_json::to_stream(&props);
                 Ok(
@@ -171,10 +173,11 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                         ),
                     )
                 } else {
+                    eprintln!("Error at {}: {:?}", path, e);
                     Ok(
                         Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from(format!("Error: {:?}", e)))
+                            .body(Body::from("Internal Server Error"))
                             .unwrap(),
                     )
                 }
@@ -183,7 +186,13 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
     } else if path_segments.len() == 2usize && path_segments.first() == Some(&"post") {
         let id: String = path_segments[1usize].to_string();
         let path_params = pages_post__id_::PathParams { id };
-        match pages_post__id_::handler(headers, &mut cookie_jar, path_params).await {
+        let req = ForteRequest {
+            uri_authority,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            body: (),
+        };
+        match pages_post__id_::handler(req, path_params).await {
             Ok(props) => {
                 let stream = forte_json::to_stream(&props);
                 Ok(
@@ -206,17 +215,24 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                         ),
                     )
                 } else {
+                    eprintln!("Error at {}: {:?}", path, e);
                     Ok(
                         Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from(format!("Error: {:?}", e)))
+                            .body(Body::from("Internal Server Error"))
                             .unwrap(),
                     )
                 }
             }
         }
     } else if path == "/write" {
-        match pages_write::handler(headers, &mut cookie_jar).await {
+        let req = ForteRequest {
+            uri_authority,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            body: (),
+        };
+        match pages_write::handler(req).await {
             Ok(props) => {
                 let stream = forte_json::to_stream(&props);
                 Ok(
@@ -239,10 +255,11 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                         ),
                     )
                 } else {
+                    eprintln!("Error at {}: {:?}", path, e);
                     Ok(
                         Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from(format!("Error: {:?}", e)))
+                            .body(Body::from("Internal Server Error"))
                             .unwrap(),
                     )
                 }
@@ -269,7 +286,7 @@ async fn handle_hook(
         "me" => {
             let input: hooks_me::Input = serde_json::from_slice(body_bytes)
                 .map_err(|e| Error::msg(e.to_string()))?;
-            let req = HookRequest {
+            let req = ForteRequest {
                 uri_authority,
                 headers,
                 jar: cookie_jar,

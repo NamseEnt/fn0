@@ -231,6 +231,7 @@ export default _mod.default ?? _mod;"#,
         for (package_name, flat_id) in &package_to_flat_id {
             let output_path = output_dir.join(format!("{}.js", flat_id));
             if output_path.exists() {
+                self.patch_cjs_requires(&output_path, &package_to_flat_id)?;
                 let is_cjs = self.detect_cjs_module(&output_path);
                 results.insert(package_name.clone(), (output_path, is_cjs));
             }
@@ -241,6 +242,60 @@ export default _mod.default ?? _mod;"#,
             results.len()
         );
         Ok(results)
+    }
+
+    fn patch_cjs_requires(
+        &self,
+        bundled_path: &Path,
+        package_to_flat_id: &HashMap<String, String>,
+    ) -> Result<()> {
+        let content = std::fs::read_to_string(bundled_path)?;
+
+        if !content.contains("__require(") {
+            return Ok(());
+        }
+
+        let require_pattern = regex::Regex::new(r#"__require\("([^"]+)"\)"#).unwrap();
+
+        let mut patched = content.clone();
+        let mut imports_to_add: Vec<(String, String)> = Vec::new();
+
+        for cap in require_pattern.captures_iter(&content) {
+            let full_match = cap.get(0).unwrap().as_str();
+            let pkg_name = cap.get(1).unwrap().as_str();
+
+            if let Some(flat_id) = package_to_flat_id.get(pkg_name) {
+                let import_var = format!("__vite_injected_{}", flat_id.replace('-', "_"));
+                imports_to_add.push((pkg_name.to_string(), import_var.clone()));
+                patched = patched.replace(full_match, &import_var);
+            }
+        }
+
+        if imports_to_add.is_empty() {
+            return Ok(());
+        }
+
+        imports_to_add.dedup_by(|a, b| a.0 == b.0);
+
+        let mut import_statements = String::new();
+        for (pkg_name, import_var) in &imports_to_add {
+            let flat_id = package_to_flat_id.get(pkg_name).unwrap();
+            import_statements.push_str(&format!(
+                "import * as {} from \"./{}.js\";\n",
+                import_var, flat_id
+            ));
+        }
+
+        let final_content = format!("{}{}", import_statements, patched);
+        std::fs::write(bundled_path, final_content)?;
+
+        tracing::info!(
+            "[deps] Patched {} CJS requires in {:?}",
+            imports_to_add.len(),
+            bundled_path.file_name()
+        );
+
+        Ok(())
     }
 
     fn bundle_react_refresh_runtime(&self) -> Result<PathBuf> {

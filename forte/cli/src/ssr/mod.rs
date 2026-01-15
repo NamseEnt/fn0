@@ -95,6 +95,7 @@ export default {{
     file: "{}",
     format: "iife",
     inlineDynamicImports: true,
+    sourcemap: 'inline',
   }},
   tsconfig: "tsconfig.json",
   plugins: [ssrCssPlugin()],

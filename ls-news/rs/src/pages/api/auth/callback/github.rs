@@ -1,8 +1,6 @@
 use crate::{common::auth::GitHubUser, docs::UserDoc, route_generated::Redirect};
 use anyhow::Result;
-use cookie::CookieJar;
 use forte_sdk::*;
-use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 
 pub struct SearchParams {
@@ -13,14 +11,9 @@ pub struct SearchParams {
 #[derive(Serialize)]
 pub enum Props {}
 
-pub async fn handler(
-    _headers: HeaderMap,
-    jar: &mut CookieJar,
-    search_params: SearchParams,
-) -> Result<Props> {
-    let client_id = std::env::var("GITHUB_CLIENT_ID").expect("GITHUB_CLIENT_ID not found");
-    let client_secret =
-        std::env::var("GITHUB_CLIENT_SECRET").expect("GITHUB_CLIENT_SECRET not found");
+pub async fn handler(req: ForteRequest<'_>, search_params: SearchParams) -> Result<Props> {
+    let client_id = crate::env_generated::public_github_client_id();
+    let client_secret = crate::env_generated::github_client_secret();
 
     let response = http::Client::new()
         .send(
@@ -29,6 +22,7 @@ pub async fn handler(
                 .method("POST")
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
+                .header("User-Agent", "ls-news")
                 .body(
                     serde_json::json!({
                         "client_id": client_id,
@@ -59,6 +53,7 @@ pub async fn handler(
                 .method("GET")
                 .header("Authorization", format!("Bearer {access_token}"))
                 .header("Accept", "application/json")
+                .header("User-Agent", "ls-news")
                 .body(())?,
         )
         .await?;
@@ -82,9 +77,9 @@ pub async fn handler(
     )
     .await?;
 
-    crate::common::auth::set_auth_cookies(jar, &access_token, &github_user);
+    crate::common::auth::set_auth_cookies(req.jar, &access_token, &github_user);
 
-    match crate::common::auth::verify_oauth_state(jar, &search_params.state) {
+    match crate::common::auth::verify_oauth_state(req.jar, &search_params.state) {
         Ok(redirect) => Err(redirect.into()),
         Err(err) => {
             eprintln!("GitHub OAuth error: {err}");

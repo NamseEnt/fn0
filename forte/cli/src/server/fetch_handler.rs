@@ -2,13 +2,14 @@ use bytes::Bytes;
 use fn0::{FetchHandler, FetchHandlerFuture, Fn0};
 use http::HeaderMap;
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::SimpleCache;
 
 pub struct ForteFetchHandler {
     fn0: Arc<Fn0<SimpleCache>>,
     original_headers: HeaderMap,
+    collected_cookies: Arc<Mutex<Vec<String>>>,
 }
 
 impl ForteFetchHandler {
@@ -16,7 +17,12 @@ impl ForteFetchHandler {
         Self {
             fn0,
             original_headers,
+            collected_cookies: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    pub fn get_collected_cookies(&self) -> Vec<String> {
+        self.collected_cookies.lock().unwrap().clone()
     }
 }
 
@@ -30,6 +36,7 @@ impl FetchHandler for ForteFetchHandler {
 
         let fn0 = self.fn0.clone();
         let original_headers = self.original_headers.clone();
+        let collected_cookies = self.collected_cookies.clone();
 
         Box::pin(async move {
             let (mut parts, body) = req.into_parts();
@@ -78,10 +85,17 @@ impl FetchHandler for ForteFetchHandler {
             parts.uri = uri;
 
             let req = hyper::Request::from_parts(parts, body);
-            let response = fn0.run("backend", req, None).await;
+            let response = fn0.run("backend", "", req, None).await;
 
             match response {
-                Ok(resp) => Some(resp),
+                Ok(resp) => {
+                    for value in resp.headers().get_all(http::header::SET_COOKIE) {
+                        if let Ok(s) = value.to_str() {
+                            collected_cookies.lock().unwrap().push(s.to_string());
+                        }
+                    }
+                    Some(resp)
+                }
                 Err(e) => {
                     eprintln!("[ForteFetchHandler] Error calling hook: {:?}", e);
                     let body: UnsyncBoxBody<Bytes, anyhow::Error> =

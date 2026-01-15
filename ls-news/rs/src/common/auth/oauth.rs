@@ -56,34 +56,6 @@ struct OauthState {
     timestamp: i64,
 }
 
-fn create_oauth_state(jar: &mut CookieJar, mut redirect: Redirect) -> String {
-    if !is_allowed_redirect_on_oauth(&redirect) {
-        redirect = Redirect::Index;
-    }
-
-    let mut buf = [0u8; 32];
-    rand::get_random_bytes(&mut buf);
-    let nonce = hex::encode(buf);
-
-    let state_data = serde_json::to_string(&OauthState {
-        nonce: nonce.clone(),
-        redirect,
-        timestamp: time::OffsetDateTime::now_utc().unix_timestamp(),
-    })
-    .expect("Failed to serialize state data");
-
-    jar.add(
-        CookieBuilder::new(OAUTH_STATE_COOKIE, state_data)
-            .http_only(true)
-            .secure(true)
-            .same_site(cookie::SameSite::Lax)
-            .path("/")
-            .max_age(time::Duration::seconds(60 * 10)),
-    );
-
-    nonce
-}
-
 pub fn verify_oauth_state(jar: &mut CookieJar, state_from_url: &str) -> Result<Redirect> {
     let state_cookie = jar
         .get(OAUTH_STATE_COOKIE)
@@ -115,8 +87,30 @@ pub fn verify_oauth_state(jar: &mut CookieJar, state_from_url: &str) -> Result<R
     Ok(redirect)
 }
 
-/// GitHub OAuth 로그인 준비. 쿠키에 state 저장하고 nonce 반환.
-pub fn prepare_github_login(jar: &mut CookieJar, redirect: Redirect) -> String {
-    let oauth_nonce = create_oauth_state(jar, redirect);
-    oauth_nonce
+pub fn prepare_github_login(jar: &mut CookieJar, mut redirect: Redirect) -> String {
+    if !is_allowed_redirect_on_oauth(&redirect) {
+        redirect = Redirect::Index;
+    }
+
+    let mut buf = [0u8; 32];
+    rand::get_random_bytes(&mut buf);
+    let nonce = hex::encode(buf);
+
+    let state_data = serde_json::to_string(&OauthState {
+        nonce: nonce.clone(),
+        redirect,
+        timestamp: time::OffsetDateTime::now_utc().unix_timestamp(),
+    })
+    .expect("Failed to serialize state data");
+
+    jar.add(
+        CookieBuilder::new(OAUTH_STATE_COOKIE, state_data)
+            .http_only(true)
+            .secure(true)
+            .same_site(cookie::SameSite::Lax)
+            .path("/")
+            .max_age(time::Duration::seconds(60 * 10)),
+    );
+
+    nonce
 }

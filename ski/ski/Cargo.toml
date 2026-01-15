@@ -5,6 +5,7 @@ edition = "2024"
 description = "Minimal Winter CG Compatible Runtime"
 
 [dependencies]
+base64 = "0.22"
 bytes = "1.10"
 deno_core = "0.376"
 deno_error = "0.7"

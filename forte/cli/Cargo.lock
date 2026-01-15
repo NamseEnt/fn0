@@ -6297,6 +6297,7 @@ checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 name = "ski"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "bytes",
  "deno_core",
  "deno_error",

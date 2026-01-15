@@ -403,14 +403,16 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo]) -> TokenStream {
             let query = parts.uri.query().unwrap_or("");
             let mut cookie_jar = make_cookie_jar(&headers);
 
+            let Some(uri_authority) = parts.uri.authority() else {
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Body::from("Missing authority in request URI"))
+                    .unwrap());
+            };
+            let uri_authority = uri_authority.as_str();
+
             if let Some(hook_name) = path.strip_prefix("/__forte_hook/") {
-                let Some(uri_authority) = parts.uri.authority() else {
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(Body::from("Missing authority in request URI"))
-                        .unwrap());
-                };
-                return handle_hook(hook_name, uri_authority.as_str(), &headers, &mut cookie_jar, body).await;
+                return handle_hook(hook_name, uri_authority, &headers, &mut cookie_jar, body).await;
             }
 
             let query_params: HashMap<String, String> = query
@@ -540,16 +542,16 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
             // Generate handler call based on what params exist
             let handler_call = match (&page.path_params, &page.search_params) {
                 (Some(_), Some(_)) => quote! {
-                    #module_name::handler(headers, &mut cookie_jar, path_params, search_params).await
+                    #module_name::handler(req, path_params, search_params).await
                 },
                 (Some(_), None) => quote! {
-                    #module_name::handler(headers, &mut cookie_jar, path_params).await
+                    #module_name::handler(req, path_params).await
                 },
                 (None, Some(_)) => quote! {
-                    #module_name::handler(headers, &mut cookie_jar, search_params).await
+                    #module_name::handler(req, search_params).await
                 },
                 (None, None) => quote! {
-                    #module_name::handler(headers, &mut cookie_jar).await
+                    #module_name::handler(req).await
                 },
             };
 
@@ -557,6 +559,13 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                 if #route_condition {
                     #path_params_extraction
                     #search_params_extraction
+
+                    let req = ForteRequest {
+                        uri_authority,
+                        headers: &headers,
+                        jar: &mut cookie_jar,
+                        body: (),
+                    };
 
                     match #handler_call {
                         Ok(props) => {
@@ -574,9 +583,10 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                                     &cookie_jar,
                                 ))
                             } else {
+                                eprintln!("Error at {}: {:?}", path, e);
                                 Ok(Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                    .body(Body::from(format!("Error: {:?}", e)))
+                                    .body(Body::from("Internal Server Error"))
                                     .unwrap())
                             }
                         }
@@ -861,7 +871,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                 #name => {
                     let input: #module_name::Input = serde_json::from_slice(body_bytes)
                         .map_err(|e| Error::msg(e.to_string()))?;
-                    let req = HookRequest {
+                    let req = ForteRequest {
                         uri_authority,
                         headers,
                         jar: cookie_jar,

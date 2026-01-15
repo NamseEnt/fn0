@@ -1,7 +1,9 @@
 pub mod cookie_sign;
+mod generate_env;
 mod generate_routes;
 
 pub use anyhow;
+pub use generate_env::generate_env;
 pub use cookie::{self, Cookie, CookieBuilder, CookieJar};
 pub use forte_db;
 pub use forte_json;
@@ -22,7 +24,7 @@ pub fn now() -> DateTime {
     chrono::Utc::now()
 }
 
-pub struct HookRequest<'a, Body> {
+pub struct ForteRequest<'a, Body = ()> {
     pub uri_authority: &'a str,
     pub headers: &'a http::HeaderMap,
     pub jar: &'a mut CookieJar,

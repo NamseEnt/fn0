@@ -6,7 +6,7 @@ mod transform_server;
 use anyhow::Result;
 pub use cache::SimpleCache;
 use fetch_handler::ForteFetchHandler;
-use fn0::{CodeKind, DeploymentMap, Fn0};
+use fn0::{CodeKind, DeploymentMap, EnvVars, Fn0};
 use futures_util::{SinkExt, StreamExt};
 pub use hmr::{HmrBroadcaster, HmrModuleUpdate};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
@@ -15,8 +15,8 @@ use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
@@ -33,12 +33,40 @@ pub struct ServerConfig {
     pub project_root: PathBuf,
     pub dev_mode: bool,
     pub prebundler: Arc<Mutex<DependencyPrebundler>>,
+    pub env_vars: EnvVars,
 }
 
 pub struct ServerHandle {
     pub cache: SimpleCache,
     pub hmr: HmrBroadcaster,
     pub transform_server: Option<Arc<TransformServer>>,
+    pub fn0: Arc<Fn0<SimpleCache>>,
+}
+
+pub fn load_env_file(project_root: &Path) -> Vec<(String, String)> {
+    let env_path = project_root.join(".env");
+    let mut vars = Vec::new();
+
+    let Ok(content) = std::fs::read_to_string(&env_path) else {
+        return vars;
+    };
+
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        if let Some((key, value)) = line.split_once('=') {
+            vars.push((key.trim().to_string(), value.trim().to_string()));
+        }
+    }
+
+    vars
+}
+
+pub fn create_env_vars(project_root: &Path) -> EnvVars {
+    Arc::new(RwLock::new(load_env_file(project_root)))
 }
 
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
@@ -59,19 +87,21 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
         None
     };
 
+    let fn0 = Arc::new(Fn0::new(cache.clone(), cache.clone(), deployment_map, config.env_vars));
+
     let handle = ServerHandle {
         cache: cache.clone(),
         hmr: hmr.clone(),
         transform_server: transform_server.clone(),
+        fn0: fn0.clone(),
     };
-
-    let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map));
     let public_dir = Arc::new(config.public_dir);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     println!("Forte dev server listening on http://{}", addr);
 
+    let frontend_path = Arc::new(config.frontend_path);
     tokio::spawn(async move {
         loop {
             let (socket, _) = match listener.accept().await {
@@ -85,6 +115,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
             let public_dir_clone = public_dir.clone();
             let hmr_clone = hmr.clone();
             let transform_server_clone = transform_server.clone();
+            let frontend_path_clone = frontend_path.clone();
 
             tokio::spawn(async move {
                 let io = TokioIo::new(socket);
@@ -95,7 +126,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let public_dir = public_dir_clone.clone();
                         let hmr = hmr_clone.clone();
                         let ts = transform_server_clone.clone();
-                        handle_request(req, fn0, public_dir, hmr, ts)
+                        let frontend_path = frontend_path_clone.clone();
+                        handle_request(req, fn0, public_dir, hmr, ts, frontend_path)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -114,6 +146,7 @@ async fn handle_request(
     public_dir: Arc<PathBuf>,
     hmr: HmrBroadcaster,
     transform_server: Option<Arc<TransformServer>>,
+    frontend_path: Arc<String>,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
@@ -142,6 +175,7 @@ async fn handle_request(
     let backend_response = match fn0
         .run(
             "backend",
+            "",
             req.map(|body| {
                 UnsyncBoxBody::new(body)
                     .map_err(|e| anyhow::anyhow!(e))
@@ -160,11 +194,15 @@ async fn handle_request(
 
     let backend_status = backend_response.status();
 
-    if !backend_status.is_success() {
+    if backend_status.is_redirection() {
+        return Ok(backend_response);
+    }
+
+    if backend_status.is_client_error() || backend_status.is_server_error() {
         let (parts, body) = backend_response.into_parts();
         let body_bytes = body.collect().await?.to_bytes();
         let body_str = String::from_utf8_lossy(&body_bytes);
-        eprintln!("Backend error response body: {}", body_str);
+        eprintln!("Backend error: {} {} - {}", backend_status, path, body_str);
 
         return Ok(fn0::Response::from_parts(
             parts,
@@ -185,8 +223,19 @@ async fn handle_request(
         .body(backend_response.into_body())?;
 
     let fetch_handler = Arc::new(ForteFetchHandler::new(fn0.clone(), original_headers));
-    fn0.run("frontend", frontend_request, Some(fetch_handler))
-        .await
+    let mut ssr_response = fn0
+        .run("frontend", &frontend_path, frontend_request, Some(fetch_handler.clone()))
+        .await?;
+
+    for cookie in fetch_handler.get_collected_cookies() {
+        if let Ok(value) = cookie.parse() {
+            ssr_response
+                .headers_mut()
+                .append(http::header::SET_COOKIE, value);
+        }
+    }
+
+    Ok(ssr_response)
 }
 
 fn should_transform(path: &str) -> bool {

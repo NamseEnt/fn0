@@ -108,7 +108,14 @@ export async function render(url: string, rawProps: any): Promise<string> {
 (globalThis as any).handler = async function handler(
   request: Request
 ): Promise<Response> {
-  const rawProps = await request.json();
+  const bodyText = await request.text();
+  let rawProps;
+  try {
+    rawProps = JSON.parse(bodyText);
+  } catch (e) {
+    console.error(`[SSR] JSON parse error. URL: ${request.url}, Body: "${bodyText.slice(0, 500)}"`);
+    throw e;
+  }
   const url = new URL(request.url);
 
   const matched = matchRoute(url.pathname);

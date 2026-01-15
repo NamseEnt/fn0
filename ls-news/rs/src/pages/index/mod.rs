@@ -1,8 +1,6 @@
 use crate::docs::{DeletedPost, Post, UserDoc};
 use anyhow::Result;
-use cookie::CookieJar;
 use forte_sdk::*;
-use http::HeaderMap;
 use serde::Serialize;
 use std::collections::HashSet;
 
@@ -30,12 +28,8 @@ pub struct User {
     pub avatar_url: String,
 }
 
-pub async fn handler(
-    _headers: HeaderMap,
-    jar: &mut CookieJar,
-    search_params: SearchParams,
-) -> Result<Props> {
-    let is_admin = crate::common::auth::is_admin(jar);
+pub async fn handler(req: ForteRequest<'_>, search_params: SearchParams) -> Result<Props> {
+    let is_admin = crate::common::auth::is_admin(req.jar);
 
     let rows = match get_rows(search_params.after, is_admin).await {
         Ok(rows) => rows,

@@ -1,5 +1,6 @@
 mod http_body_resource;
 mod runtime_options;
+mod source_map;
 
 use bytes::Bytes;
 use deno_core::anyhow::{Result, anyhow};
@@ -12,10 +13,67 @@ use http_body_util::{BodyExt, Empty};
 use runtime_options::*;
 use serde::Serialize;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
+
+
+use std::borrow::Cow;
+
+struct SourceMapLoader {
+    source_maps: RefCell<HashMap<String, Vec<u8>>>,
+}
+
+impl SourceMapLoader {
+    fn new() -> Self {
+        Self {
+            source_maps: RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn register(&self, name: &str, source_map: Vec<u8>) {
+        self.source_maps
+            .borrow_mut()
+            .insert(name.to_string(), source_map);
+    }
+}
+
+impl ModuleLoader for SourceMapLoader {
+    fn resolve(
+        &self,
+        _specifier: &str,
+        _referrer: &str,
+        _kind: ResolutionKind,
+    ) -> Result<ModuleSpecifier, error::ModuleLoaderError> {
+        Err(error::ModuleLoaderError::generic(
+            "Module loading not supported",
+        ))
+    }
+
+    fn load(
+        &self,
+        _module_specifier: &ModuleSpecifier,
+        _maybe_referrer: Option<&ModuleLoadReferrer>,
+        _options: ModuleLoadOptions,
+    ) -> ModuleLoadResponse {
+        ModuleLoadResponse::Sync(Err(error::ModuleLoaderError::generic(
+            "Module loading not supported",
+        )))
+    }
+
+    fn get_source_map(&self, file_name: &str) -> Option<Cow<'_, [u8]>> {
+        self.source_maps
+            .borrow()
+            .get(file_name)
+            .map(|v| Cow::Owned(v.clone()))
+    }
+
+    fn source_map_source_exists(&self, _source_url: &str) -> Option<bool> {
+        Some(true)
+    }
+}
 
 pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
@@ -115,10 +173,12 @@ static RUNTIME_SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/RUNJS
 
 pub async fn run(
     code: &str,
+    script_path: &str,
     request: Request,
     fetch_handler: Option<Arc<dyn FetchHandler>>,
 ) -> Result<Response> {
     let code = code.to_string();
+    let script_url = format!("file://{}", script_path);
 
     tokio::task::spawn_blocking(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -126,12 +186,18 @@ pub async fn run(
             .build()
             .unwrap();
         rt.block_on(async move {
+            let loader = Rc::new(SourceMapLoader::new());
+            if let Some(sm) = source_map::extract_source_map(code.as_bytes()) {
+                loader.register(&script_url, sm);
+            }
+
             let mut runtime_options = runtime_options();
             runtime_options.startup_snapshot = Some(RUNTIME_SNAPSHOT);
             runtime_options.extensions.push(fetch_intercept_extension::init());
+            runtime_options.module_loader = Some(loader);
 
             let mut runtime = JsRuntime::new(runtime_options);
-            runtime.execute_script("[user code]", code.to_string())?;
+            runtime.execute_script(script_url.clone(), code.to_string())?;
 
             register_hyper_request(&mut runtime, request, fetch_handler);
 

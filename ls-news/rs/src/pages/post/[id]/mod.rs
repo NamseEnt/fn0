@@ -1,8 +1,6 @@
 use crate::docs::*;
 use anyhow::Result;
-use cookie::CookieJar;
 use forte_sdk::*;
-use http::HeaderMap;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -25,12 +23,8 @@ pub enum Props {
     },
 }
 
-pub async fn handler(
-    _headers: HeaderMap,
-    jar: &mut CookieJar,
-    path_params: PathParams,
-) -> Result<Props> {
-    let is_admin = crate::common::auth::is_admin(jar);
+pub async fn handler(req: ForteRequest<'_>, path_params: PathParams) -> Result<Props> {
+    let is_admin = crate::common::auth::is_admin(req.jar);
 
     match get_post_with_comments(&path_params.id, is_admin).await {
         Ok(Some((post, comments, users))) => Ok(Props::Ok {

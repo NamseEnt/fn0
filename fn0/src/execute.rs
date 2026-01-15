@@ -6,7 +6,7 @@ use http_body_util::BodyExt;
 use measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use std::{
     sync::{
-        Arc,
+        Arc, RwLock,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -25,6 +25,8 @@ use wasmtime_wasi_http::{
     },
 };
 
+pub type EnvVars = Arc<RwLock<Vec<(String, String)>>>;
+
 pub struct Job {
     pub req: Request,
     pub res_tx: oneshot::Sender<Response>,
@@ -33,10 +35,11 @@ pub struct Job {
 
 pub struct WasmExecutor {
     job_tx: Sender<Job>,
+    env_vars: EnvVars,
 }
 
 impl WasmExecutor {
-    pub fn new<A, C>(proxy_cache: A, clock: C) -> Self
+    pub fn new<A, C>(proxy_cache: A, clock: C, env_vars: EnvVars) -> Self
     where
         A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
         C: Clock,
@@ -53,6 +56,7 @@ impl WasmExecutor {
             let engine = engine.clone();
             let linker = linker.clone();
             let clock = clock.clone();
+            let env_vars = env_vars.clone();
 
             async move {
                 let mut interval = tokio::time::interval(Duration::from_millis(3));
@@ -69,9 +73,10 @@ impl WasmExecutor {
                                     let engine = engine.clone();
                                     let linker = linker.clone();
                                     let clock = clock.clone();
+                                    let env_vars = env_vars.clone();
 
                                     tokio::spawn(async move {
-                                        run_job(job, proxy_cache, engine, linker, clock).await;
+                                        run_job(job, proxy_cache, engine, linker, clock, env_vars).await;
                                     });
                                 },
                                 None => break,
@@ -82,7 +87,13 @@ impl WasmExecutor {
             }
         });
 
-        Self { job_tx }
+        Self { job_tx, env_vars }
+    }
+
+    pub fn update_env(&self, new_vars: Vec<(String, String)>) {
+        if let Ok(mut env) = self.env_vars.write() {
+            *env = new_vars;
+        }
     }
 
     pub(crate) async fn run(&self, code_id: &str, request: Request) -> Result<Response> {
@@ -148,6 +159,7 @@ async fn run_job<A, C>(
     engine: Engine,
     linker: Linker<ClientState<C>>,
     clock: C,
+    env_vars: EnvVars,
 ) where
     A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
     C: Clock,
@@ -158,7 +170,7 @@ async fn run_job<A, C>(
         return;
     };
 
-    let response = handle_request(proxy_pre, job.req, job.code_id, clock).await;
+    let response = handle_request(proxy_pre, job.req, job.code_id, clock, env_vars).await;
 
     let _ = job.res_tx.send(response);
 }
@@ -197,6 +209,7 @@ async fn handle_request<C>(
     req: Request,
     code_id: String,
     clock: C,
+    env_vars: EnvVars,
 ) -> Response
 where
     C: Clock + Send + 'static,
@@ -204,11 +217,22 @@ where
     let time_tracker = TimeTracker::new(clock);
     let is_timeout = Arc::new(AtomicBool::new(false));
 
+    let wasi = {
+        let mut builder = WasiCtx::builder();
+        builder.inherit_stdio();
+        if let Ok(vars) = env_vars.read() {
+            for (key, value) in vars.iter() {
+                builder.env(key, value);
+            }
+        }
+        builder.build()
+    };
+
     let mut store = Store::new(
         pre.engine(),
         ClientState {
             table: ResourceTable::new(),
-            wasi: WasiCtx::builder().inherit_stdio().inherit_env().build(),
+            wasi,
             http: WasiHttpCtx::new(),
             time_tracker: time_tracker.clone(),
             code_id: code_id.clone(),
