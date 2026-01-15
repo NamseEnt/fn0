@@ -3,11 +3,11 @@
 mod blob;
 mod compression;
 mod console;
+mod message_port;
 mod stream_resource;
 mod timers;
 mod url;
 mod urlpattern;
-mod message_port;
 
 pub use crate::blob::Blob;
 pub use crate::blob::BlobPart;
@@ -20,6 +20,10 @@ use crate::blob::op_blob_read_part;
 use crate::blob::op_blob_remove_part;
 use crate::blob::op_blob_revoke_object_url;
 use crate::blob::op_blob_slice_part;
+use crate::message_port::op_message_port_create_entangled;
+use crate::message_port::op_message_port_post_message;
+use crate::message_port::op_message_port_recv_message;
+use crate::message_port::op_message_port_recv_message_sync;
 pub use crate::timers::StartTime;
 use crate::timers::op_defer;
 use crate::timers::op_now;
@@ -39,10 +43,6 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::sync::Arc;
 pub use stream_resource::StreamResourceError;
-use crate::message_port::op_message_port_create_entangled;
-use crate::message_port::op_message_port_post_message;
-use crate::message_port::op_message_port_recv_message;
-use crate::message_port::op_message_port_recv_message_sync;
 
 deno_core::extension!(deno_web,
   deps = [ deno_webidl ],
