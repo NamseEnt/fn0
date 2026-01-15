@@ -1,3 +1,5 @@
+#[path = "pages/signout.rs"]
+mod pages_signout;
 #[path = "pages/api/auth/callback/github.rs"]
 mod pages_api_auth_callback_github;
 #[path = "pages/index/mod.rs"]
@@ -18,6 +20,7 @@ use std::collections::HashMap;
 #[allow(non_camel_case_types)]
 pub enum Redirect {
     External { url: String },
+    Signout,
     ApiAuthCallbackGithub,
     Index,
     Post_id_ { id: String },
@@ -27,6 +30,7 @@ impl Redirect {
     pub fn to_path(&self) -> String {
         match self {
             Redirect::External { url } => url.clone(),
+            Redirect::Signout => "/signout".to_string(),
             Redirect::ApiAuthCallbackGithub => "/api/auth/callback/github".to_string(),
             Redirect::Index => "/".to_string(),
             Redirect::Post_id_ { id } => {
@@ -73,7 +77,37 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
         })
         .collect();
     let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
-    if path == "/api/auth/callback/github" {
+    if path == "/signout" {
+        let req = ForteRequest {
+            uri_authority,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            body: (),
+        };
+        match pages_signout::handler(req).await {
+            Ok(redirect) => {
+                Ok(
+                    build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ),
+                )
+            }
+            Err(e) => {
+                eprintln!("Error at {}: {:?}", path, e);
+                Ok(
+                    Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap(),
+                )
+            }
+        }
+    } else if path == "/api/auth/callback/github" {
         let Some(code) = query_params.get("code").cloned() else {
             return Ok(
                 Response::builder()

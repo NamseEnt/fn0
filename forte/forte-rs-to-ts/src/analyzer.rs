@@ -255,6 +255,13 @@ impl Callbacks for Analyzer {
                 std::process::exit(1);
             }
             if let Some(props_id) = props_def_id {
+                // Skip redirect-only pages (type Props = Redirect)
+                let props_ty = tcx.type_of(props_id).instantiate_identity();
+                let props_ty_str = format!("{:?}", props_ty);
+                if props_ty_str.contains("Redirect") {
+                    continue;
+                }
+
                 let kind_name = match props_kind {
                     Some(DefKind::Struct) => "struct",
                     Some(DefKind::Enum) => "enum",
@@ -274,7 +281,6 @@ impl Callbacks for Analyzer {
                 println!("{} -> Props ({})", rust_source_path, kind_name);
 
                 let mut converter = TypeConverter::new(tcx);
-                let props_ty = tcx.type_of(props_id).instantiate_identity();
                 let context = format!("{:?}", filename);
 
                 // 1. 변환 수행 (이제 ts_type은 Reference("...Props") 형태일 것임)

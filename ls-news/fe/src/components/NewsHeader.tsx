@@ -1,6 +1,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { Link } from "@/components/ui/link";
 import { useMe } from "@/hooks/.generated/useMe";
+import { paths } from "@/paths.generated";
 
 function NewsHeaderContent() {
   const me = useMe({});
@@ -46,16 +47,12 @@ function NewsHeaderContent() {
                   )}
                   <span className="text-sm">{me.user.username}</span>
                 </div>
-                <button
-                  type="button"
-                  className="text-sm hover:underline cursor-pointer"
-                  onClick={async () => {
-                    await fetch("/api/auth/signout", { method: "POST" });
-                    window.location.reload();
-                  }}
+                <a
+                  href={paths["/signout"]()}
+                  className="text-sm hover:underline"
                 >
                   ログアウト
-                </button>
+                </a>
               </>
             ) : authUrl ? (
               <a href={authUrl} className="text-sm hover:underline">

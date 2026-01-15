@@ -44,7 +44,7 @@ pub fn clear_auth_cookies(jar: &mut CookieJar) {
 
 fn is_allowed_redirect_on_oauth(redirect: &Redirect) -> bool {
     match redirect {
-        Redirect::External { .. } | Redirect::ApiAuthCallbackGithub => false,
+        Redirect::External { .. } | Redirect::ApiAuthCallbackGithub | Redirect::Signout => false,
         Redirect::Index | Redirect::Post_id_ { .. } | Redirect::Write => true,
     }
 }

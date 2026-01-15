@@ -7,6 +7,7 @@ pub fn generate_routes() {
     let pages_dir = Path::new(&manifest_dir).join("src/pages");
     let hooks_dir = Path::new(&manifest_dir).join("src/hooks");
     let output_path = Path::new(&manifest_dir).join("src/route_generated.rs");
+    let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
     println!("cargo:rerun-if-changed=src/pages");
     println!("cargo:rerun-if-changed=src/hooks");
@@ -23,6 +24,13 @@ pub fn generate_routes() {
     if current_content != formatted {
         fs::write(&output_path, formatted).unwrap();
     }
+
+    // Generate frontend paths.generated.ts
+    let fe_paths_content = generate_fe_paths(&pages);
+    let current_fe_paths = fs::read_to_string(&fe_paths_output).unwrap_or_default();
+    if current_fe_paths != fe_paths_content {
+        fs::write(&fe_paths_output, fe_paths_content).unwrap();
+    }
 }
 
 #[derive(Debug)]
@@ -33,6 +41,7 @@ struct PageInfo {
     route_segments: Vec<RouteSegment>,
     path_params: Option<Vec<PathParamField>>,
     search_params: Option<Vec<SearchParamField>>,
+    is_redirect_only: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -139,9 +148,15 @@ fn has_hook_handler(content: &str) -> bool {
     has_input && has_output && has_handler
 }
 
-fn has_handler(content: &str) -> bool {
+enum HandlerType {
+    None,
+    Props,
+    Redirect,
+}
+
+fn get_handler_type(content: &str) -> HandlerType {
     let Ok(syntax_tree) = syn::parse_file(content) else {
-        return false;
+        return HandlerType::None;
     };
 
     for item in syntax_tree.items {
@@ -152,14 +167,37 @@ fn has_handler(content: &str) -> bool {
             let is_handler = func.sig.ident == "handler";
 
             if is_pub && is_async && is_handler {
-                // Check return type is Result<Props>
                 if let syn::ReturnType::Type(_, ty) = &func.sig.output {
                     let type_str = quote!(#ty).to_string();
                     if type_str.contains("Result") && type_str.contains("Props") {
-                        return true;
+                        // Check if Props is aliased to Redirect
+                        if is_props_redirect(content) {
+                            return HandlerType::Redirect;
+                        }
+                        return HandlerType::Props;
+                    }
+                    if type_str.contains("Result") && type_str.contains("Redirect") {
+                        return HandlerType::Redirect;
                     }
                 }
             }
+        }
+    }
+
+    HandlerType::None
+}
+
+fn is_props_redirect(content: &str) -> bool {
+    let Ok(syntax_tree) = syn::parse_file(content) else {
+        return false;
+    };
+
+    for item in syntax_tree.items {
+        if let syn::Item::Type(type_alias) = item
+            && type_alias.ident == "Props"
+        {
+            let type_str = quote!(#type_alias.ty).to_string();
+            return type_str.contains("Redirect");
         }
     }
 
@@ -261,9 +299,12 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
                 continue;
             };
 
-            if !has_handler(&content) {
-                continue;
-            }
+            let handler_type = get_handler_type(&content);
+            let is_redirect_only = match handler_type {
+                HandlerType::None => continue,
+                HandlerType::Props => false,
+                HandlerType::Redirect => true,
+            };
 
             // Build route info from file path
             let relative_path = path.strip_prefix(base_dir).unwrap();
@@ -346,6 +387,7 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
                 route_segments: parsed_route_segments,
                 path_params,
                 search_params,
+                is_redirect_only,
             });
         }
     }
@@ -555,18 +597,31 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                 },
             };
 
-            quote! {
-                if #route_condition {
-                    #path_params_extraction
-                    #search_params_extraction
-
-                    let req = ForteRequest {
-                        uri_authority,
-                        headers: &headers,
-                        jar: &mut cookie_jar,
-                        body: (),
-                    };
-
+            // Different response handling for redirect-only pages vs props pages
+            let response_handling = if page.is_redirect_only {
+                quote! {
+                    match #handler_call {
+                        Ok(redirect) => {
+                            Ok(build_response_with_cookies(
+                                Response::builder()
+                                    .status(StatusCode::FOUND)
+                                    .header(LOCATION, redirect.to_path())
+                                    .body(Body::empty())
+                                    .unwrap(),
+                                &cookie_jar,
+                            ))
+                        }
+                        Err(e) => {
+                            eprintln!("Error at {}: {:?}", path, e);
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .body(Body::from("Internal Server Error"))
+                                .unwrap())
+                        }
+                    }
+                }
+            } else {
+                quote! {
                     match #handler_call {
                         Ok(props) => {
                             let stream = forte_json::to_stream(&props);
@@ -591,6 +646,22 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                             }
                         }
                     }
+                }
+            };
+
+            quote! {
+                if #route_condition {
+                    #path_params_extraction
+                    #search_params_extraction
+
+                    let req = ForteRequest {
+                        uri_authority,
+                        headers: &headers,
+                        jar: &mut cookie_jar,
+                        body: (),
+                    };
+
+                    #response_handling
                 }
             }
         })
@@ -910,6 +981,77 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                     .unwrap()),
             }
         }
+    }
+}
+
+fn generate_fe_paths(pages: &[PageInfo]) -> String {
+    let mut content = String::new();
+    content.push_str("// Auto-generated by forte build\n\n");
+    content.push_str("export const paths = {\n");
+
+    for page in pages {
+        // Convert [id] to :id format for the key
+        let route_path = page
+            .route_segments
+            .iter()
+            .map(|seg| match seg {
+                RouteSegment::Static(s) => s.clone(),
+                RouteSegment::Dynamic(name) => format!(":{}", name),
+            })
+            .collect::<Vec<_>>();
+        let route_path = if route_path.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{}", route_path.join("/"))
+        };
+
+        if let Some(path_params) = &page.path_params {
+            // Has dynamic params: "/post/:id": ({id}: {id: string}) => `/post/${id}`
+            let param_names: Vec<&str> = path_params.iter().map(|p| p.name.as_str()).collect();
+            let param_types: Vec<String> = path_params
+                .iter()
+                .map(|p| format!("{}: {}", p.name, rust_type_to_ts(&p.inner_type)))
+                .collect();
+
+            let path_template = page
+                .route_segments
+                .iter()
+                .map(|seg| match seg {
+                    RouteSegment::Static(s) => s.clone(),
+                    RouteSegment::Dynamic(name) => format!("${{{}}}", name),
+                })
+                .collect::<Vec<_>>()
+                .join("/");
+
+            content.push_str(&format!(
+                "  \"{}\": ({{{}}}: {{{}}}) => `/{}`",
+                route_path,
+                param_names.join(", "),
+                param_types.join("; "),
+                path_template
+            ));
+        } else {
+            // No params: "/": () => "/"
+            content.push_str(&format!(
+                "  \"{}\": () => \"{}\"",
+                route_path, route_path
+            ));
+        }
+
+        content.push_str(",\n");
+    }
+
+    content.push_str("} as const;\n");
+    content
+}
+
+fn rust_type_to_ts(rust_type: &str) -> &str {
+    match rust_type {
+        "String" | "&str" => "string",
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" | "isize"
+        | "usize" => "number",
+        "bool" => "boolean",
+        _ => "string",
     }
 }
 
