@@ -1,12 +1,15 @@
 mod cache;
 mod fetch_handler;
 mod hmr;
+mod ssr_entry;
+pub mod ssr_module_fetcher;
 mod transform_server;
 
 use anyhow::Result;
 pub use cache::SimpleCache;
 use fetch_handler::ForteFetchHandler;
 use fn0::{CodeKind, DeploymentMap, EnvVars, Fn0};
+pub use ssr_module_fetcher::SsrModuleFetcher;
 use futures_util::{SinkExt, StreamExt};
 pub use hmr::{HmrBroadcaster, HmrModuleUpdate};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
@@ -87,6 +90,15 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
         None
     };
 
+    let ssr_module_fetcher: Option<Arc<dyn fn0::ModuleFetcher>> = if config.dev_mode {
+        Some(Arc::new(SsrModuleFetcher::new(
+            &config.project_root,
+            config.prebundler.clone(),
+        )))
+    } else {
+        None
+    };
+
     let fn0 = Arc::new(Fn0::new(cache.clone(), cache.clone(), deployment_map, config.env_vars));
 
     let handle = ServerHandle {
@@ -116,6 +128,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
             let hmr_clone = hmr.clone();
             let transform_server_clone = transform_server.clone();
             let frontend_path_clone = frontend_path.clone();
+            let ssr_fetcher_clone = ssr_module_fetcher.clone();
 
             tokio::spawn(async move {
                 let io = TokioIo::new(socket);
@@ -127,7 +140,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let hmr = hmr_clone.clone();
                         let ts = transform_server_clone.clone();
                         let frontend_path = frontend_path_clone.clone();
-                        handle_request(req, fn0, public_dir, hmr, ts, frontend_path)
+                        let ssr_fetcher = ssr_fetcher_clone.clone();
+                        handle_request(req, fn0, public_dir, hmr, ts, frontend_path, ssr_fetcher)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -147,6 +161,7 @@ async fn handle_request(
     hmr: HmrBroadcaster,
     transform_server: Option<Arc<TransformServer>>,
     frontend_path: Arc<String>,
+    ssr_module_fetcher: Option<Arc<dyn fn0::ModuleFetcher>>,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
@@ -223,9 +238,22 @@ async fn handle_request(
         .body(backend_response.into_body())?;
 
     let fetch_handler = Arc::new(ForteFetchHandler::new(fn0.clone(), original_headers));
-    let mut ssr_response = fn0
-        .run("frontend", &frontend_path, frontend_request, Some(fetch_handler.clone()))
-        .await?;
+
+    let mut ssr_response = if let Some(ssr_fetcher) = ssr_module_fetcher {
+        let entry_specifier = format!("http://localhost{}", ssr_module_fetcher::SSR_ENTRY_PATH);
+        let base_url = "http://localhost".to_string();
+        fn0.run_esm(
+            &entry_specifier,
+            &base_url,
+            frontend_request,
+            Some(fetch_handler.clone()),
+            ssr_fetcher,
+        )
+        .await?
+    } else {
+        fn0.run("frontend", &frontend_path, frontend_request, Some(fetch_handler.clone()))
+            .await?
+    };
 
     for cookie in fetch_handler.get_collected_cookies() {
         if let Ok(value) = cookie.parse() {

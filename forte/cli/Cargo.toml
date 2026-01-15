@@ -7,6 +7,7 @@ edition = "2024"
 
 [dependencies]
 fn0 = { path = "../../fn0" }
+ski = { path = "../../ski/ski" }
 adapt-cache = { path = "../../adapt-cache" }
 tokio = { version = "1", features = ["full"] }
 hyper = { version = "1", features = ["server", "http1", "client"] }
@@ -48,6 +49,8 @@ oxc_span = "0.96"
 sha2 = "0.10"
 hex = "0.4"
 regex = "1"
+base64 = "0.22"
+url = "2"
 
 [dev-dependencies]
 assert_cmd = "2"

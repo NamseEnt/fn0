@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 use wasmtime::Engine;
 use wasmtime_wasi_http::bindings::ProxyPre;
 
-pub use ski::{FetchHandler, FetchHandlerFuture};
+pub use ski::{FetchHandler, FetchHandlerFuture, FetchedModule, ModuleFetcher};
 
 pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
@@ -75,6 +75,18 @@ where
                 Ok(response)
             }
         }
+    }
+
+    pub async fn run_esm(
+        &self,
+        entry_specifier: &str,
+        base_url: &str,
+        request: Request,
+        fetch_handler: Option<Arc<dyn FetchHandler>>,
+        module_fetcher: Arc<dyn ModuleFetcher>,
+    ) -> Result<Response> {
+        let response = ski::run_esm(entry_specifier, base_url, request, fetch_handler, module_fetcher).await?;
+        Ok(response)
     }
 }
 

@@ -19,6 +19,7 @@
     "@types/react-dom": "^19.2.3",
     "react-refresh": "^0.18.0",
     "rolldown": "^1.0.0-beta.57",
+    "source-map": "^0.7.6",
     "tailwindcss": "^4.1.16",
     "typescript": "^5.9.3"
   }
