@@ -98,6 +98,10 @@ impl DependencyPrebundler {
             }
         }
 
+        if packages_to_bundle.iter().any(|p| p == "react") {
+            packages_to_bundle.push("react/jsx-runtime".to_string());
+        }
+
         let bundle_results = self.bundle_all_dependencies(&packages_to_bundle)?;
 
         for (package_name, (output_path, is_cjs)) in bundle_results {

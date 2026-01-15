@@ -33,7 +33,8 @@ impl Resource for HttpBodyResource {
         Box::pin(
             async move {
                 let mut body = self.body.borrow_mut().await;
-                match body.frame().await {
+                let frame_result = Body::frame(&mut *body).await;
+                match frame_result {
                     Some(Ok(frame)) => frame
                         .into_data()
                         .map(BufView::from)

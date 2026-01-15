@@ -1,0 +1,240 @@
+use bytes::Bytes;
+use deno_core::anyhow::{self, anyhow, Result};
+use deno_core::{JsRuntime, ModuleLoadOptions, ModuleLoadReferrer, ModuleLoadResponse, ModuleLoader, ModuleSpecifier, ResolutionKind};
+use http::{HeaderName, HeaderValue, StatusCode};
+use http_body_util::{BodyExt, Empty};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use crate::http_body_resource::HttpBodyResource;
+use crate::module_loader::SsrModuleLoader;
+use crate::ops::{fetch_intercept_extension, FetchHandlerHolder};
+use crate::runtime_options::{runtime_options, RequestParts, ResponseParts};
+use crate::source_map;
+use crate::{FetchHandler, ModuleFetcher, Request, Response, SourceMapInfo};
+
+static RUNTIME_SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/RUNJS_SNAPSHOT.bin"));
+
+struct SourceMapLoader {
+    source_maps: RefCell<HashMap<String, Vec<u8>>>,
+}
+
+impl SourceMapLoader {
+    fn new() -> Self {
+        Self {
+            source_maps: RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn register(&self, name: &str, source_map: Vec<u8>) {
+        self.source_maps
+            .borrow_mut()
+            .insert(name.to_string(), source_map);
+    }
+}
+
+impl ModuleLoader for SourceMapLoader {
+    fn resolve(
+        &self,
+        _specifier: &str,
+        _referrer: &str,
+        _kind: ResolutionKind,
+    ) -> Result<ModuleSpecifier, deno_core::error::ModuleLoaderError> {
+        Err(deno_core::error::ModuleLoaderError::generic(
+            "Module loading not supported",
+        ))
+    }
+
+    fn load(
+        &self,
+        _module_specifier: &ModuleSpecifier,
+        _maybe_referrer: Option<&ModuleLoadReferrer>,
+        _options: ModuleLoadOptions,
+    ) -> ModuleLoadResponse {
+        ModuleLoadResponse::Sync(Err(deno_core::error::ModuleLoaderError::generic(
+            "Module loading not supported",
+        )))
+    }
+
+    fn get_source_map(&self, file_name: &str) -> Option<Cow<'_, [u8]>> {
+        self.source_maps
+            .borrow()
+            .get(file_name)
+            .map(|v| Cow::Owned(v.clone()))
+    }
+
+    fn source_map_source_exists(&self, _source_url: &str) -> Option<bool> {
+        Some(true)
+    }
+}
+
+pub async fn run(
+    code: &str,
+    script_path: &str,
+    request: Request,
+    fetch_handler: Option<Arc<dyn FetchHandler>>,
+) -> Result<Response> {
+    let code = code.to_string();
+    let script_url = format!("file://{}", script_path);
+
+    tokio::task::spawn_blocking(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async move {
+            let loader = Rc::new(SourceMapLoader::new());
+            let source_map_json = source_map::extract_source_map(code.as_bytes());
+            if let Some(ref sm) = source_map_json {
+                loader.register(&script_url, sm.clone());
+            }
+
+            let mut runtime_options = runtime_options();
+            runtime_options.startup_snapshot = Some(RUNTIME_SNAPSHOT);
+            runtime_options.extensions.push(fetch_intercept_extension::init());
+            runtime_options.module_loader = Some(loader);
+
+            let mut runtime = JsRuntime::new(runtime_options);
+            runtime.execute_script(script_url.clone(), code.to_string())?;
+
+            if let Some(sm) = source_map_json {
+                let op_state = runtime.op_state();
+                op_state.borrow_mut().put(SourceMapInfo {
+                    script_url: script_url.clone(),
+                    source_map_json: sm,
+                });
+            }
+
+            register_hyper_request(&mut runtime, request, fetch_handler);
+
+            let script_result =
+                runtime.execute_script("[run]", deno_core::ascii_str!("globalThis.__ski_runHandler();"))?;
+            let run_future = runtime.resolve(script_result);
+            runtime
+                .with_event_loop_future(run_future, Default::default())
+                .await?;
+
+            extract_response(&mut runtime)
+        })
+    })
+    .await?
+}
+
+pub async fn run_esm(
+    entry_specifier: &str,
+    base_url: &str,
+    request: Request,
+    fetch_handler: Option<Arc<dyn FetchHandler>>,
+    module_fetcher: Arc<dyn ModuleFetcher>,
+) -> Result<Response> {
+    let entry_specifier = entry_specifier.to_string();
+    let base_url = base_url.to_string();
+
+    tokio::task::spawn_blocking(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async move {
+            let loader = Rc::new(SsrModuleLoader::new(module_fetcher, base_url));
+
+            let mut runtime_options = runtime_options();
+            runtime_options.startup_snapshot = Some(RUNTIME_SNAPSHOT);
+            runtime_options.extensions.push(fetch_intercept_extension::init());
+            runtime_options.module_loader = Some(loader);
+
+            let mut runtime = JsRuntime::new(runtime_options);
+
+            register_hyper_request(&mut runtime, request, fetch_handler);
+
+            let module_specifier = ModuleSpecifier::parse(&entry_specifier)
+                .map_err(|e| anyhow!("Invalid module specifier: {}", e))?;
+
+            let module_id = runtime.load_main_es_module(&module_specifier).await?;
+            let eval_result = runtime.mod_evaluate(module_id);
+
+            runtime
+                .with_event_loop_future(eval_result, Default::default())
+                .await?;
+
+            extract_response(&mut runtime)
+        })
+    })
+    .await?
+}
+
+fn register_hyper_request(
+    runtime: &mut JsRuntime,
+    req: Request,
+    fetch_handler: Option<Arc<dyn FetchHandler>>,
+) {
+    let op_state = runtime.op_state();
+    let mut state = op_state.borrow_mut();
+
+    let (parts, body) = req.into_parts();
+
+    let url = if parts.uri.scheme().is_some() {
+        parts.uri.to_string()
+    } else {
+        format!("http://localhost{}", parts.uri)
+    };
+    let method = parts.method.to_string();
+    let headers: Vec<(String, String)> = parts
+        .headers
+        .iter()
+        .map(|(k, v): (&HeaderName, &HeaderValue)| {
+            (k.to_string(), v.to_str().unwrap_or("").to_string())
+        })
+        .collect();
+
+    let rid = if method == "GET" || method == "HEAD" {
+        None
+    } else {
+        let resource = HttpBodyResource::new(body);
+        Some(state.resource_table.add(resource))
+    };
+    state.put(RequestParts {
+        url,
+        method,
+        headers,
+        rid,
+    });
+    state.put(FetchHandlerHolder(fetch_handler));
+}
+
+fn extract_response(runtime: &mut JsRuntime) -> Result<Response> {
+    let op_state = runtime.op_state();
+
+    let response_parts = op_state
+        .borrow_mut()
+        .try_take::<ResponseParts>()
+        .ok_or_else(|| anyhow!("Did not get a response from JavaScript"))?;
+
+    let mut builder =
+        hyper::Response::builder().status(StatusCode::from_u16(response_parts.status)?);
+
+    for (key, value) in response_parts.headers {
+        if let Ok(name) = HeaderName::from_bytes(key.as_bytes()) {
+            builder = builder.header(name, value);
+        }
+    }
+
+    let Some(rid) = response_parts.rid else {
+        let body = BodyExt::boxed_unsync(Empty::<Bytes>::new().map_err(|never| match never {}));
+        return Ok(builder.body(body)?);
+    };
+
+    let resource = op_state
+        .borrow_mut()
+        .resource_table
+        .get_any(rid)
+        .map_err(|_| anyhow!("Resource not found"))?;
+
+    let body_adapter = deno_fetch::ResourceToBodyAdapter::new(resource);
+    let body = BodyExt::boxed_unsync(body_adapter.map_err(|e| anyhow::anyhow!(e)));
+
+    Ok(builder.body(body)?)
+}
