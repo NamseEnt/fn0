@@ -24,6 +24,7 @@ pub fn sign_cookie<T: Serialize>(jar: &mut CookieJar, name: &str, value: &T) {
     let cookie = Cookie::build((name.to_string(), cookie_value))
         .http_only(true)
         .secure(true)
+        .path("/")
         .build();
 
     jar.add(cookie);
