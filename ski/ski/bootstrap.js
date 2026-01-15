@@ -13,21 +13,6 @@ Object.defineProperty(globalThis, "__ski_runHandler", {
   writable: false,
 });
 
-// Expose helper functions for ESM modules (which cannot import ext: modules)
-Object.defineProperty(globalThis, "__ski_getRequestParts", {
-  value: () => core.ops.op_get_request_parts(),
-  enumerable: false,
-  configurable: false,
-  writable: false,
-});
-
-Object.defineProperty(globalThis, "__ski_respond", {
-  value: (status, headers, rid) => core.ops.op_respond(status, headers, rid),
-  enumerable: false,
-  configurable: false,
-  writable: false,
-});
-
 import "ext:deno_web/00_infra.js";
 import * as url from "ext:deno_web/00_url.js";
 import * as console from "ext:deno_web/01_console.js";
@@ -52,21 +37,6 @@ import * as formData from "ext:deno_fetch/21_formdata.js";
 import * as request from "ext:deno_fetch/23_request.js";
 import * as response from "ext:deno_fetch/23_response.js";
 import * as fetch from "ext:deno_fetch/26_fetch.js";
-
-// Expose stream-related helper functions for ESM modules (after streams import)
-Object.defineProperty(globalThis, "__ski_readableStreamForRid", {
-  value: (rid) => streams.readableStreamForRid(rid),
-  enumerable: false,
-  configurable: false,
-  writable: false,
-});
-
-Object.defineProperty(globalThis, "__ski_resourceForReadableStream", {
-  value: (stream) => streams.resourceForReadableStream(stream),
-  enumerable: false,
-  configurable: false,
-  writable: false,
-});
 
 const originalFetch = fetch.fetch;
 

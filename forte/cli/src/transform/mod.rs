@@ -91,11 +91,6 @@ impl TransformConfig {
         self.react_refresh = enabled;
         self
     }
-
-    pub fn with_development(mut self, enabled: bool) -> Self {
-        self.development = enabled;
-        self
-    }
 }
 
 pub struct TransformPipeline {

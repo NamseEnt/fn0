@@ -2652,7 +2652,6 @@ dependencies = [
  "adapt-cache",
  "anyhow",
  "assert_cmd",
- "base64",
  "bytes",
  "clap",
  "fn0",
@@ -2677,14 +2676,12 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "ski",
  "tempfile",
  "tokio",
  "tokio-tungstenite",
  "tower",
  "tracing",
  "tracing-subscriber",
- "url",
 ]
 
 [[package]]
@@ -6312,15 +6309,12 @@ dependencies = [
  "http 1.4.0",
  "http-body-util",
  "hyper 1.8.1",
- "regex",
  "reqwest",
  "serde",
  "serde_json",
- "sourcemap",
  "thiserror 2.0.17",
  "tokio",
  "tokio-util",
- "url",
 ]
 
 [[package]]

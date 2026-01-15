@@ -35,10 +35,7 @@ export async function runHandler() {
       responseRid
     );
   } catch (e) {
-    const stack = e.stack || String(e);
-    const rewrittenStack = core.ops.op_rewrite_stack_trace(stack);
-    console.error("[ski/run.js] Error:", e.message);
-    console.error(rewrittenStack);
+    console.error("[ski/run.js] Error:", e.message, e.stack);
     await core.ops.op_respond(
       500,
       [["content-type", "text/plain"]],

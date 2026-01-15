@@ -2464,15 +2464,12 @@ dependencies = [
  "http",
  "http-body-util",
  "hyper",
- "regex",
  "reqwest",
  "serde",
  "serde_json",
- "sourcemap",
  "thiserror 2.0.17",
  "tokio",
  "tokio-util",
- "url",
 ]
 
 [[package]]
