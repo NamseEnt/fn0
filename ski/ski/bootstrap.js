@@ -38,8 +38,55 @@ import * as request from "ext:deno_fetch/23_request.js";
 import * as response from "ext:deno_fetch/23_response.js";
 import * as fetch from "ext:deno_fetch/26_fetch.js";
 
+const originalFetch = fetch.fetch;
+
+async function interceptedFetch(input, init) {
+  const req = new request.Request(input, init);
+  const url = req.url;
+  const method = req.method;
+  const headersList = [];
+  for (const [key, value] of req.headers) {
+    headersList.push([key, value]);
+  }
+
+  let bodyBytes = null;
+  if (req.body) {
+    const reader = req.body.getReader();
+    const chunks = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    bodyBytes = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bodyBytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    bodyBytes = Array.from(bodyBytes);
+  }
+
+  const intercepted = await core.ops.op_fetch_intercept(
+    url,
+    method,
+    headersList,
+    bodyBytes
+  );
+
+  if (intercepted !== null) {
+    return new response.Response(new Uint8Array(intercepted.body), {
+      status: intercepted.status,
+      headers: intercepted.headers,
+    });
+  }
+
+  return originalFetch(input, init);
+}
+
 Object.defineProperty(globalThis, "fetch", {
-  value: fetch.fetch,
+  value: interceptedFetch,
   enumerable: true,
   configurable: true,
   writable: true,

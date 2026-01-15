@@ -1,0 +1,19 @@
+{
+  "type": "module",
+  "scripts": {
+    "build": "rolldown -c"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vite": "^6.0.7"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "rolldown": "^1.0.0-beta.57",
+    "typescript": "^5.9.3"
+  }
+}
