@@ -255,7 +255,6 @@ impl Callbacks for Analyzer {
                 std::process::exit(1);
             }
             if let Some(props_id) = props_def_id {
-                // Skip redirect-only pages (type Props = Redirect)
                 let props_ty = tcx.type_of(props_id).instantiate_identity();
                 let props_ty_str = format!("{:?}", props_ty);
                 if props_ty_str.contains("Redirect") {

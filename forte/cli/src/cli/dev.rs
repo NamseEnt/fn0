@@ -135,6 +135,9 @@ fn scan_pages_dir(base_dir: &Path, current_dir: &Path, routes: &mut Vec<RouteInf
 
 fn has_handler_function(path: &Path) -> Result<bool> {
     let content = fs::read_to_string(path)?;
+    if content.contains("type Props = Redirect") {
+        return Ok(false);
+    }
     Ok(content.contains("pub async fn handler"))
 }
 

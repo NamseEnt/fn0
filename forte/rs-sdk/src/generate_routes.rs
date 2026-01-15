@@ -25,7 +25,6 @@ pub fn generate_routes() {
         fs::write(&output_path, formatted).unwrap();
     }
 
-    // Generate frontend paths.generated.ts
     let fe_paths_content = generate_fe_paths(&pages);
     let current_fe_paths = fs::read_to_string(&fe_paths_output).unwrap_or_default();
     if current_fe_paths != fe_paths_content {
@@ -170,7 +169,6 @@ fn get_handler_type(content: &str) -> HandlerType {
                 if let syn::ReturnType::Type(_, ty) = &func.sig.output {
                     let type_str = quote!(#ty).to_string();
                     if type_str.contains("Result") && type_str.contains("Props") {
-                        // Check if Props is aliased to Redirect
                         if is_props_redirect(content) {
                             return HandlerType::Redirect;
                         }
