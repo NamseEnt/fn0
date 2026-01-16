@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
-import { PostType } from "@/types";
+import { createPost } from "@/actions/.generated";
 
 function buildGithubAuthUrl(oauthNonce: string): string {
   if (typeof window === "undefined") {
@@ -31,13 +31,13 @@ function RedirectToLogin({ oauthNonce }: { oauthNonce: string }) {
   return <div>ログイン中...</div>;
 }
 
+type PostType = "Normal" | "ShowLs";
+
 function WriteForm() {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [content, setContent] = useState("");
-  const [postType, setPostType] = useState<
-    typeof PostType.Normal | typeof PostType.ShowLs
-  >(PostType.Normal);
+  const [postType, setPostType] = useState<PostType>("Normal");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,37 +50,26 @@ function WriteForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/post/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title,
-          url,
-          content,
-          postType,
-        }),
+      const result = await createPost({
+        title,
+        url,
+        content,
+        postType: { t: postType },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Failed to create post:", data);
-        alert("投稿に失敗しました");
+      if (result.t === "Ok") {
+        window.location.href = `/post/${result.id}`;
         return;
       }
 
-      if (data.ok) {
-        window.location.href = `/post/${data.id}`;
+      if (result.t === "RateLimitExceeded") {
+        alert("投稿が多すぎます。しばらくお待ちください。");
         return;
       }
-      switch (data.error) {
-        case "RATE_LIMIT_EXCEEDED": {
-          return alert("投稿が多すぎます。しばらくお待ちください。");
-        }
-        default:
-          throw new Error(`Unexpected error: ${data.error}`);
+
+      if (result.t === "NotLoggedIn") {
+        alert("ログインが必要です。");
+        return;
       }
     } catch (error) {
       console.error("Error creating post:", error);
@@ -113,11 +102,9 @@ function WriteForm() {
               <input
                 type="radio"
                 name="postType"
-                value={PostType.Normal}
-                checked={postType === PostType.Normal}
-                onChange={(e) =>
-                  setPostType(e.target.value as typeof PostType.Normal)
-                }
+                value="Normal"
+                checked={postType === "Normal"}
+                onChange={(e) => setPostType(e.target.value as PostType)}
                 className="cursor-pointer"
               />
               <span>Normal</span>
@@ -126,11 +113,9 @@ function WriteForm() {
               <input
                 type="radio"
                 name="postType"
-                value={PostType.ShowLs}
-                checked={postType === PostType.ShowLs}
-                onChange={(e) =>
-                  setPostType(e.target.value as typeof PostType.ShowLs)
-                }
+                value="ShowLs"
+                checked={postType === "ShowLs"}
+                onChange={(e) => setPostType(e.target.value as PostType)}
                 className="cursor-pointer"
               />
               <span>Show ls</span>

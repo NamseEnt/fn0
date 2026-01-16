@@ -11,6 +11,8 @@ mod pages_post__id_;
 mod pages_write;
 #[path = "hooks/me.rs"]
 mod hooks_me;
+#[path = "actions/create_post.rs"]
+mod actions_create_post;
 use forte_sdk::anyhow::Result;
 use forte_sdk::http::{Error, Request, Response, StatusCode, body::Body, HeaderMap};
 use forte_sdk::http_header::{COOKIE, LOCATION, SET_COOKIE};
@@ -64,6 +66,10 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
     let uri_authority = uri_authority.as_str();
     if let Some(hook_name) = path.strip_prefix("/__forte_hook/") {
         return handle_hook(hook_name, uri_authority, &headers, &mut cookie_jar, body)
+            .await;
+    }
+    if let Some(action_name) = path.strip_prefix("/__forte_action/") {
+        return handle_action(action_name, uri_authority, &headers, &mut cookie_jar, body)
             .await;
     }
     let query_params: HashMap<String, String> = query
@@ -344,6 +350,47 @@ async fn handle_hook(
                 Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .body(Body::from(format!("Hook '{}' not found", hook_name)))
+                    .unwrap(),
+            )
+        }
+    }
+}
+async fn handle_action(
+    action_name: &str,
+    uri_authority: &str,
+    headers: &HeaderMap,
+    cookie_jar: &mut cookie::CookieJar,
+    mut body: Body,
+) -> Result<Response<Body>, Error> {
+    let body_bytes = body.contents().await?;
+    match action_name {
+        "create_post" => {
+            let input: actions_create_post::Input = serde_json::from_slice(body_bytes)
+                .map_err(|e| Error::msg(e.to_string()))?;
+            let req = ForteRequest {
+                uri_authority,
+                headers,
+                jar: cookie_jar,
+                body: input,
+            };
+            let output = actions_create_post::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(
+                build_response_with_cookies(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("content-type", "application/json")
+                        .body(Body::from(json))
+                        .unwrap(),
+                    cookie_jar,
+                ),
+            )
+        }
+        _ => {
+            Ok(
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from(format!("Action '{}' not found", action_name)))
                     .unwrap(),
             )
         }

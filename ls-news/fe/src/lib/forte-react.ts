@@ -97,3 +97,23 @@ export function clearHookCache(hookName?: string) {
     hookCache.clear();
   }
 }
+
+export async function callAction<T>(
+  actionName: string,
+  input: unknown,
+  schema: z.ZodSchema<T>
+): Promise<T> {
+  const res = await fetch(`/__forte_action/${actionName}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Action '${actionName}' failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return schema.parse(data);
+}
