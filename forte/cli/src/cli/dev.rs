@@ -1,5 +1,5 @@
 use crate::deps::DependencyPrebundler;
-use crate::server::{self, HmrModuleUpdate, ServerConfig, ServerHandle};
+use crate::server::{self, vite_dev, HmrModuleUpdate, ServerConfig, ServerHandle};
 use crate::ssr::SsrBundler;
 use anyhow::{Context, Result};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
@@ -294,22 +294,28 @@ pub async fn run(options: DevOptions) -> Result<()> {
     build_backend(&project_dir)?;
     build_css(&project_dir)?;
 
-    println!("[deps] Pre-bundling dependencies...");
-    let mut prebundler = DependencyPrebundler::new(&project_dir);
-    let dep_map = prebundler.prebundle()?;
-    println!("[deps] Pre-bundled {} dependencies", dep_map.entries.len());
-    let prebundler = std::sync::Arc::new(std::sync::Mutex::new(prebundler));
+    let use_vite_dev = true;
 
-    println!("[ssr] Building SSR bundle...");
-    let ssr_bundler = SsrBundler::new(&project_dir);
-    ssr_bundler.build()?;
+    let fe_dir = project_dir.join("fe");
+    let mut vite_server: Option<vite_dev::ViteServer> = None;
+
+    if use_vite_dev {
+        println!("[vite] Starting Vite dev server...");
+        let server = vite_dev::spawn_vite_server(&fe_dir)?;
+        vite_dev::wait_for_vite_ready(&server.socket_path).await?;
+        println!("[vite] Vite dev server ready on {:?}", server.socket_path);
+        vite_server = Some(server);
+    }
+
+    let prebundler = DependencyPrebundler::new(&project_dir);
+    let prebundler = std::sync::Arc::new(std::sync::Mutex::new(prebundler));
 
     let backend_path = project_dir
         .join("target/wasm32-wasip2/release/backend.wasm")
         .to_string_lossy()
         .to_string();
 
-    let frontend_path = ssr_bundler.output_path().to_string_lossy().to_string();
+    let frontend_path = String::new();
     let public_dir = project_dir.join("fe/public");
 
     let env_vars = server::create_env_vars(&project_dir);
@@ -321,13 +327,21 @@ pub async fn run(options: DevOptions) -> Result<()> {
         public_dir,
         project_root: project_dir.clone(),
         dev_mode: true,
+        use_vite_dev,
+        vite_socket_path: vite_server.as_ref().map(|s| s.socket_path.clone()),
         prebundler,
         env_vars,
     };
 
     let handle = server::run(config).await?;
 
-    run_watch_loop(&project_dir, handle).await
+    let result = run_watch_loop(&project_dir, handle).await;
+
+    if let Some(mut server) = vite_server {
+        let _ = server.child.kill();
+    }
+
+    result
 }
 
 async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> {
