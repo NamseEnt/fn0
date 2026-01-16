@@ -6,15 +6,18 @@ pub fn generate_routes() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let pages_dir = Path::new(&manifest_dir).join("src/pages");
     let hooks_dir = Path::new(&manifest_dir).join("src/hooks");
+    let actions_dir = Path::new(&manifest_dir).join("src/actions");
     let output_path = Path::new(&manifest_dir).join("src/route_generated.rs");
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
     println!("cargo:rerun-if-changed=src/pages");
     println!("cargo:rerun-if-changed=src/hooks");
+    println!("cargo:rerun-if-changed=src/actions");
 
     let pages = discover_pages(&pages_dir);
     let hooks = discover_hooks(&hooks_dir);
-    let tokens = generate_code(&pages, &hooks);
+    let actions = discover_actions(&actions_dir);
+    let tokens = generate_code(&pages, &hooks, &actions);
 
     let syntax_tree = syn::parse2::<syn::File>(tokens).expect("Failed to parse generated code");
     let formatted = prettyplease::unparse(&syntax_tree);
@@ -64,6 +67,13 @@ struct PathParamField {
 
 #[derive(Debug)]
 struct HookInfo {
+    name: String,
+    module_name: String,
+    module_path: String,
+}
+
+#[derive(Debug)]
+struct ActionInfo {
     name: String,
     module_name: String,
     module_path: String,
@@ -137,6 +147,85 @@ fn has_hook_handler(content: &str) -> bool {
                 let is_handler_fn = func.sig.ident == "handler";
 
                 if is_pub && is_handler_fn {
+                    has_handler = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    has_input && has_output && has_handler
+}
+
+fn discover_actions(actions_dir: &Path) -> Vec<ActionInfo> {
+    let mut actions = Vec::new();
+
+    if !actions_dir.exists() {
+        return actions;
+    }
+
+    let Ok(entries) = fs::read_dir(actions_dir) else {
+        return actions;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_file() && path.extension().map(|e| e == "rs").unwrap_or(false) {
+            let file_name = path.file_stem().unwrap().to_string_lossy().to_string();
+
+            if file_name == "mod" {
+                continue;
+            }
+
+            let Some(content) = fs::read_to_string(&path).ok() else {
+                continue;
+            };
+
+            if has_action_handler(&content) {
+                let module_name = format!("actions_{}", file_name);
+                let module_path = format!("actions/{}.rs", file_name);
+                actions.push(ActionInfo {
+                    name: file_name,
+                    module_name,
+                    module_path,
+                });
+            }
+        }
+    }
+
+    actions
+}
+
+fn has_action_handler(content: &str) -> bool {
+    let Ok(syntax_tree) = syn::parse_file(content) else {
+        return false;
+    };
+
+    let mut has_input = false;
+    let mut has_output = false;
+    let mut has_handler = false;
+
+    for item in syntax_tree.items {
+        match item {
+            syn::Item::Struct(item_struct) => {
+                if item_struct.ident == "Input" {
+                    has_input = true;
+                } else if item_struct.ident == "Output" {
+                    has_output = true;
+                }
+            }
+            syn::Item::Enum(item_enum) => {
+                if item_enum.ident == "Output" {
+                    has_output = true;
+                }
+            }
+            syn::Item::Fn(func) => {
+                let is_pub = matches!(func.vis, syn::Visibility::Public(_));
+                let is_async = func.sig.asyncness.is_some();
+                let is_handler_fn = func.sig.ident == "handler";
+
+                if is_pub && is_async && is_handler_fn {
                     has_handler = true;
                 }
             }
@@ -391,12 +480,14 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
     }
 }
 
-fn generate_code(pages: &[PageInfo], hooks: &[HookInfo]) -> TokenStream {
+fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo]) -> TokenStream {
     let module_declarations = generate_module_declarations(pages);
     let hook_module_declarations = generate_hook_module_declarations(hooks);
+    let action_module_declarations = generate_action_module_declarations(actions);
     let route_matches = generate_route_matches(pages);
     let redirect_enum = generate_redirect_enum(pages);
     let hook_handler = generate_hook_handler(hooks);
+    let action_handler = generate_action_handler(actions);
 
     let route_chain = if route_matches.is_empty() {
         quote! {
@@ -426,6 +517,7 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo]) -> TokenStream {
 
         #(#module_declarations)*
         #(#hook_module_declarations)*
+        #(#action_module_declarations)*
 
         use forte_sdk::anyhow::Result;
         use forte_sdk::http::{Error, Request, Response, StatusCode, body::Body, HeaderMap};
@@ -455,6 +547,10 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo]) -> TokenStream {
                 return handle_hook(hook_name, uri_authority, &headers, &mut cookie_jar, body).await;
             }
 
+            if let Some(action_name) = path.strip_prefix("/__forte_action/") {
+                return handle_action(action_name, uri_authority, &headers, &mut cookie_jar, body).await;
+            }
+
             let query_params: HashMap<String, String> = query
                 .split('&')
                 .filter(|s| !s.is_empty())
@@ -470,6 +566,8 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo]) -> TokenStream {
         }
 
         #hook_handler
+
+        #action_handler
 
         fn make_cookie_jar(headers: &HeaderMap) -> cookie::CookieJar {
             let mut jar = cookie::CookieJar::new();
@@ -976,6 +1074,91 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                 _ => Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .body(Body::from(format!("Hook '{}' not found", hook_name)))
+                    .unwrap()),
+            }
+        }
+    }
+}
+
+fn generate_action_module_declarations(actions: &[ActionInfo]) -> Vec<TokenStream> {
+    actions
+        .iter()
+        .map(|action| {
+            let module_name = format_ident!("{}", action.module_name);
+            let module_path = &action.module_path;
+
+            quote! {
+                #[path = #module_path]
+                mod #module_name;
+            }
+        })
+        .collect()
+}
+
+fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
+    if actions.is_empty() {
+        return quote! {
+            async fn handle_action(
+                action_name: &str,
+                _uri_authority: &str,
+                _headers: &HeaderMap,
+                _cookie_jar: &mut cookie::CookieJar,
+                _body: Body,
+            ) -> Result<Response<Body>, Error> {
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from(format!("Action '{}' not found", action_name)))
+                    .unwrap())
+            }
+        };
+    }
+
+    let action_matches: Vec<TokenStream> = actions
+        .iter()
+        .map(|action| {
+            let name = &action.name;
+            let module_name = format_ident!("{}", action.module_name);
+
+            quote! {
+                #name => {
+                    let input: #module_name::Input = serde_json::from_slice(body_bytes)
+                        .map_err(|e| Error::msg(e.to_string()))?;
+                    let req = ForteRequest {
+                        uri_authority,
+                        headers,
+                        jar: cookie_jar,
+                        body: input,
+                    };
+                    let output = #module_name::handler(req).await;
+                    let json = forte_json::to_vec(&output);
+                    Ok(build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::OK)
+                            .header("content-type", "application/json")
+                            .body(Body::from(json))
+                            .unwrap(),
+                        cookie_jar,
+                    ))
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        async fn handle_action(
+            action_name: &str,
+            uri_authority: &str,
+            headers: &HeaderMap,
+            cookie_jar: &mut cookie::CookieJar,
+            mut body: Body,
+        ) -> Result<Response<Body>, Error> {
+            let body_bytes = body.contents().await?;
+
+            match action_name {
+                #(#action_matches)*
+                _ => Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from(format!("Action '{}' not found", action_name)))
                     .unwrap()),
             }
         }

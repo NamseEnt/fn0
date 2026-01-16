@@ -1,4 +1,4 @@
-import type { Props, Post, Comment, User } from "./.props";
+import type { Props, Post, Comment, UserDoc } from "./.props";
 import { Layout } from "@/components/Layout";
 import { Link } from "@/components/ui/link";
 import { IconButton } from "@/components/ui/icon-button";
@@ -52,7 +52,7 @@ function PostHeader({
   commentsCount,
 }: {
   post: Post;
-  author: User | undefined;
+  author: UserDoc | undefined;
   commentsCount: number;
 }) {
   const timeAgo = getRelativeTimeText(post.createdAt);
@@ -118,7 +118,7 @@ function CommentList({
   users,
 }: {
   comments: Comment[];
-  users: Record<string, User>;
+  users: Record<string, UserDoc>;
 }) {
   const commentsMap = new Map<string, Comment>();
   comments.forEach((comment) => {
@@ -155,7 +155,7 @@ function CommentItem({
   indent,
 }: {
   comment: Comment;
-  author: User | undefined;
+  author: UserDoc | undefined;
   indent: number;
 }) {
   const timeAgo = getRelativeTimeText(comment.createdAt);
