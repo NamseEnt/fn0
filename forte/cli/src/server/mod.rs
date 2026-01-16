@@ -108,7 +108,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
-    println!("Forte dev server listening on http://{}", addr);
+    println!("Listening on http://localhost:{}", config.port);
 
     let frontend_path = Arc::new(config.frontend_path);
     tokio::spawn(async move {
