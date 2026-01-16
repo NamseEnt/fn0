@@ -42,7 +42,6 @@ async function main() {{
     const vite = await createServer({{
         server: {{
             middlewareMode: true,
-            hmr: false,
         }},
         appType: "custom",
     }});
