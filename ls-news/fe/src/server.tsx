@@ -1,4 +1,4 @@
-import { renderToReadableStream } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server.browser";
 import { routes } from "./routes.generated";
 import { serializeHookCache, clearHookCache } from "./lib/forte-react";
 
@@ -65,7 +65,6 @@ export async function render(url: string, rawProps: any): Promise<string> {
     return "Not Found";
   }
 
-  // Clear hook cache for fresh request
   clearHookCache();
 
   const [pageModule, schemaModule] = await Promise.all([
@@ -76,14 +75,9 @@ export async function render(url: string, rawProps: any): Promise<string> {
   const allProps = { ...props, params: matched.params };
   const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
-  const hmrScript = `<script type="module" src="/__hmr-client.js"></script>`;
-  const reactRefreshScript = `<script type="module" src="/__react-refresh.js"></script>`;
-  const clientScript = `/src/client.tsx`;
-
   const stream = await renderToReadableStream(pageModule.default(allProps));
   const html = await streamToString(stream);
 
-  // Serialize hook cache for client hydration
   const hookCacheJson = serializeHookCache();
 
   return `<!DOCTYPE html>
@@ -93,14 +87,13 @@ export async function render(url: string, rawProps: any): Promise<string> {
     <meta name="viewport" content="width=device-width" />
     <title>ls-news</title>
     <link rel="stylesheet" href="/src/styles/globals.css" />
-    ${hmrScript}
-    ${reactRefreshScript}
+    <script type="module" src="/@vite/client"></script>
 </head>
 <body>
     <div id="root">${html}</div>
     <script>window.__FORTE_PROPS__ = ${propsJson};</script>
     <script>window.__FORTE_HOOK_CACHE__ = ${hookCacheJson};</script>
-    <script type="module" src="${clientScript}"></script>
+    <script type="module" src="/src/client.tsx"></script>
 </body>
 </html>`;
 }

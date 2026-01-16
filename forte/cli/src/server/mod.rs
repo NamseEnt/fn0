@@ -2,6 +2,7 @@ mod cache;
 mod fetch_handler;
 mod hmr;
 mod transform_server;
+pub mod vite_dev;
 
 use anyhow::Result;
 pub use cache::SimpleCache;
@@ -17,7 +18,10 @@ use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+#[cfg(unix)]
+use tokio::net::UnixStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
 pub use transform_server::TransformServer;
@@ -32,6 +36,8 @@ pub struct ServerConfig {
     pub public_dir: PathBuf,
     pub project_root: PathBuf,
     pub dev_mode: bool,
+    pub use_vite_dev: bool,
+    pub vite_socket_path: Option<PathBuf>,
     pub prebundler: Arc<Mutex<DependencyPrebundler>>,
     pub env_vars: EnvVars,
 }
@@ -77,7 +83,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let cache = SimpleCache::new(config.backend_path.clone(), config.frontend_path.clone());
     let hmr = HmrBroadcaster::new();
 
-    let transform_server = if config.dev_mode {
+    let transform_server = if config.dev_mode && !config.use_vite_dev {
         Some(Arc::new(TransformServer::new(
             &config.project_root,
             config.prebundler.clone(),
@@ -86,6 +92,9 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     } else {
         None
     };
+
+    let use_vite_dev = config.use_vite_dev;
+    let vite_socket_path = config.vite_socket_path.map(Arc::new);
 
     let fn0 = Arc::new(Fn0::new(cache.clone(), cache.clone(), deployment_map, config.env_vars));
 
@@ -116,7 +125,9 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
             let hmr_clone = hmr.clone();
             let transform_server_clone = transform_server.clone();
             let frontend_path_clone = frontend_path.clone();
+            let vite_socket_path_clone = vite_socket_path.clone();
 
+            let use_vite_dev_clone = use_vite_dev;
             tokio::spawn(async move {
                 let io = TokioIo::new(socket);
                 let conn = http1::Builder::new().serve_connection(
@@ -127,7 +138,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let hmr = hmr_clone.clone();
                         let ts = transform_server_clone.clone();
                         let frontend_path = frontend_path_clone.clone();
-                        handle_request(req, fn0, public_dir, hmr, ts, frontend_path)
+                        let vite_socket = vite_socket_path_clone.clone();
+                        handle_request(req, fn0, public_dir, hmr, ts, frontend_path, use_vite_dev_clone, vite_socket)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -147,6 +159,8 @@ async fn handle_request(
     hmr: HmrBroadcaster,
     transform_server: Option<Arc<TransformServer>>,
     frontend_path: Arc<String>,
+    use_vite_dev: bool,
+    vite_socket_path: Option<Arc<PathBuf>>,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
@@ -155,8 +169,14 @@ async fn handle_request(
         .map(|pq| pq.as_str())
         .unwrap_or(path);
 
-    if path == "/__hmr" {
+    if path == "/__hmr" && !use_vite_dev {
         return handle_hmr_upgrade(req, hmr).await;
+    }
+
+    if use_vite_dev && should_proxy_to_vite(path) {
+        if let Some(socket_path) = &vite_socket_path {
+            return proxy_to_vite_uds(socket_path, path_with_query).await;
+        }
     }
 
     if let Some(ts) = &transform_server {
@@ -214,6 +234,16 @@ async fn handle_request(
 
     if path.starts_with("/__forte_hook/") {
         return Ok(backend_response);
+    }
+
+    if use_vite_dev {
+        if let Some(socket_path) = &vite_socket_path {
+            let (_, body) = backend_response.into_parts();
+            let body_bytes = body.collect().await?.to_bytes();
+            let props: serde_json::Value = serde_json::from_slice(&body_bytes)?;
+
+            return call_vite_ssr_uds(socket_path, &uri.to_string(), props).await;
+        }
     }
 
     let frontend_request = Request::builder()
@@ -423,4 +453,91 @@ async fn handle_hmr_upgrade(
                 .map_err(|e| anyhow::anyhow!("{e}"))
                 .boxed_unsync(),
         )?)
+}
+
+fn should_proxy_to_vite(path: &str) -> bool {
+    path.starts_with("/src/")
+        || path.starts_with("/@vite/")
+        || path.starts_with("/@id/")
+        || path.starts_with("/@fs/")
+        || path.starts_with("/__vite")
+        || path.starts_with("/node_modules/")
+        || path == "/@react-refresh"
+}
+
+#[cfg(unix)]
+async fn proxy_to_vite_uds(socket_path: &Path, path: &str) -> Result<fn0::Response> {
+    let mut stream = UnixStream::connect(socket_path).await?;
+
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        path
+    );
+    stream.write_all(request.as_bytes()).await?;
+
+    let mut response_bytes = Vec::new();
+    stream.read_to_end(&mut response_bytes).await?;
+
+    parse_http_response(&response_bytes)
+}
+
+#[cfg(unix)]
+async fn call_vite_ssr_uds(socket_path: &Path, url: &str, props: serde_json::Value) -> Result<fn0::Response> {
+    let mut stream = UnixStream::connect(socket_path).await?;
+
+    let body = serde_json::json!({
+        "url": url,
+        "props": props,
+    })
+    .to_string();
+
+    let request = format!(
+        "POST /__ssr_render HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    stream.write_all(request.as_bytes()).await?;
+
+    let mut response_bytes = Vec::new();
+    stream.read_to_end(&mut response_bytes).await?;
+
+    parse_http_response(&response_bytes)
+}
+
+fn parse_http_response(response_bytes: &[u8]) -> Result<fn0::Response> {
+    let response_str = String::from_utf8_lossy(response_bytes);
+
+    let header_end = response_str
+        .find("\r\n\r\n")
+        .ok_or_else(|| anyhow::anyhow!("Invalid HTTP response"))?;
+
+    let header_part = &response_str[..header_end];
+    let body_start = header_end + 4;
+    let body = &response_bytes[body_start..];
+
+    let mut lines = header_part.lines();
+    let status_line = lines.next().ok_or_else(|| anyhow::anyhow!("Missing status line"))?;
+
+    let status_code: u16 = status_line
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(500);
+
+    let mut builder = Response::builder().status(status_code);
+
+    for line in lines {
+        if let Some((key, value)) = line.split_once(": ") {
+            let key_lower = key.to_lowercase();
+            if key_lower != "transfer-encoding" && key_lower != "content-length" {
+                builder = builder.header(key, value);
+            }
+        }
+    }
+
+    Ok(builder.body(
+        Full::new(bytes::Bytes::from(body.to_vec()))
+            .map_err(|e| anyhow::anyhow!("{e}"))
+            .boxed_unsync(),
+    )?)
 }
