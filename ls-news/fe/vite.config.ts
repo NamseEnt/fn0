@@ -13,6 +13,13 @@ export default defineConfig(({ command }) => {
         "@": path.resolve(__dirname, "src"),
       },
     },
+    server: {
+      hmr: {
+        host: "localhost",
+        protocol: "ws",
+      },
+      cors: true,
+    },
     ssr: isBuild
       ? {
           target: "webworker",

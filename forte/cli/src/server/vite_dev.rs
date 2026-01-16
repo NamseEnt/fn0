@@ -46,6 +46,7 @@ async function main() {{
         appType: "custom",
     }});
 
+
     const server = createHttpServer(async (req, res) => {{
         if (req.method === "POST" && req.url === "/__ssr_render") {{
             let body = "";
