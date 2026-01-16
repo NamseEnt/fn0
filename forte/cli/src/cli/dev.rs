@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::mpsc::channel;
 use std::time::{Duration, SystemTime};
 
@@ -43,14 +43,15 @@ fn run_codegen(project_dir: &Path) -> Result<()> {
         .expect("Failed to get parent of CARGO_MANIFEST_DIR")
         .join("forte-rs-to-ts");
 
-    println!("[codegen] Running forte-rs-to-ts...");
     let status = Command::new("cargo")
         .arg("run")
         .arg("--release")
+        .arg("--quiet")
         .arg("--")
         .arg(&rs_dir)
         .current_dir(&forte_rs_to_ts_dir)
         .env_remove("RUSTUP_TOOLCHAIN")
+        .stdout(Stdio::null())
         .status()
         .context("Failed to run forte-rs-to-ts. Is it installed?")?;
 
@@ -76,8 +77,6 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
     if !pages_dir.exists() {
         return Ok(());
     }
-
-    println!("[codegen] Generating frontend routes...");
 
     let mut routes = Vec::new();
     scan_pages_dir(&pages_dir, &pages_dir, &mut routes)?;
@@ -110,8 +109,6 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
     output.push_str("];\n");
 
     fs::write(fe_src_dir.join("routes.generated.ts"), output)?;
-
-    println!("[codegen] Generated {} route(s)", routes.len());
 
     Ok(())
 }
@@ -196,10 +193,10 @@ fn build_fe_page_path(route_path: &str) -> String {
 }
 
 fn build_backend(project_dir: &Path) -> Result<()> {
-    println!("[build] Building backend...");
     let status = Command::new("cargo")
         .arg("build")
         .arg("--release")
+        .arg("--quiet")
         .arg("--target")
         .arg("wasm32-wasip2")
         .arg("-p")
@@ -210,36 +207,6 @@ fn build_backend(project_dir: &Path) -> Result<()> {
 
     if !status.success() {
         anyhow::bail!("cargo build failed with status: {}", status);
-    }
-
-    Ok(())
-}
-
-fn build_css(project_dir: &Path) -> Result<()> {
-    let fe_dir = project_dir.join("fe");
-    let input_css = fe_dir.join("src/styles/globals.css");
-    let output_dir = fe_dir.join(".forte/styles");
-    let output_css = output_dir.join("globals.css");
-
-    if !input_css.exists() {
-        return Ok(());
-    }
-
-    fs::create_dir_all(&output_dir)?;
-
-    println!("[css] Building CSS with Tailwind...");
-    let status = Command::new("npx")
-        .arg("@tailwindcss/cli")
-        .arg("-i")
-        .arg(&input_css)
-        .arg("-o")
-        .arg(&output_css)
-        .current_dir(&fe_dir)
-        .status()
-        .context("Failed to run tailwindcss CLI. Is @tailwindcss/cli installed?")?;
-
-    if !status.success() {
-        anyhow::bail!("tailwindcss build failed with status: {}", status);
     }
 
     Ok(())
@@ -287,12 +254,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
         }
     };
 
-    println!("Starting Forte dev server...");
-    println!("Project directory: {}", project_dir.display());
-
     run_codegen(&project_dir)?;
     build_backend(&project_dir)?;
-    build_css(&project_dir)?;
 
     let use_vite_dev = true;
 
@@ -300,10 +263,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let mut vite_server: Option<vite_dev::ViteServer> = None;
 
     if use_vite_dev {
-        println!("[vite] Starting Vite dev server...");
         let server = vite_dev::spawn_vite_server(&fe_dir)?;
         vite_dev::wait_for_vite_ready(&server.socket_path).await?;
-        println!("[vite] Vite dev server ready on {:?}", server.socket_path);
         vite_server = Some(server);
     }
 
@@ -364,8 +325,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
             .watcher()
             .watch(&env_file, RecursiveMode::NonRecursive)?;
     }
-
-    println!("[watch] Watching for changes in rs/src, fe/src, and .env...");
 
     let mut known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
     let mut known_fe_mtimes = collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
@@ -429,7 +388,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                     known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
                     let new_vars = server::load_env_file(project_dir);
                     handle.fn0.update_env(new_vars);
-                    println!("[env] .env reloaded");
                 }
 
                 if !rs_changes.is_empty() {
@@ -446,25 +404,7 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                 }
 
                 if !fe_changes.is_empty() {
-                    let css_changes: Vec<_> = fe_changes
-                        .iter()
-                        .filter(|e| e.path.extension().is_some_and(|ext| ext == "css"))
-                        .collect();
-
-                    let js_changes: Vec<_> = fe_changes
-                        .iter()
-                        .filter(|e| e.path.extension().is_some_and(|ext| ext != "css"))
-                        .collect();
-
-                    if !css_changes.is_empty() {
-                        if let Err(e) = build_css(project_dir) {
-                            eprintln!("[watch] CSS rebuild failed: {}", e);
-                        } else {
-                            handle.hmr.send_reload();
-                        }
-                    }
-
-                    for e in &js_changes {
+                    for e in &fe_changes {
                         handle_frontend_change(&e.path, &handle);
                     }
 

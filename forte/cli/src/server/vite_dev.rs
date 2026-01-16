@@ -3,12 +3,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use uuid::Uuid;
 
-pub fn generate_vite_server_script(fe_dir: &Path, socket_path: &Path) -> String {
-    let fe_dir_str = fe_dir.display();
+pub fn generate_vite_server_script(socket_path: &Path) -> String {
     let socket_path_str = socket_path.display();
     format!(
         r#"import {{ createServer }} from "vite";
-import react from "@vitejs/plugin-react";
 import {{ createServer as createHttpServer }} from "http";
 import {{ unlinkSync, existsSync }} from "fs";
 
@@ -30,12 +28,10 @@ process.on("SIGTERM", () => {{ cleanup(); process.exit(0); }});
 
 process.stdin.resume();
 process.stdin.on("end", () => {{
-    console.log("[vite-ssr] Parent process died, exiting...");
     cleanup();
     process.exit(0);
 }});
 process.stdin.on("close", () => {{
-    console.log("[vite-ssr] Parent process died, exiting...");
     cleanup();
     process.exit(0);
 }});
@@ -44,19 +40,11 @@ async function main() {{
     cleanup();
 
     const vite = await createServer({{
-        configFile: false,
-        root: "{fe_dir_str}",
-        plugins: [react()],
         server: {{
             middlewareMode: true,
             hmr: false,
         }},
         appType: "custom",
-        resolve: {{
-            alias: {{
-                "@": "{fe_dir_str}/src",
-            }},
-        }},
     }});
 
     const server = createHttpServer(async (req, res) => {{
@@ -85,9 +73,7 @@ async function main() {{
         vite.middlewares(req, res);
     }});
 
-    server.listen(SOCKET_PATH, () => {{
-        console.log(`[vite-ssr] Server ready on ${{SOCKET_PATH}}`);
-    }});
+    server.listen(SOCKET_PATH);
 }}
 
 main().catch((e) => {{
@@ -111,14 +97,14 @@ pub fn spawn_vite_server(fe_dir: &Path) -> Result<ViteServer> {
     let socket_path = dev_dir.join(format!("vite-{}.sock", session_id));
 
     let script_path = dev_dir.join(format!("vite-ssr-server-{}.mjs", session_id));
-    let script_content = generate_vite_server_script(fe_dir, &socket_path);
+    let script_content = generate_vite_server_script(&socket_path);
     std::fs::write(&script_path, &script_content)?;
 
     let child = Command::new("node")
         .arg(&script_path)
         .current_dir(fe_dir)
         .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
+        .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()?;
 
