@@ -9,6 +9,12 @@ type CacheEntry<T> = {
 const isSSR = typeof window === "undefined";
 
 const hookCache = new Map<string, CacheEntry<unknown>>();
+const collectedCookies: string[] = [];
+let requestCookie: string | null = null;
+
+export function setRequestCookie(cookie: string | null): void {
+  requestCookie = cookie;
+}
 
 if (!isSSR && (window as any).__FORTE_HOOK_CACHE__) {
   const serialized = (window as any).__FORTE_HOOK_CACHE__ as Record<
@@ -47,14 +53,22 @@ export function useForteHook<T>(
 
   // Hooks are only fetched during SSR, never in browser (browser uses cached results)
   const fortePort = process.env["FORTE_PORT"];
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (requestCookie) {
+    headers["Cookie"] = requestCookie;
+  }
   const promise = fetch(`http://localhost:${fortePort}/__forte_hook/${hookName}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(input),
   })
     .then((res) => {
       if (!res.ok) {
         throw new Error(`Hook '${hookName}' failed: ${res.status}`);
+      }
+      const setCookies = res.headers.getSetCookie?.() ?? [];
+      for (const cookie of setCookies) {
+        collectedCookies.push(cookie);
       }
       return res.json();
     })
@@ -84,6 +98,14 @@ export function serializeHookCache(): string {
   return JSON.stringify(serialized)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e");
+}
+
+export function getCollectedCookies(): string[] {
+  return [...collectedCookies];
+}
+
+export function clearCollectedCookies(): void {
+  collectedCookies.length = 0;
 }
 
 export function clearHookCache(hookName?: string) {
