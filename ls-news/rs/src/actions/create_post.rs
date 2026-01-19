@@ -1,5 +1,5 @@
 use crate::common::auth::get_me;
-use crate::docs::Post;
+use crate::docs::PostDoc;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +34,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let id = generate_id();
     let now = now();
 
-    let post = Post {
+    let post = PostDoc {
         id: id.clone(),
         title: req.body.title,
         url: req.body.url,
@@ -46,10 +46,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         updated_at: now,
     };
 
-    if let Err(e) = forte_db::turso()
-        .put("posts", &id, &serde_json::to_vec(&post).unwrap())
-        .await
-    {
+    if let Err(e) = post.put().await {
         eprintln!("Failed to create post: {:?}", e);
         return Output::RateLimitExceeded;
     }
