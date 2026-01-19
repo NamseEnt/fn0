@@ -242,7 +242,12 @@ async fn handle_request(
             let body_bytes = body.collect().await?.to_bytes();
             let props: serde_json::Value = serde_json::from_slice(&body_bytes)?;
 
-            return call_vite_ssr_uds(socket_path, &uri.to_string(), props).await;
+            let cookie_header = original_headers
+                .get(http::header::COOKIE)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
+            return call_vite_ssr_uds(socket_path, &uri.to_string(), props, cookie_header).await;
         }
     }
 
@@ -482,12 +487,13 @@ async fn proxy_to_vite_uds(socket_path: &Path, path: &str) -> Result<fn0::Respon
 }
 
 #[cfg(unix)]
-async fn call_vite_ssr_uds(socket_path: &Path, url: &str, props: serde_json::Value) -> Result<fn0::Response> {
+async fn call_vite_ssr_uds(socket_path: &Path, url: &str, props: serde_json::Value, cookie: Option<String>) -> Result<fn0::Response> {
     let mut stream = UnixStream::connect(socket_path).await?;
 
     let body = serde_json::json!({
         "url": url,
         "props": props,
+        "cookie": cookie,
     })
     .to_string();
 

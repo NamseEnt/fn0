@@ -1,6 +1,6 @@
 import { renderToReadableStream } from "react-dom/server.browser";
 import { routes } from "./routes.generated";
-import { serializeHookCache, clearHookCache } from "./lib/forte-react";
+import { serializeHookCache, clearHookCache, getCollectedCookies, clearCollectedCookies, setRequestCookie } from "./lib/forte-react";
 
 function matchRoute(
   pathname: string
@@ -57,15 +57,17 @@ async function streamToString(stream: ReadableStream<Uint8Array>): Promise<strin
   return new TextDecoder().decode(result);
 }
 
-export async function render(url: string, rawProps: any): Promise<string> {
+export async function render(url: string, rawProps: any, cookie?: string | null): Promise<{ html: string; cookies: string[] }> {
   const urlObj = new URL(url, "http://localhost");
   const matched = matchRoute(urlObj.pathname);
 
   if (!matched) {
-    return "Not Found";
+    return { html: "Not Found", cookies: [] };
   }
 
   clearHookCache();
+  clearCollectedCookies();
+  setRequestCookie(cookie ?? null);
 
   const [pageModule, schemaModule] = await Promise.all([
     matched.route.component(),
@@ -79,8 +81,10 @@ export async function render(url: string, rawProps: any): Promise<string> {
   const html = await streamToString(stream);
 
   const hookCacheJson = serializeHookCache();
+  const cookies = getCollectedCookies();
 
-  return `<!DOCTYPE html>
+  return {
+    html: `<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
@@ -102,7 +106,9 @@ export async function render(url: string, rawProps: any): Promise<string> {
     <script>window.__FORTE_HOOK_CACHE__ = ${hookCacheJson};</script>
     <script type="module" src="/src/client.tsx"></script>
 </body>
-</html>`;
+</html>`,
+    cookies,
+  };
 }
 
 (globalThis as any).handler = async function handler(
@@ -120,8 +126,9 @@ export async function render(url: string, rawProps: any): Promise<string> {
 
   const matched = matchRoute(url.pathname);
   if (matched) {
-    // Clear hook cache for fresh request
+    // Clear hook cache and cookies for fresh request
     clearHookCache();
+    clearCollectedCookies();
 
     const [pageModule, schemaModule] = await Promise.all([
       matched.route.component(),
@@ -149,6 +156,12 @@ export async function render(url: string, rawProps: any): Promise<string> {
     // Serialize hook cache for client hydration
     const hookCacheJson = serializeHookCache();
 
+    const cookies = getCollectedCookies();
+    const headers = new Headers({ "Content-Type": "text/html" });
+    for (const cookie of cookies) {
+      headers.append("Set-Cookie", cookie);
+    }
+
     return new Response(
       `<!DOCTYPE html>
 <html lang="ja">
@@ -167,9 +180,7 @@ export async function render(url: string, rawProps: any): Promise<string> {
     <script type="module" src="${clientScript}"></script>
 </body>
 </html>`,
-      {
-        headers: { "Content-Type": "text/html" },
-      }
+      { headers }
     );
   }
 

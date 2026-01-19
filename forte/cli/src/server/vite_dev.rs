@@ -55,12 +55,17 @@ async function main() {{
             }});
             req.on("end", async () => {{
                 try {{
-                    const {{ url, props }} = JSON.parse(body);
+                    const {{ url, props, cookie }} = JSON.parse(body);
                     const {{ render }} = await vite.ssrLoadModule("/src/server.tsx");
-                    const html = await render(url, props);
-                    const htmlBuffer = Buffer.from(html);
+                    const result = await render(url, props, cookie);
+                    const htmlBuffer = Buffer.from(result.html);
                     res.useChunkedEncodingByDefault = false;
-                    res.writeHead(200, {{ "Content-Type": "text/html", "Content-Length": htmlBuffer.length }});
+                    res.setHeader("Content-Type", "text/html");
+                    res.setHeader("Content-Length", htmlBuffer.length);
+                    if (result.cookies && result.cookies.length > 0) {{
+                        res.setHeader("Set-Cookie", result.cookies);
+                    }}
+                    res.writeHead(200);
                     res.end(htmlBuffer);
                 }} catch (e) {{
                     vite.ssrFixStacktrace(e);

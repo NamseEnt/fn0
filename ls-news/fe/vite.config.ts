@@ -7,6 +7,8 @@ export default defineConfig(({ command }) => {
   const isBuild = command === "build";
 
   return {
+    envDir: path.resolve(__dirname, ".."),
+    envPrefix: "PUBLIC_",
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
