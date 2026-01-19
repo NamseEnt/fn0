@@ -58,8 +58,10 @@ async function main() {{
                     const {{ url, props }} = JSON.parse(body);
                     const {{ render }} = await vite.ssrLoadModule("/src/server.tsx");
                     const html = await render(url, props);
-                    res.writeHead(200, {{ "Content-Type": "text/html" }});
-                    res.end(html);
+                    const htmlBuffer = Buffer.from(html);
+                    res.useChunkedEncodingByDefault = false;
+                    res.writeHead(200, {{ "Content-Type": "text/html", "Content-Length": htmlBuffer.length }});
+                    res.end(htmlBuffer);
                 }} catch (e) {{
                     vite.ssrFixStacktrace(e);
                     console.error("[vite-ssr] Error:", e.stack || e.message);
