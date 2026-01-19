@@ -1313,6 +1313,7 @@ dependencies = [
  "sha2",
  "syn",
  "time",
+ "uuid",
  "wstd",
 ]
 

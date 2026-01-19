@@ -22,3 +22,4 @@ hex = "0.4.3"
 chrono = { version = "0.4.42", features = ["serde"] }
 futures = "0.3.31"
 time = "0.3.44"
+uuid = { version = "1.19.0", features = ["v7"] }

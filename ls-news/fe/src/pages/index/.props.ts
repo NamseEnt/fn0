@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 
-export const PostSchema = z.object({
+export const PostDocSchema = z.object({
     id: z.string(),
     title: z.string(),
     url: z.string(),
@@ -14,7 +14,7 @@ export const PostSchema = z.object({
     updatedAt: z.coerce.date(),
   });
 
-export type Post = z.infer<typeof PostSchema>;
+export type PostDoc = z.infer<typeof PostDocSchema>;
 
 export const UserSchema = z.object({
     id: z.string(),
@@ -25,7 +25,7 @@ export const UserSchema = z.object({
 export type User = z.infer<typeof UserSchema>;
 
 export const RowSchema = z.object({
-    post: PostSchema,
+    post: PostDocSchema,
     deletedAt: z.coerce.date().optional(),
     author: UserSchema,
   });

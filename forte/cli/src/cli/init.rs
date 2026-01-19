@@ -66,11 +66,6 @@ pub fn run(name: &str) -> Result<()> {
         generate_robots_txt(),
     )?;
 
-    fs::write(
-        project_dir.join("fe/dev-server.mjs"),
-        generate_dev_server_mjs(),
-    )?;
-
     install_npm_packages(project_dir)?;
 
     println!("Created project '{}'", name);
@@ -103,7 +98,6 @@ fn install_npm_packages(project_dir: &Path) -> Result<()> {
         "@types/react",
         "@types/react-dom",
         "@vitejs/plugin-react",
-        "express",
         "typescript",
         "vite",
     ];
@@ -494,51 +488,6 @@ export default function IndexPage(props: Props) {
 fn generate_robots_txt() -> &'static str {
     r#"User-agent: *
 Allow: /
-"#
-}
-
-fn generate_dev_server_mjs() -> &'static str {
-    r#"import express from "express";
-import { createServer as createViteServer } from "vite";
-import { createServer } from "http";
-
-async function startDevServer() {
-  const app = express();
-  app.use(express.json({ limit: "50mb" }));
-
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: "custom",
-  });
-
-  app.use(vite.middlewares);
-
-  app.post("/__ssr_render", async (req, res) => {
-    try {
-      const { url, props } = req.body;
-      const serverModule = await vite.ssrLoadModule("/src/server.tsx");
-      const html = await serverModule.render(url, props);
-      res.set("Content-Type", "text/html");
-      res.send(html);
-    } catch (e) {
-      vite.ssrFixStacktrace(e);
-      console.error(e);
-      res.status(500).send(`SSR Error: ${e.message}`);
-    }
-  });
-
-  const server = createServer(app);
-
-  server.listen(0, "127.0.0.1", () => {
-    const addr = server.address();
-    console.log(JSON.stringify({ port: addr.port }));
-  });
-
-  process.stdin.resume();
-  process.stdin.on("close", () => process.exit(0));
-}
-
-startDevServer();
 "#
 }
 

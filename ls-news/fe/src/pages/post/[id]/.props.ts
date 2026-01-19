@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 
-export const PostSchema = z.object({
+export const PostDocSchema = z.object({
     id: z.string(),
     title: z.string(),
     url: z.string(),
@@ -14,12 +14,12 @@ export const PostSchema = z.object({
     updatedAt: z.coerce.date(),
   });
 
-export type Post = z.infer<typeof PostSchema>;
+export type PostDoc = z.infer<typeof PostDocSchema>;
 
-export const CommentSchema = z.object({
+export const CommentDocSchema = z.object({
+    postId: z.string(),
     id: z.string(),
     content: z.string(),
-    postId: z.string(),
     authorId: z.string(),
     parentCommentId: z.string().optional(),
     likes: z.number(),
@@ -28,7 +28,7 @@ export const CommentSchema = z.object({
     updatedAt: z.coerce.date(),
   });
 
-export type Comment = z.infer<typeof CommentSchema>;
+export type CommentDoc = z.infer<typeof CommentDocSchema>;
 
 export const UserDocSchema = z.object({
     id: z.string(),
@@ -43,8 +43,8 @@ export type UserDoc = z.infer<typeof UserDocSchema>;
 export const PropsSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
-    post: PostSchema,
-    comments: z.array(CommentSchema),
+    post: PostDocSchema,
+    comments: z.array(CommentDocSchema),
     users: z.record(z.string(), UserDocSchema),
   }),
     z.object({

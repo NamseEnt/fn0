@@ -56,17 +56,23 @@ async function main() {{
             req.on("end", async () => {{
                 try {{
                     const {{ url, props, cookie }} = JSON.parse(body);
-                    const {{ render }} = await vite.ssrLoadModule("/src/server.tsx");
-                    const result = await render(url, props, cookie);
-                    const htmlBuffer = Buffer.from(result.html);
-                    res.useChunkedEncodingByDefault = false;
+                    const {{ renderStream }} = await vite.ssrLoadModule("/src/server.tsx");
+                    const {{ stream, cookies }} = await renderStream(url, props, cookie);
+
                     res.setHeader("Content-Type", "text/html");
-                    res.setHeader("Content-Length", htmlBuffer.length);
-                    if (result.cookies && result.cookies.length > 0) {{
-                        res.setHeader("Set-Cookie", result.cookies);
+                    res.setHeader("Transfer-Encoding", "chunked");
+                    if (cookies && cookies.length > 0) {{
+                        res.setHeader("Set-Cookie", cookies);
                     }}
                     res.writeHead(200);
-                    res.end(htmlBuffer);
+
+                    const reader = stream.getReader();
+                    while (true) {{
+                        const {{ done, value }} = await reader.read();
+                        if (done) break;
+                        res.write(value);
+                    }}
+                    res.end();
                 }} catch (e) {{
                     vite.ssrFixStacktrace(e);
                     console.error("[vite-ssr] Error:", e.stack || e.message);

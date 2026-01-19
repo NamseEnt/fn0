@@ -50,15 +50,17 @@ async fn get_rows(after: Option<String>, is_admin: bool) -> Result<Vec<Row>> {
         pub deleted_at: Option<DateTime>,
     }
 
-    let mut rows = PostDocQuery { sk_id: after.clone() }
-        .send(10)
-        .await?
-        .into_iter()
-        .map(|post| RowWithoutAuthor {
-            post,
-            deleted_at: None,
-        })
-        .collect::<Vec<_>>();
+    let mut rows = PostDocQuery {
+        sk_id: after.clone(),
+    }
+    .send(10)
+    .await?
+    .into_iter()
+    .map(|post| RowWithoutAuthor {
+        post,
+        deleted_at: None,
+    })
+    .collect::<Vec<_>>();
     if is_admin {
         let deleted_posts_rows = DeletedPostDocQuery { sk_id: after }.send(10).await?;
         rows.extend(deleted_posts_rows.into_iter().map(|d| RowWithoutAuthor {

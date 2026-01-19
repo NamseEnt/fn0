@@ -3,10 +3,10 @@ mod generate_env;
 mod generate_routes;
 
 pub use anyhow;
-pub use generate_env::generate_env;
 pub use cookie::{self, Cookie, CookieBuilder, CookieJar};
 pub use forte_db;
 pub use forte_json;
+pub use generate_env::generate_env;
 pub use generate_routes::*;
 pub use serde;
 pub use serde_json;
@@ -18,6 +18,7 @@ pub use time;
 pub mod http_header {
     pub use http::header::*;
 }
+pub use uuid::Uuid;
 pub use wstd::{self, future, http, io, iter, net, rand, runtime, task};
 
 pub fn now() -> DateTime {
