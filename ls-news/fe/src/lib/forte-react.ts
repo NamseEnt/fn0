@@ -46,8 +46,8 @@ export function useForteHook<T>(
   }
 
   // Hooks are only fetched during SSR, never in browser (browser uses cached results)
-  // ski requires absolute URLs, so we use a placeholder host that ForteFetchHandler intercepts
-  const promise = fetch(`http://ssr-internal/__forte_hook/${hookName}`, {
+  const fortePort = process.env["FORTE_PORT"];
+  const promise = fetch(`http://localhost:${fortePort}/__forte_hook/${hookName}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

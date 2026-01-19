@@ -260,12 +260,12 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let use_vite_dev = true;
 
     let fe_dir = project_dir.join("fe");
-    let mut vite_server: Option<vite_dev::ViteServer> = None;
+    let mut vite: Option<vite_dev::Vite> = None;
 
     if use_vite_dev {
-        let server = vite_dev::spawn_vite_server(&fe_dir)?;
-        vite_dev::wait_for_vite_ready(&server.socket_path).await?;
-        vite_server = Some(server);
+        let v = vite_dev::spawn_vite(&fe_dir, port)?;
+        vite_dev::wait_for_vite_ready(&v.socket_path).await?;
+        vite = Some(v);
     }
 
     let prebundler = DependencyPrebundler::new(&project_dir);
@@ -289,7 +289,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
         project_root: project_dir.clone(),
         dev_mode: true,
         use_vite_dev,
-        vite_socket_path: vite_server.as_ref().map(|s| s.socket_path.clone()),
+        vite_socket_path: vite.as_ref().map(|v| v.socket_path.clone()),
         prebundler,
         env_vars,
     };
@@ -298,8 +298,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
 
     let result = run_watch_loop(&project_dir, handle).await;
 
-    if let Some(mut server) = vite_server {
-        let _ = server.child.kill();
+    if let Some(mut v) = vite {
+        let _ = v.child.kill();
     }
 
     result

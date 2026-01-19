@@ -84,12 +84,12 @@ main().catch((e) => {{
     )
 }
 
-pub struct ViteServer {
+pub struct Vite {
     pub child: Child,
     pub socket_path: PathBuf,
 }
 
-pub fn spawn_vite_server(fe_dir: &Path) -> Result<ViteServer> {
+pub fn spawn_vite(fe_dir: &Path, forte_port: u16) -> Result<Vite> {
     let dev_dir = fe_dir.join(".forte/dev");
     std::fs::create_dir_all(&dev_dir)?;
 
@@ -103,12 +103,13 @@ pub fn spawn_vite_server(fe_dir: &Path) -> Result<ViteServer> {
     let child = Command::new("node")
         .arg(&script_path)
         .current_dir(fe_dir)
+        .env("FORTE_PORT", forte_port.to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()?;
 
-    Ok(ViteServer { child, socket_path })
+    Ok(Vite { child, socket_path })
 }
 
 pub async fn wait_for_vite_ready(socket_path: &Path) -> Result<()> {
