@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { createPost } from "@/actions/.generated";
+import { Layout } from "@/components/Layout";
 
 function buildGithubAuthUrl(oauthNonce: string): string {
   if (typeof window === "undefined") {
@@ -20,7 +21,11 @@ export default function WritePage(props: Props) {
     return <RedirectToLogin oauthNonce={props.oauthNonce} />;
   }
 
-  return <WriteForm />;
+  return (
+    <Layout>
+      <WriteForm />
+    </Layout>
+  );
 }
 
 function RedirectToLogin({ oauthNonce }: { oauthNonce: string }) {
