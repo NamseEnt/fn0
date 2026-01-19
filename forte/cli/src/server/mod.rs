@@ -513,7 +513,7 @@ fn parse_http_response(response_bytes: &[u8]) -> Result<fn0::Response> {
 
     let header_part = &response_str[..header_end];
     let body_start = header_end + 4;
-    let body = &response_bytes[body_start..];
+    let raw_body = &response_bytes[body_start..];
 
     let mut lines = header_part.lines();
     let status_line = lines.next().ok_or_else(|| anyhow::anyhow!("Missing status line"))?;
@@ -525,19 +525,80 @@ fn parse_http_response(response_bytes: &[u8]) -> Result<fn0::Response> {
         .unwrap_or(500);
 
     let mut builder = Response::builder().status(status_code);
+    let mut is_chunked = false;
 
     for line in lines {
         if let Some((key, value)) = line.split_once(": ") {
             let key_lower = key.to_lowercase();
+            if key_lower == "transfer-encoding" && value.to_lowercase().contains("chunked") {
+                is_chunked = true;
+            }
             if key_lower != "transfer-encoding" && key_lower != "content-length" {
                 builder = builder.header(key, value);
             }
         }
     }
 
-    Ok(builder.body(
-        Full::new(bytes::Bytes::from(body.to_vec()))
-            .map_err(|e| anyhow::anyhow!("{e}"))
-            .boxed_unsync(),
-    )?)
+    let body = if is_chunked || looks_like_chunked(raw_body) {
+        decode_chunked_body(raw_body)
+    } else {
+        raw_body.to_vec()
+    };
+
+    let body_bytes = bytes::Bytes::from(body);
+    let body_len = body_bytes.len();
+    Ok(builder
+        .header(hyper::header::CONTENT_LENGTH, body_len.to_string())
+        .body(
+            Full::new(body_bytes)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .boxed_unsync(),
+        )?)
+}
+
+fn looks_like_chunked(data: &[u8]) -> bool {
+    let crlf_pos = data.windows(2).position(|w| w == b"\r\n");
+    if let Some(pos) = crlf_pos {
+        if pos > 0 && pos <= 8 {
+            let potential_size = &data[..pos];
+            if let Ok(s) = std::str::from_utf8(potential_size) {
+                return usize::from_str_radix(s.trim(), 16).is_ok();
+            }
+        }
+    }
+    false
+}
+
+fn decode_chunked_body(data: &[u8]) -> Vec<u8> {
+    let mut result = Vec::new();
+    let mut pos = 0;
+
+    while pos < data.len() {
+        let chunk_size_end = data[pos..]
+            .windows(2)
+            .position(|w| w == b"\r\n")
+            .map(|p| pos + p);
+
+        let Some(chunk_size_end) = chunk_size_end else {
+            break;
+        };
+
+        let chunk_size_str = String::from_utf8_lossy(&data[pos..chunk_size_end]);
+        let chunk_size = usize::from_str_radix(chunk_size_str.trim(), 16).unwrap_or(0);
+
+        if chunk_size == 0 {
+            break;
+        }
+
+        let chunk_start = chunk_size_end + 2;
+        let chunk_end = chunk_start + chunk_size;
+
+        if chunk_end <= data.len() {
+            result.extend_from_slice(&data[chunk_start..chunk_end]);
+        }
+
+        pos = chunk_end + 2;
+    }
+
+    result
 }
