@@ -1,6 +1,8 @@
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::stream::Stream;
+use serde::de::DeserializeOwned;
 use serde::ser::{self, Serialize, SerializeSeq};
+use serde_json::Value;
 
 fn to_camel_case(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
@@ -18,6 +20,51 @@ fn to_camel_case(s: &str) -> String {
     }
 
     result
+}
+
+fn to_snake_case(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() + 4);
+
+    for (i, ch) in s.chars().enumerate() {
+        if ch.is_ascii_uppercase() {
+            if i > 0 {
+                result.push('_');
+            }
+            result.push(ch.to_ascii_lowercase());
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+fn transform_keys_to_snake_case(value: Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let new_map = map
+                .into_iter()
+                .map(|(k, v)| (to_snake_case(&k), transform_keys_to_snake_case(v)))
+                .collect();
+            Value::Object(new_map)
+        }
+        Value::Array(arr) => {
+            Value::Array(arr.into_iter().map(transform_keys_to_snake_case).collect())
+        }
+        other => other,
+    }
+}
+
+pub fn from_slice<T: DeserializeOwned>(slice: &[u8]) -> Result<T, serde_json::Error> {
+    let value: Value = serde_json::from_slice(slice)?;
+    let transformed = transform_keys_to_snake_case(value);
+    serde_json::from_value(transformed)
+}
+
+pub fn from_str<T: DeserializeOwned>(s: &str) -> Result<T, serde_json::Error> {
+    let value: Value = serde_json::from_str(s)?;
+    let transformed = transform_keys_to_snake_case(value);
+    serde_json::from_value(transformed)
 }
 
 pub fn to_stream<T: Serialize + ?Sized>(value: &T) -> impl Stream<Item = Bytes> + use<T> {

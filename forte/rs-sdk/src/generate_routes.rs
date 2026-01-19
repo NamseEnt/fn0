@@ -1036,7 +1036,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
 
             quote! {
                 #name => {
-                    let input: #module_name::Input = serde_json::from_slice(body_bytes)
+                    let input: #module_name::Input = forte_json::from_slice(body_bytes)
                         .map_err(|e| Error::msg(e.to_string()))?;
                     let req = ForteRequest {
                         uri_authority,
@@ -1121,7 +1121,7 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
 
             quote! {
                 #name => {
-                    let input: #module_name::Input = serde_json::from_slice(body_bytes)
+                    let input: #module_name::Input = forte_json::from_slice(body_bytes)
                         .map_err(|e| Error::msg(e.to_string()))?;
                     let req = ForteRequest {
                         uri_authority,
