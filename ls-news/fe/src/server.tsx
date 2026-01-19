@@ -1,6 +1,12 @@
 import { renderToReadableStream } from "react-dom/server.browser";
 import { routes } from "./routes.generated";
-import { serializeHookCache, clearHookCache, getCollectedCookies, clearCollectedCookies, setRequestCookie } from "./lib/forte-react";
+import {
+  serializeHookCache,
+  clearHookCache,
+  getCollectedCookies,
+  clearCollectedCookies,
+  setRequestCookie,
+} from "./lib/forte-react";
 
 function matchRoute(
   pathname: string
@@ -36,7 +42,9 @@ function escapeJsonForScript(json: string): string {
 
 const isDev = import.meta.env.DEV;
 
-async function streamToString(stream: ReadableStream<Uint8Array>): Promise<string> {
+async function streamToString(
+  stream: ReadableStream<Uint8Array>
+): Promise<string> {
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
 
@@ -57,7 +65,11 @@ async function streamToString(stream: ReadableStream<Uint8Array>): Promise<strin
   return new TextDecoder().decode(result);
 }
 
-export async function render(url: string, rawProps: any, cookie?: string | null): Promise<{ html: string; cookies: string[] }> {
+export async function render(
+  url: string,
+  rawProps: any,
+  cookie?: string | null
+): Promise<{ html: string; cookies: string[] }> {
   const urlObj = new URL(url, "http://localhost");
   const matched = matchRoute(urlObj.pathname);
 
@@ -90,7 +102,7 @@ export async function render(url: string, rawProps: any, cookie?: string | null)
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>ls-news</title>
-    <link rel="stylesheet" href="/src/styles/globals.css" />
+    <link rel="stylesheet" href="/src/styles/globals.css?direct" />
     <script type="module" src="/@vite/client"></script>
     <script type="module">
       import RefreshRuntime from "/@react-refresh";
@@ -119,7 +131,12 @@ export async function render(url: string, rawProps: any, cookie?: string | null)
   try {
     rawProps = JSON.parse(bodyText);
   } catch (e) {
-    console.error(`[SSR] JSON parse error. URL: ${request.url}, Body: "${bodyText.slice(0, 500)}"`);
+    console.error(
+      `[SSR] JSON parse error. URL: ${request.url}, Body: "${bodyText.slice(
+        0,
+        500
+      )}"`
+    );
     throw e;
   }
   const url = new URL(request.url);

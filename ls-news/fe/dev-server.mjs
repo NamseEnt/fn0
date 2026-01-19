@@ -17,7 +17,9 @@ async function startDevServer() {
     try {
       const { url, props, forteBaseUrl } = req.body;
       const serverModule = await vite.ssrLoadModule("/src/server.tsx");
-      const html = await serverModule.render(url, props, forteBaseUrl);
+      const rawHtml = await serverModule.render(url, props, forteBaseUrl);
+      const html = await vite.transformIndexHtml(url, rawHtml.html);
+
       res.set("Content-Type", "text/html");
       res.send(html);
     } catch (e) {
