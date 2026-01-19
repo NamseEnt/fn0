@@ -1,4 +1,4 @@
-use crate::docs::{DeletedPost, Post, UserDoc};
+use crate::docs::{DeletedPostDocQuery, PostDoc, PostDocQuery, UserDocGet};
 use anyhow::Result;
 use forte_sdk::*;
 use serde::Serialize;
@@ -16,7 +16,7 @@ pub enum Props {
 
 #[derive(Serialize)]
 pub struct Row {
-    pub post: Post,
+    pub post: PostDoc,
     pub deleted_at: Option<DateTime>,
     pub author: User,
 }
@@ -46,11 +46,12 @@ pub async fn handler(req: ForteRequest<'_>, search_params: SearchParams) -> Resu
 
 async fn get_rows(after: Option<String>, is_admin: bool) -> Result<Vec<Row>> {
     pub struct RowWithoutAuthor {
-        pub post: Post,
+        pub post: PostDoc,
         pub deleted_at: Option<DateTime>,
     }
 
-    let mut rows = Post::query(&after, 10)
+    let mut rows = PostDocQuery { sk_id: after.clone() }
+        .send(10)
         .await?
         .into_iter()
         .map(|post| RowWithoutAuthor {
@@ -59,9 +60,19 @@ async fn get_rows(after: Option<String>, is_admin: bool) -> Result<Vec<Row>> {
         })
         .collect::<Vec<_>>();
     if is_admin {
-        let deleted_posts_rows = DeletedPost::query(&after, 10).await?;
+        let deleted_posts_rows = DeletedPostDocQuery { sk_id: after }.send(10).await?;
         rows.extend(deleted_posts_rows.into_iter().map(|d| RowWithoutAuthor {
-            post: d.post,
+            post: PostDoc {
+                id: d.id,
+                title: d.title,
+                url: d.url,
+                content: d.content,
+                author_id: d.author_id,
+                likes: d.likes,
+                dislikes: d.dislikes,
+                created_at: d.created_at,
+                updated_at: d.updated_at,
+            },
             deleted_at: Some(d.deleted_at),
         }));
         rows.sort_by(|a, b| b.post.id.cmp(&a.post.id));
@@ -72,11 +83,15 @@ async fn get_rows(after: Option<String>, is_admin: bool) -> Result<Vec<Row>> {
         .map(|r| r.post.author_id.clone())
         .collect::<HashSet<_>>();
 
-    let users = futures::future::try_join_all(user_ids.iter().map(UserDoc::get))
-        .await?
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
+    let users = futures::future::try_join_all(
+        user_ids
+            .iter()
+            .map(|id| UserDocGet { sk_id: id.clone() }.send()),
+    )
+    .await?
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
 
     Ok(rows
         .into_iter()

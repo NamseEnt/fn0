@@ -1,4 +1,6 @@
-use crate::docs::*;
+use crate::docs::{
+    CommentDoc, CommentDocQuery, DeletedCommentDocQuery, PostDoc, PostDocGet, UserDoc, UserDocGet,
+};
 use anyhow::Result;
 use forte_sdk::*;
 use serde::Serialize;
@@ -12,8 +14,8 @@ pub struct PathParams {
 #[derive(Serialize)]
 pub enum Props {
     Ok {
-        post: Post,
-        comments: Vec<Comment>,
+        post: PostDoc,
+        comments: Vec<CommentDoc>,
         users: HashMap<String, UserDoc>,
     },
     // TODO: Return status 404
@@ -45,14 +47,39 @@ pub async fn handler(req: ForteRequest<'_>, path_params: PathParams) -> Result<P
 async fn get_post_with_comments(
     post_id: &str,
     is_admin: bool,
-) -> Result<Option<(Post, Vec<Comment>, HashMap<String, UserDoc>)>> {
-    let Some(post) = Post::get(post_id).await? else {
+) -> Result<Option<(PostDoc, Vec<CommentDoc>, HashMap<String, UserDoc>)>> {
+    let Some(post) = PostDocGet {
+        sk_id: post_id.to_string(),
+    }
+    .send()
+    .await?
+    else {
         return Ok(None);
     };
-    let mut comments = Comment::query(post_id, (), 1000).await?;
+    let mut comments = CommentDocQuery {
+        pk_post_id: post_id.to_string(),
+        sk_id: None,
+    }
+    .send(1000)
+    .await?;
     if is_admin {
-        let deleted_comments = DeletedComment::query(post_id, (), 1000).await?;
-        comments.extend(deleted_comments.into_iter().map(|comment| comment.comment));
+        let deleted_comments = DeletedCommentDocQuery {
+            pk_post_id: post_id.to_string(),
+            sk_id: None,
+        }
+        .send(1000)
+        .await?;
+        comments.extend(deleted_comments.into_iter().map(|d| CommentDoc {
+            post_id: d.post_id,
+            id: d.id,
+            content: d.content,
+            author_id: d.author_id,
+            parent_comment_id: d.parent_comment_id,
+            likes: d.likes,
+            dislikes: d.dislikes,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+        }));
         comments.sort_by_key(|comment| comment.created_at);
     }
 
@@ -61,11 +88,15 @@ async fn get_post_with_comments(
         .map(|comment| comment.author_id.clone())
         .chain(std::iter::once(post.author_id.clone()))
         .collect::<HashSet<_>>();
-    let users = futures::future::try_join_all(user_ids.iter().map(UserDoc::get))
-        .await?
-        .into_iter()
-        .flatten()
-        .map(|user| (user.id.clone(), user))
-        .collect::<HashMap<_, _>>();
+    let users = futures::future::try_join_all(
+        user_ids
+            .iter()
+            .map(|id| UserDocGet { sk_id: id.clone() }.send()),
+    )
+    .await?
+    .into_iter()
+    .flatten()
+    .map(|user| (user.id.clone(), user))
+    .collect::<HashMap<_, _>>();
     Ok(Some((post, comments, users)))
 }

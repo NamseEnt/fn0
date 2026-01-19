@@ -65,16 +65,14 @@ pub async fn handler(req: ForteRequest<'_>, search_params: SearchParams) -> Resu
 
     let github_user: GitHubUser = response.into_body().json().await?;
 
-    UserDoc::put(
-        github_user.id.to_string(),
-        &UserDoc {
-            id: github_user.id.to_string(),
-            username: github_user.login.clone(),
-            avatar_url: github_user.avatar_url.clone(),
-            created_at: now(),
-            updated_at: now(),
-        },
-    )
+    UserDoc {
+        id: github_user.id.to_string(),
+        username: github_user.login.clone(),
+        avatar_url: github_user.avatar_url.clone(),
+        created_at: now(),
+        updated_at: now(),
+    }
+    .put()
     .await?;
 
     crate::common::auth::set_auth_cookies(req.jar, &access_token, &github_user);
