@@ -232,7 +232,7 @@ async fn handle_request(
         ));
     }
 
-    if path.starts_with("/__forte_hook/") {
+    if path.starts_with("/__forte_hook/") || path.starts_with("/__forte_action/") {
         return Ok(backend_response);
     }
 
