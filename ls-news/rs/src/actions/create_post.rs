@@ -46,10 +46,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         updated_at: now,
     };
 
-    let sk = format!("{}#{}", now.timestamp_millis(), id);
-
     if let Err(e) = forte_db::turso()
-        .put("posts", &sk, &serde_json::to_vec(&post).unwrap())
+        .put("posts", &id, &serde_json::to_vec(&post).unwrap())
         .await
     {
         eprintln!("Failed to create post: {:?}", e);
