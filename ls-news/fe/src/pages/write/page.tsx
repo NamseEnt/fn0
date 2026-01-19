@@ -13,7 +13,9 @@ function buildGithubAuthUrl(oauthNonce: string): string {
   }
   const clientId = import.meta.env.PUBLIC_GITHUB_CLIENT_ID;
   const redirectUri = `${window.location.origin}/api/auth/callback/github`;
-  return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20user:email&state=${oauthNonce}`;
+  return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+    redirectUri
+  )}&scope=read:user%20user:email&state=${oauthNonce}`;
 }
 
 export default function WritePage(props: Props) {
@@ -67,8 +69,8 @@ function WriteForm() {
         return;
       }
 
-      if (result.t === "RateLimitExceeded") {
-        alert("投稿が多すぎます。しばらくお待ちください。");
+      if (result.t === "InternalError") {
+        alert("投稿に失敗しました");
         return;
       }
 

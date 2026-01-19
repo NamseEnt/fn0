@@ -22,7 +22,7 @@ pub enum PostType {
 #[derive(Serialize)]
 pub enum Output {
     Ok { id: String },
-    RateLimitExceeded,
+    InternalError,
     NotLoggedIn,
 }
 
@@ -31,10 +31,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotLoggedIn;
     };
 
-    let id = generate_id();
+    let id = Uuid::now_v7().to_string();
     let now = now();
 
-    let post = PostDoc {
+    if let Err(e) = (PostDoc {
         id: id.clone(),
         title: req.body.title,
         url: req.body.url,
@@ -44,21 +44,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         dislikes: 0,
         created_at: now,
         updated_at: now,
-    };
-
-    if let Err(e) = post.put().await {
-        eprintln!("Failed to create post: {:?}", e);
-        return Output::RateLimitExceeded;
+    })
+    .put()
+    .await
+    {
+        eprintln!("Failed to create post: {e:?}");
+        return Output::InternalError;
     }
 
     Output::Ok { id }
-}
-
-fn generate_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis();
-    format!("{:x}", timestamp)
 }

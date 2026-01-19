@@ -25,7 +25,7 @@ const OutputSchema = z.discriminatedUnion("t", [
     id: z.string(),
   }),
     z.object({
-    t: z.literal("RateLimitExceeded"),
+    t: z.literal("InternalError"),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),

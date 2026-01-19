@@ -324,7 +324,7 @@ async fn handle_hook(
     let body_bytes = body.contents().await?;
     match hook_name {
         "me" => {
-            let input: hooks_me::Input = serde_json::from_slice(body_bytes)
+            let input: hooks_me::Input = forte_json::from_slice(body_bytes)
                 .map_err(|e| Error::msg(e.to_string()))?;
             let req = ForteRequest {
                 uri_authority,
@@ -365,7 +365,7 @@ async fn handle_action(
     let body_bytes = body.contents().await?;
     match action_name {
         "create_post" => {
-            let input: actions_create_post::Input = serde_json::from_slice(body_bytes)
+            let input: actions_create_post::Input = forte_json::from_slice(body_bytes)
                 .map_err(|e| Error::msg(e.to_string()))?;
             let req = ForteRequest {
                 uri_authority,

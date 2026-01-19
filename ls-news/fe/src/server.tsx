@@ -42,39 +42,27 @@ function escapeJsonForScript(json: string): string {
 
 const isDev = import.meta.env.DEV;
 
-async function streamToString(
-  stream: ReadableStream<Uint8Array>
-): Promise<string> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
-
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return new TextDecoder().decode(result);
-}
-
-export async function render(
+export async function renderStream(
   url: string,
   rawProps: any,
   cookie?: string | null
-): Promise<{ html: string; cookies: string[] }> {
+): Promise<{ stream: ReadableStream<Uint8Array>; cookies: string[] }> {
   const urlObj = new URL(url, "http://localhost");
   const matched = matchRoute(urlObj.pathname);
 
+  const encoder = new TextEncoder();
+
   if (!matched) {
-    return { html: "Not Found", cookies: [] };
+    return {
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode("Not Found"));
+          controller.close();
+        },
+      }),
+      cookies: [],
+    };
   }
 
   clearHookCache();
@@ -89,14 +77,14 @@ export async function render(
   const allProps = { ...props, params: matched.params };
   const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
-  const stream = await renderToReadableStream(pageModule.default(allProps));
-  const html = await streamToString(stream);
+  const reactStream = await renderToReadableStream(pageModule.default(allProps));
+
+  await reactStream.allReady;
 
   const hookCacheJson = serializeHookCache();
   const cookies = getCollectedCookies();
 
-  return {
-    html: `<!DOCTYPE html>
+  const headHtml = `<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
@@ -113,14 +101,34 @@ export async function render(
     </script>
 </head>
 <body>
-    <div id="root">${html}</div>
+    <div id="root">`;
+
+  const tailHtml = `</div>
     <script>window.__FORTE_PROPS__ = ${propsJson};</script>
     <script>window.__FORTE_HOOK_CACHE__ = ${hookCacheJson};</script>
     <script type="module" src="/src/client.tsx"></script>
 </body>
-</html>`,
-    cookies,
-  };
+</html>`;
+
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+
+  (async () => {
+    const writer = writable.getWriter();
+
+    await writer.write(encoder.encode(headHtml));
+
+    const reader = reactStream.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      await writer.write(value);
+    }
+
+    await writer.write(encoder.encode(tailHtml));
+    await writer.close();
+  })();
+
+  return { stream: readable, cookies };
 }
 
 (globalThis as any).handler = async function handler(
@@ -143,7 +151,6 @@ export async function render(
 
   const matched = matchRoute(url.pathname);
   if (matched) {
-    // Clear hook cache and cookies for fresh request
     clearHookCache();
     clearCollectedCookies();
 
@@ -167,20 +174,21 @@ export async function render(
       ? `<link rel="stylesheet" href="/src/styles/globals.css" />`
       : `<link rel="stylesheet" href="/public/globals.css" />`;
 
-    const stream = await renderToReadableStream(pageModule.default(allProps));
-    const html = await streamToString(stream);
+    const reactStream = await renderToReadableStream(pageModule.default(allProps));
 
-    // Serialize hook cache for client hydration
+    await reactStream.allReady;
+
     const hookCacheJson = serializeHookCache();
-
     const cookies = getCollectedCookies();
+
     const headers = new Headers({ "Content-Type": "text/html" });
     for (const cookie of cookies) {
       headers.append("Set-Cookie", cookie);
     }
 
-    return new Response(
-      `<!DOCTYPE html>
+    const encoder = new TextEncoder();
+
+    const headHtml = `<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="utf-8" />
@@ -191,14 +199,34 @@ export async function render(
     ${reactRefreshScript}
 </head>
 <body>
-    <div id="root">${html}</div>
+    <div id="root">`;
+
+    const tailHtml = `</div>
     <script>window.__FORTE_PROPS__ = ${propsJson};</script>
     <script>window.__FORTE_HOOK_CACHE__ = ${hookCacheJson};</script>
     <script type="module" src="${clientScript}"></script>
 </body>
-</html>`,
-      { headers }
-    );
+</html>`;
+
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+
+    (async () => {
+      const writer = writable.getWriter();
+
+      await writer.write(encoder.encode(headHtml));
+
+      const reader = reactStream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writer.write(value);
+      }
+
+      await writer.write(encoder.encode(tailHtml));
+      await writer.close();
+    })();
+
+    return new Response(readable, { headers });
   }
 
   return new Response("Not Found", { status: 404 });
