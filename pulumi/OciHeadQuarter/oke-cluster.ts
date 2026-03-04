@@ -109,7 +109,7 @@ export function createOkeCluster(
         memoryInGbs: 6,
       },
       nodeConfigDetails: {
-        size: 1,
+        size: 0,
         placementConfigs: [
           {
             availabilityDomain: ad1,
