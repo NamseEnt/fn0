@@ -1,8 +1,14 @@
 import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
+  aws: pulumi.Input<AwsArgs>;
   cert: pulumi.Input<string>;
   docDb: pulumi.Input<DocDbArgs>;
+  githubClientId: pulumi.Input<string>;
   sites: pulumi.Input<Array<SiteArgs>>;
+}
+export interface AwsArgs {
+  region: pulumi.Input<string>;
+  wasmBucket: pulumi.Input<string>;
 }
 export interface CloudflareDnsProviderArgs {
   apiToken: pulumi.Input<string>;

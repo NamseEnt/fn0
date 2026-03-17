@@ -1,5 +1,6 @@
 mod args;
 mod args_parse;
+mod deploy;
 mod deployment_cache;
 mod dns;
 mod host_connection;
@@ -10,11 +11,12 @@ mod site;
 mod telemetry;
 
 use args::HqArgs;
+use args_parse::DeployContext;
 use color_eyre::eyre::{Result, eyre};
 use host_id::*;
 use host_provider::*;
 use http_body_util::Full;
-use hyper::{Request, Response, body::Bytes, server::conn::http1, service::service_fn};
+use hyper::{Method, Request, Response, body::Bytes, server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, task::JoinSet};
@@ -30,6 +32,7 @@ fn main() -> Result<()> {
         let HqArgsParsed {
             sites,
             deployment_cache,
+            deploy_context,
         } = HqArgs::parse().await?;
 
         let mut set = JoinSet::new();
@@ -48,7 +51,7 @@ fn main() -> Result<()> {
             tokio::signal::ctrl_c().await?;
             Ok(())
         });
-        set.spawn(web_server());
+        set.spawn(web_server(deploy_context));
 
         let result = set.join_next().await.unwrap().map_err(|err| eyre!(err));
 
@@ -58,17 +61,21 @@ fn main() -> Result<()> {
     })?
 }
 
-async fn web_server() -> Result<()> {
+async fn web_server(deploy_context: Arc<DeployContext>) -> Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     let listener = TcpListener::bind(addr).await?;
 
     loop {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);
+        let ctx = deploy_context.clone();
 
         tokio::task::spawn(async move {
             if let Err(err) = http1::Builder::new()
-                .serve_connection(io, service_fn(route))
+                .serve_connection(io, service_fn(move |req| {
+                    let ctx = ctx.clone();
+                    async move { route(req, ctx).await }
+                }))
                 .await
             {
                 eprintln!("Error serving connection: {:?}", err);
@@ -77,11 +84,20 @@ async fn web_server() -> Result<()> {
     }
 }
 
-async fn route(req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>> {
-    match req.uri().path() {
-        "/health" => {
+async fn route(
+    req: Request<hyper::body::Incoming>,
+    ctx: Arc<DeployContext>,
+) -> Result<Response<Full<Bytes>>> {
+    match (req.method(), req.uri().path()) {
+        (&Method::GET, "/health") => {
             info!("health check");
             Ok(Response::new(Full::new(Bytes::from("ok"))))
+        }
+        (&Method::POST, "/deploy/start") => {
+            Ok(deploy::handle_deploy_start(req, ctx).await)
+        }
+        (&Method::POST, "/deploy/finish") => {
+            Ok(deploy::handle_deploy_finish(req, ctx).await)
         }
         _ => Ok(Response::builder()
             .status(404)
