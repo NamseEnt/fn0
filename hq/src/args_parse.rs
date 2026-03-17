@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use aws_sdk_s3::Client as S3Client;
 use color_eyre::eyre::{Result, eyre};
 use doc_db::DocDb;
 
@@ -9,9 +12,17 @@ use crate::{
     site::Site,
 };
 
+pub struct DeployContext {
+    pub s3_client: S3Client,
+    pub wasm_bucket: String,
+    pub github_client_id: String,
+    pub doc_db: DocDb,
+}
+
 pub struct HqArgsParsed {
     pub sites: Vec<Site>,
     pub deployment_cache: DeploymentCache,
+    pub deploy_context: Arc<DeployContext>,
 }
 
 impl HqArgs {
@@ -26,6 +37,19 @@ impl HqArgs {
 
         let doc_db = DocDb::new(args.doc_db.url, args.doc_db.token).await?;
         let deployment_cache = DeploymentCache::new(doc_db.clone()).await?;
+
+        let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .region(aws_config::Region::new(args.aws.region))
+            .load()
+            .await;
+        let s3_client = S3Client::new(&aws_config);
+
+        let deploy_context = Arc::new(DeployContext {
+            s3_client,
+            wasm_bucket: args.aws.wasm_bucket,
+            github_client_id: args.github_client_id,
+            doc_db: doc_db.clone(),
+        });
 
         let sites = args
             .sites
@@ -62,6 +86,7 @@ impl HqArgs {
         Ok(HqArgsParsed {
             sites,
             deployment_cache,
+            deploy_context,
         })
     }
 }

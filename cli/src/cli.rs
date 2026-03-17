@@ -15,6 +15,12 @@ pub enum Commands {
         name: Option<String>,
     },
     Build,
+    Deploy {
+        #[arg(long)]
+        code_id: u64,
+        #[arg(long)]
+        code_version: u64,
+    },
     Local {
         #[arg(short, long)]
         port: Option<u16>,

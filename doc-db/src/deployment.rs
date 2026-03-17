@@ -28,6 +28,33 @@ impl DocDb {
         Ok(deployments)
     }
 
+    pub async fn insert_deployment(&self, code_id: u64, code_version: u64) -> Result<()> {
+        let conn = self.db.connect()?;
+
+        let next_sk: u64 = conn
+            .query(
+                "SELECT COALESCE(MAX(sk), 0) + 1 FROM docs WHERE pk = 'deployments'",
+                libsql::params!(),
+            )
+            .await?
+            .next()
+            .await?
+            .map(|row| row.get::<u64>(0).unwrap())
+            .unwrap_or(1);
+
+        let mut value = Vec::with_capacity(16);
+        value.extend_from_slice(&code_id.to_le_bytes());
+        value.extend_from_slice(&code_version.to_le_bytes());
+
+        conn.execute(
+            "INSERT INTO docs (pk, sk, value) VALUES ('deployments', ?, ?)",
+            libsql::params!(next_sk, value),
+        )
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn deployments_after(&self, sk: u64) -> Result<Vec<Deployment>> {
         let mut deployments = vec![];
 
