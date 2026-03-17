@@ -1,6 +1,67 @@
+//! # Integer Key Formatting for PK/SK
+//!
+//! When integer types are used as PK (Partition Key) or SK (Sort Key) fields,
+//! they are zero-padded to their maximum decimal digit width so that
+//! lexicographic (string) sort order matches numeric sort order.
+//!
+//! ## Unsigned types
+//!
+//! | Type          | Width | Example              |
+//! |---------------|-------|----------------------|
+//! | `u8`          | 3     | `042`                |
+//! | `u16`         | 5     | `00042`              |
+//! | `u32`         | 10    | `0000000042`         |
+//! | `u64`/`usize` | 20   | `00000000000000000042` |
+//!
+//! ## Signed types (offset encoding)
+//!
+//! Signed integers are converted to unsigned by adding an offset equal to
+//! `|T::MIN|` (i.e. `2^(bits-1)`), then zero-padded to the same width as the
+//! corresponding unsigned type. This maps the full signed range onto `0..=U::MAX`
+//! while preserving numeric order.
+//!
+//! | Type          | Offset           | Width | MIN → | 0 →  | MAX →  |
+//! |---------------|------------------|-------|-------|------|--------|
+//! | `i8`          | 128              | 3     | `000` | `128` | `255` |
+//! | `i16`         | 32768            | 5     | `00000` | `32768` | `65535` |
+//! | `i32`         | 2147483648       | 10    | `0000000000` | `2147483648` | `4294967295` |
+//! | `i64`/`isize` | 9223372036854775808 | 20 | `00000000000000000000` | `09223372036854775808` | `18446744073709551615` |
+//!
+//! `usize` is always treated as `u64`, and `isize` as `i64`.
+
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, Fields, ItemStruct, LitStr};
+
+fn format_placeholder(ty: &syn::Type) -> String {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            match segment.ident.to_string().as_str() {
+                "u8" | "i8" => return "{:03}".to_string(),
+                "u16" | "i16" => return "{:05}".to_string(),
+                "u32" | "i32" => return "{:010}".to_string(),
+                "u64" | "i64" | "usize" | "isize" => return "{:020}".to_string(),
+                _ => {}
+            }
+        }
+    }
+    "{}".to_string()
+}
+
+fn wrap_expr(ty: &syn::Type, expr: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            match segment.ident.to_string().as_str() {
+                "i8" => return quote! { (#expr as u8).wrapping_add(128u8) },
+                "i16" => return quote! { (#expr as u16).wrapping_add(32768u16) },
+                "i32" => return quote! { (#expr as u32).wrapping_add(2147483648u32) },
+                "i64" | "isize" => return quote! { (#expr as u64).wrapping_add(9223372036854775808u64) },
+                _ => {}
+            }
+        }
+    }
+    expr
+}
 
 #[proc_macro_attribute]
 pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -74,17 +135,19 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let name_str = name.to_string();
         let pk_format_parts: Vec<_> = pk_field_names
             .iter()
-            .map(|n| {
+            .zip(pk_field_types.iter())
+            .map(|(n, ty)| {
                 let name_str = n.as_ref().unwrap().to_string();
-                format!("{}={{}}", name_str)
+                format!("{}={}", name_str, format_placeholder(ty))
             })
             .collect();
         let pk_format_string = format!("{}/{}", name_str, pk_format_parts.join("&"));
         let pk_format_args: Vec<_> = pk_field_names
             .iter()
-            .map(|n| {
+            .zip(pk_field_types.iter())
+            .map(|(n, ty)| {
                 let field_name = format_ident!("pk_{}", n.as_ref().unwrap());
-                quote! { self.#field_name }
+                wrap_expr(ty, quote! { self.#field_name })
             })
             .collect();
         quote! { format!(#pk_format_string, #(#pk_format_args),*) }
@@ -92,12 +155,15 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let query_sk_build: Vec<_> = sk_field_names
         .iter()
-        .map(|n| {
+        .zip(sk_field_types.iter())
+        .map(|(n, ty)| {
             let name_str = n.as_ref().unwrap().to_string();
             let field_name = format_ident!("sk_{}", n.as_ref().unwrap());
+            let fmt = format!("{}={}", name_str, format_placeholder(ty));
+            let val_expr = wrap_expr(ty, quote! { *v });
             quote! {
                 if let Some(v) = &self.#field_name {
-                    parts.push(format!("{}={}", #name_str, v));
+                    parts.push(format!(#fmt, #val_expr));
                 } else {
                     break 'build;
                 }
@@ -112,17 +178,19 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let name_str = name.to_string();
         let pk_format_parts: Vec<_> = pk_field_names
             .iter()
-            .map(|n| {
+            .zip(pk_field_types.iter())
+            .map(|(n, ty)| {
                 let name_str = n.as_ref().unwrap().to_string();
-                format!("{}={{}}", name_str)
+                format!("{}={}", name_str, format_placeholder(ty))
             })
             .collect();
         let pk_format_string = format!("{}/{}", name_str, pk_format_parts.join("&"));
         let pk_format_args: Vec<_> = pk_field_names
             .iter()
-            .map(|n| {
+            .zip(pk_field_types.iter())
+            .map(|(n, ty)| {
                 let field_name = format_ident!("pk_{}", n.as_ref().unwrap());
-                quote! { self.#field_name }
+                wrap_expr(ty, quote! { self.#field_name })
             })
             .collect();
         quote! { format!(#pk_format_string, #(#pk_format_args),*) }
@@ -130,17 +198,19 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let sk_format_parts: Vec<_> = sk_field_names
         .iter()
-        .map(|n| {
+        .zip(sk_field_types.iter())
+        .map(|(n, ty)| {
             let name_str = n.as_ref().unwrap().to_string();
-            format!("{}={{}}", name_str)
+            format!("{}={}", name_str, format_placeholder(ty))
         })
         .collect();
     let sk_format_string = sk_format_parts.join("&");
     let sk_format_args: Vec<_> = sk_field_names
         .iter()
-        .map(|n| {
+        .zip(sk_field_types.iter())
+        .map(|(n, ty)| {
             let field_name = format_ident!("sk_{}", n.as_ref().unwrap());
-            quote! { self.#field_name }
+            wrap_expr(ty, quote! { self.#field_name })
         })
         .collect();
 
@@ -151,17 +221,19 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let name_str = name.to_string();
         let pk_format_parts: Vec<_> = pk_field_names
             .iter()
-            .map(|n| {
+            .zip(pk_field_types.iter())
+            .map(|(n, ty)| {
                 let name_str = n.as_ref().unwrap().to_string();
-                format!("{}={{}}", name_str)
+                format!("{}={}", name_str, format_placeholder(ty))
             })
             .collect();
         let pk_format_string = format!("{}/{}", name_str, pk_format_parts.join("&"));
         let pk_format_args: Vec<_> = pk_field_names
             .iter()
-            .map(|n| {
+            .zip(pk_field_types.iter())
+            .map(|(n, ty)| {
                 let field_name = n.as_ref().unwrap();
-                quote! { self.#field_name }
+                wrap_expr(ty, quote! { self.#field_name })
             })
             .collect();
         quote! { format!(#pk_format_string, #(#pk_format_args),*) }
@@ -169,9 +241,10 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let put_sk_format_args: Vec<_> = sk_field_names
         .iter()
-        .map(|n| {
+        .zip(sk_field_types.iter())
+        .map(|(n, ty)| {
             let field_name = n.as_ref().unwrap();
-            quote! { self.#field_name }
+            wrap_expr(ty, quote! { self.#field_name })
         })
         .collect();
 
@@ -281,18 +354,20 @@ pub fn doc(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let sk_format_parts: Vec<_> = sk_field_names
         .iter()
-        .map(|n| {
+        .zip(sk_field_types.iter())
+        .map(|(n, ty)| {
             let name_str = n.as_ref().unwrap().to_string();
-            format!("{}={{}}", name_str)
+            format!("{}={}", name_str, format_placeholder(ty))
         })
         .collect();
     let sk_format_string = sk_format_parts.join(",");
 
     let sk_format_args: Vec<_> = sk_field_names
         .iter()
-        .map(|n| {
+        .zip(sk_field_types.iter())
+        .map(|(n, ty)| {
             let ident = n.as_ref().unwrap();
-            quote! { sk.#ident }
+            wrap_expr(ty, quote! { sk.#ident })
         })
         .collect();
 
