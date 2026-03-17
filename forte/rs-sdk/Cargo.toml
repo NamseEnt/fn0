@@ -2,6 +2,9 @@
 name = "forte-sdk"
 version = "0.1.0"
 edition = "2024"
+description = "Core SDK for the Forte web framework"
+license = "AGPL-3.0-only"
+repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
 anyhow = { version = "1", features = ["backtrace"] }
@@ -9,8 +12,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 http = "1"
 wstd = "0.6"
-forte-json = { path = "../../forte/forte-json" }
-forte-db = { path = "../../forte/db" }
+forte-json = { version = "0.1.0", path = "../forte-json" }
+forte-db = { version = "0.1.0", path = "../db" }
 cookie = { version = "0.18", features = ["percent-encode"] }
 syn = { version = "2.0", features = ["full"] }
 quote = "1"
