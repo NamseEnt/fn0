@@ -8,6 +8,15 @@ pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
     pub doc_db: DocDbArgs,
     pub cert: String,
+    pub aws: AwsArgs,
+    pub github_client_id: String,
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AwsArgs {
+    pub region: String,
+    pub wasm_bucket: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]

@@ -22,6 +22,9 @@ async fn main() -> Result<()> {
         Commands::Build => {
             commands::build::execute().await?;
         }
+        Commands::Deploy { code_id, code_version } => {
+            commands::deploy::execute(code_id, code_version).await?;
+        }
         Commands::Local { port } => {
             commands::local::execute(port).await?;
         }
