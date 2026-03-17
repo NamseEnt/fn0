@@ -64,7 +64,7 @@ fn wrap_expr(ty: &syn::Type, expr: proc_macro2::TokenStream) -> proc_macro2::Tok
 }
 
 #[proc_macro_attribute]
-pub fn doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
 
     let name = &input.ident;
@@ -74,7 +74,7 @@ pub fn doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let fields = match &input.fields {
         Fields::Named(fields) => &fields.named,
-        _ => panic!("doc only supports named fields"),
+        _ => panic!("forte_doc only supports named fields"),
     };
 
     let pk_fields: Vec<_> = fields
