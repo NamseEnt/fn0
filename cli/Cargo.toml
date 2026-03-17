@@ -12,6 +12,12 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
 fn0 = { path = "../fn0" }
+adapt-cache = { path = "../adapt-cache" }
+anyhow = "1"
+bytes = "1"
+http-body-util = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+dirs = "6"
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
 tower = { workspace = true, features = ["util"] }

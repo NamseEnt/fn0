@@ -9,6 +9,9 @@ debug = true
 [dependencies]
 host-hq-protocol = { path = "../host-hq-protocol", version = "0.1" }
 doc-db = { path = "../doc-db", version = "0.1" }
+aws-config = "1"
+aws-sdk-s3 = { version = "1", features = ["behavior-version-latest"] }
+uuid = { version = "1", features = ["v4"] }
 chrono = "0.4.42"
 color-eyre = "0.6.5"
 dashmap = "6.1.0"
