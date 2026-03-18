@@ -50,10 +50,13 @@ async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
 
 async fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
+    if !rs_dir.exists() {
+        return Ok(());
+    }
     let binary = ensure_forte_rs_to_ts().await?;
 
     let status = Command::new(&binary)
-        .arg(&rs_dir)
+        .arg(project_dir)
         .stdout(Stdio::null())
         .status()
         .context("Failed to run forte-rs-to-ts")?;
