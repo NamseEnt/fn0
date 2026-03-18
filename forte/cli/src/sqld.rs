@@ -123,7 +123,7 @@ pub async fn start(project_dir: &Path, port: u16) -> Result<SqldProcess> {
         .arg(format!("127.0.0.1:{}", port))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::null())
         .spawn()
         .context("Failed to start sqld")?;
 
