@@ -1,5 +1,5 @@
 [workspace]
-members = ["cargo:forte/cli", "cargo:forte/forte-rs-to-ts"]
+members = ["cargo:forte/cli"]
 
 [dist]
 cargo-dist-version = "0.31.0"
