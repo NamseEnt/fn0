@@ -254,6 +254,11 @@ pub async fn run(options: DevOptions) -> Result<()> {
         }
     };
 
+    let sqld_port = find_available_port(8080)
+        .ok_or_else(|| anyhow::anyhow!("No available port found for sqld starting from 8080"))?;
+    let mut _sqld = crate::sqld::start(&project_dir, sqld_port).await?;
+    println!("sqld running on port {}", sqld_port);
+
     run_codegen(&project_dir)?;
     build_backend(&project_dir)?;
 
@@ -280,6 +285,15 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let public_dir = project_dir.join("fe/public");
 
     let env_vars = server::create_env_vars(&project_dir);
+    {
+        let mut vars = env_vars.write().unwrap();
+        if !vars.iter().any(|(k, _)| k == "TURSO_URL") {
+            vars.push((
+                "TURSO_URL".to_string(),
+                format!("http://127.0.0.1:{}", sqld_port),
+            ));
+        }
+    }
 
     let config = ServerConfig {
         port,
@@ -301,6 +315,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
     if let Some(mut v) = vite {
         let _ = v.child.kill();
     }
+
+    _sqld.kill();
 
     result
 }

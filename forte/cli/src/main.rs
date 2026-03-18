@@ -2,6 +2,7 @@ mod cli;
 mod deps;
 mod module_graph;
 mod server;
+mod sqld;
 mod ssr;
 mod transform;
 
