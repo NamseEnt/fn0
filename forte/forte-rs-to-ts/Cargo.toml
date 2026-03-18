@@ -2,8 +2,15 @@
 name = "forte-rs-to-ts"
 version = "0.1.0"
 edition = "2024"
+description = "Rust to TypeScript type generator for the Forte web framework"
+license = "AGPL-3.0-only"
+repository = "https://github.com/NamseEnt/fn0"
 
 [package.metadata.rust-analyzer]
 rustc_private = true
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
 
 [dependencies]

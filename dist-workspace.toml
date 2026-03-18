@@ -1,5 +1,5 @@
 [workspace]
-members = ["cargo:forte/cli"]
+members = ["cargo:forte/cli", "cargo:forte/forte-rs-to-ts"]
 
 [dist]
 cargo-dist-version = "0.31.0"
@@ -10,7 +10,6 @@ targets = [
     "aarch64-unknown-linux-gnu",
 ]
 installers = ["shell"]
-tag-namespace = "forte-cli"
 
 [dist.github-custom-runners]
 aarch64-unknown-linux-gnu = "ubuntu-24.04-arm"

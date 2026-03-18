@@ -4,6 +4,7 @@ mod module_graph;
 mod server;
 mod sqld;
 mod ssr;
+mod tools;
 mod transform;
 
 use anyhow::Result;
