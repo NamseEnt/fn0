@@ -1016,6 +1016,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
         return quote! {
             async fn handle_hook(
                 hook_name: &str,
+                _uri_authority: &str,
                 _headers: &HeaderMap,
                 _cookie_jar: &mut cookie::CookieJar,
                 _body: Body,

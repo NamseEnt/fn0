@@ -40,9 +40,9 @@ fn main() {
         run_compiler(
             &args[1..],
             &mut Analyzer {
-                ts_output_dir: "fe/src/pages".to_string(),
-                hooks_output_dir: "fe/src/hooks/.generated".to_string(),
-                actions_output_dir: "fe/src/actions/.generated".to_string(),
+                ts_output_dir: "../fe/src/pages".to_string(),
+                hooks_output_dir: "../fe/src/hooks/.generated".to_string(),
+                actions_output_dir: "../fe/src/actions/.generated".to_string(),
             },
         );
         return;
