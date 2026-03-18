@@ -1,10 +1,9 @@
-#[cfg(unix)]
-fn main() {
-    use std::env;
-    use std::fs;
-    use std::os::unix::fs::symlink;
-    use std::path::PathBuf;
+use std::env;
+use std::fs;
+use std::os::unix::fs::symlink;
+use std::path::PathBuf;
 
+fn main() {
     let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
 
@@ -43,6 +42,3 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=PROFILE");
 }
-
-#[cfg(not(unix))]
-fn main() {}
