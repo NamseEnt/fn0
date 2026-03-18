@@ -35,25 +35,33 @@ fn find_available_port(start: u16) -> Option<u16> {
     (start..=65535).find(|&port| is_port_available(port))
 }
 
+fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
+    if let Ok(path) = which::which("forte-rs-to-ts") {
+        return Ok(path);
+    }
+
+    println!("Installing forte-rs-to-ts...");
+    let status = Command::new("cargo")
+        .args(["install", "forte-rs-to-ts"])
+        .status()
+        .context("Failed to run cargo install")?;
+
+    if !status.success() {
+        anyhow::bail!("Failed to install forte-rs-to-ts");
+    }
+
+    which::which("forte-rs-to-ts").context("forte-rs-to-ts not found after installation")
+}
+
 fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
+    let binary = ensure_forte_rs_to_ts()?;
 
-    let forte_rs_to_ts_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("Failed to get parent of CARGO_MANIFEST_DIR")
-        .join("forte-rs-to-ts");
-
-    let status = Command::new("cargo")
-        .arg("run")
-        .arg("--release")
-        .arg("--quiet")
-        .arg("--")
+    let status = Command::new(&binary)
         .arg(&rs_dir)
-        .current_dir(&forte_rs_to_ts_dir)
-        .env_remove("RUSTUP_TOOLCHAIN")
         .stdout(Stdio::null())
         .status()
-        .context("Failed to run forte-rs-to-ts. Is it installed?")?;
+        .context("Failed to run forte-rs-to-ts")?;
 
     if !status.success() {
         anyhow::bail!("forte-rs-to-ts failed with status: {}", status);
