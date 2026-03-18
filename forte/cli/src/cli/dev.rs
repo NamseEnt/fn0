@@ -35,27 +35,22 @@ fn find_available_port(start: u16) -> Option<u16> {
     (start..=65535).find(|&port| is_port_available(port))
 }
 
-fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
-    if let Ok(path) = which::which("forte-rs-to-ts") {
-        return Ok(path);
-    }
+const FORTE_RS_TO_TS_VERSION: &str = "0.1.0";
 
-    println!("Installing forte-rs-to-ts...");
-    let status = Command::new("cargo")
-        .args(["install", "forte-rs-to-ts"])
-        .status()
-        .context("Failed to run cargo install")?;
-
-    if !status.success() {
-        anyhow::bail!("Failed to install forte-rs-to-ts");
-    }
-
-    which::which("forte-rs-to-ts").context("forte-rs-to-ts not found after installation")
+async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
+    let url = crate::tools::fn0_release_url("forte-rs-to-ts", FORTE_RS_TO_TS_VERSION)?;
+    crate::tools::ensure_github_tool(
+        "forte-rs-to-ts",
+        FORTE_RS_TO_TS_VERSION,
+        &url,
+        "forte-rs-to-ts",
+    )
+    .await
 }
 
-fn run_codegen(project_dir: &Path) -> Result<()> {
+async fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
-    let binary = ensure_forte_rs_to_ts()?;
+    let binary = ensure_forte_rs_to_ts().await?;
 
     let status = Command::new(&binary)
         .arg(&rs_dir)
@@ -267,7 +262,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let mut _sqld = crate::sqld::start(&project_dir, sqld_port).await?;
     println!("sqld running on port {}", sqld_port);
 
-    run_codegen(&project_dir)?;
+    run_codegen(&project_dir).await?;
     build_backend(&project_dir)?;
 
     let use_vite_dev = true;
@@ -471,7 +466,7 @@ fn handle_frontend_change(file_path: &Path, handle: &ServerHandle) {
 }
 
 async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()> {
-    run_codegen(project_dir)?;
+    run_codegen(project_dir).await?;
     build_backend(project_dir)?;
     handle.cache.invalidate("backend").await;
     Ok(())

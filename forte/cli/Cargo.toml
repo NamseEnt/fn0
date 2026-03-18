@@ -56,7 +56,6 @@ oxc_span = "0.96"
 sha2 = "0.10"
 hex = "0.4"
 regex = "1"
-which = "7"
 
 [profile.dist]
 inherits = "release"
