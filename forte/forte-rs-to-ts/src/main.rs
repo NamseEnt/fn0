@@ -17,11 +17,20 @@ use rustc_driver::run_compiler;
 use std::env;
 use std::process::Command;
 
+fn derive_sysroot(rustc_path: &str) -> String {
+    let output = Command::new(rustc_path)
+        .arg("--print")
+        .arg("sysroot")
+        .output()
+        .expect("Failed to get sysroot from rustc");
+    String::from_utf8(output.stdout)
+        .expect("Invalid sysroot output")
+        .trim()
+        .to_string()
+}
+
 fn main() {
     if env::var("MY_ANALYZER_WRAPPER_MODE").is_ok() {
-        // args[0] = forte-rs-to-ts
-        // args[1] = /path/to/.../rustc
-        // args[2..] = --crate-name build_script_build ...
         let args: Vec<String> = env::args().collect();
 
         // IMPORTANT: DO NOT REMOVE THIS CHECK!
@@ -37,8 +46,15 @@ fn main() {
             std::process::exit(status.code().unwrap_or(1));
         }
 
+        let mut compiler_args: Vec<String> = args[1..].to_vec();
+        if !compiler_args.iter().any(|a| a == "--sysroot") {
+            let sysroot = derive_sysroot(&args[1]);
+            compiler_args.push("--sysroot".to_string());
+            compiler_args.push(sysroot);
+        }
+
         run_compiler(
-            &args[1..],
+            &compiler_args,
             &mut Analyzer {
                 ts_output_dir: "../fe/src/pages".to_string(),
                 hooks_output_dir: "../fe/src/hooks/.generated".to_string(),
