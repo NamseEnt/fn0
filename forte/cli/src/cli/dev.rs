@@ -35,7 +35,7 @@ fn find_available_port(start: u16) -> Option<u16> {
     (start..=65535).find(|&port| is_port_available(port))
 }
 
-const FORTE_RS_TO_TS_VERSION: &str = "0.1.0";
+const FORTE_RS_TO_TS_VERSION: &str = "0.1.1";
 
 async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
     let url = crate::tools::fn0_release_url("forte-rs-to-ts", FORTE_RS_TO_TS_VERSION)?;
