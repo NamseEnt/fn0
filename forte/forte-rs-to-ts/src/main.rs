@@ -49,7 +49,7 @@ fn main() {
     }
     let project_dir = env::args()
         .nth(1)
-        .unwrap_or_else(|| "../../ls-news".to_string());
+        .expect("Usage: forte-rs-to-ts <project-dir>");
     let target_dir = format!("{}/rs", project_dir);
 
     let current_exe = env::current_exe().expect("Failed to find current exe");
