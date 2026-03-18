@@ -130,9 +130,7 @@ jobs:
       - name: "Rust Cache"
         uses: "Swatinem/rust-cache@v2"
         with:
-          "workspaces": forte/cli -> target
-forte/forte-rs-to-ts -> target
-
+          "workspaces": "forte/cli -> target"
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest
