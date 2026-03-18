@@ -1,6 +1,6 @@
 [package]
 name = "forte-cli"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 description = "CLI for the Forte fullstack web framework"
 license = "AGPL-3.0-only"
@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-{ target }{ archive-suffix }"
-bin-dir = "{ bin }{ binary-ext }"
+bin-dir = "{ name }-{ target }/{ bin }{ binary-ext }"
 pkg-fmt = "txz"
 
 [workspace]
