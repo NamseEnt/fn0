@@ -47,9 +47,10 @@ fn main() {
         );
         return;
     }
-    let target_dir = env::args()
+    let project_dir = env::args()
         .nth(1)
-        .unwrap_or_else(|| "../../ls-news/rs".to_string());
+        .unwrap_or_else(|| "../../ls-news".to_string());
+    let target_dir = format!("{}/rs", project_dir);
 
     let current_exe = env::current_exe().expect("Failed to find current exe");
     println!("Running cargo check on: {target_dir}");
