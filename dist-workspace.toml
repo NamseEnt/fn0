@@ -11,7 +11,7 @@ targets = [
 ]
 installers = ["shell"]
 
-github-build-setup = "build-setup.yml"
+github-build-setup = "../dist/build-setup.yml"
 
 [dist.github-custom-runners]
 aarch64-unknown-linux-gnu = "ubuntu-24.04-arm"
