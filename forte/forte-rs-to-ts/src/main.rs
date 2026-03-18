@@ -15,18 +15,17 @@ mod ts_codegen;
 use analyzer::Analyzer;
 use rustc_driver::run_compiler;
 use std::env;
+use std::path::PathBuf;
 use std::process::Command;
 
-fn derive_sysroot(rustc_path: &str) -> String {
-    let output = Command::new(rustc_path)
-        .arg("--print")
-        .arg("sysroot")
-        .output()
-        .expect("Failed to get sysroot from rustc");
-    String::from_utf8(output.stdout)
-        .expect("Invalid sysroot output")
-        .trim()
-        .to_string()
+fn bundled_sysroot() -> PathBuf {
+    let exe = env::current_exe().expect("Failed to find current exe");
+    let install_dir = exe.parent().expect("No parent dir");
+    install_dir.to_path_buf()
+}
+
+fn bundled_rustc() -> PathBuf {
+    bundled_sysroot().join("bin").join("rustc")
 }
 
 fn main() {
@@ -46,12 +45,10 @@ fn main() {
             std::process::exit(status.code().unwrap_or(1));
         }
 
+        let sysroot = bundled_sysroot();
         let mut compiler_args: Vec<String> = args[1..].to_vec();
-        if !compiler_args.iter().any(|a| a == "--sysroot") {
-            let sysroot = derive_sysroot(&args[1]);
-            compiler_args.push("--sysroot".to_string());
-            compiler_args.push(sysroot);
-        }
+        compiler_args.push("--sysroot".to_string());
+        compiler_args.push(sysroot.to_string_lossy().to_string());
 
         run_compiler(
             &compiler_args,
@@ -69,13 +66,17 @@ fn main() {
     let target_dir = format!("{}/rs", project_dir);
 
     let current_exe = env::current_exe().expect("Failed to find current exe");
+    let rustc = bundled_rustc();
+    let target_cache = format!("{}/.forte/rs-to-ts-target", project_dir);
     println!("Running cargo check on: {target_dir}");
 
     let status = Command::new("cargo")
         .arg("check")
         .current_dir(&target_dir)
-        .env("RUSTC_WORKSPACE_WRAPPER", current_exe)
+        .env("RUSTC", &rustc)
+        .env("RUSTC_WORKSPACE_WRAPPER", &current_exe)
         .env("MY_ANALYZER_WRAPPER_MODE", "true")
+        .env("CARGO_TARGET_DIR", &target_cache)
         .status()
         .expect("Failed to run cargo");
 

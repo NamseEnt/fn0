@@ -36,7 +36,7 @@ jobs:
 
       - name: Install Rust nightly
         run: |
-          rustup toolchain install nightly-2026-01-05 --component rustc-dev
+          rustup toolchain install nightly-2026-01-05 --component rustc-dev --target wasm32-wasip2
           rustup default nightly-2026-01-05
 
       - name: Install patchelf (Linux)
@@ -47,21 +47,42 @@ jobs:
         working-directory: forte/forte-rs-to-ts
         run: cargo build --profile dist
 
-      - name: Package with dylibs
+      - name: Package with toolchain
         shell: bash
         run: |
           set -euo pipefail
           TARGET="${{ matrix.target }}"
           DYLIB_EXT="${{ matrix.dylib_ext }}"
+          SYSROOT="$(rustc --print sysroot)"
           ARCHIVE_DIR="forte-rs-to-ts-${TARGET}"
-          mkdir -p "${ARCHIVE_DIR}/lib"
+
+          mkdir -p "${ARCHIVE_DIR}/bin"
+          mkdir -p "${ARCHIVE_DIR}/lib/rustlib/${TARGET}/lib"
+          mkdir -p "${ARCHIVE_DIR}/lib/rustlib/wasm32-wasip2/lib"
 
           cp "forte/forte-rs-to-ts/target/dist/forte-rs-to-ts" "${ARCHIVE_DIR}/"
 
-          TOOLCHAIN_LIB="$(rustc --print sysroot)/lib"
+          cp "${SYSROOT}/bin/rustc" "${ARCHIVE_DIR}/bin/"
 
-          DYLIB_NAME=$(basename $(ls ${TOOLCHAIN_LIB}/librustc_driver-*.${DYLIB_EXT} | head -1))
-          cp "${TOOLCHAIN_LIB}/${DYLIB_NAME}" "${ARCHIVE_DIR}/lib/"
+          cp "${SYSROOT}/lib/librustc_driver-"*.${DYLIB_EXT} "${ARCHIVE_DIR}/lib/"
+
+          HOST_LIB="${SYSROOT}/lib/rustlib/${TARGET}/lib"
+          DEST_HOST="${ARCHIVE_DIR}/lib/rustlib/${TARGET}/lib"
+          for f in "${HOST_LIB}"/*.rlib; do
+            NAME=$(basename "$f")
+            case "$NAME" in
+              librustc_std_workspace_*|librustc_demangle*|librustc_literal_escaper*)
+                cp "$f" "${DEST_HOST}/"
+                ;;
+              librustc_*)
+                ;;
+              *)
+                cp "$f" "${DEST_HOST}/"
+                ;;
+            esac
+          done
+
+          cp -r "${SYSROOT}/lib/rustlib/wasm32-wasip2/lib/"* "${ARCHIVE_DIR}/lib/rustlib/wasm32-wasip2/lib/"
 
           if [ "${{ matrix.rpath_tool }}" = "install_name_tool" ]; then
             install_name_tool -add_rpath @executable_path/lib "${ARCHIVE_DIR}/forte-rs-to-ts"
