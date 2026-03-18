@@ -1,0 +1,100 @@
+name: Release forte-rs-to-ts
+
+on:
+  push:
+    tags:
+      - 'forte-rs-to-ts-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            dylib_ext: dylib
+            rpath_tool: install_name_tool
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+            dylib_ext: so
+            rpath_tool: patchelf
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            dylib_ext: so
+            rpath_tool: patchelf
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust nightly
+        run: |
+          rustup toolchain install nightly-2026-01-05 --component rustc-dev
+          rustup default nightly-2026-01-05
+
+      - name: Install patchelf (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y patchelf
+
+      - name: Build forte-rs-to-ts
+        working-directory: forte/forte-rs-to-ts
+        run: cargo build --profile dist
+
+      - name: Package with dylibs
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.target }}"
+          DYLIB_EXT="${{ matrix.dylib_ext }}"
+          ARCHIVE_DIR="forte-rs-to-ts-${TARGET}"
+          mkdir -p "${ARCHIVE_DIR}/lib"
+
+          cp "forte/forte-rs-to-ts/target/dist/forte-rs-to-ts" "${ARCHIVE_DIR}/"
+
+          TOOLCHAIN_LIB="$(rustc --print sysroot)/lib"
+
+          DYLIB_NAME=$(basename $(ls ${TOOLCHAIN_LIB}/librustc_driver-*.${DYLIB_EXT} | head -1))
+          cp "${TOOLCHAIN_LIB}/${DYLIB_NAME}" "${ARCHIVE_DIR}/lib/"
+
+          if [ "${{ matrix.rpath_tool }}" = "install_name_tool" ]; then
+            install_name_tool -add_rpath @executable_path/lib "${ARCHIVE_DIR}/forte-rs-to-ts"
+          else
+            patchelf --set-rpath '$ORIGIN/lib' "${ARCHIVE_DIR}/forte-rs-to-ts"
+          fi
+
+          tar cJf "forte-rs-to-ts-${TARGET}.tar.xz" "${ARCHIVE_DIR}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: forte-rs-to-ts-${{ matrix.target }}
+          path: forte-rs-to-ts-${{ matrix.target }}.tar.xz
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: forte-rs-to-ts-*
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#forte-rs-to-ts-}"
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "forte-rs-to-ts ${VERSION}" \
+            --generate-notes \
+            forte-rs-to-ts-*.tar.xz

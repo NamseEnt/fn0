@@ -1,5 +1,5 @@
 use crate::deps::DependencyPrebundler;
-use crate::server::{self, vite_dev, HmrModuleUpdate, ServerConfig, ServerHandle};
+use crate::server::{self, HmrModuleUpdate, ServerConfig, ServerHandle, vite_dev};
 use crate::ssr::SsrBundler;
 use anyhow::{Context, Result};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
@@ -39,7 +39,7 @@ const FORTE_RS_TO_TS_VERSION: &str = "0.1.0";
 
 async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
     let url = crate::tools::fn0_release_url("forte-rs-to-ts", FORTE_RS_TO_TS_VERSION)?;
-    crate::tools::ensure_github_tool(
+    crate::tools::ensure_github_tool_with_libs(
         "forte-rs-to-ts",
         FORTE_RS_TO_TS_VERSION,
         &url,
@@ -395,7 +395,8 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                     .collect();
 
                 let env_changed = events.iter().any(|e| e.path == env_file) && {
-                    let current_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
+                    let current_mtime =
+                        fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
                     match (current_mtime, known_env_mtime) {
                         (Some(current), Some(known)) => current > known,
                         (Some(_), None) => true,

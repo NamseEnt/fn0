@@ -72,6 +72,91 @@ pub async fn ensure_github_tool(
     Ok(path)
 }
 
+pub async fn ensure_github_tool_with_libs(
+    name: &str,
+    version: &str,
+    download_url: &str,
+    binary_name: &str,
+) -> Result<PathBuf> {
+    let dir = tools_dir()?;
+    let install_dir = dir.join(format!("{}-{}", name, version));
+    let binary_path = install_dir.join(binary_name);
+
+    if binary_path.exists() {
+        return Ok(binary_path);
+    }
+
+    std::fs::create_dir_all(&dir)?;
+
+    println!("Downloading {} {}...", name, version);
+
+    let response = reqwest::get(download_url).await?.error_for_status()?;
+    let bytes = response.bytes().await?;
+
+    let temp_archive = dir.join(format!("{}-temp.tar.xz", name));
+    std::fs::write(&temp_archive, &bytes)?;
+
+    let temp_extract = dir.join(format!("{}-temp_extract", name));
+    std::fs::create_dir_all(&temp_extract)?;
+
+    let status = Command::new("tar")
+        .arg("xf")
+        .arg(&temp_archive)
+        .arg("-C")
+        .arg(&temp_extract)
+        .status()
+        .context("Failed to run tar")?;
+
+    std::fs::remove_file(&temp_archive)?;
+
+    if !status.success() {
+        let _ = std::fs::remove_dir_all(&temp_extract);
+        anyhow::bail!("Failed to extract {} archive", name);
+    }
+
+    let extracted_binary = find_binary(&temp_extract, binary_name)?;
+    let extracted_dir = extracted_binary.parent().unwrap();
+
+    if install_dir.exists() {
+        std::fs::remove_dir_all(&install_dir)?;
+    }
+    rename_dir(extracted_dir, &install_dir)?;
+    let _ = std::fs::remove_dir_all(&temp_extract);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&binary_path, std::fs::Permissions::from_mode(0o755))?;
+    }
+
+    println!("{} {} ready.", name, version);
+    Ok(binary_path)
+}
+
+fn rename_dir(from: &Path, to: &Path) -> Result<()> {
+    if std::fs::rename(from, to).is_ok() {
+        return Ok(());
+    }
+    copy_dir_recursive(from, to)?;
+    std::fs::remove_dir_all(from)?;
+    Ok(())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
 fn find_binary(dir: &Path, binary_name: &str) -> Result<PathBuf> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
