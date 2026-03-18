@@ -1,61 +1,61 @@
-# Forte CLI 구현 계획
+# Forte CLI Implementation Plan
 
-## 개요
+## Overview
 
-Forte는 Rust 백엔드 + TypeScript/React 프론트엔드를 통합하는 풀스택 프레임워크입니다.
-이 문서는 Forte CLI 도구 구현 계획을 정리합니다.
+Forte is a fullstack framework integrating a Rust backend + TypeScript/React frontend.
+This document outlines the implementation plan for the Forte CLI tool.
 
-## 현재 상태
+## Current State
 
-### 기존 구성요소
+### Existing Components
 
-| 프로젝트 | 역할 | 상태 |
-|----------|------|------|
-| `forte/` | SSR 서버 오케스트레이션 | PoC 완료 |
-| `forte-manual/` | 수동 생성된 예제 앱 | PoC 완료 |
-| `forte-rs-to-ts/` | Rust → TypeScript 타입 생성 | 완료 |
-| `forte-json/` | 스트리밍 JSON 직렬화 | 완료 |
-| `fn0/` | WASM/JS 실행 엔진 | 완료 |
-| `ski/` | JavaScript 런타임 (Deno core) | 완료 |
+| Project | Role | Status |
+|---------|------|--------|
+| `forte/` | SSR server orchestration | PoC complete |
+| `forte-manual/` | Manually generated example app | PoC complete |
+| `forte-rs-to-ts/` | Rust → TypeScript type generation | Complete |
+| `forte-json/` | Streaming JSON serialization | Complete |
+| `fn0/` | WASM/JS execution engine | Complete |
+| `ski/` | JavaScript runtime (Deno core) | Complete |
 
-### 코드 생성 역할 분담
+### Code Generation Responsibilities
 
-| 생성 대상 | 담당 | 실행 시점 |
-|-----------|------|-----------|
-| 백엔드 라우트 (`route_generated.rs`) | `build.rs` | `cargo build` |
-| Props 타입 (`.props.ts`) | CLI → `forte-rs-to-ts` 호출 | `forte dev` |
-| 프론트엔드 라우터 (`routes.generated.ts`) | CLI | `forte dev` |
-| Action 타입 + 클라이언트 (`forte:actions`) | CLI | `forte dev` |
+| Target | Owner | Execution Timing |
+|--------|-------|-----------------|
+| Backend routes (`route_generated.rs`) | `build.rs` | `cargo build` |
+| Props types (`.props.ts`) | CLI → calls `forte-rs-to-ts` | `forte dev` |
+| Frontend router (`routes.generated.ts`) | CLI | `forte dev` |
+| Action types + client (`forte:actions`) | CLI | `forte dev` |
 
-- 백엔드 개발자: `cargo build`만으로 작업 가능
-- 프론트엔드 개발자: `forte dev`로 타입 + 라우터 동기화
-
----
-
-## CLI 명령어 구조
-
-```
-forte init <project-name>     # 새 프로젝트 생성
-forte add page <path>         # 페이지 추가
-forte add action <name>       # 액션 추가
-forte dev                     # 개발 서버 (watch + codegen)
-forte build                   # 프로덕션 빌드
-```
+- Backend developer: Can work with just `cargo build`
+- Frontend developer: Use `forte dev` to sync types + router
 
 ---
 
-## 1단계: 프로젝트 구조 리팩토링
+## CLI Command Structure
 
-현재 `forte/src/main.rs`에 SSR 서버 로직이 있습니다.
-CLI와 서버를 분리합니다.
+```
+forte init <project-name>     # Create new project
+forte add page <path>         # Add page
+forte add action <name>       # Add action
+forte dev                     # Dev server (watch + codegen)
+forte build                   # Production build
+```
 
-### 변경 후 구조
+---
+
+## Step 1: Project Structure Refactoring
+
+Currently, SSR server logic is in `forte/src/main.rs`.
+Separate CLI and server.
+
+### Post-refactoring Structure
 
 ```
 forte/
 ├── Cargo.toml
 ├── src/
-│   ├── main.rs              # CLI 진입점
+│   ├── main.rs              # CLI entry point
 │   ├── cli/
 │   │   ├── mod.rs
 │   │   ├── init.rs          # forte init
@@ -64,66 +64,66 @@ forte/
 │   │   └── build.rs         # forte build
 │   ├── codegen/
 │   │   ├── mod.rs
-│   │   ├── backend_routes.rs    # route_generated.rs 생성
-│   │   └── frontend_routes.rs   # 프론트엔드 라우터 생성
+│   │   ├── backend_routes.rs    # route_generated.rs generation
+│   │   └── frontend_routes.rs   # Frontend router generation
 │   ├── server/
-│   │   └── mod.rs           # 현재 main.rs의 SSR 서버 로직
-│   ├── watcher.rs           # 파일 변경 감지
-│   └── templates/           # 내장 템플릿
-└── templates/               # 프로젝트/페이지 템플릿 파일
+│   │   └── mod.rs           # SSR server logic from current main.rs
+│   ├── watcher.rs           # File change detection
+│   └── templates/           # Embedded templates
+└── templates/               # Project/page template files
 ```
 
 ---
 
-## 2단계: `forte dev` 구현
+## Step 2: `forte dev` Implementation
 
-개발 서버 + 코드 생성 + watch 모드
+Dev server + code generation + watch mode
 
-### 실행 흐름
+### Execution Flow
 
 ```
 forte dev
     │
-    ├─1. 초기 코드 생성
-    │   ├─ forte-rs-to-ts 실행 → .props.ts 생성
-    │   ├─ backend routes 생성 → route_generated.rs
-    │   └─ frontend routes 생성 → routes.generated.ts
+    ├─1. Initial code generation
+    │   ├─ Run forte-rs-to-ts → generate .props.ts
+    │   ├─ Generate backend routes → route_generated.rs
+    │   └─ Generate frontend routes → routes.generated.ts
     │
-    ├─2. 초기 빌드
-    │   ├─ cargo build --target wasm32-wasip2 (백엔드)
-    │   └─ npm run build (프론트엔드)
+    ├─2. Initial build
+    │   ├─ cargo build --target wasm32-wasip2 (backend)
+    │   └─ npm run build (frontend)
     │
-    ├─3. 서버 시작
+    ├─3. Start server
     │   └─ http://localhost:3000
     │
-    └─4. Watch 모드
-        ├─ rs/src/pages/** 변경 → 백엔드 재빌드 + codegen
-        └─ fe/src/pages/** 변경 → 프론트엔드 재빌드
+    └─4. Watch mode
+        ├─ rs/src/pages/** change → backend rebuild + codegen
+        └─ fe/src/pages/** change → frontend rebuild
 ```
 
-### 코드 생성 상세
+### Code Generation Details
 
-#### 2-1. Props 타입 생성 (기존 도구 활용)
+#### 2-1. Props Type Generation (using existing tool)
 
-`forte-rs-to-ts` 호출:
+Call `forte-rs-to-ts`:
 ```rust
 Command::new("forte-rs-to-ts")
     .arg(&project_rs_dir)
     .status()
 ```
 
-#### 2-2. 백엔드 라우트 생성
+#### 2-2. Backend Route Generation
 
-현재 `rs/build.rs` 로직을 CLI로 이동.
-`build.rs`는 단순히 CLI를 호출하거나, CLI가 직접 생성.
+Move current `rs/build.rs` logic to CLI.
+`build.rs` simply calls CLI, or CLI generates directly.
 
-생성 파일: `rs/src/route_generated.rs`
+Generated file: `rs/src/route_generated.rs`
 
-#### 2-3. 프론트엔드 라우터 생성
+#### 2-3. Frontend Router Generation
 
-현재 `fe/src/server.ts`의 하드코딩된 라우팅을 자동 생성.
+Auto-generate the hardcoded routing in current `fe/src/server.ts`.
 
-생성 파일: `fe/src/routes.generated.ts`
+Generated file: `fe/src/routes.generated.ts`
 
 ```typescript
 // Auto-generated by forte CLI
@@ -150,7 +150,7 @@ export const routes: Route[] = [
 ];
 ```
 
-`server.ts`는 이를 import하여 라우팅:
+`server.ts` imports this for routing:
 
 ```typescript
 import { routes } from './routes.generated';
@@ -173,16 +173,16 @@ export async function handler(request: Request): Promise<Response> {
 
 ---
 
-## 3단계: `forte init` 구현
+## Step 3: `forte init` Implementation
 
-### 명령어
+### Command
 
 ```bash
 forte init my-app
 cd my-app
 ```
 
-### 생성되는 구조
+### Generated Structure
 
 ```
 my-app/
@@ -206,9 +206,9 @@ my-app/
                 └── page.tsx
 ```
 
-### 템플릿 내장
+### Embedded Templates
 
-`include_str!` 또는 `rust-embed`로 템플릿 파일 내장:
+Embed template files with `include_str!` or `rust-embed`:
 
 ```rust
 static CARGO_TOML_TEMPLATE: &str = include_str!("../templates/rs/Cargo.toml.tmpl");
@@ -216,40 +216,40 @@ static PAGE_MOD_TEMPLATE: &str = include_str!("../templates/rs/page.mod.rs.tmpl"
 // ...
 ```
 
-### 변수 치환
+### Variable Substitution
 
-간단한 템플릿 변수 치환:
-- `{{project_name}}` → 프로젝트 이름
-- `{{page_name}}` → 페이지 이름
+Simple template variable substitution:
+- `{{project_name}}` → project name
+- `{{page_name}}` → page name
 
 ---
 
-## 4단계: `forte add page` 구현
+## Step 4: `forte add page` Implementation
 
-### 명령어
+### Command
 
 ```bash
 forte add page product/[id]
 forte add page user/settings
 ```
 
-### 동작
+### Behavior
 
-1. 경로 파싱
-   - `product/[id]` → 정적: `product`, 동적: `id`
+1. Parse path
+   - `product/[id]` → static: `product`, dynamic: `id`
 
-2. 백엔드 파일 생성
+2. Generate backend file
    - `rs/src/pages/product/[id]/mod.rs`
 
-3. 프론트엔드 파일 생성
+3. Generate frontend file
    - `fe/src/pages/product/[id]/page.tsx`
 
-4. 코드 재생성
-   - `route_generated.rs` 업데이트
-   - `routes.generated.ts` 업데이트
-   - `.props.ts` 생성
+4. Regenerate code
+   - Update `route_generated.rs`
+   - Update `routes.generated.ts`
+   - Generate `.props.ts`
 
-### 템플릿
+### Templates
 
 **rs/src/pages/{path}/mod.rs:**
 ```rust
@@ -262,7 +262,7 @@ pub enum Props {
     },
 }
 
-// Infallible - 에러는 Props variant로 처리
+// Infallible - errors are handled via Props variants
 pub async fn handler(
     _headers: std::collections::HashMap<String, String>,
     {{#params}}
@@ -293,127 +293,127 @@ export default function Page(props: Props) {
 
 ---
 
-## 5단계: `forte build` 구현
+## Step 5: `forte build` Implementation
 
-### 명령어
+### Command
 
 ```bash
 forte build
 ```
 
-### 출력
+### Output
 
 ```
 dist/
-├── backend.wasm         # 또는 backend.cwasm (사전 컴파일)
+├── backend.wasm         # or backend.cwasm (pre-compiled)
 ├── frontend/
-│   └── server.js        # SSR 번들
-└── static/              # 정적 에셋
+│   └── server.js        # SSR bundle
+└── static/              # Static assets
 ```
 
-### 빌드 단계
+### Build Steps
 
-1. **코드 생성** (dev와 동일)
+1. **Code generation** (same as dev)
 
-2. **백엔드 빌드**
+2. **Backend build**
    ```bash
    cargo build --release --target wasm32-wasip2
    ```
 
-3. **CWASM 사전 컴파일** (선택적)
+3. **CWASM pre-compilation** (optional)
    ```bash
    wasmtime compile backend.wasm -o backend.cwasm
    ```
 
-4. **프론트엔드 빌드**
+4. **Frontend build**
    ```bash
    npm run build
    ```
 
-5. **정적 에셋 복사**
+5. **Copy static assets**
    - `fe/public/` → `dist/static/`
-   - 에셋 해싱 (선택적)
+   - Asset hashing (optional)
 
 ---
 
-## 6단계: Watch 모드 + 핫 스왑
+## Step 6: Watch Mode + Hot Swap
 
-### 의존성
+### Dependencies
 
 ```toml
-notify = "6"  # 파일 시스템 감시
+notify = "6"  # File system watching
 ```
 
-### 감시 대상
+### Watch Targets
 
-| 경로 | 변경 시 동작 |
-|------|-------------|
-| `rs/src/pages/**/*.rs` | Props codegen + 백엔드 재빌드 + WASM 핫 스왑 |
-| `rs/src/actions/**/*.rs` | Action codegen + 백엔드 재빌드 + WASM 핫 스왑 |
-| `fe/src/pages/**/*.tsx` | 프론트엔드 재빌드 + JS 핫 스왑 |
-| `fe/public/**` | 정적 에셋 변경 알림 |
-| `Forte.toml` | 전체 재시작 |
+| Path | Action on Change |
+|------|-----------------|
+| `rs/src/pages/**/*.rs` | Props codegen + backend rebuild + WASM hot swap |
+| `rs/src/actions/**/*.rs` | Action codegen + backend rebuild + WASM hot swap |
+| `fe/src/pages/**/*.tsx` | Frontend rebuild + JS hot swap |
+| `fe/public/**` | Static asset change notification |
+| `Forte.toml` | Full restart |
 
-### 핫 스왑 (서버 재시작 없음)
+### Hot Swap (no server restart)
 
-**백엔드 WASM:**
+**Backend WASM:**
 ```
-파일 변경 → cargo build → fn0 캐시 무효화 → 다음 요청에서 새 WASM 로드
+File change → cargo build → fn0 cache invalidation → new WASM loaded on next request
 ```
 
 **SSR JS:**
 ```
-파일 변경 → npm run build → fn0 캐시 무효화 → 다음 요청에서 새 JS 로드
+File change → npm run build → fn0 cache invalidation → new JS loaded on next request
 ```
 
-**클라이언트 (1차: LiveReload):**
+**Client (Phase 1: LiveReload):**
 ```
-파일 변경 → 브라우저에 새로고침 신호
+File change → reload signal to browser
 ```
 
-### 디바운싱
+### Debouncing
 
-빠른 연속 변경 시 재빌드 지연:
+Delay rebuild on rapid consecutive changes:
 ```rust
 let debounce_duration = Duration::from_millis(100);
 ```
 
 ---
 
-## E2E 테스트 전략
+## E2E Test Strategy
 
-### 원칙
+### Principles
 
-- **모든 명령어는 E2E 테스트로 검증**
-- 수동 테스트 금지, 코드로 자동화
-- `forte init`으로 생성한 프로젝트를 다른 명령어 테스트에 사용
+- **All commands verified through E2E tests**
+- No manual testing, automate with code
+- Use project created by `forte init` for testing other commands
 
-### 테스트 구조
+### Test Structure
 
 ```
 forte/
 ├── tests/
 │   └── e2e/
 │       ├── mod.rs
-│       ├── init_test.rs      # forte init 테스트
-│       ├── dev_test.rs       # forte dev 테스트
-│       ├── add_test.rs       # forte add 테스트
-│       └── build_test.rs     # forte build 테스트
+│       ├── init_test.rs      # forte init tests
+│       ├── dev_test.rs       # forte dev tests
+│       ├── add_test.rs       # forte add tests
+│       └── build_test.rs     # forte build tests
 ```
 
-### 테스트 의존성
+### Test Dependencies
 
 ```toml
 [dev-dependencies]
-assert_cmd = "2"      # CLI 실행 및 검증
-predicates = "3"      # 출력 검증
-tempfile = "3"        # 임시 디렉토리
-reqwest = { version = "0.12", features = ["blocking"] }  # HTTP 요청
+assert_cmd = "2"      # CLI execution and verification
+predicates = "3"      # Output verification
+tempfile = "3"        # Temporary directories
+reqwest = { version = "0.12", features = ["blocking"] }  # HTTP requests
 ```
 
-### 테스트 시나리오
+### Test Scenarios
 
-**`forte init` 테스트:**
+**`forte init` test:**
 ```rust
 #[test]
 fn test_init_creates_project_structure() {
@@ -425,77 +425,77 @@ fn test_init_creates_project_structure() {
         .assert()
         .success();
 
-    // 디렉토리 구조 검증
+    // Verify directory structure
     assert!(temp.path().join("my-app/Forte.toml").exists());
     assert!(temp.path().join("my-app/rs/Cargo.toml").exists());
     assert!(temp.path().join("my-app/fe/package.json").exists());
 }
 ```
 
-**`forte dev` 테스트:**
+**`forte dev` test:**
 ```rust
 #[tokio::test]
 async fn test_dev_server_responds() {
     let temp = tempfile::tempdir().unwrap();
 
-    // 1. forte init으로 프로젝트 생성
+    // 1. Create project with forte init
     Command::cargo_bin("forte").unwrap()
         .args(["init", "test-app"])
         .current_dir(&temp)
         .assert()
         .success();
 
-    // 2. forte dev 백그라운드 실행
+    // 2. Run forte dev in background
     let mut child = Command::cargo_bin("forte").unwrap()
         .args(["dev"])
         .current_dir(temp.path().join("test-app"))
         .spawn()
         .unwrap();
 
-    // 3. 서버 시작 대기 후 HTTP 요청
+    // 3. Wait for server start then make HTTP request
     tokio::time::sleep(Duration::from_secs(10)).await;
     let resp = reqwest::get("http://127.0.0.1:3000").await.unwrap();
     assert!(resp.status().is_success());
 
-    // 4. 정리
+    // 4. Cleanup
     child.kill().unwrap();
 }
 ```
 
 ---
 
-## 구현 순서
+## Implementation Order
 
-### 원칙
+### Principles
 
-- **테스트 코드 먼저 작성, 구현은 그 다음**
-- 각 단계는 E2E 테스트 통과로 완료 판정
+- **Write test code first, then implement**
+- Each step is considered complete when E2E tests pass
 
-### 1차 (MVP)
+### Phase 1 (MVP)
 
-| 순서 | 작업 | 테스트 검증 항목 |
-|------|------|-----------------|
-| 1 | 프로젝트 구조 리팩토링 ✅ | - |
-| 2 | `forte init` | 디렉토리 구조, 필수 파일 생성 |
-| 3 | `forte dev` E2E 테스트 | init → dev → HTTP 200 응답 |
-| 4 | 프론트엔드 라우터 자동 생성 | routes.generated.ts 파일 검증 |
-| 5 | `forte add page` | 페이지 파일 생성, codegen 실행 |
-| 6 | Watch 모드 + 핫 스왑 | 파일 변경 → 재빌드 → 응답 변경 |
-| 7 | `forte add action` | Action 파일 생성, 타입 생성 |
-| 8 | 정적 에셋 서빙 | /static/* 경로 응답 |
-| 9 | `forte build` | dist/ 디렉토리 생성, 파일 검증 |
+| Order | Task | Test Verification |
+|-------|------|------------------|
+| 1 | Project structure refactoring ✅ | - |
+| 2 | `forte init` | Directory structure, required file generation |
+| 3 | `forte dev` E2E test | init → dev → HTTP 200 response |
+| 4 | Frontend router auto-generation | routes.generated.ts file verification |
+| 5 | `forte add page` | Page file generation, codegen execution |
+| 6 | Watch mode + hot swap | File change → rebuild → response change |
+| 7 | `forte add action` | Action file generation, type generation |
+| 8 | Static asset serving | /static/* path response |
+| 9 | `forte build` | dist/ directory generation, file verification |
 
-### 2차 (향후)
+### Phase 2 (Future)
 
-| 작업 | 테스트 검증 항목 |
-|------|-----------------|
-| 클라이언트 HMR | WebSocket 연결, 모듈 교체 |
-| 프로덕션 에셋 해싱 | 해시 포함 파일명, manifest |
-| Hydration 지원 | 클라이언트 JS 실행 검증 |
+| Task | Test Verification |
+|------|------------------|
+| Client HMR | WebSocket connection, module replacement |
+| Production asset hashing | Hash-included filenames, manifest |
+| Hydration support | Client JS execution verification |
 
 ---
 
-## 의존성
+## Dependencies
 
 ### CLI
 
@@ -508,15 +508,15 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 ```
 
-### 기존 활용
+### Existing Tools
 
-- `forte-rs-to-ts`: Props 타입 생성 (외부 바이너리로 호출)
-- `fn0`: WASM/JS 실행 (라이브러리로 의존)
-- `forte-json`: JSON 직렬화 (백엔드에서 사용)
+- `forte-rs-to-ts`: Props type generation (called as external binary)
+- `fn0`: WASM/JS execution (library dependency)
+- `forte-json`: JSON serialization (used by backend)
 
 ---
 
-## Forte.toml 설정
+## Forte.toml Configuration
 
 ```toml
 [project]
@@ -526,7 +526,7 @@ name = "my-app"
 port = 3000
 
 [build]
-# CWASM 사전 컴파일 여부
+# Whether to pre-compile CWASM
 precompile_wasm = false
 
 [paths]
@@ -536,34 +536,34 @@ frontend = "fe"
 
 ---
 
-## 결정된 사항
+## Decisions Made
 
-### 1. 코드 생성 역할 분담
+### 1. Code Generation Responsibilities
 
-| 생성 대상 | 담당 |
-|-----------|------|
-| 백엔드 라우트 (`route_generated.rs`) | `build.rs` 유지 |
-| Props/Action 타입, 프론트엔드 라우터 | CLI |
+| Target | Owner |
+|--------|-------|
+| Backend routes (`route_generated.rs`) | `build.rs` (kept) |
+| Props/Action types, frontend router | CLI |
 
-- 백엔드 개발자: `cargo build`만으로 독립 작업 가능
-- CLI는 `forte-rs-to-ts`를 호출하여 타입 생성
+- Backend developer: Can work independently with just `cargo build`
+- CLI calls `forte-rs-to-ts` for type generation
 
-### 2. 핫 스왑 + HMR
+### 2. Hot Swap + HMR
 
-**1차 구현:**
-- 백엔드 WASM 핫 스왑 (서버 재시작 없음)
-- SSR JS 핫 스왑 (서버 재시작 없음)
-- 클라이언트: LiveReload (브라우저 새로고침)
+**Phase 1 Implementation:**
+- Backend WASM hot swap (no server restart)
+- SSR JS hot swap (no server restart)
+- Client: LiveReload (browser refresh)
 
-**TODO (향후 필수):**
-- 클라이언트 HMR (React Fast Refresh)
-- Vite 통합 vs 자체 구현 → 추후 결정
+**TODO (future must-have):**
+- Client HMR (React Fast Refresh)
+- Vite integration vs custom implementation → decide later
 
-### 3. Action 구현 방식
+### 3. Action Implementation Approach
 
-**Astro Actions 스타일 벤치마크**
+**Benchmarked against Astro Actions style**
 
-백엔드 구조:
+Backend structure:
 ```
 rs/src/
 ├── pages/
@@ -589,13 +589,13 @@ pub enum Response {
     Error { message: String },
 }
 
-// Infallible - 에러는 Response variant로 처리
+// Infallible - errors are handled via Response variants
 pub async fn handler(request: Request) -> Response {
     Response::Ok { token: "...".to_string() }
 }
 ```
 
-**프론트엔드 사용:**
+**Frontend usage:**
 ```typescript
 import { actions } from 'forte:actions';
 
@@ -605,13 +605,13 @@ if (result.t === 'Ok') {
 }
 ```
 
-- 중첩 경로 지원: `actions/user/login.rs` → `actions.user.login()`
-- `forte:actions` import 방식: Astro 스타일 (구현 시 상세 결정)
+- Nested path support: `actions/user/login.rs` → `actions.user.login()`
+- `forte:actions` import approach: Astro style (details to be decided during implementation)
 
-### 4. 정적 에셋 처리
+### 4. Static Asset Handling
 
-- 디렉토리: `fe/public/`
-- 개발 환경: `forte dev`가 직접 서빙
-- 프로덕션 빌드:
-  - 에셋 해싱 적용 (캐시 무효화)
-  - CDN 경로 지원 필수
+- Directory: `fe/public/`
+- Development: `forte dev` serves directly
+- Production build:
+  - Asset hashing applied (cache invalidation)
+  - CDN path support required
