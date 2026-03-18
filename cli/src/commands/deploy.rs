@@ -69,9 +69,9 @@ async fn github_device_flow() -> Result<String> {
         .json()
         .await?;
 
-    println!("\nGitHub 인증이 필요합니다.");
-    println!("브라우저에서 {} 를 열고", resp.verification_uri);
-    println!("코드를 입력하세요: {}\n", resp.user_code);
+    println!("\nGitHub authentication required.");
+    println!("Open {} in your browser", resp.verification_uri);
+    println!("and enter the code: {}\n", resp.user_code);
 
     let interval = std::time::Duration::from_secs(resp.interval.max(5));
 
@@ -116,7 +116,7 @@ async fn get_github_token() -> Result<String> {
     save_credentials(&Credentials {
         github_token: token.clone(),
     })?;
-    println!("인증 완료! 토큰이 저장되었습니다.\n");
+    println!("Authentication complete! Token saved.\n");
 
     Ok(token)
 }
@@ -124,12 +124,12 @@ async fn get_github_token() -> Result<String> {
 pub async fn execute(code_id: u64, code_version: u64) -> Result<()> {
     let github_token = get_github_token().await?;
 
-    println!("빌드 시작...");
+    println!("Starting build...");
     crate::commands::build::execute().await?;
 
     let client = reqwest::Client::new();
 
-    println!("배포 시작 요청...");
+    println!("Requesting deploy start...");
     let start_resp: DeployStartResponse = client
         .post(format!("{}/deploy/start", HQ_URL))
         .json(&serde_json::json!({ "github_token": github_token }))
@@ -140,7 +140,7 @@ pub async fn execute(code_id: u64, code_version: u64) -> Result<()> {
         .json()
         .await?;
 
-    println!("WASM 업로드 중...");
+    println!("Uploading WASM...");
     let wasm_bytes = std::fs::read("dist/component.wasm")
         .map_err(|e| eyre!("Failed to read dist/component.wasm: {}", e))?;
 
@@ -152,7 +152,7 @@ pub async fn execute(code_id: u64, code_version: u64) -> Result<()> {
         .error_for_status()
         .map_err(|e| eyre!("WASM upload failed: {}", e))?;
 
-    println!("배포 완료 요청...");
+    println!("Requesting deploy finish...");
     client
         .post(format!("{}/deploy/finish", HQ_URL))
         .json(&serde_json::json!({
@@ -166,7 +166,7 @@ pub async fn execute(code_id: u64, code_version: u64) -> Result<()> {
         .error_for_status()
         .map_err(|e| eyre!("Deploy finish failed: {}", e))?;
 
-    println!("배포 완료!");
+    println!("Deploy complete!");
 
     Ok(())
 }
