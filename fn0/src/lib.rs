@@ -1,5 +1,6 @@
 mod deployment;
 mod execute;
+pub mod measure_cpu_time;
 pub mod telemetry;
 
 use adapt_cache::AdaptCache;
@@ -10,7 +11,7 @@ pub use deployment::{CodeKind, DeploymentMap};
 use execute::*;
 pub use execute::EnvVars;
 use http_body_util::combinators::UnsyncBoxBody;
-use measure_cpu_time::SystemClock;
+use crate::measure_cpu_time::SystemClock;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, RwLock};
 use wasmtime::Engine;
@@ -79,14 +80,12 @@ where
 }
 
 pub fn compile(wasm_bytes: &[u8]) -> Result<Vec<u8>> {
-    let engine = Engine::new(&engine_config())?;
+    let engine = Engine::new(&engine_config()).map_err(|e| anyhow!("{e}"))?;
 
-    // Check if it's a component by looking for component-specific markers
-    if wasm_bytes.len() > 8 && wasm_bytes[4..8] == [0x0d, 0x00, 0x01, 0x00] {
-        // This is a WebAssembly Component
+    let result = if wasm_bytes.len() > 8 && wasm_bytes[4..8] == [0x0d, 0x00, 0x01, 0x00] {
         engine.precompile_component(wasm_bytes)
     } else {
-        // This is a standard WebAssembly Module
         engine.precompile_module(wasm_bytes)
-    }
+    };
+    result.map_err(|e| anyhow!("{e}"))
 }

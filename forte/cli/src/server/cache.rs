@@ -54,10 +54,13 @@ impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for S
                 _ => return Err(adapt_cache::Error::NotFound),
             };
 
-            let mut data = self
-                .load_file(path)
-                .await
-                .map_err(|e| adapt_cache::Error::StorageError(anyhow::anyhow!(e)))?;
+            let mut data = match self.load_file(path).await {
+                Ok(data) => data,
+                Err(e) => {
+                    eprintln!("Failed to read '{path}': {e}");
+                    return Err(adapt_cache::Error::StorageError(anyhow::anyhow!(e)));
+                }
+            };
 
             if id == "backend" {
                 match fn0::compile(&data) {
