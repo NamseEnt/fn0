@@ -45,7 +45,6 @@ jobs:
             sleep 30
           }
 
-          publish_if_needed "measure-cpu-time" "measure-cpu-time"
           publish_if_needed "adapt-cache" "fn0-adapt-cache"
           publish_if_needed "ski/ski" "fn0-ski"
           publish_if_needed "fn0" "fn0"
