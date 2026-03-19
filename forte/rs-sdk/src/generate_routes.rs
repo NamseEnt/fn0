@@ -497,10 +497,18 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
                 .unwrap())
         }
     } else {
+        let needs_path_segments = pages.iter().any(|p| has_dynamic_segments(&p.route_segments));
+        let path_segments_decl = if needs_path_segments {
+            quote! {
+                let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            }
+        } else {
+            quote! {}
+        };
         let first = &route_matches[0];
         let rest = &route_matches[1..];
         quote! {
-            let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            #path_segments_decl
             #first
             #(else #rest)*
             else {
@@ -523,7 +531,6 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
         use forte_sdk::http::{Error, Request, Response, StatusCode, body::Body, HeaderMap};
         use forte_sdk::http_header::{COOKIE, LOCATION, SET_COOKIE};
         use forte_sdk::*;
-        use std::collections::HashMap;
 
         #redirect_enum
 
@@ -532,7 +539,6 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
             let (parts, body) = request.into_parts();
             let headers = parts.headers;
             let path = parts.uri.path();
-            let query = parts.uri.query().unwrap_or("");
             let mut cookie_jar = make_cookie_jar(&headers);
 
             let Some(uri_authority) = parts.uri.authority() else {
@@ -550,17 +556,6 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
             if let Some(action_name) = path.strip_prefix("/__forte_action/") {
                 return handle_action(action_name, uri_authority, &headers, &mut cookie_jar, body).await;
             }
-
-            let query_params: HashMap<String, String> = query
-                .split('&')
-                .filter(|s| !s.is_empty())
-                .filter_map(|pair| {
-                    let mut parts = pair.splitn(2, '=');
-                    let key = parts.next()?;
-                    let value = parts.next().unwrap_or("");
-                    Some((key.to_string(), value.to_string()))
-                })
-                .collect();
 
             #route_chain
         }
@@ -662,12 +657,23 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                 quote! {}
             };
 
-            // Generate search params extraction
             let search_params_extraction = if let Some(fields) = &page.search_params {
                 let field_parsers = generate_search_field_parsers(fields);
                 let field_names: Vec<_> =
                     fields.iter().map(|f| format_ident!("{}", f.name)).collect();
                 quote! {
+                    use std::collections::HashMap;
+                    let query = parts.uri.query().unwrap_or("");
+                    let query_params: HashMap<String, String> = query
+                        .split('&')
+                        .filter(|s| !s.is_empty())
+                        .filter_map(|pair| {
+                            let mut parts = pair.splitn(2, '=');
+                            let key = parts.next()?;
+                            let value = parts.next().unwrap_or("");
+                            Some((key.to_string(), value.to_string()))
+                        })
+                        .collect();
                     #(#field_parsers)*
                     let search_params = #module_name::SearchParams {
                         #(#field_names),*

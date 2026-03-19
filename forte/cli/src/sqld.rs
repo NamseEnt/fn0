@@ -36,8 +36,7 @@ impl Drop for SqldProcess {
 
 pub async fn start(project_dir: &Path, port: u16) -> Result<SqldProcess> {
     let url = sqld_archive_url()?;
-    let binary =
-        crate::tools::ensure_github_tool("sqld", SQLD_VERSION, &url, "sqld").await?;
+    let binary = crate::tools::ensure_github_tool("sqld", SQLD_VERSION, &url, "sqld").await?;
 
     let data_dir = project_dir.join(".forte").join("data");
     std::fs::create_dir_all(&data_dir)?;

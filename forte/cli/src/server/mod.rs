@@ -1,7 +1,6 @@
 mod cache;
 mod fetch_handler;
 mod hmr;
-mod transform_server;
 pub mod vite_dev;
 
 use anyhow::Result;
@@ -24,10 +23,6 @@ use tokio::net::TcpListener;
 use tokio::net::UnixStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
-pub use transform_server::TransformServer;
-
-use crate::deps::DependencyPrebundler;
-use std::sync::Mutex;
 
 pub struct ServerConfig {
     pub port: u16,
@@ -36,16 +31,13 @@ pub struct ServerConfig {
     pub public_dir: PathBuf,
     pub project_root: PathBuf,
     pub dev_mode: bool,
-    pub use_vite_dev: bool,
     pub vite_socket_path: Option<PathBuf>,
-    pub prebundler: Arc<Mutex<DependencyPrebundler>>,
     pub env_vars: EnvVars,
 }
 
 pub struct ServerHandle {
     pub cache: SimpleCache,
     pub hmr: HmrBroadcaster,
-    pub transform_server: Option<Arc<TransformServer>>,
     pub fn0: Arc<Fn0<SimpleCache>>,
 }
 
@@ -83,25 +75,18 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let cache = SimpleCache::new(config.backend_path.clone(), config.frontend_path.clone());
     let hmr = HmrBroadcaster::new();
 
-    let transform_server = if config.dev_mode && !config.use_vite_dev {
-        Some(Arc::new(TransformServer::new(
-            &config.project_root,
-            config.prebundler.clone(),
-            hmr.clone(),
-        )))
-    } else {
-        None
-    };
-
-    let use_vite_dev = config.use_vite_dev;
     let vite_socket_path = config.vite_socket_path.map(Arc::new);
 
-    let fn0 = Arc::new(Fn0::new(cache.clone(), cache.clone(), deployment_map, config.env_vars));
+    let fn0 = Arc::new(Fn0::new(
+        cache.clone(),
+        cache.clone(),
+        deployment_map,
+        config.env_vars,
+    ));
 
     let handle = ServerHandle {
         cache: cache.clone(),
         hmr: hmr.clone(),
-        transform_server: transform_server.clone(),
         fn0: fn0.clone(),
     };
     let public_dir = Arc::new(config.public_dir);
@@ -123,11 +108,9 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
             let fn0_clone = fn0.clone();
             let public_dir_clone = public_dir.clone();
             let hmr_clone = hmr.clone();
-            let transform_server_clone = transform_server.clone();
             let frontend_path_clone = frontend_path.clone();
             let vite_socket_path_clone = vite_socket_path.clone();
 
-            let use_vite_dev_clone = use_vite_dev;
             tokio::spawn(async move {
                 let io = TokioIo::new(socket);
                 let conn = http1::Builder::new().serve_connection(
@@ -136,10 +119,16 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let fn0 = fn0_clone.clone();
                         let public_dir = public_dir_clone.clone();
                         let hmr = hmr_clone.clone();
-                        let ts = transform_server_clone.clone();
                         let frontend_path = frontend_path_clone.clone();
                         let vite_socket = vite_socket_path_clone.clone();
-                        handle_request(req, fn0, public_dir, hmr, ts, frontend_path, use_vite_dev_clone, vite_socket)
+                        handle_request(
+                            req,
+                            fn0,
+                            public_dir,
+                            hmr,
+                            frontend_path,
+                            vite_socket,
+                        )
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -157,31 +146,16 @@ async fn handle_request(
     fn0: Arc<Fn0<SimpleCache>>,
     public_dir: Arc<PathBuf>,
     hmr: HmrBroadcaster,
-    transform_server: Option<Arc<TransformServer>>,
     frontend_path: Arc<String>,
-    use_vite_dev: bool,
     vite_socket_path: Option<Arc<PathBuf>>,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
-    let path_with_query = uri
-        .path_and_query()
-        .map(|pq| pq.as_str())
-        .unwrap_or(path);
+    let path_with_query = uri.path_and_query().map(|pq| pq.as_str()).unwrap_or(path);
 
-    if path == "/__hmr" && !use_vite_dev {
-        return handle_hmr_upgrade(req, hmr).await;
-    }
-
-    if use_vite_dev && should_proxy_to_vite(path) {
+    if should_proxy_to_vite(path) {
         if let Some(socket_path) = &vite_socket_path {
             return proxy_to_vite_uds(socket_path, path_with_query).await;
-        }
-    }
-
-    if let Some(ts) = &transform_server {
-        if should_transform(path) {
-            return serve_transformed(ts, path_with_query).await;
         }
     }
 
@@ -236,7 +210,7 @@ async fn handle_request(
         return Ok(backend_response);
     }
 
-    if use_vite_dev {
+    {
         if let Some(socket_path) = &vite_socket_path {
             let (_, body) = backend_response.into_parts();
             let body_bytes = body.collect().await?.to_bytes();
@@ -247,7 +221,12 @@ async fn handle_request(
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
 
-            return call_vite_ssr_uds(socket_path, &uri.to_string(), props, cookie_header).await;
+            let host = original_headers
+                .get(http::header::HOST)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("localhost");
+            let full_url = format!("http://{}{}", host, uri);
+            return call_vite_ssr_uds(socket_path, &full_url, props, cookie_header).await;
         }
     }
 
@@ -259,7 +238,12 @@ async fn handle_request(
 
     let fetch_handler = Arc::new(ForteFetchHandler::new(fn0.clone(), original_headers));
     let mut ssr_response = fn0
-        .run("frontend", &frontend_path, frontend_request, Some(fetch_handler.clone()))
+        .run(
+            "frontend",
+            &frontend_path,
+            frontend_request,
+            Some(fetch_handler.clone()),
+        )
         .await?;
 
     for cookie in fetch_handler.get_collected_cookies() {
@@ -271,36 +255,6 @@ async fn handle_request(
     }
 
     Ok(ssr_response)
-}
-
-fn should_transform(path: &str) -> bool {
-    path.starts_with("/src/")
-        || path.starts_with("/.forte/deps/")
-        || path == "/__hmr-client.js"
-        || path == "/__react-refresh.js"
-        || path == "/__error-overlay.js"
-}
-
-async fn serve_transformed(ts: &TransformServer, path: &str) -> Result<fn0::Response> {
-    match ts.serve_module(path).await {
-        Ok(resp) => {
-            let (parts, body) = resp.into_parts();
-            Ok(Response::from_parts(
-                parts,
-                UnsyncBoxBody::new(body).boxed_unsync(),
-            ))
-        }
-        Err(e) => {
-            eprintln!("[transform] Error serving {}: {:?}", path, e);
-            Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(
-                    Full::new(bytes::Bytes::from(format!("Transform error: {}", e)))
-                        .map_err(|e| anyhow::anyhow!("{e}"))
-                        .boxed_unsync(),
-                )?)
-        }
-    }
 }
 
 async fn try_serve_static(public_dir: &PathBuf, path: &str) -> Option<fn0::Response> {
@@ -487,7 +441,12 @@ async fn proxy_to_vite_uds(socket_path: &Path, path: &str) -> Result<fn0::Respon
 }
 
 #[cfg(unix)]
-async fn call_vite_ssr_uds(socket_path: &Path, url: &str, props: serde_json::Value, cookie: Option<String>) -> Result<fn0::Response> {
+async fn call_vite_ssr_uds(
+    socket_path: &Path,
+    url: &str,
+    props: serde_json::Value,
+    cookie: Option<String>,
+) -> Result<fn0::Response> {
     let mut stream = UnixStream::connect(socket_path).await?;
 
     let body = serde_json::json!({
@@ -522,7 +481,9 @@ fn parse_http_response(response_bytes: &[u8]) -> Result<fn0::Response> {
     let raw_body = &response_bytes[body_start..];
 
     let mut lines = header_part.lines();
-    let status_line = lines.next().ok_or_else(|| anyhow::anyhow!("Missing status line"))?;
+    let status_line = lines
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Missing status line"))?;
 
     let status_code: u16 = status_line
         .split_whitespace()

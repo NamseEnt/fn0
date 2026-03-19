@@ -1,20 +1,23 @@
 [package]
-name = "adapt-cache"
-version = "0.1.0"
+name = "fn0-adapt-cache"
+version = "0.1.2"
 edition = "2024"
+description = "Adaptive caching layer with S3 backend support"
+license = "AGPL-3.0-only"
+repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
-async_singleflight.workspace = true
-aws-sdk-s3.workspace = true
-bytes.workspace = true
-anyhow.workspace = true
-tokio = { workspace = true, features = ["fs", "rt", "test-util"] }
+async_singleflight = "0.6"
+aws-sdk-s3 = { version = "=1.115.0", default-features = false }
+bytes = "1"
+anyhow = "1"
+tokio = { version = "1.48", features = ["fs", "rt", "test-util"] }
 
 [dev-dependencies]
-tempfile.workspace = true
-tokio = { workspace = true, features = ["macros", "test-util"] }
-aws-config = { workspace = true, features = ["behavior-version-latest"] }
-aws-smithy-mocks.workspace = true
-aws-smithy-runtime-api.workspace = true
-aws-smithy-types.workspace = true
-aws-sdk-s3 = { workspace = true, features = ["test-util"] }
+tempfile = "3"
+tokio = { version = "1.48", features = ["macros", "test-util"] }
+aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
+aws-smithy-mocks = "0.2"
+aws-smithy-runtime-api = "1.7"
+aws-smithy-types = "1.3"
+aws-sdk-s3 = { version = "=1.115.0", features = ["test-util"] }

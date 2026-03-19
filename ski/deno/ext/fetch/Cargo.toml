@@ -1,54 +1,46 @@
 # Copyright 2018-2025 the Deno authors. MIT license.
 
 [package]
-name = "deno_fetch"
+name = "fn0-deno-fetch"
 version = "0.249.0"
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
-readme = "README.md"
-repository.workspace = true
-description = "Fetch API implementation for Deno"
+authors = ["the Deno authors"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/NamseEnt/fn0"
+description = "Fetch API implementation (fn0 fork of deno_fetch without deno_net dependency)"
 
 [lib]
 path = "lib.rs"
 
 [dependencies]
-base64.workspace = true
-bytes.workspace = true
-data-url.workspace = true
-deno_core.workspace = true
-deno_error.workspace = true
-deno_fs.workspace = true
-deno_path_util.workspace = true
-deno_permissions.workspace = true
-deno_tls.workspace = true
-dyn-clone.workspace = true
-error_reporter.workspace = true
-h2.workspace = true
-hickory-resolver.workspace = true
-http.workspace = true
-http-body-util.workspace = true
-hyper.workspace = true
-hyper-rustls.workspace = true
-hyper-util.workspace = true
-ipnet.workspace = true
-percent-encoding.workspace = true
-rustls-webpki.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true
-tokio.workspace = true
-tokio-rustls.workspace = true
-tokio-socks.workspace = true
-tokio-util = { workspace = true, features = ["io"] }
-tower.workspace = true
-tower-http.workspace = true
-tower-service.workspace = true
+base64 = "0.22.1"
+bytes = "1.4.0"
+data-url = "=0.3.1"
+deno_core = "0.376.0"
+deno_error = "=0.7.1"
+deno_tls = "0.212.0"
+dyn-clone = "1"
+error_reporter = "1"
+h2 = "0.4.6"
+hickory-resolver = { version = "0.25.2", features = ["tokio", "serde"] }
+http = "1.0"
+http-body-util = "0.1.2"
+hyper = { version = "1.6.0", features = ["full"] }
+hyper-rustls = { version = "0.27.2", default-features = false, features = ["http1", "http2", "tls12", "aws-lc-rs"] }
+hyper-util = { version = "0.1.17", features = ["tokio", "client", "client-legacy", "server", "server-auto"] }
+ipnet = "2.3"
+percent-encoding = "2.3.0"
+rustls-webpki = "0.102"
+serde = { version = "1.0.149", features = ["derive"] }
+serde_json = "1.0.85"
+thiserror = "2.0.12"
+tokio = { version = "1.47.1", features = ["full"] }
+tokio-rustls = { version = "0.26.0", default-features = false, features = ["aws_lc_rs", "tls12"] }
+tokio-socks = "0.5.1"
+tokio-util = { version = "0.7.16", features = ["io"] }
+tower = { version = "0.5.2", default-features = false, features = ["retry", "util"] }
+tower-http = { version = "0.6.1", features = ["decompression-br", "decompression-gzip"] }
+tower-service = "0.3.2"
 
 [target.'cfg(any(target_os = "android", target_os = "linux", target_os = "macos"))'.dependencies]
-tokio-vsock.workspace = true
-
-[dev-dependencies]
-fast-socks5.workspace = true
-rustls.workspace = true
+tokio-vsock = "0.7"

@@ -1,6 +1,4 @@
-use crate::deps::DependencyPrebundler;
-use crate::server::{self, HmrModuleUpdate, ServerConfig, ServerHandle, vite_dev};
-use crate::ssr::SsrBundler;
+use crate::server::{self, ServerConfig, ServerHandle, vite_dev};
 use anyhow::{Context, Result};
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
 use std::collections::HashMap;
@@ -276,19 +274,9 @@ pub async fn run(options: DevOptions) -> Result<()> {
     run_codegen(&project_dir).await?;
     build_backend(&project_dir)?;
 
-    let use_vite_dev = true;
-
     let fe_dir = project_dir.join("fe");
-    let mut vite: Option<vite_dev::Vite> = None;
-
-    if use_vite_dev {
-        let v = vite_dev::spawn_vite(&fe_dir, port)?;
-        vite_dev::wait_for_vite_ready(&v.socket_path).await?;
-        vite = Some(v);
-    }
-
-    let prebundler = DependencyPrebundler::new(&project_dir);
-    let prebundler = std::sync::Arc::new(std::sync::Mutex::new(prebundler));
+    let vite = vite_dev::spawn_vite(&fe_dir, port)?;
+    vite_dev::wait_for_vite_ready(&vite.socket_path).await?;
 
     let backend_path = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?
         .to_string_lossy()
@@ -315,20 +303,16 @@ pub async fn run(options: DevOptions) -> Result<()> {
         public_dir,
         project_root: project_dir.clone(),
         dev_mode: true,
-        use_vite_dev,
-        vite_socket_path: vite.as_ref().map(|v| v.socket_path.clone()),
-        prebundler,
+        vite_socket_path: Some(vite.socket_path.clone()),
         env_vars,
     };
 
     let handle = server::run(config).await?;
 
+    let mut vite = vite;
     let result = run_watch_loop(&project_dir, handle).await;
 
-    if let Some(mut v) = vite {
-        let _ = v.child.kill();
-    }
-
+    let _ = vite.child.kill();
     _sqld.kill();
 
     result
@@ -455,25 +439,8 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     Ok(())
 }
 
-fn handle_frontend_change(file_path: &Path, handle: &ServerHandle) {
-    if let Some(ts) = &handle.transform_server {
-        ts.invalidate_module(file_path);
-
-        if let Some(update) = ts.get_hmr_update(file_path) {
-            if update.needs_full_reload {
-                handle.hmr.send_reload();
-            } else {
-                handle.hmr.send_update(vec![HmrModuleUpdate {
-                    id: update.boundary.clone(),
-                    accepted_by: update.boundary,
-                }]);
-            }
-        } else {
-            handle.hmr.send_reload();
-        }
-    } else {
-        handle.hmr.send_reload();
-    }
+fn handle_frontend_change(_file_path: &Path, handle: &ServerHandle) {
+    handle.hmr.send_reload();
 }
 
 async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()> {
