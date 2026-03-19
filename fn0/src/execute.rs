@@ -3,7 +3,7 @@ use adapt_cache::AdaptCache;
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
 use http_body_util::BodyExt;
-use measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
+use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use std::{
     sync::{
         Arc, RwLock,
@@ -164,10 +164,12 @@ async fn run_job<A, C>(
     A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
     C: Clock,
 {
-    let Ok(proxy_pre) = get_proxy_pre(job.code_id.clone(), proxy_cache, engine, linker).await
-    else {
-        let _ = job.res_tx.send(internal_error_response());
-        return;
+    let proxy_pre = match get_proxy_pre(job.code_id.clone(), proxy_cache, engine, linker).await {
+        Ok(x) => x,
+        Err(error) => {
+            let _ = job.res_tx.send(internal_error_response(&error));
+            return;
+        }
     };
 
     let response = handle_request(proxy_pre, job.req, job.code_id, clock, env_vars).await;
@@ -180,7 +182,7 @@ async fn get_proxy_pre<A, C>(
     proxy_cache: A,
     engine: Engine,
     linker: Linker<ClientState<C>>,
-) -> Result<ProxyPre<ClientState<C>>, ()>
+) -> Result<ProxyPre<ClientState<C>>, adapt_cache::Error<wasmtime::Error>>
 where
     A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
     C: Clock,
@@ -199,7 +201,7 @@ where
         Ok(proxy_pre) => Ok(proxy_pre),
         Err(error) => {
             telemetry::proxy_cache_error(&code_id, &format!("{error:?}"));
-            Err(())
+            Err(error)
         }
     }
 }
@@ -267,25 +269,22 @@ where
             Ok(x) => x,
             Err(error) => {
                 telemetry::wasmtime_error("new_incoming_request", &code_id, &format!("{error:?}"));
-                return internal_error_response();
+                return internal_error_response(&error);
             }
         };
     let out = match store.data_mut().new_response_outparam(tx) {
         Ok(x) => x,
         Err(error) => {
             telemetry::wasmtime_error("new_response_outparam", &code_id, &format!("{error:?}"));
-            return internal_error_response();
+            return internal_error_response(&error);
         }
     };
 
-    // NOTE: Bad guys can put infinite loop in initialization code so it would be needed to measure cpu time from here.
-    // But also it includes wasmtime's instantiation.
-    // I guess we can put limit with fuel for initialization.
     let proxy = match pre.instantiate_async(&mut store).await {
         Ok(x) => x,
         Err(error) => {
             telemetry::wasmtime_error("instantiate_async", &code_id, &format!("{error:?}"));
-            return internal_error_response();
+            return internal_error_response(&error);
         }
     };
 
@@ -312,7 +311,7 @@ where
         let result = task.await;
         if let Err(error) = result {
             telemetry::request_task_join_error(&code_id, &format!("{error:?}"));
-            return internal_error_response();
+            return internal_error_response(&error);
         }
         let result = result.unwrap();
 
@@ -320,9 +319,17 @@ where
             match error.downcast::<wasmtime::Trap>() {
                 Ok(trap) => {
                     telemetry::trapped(&code_id, &format!("{trap:?}"));
+                    if is_timeout.load(Ordering::Relaxed) {
+                        return timeout_response();
+                    }
+                    return internal_error_response(&trap);
                 }
                 Err(error) => {
                     telemetry::canceled_unexpectedly(&code_id, &format!("{error:?}"));
+                    if is_timeout.load(Ordering::Relaxed) {
+                        return timeout_response();
+                    }
+                    return internal_error_response(&error);
                 }
             }
         }
@@ -331,7 +338,7 @@ where
             return timeout_response();
         }
 
-        return internal_error_response();
+        return internal_error_response(&"no response received");
     }
 
     let result = result.unwrap();
@@ -346,7 +353,7 @@ where
     let error_code: ErrorCode = result.unwrap_err();
 
     telemetry::proxy_returns_error_code(&code_id, &format!("{error_code:?}"));
-    internal_error_response()
+    internal_error_response(&error_code)
 }
 
 fn response(status: hyper::StatusCode, body: Bytes) -> Response {
@@ -363,7 +370,7 @@ fn timeout_response() -> Response {
     )
 }
 
-fn internal_error_response() -> Response {
+fn internal_error_response(_error: &dyn std::fmt::Debug) -> Response {
     response(
         hyper::StatusCode::INTERNAL_SERVER_ERROR,
         Bytes::from("Internal Server Error"),

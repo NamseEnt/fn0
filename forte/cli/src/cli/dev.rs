@@ -216,6 +216,16 @@ fn build_backend(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+fn find_wasm_binary(release_dir: &Path) -> Result<PathBuf> {
+    for entry in fs::read_dir(release_dir)? {
+        let path = entry?.path();
+        if path.extension().is_some_and(|ext| ext == "wasm") {
+            return Ok(path);
+        }
+    }
+    anyhow::bail!("No .wasm file found in {}", release_dir.display())
+}
+
 fn collect_file_mtimes(dir: &Path, extensions: &[&str]) -> HashMap<PathBuf, SystemTime> {
     let mut mtimes = HashMap::new();
     if let Ok(entries) = fs::read_dir(dir) {
@@ -280,8 +290,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let prebundler = DependencyPrebundler::new(&project_dir);
     let prebundler = std::sync::Arc::new(std::sync::Mutex::new(prebundler));
 
-    let backend_path = project_dir
-        .join("rs/target/wasm32-wasip2/release/backend.wasm")
+    let backend_path = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?
         .to_string_lossy()
         .to_string();
 

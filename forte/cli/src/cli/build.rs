@@ -203,6 +203,16 @@ fn build_backend(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+fn find_wasm_binary(release_dir: &Path) -> Result<PathBuf> {
+    for entry in fs::read_dir(release_dir)? {
+        let path = entry?.path();
+        if path.extension().is_some_and(|ext| ext == "wasm") {
+            return Ok(path);
+        }
+    }
+    anyhow::bail!("No .wasm file found in {}", release_dir.display())
+}
+
 fn build_frontend(project_dir: &Path) -> Result<()> {
     let fe_dir = project_dir.join("fe");
 
@@ -229,7 +239,7 @@ fn create_dist(project_dir: &Path, dist_dir: &Path) -> Result<()> {
     }
     fs::create_dir_all(dist_dir)?;
 
-    let backend_wasm = project_dir.join("rs/target/wasm32-wasip2/release/backend.wasm");
+    let backend_wasm = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?;
     let frontend_js = project_dir.join("fe/dist/ssr/server.js");
     let client_js = project_dir.join("fe/dist/client.js");
     let public_dir = project_dir.join("fe/public");
