@@ -13,7 +13,6 @@ members = [
   "ext/canvas",
   "ext/cron",
   "ext/crypto",
-  "ext/fetch",
   "ext/ffi",
   "ext/fs",
   "ext/http",
@@ -27,7 +26,6 @@ members = [
   "ext/signals",
   "ext/telemetry",
   "ext/url",
-  "ext/web",
   "ext/webgpu",
   "ext/webidl",
   "ext/websocket",
@@ -54,7 +52,7 @@ members = [
 ]
 # tests/sqlite_extension is excluded because it requires rusqlite's "loadable_extension"
 # feature, which is incompatible with the "session" feature used by the rest of the workspace.
-exclude = ["tests/util/std/hash/_wasm", "tests/sqlite_extension"]
+exclude = ["tests/util/std/hash/_wasm", "tests/sqlite_extension", "ext/web", "ext/fetch"]
 
 [workspace.package]
 authors = ["the Deno authors"]
@@ -94,7 +92,7 @@ deno_cache = { version = "0.158.0", path = "./ext/cache" }
 deno_canvas = { version = "0.94.0", path = "./ext/canvas" }
 deno_cron = { version = "0.105.0", path = "./ext/cron" }
 deno_crypto = { version = "0.239.0", path = "./ext/crypto" }
-deno_fetch = { version = "0.249.0", path = "./ext/fetch" }
+deno_fetch = { version = "0.249.0" }
 deno_ffi = { version = "0.212.0", path = "./ext/ffi" }
 deno_fs = { version = "0.135.0", path = "./ext/fs" }
 deno_http = { version = "0.223.0", path = "./ext/http" }
@@ -108,7 +106,7 @@ deno_process = { version = "0.40.0", path = "./ext/process" }
 deno_signals = { version = "0.16.0", path = "./ext/signals" }
 deno_telemetry = { version = "0.47.0", path = "./ext/telemetry" }
 deno_tls = { version = "0.212.0", path = "./ext/tls" }
-deno_web = { version = "0.256.0", path = "./ext/web" }
+deno_web = { version = "0.256.0" }
 deno_webgpu = { version = "0.192.0", path = "./ext/webgpu" }
 deno_webidl = { version = "0.225.0", path = "./ext/webidl" }
 deno_websocket = { version = "0.230.0", path = "./ext/websocket" }

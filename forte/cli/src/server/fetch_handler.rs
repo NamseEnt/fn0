@@ -56,7 +56,10 @@ impl FetchHandler for ForteFetchHandler {
                 .map(|pq| pq.as_str())
                 .unwrap_or("/");
 
-            let Some(host) = original_headers.get(http::header::HOST).and_then(|v| v.to_str().ok()) else {
+            let Some(host) = original_headers
+                .get(http::header::HOST)
+                .and_then(|v| v.to_str().ok())
+            else {
                 let body: UnsyncBoxBody<Bytes, anyhow::Error> =
                     Full::new(Bytes::from("Missing Host header in original request"))
                         .map_err(|e| anyhow::anyhow!("{e}"))

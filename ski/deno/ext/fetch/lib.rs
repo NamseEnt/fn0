@@ -1,7 +1,6 @@
 // Copyright 2018-2025 the Deno authors. MIT license.
 
 pub mod dns;
-mod fs_fetch_handler;
 mod proxy;
 #[cfg(test)]
 mod tests;
@@ -13,8 +12,6 @@ use std::convert::From;
 use std::future;
 use std::future::Future;
 use std::net::IpAddr;
-use std::path::Path;
-#[cfg(not(windows))]
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -49,11 +46,6 @@ use deno_core::url;
 use deno_core::url::Url;
 use deno_core::v8;
 use deno_error::JsErrorBox;
-pub use deno_fs::FsError;
-use deno_path_util::PathToUrlError;
-use deno_permissions::OpenAccessKind;
-use deno_permissions::PermissionCheckError;
-use deno_permissions::PermissionsContainer;
 use deno_tls::Proxy;
 use deno_tls::RootCertStoreProvider;
 use deno_tls::SocketUse;
@@ -61,7 +53,6 @@ use deno_tls::TlsKey;
 use deno_tls::TlsKeys;
 use deno_tls::TlsKeysHolder;
 use deno_tls::rustls::RootCertStore;
-pub use fs_fetch_handler::FsFetchHandler;
 use http::Extensions;
 use http::HeaderMap;
 use http::Method;
@@ -174,18 +165,12 @@ pub enum FetchError {
   #[class(inherit)]
   #[error(transparent)]
   Resource(#[from] deno_core::error::ResourceError),
-  #[class(inherit)]
-  #[error(transparent)]
-  Permission(#[from] PermissionCheckError),
   #[class(type)]
   #[error("NetworkError when attempting to fetch resource")]
   NetworkError,
   #[class(type)]
   #[error("Fetching files only supports the GET method: received {0}")]
   FsNotGet(Method),
-  #[class(inherit)]
-  #[error(transparent)]
-  PathToUrl(#[from] PathToUrlError),
   #[class(type)]
   #[error("Invalid URL {0}")]
   InvalidUrl(Url),
@@ -234,22 +219,6 @@ pub enum FetchError {
   #[class(generic)]
   #[error(transparent)]
   Dns(hickory_resolver::ResolveError),
-  #[class(generic)]
-  #[error(transparent)]
-  PermissionCheck(PermissionCheckError),
-}
-
-impl From<deno_fs::FsError> for FetchError {
-  fn from(value: deno_fs::FsError) -> Self {
-    match value {
-      deno_fs::FsError::Io(_)
-      | deno_fs::FsError::FileBusy
-      | deno_fs::FsError::NotSupported => FetchError::NetworkError,
-      deno_fs::FsError::PermissionCheck(err) => {
-        FetchError::PermissionCheck(err)
-      }
-    }
-  }
 }
 
 pub type CancelableResponseFuture =
@@ -448,9 +417,6 @@ pub fn op_fetch(
       (request_rid, maybe_cancel_handle_rid)
     }
     "http" | "https" => {
-      let permissions = state.borrow_mut::<PermissionsContainer>();
-      permissions.check_net_url(&url, "fetch()")?;
-
       let maybe_authority = extract_authority(&mut url);
       let uri = url
         .as_str()
@@ -842,38 +808,7 @@ pub fn op_fetch_custom_client(
   #[serde] mut args: CreateHttpClientArgs,
   #[cppgc] tls_keys: &TlsKeysHolder,
 ) -> Result<ResourceId, FetchError> {
-  if let Some(proxy) = &mut args.proxy {
-    let permissions = state.borrow_mut::<PermissionsContainer>();
-    match proxy {
-      Proxy::Http { url, .. } => {
-        let url = Url::parse(url)?;
-        permissions.check_net_url(&url, "Deno.createHttpClient()")?;
-      }
-      Proxy::Tcp { hostname, port } => {
-        permissions
-          .check_net(&(hostname, Some(*port)), "Deno.createHttpClient()")?;
-      }
-      Proxy::Unix {
-        path: original_path,
-      } => {
-        let path = Path::new(original_path);
-        let resolved_path = permissions
-          .check_open(
-            Cow::Borrowed(path),
-            OpenAccessKind::ReadWriteNoFollow,
-            Some("Deno.createHttpClient()"),
-          )?
-          .into_path();
-        if path != resolved_path {
-          *original_path = resolved_path.to_string_lossy().into_owned();
-        }
-      }
-      Proxy::Vsock { cid, port } => {
-        let permissions = state.borrow_mut::<PermissionsContainer>();
-        permissions.check_net_vsock(*cid, *port, "Deno.createHttpClient()")?;
-      }
-    }
-  }
+  let _ = &mut args.proxy;
 
   let options = state.borrow::<Options>();
   let ca_certs = args

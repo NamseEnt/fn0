@@ -49,10 +49,7 @@ impl SsrBundler {
 
         for (key, value) in env_vars {
             let escaped = value.replace('\\', "\\\\").replace('\'', "\\'");
-            defines.push(format!(
-                r#""import.meta.env.{}": "'{}'""#,
-                key, escaped
-            ));
+            defines.push(format!(r#""import.meta.env.{}": "'{}'""#, key, escaped));
         }
 
         format!(
@@ -74,7 +71,11 @@ impl SsrBundler {
         let env_vars = self.load_env_vars();
         let define_config = self.generate_define_config(&env_vars);
 
-        let config_path = self.output_path.parent().unwrap().join("rolldown.config.mjs");
+        let config_path = self
+            .output_path
+            .parent()
+            .unwrap()
+            .join("rolldown.config.mjs");
         let config_content = format!(
             r#"// SSR CSS Plugin - returns empty export for CSS files (no DOM in SSR)
 function ssrCssPlugin() {{

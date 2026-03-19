@@ -1,6 +1,6 @@
 [package]
 name = "forte-sdk"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Core SDK for the Forte web framework"
 license = "AGPL-3.0-only"

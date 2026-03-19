@@ -36,6 +36,24 @@ process.stdin.on("close", () => {{
     process.exit(0);
 }});
 
+async function streamToString(stream) {{
+    const reader = stream.getReader();
+    const chunks = [];
+    while (true) {{
+        const {{ done, value }} = await reader.read();
+        if (done) break;
+        chunks.push(value);
+    }}
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {{
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }}
+    return result;
+}}
+
 async function main() {{
     cleanup();
 
@@ -59,20 +77,15 @@ async function main() {{
                     const {{ renderStream }} = await vite.ssrLoadModule("/src/server.tsx");
                     const {{ stream, cookies }} = await renderStream(url, props, cookie);
 
+                    const htmlBuffer = Buffer.from(await streamToString(stream));
+                    res.useChunkedEncodingByDefault = false;
                     res.setHeader("Content-Type", "text/html");
-                    res.setHeader("Transfer-Encoding", "chunked");
+                    res.setHeader("Content-Length", htmlBuffer.length);
                     if (cookies && cookies.length > 0) {{
                         res.setHeader("Set-Cookie", cookies);
                     }}
                     res.writeHead(200);
-
-                    const reader = stream.getReader();
-                    while (true) {{
-                        const {{ done, value }} = await reader.read();
-                        if (done) break;
-                        res.write(value);
-                    }}
-                    res.end();
+                    res.end(htmlBuffer);
                 }} catch (e) {{
                     vite.ssrFixStacktrace(e);
                     console.error("[vite-ssr] Error:", e.stack || e.message);

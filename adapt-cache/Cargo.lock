@@ -3,22 +3,6 @@
 version = 4
 
 [[package]]
-name = "adapt-cache"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async_singleflight",
- "aws-config",
- "aws-sdk-s3",
- "aws-smithy-mocks",
- "aws-smithy-runtime-api",
- "aws-smithy-types",
- "bytes",
- "tempfile",
- "tokio",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -952,6 +936,22 @@ name = "find-msvc-tools"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a3076410a55c90011c298b04d0cfa770b00fa04e1e3c97d3f6c9de105a03844"
+
+[[package]]
+name = "fn0-adapt-cache"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "async_singleflight",
+ "aws-config",
+ "aws-sdk-s3",
+ "aws-smithy-mocks",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "bytes",
+ "tempfile",
+ "tokio",
+]
 
 [[package]]
 name = "fnv"
