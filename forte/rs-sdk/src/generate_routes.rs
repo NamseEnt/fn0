@@ -664,15 +664,8 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                 quote! {
                     use std::collections::HashMap;
                     let query = parts.uri.query().unwrap_or("");
-                    let query_params: HashMap<String, String> = query
-                        .split('&')
-                        .filter(|s| !s.is_empty())
-                        .filter_map(|pair| {
-                            let mut parts = pair.splitn(2, '=');
-                            let key = parts.next()?;
-                            let value = parts.next().unwrap_or("");
-                            Some((key.to_string(), value.to_string()))
-                        })
+                    let query_params: HashMap<String, String> = forte_sdk::form_urlencoded::parse(query.as_bytes())
+                        .map(|(k, v)| (k.into_owned(), v.into_owned()))
                         .collect();
                     #(#field_parsers)*
                     let search_params = #module_name::SearchParams {
