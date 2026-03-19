@@ -1,6 +1,6 @@
 [package]
 name = "forte-cli"
-version = "0.3.7"
+version = "0.3.8"
 edition = "2024"
 description = "CLI for the Forte fullstack web framework"
 license = "AGPL-3.0-only"
@@ -18,7 +18,7 @@ pkg-fmt = "txz"
 [workspace]
 
 [dependencies]
-fn0 = { version = "0.1.0", path = "../../fn0" }
+fn0 = { version = "0.1.1", path = "../../fn0" }
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
 tokio = { version = "1", features = ["full"] }
 hyper = { version = "1", features = ["server", "http1", "client"] }
