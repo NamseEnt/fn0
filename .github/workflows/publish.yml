@@ -1,0 +1,80 @@
+name: Publish crates
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.RELEASE_PAT }}
+          persist-credentials: true
+
+      - name: Install Rust
+        run: rustup update stable
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Publish changed crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          publish_if_needed() {
+            local dir="$1"
+            local name="$2"
+
+            local local_ver=$(grep '^version' "$dir/Cargo.toml" | head -1 | sed 's/version = "\(.*\)"/\1/')
+            local remote_ver=$(cargo search "$name" --limit 1 2>/dev/null | grep "^${name} " | sed 's/.* = "\(.*\)".*/\1/' || echo "")
+
+            if [ "$local_ver" = "$remote_ver" ]; then
+              return
+            fi
+
+            echo "Publishing $name@$local_ver (crates.io: ${remote_ver:-none})"
+            cargo publish --manifest-path "$dir/Cargo.toml" --allow-dirty
+            echo "Waiting for crates.io to index..."
+            sleep 30
+          }
+
+          publish_if_needed "measure-cpu-time" "measure-cpu-time"
+          publish_if_needed "adapt-cache" "fn0-adapt-cache"
+          publish_if_needed "ski/ski" "fn0-ski"
+          publish_if_needed "fn0" "fn0"
+          publish_if_needed "forte/forte-json" "forte-json"
+          publish_if_needed "forte/db" "forte-db"
+          publish_if_needed "forte/macros" "forte-macros"
+          publish_if_needed "forte/rs-sdk" "forte-sdk"
+          publish_if_needed "forte/cli" "forte-cli"
+
+      - name: Create release tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_if_needed() {
+            local dir="$1"
+            local tag_prefix="$2"
+
+            local local_ver=$(grep '^version' "$dir/Cargo.toml" | head -1 | sed 's/version = "\(.*\)"/\1/')
+            local tag="${tag_prefix}-v${local_ver}"
+
+            if git ls-remote --tags origin | grep -q "refs/tags/${tag}$"; then
+              return
+            fi
+
+            echo "Creating tag $tag"
+            git tag "$tag"
+            git push origin "$tag"
+          }
+
+          tag_if_needed "forte/cli" "forte-cli"
+          tag_if_needed "forte/forte-rs-to-ts" "forte-rs-to-ts"
