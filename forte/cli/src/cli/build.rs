@@ -46,7 +46,7 @@ fn run_codegen(project_dir: &Path) -> Result<()> {
         .arg("run")
         .arg("--release")
         .arg("--")
-        .arg(&rs_dir)
+        .arg(project_dir)
         .current_dir(&forte_rs_to_ts_dir)
         .env_remove("RUSTUP_TOOLCHAIN")
         .status()
@@ -192,9 +192,7 @@ fn build_backend(project_dir: &Path) -> Result<()> {
         .arg("--release")
         .arg("--target")
         .arg("wasm32-wasip2")
-        .arg("-p")
-        .arg("backend")
-        .current_dir(project_dir)
+        .current_dir(project_dir.join("rs"))
         .status()
         .context("Failed to run cargo build")?;
 
@@ -231,7 +229,7 @@ fn create_dist(project_dir: &Path, dist_dir: &Path) -> Result<()> {
     }
     fs::create_dir_all(dist_dir)?;
 
-    let backend_wasm = project_dir.join("target/wasm32-wasip2/release/backend.wasm");
+    let backend_wasm = project_dir.join("rs/target/wasm32-wasip2/release/backend.wasm");
     let frontend_js = project_dir.join("fe/dist/ssr/server.js");
     let client_js = project_dir.join("fe/dist/client.js");
     let public_dir = project_dir.join("fe/public");

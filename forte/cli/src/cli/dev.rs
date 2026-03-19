@@ -205,9 +205,7 @@ fn build_backend(project_dir: &Path) -> Result<()> {
         .arg("--quiet")
         .arg("--target")
         .arg("wasm32-wasip2")
-        .arg("-p")
-        .arg("backend")
-        .current_dir(project_dir)
+        .current_dir(project_dir.join("rs"))
         .status()
         .context("Failed to run cargo build")?;
 
@@ -283,7 +281,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let prebundler = std::sync::Arc::new(std::sync::Mutex::new(prebundler));
 
     let backend_path = project_dir
-        .join("target/wasm32-wasip2/release/backend.wasm")
+        .join("rs/target/wasm32-wasip2/release/backend.wasm")
         .to_string_lossy()
         .to_string();
 
