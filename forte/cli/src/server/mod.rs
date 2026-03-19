@@ -212,6 +212,13 @@ async fn handle_request(
 
     {
         if let Some(socket_path) = &vite_socket_path {
+            let backend_set_cookies: Vec<_> = backend_response
+                .headers()
+                .get_all(http::header::SET_COOKIE)
+                .iter()
+                .cloned()
+                .collect();
+
             let (_, body) = backend_response.into_parts();
             let body_bytes = body.collect().await?.to_bytes();
             let props: serde_json::Value = serde_json::from_slice(&body_bytes)?;
@@ -226,7 +233,16 @@ async fn handle_request(
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("localhost");
             let full_url = format!("http://{}{}", host, uri);
-            return call_vite_ssr_uds(socket_path, &full_url, props, cookie_header).await;
+            let mut ssr_response =
+                call_vite_ssr_uds(socket_path, &full_url, props, cookie_header).await?;
+
+            for cookie_value in backend_set_cookies {
+                ssr_response
+                    .headers_mut()
+                    .append(http::header::SET_COOKIE, cookie_value);
+            }
+
+            return Ok(ssr_response);
         }
     }
 

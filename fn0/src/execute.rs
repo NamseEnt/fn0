@@ -1,7 +1,6 @@
-use crate::{Body, Request, Response, telemetry};
+use crate::{Request, Response, telemetry};
 use adapt_cache::AdaptCache;
 use anyhow::{Result, anyhow};
-use bytes::Bytes;
 use http_body_util::BodyExt;
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use std::{
@@ -29,7 +28,7 @@ pub type EnvVars = Arc<RwLock<Vec<(String, String)>>>;
 
 pub struct Job {
     pub req: Request,
-    pub res_tx: oneshot::Sender<Response>,
+    pub res_tx: oneshot::Sender<Result<Response>>,
     pub code_id: String,
 }
 
@@ -109,7 +108,7 @@ impl WasmExecutor {
             .await
             .map_err(|_| anyhow!("job_tx closed"))?;
 
-        Ok(res_rx.await?)
+        res_rx.await?
     }
 }
 
@@ -167,14 +166,14 @@ async fn run_job<A, C>(
     let proxy_pre = match get_proxy_pre(job.code_id.clone(), proxy_cache, engine, linker).await {
         Ok(x) => x,
         Err(error) => {
-            let _ = job.res_tx.send(internal_error_response(&error));
+            let _ = job.res_tx.send(Err(anyhow!("Failed to get proxy pre: {error:?}")));
             return;
         }
     };
 
-    let response = handle_request(proxy_pre, job.req, job.code_id, clock, env_vars).await;
+    let result = handle_request(proxy_pre, job.req, job.code_id, clock, env_vars).await;
 
-    let _ = job.res_tx.send(response);
+    let _ = job.res_tx.send(result);
 }
 
 async fn get_proxy_pre<A, C>(
@@ -212,7 +211,7 @@ async fn handle_request<C>(
     code_id: String,
     clock: C,
     env_vars: EnvVars,
-) -> Response
+) -> Result<Response>
 where
     C: Clock + Send + 'static,
 {
@@ -269,14 +268,14 @@ where
             Ok(x) => x,
             Err(error) => {
                 telemetry::wasmtime_error("new_incoming_request", &code_id, &format!("{error:?}"));
-                return internal_error_response(&error);
+                return Err(anyhow!("new_incoming_request failed: {error:?}"));
             }
         };
     let out = match store.data_mut().new_response_outparam(tx) {
         Ok(x) => x,
         Err(error) => {
             telemetry::wasmtime_error("new_response_outparam", &code_id, &format!("{error:?}"));
-            return internal_error_response(&error);
+            return Err(anyhow!("new_response_outparam failed: {error:?}"));
         }
     };
 
@@ -284,7 +283,7 @@ where
         Ok(x) => x,
         Err(error) => {
             telemetry::wasmtime_error("instantiate_async", &code_id, &format!("{error:?}"));
-            return internal_error_response(&error);
+            return Err(anyhow!("instantiate_async failed: {error:?}"));
         }
     };
 
@@ -311,7 +310,7 @@ where
         let result = task.await;
         if let Err(error) = result {
             telemetry::request_task_join_error(&code_id, &format!("{error:?}"));
-            return internal_error_response(&error);
+            return Err(anyhow!("request task join error: {error:?}"));
         }
         let result = result.unwrap();
 
@@ -320,62 +319,42 @@ where
                 Ok(trap) => {
                     telemetry::trapped(&code_id, &format!("{trap:?}"));
                     if is_timeout.load(Ordering::Relaxed) {
-                        return timeout_response();
+                        return Err(anyhow!("CPU time limit exceeded (trapped: {trap:?})"));
                     }
-                    return internal_error_response(&trap);
+                    return Err(anyhow!("trapped: {trap:?}"));
                 }
                 Err(error) => {
                     telemetry::canceled_unexpectedly(&code_id, &format!("{error:?}"));
                     if is_timeout.load(Ordering::Relaxed) {
-                        return timeout_response();
+                        return Err(anyhow!("CPU time limit exceeded: {error:?}"));
                     }
-                    return internal_error_response(&error);
+                    return Err(anyhow!("canceled unexpectedly: {error:?}"));
                 }
             }
         }
 
         if is_timeout.load(Ordering::Relaxed) {
-            return timeout_response();
+            return Err(anyhow!("CPU time limit exceeded"));
         }
 
-        return internal_error_response(&"no response received");
+        return Err(anyhow!("no response received"));
     }
 
     let result = result.unwrap();
 
     if let Ok(response) = result {
-        return response.map(|body| {
+        return Ok(response.map(|body| {
             body.map_err(|error_code| anyhow!("error_code: {error_code:?}"))
                 .boxed_unsync()
-        });
+        }));
     }
 
     let error_code: ErrorCode = result.unwrap_err();
 
     telemetry::proxy_returns_error_code(&code_id, &format!("{error_code:?}"));
-    internal_error_response(&error_code)
+    Err(anyhow!("proxy returned error code: {error_code:?}"))
 }
 
-fn response(status: hyper::StatusCode, body: Bytes) -> Response {
-    let body = http_body_util::Full::new(body).map_err(|never| match never {});
-    let mut res = hyper::Response::new(Body::new(body));
-    *res.status_mut() = status;
-    res
-}
-
-fn timeout_response() -> Response {
-    response(
-        hyper::StatusCode::GATEWAY_TIMEOUT,
-        Bytes::from("Gateway Timeout"),
-    )
-}
-
-fn internal_error_response(_error: &dyn std::fmt::Debug) -> Response {
-    response(
-        hyper::StatusCode::INTERNAL_SERVER_ERROR,
-        Bytes::from("Internal Server Error"),
-    )
-}
 
 pub struct ClientState<C: Clock> {
     wasi: WasiCtx,
