@@ -77,7 +77,8 @@ export async function renderStream(
   const allProps = { ...props, params: matched.params };
   const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
-  const reactStream = await renderToReadableStream(pageModule.default(allProps));
+  const PageComponent = pageModule.default;
+  const reactStream = await renderToReadableStream(<PageComponent {...allProps} />);
 
   await reactStream.allReady;
 
@@ -90,7 +91,6 @@ export async function renderStream(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>ls-news</title>
-    <link rel="stylesheet" href="/src/styles/globals.css?direct" />
     <script type="module" src="/@vite/client"></script>
     <script type="module">
       import RefreshRuntime from "/@react-refresh";
@@ -170,11 +170,8 @@ export async function renderStream(
       : "";
     const clientScript = isDev ? `/src/client.tsx` : `/public/client.js`;
 
-    const cssLink = isDev
-      ? `<link rel="stylesheet" href="/src/styles/globals.css" />`
-      : `<link rel="stylesheet" href="/public/globals.css" />`;
-
-    const reactStream = await renderToReadableStream(pageModule.default(allProps));
+    const PageComponent = pageModule.default;
+    const reactStream = await renderToReadableStream(<PageComponent {...allProps} />);
 
     await reactStream.allReady;
 
@@ -194,7 +191,6 @@ export async function renderStream(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>ls-news</title>
-    ${cssLink}
     ${hmrScript}
     ${reactRefreshScript}
 </head>

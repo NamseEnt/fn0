@@ -1,3 +1,4 @@
+import "./styles/globals.css";
 import { hydrateRoot } from "react-dom/client";
 import { routes } from "./routes.generated";
 
@@ -39,8 +40,9 @@ async function hydrate() {
       matched.route.schema(),
     ]);
     const props = schemaModule.PropsSchema.parse(rawProps);
-    const element = pageModule.default({ ...props, params: matched.params });
-    hydrateRoot(document.getElementById("root")!, element);
+    const PageComponent = pageModule.default;
+    const allProps = { ...props, params: matched.params };
+    hydrateRoot(document.getElementById("root")!, <PageComponent {...allProps} />);
   }
 }
 
