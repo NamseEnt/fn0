@@ -1,6 +1,6 @@
 [package]
 name = "forte-cli"
-version = "0.3.8"
+version = "0.3.9"
 edition = "2024"
 description = "CLI for the Forte fullstack web framework"
 license = "AGPL-3.0-only"
@@ -37,8 +37,6 @@ tower = "0.5"
 clap = { version = "4", features = ["derive"] }
 notify = "8"
 notify-debouncer-mini = "0.6"
-tokio-tungstenite = "0.24"
-futures-util = "0.3"
 http = "1"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",

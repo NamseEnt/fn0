@@ -324,15 +324,11 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     let mut debouncer = new_debouncer(Duration::from_millis(100), tx)?;
 
     let rs_dir = project_dir.join("rs/src");
-    let fe_src_dir = project_dir.join("fe/src");
     let env_file = project_dir.join(".env");
 
     debouncer
         .watcher()
         .watch(&rs_dir, RecursiveMode::Recursive)?;
-    debouncer
-        .watcher()
-        .watch(&fe_src_dir, RecursiveMode::Recursive)?;
     if env_file.exists() {
         debouncer
             .watcher()
@@ -340,7 +336,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     }
 
     let mut known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
-    let mut known_fe_mtimes = collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
     let mut known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
 
     loop {
@@ -357,30 +352,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                         let current_mtime =
                             fs::metadata(&e.path).ok().and_then(|m| m.modified().ok());
                         match (current_mtime, known_rs_mtimes.get(&e.path)) {
-                            (Some(current), Some(known)) => current > *known,
-                            (Some(_), None) => true,
-                            _ => false,
-                        }
-                    })
-                    .collect();
-
-                let fe_changes: Vec<_> = events
-                    .iter()
-                    .filter(|e| {
-                        e.path.starts_with(&fe_src_dir)
-                            && e.path.extension().is_some_and(|ext| {
-                                ext == "tsx"
-                                    || ext == "ts"
-                                    || ext == "jsx"
-                                    || ext == "js"
-                                    || ext == "css"
-                            })
-                            && !is_generated_file(&e.path)
-                    })
-                    .filter(|e| {
-                        let current_mtime =
-                            fs::metadata(&e.path).ok().and_then(|m| m.modified().ok());
-                        match (current_mtime, known_fe_mtimes.get(&e.path)) {
                             (Some(current), Some(known)) => current > *known,
                             (Some(_), None) => true,
                             _ => false,
@@ -412,18 +383,7 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
 
                     if let Err(e) = result {
                         eprintln!("[watch] Backend rebuild failed: {}", e);
-                    } else {
-                        handle.hmr.send_reload();
                     }
-                }
-
-                if !fe_changes.is_empty() {
-                    for e in &fe_changes {
-                        handle_frontend_change(&e.path, &handle);
-                    }
-
-                    known_fe_mtimes =
-                        collect_file_mtimes(&fe_src_dir, &["tsx", "ts", "jsx", "js", "css"]);
                 }
             }
             Ok(Err(error)) => {
@@ -439,10 +399,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     Ok(())
 }
 
-fn handle_frontend_change(_file_path: &Path, handle: &ServerHandle) {
-    handle.hmr.send_reload();
-}
-
 async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()> {
     run_codegen(project_dir).await?;
     build_backend(project_dir)?;
@@ -450,9 +406,3 @@ async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()
     Ok(())
 }
 
-fn is_generated_file(path: &Path) -> bool {
-    let path_str = path.to_string_lossy();
-    path_str.contains(".generated/")
-        || path_str.ends_with(".props.ts")
-        || path_str.ends_with("routes.generated.ts")
-}
