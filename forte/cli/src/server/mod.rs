@@ -183,7 +183,9 @@ async fn handle_request(
         let (parts, body) = backend_response.into_parts();
         let body_bytes = body.collect().await?.to_bytes();
         let body_str = String::from_utf8_lossy(&body_bytes);
-        eprintln!("Backend error: {} {} - {}", backend_status, path, body_str);
+        if backend_status != StatusCode::NOT_FOUND {
+            eprintln!("Backend error: {} {} - {}", backend_status, path, body_str);
+        }
 
         return Ok(fn0::Response::from_parts(
             parts,
