@@ -12,7 +12,6 @@ This document outlines the implementation plan for the Forte CLI tool.
 | Project | Role | Status |
 |---------|------|--------|
 | `forte/` | SSR server orchestration | PoC complete |
-| `forte-manual/` | Manually generated example app | PoC complete |
 | `forte-rs-to-ts/` | Rust → TypeScript type generation | Complete |
 | `forte-json/` | Streaming JSON serialization | Complete |
 | `fn0/` | WASM/JS execution engine | Complete |
