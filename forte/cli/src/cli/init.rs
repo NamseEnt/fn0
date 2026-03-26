@@ -403,7 +403,8 @@ export async function render(url: string, props: any): Promise<string> {
 
     const allProps = { ...props, params: matched.params };
     const pageModule = await matched.route.component();
-    const html = renderToString(pageModule.default(allProps));
+    const PageComponent = pageModule.default;
+    const html = renderToString(<PageComponent {...allProps} />);
     const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
     const viteScripts = `<script type="module" src="/@vite/client"></script>`;
@@ -432,7 +433,8 @@ export async function render(url: string, props: any): Promise<string> {
     if (matched) {
         const allProps = { ...props, params: matched.params };
         const pageModule = await matched.route.component();
-        const html = renderToString(pageModule.default(allProps));
+        const PageComponent = pageModule.default;
+        const html = renderToString(<PageComponent {...allProps} />);
         const propsJson = escapeJsonForScript(JSON.stringify(allProps));
 
         const viteScripts = isDev
@@ -527,8 +529,9 @@ async function hydrate() {
 
     if (matched) {
         const pageModule = await matched.route.component();
-        const element = pageModule.default({ ...props, params: matched.params });
-        hydrateRoot(document.getElementById("root")!, element);
+        const PageComponent = pageModule.default;
+        const allProps = { ...props, params: matched.params };
+        hydrateRoot(document.getElementById("root")!, <PageComponent {...allProps} />);
     }
 }
 
