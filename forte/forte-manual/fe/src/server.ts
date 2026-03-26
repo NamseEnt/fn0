@@ -15,7 +15,8 @@ import { renderToReadableStream } from "react-dom/server";
   if (pathParts.length === 2 && pathParts[1] === "") {
     console.log("Rendering index page");
     const pageModule = await import("./pages/index/page");
-    const element = pageModule.default(props);
+    const PageComponent = pageModule.default;
+    const element = <PageComponent {...props} />;
     const stream = await renderToReadableStream(element);
     return new Response(stream, {
       headers: { "content-type": "text/html; charset=utf-8" }
@@ -25,7 +26,8 @@ import { renderToReadableStream } from "react-dom/server";
   if (pathParts.length === 3 && pathParts[1] === "product") {
     console.log("Rendering product page");
     const pageModule = await import("./pages/product/[id]/page");
-    const element = pageModule.default(props);
+    const PageComponent = pageModule.default;
+    const element = <PageComponent {...props} />;
     const stream = await renderToReadableStream(element);
     return new Response(stream, {
       headers: { "content-type": "text/html; charset=utf-8" }
