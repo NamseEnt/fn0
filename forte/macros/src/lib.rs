@@ -71,6 +71,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let vis = &input.vis;
     let get_name = format_ident!("{}Get", name);
     let query_name = format_ident!("{}Query", name);
+    let delete_name = format_ident!("{}Delete", name);
 
     let fields = match &input.fields {
         Fields::Named(fields) => &fields.named,
@@ -272,6 +273,14 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     .await
             }
 
+            pub async fn delete(&self) -> anyhow::Result<()> {
+                let pk = #put_pk_str;
+                let sk = format!(#sk_format_string, #(#put_sk_format_args),*);
+                forte_db::turso()
+                    .delete(&pk, &sk)
+                    .await
+            }
+
             pub async fn query_next(&self, limit: usize) -> anyhow::Result<Vec<Self>> {
                 let pk = #put_pk_str;
                 let sk = format!(#sk_format_string, #(#put_sk_format_args),*);
@@ -338,6 +347,28 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
                                     .collect::<Result<Vec<_>, _>>()
                                     .map_err(Into::into)
                             }
+                            _ => anyhow::bail!("unexpected result type"),
+                        }
+                    }),
+                }
+            }
+        }
+
+        #vis struct #delete_name {
+            #(#get_pk_fields,)*
+            #(#get_sk_fields,)*
+        }
+
+        impl forte_db::DbRequest for #delete_name {
+            type Output = ();
+            fn prepare(self) -> forte_db::Prepared<Self::Output> {
+                let pk = #pk_str;
+                let sk = format!(#sk_format_string, #(#sk_format_args),*);
+                forte_db::Prepared {
+                    ops: vec![forte_db::DbOp::Delete { pk, sk }],
+                    parse: Box::new(|iter| {
+                        match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
+                            forte_db::DbResult::Done => Ok(()),
                             _ => anyhow::bail!("unexpected result type"),
                         }
                     }),
