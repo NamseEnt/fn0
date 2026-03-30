@@ -12,6 +12,7 @@ pub use generate_routes::*;
 pub use serde;
 pub use serde_json;
 pub use sha2;
+pub use forte_macros::forte_doc;
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub use form_urlencoded;
 pub use futures;
