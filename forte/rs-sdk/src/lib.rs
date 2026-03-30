@@ -5,6 +5,7 @@ mod generate_routes;
 pub use anyhow;
 pub use cookie::{self, Cookie, CookieBuilder, CookieJar};
 pub use forte_db;
+pub use forte_db::DbRequest;
 pub use forte_json;
 pub use generate_env::generate_env;
 pub use generate_routes::*;

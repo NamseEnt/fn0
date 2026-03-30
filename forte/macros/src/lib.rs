@@ -289,25 +289,36 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #(#get_sk_fields,)*
         }
 
-        impl #get_name {
-            pub async fn send(self) -> anyhow::Result<Option<#name>> {
+        impl forte_db::DbRequest for #get_name {
+            type Output = Option<#name>;
+            fn prepare(self) -> forte_db::Prepared<Self::Output> {
                 let pk = #pk_str;
                 let sk = format!(#sk_format_string, #(#sk_format_args),*);
-                Ok(forte_db::turso()
-                    .get(&pk, &sk)
-                    .await?
-                    .map(|data| serde_json::from_slice(&data))
-                    .transpose()?)
+                forte_db::Prepared {
+                    ops: vec![forte_db::DbOp::Get { pk, sk }],
+                    parse: Box::new(|iter| {
+                        match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
+                            forte_db::DbResult::Single(opt) => {
+                                opt.map(|data| serde_json::from_slice(&data))
+                                    .transpose()
+                                    .map_err(Into::into)
+                            }
+                            _ => anyhow::bail!("unexpected result type"),
+                        }
+                    }),
+                }
             }
         }
 
         #vis struct #query_name {
             #(#query_pk_fields,)*
             #(#query_sk_fields,)*
+            pub limit: Option<usize>,
         }
 
-        impl #query_name {
-            pub async fn send(self, limit: usize) -> anyhow::Result<Vec<#name>> {
+        impl forte_db::DbRequest for #query_name {
+            type Output = Vec<#name>;
+            fn prepare(self) -> forte_db::Prepared<Self::Output> {
                 let pk = #query_pk_str;
                 let after_sk: Option<String> = {
                     let mut parts: Vec<String> = Vec::new();
@@ -316,12 +327,21 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                     if parts.is_empty() { None } else { Some(parts.join("&")) }
                 };
-                Ok(forte_db::turso()
-                    .query(&pk, after_sk.as_deref(), limit)
-                    .await?
-                    .into_iter()
-                    .map(|(_sk, data)| serde_json::from_slice(&data))
-                    .collect::<Result<Vec<_>, _>>()?)
+                let limit = self.limit;
+                forte_db::Prepared {
+                    ops: vec![forte_db::DbOp::Query { pk, after_sk, limit }],
+                    parse: Box::new(|iter| {
+                        match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
+                            forte_db::DbResult::Multiple(items) => {
+                                items.into_iter()
+                                    .map(|(_sk, data)| serde_json::from_slice(&data))
+                                    .collect::<Result<Vec<_>, _>>()
+                                    .map_err(Into::into)
+                            }
+                            _ => anyhow::bail!("unexpected result type"),
+                        }
+                    }),
+                }
             }
         }
     };
