@@ -526,6 +526,186 @@ impl TursoDatabase {
         Ok(())
     }
 
+    pub(crate) async fn execute_ops(&self, ops: Vec<crate::DbOp>) -> Result<Vec<crate::DbResult>> {
+        use crate::{DbOp, DbResult};
+
+        if ops.is_empty() {
+            return Ok(vec![]);
+        }
+
+        for retry in 0..2 {
+            let mut requests: Vec<StreamRequest> = ops
+                .iter()
+                .map(|op| {
+                    StreamRequest::Execute(ExecuteStreamReq {
+                        stmt: match op {
+                            DbOp::Get { pk, sk } => Stmt {
+                                sql: Some(
+                                    "SELECT data FROM docs WHERE pk = ? AND sk = ?".to_string(),
+                                ),
+                                sql_id: None,
+                                args: vec![
+                                    Value::Text {
+                                        value: pk.clone().into(),
+                                    },
+                                    Value::Text {
+                                        value: sk.clone().into(),
+                                    },
+                                ],
+                                named_args: vec![],
+                                want_rows: Some(true),
+                                replication_index: None,
+                            },
+                            DbOp::Query {
+                                pk,
+                                after_sk,
+                                limit,
+                            } => {
+                                let mut sql_parts =
+                                    vec!["SELECT sk, data FROM docs WHERE pk = ?".to_string()];
+                                let mut args = vec![Value::Text {
+                                    value: pk.clone().into(),
+                                }];
+                                if let Some(sk) = after_sk {
+                                    sql_parts.push("AND sk > ?".to_string());
+                                    args.push(Value::Text {
+                                        value: sk.clone().into(),
+                                    });
+                                }
+                                sql_parts.push("ORDER BY sk".to_string());
+                                if let Some(lim) = limit {
+                                    sql_parts.push("LIMIT ?".to_string());
+                                    args.push(Value::Integer {
+                                        value: *lim as i64,
+                                    });
+                                }
+                                Stmt {
+                                    sql: Some(sql_parts.join(" ")),
+                                    sql_id: None,
+                                    args,
+                                    named_args: vec![],
+                                    want_rows: Some(true),
+                                    replication_index: None,
+                                }
+                            }
+                            DbOp::Put { pk, sk, data } => Stmt {
+                                sql: Some(
+                                    "INSERT OR REPLACE INTO docs (pk, sk, data) VALUES (?, ?, ?)"
+                                        .to_string(),
+                                ),
+                                sql_id: None,
+                                args: vec![
+                                    Value::Text {
+                                        value: pk.clone().into(),
+                                    },
+                                    Value::Text {
+                                        value: sk.clone().into(),
+                                    },
+                                    Value::Blob {
+                                        value: data.clone().into(),
+                                    },
+                                ],
+                                named_args: vec![],
+                                want_rows: Some(false),
+                                replication_index: None,
+                            },
+                            DbOp::Delete { pk, sk } => Stmt {
+                                sql: Some(
+                                    "DELETE FROM docs WHERE pk = ? AND sk = ?".to_string(),
+                                ),
+                                sql_id: None,
+                                args: vec![
+                                    Value::Text {
+                                        value: pk.clone().into(),
+                                    },
+                                    Value::Text {
+                                        value: sk.clone().into(),
+                                    },
+                                ],
+                                named_args: vec![],
+                                want_rows: Some(false),
+                                replication_index: None,
+                            },
+                        },
+                    })
+                })
+                .collect();
+
+            requests.push(StreamRequest::Close(CloseStreamReq {}));
+
+            let response = self.execute_pipeline(requests).await?;
+
+            let mut db_results = Vec::new();
+            let mut should_retry = false;
+            let mut op_idx = 0;
+
+            for result in response.results {
+                match result {
+                    StreamResult::Ok { response } => match response {
+                        StreamResponse::Execute(exec_resp) => {
+                            if op_idx < ops.len() {
+                                match &ops[op_idx] {
+                                    DbOp::Get { .. } => {
+                                        let value = exec_resp
+                                            .result
+                                            .rows
+                                            .first()
+                                            .and_then(|row| row.values.first())
+                                            .and_then(|v| match v {
+                                                Value::Blob { value } => Some(value.clone()),
+                                                _ => None,
+                                            });
+                                        db_results.push(DbResult::Single(value));
+                                    }
+                                    DbOp::Query { .. } => {
+                                        let items = exec_resp
+                                            .result
+                                            .rows
+                                            .iter()
+                                            .filter_map(|row| {
+                                                if let (
+                                                    Some(Value::Text { value: sk }),
+                                                    Some(Value::Blob { value: data }),
+                                                ) = (row.values.first(), row.values.get(1))
+                                                {
+                                                    Some((sk.to_string(), data.clone()))
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .collect();
+                                        db_results.push(DbResult::Multiple(items));
+                                    }
+                                    DbOp::Put { .. } | DbOp::Delete { .. } => {
+                                        db_results.push(DbResult::Done);
+                                    }
+                                }
+                                op_idx += 1;
+                            }
+                        }
+                        StreamResponse::Close(_) => {}
+                        _ => {}
+                    },
+                    StreamResult::Error { error } => {
+                        if retry == 0 && Self::is_table_not_found_error(&error.message) {
+                            self.create_table().await?;
+                            should_retry = true;
+                            break;
+                        }
+                        bail!("Pipeline error: {}", error.message);
+                    }
+                    StreamResult::None => {}
+                }
+            }
+
+            if !should_retry {
+                return Ok(db_results);
+            }
+        }
+
+        Ok(vec![])
+    }
+
     pub(crate) async fn transaction(&self) -> Result<TursoTransaction<'_>> {
         // Ensure table exists before starting transaction
         self.ensure_table().await?;

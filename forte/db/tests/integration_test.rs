@@ -1,9 +1,9 @@
-use forte_db::{BatchOp, turso_with_config};
+use forte_db::{BatchOp, DbOp, DbResult, turso_with_config};
 
-const LOCAL_LIBSQL_URL: &str = "http://127.0.0.1:8080";
+const TEST_PORT: u16 = 18123;
 
 fn create_test_db() -> forte_db::Database {
-    turso_with_config(LOCAL_LIBSQL_URL.to_string(), String::new())
+    turso_with_config(format!("http://127.0.0.1:{}", TEST_PORT), String::new())
 }
 
 #[wstd::test]
@@ -418,4 +418,205 @@ async fn test_transaction_delete() {
     // Data should be gone
     let result = db.get(pk, "sk_to_delete").await.expect("Get failed");
     assert!(result.is_none());
+}
+
+#[wstd::test]
+async fn test_execute_ops_single_get() {
+    let db = create_test_db();
+    let pk = "exec_ops_get_pk";
+    let sk = "sk_1";
+
+    db.put(pk, sk, b"hello").await.expect("Put failed");
+
+    let results = db
+        .execute_ops(vec![DbOp::Get {
+            pk: pk.to_string(),
+            sk: sk.to_string(),
+        }])
+        .await
+        .expect("execute_ops failed");
+
+    assert_eq!(results.len(), 1);
+    match &results[0] {
+        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"hello"),
+        _ => panic!("Expected Single(Some(...))"),
+    }
+
+    db.delete(pk, sk).await.expect("Delete failed");
+}
+
+#[wstd::test]
+async fn test_execute_ops_multiple() {
+    let db = create_test_db();
+    let pk = "exec_ops_multi_pk";
+
+    db.put(pk, "sk_a", b"aaa").await.expect("Put failed");
+    db.put(pk, "sk_b", b"bbb").await.expect("Put failed");
+
+    let results = db
+        .execute_ops(vec![
+            DbOp::Get {
+                pk: pk.to_string(),
+                sk: "sk_a".to_string(),
+            },
+            DbOp::Get {
+                pk: pk.to_string(),
+                sk: "sk_b".to_string(),
+            },
+            DbOp::Get {
+                pk: pk.to_string(),
+                sk: "sk_nonexistent".to_string(),
+            },
+        ])
+        .await
+        .expect("execute_ops failed");
+
+    assert_eq!(results.len(), 3);
+    match &results[0] {
+        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"aaa"),
+        _ => panic!("Expected Single(Some(...)) for sk_a"),
+    }
+    match &results[1] {
+        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"bbb"),
+        _ => panic!("Expected Single(Some(...)) for sk_b"),
+    }
+    match &results[2] {
+        DbResult::Single(None) => {}
+        _ => panic!("Expected Single(None) for nonexistent"),
+    }
+
+    db.delete(pk, "sk_a").await.expect("Delete failed");
+    db.delete(pk, "sk_b").await.expect("Delete failed");
+}
+
+#[wstd::test]
+async fn test_execute_ops_query() {
+    let db = create_test_db();
+    let pk = "exec_ops_query_pk";
+
+    for i in 0..5 {
+        let sk = format!("sk_{:02}", i);
+        db.put(pk, &sk, format!("data_{}", i).as_bytes())
+            .await
+            .expect("Put failed");
+    }
+
+    let results = db
+        .execute_ops(vec![DbOp::Query {
+            pk: pk.to_string(),
+            after_sk: None,
+            limit: Some(3),
+        }])
+        .await
+        .expect("execute_ops failed");
+
+    assert_eq!(results.len(), 1);
+    match &results[0] {
+        DbResult::Multiple(items) => {
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0].0, "sk_00");
+            assert_eq!(items[1].0, "sk_01");
+            assert_eq!(items[2].0, "sk_02");
+        }
+        _ => panic!("Expected Multiple"),
+    }
+
+    for i in 0..5 {
+        let sk = format!("sk_{:02}", i);
+        db.delete(pk, &sk).await.expect("Delete failed");
+    }
+}
+
+#[wstd::test]
+async fn test_execute_ops_put_and_delete() {
+    let db = create_test_db();
+    let pk = "exec_ops_put_del_pk";
+
+    let results = db
+        .execute_ops(vec![
+            DbOp::Put {
+                pk: pk.to_string(),
+                sk: "sk_1".to_string(),
+                data: b"data_1".to_vec(),
+            },
+            DbOp::Put {
+                pk: pk.to_string(),
+                sk: "sk_2".to_string(),
+                data: b"data_2".to_vec(),
+            },
+        ])
+        .await
+        .expect("execute_ops put failed");
+
+    assert_eq!(results.len(), 2);
+    assert!(matches!(&results[0], DbResult::Done));
+    assert!(matches!(&results[1], DbResult::Done));
+
+    let got = db.get(pk, "sk_1").await.expect("Get failed");
+    assert_eq!(got.unwrap().as_ref(), b"data_1");
+    let got = db.get(pk, "sk_2").await.expect("Get failed");
+    assert_eq!(got.unwrap().as_ref(), b"data_2");
+
+    let results = db
+        .execute_ops(vec![DbOp::Delete {
+            pk: pk.to_string(),
+            sk: "sk_1".to_string(),
+        }])
+        .await
+        .expect("execute_ops delete failed");
+
+    assert_eq!(results.len(), 1);
+    assert!(matches!(&results[0], DbResult::Done));
+
+    let got = db.get(pk, "sk_1").await.expect("Get failed");
+    assert!(got.is_none());
+
+    db.delete(pk, "sk_2").await.expect("Cleanup failed");
+}
+
+#[wstd::test]
+async fn test_execute_ops_mixed() {
+    let db = create_test_db();
+    let pk = "exec_ops_mixed_pk";
+
+    db.put(pk, "sk_existing", b"old_data")
+        .await
+        .expect("Put failed");
+
+    let results = db
+        .execute_ops(vec![
+            DbOp::Get {
+                pk: pk.to_string(),
+                sk: "sk_existing".to_string(),
+            },
+            DbOp::Put {
+                pk: pk.to_string(),
+                sk: "sk_new".to_string(),
+                data: b"new_data".to_vec(),
+            },
+            DbOp::Query {
+                pk: pk.to_string(),
+                after_sk: None,
+                limit: None,
+            },
+        ])
+        .await
+        .expect("execute_ops mixed failed");
+
+    assert_eq!(results.len(), 3);
+
+    match &results[0] {
+        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"old_data"),
+        _ => panic!("Expected Single(Some(...))"),
+    }
+    assert!(matches!(&results[1], DbResult::Done));
+    match &results[2] {
+        DbResult::Multiple(items) => {
+            assert_eq!(items.len(), 2);
+        }
+        _ => panic!("Expected Multiple"),
+    }
+
+    db.delete(pk, "sk_existing").await.expect("Cleanup failed");
+    db.delete(pk, "sk_new").await.expect("Cleanup failed");
 }
