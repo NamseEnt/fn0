@@ -1,4 +1,4 @@
-use adapt_cache::AdaptCache;
+use fn0_adapt_cache::AdaptCache;
 use bytes::Bytes;
 use color_eyre::Result;
 use fn0::{CodeKind, DeploymentMap, Fn0};
@@ -29,7 +29,8 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     deployment_map.register_code("local", CodeKind::Wasm);
 
     let cache = LocalCache::new(wasm_path);
-    let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map));
+    let env_vars = std::sync::Arc::new(std::sync::RwLock::new(Vec::new()));
+    let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map, env_vars));
 
     let port = port.unwrap_or(3000);
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -51,11 +52,13 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
                             let resp = fn0
                                 .run(
                                     "local",
+                                    "/",
                                     req.map(|body| {
                                         UnsyncBoxBody::new(body)
                                             .map_err(|e: hyper::Error| anyhow::anyhow!(e))
                                             .boxed_unsync()
                                     }),
+                                    None,
                                 )
                                 .await;
 
@@ -109,30 +112,30 @@ impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for L
         &self,
         id: &str,
         convert: impl FnOnce(Bytes) -> std::result::Result<(T, usize), E> + Send,
-    ) -> std::result::Result<T, adapt_cache::Error<E>> {
+    ) -> std::result::Result<T, fn0_adapt_cache::Error<E>> {
         let mut cache = self.memory.lock().await;
 
         let bytes = if let Some(data) = cache.get(id) {
             Bytes::copy_from_slice(data)
         } else {
             if id != "local" {
-                return Err(adapt_cache::Error::NotFound);
+                return Err(fn0_adapt_cache::Error::NotFound);
             }
 
             let data = tokio::fs::read(&self.wasm_path)
                 .await
-                .map_err(|e| adapt_cache::Error::StorageError(anyhow::anyhow!(e)))?;
+                .map_err(|e| fn0_adapt_cache::Error::StorageError(anyhow::anyhow!(e)))?;
 
             eprintln!("Compiling WASM ({} bytes)...", data.len());
             let cwasm = fn0::compile(&data)
-                .map_err(|e| adapt_cache::Error::StorageError(e))?;
+                .map_err(|e| fn0_adapt_cache::Error::StorageError(e))?;
             eprintln!("Compilation done ({} bytes)", cwasm.len());
 
             cache.insert(id.to_string(), cwasm.clone());
             Bytes::from(cwasm)
         };
 
-        let (converted, _) = convert(bytes).map_err(adapt_cache::Error::ConvertError)?;
+        let (converted, _) = convert(bytes).map_err(fn0_adapt_cache::Error::ConvertError)?;
         Ok(converted)
     }
 }
