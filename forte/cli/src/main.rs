@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
             let options = cli::build::BuildOptions {
                 project_dir: project.unwrap_or_else(|| ".".into()),
             };
-            cli::build::run(options)?;
+            cli::build::run(options).await?;
         }
     }
 

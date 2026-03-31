@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 const HQ_URL: &str = "http://fn0-hq.fn0.dev:8080";
-const GITHUB_CLIENT_ID: &str = "Ov23liGi0QXBR8oEcBaI";
+const GITHUB_CLIENT_ID: &str = "Ov23liRuIJf1NSe9ccP8";
 
 #[derive(Serialize, Deserialize)]
 struct Credentials {
