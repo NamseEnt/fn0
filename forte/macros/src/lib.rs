@@ -63,6 +63,47 @@ fn wrap_expr(ty: &syn::Type, expr: proc_macro2::TokenStream) -> proc_macro2::Tok
     expr
 }
 
+fn is_string_type(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            return segment.ident == "String";
+        }
+    }
+    false
+}
+
+fn make_generics(
+    pk_is_string: &[bool],
+    sk_is_string: &[bool],
+) -> (Vec<Option<proc_macro2::Ident>>, Vec<Option<proc_macro2::Ident>>) {
+    let mut counter = 0usize;
+    let pk = pk_is_string
+        .iter()
+        .map(|&s| {
+            if s {
+                let ident = format_ident!("__T{}", counter);
+                counter += 1;
+                Some(ident)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let sk = sk_is_string
+        .iter()
+        .map(|&s| {
+            if s {
+                let ident = format_ident!("__T{}", counter);
+                counter += 1;
+                Some(ident)
+            } else {
+                None
+            }
+        })
+        .collect();
+    (pk, sk)
+}
+
 #[proc_macro_attribute]
 pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
@@ -94,30 +135,78 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let sk_field_names: Vec<_> = sk_fields.iter().map(|f| &f.ident).collect();
     let sk_field_types: Vec<_> = sk_fields.iter().map(|f| &f.ty).collect();
 
+    let pk_is_string: Vec<bool> = pk_field_types.iter().map(|ty| is_string_type(ty)).collect();
+    let sk_is_string: Vec<bool> = sk_field_types.iter().map(|ty| is_string_type(ty)).collect();
+
+    let (gpk, gsk) = make_generics(&pk_is_string, &sk_is_string);
+    let all_generics: Vec<_> = gpk
+        .iter()
+        .chain(gsk.iter())
+        .filter_map(|g| g.as_ref())
+        .collect();
+
+    let generic_def = if all_generics.is_empty() {
+        quote! {}
+    } else {
+        quote! { <#(#all_generics: AsRef<str>),*> }
+    };
+    let generic_use = if all_generics.is_empty() {
+        quote! {}
+    } else {
+        quote! { <#(#all_generics),*> }
+    };
+
+    let query_generics: Vec<_> = gpk.iter().filter_map(|g| g.as_ref()).collect();
+    let query_generic_def = if query_generics.is_empty() {
+        quote! {}
+    } else {
+        quote! { <#(#query_generics: AsRef<str>),*> }
+    };
+    let query_generic_use = if query_generics.is_empty() {
+        quote! {}
+    } else {
+        quote! { <#(#query_generics),*> }
+    };
+
     let get_pk_fields: Vec<_> = pk_field_names
         .iter()
         .zip(pk_field_types.iter())
-        .map(|(name, ty)| {
+        .zip(gpk.iter())
+        .map(|((name, ty), gp)| {
             let field_name = format_ident!("pk_{}", name.as_ref().unwrap());
-            quote! { pub #field_name: #ty }
+            if let Some(g) = gp {
+                quote! { pub #field_name: #g }
+            } else {
+                quote! { pub #field_name: #ty }
+            }
         })
         .collect();
 
     let get_sk_fields: Vec<_> = sk_field_names
         .iter()
         .zip(sk_field_types.iter())
-        .map(|(name, ty)| {
+        .zip(gsk.iter())
+        .map(|((name, ty), gp)| {
             let field_name = format_ident!("sk_{}", name.as_ref().unwrap());
-            quote! { pub #field_name: #ty }
+            if let Some(g) = gp {
+                quote! { pub #field_name: #g }
+            } else {
+                quote! { pub #field_name: #ty }
+            }
         })
         .collect();
 
     let query_pk_fields: Vec<_> = pk_field_names
         .iter()
         .zip(pk_field_types.iter())
-        .map(|(name, ty)| {
+        .zip(gpk.iter())
+        .map(|((name, ty), gp)| {
             let field_name = format_ident!("pk_{}", name.as_ref().unwrap());
-            quote! { pub #field_name: #ty }
+            if let Some(g) = gp {
+                quote! { pub #field_name: #g }
+            } else {
+                quote! { pub #field_name: #ty }
+            }
         })
         .collect();
 
@@ -147,9 +236,14 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let pk_format_args: Vec<_> = pk_field_names
             .iter()
             .zip(pk_field_types.iter())
-            .map(|(n, ty)| {
+            .zip(pk_is_string.iter())
+            .map(|((n, ty), &is_str)| {
                 let field_name = format_ident!("pk_{}", n.as_ref().unwrap());
-                wrap_expr(ty, quote! { self.#field_name })
+                if is_str {
+                    quote! { self.#field_name.as_ref() }
+                } else {
+                    wrap_expr(ty, quote! { self.#field_name })
+                }
             })
             .collect();
         quote! { format!(#pk_format_string, #(#pk_format_args),*) }
@@ -190,9 +284,14 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let pk_format_args: Vec<_> = pk_field_names
             .iter()
             .zip(pk_field_types.iter())
-            .map(|(n, ty)| {
+            .zip(pk_is_string.iter())
+            .map(|((n, ty), &is_str)| {
                 let field_name = format_ident!("pk_{}", n.as_ref().unwrap());
-                wrap_expr(ty, quote! { self.#field_name })
+                if is_str {
+                    quote! { self.#field_name.as_ref() }
+                } else {
+                    wrap_expr(ty, quote! { self.#field_name })
+                }
             })
             .collect();
         quote! { format!(#pk_format_string, #(#pk_format_args),*) }
@@ -210,9 +309,14 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let sk_format_args: Vec<_> = sk_field_names
         .iter()
         .zip(sk_field_types.iter())
-        .map(|(n, ty)| {
+        .zip(sk_is_string.iter())
+        .map(|((n, ty), &is_str)| {
             let field_name = format_ident!("sk_{}", n.as_ref().unwrap());
-            wrap_expr(ty, quote! { self.#field_name })
+            if is_str {
+                quote! { self.#field_name.as_ref() }
+            } else {
+                wrap_expr(ty, quote! { self.#field_name })
+            }
         })
         .collect();
 
@@ -285,12 +389,12 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        #vis struct #get_name {
+        #vis struct #get_name #generic_def {
             #(#get_pk_fields,)*
             #(#get_sk_fields,)*
         }
 
-        impl forte_db::DbRequest for #get_name {
+        impl #generic_def forte_db::DbRequest for #get_name #generic_use {
             type Output = Option<#name>;
             fn prepare(self) -> forte_db::Prepared<Self::Output> {
                 let pk = #pk_str;
@@ -311,13 +415,13 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        #vis struct #query_name {
+        #vis struct #query_name #query_generic_def {
             #(#query_pk_fields,)*
             #(#query_sk_fields,)*
             pub limit: Option<usize>,
         }
 
-        impl forte_db::DbRequest for #query_name {
+        impl #query_generic_def forte_db::DbRequest for #query_name #query_generic_use {
             type Output = Vec<#name>;
             fn prepare(self) -> forte_db::Prepared<Self::Output> {
                 let pk = #query_pk_str;
@@ -346,12 +450,12 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        #vis struct #delete_name {
+        #vis struct #delete_name #generic_def {
             #(#get_pk_fields,)*
             #(#get_sk_fields,)*
         }
 
-        impl forte_db::DbRequest for #delete_name {
+        impl #generic_def forte_db::DbRequest for #delete_name #generic_use {
             type Output = ();
             fn prepare(self) -> forte_db::Prepared<Self::Output> {
                 let pk = #pk_str;
@@ -371,4 +475,3 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
-
