@@ -72,7 +72,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   certificate: dns.certificate,
   awsRegion: awsRegion,
   wasmBucket: wasmS3.bucket,
-  githubClientId: "Ov23liGi0QXBR8oEcBaI",
+  githubClientId: config.require("githubClientId"),
   sites: [
     {
       hostProvider: {

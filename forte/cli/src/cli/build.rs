@@ -3,13 +3,14 @@ use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::process::Stdio;
 
 #[derive(Debug)]
 pub struct BuildOptions {
     pub project_dir: PathBuf,
 }
 
-pub fn run(options: BuildOptions) -> Result<()> {
+pub async fn run(options: BuildOptions) -> Result<()> {
     let project_dir = options.project_dir.canonicalize()?;
 
     if !project_dir.join("Forte.toml").exists() {
@@ -19,7 +20,7 @@ pub fn run(options: BuildOptions) -> Result<()> {
     println!("Building Forte project for production...");
     println!("Project directory: {}", project_dir.display());
 
-    run_codegen(&project_dir)?;
+    run_codegen(&project_dir).await?;
     build_backend(&project_dir)?;
     build_frontend(&project_dir)?;
 
@@ -33,22 +34,32 @@ pub fn run(options: BuildOptions) -> Result<()> {
     Ok(())
 }
 
-fn run_codegen(project_dir: &Path) -> Result<()> {
-    let rs_dir = project_dir.join("rs");
+const FORTE_RS_TO_TS_VERSION: &str = "0.1.3";
 
-    let forte_rs_to_ts_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("Failed to get parent of CARGO_MANIFEST_DIR")
-        .join("forte-rs-to-ts");
+async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
+    let url = crate::tools::fn0_release_url("forte-rs-to-ts", FORTE_RS_TO_TS_VERSION)?;
+    crate::tools::ensure_github_tool_with_libs(
+        "forte-rs-to-ts",
+        FORTE_RS_TO_TS_VERSION,
+        &url,
+        "forte-rs-to-ts",
+    )
+    .await
+}
+
+async fn run_codegen(project_dir: &Path) -> Result<()> {
+    let rs_dir = project_dir.join("rs");
+    if !rs_dir.exists() {
+        generate_frontend_routes(project_dir)?;
+        return Ok(());
+    }
+
+    let binary = ensure_forte_rs_to_ts().await?;
 
     println!("[codegen] Running forte-rs-to-ts...");
-    let status = Command::new("cargo")
-        .arg("run")
-        .arg("--release")
-        .arg("--")
+    let status = Command::new(&binary)
         .arg(project_dir)
-        .current_dir(&forte_rs_to_ts_dir)
-        .env_remove("RUSTUP_TOOLCHAIN")
+        .stdout(Stdio::null())
         .status()
         .context("Failed to run forte-rs-to-ts")?;
 

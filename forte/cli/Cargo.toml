@@ -18,7 +18,7 @@ pkg-fmt = "txz"
 [workspace]
 
 [dependencies]
-fn0 = { version = "0.1.1", path = "../../fn0" }
+fn0 = { version = "0.2", path = "../../fn0" }
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
 tokio = { version = "1", features = ["full"] }
 hyper = { version = "1", features = ["server", "http1", "client"] }
