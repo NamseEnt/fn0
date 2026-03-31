@@ -65,6 +65,10 @@ jobs:
           cp "${SYSROOT}/bin/rustc" "${ARCHIVE_DIR}/bin/"
 
           cp "${SYSROOT}/lib/librustc_driver-"*.${DYLIB_EXT} "${ARCHIVE_DIR}/lib/"
+          # Linux: librustc_driver.so dynamically links to libLLVM.so
+          if [ "${DYLIB_EXT}" = "so" ]; then
+            cp "${SYSROOT}/lib/libLLVM"*.so* "${ARCHIVE_DIR}/lib/" 2>/dev/null || true
+          fi
 
           HOST_LIB="${SYSROOT}/lib/rustlib/${TARGET}/lib"
           DEST_HOST="${ARCHIVE_DIR}/lib/rustlib/${TARGET}/lib"
