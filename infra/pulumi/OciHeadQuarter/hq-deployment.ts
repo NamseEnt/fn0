@@ -5,21 +5,18 @@ import type { HqArgs } from "../hqArgs.schema";
 
 export function deployHqApplication(
   parent: pulumi.Resource,
-  {
-    k8sProvider,
-    hqImage,
-    otlpEndpoint,
-    hqArgs,
-  }: {
+  args: {
     k8sProvider: k8s.Provider;
     hqImage: docker.Image;
     otlpEndpoint: pulumi.Output<string>;
     hqArgs: HqArgs;
+    regionalSubnetId: pulumi.Input<string>;
   }
 ): {
   deployment: k8s.apps.v1.Deployment;
   service: k8s.core.v1.Service;
 } {
+  const { k8sProvider, hqImage, otlpEndpoint, hqArgs, regionalSubnetId } = args;
   const appLabels = { app: "hq" };
 
   const hqArgsSecret = new k8s.core.v1.Secret(
@@ -104,7 +101,13 @@ export function deployHqApplication(
   const service = new k8s.core.v1.Service(
     "hq-service",
     {
-      metadata: { labels: appLabels },
+      metadata: {
+        labels: appLabels,
+        annotations: {
+          "oci.oraclecloud.com/load-balancer-type": "lb",
+          "service.beta.kubernetes.io/oci-load-balancer-subnet1": regionalSubnetId,
+        },
+      },
       spec: {
         type: "LoadBalancer",
         selector: appLabels,
