@@ -89,6 +89,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       k8sProvider,
       hqImage,
       otlpEndpoint,
+      regionalSubnetId: regionalSubnet.id,
       hqArgs: {
         sites,
         docDb: {
