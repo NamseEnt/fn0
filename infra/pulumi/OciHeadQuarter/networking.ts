@@ -47,6 +47,7 @@ export function createNetworking(
     { parent }
   );
 
+
   const myIp = command.local.runOutput({
     command: "curl -s ifconfig.co",
   }).stdout;

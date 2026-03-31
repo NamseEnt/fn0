@@ -19,14 +19,15 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
 
     const { region, wasmBucket, queueArn, cWasmBucket } = args;
 
-    const fn0CompilerLayer = new aws.lambda.LayerVersion(
-      "fn0-compiler-layer",
+    const wasmtimeVersion = "42.0.1";
+
+    const wasmtimeLayer = new aws.lambda.LayerVersion(
+      "wasmtime-layer",
       {
         region,
-        layerName: "fn0-compiler",
-        compatibleArchitectures: ["arm64"],
+        layerName: `wasmtime-${wasmtimeVersion.replace(/\./g, "-")}`,
         code: new pulumi.asset.FileArchive(
-          path.join(__dirname, "./fn0-compiler-layer")
+          path.join(__dirname, "./wasmtime-layer")
         ),
       },
       { parent: this }
@@ -36,9 +37,10 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       "zstd-layer",
       {
         region,
-        layerName: "zstd-arm64",
-        compatibleArchitectures: ["arm64"],
-        code: new pulumi.asset.FileArchive(path.join(__dirname, "./zstd-arm64-layer")),
+        layerName: "zstd",
+        code: new pulumi.asset.FileArchive(
+          path.join(__dirname, "./zstd-layer")
+        ),
       },
       { parent: this }
     );
@@ -50,8 +52,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       "cwasm-compiler-lambda",
       {
         region,
-        architectures: ["arm64"],
-        layers: [fn0CompilerLayer.arn, zstdLayer.arn],
+        layers: [wasmtimeLayer.arn, zstdLayer.arn],
         timeout: 20,
         memorySize: 10240,
         environment: {
@@ -75,7 +76,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
           const s3Client = new S3Client({});
 
           const cWasmBucketName = process.env.CWASM_BUCKET!;
-          const compilerPath = `/opt/fn0-compiler`;
+          const wasmtimePath = `/opt/wasmtime`;
           const zstdPath = `/opt/zstd`;
 
           if (event.Records.length !== 1) {
@@ -117,8 +118,8 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
             createWriteStream(wasmPath)
           );
 
-          console.log("compile wasm to cwasm using fn0-compiler");
-          execSync(`${compilerPath} "${wasmPath}" "${cwasmPath}"`, {
+          console.log("compile wasm to cwasm");
+          execSync(`${wasmtimePath} compile "${wasmPath}" -o "${cwasmPath}"`, {
             stdio: "inherit",
           });
 
