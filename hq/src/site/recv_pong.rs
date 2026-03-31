@@ -1,7 +1,7 @@
 use super::*;
 use crate::{deployment_cache::DeploymentId, telemetry, *};
 use doc_db::Deployment;
-use host_hq_protocol::{HostToHq, HqToHostReliable};
+use host_hq_protocol::{CodeDeployment, HostToHq, HqToHostReliable};
 
 impl Site {
     #[tracing::instrument(skip_all)]
@@ -74,9 +74,13 @@ fn send_updates(
 
     let message = HqToHostReliable::DeploymentUpdates {
         deployment_id: host_deployment_id,
-        code_id_and_versions: updates
+        codes: updates
             .into_iter()
-            .map(|update| (update.code_id, update.code_version))
+            .map(|update| CodeDeployment {
+                subdomain: update.subdomain,
+                code_id: update.code_id,
+                code_version: update.code_version,
+            })
             .collect(),
     };
     let connection = connection.clone();

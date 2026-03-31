@@ -1,10 +1,8 @@
-use bytes::Buf;
-use libsql::Row;
-
 use super::*;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Deployment {
+    pub subdomain: String,
     pub code_id: u64,
     pub code_version: u64,
 }
@@ -22,13 +20,16 @@ impl DocDb {
             .await?;
 
         while let Some(row) = rows.next().await? {
-            deployments.push(row.into());
+            let json_str: String = row.get(0)?;
+            if let Ok(d) = serde_json::from_str(&json_str) {
+                deployments.push(d);
+            }
         }
 
         Ok(deployments)
     }
 
-    pub async fn insert_deployment(&self, code_id: u64, code_version: u64) -> Result<()> {
+    pub async fn insert_deployment(&self, subdomain: &str, code_id: u64, code_version: u64) -> Result<()> {
         let conn = self.db.connect()?;
 
         let next_sk: u64 = conn
@@ -42,9 +43,11 @@ impl DocDb {
             .map(|row| row.get::<u64>(0).unwrap())
             .unwrap_or(1);
 
-        let mut value = Vec::with_capacity(16);
-        value.extend_from_slice(&code_id.to_le_bytes());
-        value.extend_from_slice(&code_version.to_le_bytes());
+        let value = serde_json::to_string(&Deployment {
+            subdomain: subdomain.to_string(),
+            code_id,
+            code_version,
+        }).unwrap();
 
         conn.execute(
             "INSERT INTO docs (pk, sk, value) VALUES ('deployments', ?, ?)",
@@ -67,22 +70,12 @@ impl DocDb {
             .await?;
 
         while let Some(row) = rows.next().await? {
-            deployments.push(row.into());
+            let json_str: String = row.get(0)?;
+            if let Ok(d) = serde_json::from_str(&json_str) {
+                deployments.push(d);
+            }
         }
 
         Ok(deployments)
-    }
-}
-
-impl From<Row> for Deployment {
-    fn from(row: Row) -> Self {
-        let bytes: [u8; 16] = row.get(0).unwrap();
-        assert_eq!(bytes.len(), 16);
-
-        let mut cursor = bytes.as_slice();
-        Deployment {
-            code_id: cursor.get_u64_le(),
-            code_version: cursor.get_u64_le(),
-        }
     }
 }

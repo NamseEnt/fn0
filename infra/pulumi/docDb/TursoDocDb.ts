@@ -46,7 +46,7 @@ export class TursoDocDb extends pulumi.ComponentResource {
       "database",
       {
         organizationSlug,
-        name: `fn0-doc-db-${nameSuffix8}`,
+        name: pulumi.interpolate`fn0-doc-db-${nameSuffix8}`,
         group: group.name,
       },
       { parent: this }
@@ -65,6 +65,7 @@ export class TursoDocDb extends pulumi.ComponentResource {
       "docs-table",
       {
         organizationSlug,
+        location,
         jwt: token.jwt,
         databaseName: database.name,
         createTableSql: `
@@ -78,7 +79,14 @@ CREATE TABLE IF NOT EXISTS docs (
       { parent: this }
     );
 
-    this.url = pulumi.interpolate`libsql://${database.name}.${location}.turso.io`;
-    this.token = token.jwt;
+    this.url = pulumi.interpolate`libsql://${database.name}-${organizationSlug}.${location}.turso.io`;
+    const tursoConfig = new pulumi.Config("turso");
+    this.token = database.name.apply((dbName) => {
+      const apiKey = tursoConfig.require("apiToken");
+      return fetch(
+        `https://api.turso.tech/v1/organizations/${organizationSlug}/databases/${dbName}/auth/tokens`,
+        { method: "POST", headers: { Authorization: `Bearer ${apiKey}` } }
+      ).then((r) => r.json()).then((d: any) => d.jwt as string);
+    });
   }
 }

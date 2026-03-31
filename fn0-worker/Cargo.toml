@@ -1,0 +1,29 @@
+[package]
+name = "fn0-worker"
+version = "0.1.0"
+edition = "2024"
+
+[profile.release]
+debug = true
+
+[dependencies]
+fn0 = "0.2.0"
+adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
+host-hq-protocol = { package = "fn0-host-hq-protocol", version = "0.2.0" }
+aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
+aws-sdk-s3 = { version = "=1.115.0", default-features = false }
+bytes = "1"
+color-eyre = "0.6"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+quinn = "0.11"
+rcgen = "0.13"
+rustls = "=0.23.28"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1"
+zstd = "0.13"

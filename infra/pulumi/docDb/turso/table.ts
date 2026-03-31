@@ -2,6 +2,7 @@ import * as pulumi from "@pulumi/pulumi";
 
 interface TursoTableArgs {
   organizationSlug: pulumi.Input<string>;
+  location: pulumi.Input<string>;
   jwt: pulumi.Input<string>;
   databaseName: pulumi.Input<string>;
   createTableSql: pulumi.Input<string>;
@@ -21,6 +22,7 @@ export class TursoTable extends pulumi.dynamic.Resource {
 
 interface TursoTableInputs {
   organizationSlug: string;
+  location: string;
   jwt: string;
   databaseName: string;
   createTableSql: string;
@@ -28,12 +30,28 @@ interface TursoTableInputs {
 
 class TursoTableProvider implements pulumi.dynamic.ResourceProvider {
   async create(inputs: TursoTableInputs): Promise<pulumi.dynamic.CreateResult> {
+    const config = new pulumi.Config("turso");
+    const apiKey = config.require("apiToken");
+
+    const tokenResp = await fetch(
+      `https://api.turso.tech/v1/organizations/${inputs.organizationSlug}/databases/${inputs.databaseName}/auth/tokens`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+    );
+    if (!tokenResp.ok) {
+      throw new Error(`Failed to get DB token: ${await tokenResp.text()}`);
+    }
+    const { jwt } = await tokenResp.json();
+
+    const url = `https://${inputs.databaseName}-${inputs.organizationSlug}.${inputs.location}.turso.io/v2/pipeline`;
     const response = await fetch(
-      `https://${inputs.databaseName}-${inputs.organizationSlug}.turso.io`,
+      url,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${inputs.jwt}`,
+          Authorization: `Bearer ${jwt}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -54,7 +72,7 @@ class TursoTableProvider implements pulumi.dynamic.ResourceProvider {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Failed to create table: ${error}`);
+      throw new Error(`Failed to create table at ${url}: ${error}`);
     }
 
     const crypto = await import("crypto");

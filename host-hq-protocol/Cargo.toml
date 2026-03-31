@@ -1,7 +1,10 @@
 [package]
-name = "host-hq-protocol"
-version = "0.1.0"
+name = "fn0-host-hq-protocol"
+version = "0.2.0"
 edition = "2024"
+description = "Protocol definitions for fn0 host-HQ communication"
+license = "AGPL-3.0-only"
+repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
 bytes = "1.11.0"

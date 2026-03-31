@@ -19,18 +19,14 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
 
     const { region, wasmBucket, queueArn, cWasmBucket } = args;
 
-    const wasmtimeVersion = "39.0.1";
-
-    const wasmtimeLayer = new aws.lambda.LayerVersion(
-      "wasmtime-layer",
+    const fn0CompilerLayer = new aws.lambda.LayerVersion(
+      "fn0-compiler-layer",
       {
         region,
-        layerName: wasmtimeVersion,
+        layerName: "fn0-compiler",
+        compatibleArchitectures: ["arm64"],
         code: new pulumi.asset.FileArchive(
-          path.join(
-            __dirname,
-            `./wasmtime-v${wasmtimeVersion}-x86_64-linux.tar.xz`
-          )
+          path.join(__dirname, "./fn0-compiler-layer")
         ),
       },
       { parent: this }
@@ -40,8 +36,9 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       "zstd-layer",
       {
         region,
-        layerName: "zstd-1.5.5-1",
-        code: new pulumi.asset.FileArchive(path.join(__dirname, "./zstd")),
+        layerName: "zstd-arm64",
+        compatibleArchitectures: ["arm64"],
+        code: new pulumi.asset.FileArchive(path.join(__dirname, "./zstd-arm64-layer")),
       },
       { parent: this }
     );
@@ -53,12 +50,12 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       "cwasm-compiler-lambda",
       {
         region,
-        layers: [wasmtimeLayer.arn, zstdLayer.arn],
+        architectures: ["arm64"],
+        layers: [fn0CompilerLayer.arn, zstdLayer.arn],
         timeout: 20,
         memorySize: 10240,
         environment: {
           variables: {
-            WASMTIME_VERSION: wasmtimeVersion,
             CWASM_BUCKET: cWasmBucket,
           },
         },
@@ -77,9 +74,8 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
 
           const s3Client = new S3Client({});
 
-          const wasmtimeVer = process.env.WASMTIME_VERSION!;
           const cWasmBucketName = process.env.CWASM_BUCKET!;
-          const wasmtimePath = `/opt/wasmtime-v${wasmtimeVer}-x86_64-linux/wasmtime`;
+          const compilerPath = `/opt/fn0-compiler`;
           const zstdPath = `/opt/zstd`;
 
           if (event.Records.length !== 1) {
@@ -121,8 +117,8 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
             createWriteStream(wasmPath)
           );
 
-          console.log("compile wasm to cwasm");
-          execSync(`${wasmtimePath} compile "${wasmPath}" -o "${cwasmPath}"`, {
+          console.log("compile wasm to cwasm using fn0-compiler");
+          execSync(`${compilerPath} "${wasmPath}" "${cwasmPath}"`, {
             stdio: "inherit",
           });
 

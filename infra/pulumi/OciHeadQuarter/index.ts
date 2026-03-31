@@ -19,10 +19,14 @@ export interface OciHeadQuarterArgs {
   docDbToken: pulumi.Input<string>;
   sites: pulumi.Input<SiteArgs[]>;
   certificate: pulumi.Input<string>;
+  awsRegion: pulumi.Input<string>;
+  wasmBucket: pulumi.Input<string>;
+  githubClientId: pulumi.Input<string>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
   kubeconfig: pulumi.Output<string>;
+  hqServiceIp: pulumi.Output<string>;
   constructor(
     name: string,
     args: OciHeadQuarterArgs,
@@ -66,17 +70,14 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
     });
     this.kubeconfig = kubeconfig;
 
-    const { release: grafanaRelease, otlpEndpoint } = hqGrafana(this, {
-      regionSlug: args.grafanaRegion,
-      slug: args.grafanaSlug,
-      k8sProvider: k8sProvider,
-      suffix,
-    });
-
-    deployK8sDashboard(this, {
-      k8sProvider,
-      dependsOn: [grafanaRelease],
-    });
+    // TODO: Fix grafana helm chart schema for new k8s-monitoring version
+    // const { release: grafanaRelease, otlpEndpoint } = hqGrafana(this, {
+    //   regionSlug: args.grafanaRegion,
+    //   slug: args.grafanaSlug,
+    //   k8sProvider: k8sProvider,
+    //   suffix,
+    // });
+    const otlpEndpoint = pulumi.output("");
 
     const { hqImage } = createDockerRegistry(this, {
       compartmentId,
@@ -84,18 +85,27 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       region: ociRegion,
     });
 
-    deployHqApplication(this, {
+    const { service } = deployHqApplication(this, {
       k8sProvider,
       hqImage,
       otlpEndpoint,
       hqArgs: {
         sites,
-        deploymentDb: {
+        docDb: {
           url: docDbUrl,
           token: docDbToken,
         },
         cert: certificate,
+        aws: {
+          region: args.awsRegion,
+          wasmBucket: args.wasmBucket,
+        },
+        githubClientId: args.githubClientId,
       },
     });
+
+    this.hqServiceIp = service.status.apply(
+      (status) => status?.loadBalancer?.ingress?.[0]?.ip ?? ""
+    );
   }
 }

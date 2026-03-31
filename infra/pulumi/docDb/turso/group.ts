@@ -30,8 +30,8 @@ class TursoGroupProvider
   async create(
     inputs: TursoGroupInputs
   ): Promise<pulumi.dynamic.CreateResult<TursoGroupInputs>> {
-    const config = new pulumi.Config();
-    const apiKey = config.require("tursoApiToken");
+    const config = new pulumi.Config("turso");
+    const apiKey = config.require("apiToken");
 
     const response = await fetch(
       `https://api.turso.tech/v1/organizations/${inputs.organizationSlug}/groups`,
@@ -63,8 +63,8 @@ class TursoGroupProvider
   }
 
   async delete(id: string, outputs: TursoGroupInputs) {
-    const config = new pulumi.Config();
-    const apiKey = config.require("tursoApiToken");
+    const config = new pulumi.Config("turso");
+    const apiKey = config.require("apiToken");
 
     const groupName = id.split("/").pop();
     const response = await fetch(

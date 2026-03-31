@@ -4,6 +4,7 @@ import * as cloudflare from "@pulumi/cloudflare";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
 import * as fs from "fs/promises";
+import * as path from "node:path";
 
 export interface S3CompatibleBucket {
   endpoint: pulumi.Input<string>;
@@ -18,6 +19,7 @@ export interface CwasmS3PusherArgs {
   awsS3Region: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
   targetBuckets: S3CompatibleBucket[];
+  cloudflareApiToken: pulumi.Input<string>;
 }
 
 export class CwasmS3Pusher extends pulumi.ComponentResource {
@@ -30,7 +32,13 @@ export class CwasmS3Pusher extends pulumi.ComponentResource {
   ) {
     super("pkg:index:cwasm-s3-pusher", name, args, opts);
 
-    const { awsS3Region, zoneId, targetBuckets } = args;
+    const { awsS3Region, zoneId, targetBuckets, cloudflareApiToken } = args;
+
+    const cfProvider = new cloudflare.Provider(
+      "cwasm-cf-provider",
+      { apiToken: cloudflareApiToken },
+      { parent: this }
+    );
 
     const workerSecretKey = new random.RandomPassword(
       "worker-secret-key",
@@ -41,23 +49,23 @@ export class CwasmS3Pusher extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    const zone = cloudflare.Zone.get("zone", zoneId);
+    const zone = cloudflare.Zone.get("zone", zoneId, {}, { provider: cfProvider });
 
     const worker = new cloudflare.WorkersScript(
       "s3-pusher-worker",
       {
         accountId: zone.account.apply((account) => account.id!),
         scriptName: "s3-pusher-worker",
-        content: fs.readFile("./cwasm-s3-pusher-workers.js", "utf-8"),
+        content: fs.readFile(path.join(__dirname, "./cwasm-s3-pusher-workers.js"), "utf-8"),
         bindings: [
           {
             name: "WORKER_SECRET_KEY",
-            type: "text",
+            type: "secret_text",
             text: workerSecretKey.result,
           },
         ],
       },
-      { parent: this }
+      { parent: this, provider: cfProvider }
     );
 
     new cloudflare.WorkersRoute(
@@ -67,7 +75,7 @@ export class CwasmS3Pusher extends pulumi.ComponentResource {
         pattern: pulumi.interpolate`cwasm-s3-pusher.${zone.name}/*`,
         script: "s3-pusher-worker",
       },
-      { parent: this }
+      { parent: this, provider: cfProvider, dependsOn: [worker] }
     );
 
     new cloudflare.DnsRecord(
@@ -80,7 +88,7 @@ export class CwasmS3Pusher extends pulumi.ComponentResource {
         ttl: 1,
         proxied: true,
       },
-      { parent: this }
+      { parent: this, provider: cfProvider }
     );
 
     new cloudflare.Ruleset(
@@ -131,7 +139,6 @@ export class CwasmS3Pusher extends pulumi.ComponentResource {
       "cwasm-upload-queue",
       {
         region: awsS3Region,
-        fifoQueue: true,
         visibilityTimeoutSeconds: 90,
       },
       { parent: this }

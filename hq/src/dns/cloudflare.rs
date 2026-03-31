@@ -141,7 +141,7 @@ impl DnsProvide for CloudflareDnsProvider {
                             IpAddr::V6(_) => "AAAA",
                         },
                         content: ip.to_string(),
-                        proxied: false,
+                        proxied: true,
                     })
                     .collect(),
             })?)

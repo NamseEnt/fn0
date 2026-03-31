@@ -1,4 +1,5 @@
 mod deployment;
+mod project;
 mod scale_config;
 
 pub use deployment::*;

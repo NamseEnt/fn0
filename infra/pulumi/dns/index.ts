@@ -12,6 +12,7 @@ export interface CloudflareDnsArgs {
 export class CloudflareDns extends pulumi.ComponentResource {
   privateKeyPem: pulumi.Output<string>;
   certificate: pulumi.Output<string>;
+  dnsApiToken: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -22,16 +23,12 @@ export class CloudflareDns extends pulumi.ComponentResource {
 
     const { accountId, domain, zoneId, suffix } = args;
 
-    const apiTokenPermissionGroups = pulumi
-      .all([accountId])
-      .apply(([accountId]) =>
-        cloudflare
-          .getAccountApiTokenPermissionGroupsList({
-            accountId,
-            name: "DNS Write",
-          })
-          .then((x) => x.results.map((x) => ({ id: x.id })))
-      );
+    const PERMISSION_IDS = {
+      DNS_WRITE: "4755a26eedb94da69e1066d98aa820be",
+      WORKERS_SCRIPTS_WRITE: "e086da7e2179491d91ee5f35b3ca210a",
+      WORKERS_ROUTES_WRITE: "28f4b596e7d643029c524985477ae49a",
+      ZONE_WAF_WRITE: "fb6778dc191143babbfaa57993f1d275",
+    };
 
     const cloudflareApiToken = new cloudflare.AccountToken(
       "cloudflare-api-token",
@@ -44,7 +41,20 @@ export class CloudflareDns extends pulumi.ComponentResource {
             resources: {
               [`com.cloudflare.api.account.zone.${zoneId}`]: "*",
             },
-            permissionGroups: apiTokenPermissionGroups,
+            permissionGroups: [
+              { id: PERMISSION_IDS.DNS_WRITE },
+              { id: PERMISSION_IDS.WORKERS_ROUTES_WRITE },
+              { id: PERMISSION_IDS.ZONE_WAF_WRITE },
+            ],
+          },
+          {
+            effect: "allow",
+            resources: {
+              [`com.cloudflare.api.account.${accountId}`]: "*",
+            },
+            permissionGroups: [
+              { id: PERMISSION_IDS.WORKERS_SCRIPTS_WRITE },
+            ],
           },
         ],
       },
@@ -86,5 +96,6 @@ export class CloudflareDns extends pulumi.ComponentResource {
     );
 
     this.certificate = originCaCert.certificate;
+    this.dnsApiToken = cloudflareApiToken.value;
   }
 }
