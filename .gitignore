@@ -1,2 +1,10 @@
 /docker/
 target/
+infra/pulumi/BuildChain/fn0-compiler-layer/
+infra/pulumi/BuildChain/fn0-compiler-layer.tar.xz
+infra/pulumi/BuildChain/zstd-arm64
+infra/pulumi/BuildChain/zstd-arm64-layer/
+infra/pulumi/BuildChain/wasmtime-v*.tar.xz
+infra/pulumi/BuildChain/sdks/
+infra/cloud/sdks/
+package-lock.json

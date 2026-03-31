@@ -13,7 +13,7 @@ export class TursoDatabaseToken extends pulumi.dynamic.Resource {
     args: TursoDatabaseTokenArgs,
     opts?: pulumi.CustomResourceOptions
   ) {
-    super(new TursoDatabaseTokenProvider(), name, args, opts);
+    super(new TursoDatabaseTokenProvider(), name, { ...args, jwt: undefined }, opts);
   }
 }
 
@@ -36,8 +36,8 @@ class TursoDatabaseTokenProvider
   async create(
     inputs: TursoDatabaseTokenInputs
   ): Promise<pulumi.dynamic.CreateResult> {
-    const config = new pulumi.Config();
-    const apiKey = config.require("tursoApiToken");
+    const config = new pulumi.Config("turso");
+    const apiKey = config.require("apiToken");
 
     const response = await fetch(
       `https://api.turso.tech/v1/organizations/${inputs.organizationSlug}/databases/${inputs.databaseName}/auth/tokens`,

@@ -1335,6 +1335,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a3076410a55c90011c298b04d0cfa770b00fa04e1e3c97d3f6c9de105a03844"
 
 [[package]]
+name = "fn0-host-hq-protocol"
+version = "0.2.0"
+dependencies = [
+ "bytes",
+ "postcard",
+ "serde",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1615,15 +1624,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-hq-protocol"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "postcard",
- "serde",
-]
-
-[[package]]
 name = "hq"
 version = "0.1.0"
 dependencies = [
@@ -1636,8 +1636,8 @@ dependencies = [
  "color-eyre",
  "dashmap",
  "doc-db",
+ "fn0-host-hq-protocol",
  "futures",
- "host-hq-protocol",
  "http-body-util",
  "hyper 1.8.1",
  "hyper-util",

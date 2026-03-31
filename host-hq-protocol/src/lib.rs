@@ -7,10 +7,17 @@ pub enum HqToHostDatagram {
     AdvertiseLatestDeploymentId { deployment_id: u64 },
 }
 #[derive(Clone, Serialize, Deserialize)]
+pub struct CodeDeployment {
+    pub subdomain: String,
+    pub code_id: u64,
+    pub code_version: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub enum HqToHostReliable {
     DeploymentUpdates {
         deployment_id: u64,
-        code_id_and_versions: Vec<(u64, u64)>,
+        codes: Vec<CodeDeployment>,
     },
     GracefulShutdown,
 }

@@ -1,0 +1,41 @@
+name: Publish Crates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "fn0/**"
+      - "host-hq-protocol/**"
+      - "adapt-cache/**"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish fn0-host-hq-protocol
+        continue-on-error: true
+        working-directory: host-hq-protocol
+        run: cargo publish --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Publish fn0-adapt-cache
+        continue-on-error: true
+        working-directory: adapt-cache
+        run: cargo publish --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for deps to propagate
+        run: sleep 30
+
+      - name: Publish fn0
+        continue-on-error: true
+        working-directory: fn0
+        run: cargo publish --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

@@ -28,7 +28,7 @@ export function deployK8sDashboard(
       name: "kubernetes-dashboard",
       chart: "kubernetes-dashboard",
       repositoryOpts: {
-        repo: "https://kubernetes.github.io/dashboard/",
+        repo: "https://kubernetes.github.io/dashboard",
       },
       namespace: "kubernetes-dashboard",
       createNamespace: true,

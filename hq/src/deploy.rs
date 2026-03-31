@@ -11,21 +11,23 @@ use crate::args_parse::DeployContext;
 #[derive(Deserialize)]
 struct DeployStartRequest {
     github_token: String,
+    project_name: String,
 }
 
 #[derive(Serialize)]
 struct DeployStartResponse {
     presigned_url: String,
     deploy_job_id: String,
+    subdomain: String,
+    code_id: u64,
 }
 
 #[derive(Deserialize)]
 struct DeployFinishRequest {
     github_token: String,
-    #[allow(dead_code)]
     deploy_job_id: String,
+    subdomain: String,
     code_id: u64,
-    code_version: u64,
 }
 
 #[derive(Serialize)]
@@ -88,12 +90,13 @@ pub async fn handle_deploy_start(
         Err(e) => return json_response(401, &ErrorResponse { error: e }),
     };
 
-    if username != "namse" {
-        return json_response(403, &ErrorResponse { error: "Unauthorized user".to_string() });
-    }
+    let project = match ctx.doc_db.get_or_create_project(&username, &request.project_name).await {
+        Ok(p) => p,
+        Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get project: {}", e) }),
+    };
 
     let deploy_job_id = uuid::Uuid::new_v4().to_string();
-    let s3_key = format!("{}.wasm", deploy_job_id);
+    let s3_key = format!("{}.wasm", project.subdomain);
 
     let presigning_config = match PresigningConfig::expires_in(std::time::Duration::from_secs(300)) {
         Ok(c) => c,
@@ -115,6 +118,8 @@ pub async fn handle_deploy_start(
     json_response(200, &DeployStartResponse {
         presigned_url: presigned.uri().to_string(),
         deploy_job_id,
+        subdomain: project.subdomain,
+        code_id: project.code_id,
     })
 }
 
@@ -137,13 +142,14 @@ pub async fn handle_deploy_finish(
         Err(e) => return json_response(401, &ErrorResponse { error: e }),
     };
 
-    if username != "namse" {
-        return json_response(403, &ErrorResponse { error: "Unauthorized user".to_string() });
-    }
+    let code_version = match ctx.doc_db.next_code_version(request.code_id).await {
+        Ok(v) => v,
+        Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get next version: {}", e) }),
+    };
 
-    if let Err(e) = ctx.doc_db.insert_deployment(request.code_id, request.code_version).await {
+    if let Err(e) = ctx.doc_db.insert_deployment(&request.subdomain, request.code_id, code_version).await {
         return json_response(500, &ErrorResponse { error: format!("Failed to insert deployment: {}", e) });
     }
 
-    json_response(200, &serde_json::json!({"ok": true}))
+    json_response(200, &serde_json::json!({"ok": true, "code_version": code_version}))
 }

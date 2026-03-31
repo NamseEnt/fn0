@@ -16,7 +16,11 @@ fn main() {
         write_schema(&mut output, &name, def.into_object());
     }
 
-    std::fs::write("../pulumi/hqArgs.schema.ts", output).expect("Failed to write schema file");
+    let out_path = std::path::Path::new("../infra/pulumi/hqArgs.schema.ts");
+    if let Some(parent) = out_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(out_path, output);
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/args.rs");

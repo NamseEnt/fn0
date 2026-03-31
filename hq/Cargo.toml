@@ -7,7 +7,7 @@ edition = "2024"
 debug = true
 
 [dependencies]
-host-hq-protocol = { path = "../host-hq-protocol", version = "0.1" }
+host-hq-protocol = { package = "fn0-host-hq-protocol", path = "../host-hq-protocol", version = "0.2" }
 doc-db = { path = "../doc-db", version = "0.1" }
 aws-config = "1"
 aws-sdk-s3 = { version = "1", features = ["behavior-version-latest"] }

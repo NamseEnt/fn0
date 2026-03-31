@@ -21,6 +21,7 @@ pub struct ProjectConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    pub name: Option<String>,
     pub language_env: LanguageEnvironment,
 }
 
@@ -42,6 +43,7 @@ impl From<&ProjectConfig> for LanguageEnvironment {
 impl Config {
     pub fn from_project_config(project_config: &ProjectConfig) -> Self {
         Self {
+            name: Some(project_config.name.clone()),
             language_env: LanguageEnvironment::from(project_config),
         }
     }

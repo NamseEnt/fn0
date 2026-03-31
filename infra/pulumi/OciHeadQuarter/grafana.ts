@@ -47,9 +47,8 @@ export function hqGrafana(
         cluster: {
           name: clusterName,
         },
-        destinations: [
-          {
-            name: destinationName,
+        destinations: {
+          [destinationName]: {
             type: "prometheus",
             url: stack.prometheusRemoteWriteEndpoint,
             auth: {
@@ -58,8 +57,7 @@ export function hqGrafana(
               password,
             },
           },
-          {
-            name: "grafana-cloud-logs",
+          "grafana-cloud-logs": {
             type: "loki",
             url: stack.logsUrl.apply((x) => `${x}/loki/api/v1/push`),
             auth: {
@@ -68,8 +66,7 @@ export function hqGrafana(
               password,
             },
           },
-          {
-            name: "gc-otlp-endpoint",
+          "gc-otlp-endpoint": {
             type: "otlp",
             url: stack.otlpUrl.apply((x) => `${x}/otlp`),
             protocol: "http",
@@ -88,7 +85,7 @@ export function hqGrafana(
               enabled: true,
             },
           },
-        ],
+        },
         clusterMetrics: {
           enabled: true,
           opencost: {

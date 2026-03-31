@@ -28,6 +28,8 @@ struct TokenResponse {
 struct DeployStartResponse {
     presigned_url: String,
     deploy_job_id: String,
+    subdomain: String,
+    code_id: u64,
 }
 
 fn credentials_path() -> Result<PathBuf> {
@@ -121,7 +123,14 @@ async fn get_github_token() -> Result<String> {
     Ok(token)
 }
 
-pub async fn execute(code_id: u64, code_version: u64) -> Result<()> {
+pub async fn execute() -> Result<()> {
+    let config = crate::config::Config::load("fn0.toml")
+        .map_err(|_| eyre!("fn0.toml not found. Run 'fn0 init' first."))?;
+
+    let project_name = config
+        .name
+        .ok_or_else(|| eyre!("'name' field missing in fn0.toml"))?;
+
     let github_token = get_github_token().await?;
 
     println!("Starting build...");
@@ -132,13 +141,18 @@ pub async fn execute(code_id: u64, code_version: u64) -> Result<()> {
     println!("Requesting deploy start...");
     let start_resp: DeployStartResponse = client
         .post(format!("{}/deploy/start", HQ_URL))
-        .json(&serde_json::json!({ "github_token": github_token }))
+        .json(&serde_json::json!({
+            "github_token": github_token,
+            "project_name": project_name,
+        }))
         .send()
         .await?
         .error_for_status()
         .map_err(|e| eyre!("Deploy start failed: {}", e))?
         .json()
         .await?;
+
+    println!("Subdomain: {}.fn0.dev", start_resp.subdomain);
 
     println!("Uploading WASM...");
     let wasm_bytes = std::fs::read("dist/component.wasm")
@@ -158,8 +172,8 @@ pub async fn execute(code_id: u64, code_version: u64) -> Result<()> {
         .json(&serde_json::json!({
             "github_token": github_token,
             "deploy_job_id": start_resp.deploy_job_id,
-            "code_id": code_id,
-            "code_version": code_version,
+            "subdomain": start_resp.subdomain,
+            "code_id": start_resp.code_id,
         }))
         .send()
         .await?

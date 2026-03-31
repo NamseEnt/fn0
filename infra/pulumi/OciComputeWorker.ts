@@ -2,6 +2,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
+import * as docker from "@pulumi/docker";
 
 export interface OciComputeWorkerArgs {
   region: pulumi.Input<string>;
@@ -19,10 +20,22 @@ export interface OciWorkerInfraEnvs {
   OCI_AVAILABILITY_DOMAIN: pulumi.Output<string>;
 }
 
+export interface OciCwasmBucketInfo {
+  endpoint: pulumi.Output<string>;
+  region: pulumi.Output<string>;
+  bucketName: pulumi.Output<string>;
+  accessKeyId: pulumi.Output<string>;
+  secretAccessKey: pulumi.Output<string>;
+  namespace: pulumi.Output<string>;
+}
+
 export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly compartmentId: pulumi.Output<string>;
+  public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
   public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
+  public readonly workerImageUrl: pulumi.Output<string>;
+  public readonly cwasmBucket: OciCwasmBucketInfo;
 
   constructor(
     name: string,
@@ -131,17 +144,24 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         ingressSecurityRules: pulumi
           .all([args.hqIpv6CidrBlocks])
           .apply(([hqIpv6CidrBlocks]) => [
-            ...cloudflareIpv4Ranges,
-            ...clareflareIpv6Ranges,
-            ...hqIpv6CidrBlocks,
-          ])
-          .apply((rules) =>
-            rules.map((source) => ({
+            ...[...cloudflareIpv4Ranges, ...clareflareIpv6Ranges].map(
+              (source) => ({
+                protocol: "6",
+                source,
+                tcpOptions: { min: 8080, max: 8080 },
+              })
+            ),
+            ...hqIpv6CidrBlocks.map((source) => ({
               protocol: "6",
               source,
-              tcpOptions: { min: 443, max: 443 },
-            }))
-          ),
+              tcpOptions: { min: 8080, max: 8080 },
+            })),
+            ...hqIpv6CidrBlocks.map((source) => ({
+              protocol: "17",
+              source,
+              udpOptions: { min: 10000, max: 10000 },
+            })),
+          ]),
         egressSecurityRules: [
           {
             destination: "0.0.0.0/0",
@@ -265,6 +285,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       { parent: this }
     );
 
+    this.subnetId = subnet.id;
     this.instanceConfigurationId = instanceConfiguration.id;
 
     this.infraEnvs = pulumi
@@ -297,6 +318,157 @@ export class OciComputeWorker extends pulumi.ComponentResource {
           OCI_AVAILABILITY_DOMAIN: pulumi.output(availabilityDomain),
         })
       );
+
+    const workerRepo = new oci.artifacts.ContainerRepository(
+      "worker-repo",
+      {
+        compartmentId: compartment.id,
+        displayName: pulumi.interpolate`fn0-worker-${compartmentSuffix}`,
+        isPublic: true,
+      },
+      { parent: this, retainOnDelete: false }
+    );
+
+    const workerDockerUser = new oci.identity.User(
+      "worker-docker-user",
+      {
+        name: pulumi.interpolate`fn0-worker-docker-${compartmentSuffix}`,
+        description: "User for fn0-worker image push",
+      },
+      { parent: this }
+    );
+
+    const workerDockerGroup = new oci.identity.Group(
+      "worker-docker-group",
+      {
+        name: pulumi.interpolate`fn0-worker-pushers-${compartmentSuffix}`,
+        description: "Group allowed to push worker images",
+      },
+      { parent: this }
+    );
+
+    new oci.identity.UserGroupMembership(
+      "worker-docker-membership",
+      {
+        userId: workerDockerUser.id,
+        groupId: workerDockerGroup.id,
+      },
+      { parent: this }
+    );
+
+    new oci.identity.Policy(
+      "worker-ocir-push-policy",
+      {
+        compartmentId: compartment.id,
+        name: pulumi.interpolate`allow-worker-push-${compartmentSuffix}`,
+        description: "Policy to allow worker image push",
+        statements: [
+          pulumi.interpolate`Allow group ${workerDockerGroup.name} to manage repos in compartment id ${compartment.id}`,
+        ],
+      },
+      { dependsOn: [workerDockerGroup], parent: this }
+    );
+
+    const workerAuthToken = new oci.identity.AuthToken(
+      "worker-auth-token",
+      {
+        userId: workerDockerUser.id,
+        description: "AuthToken for fn0-worker image push",
+      },
+      { parent: this }
+    );
+
+    const ociConfig = new pulumi.Config("oci");
+    const registryUrl = pulumi.interpolate`ocir.${args.region}.oci.oraclecloud.com`;
+
+    const workerImage = new docker.Image(
+      "worker-image",
+      {
+        imageName: pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1`,
+        build: {
+          context: "../../fn0-worker",
+          platform: "linux/arm64",
+        },
+        registry: {
+          server: registryUrl,
+          username: pulumi.interpolate`${workerRepo.namespace}/${workerDockerUser.name}`,
+          password: workerAuthToken.token,
+        },
+      },
+      { parent: this }
+    );
+
+    this.workerImageUrl = workerImage.repoDigest;
+
+    const cwasmBucketUser = new oci.identity.User(
+      "cwasm-bucket-user",
+      {
+        name: pulumi.interpolate`fn0-cwasm-${compartmentSuffix}`,
+        description: "User for cwasm S3-compatible access",
+      },
+      { parent: this }
+    );
+
+    const cwasmBucketGroup = new oci.identity.Group(
+      "cwasm-bucket-group",
+      {
+        name: pulumi.interpolate`fn0-cwasm-group-${compartmentSuffix}`,
+        description: "Group for cwasm bucket access",
+      },
+      { parent: this }
+    );
+
+    new oci.identity.UserGroupMembership(
+      "cwasm-bucket-membership",
+      {
+        userId: cwasmBucketUser.id,
+        groupId: cwasmBucketGroup.id,
+      },
+      { parent: this }
+    );
+
+    new oci.identity.Policy(
+      "cwasm-bucket-policy",
+      {
+        compartmentId: compartment.id,
+        name: pulumi.interpolate`allow-cwasm-access-${compartmentSuffix}`,
+        description: "Policy for cwasm bucket access",
+        statements: [
+          pulumi.interpolate`Allow group ${cwasmBucketGroup.name} to manage objects in compartment id ${compartment.id}`,
+          pulumi.interpolate`Allow group ${cwasmBucketGroup.name} to manage buckets in compartment id ${compartment.id}`,
+        ],
+      },
+      { dependsOn: [cwasmBucketGroup], parent: this }
+    );
+
+    const customerSecretKey = new oci.identity.CustomerSecretKey(
+      "cwasm-s3-key",
+      {
+        userId: cwasmBucketUser.id,
+        displayName: "cwasm-s3-compatible-key",
+      },
+      { parent: this }
+    );
+
+    const ociObjectStorageBucket = new oci.objectstorage.Bucket(
+      "cwasm-bucket",
+      {
+        compartmentId: compartment.id,
+        name: pulumi.interpolate`fn0-cwasm-${compartmentSuffix}`,
+        namespace: workerRepo.namespace,
+        accessType: "NoPublicAccess",
+      },
+      { parent: this }
+    );
+
+    this.cwasmBucket = {
+      endpoint: pulumi.interpolate`https://${workerRepo.namespace}.compat.objectstorage.${args.region}.oraclecloud.com`,
+      region: pulumi.output(args.region),
+      bucketName: ociObjectStorageBucket.name,
+      accessKeyId: customerSecretKey.id,
+      secretAccessKey: customerSecretKey.key,
+      namespace: workerRepo.namespace,
+    };
   }
 }
 

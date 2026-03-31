@@ -35,8 +35,8 @@ class TursoDatabaseProvider
   async create(
     inputs: TursoDatabaseInputs
   ): Promise<pulumi.dynamic.CreateResult<TursoDatabaseOutputs>> {
-    const config = new pulumi.Config();
-    const apiKey = config.require("tursoApiToken");
+    const config = new pulumi.Config("turso");
+    const apiKey = config.require("apiToken");
 
     const response = await fetch(
       `https://api.turso.tech/v1/organizations/${inputs.organizationSlug}/databases`,
@@ -70,8 +70,8 @@ class TursoDatabaseProvider
   }
 
   async delete(id: string, outputs: TursoDatabaseInputs) {
-    const config = new pulumi.Config();
-    const apiKey = config.require("tursoApiToken");
+    const config = new pulumi.Config("turso");
+    const apiKey = config.require("apiToken");
 
     const response = await fetch(
       `https://api.turso.tech/v1/organizations/${outputs.organizationSlug}/databases/${id}`,

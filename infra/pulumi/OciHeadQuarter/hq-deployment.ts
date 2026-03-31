@@ -18,6 +18,7 @@ export function deployHqApplication(
   }
 ): {
   deployment: k8s.apps.v1.Deployment;
+  service: k8s.core.v1.Service;
 } {
   const appLabels = { app: "hq" };
 
@@ -93,8 +94,32 @@ export function deployHqApplication(
         },
       },
     },
-    { provider: k8sProvider, parent }
+    {
+      provider: k8sProvider,
+      parent,
+      customTimeouts: { create: "3m", update: "3m" },
+    }
   );
 
-  return { deployment };
+  const service = new k8s.core.v1.Service(
+    "hq-service",
+    {
+      metadata: { labels: appLabels },
+      spec: {
+        type: "LoadBalancer",
+        selector: appLabels,
+        ports: [
+          {
+            name: "http",
+            port: 8080,
+            targetPort: 8080,
+            protocol: "TCP",
+          },
+        ],
+      },
+    },
+    { provider: k8sProvider, parent, dependsOn: [deployment] }
+  );
+
+  return { deployment, service };
 }

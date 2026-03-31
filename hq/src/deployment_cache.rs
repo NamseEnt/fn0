@@ -61,7 +61,7 @@ impl DeploymentCache {
         self.cache
             .iter()
             .skip(deployment_id_start_excluded.0 as usize)
-            .map(|(_, deployment)| *deployment)
+            .map(|(_, deployment)| deployment.clone())
             .collect()
     }
 

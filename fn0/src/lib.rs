@@ -1,5 +1,5 @@
 mod deployment;
-mod execute;
+pub mod execute;
 pub mod measure_cpu_time;
 pub mod telemetry;
 
@@ -18,7 +18,9 @@ use wasmtime::Engine;
 use wasmtime_wasi_http::bindings::ProxyPre;
 
 pub use ski::{FetchHandler, FetchHandlerFuture};
+pub use wasmtime;
 
+pub type WasmProxyPre = ProxyPre<ClientState<SystemClock>>;
 pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
@@ -28,7 +30,7 @@ where
     J: AdaptCache<String, FromUtf8Error>,
 {
     js_cache: J,
-    deployment_map: DeploymentMap,
+    deployment_map: RwLock<DeploymentMap>,
     wasm_executor: WasmExecutor,
     env_vars: EnvVars,
 }
@@ -43,10 +45,14 @@ where
     {
         Self {
             js_cache,
-            deployment_map,
+            deployment_map: RwLock::new(deployment_map),
             wasm_executor: WasmExecutor::new(wasm_proxy_cache, SystemClock, env_vars.clone()),
             env_vars,
         }
+    }
+
+    pub fn register_code(&self, code_id: &str, kind: CodeKind) {
+        self.deployment_map.write().unwrap().register_code(code_id, kind);
     }
 
     pub fn update_env(&self, new_vars: Vec<(String, String)>) {
@@ -59,7 +65,11 @@ where
         request: Request,
         fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
-        let Some(code_kind) = self.deployment_map.code_kind(code_id) else {
+        let code_kind = {
+            let map = self.deployment_map.read().unwrap();
+            map.code_kind(code_id)
+        };
+        let Some(code_kind) = code_kind else {
             return Err(anyhow!("code_id not found"));
         };
         match code_kind {

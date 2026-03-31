@@ -49,7 +49,6 @@ export class AwsWasmS3 extends pulumi.ComponentResource {
       "queue",
       {
         region,
-        fifoQueue: true,
       },
       { parent: this }
     );
