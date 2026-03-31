@@ -1,8 +1,19 @@
 mod turso;
 
 use anyhow::Result;
+pub use libsql_hrana::proto::Value;
 use turso::{TursoDatabase, TursoTransaction};
 use wstd::http::body::Bytes;
+
+pub fn text_value(s: impl Into<String>) -> Value {
+    Value::Text {
+        value: s.into().into(),
+    }
+}
+
+pub fn integer_value(i: i64) -> Value {
+    Value::Integer { value: i }
+}
 
 pub enum BatchOp<'a> {
     Put {
@@ -83,6 +94,17 @@ impl Database {
             DatabaseInner::Turso(db) => Ok(Transaction {
                 inner: TransactionInner::Turso(db.transaction().await?),
             }),
+        }
+    }
+
+    pub async fn execute_raw(
+        &self,
+        sql: &str,
+        args: Vec<Value>,
+        want_rows: bool,
+    ) -> Result<Vec<Vec<Value>>> {
+        match &self.inner {
+            DatabaseInner::Turso(db) => db.execute_raw(sql, args, want_rows).await,
         }
     }
 

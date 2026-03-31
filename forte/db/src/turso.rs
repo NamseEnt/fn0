@@ -706,6 +706,67 @@ impl TursoDatabase {
         Ok(vec![])
     }
 
+    pub(crate) async fn execute_raw(
+        &self,
+        sql: &str,
+        args: Vec<Value>,
+        want_rows: bool,
+    ) -> Result<Vec<Vec<Value>>> {
+        for retry in 0..2 {
+            let response = self
+                .execute_pipeline(vec![
+                    StreamRequest::Execute(ExecuteStreamReq {
+                        stmt: Stmt {
+                            sql: Some(sql.to_string()),
+                            sql_id: None,
+                            args: args.clone(),
+                            named_args: vec![],
+                            want_rows: Some(want_rows),
+                            replication_index: None,
+                        },
+                    }),
+                    StreamRequest::Close(CloseStreamReq {}),
+                ])
+                .await?;
+
+            let mut should_retry = false;
+            for result in response.results {
+                match result {
+                    StreamResult::Ok { response } => match response {
+                        StreamResponse::Execute(exec_resp) => {
+                            if want_rows {
+                                return Ok(exec_resp
+                                    .result
+                                    .rows
+                                    .into_iter()
+                                    .map(|row| row.values)
+                                    .collect());
+                            }
+                            return Ok(vec![]);
+                        }
+                        StreamResponse::Close(_) => continue,
+                        _ => {}
+                    },
+                    StreamResult::Error { error } => {
+                        if retry == 0 && Self::is_table_not_found_error(&error.message) {
+                            self.create_table().await?;
+                            should_retry = true;
+                            break;
+                        }
+                        bail!("execute_raw error: {}", error.message);
+                    }
+                    StreamResult::None => {}
+                }
+            }
+
+            if !should_retry {
+                return Ok(vec![]);
+            }
+        }
+
+        Ok(vec![])
+    }
+
     pub(crate) async fn transaction(&self) -> Result<TursoTransaction<'_>> {
         // Ensure table exists before starting transaction
         self.ensure_table().await?;

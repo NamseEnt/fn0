@@ -188,6 +188,12 @@ async fn handle_request(
             Ok(hyper::Response::new(Full::new(Bytes::from(body))))
         }
         "/role" => Ok(hyper::Response::new(Full::new(Bytes::from("worker")))),
+        path if path.starts_with("/__forte_queue_task/") => {
+            Ok(hyper::Response::builder()
+                .status(403)
+                .body(Full::new(Bytes::from("Forbidden")))
+                .unwrap())
+        }
         _ => {
             let host = req
                 .headers()

@@ -6,7 +6,7 @@ mod tools;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AddCommands, Cli, Commands};
+use cli::{AddCommands, Cli, Commands, QueueCommands};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -40,6 +40,16 @@ async fn main() -> Result<()> {
             };
             cli::build::run(options).await?;
         }
+
+        Commands::Queue { command } => match command {
+            QueueCommands::Flush {
+                project,
+                task_name,
+            } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::queue::flush(&project_dir, task_name.as_deref()).await?;
+            }
+        },
     }
 
     Ok(())

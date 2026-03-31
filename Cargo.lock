@@ -2713,7 +2713,7 @@ dependencies = [
 
 [[package]]
 name = "forte-macros"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2722,7 +2722,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "chrono",

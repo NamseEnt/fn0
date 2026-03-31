@@ -1,6 +1,6 @@
 [package]
 name = "forte-cli"
-version = "0.3.10"
+version = "0.3.11"
 edition = "2024"
 description = "CLI for the Forte fullstack web framework"
 license = "AGPL-3.0-only"
@@ -45,6 +45,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v4"] }
+tokio-util = "0.7"
 
 
 [profile.dist]

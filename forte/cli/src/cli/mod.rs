@@ -2,6 +2,7 @@ pub mod add;
 pub mod build;
 pub mod dev;
 pub mod init;
+pub mod queue;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -44,6 +45,26 @@ pub enum Commands {
         /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
+    },
+
+    /// Queue management commands
+    Queue {
+        #[command(subcommand)]
+        command: QueueCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum QueueCommands {
+    /// Flush dead queue tasks back to pending
+    Flush {
+        /// Project directory (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+
+        /// Only flush tasks with this name
+        #[arg(short, long)]
+        task_name: Option<String>,
     },
 }
 

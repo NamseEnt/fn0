@@ -72,83 +72,43 @@ crate::enqueue::my_task(MyTaskInput { user_id, level }).await?;
 
 ## Processing Flow
 
-### Enqueue (generated code)
+### Enqueue (WASM)
 
-1. `enqueue::my_task(input)` 호출
+1. `enqueue::my_task(input)` 호출 (WASM 내부, generated code)
 2. Input을 JSON serialize
 3. `__forte_queue`에 INSERT (status=`pending`, retry_count=0)
 
-### Poll & Execute
+### Poll, Execute, Cleanup (호스트)
 
-polling 주체 (dev server / fn0-worker)가 주기적으로:
+호스트(dev server / fn0-worker)가 Turso DB에 직접 접근하여 큐를 관리한다.
+호스트는 TURSO_URL과 TURSO_AUTH_TOKEN을 이미 보유하고 있다.
 
-1. `/__forte_queue_task/poll` 내부 엔드포인트를 호출
-2. WASM handler가 `__forte_queue`에서 `pending` 태스크들을 SELECT
-3. 각 태스크의 status를 `processing`으로 UPDATE
-4. 병렬로 `handle(input)` 실행
-5. 성공 시: 해당 row DELETE
-6. 실패 시:
-   - retry_count + 1 < max_retries → status를 `pending`으로 복귀, retry_count 증가
-   - retry_count + 1 >= max_retries → `__forte_dead_queue`에 INSERT 후 `__forte_queue`에서 DELETE
+**Poll (claim):**
 
-### Security
+호스트가 Turso에 직접 쿼리:
 
-- 외부 HTTP 요청으로 `/__forte_queue_task/*` 경로 접근 시 호스트 레벨에서 차단
-- 로컬: dev server가 직접 `fn0.run()` 호출 → 외부 HTTP 경로 필터링
-- 프로덕션: fn0-worker가 외부 HTTP에서 해당 경로 요청 시 거부
-
-## Dead Queue Management
-
-### Grafana Metrics
-
-fn0-worker가 주기적으로 dead queue 크기를 측정하여 metrics로 노출한다.
-
-- metric name: `forte_dead_queue_size`
-- labels: `task_name`, `code_id`(site)
-- Grafana dashboard에 패널 추가, 0 초과 시 alert 설정
-
-### Flush
-
-dead queue의 태스크를 원래 queue로 다시 넣는 기능.
-
-- `/__forte_queue_task/flush` 내부 엔드포인트 (보안 체크 동일)
-- 또는 CLI 명령: `forte queue flush [--task-name my_task]`
-- 동작: `__forte_dead_queue`에서 SELECT → `__forte_queue`에 INSERT (status=`pending`, retry_count=0) → `__forte_dead_queue`에서 DELETE
-- task_name 필터 지원 (특정 태스크만 flush)
-
-## Code Generation
-
-`generate_routes.rs`에서 추가로 생성할 것:
-
-### 1. enqueue 모듈
-
-```rust
-// route_generated.rs 내부 (또는 별도 enqueue_generated.rs)
-pub mod enqueue {
-    pub async fn my_task(input: crate::queue_task::my_task::Input) -> anyhow::Result<()> {
-        let payload = forte_sdk::serde_json::to_string(&input)?;
-        let id = forte_sdk::Uuid::now_v7().to_string();
-        let now = forte_sdk::now().to_rfc3339();
-        // __forte_queue에 INSERT
-        forte_sdk::forte_db::turso()
-            .execute(
-                "INSERT INTO __forte_queue (id, task_name, payload, status, retry_count, max_retries, created_at, updated_at) VALUES (?, ?, ?, 'pending', 0, 3, ?, ?)",
-                &[&id, "my_task", &payload, &now, &now],
-            )
-            .await?;
-        Ok(())
-    }
-}
+```sql
+WITH target AS (
+  SELECT id FROM __forte_queue
+  WHERE status='pending'
+     OR (status='processing' AND updated_at < datetime('now', '-60 seconds'))
+  LIMIT 1
+)
+UPDATE __forte_queue SET status='processing', updated_at=?
+WHERE id IN (SELECT id FROM target) RETURNING *
 ```
 
-### 2. poll handler
+- pending 태스크와 timeout된 processing 태스크를 하나의 쿼리로 처리
+- UPDATE ... RETURNING으로 atomic claim
+- 다중 워커 환경에서 경합 안전
 
-`/__forte_queue_task/poll` 엔드포인트:
+**Execute:**
 
-1. `__forte_queue`에서 pending 태스크 N개 SELECT
-2. status를 processing으로 UPDATE
-3. task_name에 따라 match하여 적절한 handler 호출
-4. 결과에 따라 DELETE 또는 dead queue 이동
+호스트가 claim된 태스크의 task_name + payload를 WASM에 전달:
+
+- `/__forte_queue_task/execute` 내부 엔드포인트 호출
+- 태스크 1개당 별도 WASM 호출 (CPU 타임 제한 준수)
+- WASM은 task_name에 따라 handler를 match하여 실행
 
 ```rust
 match task_name.as_str() {
@@ -160,37 +120,118 @@ match task_name.as_str() {
 }
 ```
 
-### 3. flush handler
+**Cleanup:**
 
-`/__forte_queue_task/flush` 엔드포인트:
+호스트가 WASM 실행 결과에 따라 Turso에 직접 처리:
 
-- dead queue → queue 이동 로직
+- 성공: `__forte_queue`에서 해당 row DELETE
+- 실패 (retry_count + 1 < max_retries): status를 `pending`으로 복귀, retry_count 증가
+- 실패 (retry_count + 1 >= max_retries): `__forte_dead_queue`에 INSERT 후 `__forte_queue`에서 DELETE
 
-## Polling Configuration
+### Security
+
+- 외부 HTTP 요청으로 `/__forte_queue_task/*` 경로 접근 시 호스트 레벨에서 차단
+- 로컬: dev server가 외부 HTTP에서 해당 경로 요청 시 거부
+- 프로덕션: fn0-worker가 외부 HTTP에서 해당 경로 요청 시 거부
+
+## Dead Queue Management
+
+### Grafana Metrics
+
+호스트(fn0-worker)가 주기적으로 Turso에 직접 쿼리하여 dead queue 크기를 측정, OTLP를 통해 Grafana에 push한다.
+
+```sql
+SELECT task_name, COUNT(*) as count FROM __forte_dead_queue GROUP BY task_name
+```
+
+- metric name: `forte_dead_queue_size`
+- labels: `task_name`, `code_id`(site)
+- type: gauge
+- Grafana dashboard에 패널 추가, 0 초과 시 alert 설정
+- 기존 OTLP 파이프라인 활용 (추가 인프라 불필요)
+
+### Flush
+
+dead queue의 태스크를 원래 queue로 다시 넣는 기능.
+
+CLI 명령으로 제공:
+
+```
+forte queue flush [--task-name my_task]
+```
+
+- 동작: `__forte_dead_queue`에서 SELECT → `__forte_queue`에 INSERT (status=`pending`, retry_count=0) → `__forte_dead_queue`에서 DELETE
+- task_name 필터 지원 (특정 태스크만 flush)
+- 필터 없이 실행 시 모든 dead 태스크를 flush
+- 로컬: local sqld에 직접 접속하여 실행
+- 프로덕션: Turso DB에 직접 접속하여 실행 (TURSO_URL, TURSO_AUTH_TOKEN 사용)
+
+## Code Generation
+
+`generate_routes.rs`에서 추가로 생성할 것:
+
+### 1. enqueue 모듈
+
+```rust
+pub mod enqueue {
+    pub async fn my_task(input: crate::queue_task::my_task::Input) -> anyhow::Result<()> {
+        let payload = forte_sdk::serde_json::to_string(&input)?;
+        let id = forte_sdk::Uuid::now_v7().to_string();
+        let now = forte_sdk::now().to_rfc3339();
+        forte_sdk::forte_db::turso()
+            .execute(
+                "INSERT INTO __forte_queue (id, task_name, payload, status, retry_count, max_retries, created_at, updated_at) VALUES (?, ?, ?, 'pending', 0, 3, ?, ?)",
+                &[&id, "my_task", &payload, &now, &now],
+            )
+            .await?;
+        Ok(())
+    }
+}
+```
+
+### 2. execute handler
+
+`/__forte_queue_task/execute` 엔드포인트:
+
+1. 호스트로부터 task_name + payload를 받음
+2. task_name에 따라 match하여 handler 호출
+3. 결과(성공/실패)를 응답으로 반환
+
+## Polling Loop
+
+### 호스트의 역할
+
+polling loop는 호스트(dev server / fn0-worker)에서 실행:
+
+1. Turso에 직접 claim 쿼리 (UPDATE ... RETURNING)
+2. 태스크가 있으면 `/__forte_queue_task/execute` WASM 호출
+3. 결과에 따라 Turso에 직접 cleanup (DELETE / retry / dead queue)
+4. 반복
 
 ### Local (dev server)
 
 - `forte dev` 실행 시 백그라운드 tokio task로 polling loop 시작
-- 간격: 1초 (설정 가능)
-- `fn0.run("backend", "", poll_request, None)` 호출
+- 간격: 1초
+- Turso 접속: `http://127.0.0.1:8080` (local sqld)
 
 ### Production (fn0-worker)
 
 - fn0-worker에 polling loop 추가
-- 간격: 1초 (설정 가능)
-- 등록된 code(site) 각각에 대해 poll 요청 실행
+- 간격: 1초
+- 등록된 code(site) 각각에 대해 poll 실행
+- 다중 워커가 동시에 poll해도 UPDATE ... RETURNING으로 경합 안전
 
 ## Table Initialization
 
-- `/__forte_queue_task/init` 내부 엔드포인트 또는
-- enqueue/poll 시 테이블이 없으면 자동 CREATE TABLE
-- CREATE TABLE IF NOT EXISTS 사용
+- 호스트가 polling loop 시작 시 CREATE TABLE IF NOT EXISTS 실행
+- Turso에 직접 DDL 실행
+- 별도 migration 불필요
 
 ## Implementation Order
 
 1. DB schema (queue table, dead queue table, CREATE TABLE IF NOT EXISTS)
-2. Code generation: queue_task 스캔, enqueue 모듈 생성, poll/flush handler 생성
+2. Code generation: queue_task 스캔, enqueue 모듈 생성, execute handler 생성
 3. Security: 호스트 레벨 경로 차단 (dev server, fn0-worker)
-4. Polling loop: dev server, fn0-worker에 추가
-5. Dead queue flush: 엔드포인트 또는 CLI
-6. Grafana metrics: dead queue size 노출 및 dashboard/alert 설정
+4. Polling loop + cleanup: dev server, fn0-worker에 추가 (Turso 직접 접근)
+5. Dead queue flush: CLI 명령 (`forte queue flush`)
+6. Grafana metrics: OTLP를 통한 dead queue size 노출 및 dashboard/alert 설정
