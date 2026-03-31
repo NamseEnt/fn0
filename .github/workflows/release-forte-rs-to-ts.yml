@@ -70,6 +70,12 @@ jobs:
             cp "${SYSROOT}/lib/libLLVM"*.so* "${ARCHIVE_DIR}/lib/" 2>/dev/null || true
           fi
 
+          # Bundle self-contained linker tools
+          HOST_BIN="${SYSROOT}/lib/rustlib/${TARGET}/bin"
+          if [ -d "${HOST_BIN}" ]; then
+            cp -r "${HOST_BIN}" "${ARCHIVE_DIR}/lib/rustlib/${TARGET}/"
+          fi
+
           HOST_LIB="${SYSROOT}/lib/rustlib/${TARGET}/lib"
           DEST_HOST="${ARCHIVE_DIR}/lib/rustlib/${TARGET}/lib"
           for f in "${HOST_LIB}"/*.rlib; do
