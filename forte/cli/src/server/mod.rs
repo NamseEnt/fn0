@@ -141,6 +141,17 @@ async fn handle_request(
     let path = uri.path();
     let path_with_query = uri.path_and_query().map(|pq| pq.as_str()).unwrap_or(path);
 
+    if path.starts_with("/__forte_queue_task/") {
+        return Ok(Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body(
+                Full::new(bytes::Bytes::from("Forbidden"))
+                    .map_err(|e| anyhow::anyhow!("{e}"))
+                    .boxed_unsync(),
+            )
+            .unwrap());
+    }
+
     if should_proxy_to_vite(path) {
         if let Some(socket_path) = &vite_socket_path {
             return proxy_to_vite_uds(socket_path, path_with_query).await;

@@ -7,17 +7,20 @@ pub fn generate_routes() {
     let pages_dir = Path::new(&manifest_dir).join("src/pages");
     let hooks_dir = Path::new(&manifest_dir).join("src/hooks");
     let actions_dir = Path::new(&manifest_dir).join("src/actions");
+    let queue_task_dir = Path::new(&manifest_dir).join("src/queue_task");
     let output_path = Path::new(&manifest_dir).join("src/route_generated.rs");
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
     println!("cargo:rerun-if-changed=src/pages");
     println!("cargo:rerun-if-changed=src/hooks");
     println!("cargo:rerun-if-changed=src/actions");
+    println!("cargo:rerun-if-changed=src/queue_task");
 
     let pages = discover_pages(&pages_dir);
     let hooks = discover_hooks(&hooks_dir);
     let actions = discover_actions(&actions_dir);
-    let tokens = generate_code(&pages, &hooks, &actions);
+    let queue_tasks = discover_queue_tasks(&queue_task_dir);
+    let tokens = generate_code(&pages, &hooks, &actions, &queue_tasks);
 
     let syntax_tree = syn::parse2::<syn::File>(tokens).expect("Failed to parse generated code");
     let formatted = prettyplease::unparse(&syntax_tree);
@@ -32,6 +35,15 @@ pub fn generate_routes() {
     let current_fe_paths = fs::read_to_string(&fe_paths_output).unwrap_or_default();
     if current_fe_paths != fe_paths_content {
         fs::write(&fe_paths_output, fe_paths_content).unwrap();
+    }
+
+    if !queue_tasks.is_empty() {
+        let queue_task_mod_path = Path::new(&manifest_dir).join("src/queue_task/mod.rs");
+        let queue_task_mod_content = generate_queue_task_mod(&queue_tasks);
+        let current_qt_mod = fs::read_to_string(&queue_task_mod_path).unwrap_or_default();
+        if current_qt_mod != queue_task_mod_content {
+            fs::write(&queue_task_mod_path, queue_task_mod_content).unwrap();
+        }
     }
 }
 
@@ -77,6 +89,11 @@ struct ActionInfo {
     name: String,
     module_name: String,
     module_path: String,
+}
+
+#[derive(Debug)]
+struct QueueTaskInfo {
+    name: String,
 }
 
 fn discover_hooks(hooks_dir: &Path) -> Vec<HookInfo> {
@@ -234,6 +251,73 @@ fn has_action_handler(content: &str) -> bool {
     }
 
     has_input && has_output && has_handler
+}
+
+fn discover_queue_tasks(queue_task_dir: &Path) -> Vec<QueueTaskInfo> {
+    let mut queue_tasks = Vec::new();
+
+    if !queue_task_dir.exists() {
+        return queue_tasks;
+    }
+
+    let Ok(entries) = fs::read_dir(queue_task_dir) else {
+        return queue_tasks;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_file() && path.extension().map(|e| e == "rs").unwrap_or(false) {
+            let file_name = path.file_stem().unwrap().to_string_lossy().to_string();
+
+            if file_name == "mod" {
+                continue;
+            }
+
+            let Some(content) = fs::read_to_string(&path).ok() else {
+                continue;
+            };
+
+            if has_queue_task_handler(&content) {
+                queue_tasks.push(QueueTaskInfo {
+                    name: file_name,
+                });
+            }
+        }
+    }
+
+    queue_tasks
+}
+
+fn has_queue_task_handler(content: &str) -> bool {
+    let Ok(syntax_tree) = syn::parse_file(content) else {
+        return false;
+    };
+
+    let mut has_input = false;
+    let mut has_handle = false;
+
+    for item in syntax_tree.items {
+        match item {
+            syn::Item::Struct(item_struct) => {
+                if item_struct.ident == "Input" {
+                    has_input = true;
+                }
+            }
+            syn::Item::Fn(func) => {
+                let is_pub = matches!(func.vis, syn::Visibility::Public(_));
+                let is_async = func.sig.asyncness.is_some();
+                let is_handle_fn = func.sig.ident == "handle";
+
+                if is_pub && is_async && is_handle_fn {
+                    has_handle = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    has_input && has_handle
 }
 
 enum HandlerType {
@@ -480,7 +564,12 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
     }
 }
 
-fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo]) -> TokenStream {
+fn generate_code(
+    pages: &[PageInfo],
+    hooks: &[HookInfo],
+    actions: &[ActionInfo],
+    queue_tasks: &[QueueTaskInfo],
+) -> TokenStream {
     let module_declarations = generate_module_declarations(pages);
     let hook_module_declarations = generate_hook_module_declarations(hooks);
     let action_module_declarations = generate_action_module_declarations(actions);
@@ -488,6 +577,8 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
     let redirect_enum = generate_redirect_enum(pages);
     let hook_handler = generate_hook_handler(hooks);
     let action_handler = generate_action_handler(actions);
+    let enqueue_module = generate_enqueue_module(queue_tasks);
+    let queue_task_execute_handler = generate_queue_task_execute_handler(queue_tasks);
 
     let route_chain = if route_matches.is_empty() {
         quote! {
@@ -534,6 +625,8 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
 
         #redirect_enum
 
+        #enqueue_module
+
         #[forte_sdk::wstd::http_server]
         pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
             let (parts, body) = request.into_parts();
@@ -557,12 +650,18 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
                 return handle_action(action_name, uri_authority, &headers, &mut cookie_jar, body).await;
             }
 
+            if path == "/__forte_queue_task/execute" {
+                return handle_queue_task_execute(body).await;
+            }
+
             #route_chain
         }
 
         #hook_handler
 
         #action_handler
+
+        #queue_task_execute_handler
 
         fn make_cookie_jar(headers: &HeaderMap) -> cookie::CookieJar {
             let mut jar = cookie::CookieJar::new();
@@ -1163,6 +1262,126 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
             }
         }
     }
+}
+
+fn generate_enqueue_module(queue_tasks: &[QueueTaskInfo]) -> TokenStream {
+    if queue_tasks.is_empty() {
+        return quote! {};
+    }
+
+    let enqueue_fns: Vec<TokenStream> = queue_tasks
+        .iter()
+        .map(|qt| {
+            let fn_name = format_ident!("{}", qt.name);
+            let task_name_str = &qt.name;
+            let module_path: Vec<_> = vec![format_ident!("queue_task"), format_ident!("{}", qt.name)];
+
+            quote! {
+                pub async fn #fn_name(input: crate::#(#module_path)::*::Input) -> forte_sdk::anyhow::Result<()> {
+                    let payload = forte_sdk::serde_json::to_string(&input)?;
+                    let id = forte_sdk::Uuid::now_v7().to_string();
+                    let now = forte_sdk::now().to_rfc3339();
+                    forte_sdk::forte_db::turso()
+                        .execute_raw(
+                            "INSERT INTO __forte_queue (id, task_name, payload, status, retry_count, max_retries, created_at, updated_at) VALUES (?, ?, ?, 'pending', 0, 3, ?, ?)",
+                            vec![
+                                forte_sdk::forte_db::text_value(&id),
+                                forte_sdk::forte_db::text_value(#task_name_str),
+                                forte_sdk::forte_db::text_value(&payload),
+                                forte_sdk::forte_db::text_value(&now),
+                                forte_sdk::forte_db::text_value(&now),
+                            ],
+                            false,
+                        )
+                        .await?;
+                    Ok(())
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        pub mod enqueue {
+            #(#enqueue_fns)*
+        }
+    }
+}
+
+fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenStream {
+    if queue_tasks.is_empty() {
+        return quote! {
+            async fn handle_queue_task_execute(
+                _body: Body,
+            ) -> Result<Response<Body>, Error> {
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from("No queue tasks defined"))
+                    .unwrap())
+            }
+        };
+    }
+
+    let task_matches: Vec<TokenStream> = queue_tasks
+        .iter()
+        .map(|qt| {
+            let name = &qt.name;
+            let module_path: Vec<_> = vec![format_ident!("queue_task"), format_ident!("{}", qt.name)];
+
+            quote! {
+                #name => {
+                    let input: crate::#(#module_path)::*::Input = forte_sdk::serde_json::from_str(&payload)
+                        .map_err(|e| Error::msg(e.to_string()))?;
+                    crate::#(#module_path)::*::handle(input).await
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        async fn handle_queue_task_execute(
+            mut body: Body,
+        ) -> Result<Response<Body>, Error> {
+            let body_bytes = body.contents().await?;
+            let request: forte_sdk::serde_json::Value = forte_sdk::serde_json::from_slice(&body_bytes)
+                .map_err(|e| Error::msg(e.to_string()))?;
+            let task_name = request["task_name"]
+                .as_str()
+                .ok_or_else(|| Error::msg("missing task_name"))?;
+            let payload = request["payload"]
+                .as_str()
+                .ok_or_else(|| Error::msg("missing payload"))?;
+
+            let result = match task_name {
+                #(#task_matches)*
+                _ => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Body::from(format!("Queue task '{}' not found", task_name)))
+                        .unwrap());
+                }
+            };
+
+            match result {
+                Ok(()) => Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .body(Body::empty())
+                    .unwrap()),
+                Err(e) => Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::from(format!("{:?}", e)))
+                    .unwrap()),
+            }
+        }
+    }
+}
+
+fn generate_queue_task_mod(queue_tasks: &[QueueTaskInfo]) -> String {
+    let mut content = String::new();
+    content.push_str("// Auto-generated by forte build\n\n");
+    for qt in queue_tasks {
+        content.push_str(&format!("pub mod {};\n", qt.name));
+    }
+    content
 }
 
 fn generate_fe_paths(pages: &[PageInfo]) -> String {

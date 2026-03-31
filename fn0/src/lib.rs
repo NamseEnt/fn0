@@ -1,7 +1,9 @@
 mod deployment;
 pub mod execute;
 pub mod measure_cpu_time;
+pub mod queue_poller;
 pub mod telemetry;
+pub mod turso_queue;
 
 use adapt_cache::AdaptCache;
 use anyhow::*;

@@ -1,5 +1,6 @@
 use crate::server::{self, ServerConfig, ServerHandle, vite_dev};
 use anyhow::{Context, Result};
+use http_body_util::BodyExt;
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
 use std::collections::HashMap;
 use std::fs;
@@ -309,8 +310,54 @@ pub async fn run(options: DevOptions) -> Result<()> {
 
     let handle = server::run(config).await?;
 
+    let shutdown_token = tokio_util::sync::CancellationToken::new();
+    let _poller_handle = {
+        let fn0 = handle.fn0.clone();
+        let turso_url = format!("http://127.0.0.1:{}", sqld_port);
+        let shutdown = shutdown_token.clone();
+        tokio::spawn(async move {
+            let poller = fn0::queue_poller::QueuePoller::new(&turso_url, "");
+            poller
+                .run(
+                    |task_name, payload| {
+                        let fn0 = fn0.clone();
+                        Box::pin(async move {
+                            let body =
+                                serde_json::json!({"task_name": task_name, "payload": payload});
+                            let body_bytes = serde_json::to_vec(&body)?;
+
+                            let request = hyper::Request::builder()
+                                .method("POST")
+                                .uri("http://localhost/__forte_queue_task/execute")
+                                .header("content-type", "application/json")
+                                .body(
+                                    http_body_util::Full::new(bytes::Bytes::from(body_bytes))
+                                        .map_err(|e| anyhow::anyhow!("{e}"))
+                                        .boxed_unsync(),
+                                )?;
+
+                            let response = fn0.run("backend", "", request, None).await?;
+                            if response.status().is_success() {
+                                Ok(())
+                            } else {
+                                let (_, body) = response.into_parts();
+                                let body_bytes =
+                                    http_body_util::BodyExt::collect(body).await?.to_bytes();
+                                let error_msg = String::from_utf8_lossy(&body_bytes);
+                                Err(anyhow::anyhow!("Task failed: {}", error_msg))
+                            }
+                        })
+                    },
+                    shutdown,
+                )
+                .await;
+        })
+    };
+
     let mut vite = vite;
     let result = run_watch_loop(&project_dir, handle).await;
+
+    shutdown_token.cancel();
 
     let _ = vite.child.kill();
     _sqld.kill();
