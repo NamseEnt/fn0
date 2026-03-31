@@ -45,6 +45,8 @@ export function deployHqApplication(
             labels: appLabels,
           },
           spec: {
+            hostNetwork: true,
+            dnsPolicy: "ClusterFirstWithHostNet",
             containers: [
               {
                 name: appLabels.app,
