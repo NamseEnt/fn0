@@ -250,7 +250,7 @@ fn generate_routes() {
     output.push_str("    let Ok(cookie_str) = cookie.to_str() else {\n");
     output.push_str("        return jar;\n");
     output.push_str("    };\n\n");
-    output.push_str("    for cookie in cookie::Cookie::split_parse_encoded(cookie_str) {\n");
+    output.push_str("    for cookie in cookie::Cookie::split_parse(cookie_str) {\n");
     output.push_str("        let Ok(cookie) = cookie else { continue };\n");
     output.push_str("        jar.add_original(cookie.into_owned());\n");
     output.push_str("    }\n\n");
