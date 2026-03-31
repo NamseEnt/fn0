@@ -70,6 +70,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.ident;
     let vis = &input.vis;
     let get_name = format_ident!("{}Get", name);
+    let put_name = format_ident!("{}Put", name);
     let query_name = format_ident!("{}Query", name);
     let delete_name = format_ident!("{}Delete", name);
 
@@ -234,7 +235,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             .zip(pk_field_types.iter())
             .map(|(n, ty)| {
                 let field_name = n.as_ref().unwrap();
-                wrap_expr(ty, quote! { self.#field_name })
+                wrap_expr(ty, quote! { self.0.#field_name })
             })
             .collect();
         quote! { format!(#pk_format_string, #(#pk_format_args),*) }
@@ -245,7 +246,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .zip(sk_field_types.iter())
         .map(|(n, ty)| {
             let field_name = n.as_ref().unwrap();
-            wrap_expr(ty, quote! { self.#field_name })
+            wrap_expr(ty, quote! { self.0.#field_name })
         })
         .collect();
 
@@ -264,32 +265,23 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #(#clean_fields,)*
         }
 
-        impl #name {
-            pub async fn put(&self) -> anyhow::Result<()> {
-                let pk = #put_pk_str;
-                let sk = format!(#sk_format_string, #(#put_sk_format_args),*);
-                forte_db::turso()
-                    .put(&pk, &sk, &serde_json::to_vec(self)?)
-                    .await
-            }
+        #vis struct #put_name(pub #name);
 
-            pub async fn delete(&self) -> anyhow::Result<()> {
+        impl forte_db::DbRequest for #put_name {
+            type Output = ();
+            fn prepare(self) -> forte_db::Prepared<Self::Output> {
                 let pk = #put_pk_str;
                 let sk = format!(#sk_format_string, #(#put_sk_format_args),*);
-                forte_db::turso()
-                    .delete(&pk, &sk)
-                    .await
-            }
-
-            pub async fn query_next(&self, limit: usize) -> anyhow::Result<Vec<Self>> {
-                let pk = #put_pk_str;
-                let sk = format!(#sk_format_string, #(#put_sk_format_args),*);
-                Ok(forte_db::turso()
-                    .query(&pk, Some(&sk), limit)
-                    .await?
-                    .into_iter()
-                    .map(|(_sk, data)| serde_json::from_slice(&data))
-                    .collect::<Result<Vec<_>, _>>()?)
+                let data = serde_json::to_vec(&self.0).expect("failed to serialize");
+                forte_db::Prepared {
+                    ops: vec![forte_db::DbOp::Put { pk, sk, data }],
+                    parse: Box::new(|iter| {
+                        match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
+                            forte_db::DbResult::Done => Ok(()),
+                            _ => anyhow::bail!("unexpected result type"),
+                        }
+                    }),
+                }
             }
         }
 
