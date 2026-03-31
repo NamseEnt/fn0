@@ -573,7 +573,7 @@ fn generate_code(pages: &[PageInfo], hooks: &[HookInfo], actions: &[ActionInfo])
                 return jar;
             };
 
-            for cookie in cookie::Cookie::split_parse_encoded(cookie_str) {
+            for cookie in cookie::Cookie::split_parse(cookie_str) {
                 let Ok(cookie) = cookie else { continue };
                 jar.add_original(cookie.into_owned());
             }
