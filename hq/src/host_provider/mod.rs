@@ -1,13 +1,14 @@
+pub mod dedicated;
 pub mod oci_compute_vm;
 pub mod oci_container;
 
 use crate::*;
-use std::net::IpAddr;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Host {
     pub id: HostId,
-    pub ip: IpAddr,
+    pub addr: String,
+    pub port: u16,
 }
 
 pub trait HostProvide: Send + Sync {
@@ -21,6 +22,7 @@ pub trait HostProvide: Send + Sync {
 pub enum HostProvider {
     OciContainerInstance(oci_container::OciContainerInstanceHostProvider),
     OciComputeVm(oci_compute_vm::OciComputeVmHostProvider),
+    Dedicated(dedicated::DedicatedHostProvider),
 }
 
 impl HostProvide for HostProvider {
@@ -28,6 +30,7 @@ impl HostProvide for HostProvider {
         match self {
             HostProvider::OciContainerInstance(p) => p.list_hosts().await,
             HostProvider::OciComputeVm(p) => p.list_hosts().await,
+            HostProvider::Dedicated(p) => p.list_hosts().await,
         }
     }
 
@@ -35,6 +38,7 @@ impl HostProvide for HostProvider {
         match self {
             HostProvider::OciContainerInstance(p) => p.terminate(host_id).await,
             HostProvider::OciComputeVm(p) => p.terminate(host_id).await,
+            HostProvider::Dedicated(p) => p.terminate(host_id).await,
         }
     }
 
@@ -42,6 +46,7 @@ impl HostProvide for HostProvider {
         match self {
             HostProvider::OciContainerInstance(p) => p.launch_instance().await,
             HostProvider::OciComputeVm(p) => p.launch_instance().await,
+            HostProvider::Dedicated(p) => p.launch_instance().await,
         }
     }
 }

@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, num::NonZeroUsize};
 pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
     pub doc_db: DocDbArgs,
-    pub cert: String,
+    pub ca_cert_pem: String,
     pub aws: AwsArgs,
     pub github_client_id: String,
 }
@@ -33,6 +33,7 @@ pub struct SiteArgs {
 pub enum HostProviderArg {
     OciContainerInstance(OciContainerInstanceHostProviderArgs),
     OciComputeVm(OciComputeVmHostProviderArgs),
+    Dedicated(DedicatedHostProviderArgs),
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -77,6 +78,15 @@ pub struct OciComputeVmHostProviderArgs {
     pub subnet_id: String,
     pub image_id: String,
     pub worker_image_url: String,
+    pub envs: BTreeMap<String, String>,
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DedicatedHostProviderArgs {
+    pub ssh_user: String,
+    pub ssh_private_key_base64: String,
+    pub worker_image: String,
     pub envs: BTreeMap<String, String>,
 }
 

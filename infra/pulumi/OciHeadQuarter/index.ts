@@ -98,7 +98,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           url: docDbUrl,
           token: docDbToken,
         },
-        cert: certificate,
+        caCertPem: certificate,
         aws: {
           region: args.awsRegion,
           wasmBucket: args.wasmBucket,

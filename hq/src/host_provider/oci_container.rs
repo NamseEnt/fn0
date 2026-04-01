@@ -6,7 +6,8 @@ use oci_rust_sdk::container_instances::*;
 use oci_rust_sdk::core::{Retrier, region::Region};
 use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroUsize;
-use std::{net::IpAddr, str::FromStr, sync::Arc};
+use std::str::FromStr;
+use std::sync::Arc;
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
@@ -85,9 +86,8 @@ impl HostProvide for OciContainerInstanceHostProvider {
                 .await?;
 
             response.items.into_iter().for_each(|instance| {
-                let Some(ip) = instance.freeform_tags.as_ref().and_then(|tags| {
-                    let ip_str = tags.get("public_ip")?;
-                    IpAddr::from_str(ip_str).ok()
+                let Some(ip_str) = instance.freeform_tags.as_ref().and_then(|tags| {
+                    tags.get("public_ip").cloned()
                 }) else {
                     error!("Failed to get public ip, id: {}", instance.id);
                     return;
@@ -95,7 +95,8 @@ impl HostProvide for OciContainerInstanceHostProvider {
 
                 let host = Host {
                     id: HostId::new(instance.id),
-                    ip,
+                    addr: ip_str,
+                    port: 10000,
                 };
                 hosts.push(host);
             });

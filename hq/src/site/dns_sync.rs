@@ -1,6 +1,7 @@
 use super::*;
 use crate::{dns::DnsProvide, telemetry, *};
-use std::{collections::BTreeSet, time::Duration};
+use std::collections::BTreeSet;
+use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 
 impl Site {
@@ -12,15 +13,15 @@ impl Site {
         loop {
             interval.tick().await;
 
-            let ips = self
+            let addrs = self
                 .host_connections
                 .iter()
-                .map(|conn| conn.key().ip)
+                .map(|conn| conn.key().addr.clone())
                 .collect::<BTreeSet<_>>();
 
-            telemetry::dns_healthy_ips(ips.len());
+            telemetry::dns_healthy_ips(addrs.len());
 
-            match self.dns_provider.sync_ips(ips).await {
+            match self.dns_provider.sync_addrs(addrs).await {
                 Ok(_) => {
                     telemetry::dns_sync_status(true);
                 }
