@@ -1336,7 +1336,7 @@ checksum = "3a3076410a55c90011c298b04d0cfa770b00fa04e1e3c97d3f6c9de105a03844"
 
 [[package]]
 name = "fn0-host-hq-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bytes",
  "postcard",
@@ -2526,6 +2526,8 @@ dependencies = [
 [[package]]
 name = "oci-rust-sdk"
 version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b65b368cc17047c5ef43e8f817b151c94fd323271f6fc55359ff76c965b1b05c"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
