@@ -8,7 +8,7 @@ use crate::{
     args::*,
     deployment_cache::DeploymentCache,
     dns::{DnsProvider, cloudflare::CloudflareDnsProvider},
-    host_provider::{HostProvider, oci_container::OciContainerInstanceHostProvider},
+    host_provider::{self, HostProvider, oci_container::OciContainerInstanceHostProvider},
     site::Site,
 };
 
@@ -69,6 +69,13 @@ impl HqArgs {
                             args.memory_in_gbs,
                             HostProvider::OciContainerInstance(
                                 OciContainerInstanceHostProvider::new(args),
+                            ),
+                        ),
+                        HostProviderArg::OciComputeVm(args) => (
+                            args.physics_cpu_cores,
+                            args.memory_in_gbs,
+                            HostProvider::OciComputeVm(
+                                host_provider::oci_compute_vm::OciComputeVmHostProvider::new(args),
                             ),
                         ),
                     };

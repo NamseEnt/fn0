@@ -1,12 +1,9 @@
 use super::*;
 use crate::args::OciContainerInstanceHostProviderArgs;
 use base64::Engine;
+use oci_rust_sdk::auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 use oci_rust_sdk::container_instances::*;
-use oci_rust_sdk::core::{
-    RetryConfig,
-    auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields},
-    region::Region,
-};
+use oci_rust_sdk::core::{Retrier, region::Region};
 use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroUsize;
 use std::{net::IpAddr, str::FromStr, sync::Arc};
@@ -15,7 +12,7 @@ const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
 #[derive(Clone)]
 pub struct OciContainerInstanceHostProvider {
-    container_instance_client: Arc<dyn oci_rust_sdk::container_instances::ContainerInstance>,
+    container_instance_client: Arc<ContainerinstancesClient>,
     compartment_id: String,
     availability_domain: String,
     shape: String,
@@ -45,14 +42,15 @@ impl OciContainerInstanceHostProvider {
         .region(region)
         .build();
 
-        let container_instance_client =
-            oci_rust_sdk::container_instances::client(oci_rust_sdk::core::ClientConfig {
-                auth_provider,
+        let container_instance_client = Arc::new(
+            oci_rust_sdk::container_instances::client(ClientConfig {
+                auth_provider: Arc::new(auth_provider),
                 region,
                 timeout: DEFAULT_TIMEOUT,
-                retry: RetryConfig::no_retry(),
+                retry: Retrier::new(),
             })
-            .unwrap();
+            .unwrap(),
+        );
 
         Self {
             container_instance_client,
@@ -77,13 +75,12 @@ impl HostProvide for OciContainerInstanceHostProvider {
             let response = self
                 .container_instance_client
                 .list_container_instances(
-                    ListContainerInstancesRequest::builder(
-                        ListContainerInstancesRequestRequiredFields {
+                    ListContainerInstancesRequest::new(
+                        ListContainerInstancesRequestRequired {
                             compartment_id: self.compartment_id.clone(),
                         },
                     )
-                    .set_page(page)
-                    .build(),
+                    .set_page(page),
                 )
                 .await?;
 
@@ -116,12 +113,11 @@ impl HostProvide for OciContainerInstanceHostProvider {
     async fn terminate(&self, host_id: &HostId) -> color_eyre::Result<()> {
         self.container_instance_client
             .delete_container_instance(
-                DeleteContainerInstanceRequest::builder(
-                    DeleteContainerInstanceRequestRequiredFields {
+                DeleteContainerInstanceRequest::new(
+                    DeleteContainerInstanceRequestRequired {
                         container_instance_id: host_id.to_string(),
                     },
-                )
-                .build(),
+                ),
             )
             .await?;
         Ok(())
@@ -134,49 +130,39 @@ impl HostProvide for OciContainerInstanceHostProvider {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
-        let create_container_instance_details = CreateContainerInstanceDetails {
-            compartment_id: self.compartment_id.clone(),
-            availability_domain: self.availability_domain.clone(),
-            shape: self.shape.clone(),
-            shape_config: CreateContainerInstanceShapeConfigDetails {
-                ocpus: self.ocpus.get() as f32,
-                memory_in_gbs: self.memory_in_gbs.get() as f32,
+        let create_container_instance_details = CreateContainerInstanceDetails::new(
+            CreateContainerInstanceDetailsRequired {
+                compartment_id: self.compartment_id.clone(),
+                availability_domain: self.availability_domain.clone(),
+                shape: self.shape.clone(),
+                shape_config: CreateContainerInstanceShapeConfigDetails::new(
+                    CreateContainerInstanceShapeConfigDetailsRequired {
+                        ocpus: self.ocpus.get() as i64,
+                    },
+                )
+                .with_memory_in_gbs(self.memory_in_gbs.get() as i64),
+                containers: vec![CreateContainerDetails::new(CreateContainerDetailsRequired {
+                    image_url: self.image.clone(),
+                })
+                .with_display_name("fn0-host")
+                .set_environment_variables(Some(environment_variables))],
+                vnics: vec![CreateContainerVnicDetails::new(
+                    CreateContainerVnicDetailsRequired {
+                        subnet_id: self.subnet_id.clone(),
+                    },
+                )
+                .with_is_public_ip_assigned(true)],
             },
-            containers: vec![CreateContainerDetails {
-                image_url: self.image.clone(),
-                display_name: Some("fn0-host".to_string()),
-                command: None,
-                arguments: None,
-                environment_variables: Some(environment_variables),
-                resource_config: None,
-            }],
-            vnics: vec![CreateContainerVnicDetails {
-                subnet_id: self.subnet_id.clone(),
-                display_name: None,
-                hostname_label: None,
-                is_public_ip_assigned: Some(true),
-                skip_source_dest_check: None,
-                nsg_ids: None,
-                private_ip: None,
-                freeform_tags: None,
-                defined_tags: None,
-            }],
-            display_name: None,
-            fault_domain: None,
-            graceful_shutdown_timeout_in_seconds: None,
-            container_restart_policy: Some("ALWAYS".to_string()),
-            freeform_tags: None,
-            defined_tags: None,
-        };
+        )
+        .with_container_restart_policy("ALWAYS");
 
         self.container_instance_client
             .create_container_instance(
-                CreateContainerInstanceRequest::builder(
-                    CreateContainerInstanceRequestRequiredFields {
+                CreateContainerInstanceRequest::new(
+                    CreateContainerInstanceRequestRequired {
                         create_container_instance_details,
                     },
-                )
-                .build(),
+                ),
             )
             .await?;
 

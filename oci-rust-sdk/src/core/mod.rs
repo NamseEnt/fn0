@@ -124,6 +124,83 @@ impl CoreClient {
         })
     }
 
+    pub async fn terminate_instance(
+        &self,
+        request: TerminateInstanceRequest,
+    ) -> Result<TerminateInstanceResponse> {
+        let mut query_params = Vec::new();
+        if let Some(preserve_boot_volume) = request.preserve_boot_volume {
+            query_params.push(("preserveBootVolume".to_string(), preserve_boot_volume.to_string()));
+        }
+
+        let query_string = if query_params.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "?{}",
+                query_params
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", urlencoding::encode(k), urlencoding::encode(v)))
+                    .collect::<Vec<_>>()
+                    .join("&")
+            )
+        };
+
+        let path = format!("/20160918/instances/{}{}", request.instance_id, query_string);
+        let response: client::http_client::OciResponse<serde_json::Value> =
+            self.client.delete(&path).await?;
+
+        Ok(TerminateInstanceResponse {
+            opc_request_id: response.get_header("opc-request-id").unwrap_or_default(),
+        })
+    }
+
+    pub async fn list_vnic_attachments(
+        &self,
+        request: ListVnicAttachmentsRequest,
+    ) -> Result<ListVnicAttachmentsResponse> {
+        let mut query_params = vec![("compartmentId".to_string(), request.compartment_id.clone())];
+
+        if let Some(instance_id) = &request.instance_id {
+            query_params.push(("instanceId".to_string(), instance_id.clone()));
+        }
+        if let Some(limit) = request.limit {
+            query_params.push(("limit".to_string(), limit.to_string()));
+        }
+        if let Some(page) = &request.page {
+            query_params.push(("page".to_string(), page.clone()));
+        }
+
+        let query_string = format!(
+            "?{}",
+            query_params
+                .iter()
+                .map(|(k, v)| format!("{}={}", urlencoding::encode(k), urlencoding::encode(v)))
+                .collect::<Vec<_>>()
+                .join("&")
+        );
+
+        let path = format!("/20160918/vnicAttachments{}", query_string);
+        let response = self.client.get(&path).await?;
+
+        Ok(ListVnicAttachmentsResponse {
+            opc_next_page: response.get_header("opc-next-page").unwrap_or_default(),
+            opc_request_id: response.get_header("opc-request-id").unwrap_or_default(),
+            items: response.body,
+        })
+    }
+
+    pub async fn get_vnic(&self, request: GetVnicRequest) -> Result<GetVnicResponse> {
+        let path = format!("/20160918/vnics/{}", request.vnic_id);
+        let response = self.client.get(&path).await?;
+
+        Ok(GetVnicResponse {
+            etag: response.get_header("etag").unwrap_or_default(),
+            opc_request_id: response.get_header("opc-request-id").unwrap_or_default(),
+            vnic: response.body,
+        })
+    }
+
     /// List public IPs in a scope
     pub async fn list_public_ips(
         &self,

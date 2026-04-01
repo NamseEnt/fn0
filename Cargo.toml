@@ -14,6 +14,7 @@ exclude = [
     "host-hq-protocol",
     "measure-cpu-time",
     "adapt-cache",
+    "oci-rust-sdk",
 ]
 
 [workspace.dependencies]

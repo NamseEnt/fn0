@@ -103,7 +103,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   sites: [
     {
       hostProvider: {
-        ociContainerInstance: {
+        ociComputeVm: {
           privateKeyBase64: ociComputeWorker.infraEnvs.OCI_PRIVATE_KEY_BASE64,
           userId: ociComputeWorker.infraEnvs.OCI_USER_ID,
           fingerprint: ociComputeWorker.infraEnvs.OCI_FINGERPRINT,
@@ -111,12 +111,13 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
           region: config.require("ociComputeWorkerRegion"),
           compartmentId: ociComputeWorker.compartmentId,
           availabilityDomain: ociComputeWorker.infraEnvs.OCI_AVAILABILITY_DOMAIN,
-          shape: "CI.Standard.A1.Flex",
+          shape: "VM.Standard.A1.Flex",
           ocpus: 1,
           physicsCpuCores: 1,
           memoryInGbs: 6,
           subnetId: ociComputeWorker.subnetId,
-          image: ociComputeWorker.workerImageUrl,
+          imageId: ociComputeWorker.osImageId,
+          workerImageUrl: ociComputeWorker.workerImageUrl,
           envs: {
             CWASM_BUCKET: ociComputeWorker.cwasmBucket.bucketName,
             S3_ENDPOINT: ociComputeWorker.cwasmBucket.endpoint,
