@@ -85,3 +85,4 @@ required-features = ["containerinstances"]
 [[example]]
 name = "simple_container_instance"
 required-features = ["containerinstances"]
+
