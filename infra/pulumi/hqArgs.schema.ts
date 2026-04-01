@@ -7,7 +7,9 @@ export interface HqArgs {
   sites: pulumi.Input<Array<SiteArgs>>;
 }
 export interface AwsArgs {
+  accessKeyId: pulumi.Input<string>;
   region: pulumi.Input<string>;
+  secretAccessKey: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
 }
 export interface CloudflareDnsProviderArgs {

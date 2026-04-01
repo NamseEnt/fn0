@@ -40,6 +40,13 @@ impl HqArgs {
 
         let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .region(aws_config::Region::new(args.aws.region))
+            .credentials_provider(aws_sdk_s3::config::Credentials::new(
+                &args.aws.access_key_id,
+                &args.aws.secret_access_key,
+                None,
+                None,
+                "hq-config",
+            ))
             .load()
             .await;
         let s3_client = S3Client::new(&aws_config);
