@@ -1,7 +1,6 @@
 target/
 infra/
 ls-news/
-fn0-worker/
 fn0-compiler/
 forte/
 cli/
@@ -10,7 +9,6 @@ ski/
 measure-cpu-time/
 oci-rust-sdk/
 wasmtime/
-adapt-cache/
 docker/
 dist-workspace.toml
 *.md
