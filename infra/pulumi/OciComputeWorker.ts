@@ -9,17 +9,6 @@ export interface OciComputeWorkerArgs {
   hqIpv6CidrBlocks: pulumi.Input<string[]>;
 }
 
-export interface OciWorkerInfraEnvs {
-  OCI_PRIVATE_KEY_BASE64: pulumi.Output<string>;
-  OCI_USER_ID: pulumi.Output<string>;
-  OCI_FINGERPRINT: pulumi.Output<string>;
-  OCI_TENANCY_ID: pulumi.Output<string>;
-  OCI_REGION: pulumi.Output<string>;
-  OCI_COMPARTMENT_ID: pulumi.Output<string>;
-  OCI_INSTANCE_CONFIGURATION_ID: pulumi.Output<string>;
-  OCI_AVAILABILITY_DOMAIN: pulumi.Output<string>;
-}
-
 export interface OciCwasmBucketInfo {
   endpoint: pulumi.Output<string>;
   region: pulumi.Output<string>;
@@ -33,7 +22,16 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly compartmentId: pulumi.Output<string>;
   public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
-  public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
+  public readonly infraEnvs: pulumi.Output<{
+    OCI_PRIVATE_KEY_BASE64: pulumi.Output<string>;
+    OCI_USER_ID: pulumi.Output<string>;
+    OCI_FINGERPRINT: pulumi.Output<string>;
+    OCI_TENANCY_ID: pulumi.Output<string>;
+    OCI_REGION: pulumi.Output<string>;
+    OCI_COMPARTMENT_ID: pulumi.Output<string>;
+    OCI_INSTANCE_CONFIGURATION_ID: pulumi.Output<string>;
+    OCI_AVAILABILITY_DOMAIN: pulumi.Output<string>;
+  }>;
   public readonly workerImageUrl: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
 
