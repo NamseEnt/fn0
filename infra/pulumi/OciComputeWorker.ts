@@ -35,6 +35,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly instanceConfigurationId: pulumi.Output<string>;
   public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
   public readonly workerImageUrl: pulumi.Output<string>;
+  public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
 
   constructor(
@@ -400,6 +401,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     );
 
     this.workerImageUrl = workerImage.repoDigest;
+    this.osImageId = imageId;
 
     const cwasmBucketUser = new oci.identity.User(
       "cwasm-bucket-user",
