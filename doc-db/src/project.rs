@@ -6,6 +6,34 @@ pub struct ProjectInfo {
 }
 
 impl DocDb {
+    pub async fn get_project(
+        &self,
+        github_username: &str,
+        project_name: &str,
+    ) -> Result<Option<ProjectInfo>> {
+        let conn = self.db.connect()?;
+        let pk = format!("project:{github_username}/{project_name}");
+        let subdomain = format!("{github_username}-{project_name}");
+
+        let existing = conn
+            .query(
+                "SELECT value FROM docs WHERE pk = ? AND sk = 0",
+                libsql::params!(pk),
+            )
+            .await?
+            .next()
+            .await?;
+
+        match existing {
+            Some(row) => {
+                let bytes: Vec<u8> = row.get(0)?;
+                let code_id = u64::from_le_bytes(bytes[..8].try_into().unwrap());
+                Ok(Some(ProjectInfo { code_id, subdomain }))
+            }
+            None => Ok(None),
+        }
+    }
+
     pub async fn get_or_create_project(
         &self,
         github_username: &str,

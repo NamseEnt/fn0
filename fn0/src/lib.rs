@@ -57,6 +57,10 @@ where
         self.deployment_map.write().unwrap().register_code(code_id, kind);
     }
 
+    pub fn unregister_code(&self, code_id: &str) {
+        self.deployment_map.write().unwrap().unregister_code(code_id);
+    }
+
     pub fn update_env(&self, new_vars: Vec<(String, String)>) {
         self.wasm_executor.update_env(new_vars);
     }

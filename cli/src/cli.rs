@@ -16,6 +16,7 @@ pub enum Commands {
     },
     Build,
     Deploy,
+    Destroy,
     Local {
         #[arg(short, long)]
         port: Option<u16>,

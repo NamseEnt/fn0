@@ -46,6 +46,11 @@ impl DeploymentMap {
         );
     }
 
+    pub fn unregister_code(&mut self, code_id: &str) {
+        self.code_id_deployment_id_map.remove(code_id);
+        self.code_manifest_map.remove(code_id);
+    }
+
     pub fn is_code_in_same_deployment(
         &self,
         code_id_a: &CodeId,
@@ -61,5 +66,63 @@ impl DeploymentMap {
         self.code_manifest_map
             .get(code_id)
             .map(|manifest| manifest.kind)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn register_and_unregister() {
+        let mut map = DeploymentMap::new();
+
+        map.register_code("app-1", CodeKind::Wasm);
+        assert!(map.code_kind("app-1").is_some());
+
+        map.unregister_code("app-1");
+        assert!(map.code_kind("app-1").is_none());
+    }
+
+    #[test]
+    fn unregister_nonexistent_does_not_panic() {
+        let mut map = DeploymentMap::new();
+        map.unregister_code("nonexistent");
+    }
+
+    #[test]
+    fn re_register_after_unregister() {
+        let mut map = DeploymentMap::new();
+
+        map.register_code("app-1", CodeKind::Wasm);
+        map.unregister_code("app-1");
+        map.register_code("app-1", CodeKind::Js);
+
+        assert!(matches!(map.code_kind("app-1"), Some(CodeKind::Js)));
+    }
+
+    #[test]
+    fn unregister_preserves_other_codes() {
+        let mut map = DeploymentMap::new();
+
+        map.register_code("app-1", CodeKind::Wasm);
+        map.register_code("app-2", CodeKind::Js);
+
+        map.unregister_code("app-1");
+
+        assert!(map.code_kind("app-1").is_none());
+        assert!(map.code_kind("app-2").is_some());
+    }
+
+    #[test]
+    fn same_deployment_after_unregister() {
+        let mut map = DeploymentMap::new();
+
+        map.register_code("a", CodeKind::Wasm);
+        map.register_code("b", CodeKind::Wasm);
+        assert_eq!(map.is_code_in_same_deployment(&"a".to_string(), &"b".to_string()), Some(true));
+
+        map.unregister_code("a");
+        assert_eq!(map.is_code_in_same_deployment(&"a".to_string(), &"b".to_string()), None);
     }
 }

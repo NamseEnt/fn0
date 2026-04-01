@@ -76,10 +76,19 @@ fn send_updates(
         deployment_id: host_deployment_id,
         codes: updates
             .into_iter()
-            .map(|update| CodeDeployment {
-                subdomain: update.subdomain,
-                code_id: update.code_id,
-                code_version: update.code_version,
+            .map(|update| match update {
+                Deployment::Deploy {
+                    subdomain,
+                    code_id,
+                    code_version,
+                } => CodeDeployment::Deploy {
+                    subdomain,
+                    code_id,
+                    code_version,
+                },
+                Deployment::Undeploy { subdomain } => {
+                    CodeDeployment::Undeploy { subdomain }
+                }
             })
             .collect(),
     };

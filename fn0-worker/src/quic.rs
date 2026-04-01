@@ -139,7 +139,14 @@ async fn handle_connection(
                                 );
 
                                 for code in &codes {
-                                    fn0.register_code(&code.subdomain, CodeKind::Wasm);
+                                    match code {
+                                        host_hq_protocol::CodeDeployment::Deploy { subdomain, .. } => {
+                                            fn0.register_code(subdomain, CodeKind::Wasm);
+                                        }
+                                        host_hq_protocol::CodeDeployment::Undeploy { subdomain } => {
+                                            fn0.unregister_code(subdomain);
+                                        }
+                                    }
                                 }
 
                                 deployment_id.store(new_deployment_id, Ordering::Relaxed);

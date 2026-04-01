@@ -2304,6 +2304,7 @@ dependencies = [
  "libsql",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -2692,7 +2693,7 @@ dependencies = [
 
 [[package]]
 name = "forte-db"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libsql-hrana",
@@ -2722,7 +2723,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "chrono",

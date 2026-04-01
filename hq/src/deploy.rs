@@ -35,6 +35,12 @@ struct ErrorResponse {
     error: String,
 }
 
+#[derive(Deserialize)]
+struct DeployDestroyRequest {
+    github_token: String,
+    project_name: String,
+}
+
 fn json_response<T: Serialize>(status: u16, body: &T) -> Response<Full<Bytes>> {
     let json = serde_json::to_string(body).unwrap();
     Response::builder()
@@ -152,4 +158,50 @@ pub async fn handle_deploy_finish(
     }
 
     json_response(200, &serde_json::json!({"ok": true, "code_version": code_version}))
+}
+
+pub async fn handle_deploy_destroy(
+    req: Request<hyper::body::Incoming>,
+    ctx: Arc<DeployContext>,
+) -> Response<Full<Bytes>> {
+    let body = match req.collect().await {
+        Ok(b) => b.to_bytes(),
+        Err(_) => return json_response(400, &ErrorResponse { error: "Failed to read body".to_string() }),
+    };
+
+    let request: DeployDestroyRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(_) => return json_response(400, &ErrorResponse { error: "Invalid request body".to_string() }),
+    };
+
+    let username = match verify_github_user(&request.github_token).await {
+        Ok(u) => u,
+        Err(e) => return json_response(401, &ErrorResponse { error: e }),
+    };
+
+    let project = match ctx.doc_db.get_project(&username, &request.project_name).await {
+        Ok(Some(p)) => p,
+        Ok(None) => return json_response(404, &ErrorResponse { error: "Project not found".to_string() }),
+        Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get project: {}", e) }),
+    };
+
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let s3_key = format!("{}.wasm", project.subdomain);
+    let job_payload = serde_json::json!({
+        "s3_key": s3_key,
+        "wasm_bucket": ctx.wasm_bucket,
+    })
+    .to_string();
+
+    if let Err(e) = ctx
+        .doc_db
+        .insert_undeployment_with_job(&project.subdomain, &job_id, &job_payload)
+        .await
+    {
+        return json_response(500, &ErrorResponse {
+            error: format!("Failed to destroy deployment: {}", e),
+        });
+    }
+
+    json_response(200, &serde_json::json!({"ok": true, "subdomain": project.subdomain}))
 }
