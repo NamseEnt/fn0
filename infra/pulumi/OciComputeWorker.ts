@@ -18,20 +18,22 @@ export interface OciCwasmBucketInfo {
   namespace: pulumi.Output<string>;
 }
 
+export interface OciWorkerInfraEnvs {
+  OCI_PRIVATE_KEY_BASE64: string;
+  OCI_USER_ID: string;
+  OCI_FINGERPRINT: string;
+  OCI_TENANCY_ID: string;
+  OCI_REGION: string;
+  OCI_COMPARTMENT_ID: string;
+  OCI_INSTANCE_CONFIGURATION_ID: string;
+  OCI_AVAILABILITY_DOMAIN: string;
+}
+
 export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly compartmentId: pulumi.Output<string>;
   public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
-  public readonly infraEnvs: pulumi.Output<{
-    OCI_PRIVATE_KEY_BASE64: string;
-    OCI_USER_ID: string;
-    OCI_FINGERPRINT: string;
-    OCI_TENANCY_ID: string;
-    OCI_REGION: string;
-    OCI_COMPARTMENT_ID: string;
-    OCI_INSTANCE_CONFIGURATION_ID: string;
-    OCI_AVAILABILITY_DOMAIN: string;
-  }>;
+  public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
   public readonly workerImageUrl: pulumi.Output<string>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
@@ -290,32 +292,34 @@ export class OciComputeWorker extends pulumi.ComponentResource {
 
     this.infraEnvs = pulumi
       .all([
-        privateKey,
-        workerManager,
-        compartment,
-        instanceConfiguration,
-        apiKey,
-        availabilityDomain,
+        privateKey.privateKeyPemPkcs8,
+        workerManager.id,
+        workerManager.compartmentId,
+        compartment.id,
+        instanceConfiguration.id,
+        apiKey.fingerprint,
+        pulumi.output(availabilityDomain),
+        pulumi.output(args.region),
       ])
       .apply(
         ([
-          privateKey,
-          oci_user,
-          compartment,
-          instanceConfiguration,
-          apiKey,
+          privateKeyPem,
+          userId,
+          tenancyId,
+          compartmentId,
+          instanceConfigurationId,
+          fingerprint,
           availabilityDomain,
+          region,
         ]) => ({
-          OCI_PRIVATE_KEY_BASE64: privateKey.privateKeyPemPkcs8.apply((x) =>
-            Buffer.from(x).toString("base64")
-          ),
-          OCI_USER_ID: oci_user.id,
-          OCI_FINGERPRINT: apiKey.fingerprint,
-          OCI_TENANCY_ID: oci_user.compartmentId,
-          OCI_REGION: pulumi.output(args.region),
-          OCI_COMPARTMENT_ID: compartment.id,
-          OCI_INSTANCE_CONFIGURATION_ID: instanceConfiguration.id,
-          OCI_AVAILABILITY_DOMAIN: pulumi.output(availabilityDomain),
+          OCI_PRIVATE_KEY_BASE64: Buffer.from(privateKeyPem).toString("base64"),
+          OCI_USER_ID: userId,
+          OCI_FINGERPRINT: fingerprint,
+          OCI_TENANCY_ID: tenancyId,
+          OCI_REGION: region,
+          OCI_COMPARTMENT_ID: compartmentId,
+          OCI_INSTANCE_CONFIGURATION_ID: instanceConfigurationId,
+          OCI_AVAILABILITY_DOMAIN: availabilityDomain,
         })
       );
 
