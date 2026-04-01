@@ -23,14 +23,14 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
   public readonly infraEnvs: pulumi.Output<{
-    OCI_PRIVATE_KEY_BASE64: pulumi.Output<string>;
-    OCI_USER_ID: pulumi.Output<string>;
-    OCI_FINGERPRINT: pulumi.Output<string>;
-    OCI_TENANCY_ID: pulumi.Output<string>;
-    OCI_REGION: pulumi.Output<string>;
-    OCI_COMPARTMENT_ID: pulumi.Output<string>;
-    OCI_INSTANCE_CONFIGURATION_ID: pulumi.Output<string>;
-    OCI_AVAILABILITY_DOMAIN: pulumi.Output<string>;
+    OCI_PRIVATE_KEY_BASE64: string;
+    OCI_USER_ID: string;
+    OCI_FINGERPRINT: string;
+    OCI_TENANCY_ID: string;
+    OCI_REGION: string;
+    OCI_COMPARTMENT_ID: string;
+    OCI_INSTANCE_CONFIGURATION_ID: string;
+    OCI_AVAILABILITY_DOMAIN: string;
   }>;
   public readonly workerImageUrl: pulumi.Output<string>;
   public readonly osImageId: pulumi.Output<string>;
