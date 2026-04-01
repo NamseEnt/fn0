@@ -1,5 +1,6 @@
 use super::*;
 use crate::{random_sleep::random_sleep, telemetry, *};
+use doc_db::ScaleConfig;
 use host_hq_protocol::HqToHostReliable;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
@@ -23,9 +24,8 @@ impl Site {
                     scale_config
                 }
                 Ok(None) => {
-                    telemetry::scaler_config_fetch_status(false);
-                    error!("Scale config not found");
-                    continue;
+                    telemetry::scaler_config_fetch_status(true);
+                    ScaleConfig::default()
                 }
                 Err(err) => {
                     telemetry::scaler_config_fetch_status(false);
