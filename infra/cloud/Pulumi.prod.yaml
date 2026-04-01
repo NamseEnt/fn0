@@ -35,3 +35,4 @@ config:
   fn0Cloud:tursoDbToken:
     secure: AAABAO/AfcXrnkFjbnPnSykeFBaR9BZRk6v2S83US/G6szWLL5Dm6jn6twJy8RjwzwiXRK0PIqGKI8RE5cwIVtVB3y0dVXNCmgHiW6Q2815kLhqABW3Haa8dJsODJ5WPJjrOB6Jmp2CQBvYPzA3RGWIsiLpLbW7dFEFEjLEclchFxgshmpgZ9MgKUyaEn+N6tDJNoEn4LOOeFHA5/xd6gKpqsnHCi9VzsLjNSKlG28/DjDmlxlfXXBDuG3KtIflpW28wWWEoLolrVBHN7ySdixiEStjdrRfILV14GWBXNXCA1FiUZo/Lx98XVgsOeM23h1FqEn+Fues3LcQojbUfVEf4AXP/H/hjyngvZnwd8NRLJR3OIsZe98I6tw4Lr5wrtkh8L7XZCq9eKWCDsbr5AJfoAYt5uoA=
   fn0Cloud:tursoDbUrl: libsql://fn0-namse.aws-ap-northeast-1.turso.io
+  fn0Cloud:githubClientId: Ov23liRuIJf1NSe9ccP8
