@@ -41,8 +41,8 @@ impl Default for ScaleConfig {
             scale_out_cooldown_secs: NonZeroUsize::new(60).unwrap(),
             scale_in_threshold_ticks: NonZeroUsize::new(3).unwrap(),
             scale_in_cooldown_secs: NonZeroUsize::new(300).unwrap(),
-            max_hosts: NonZeroUsize::new(1).unwrap(),
-            min_hosts: NonZeroUsize::new(1).unwrap(),
+            max_hosts: NonZeroUsize::new(2).unwrap(),
+            min_hosts: NonZeroUsize::new(2).unwrap(),
         }
     }
 }
