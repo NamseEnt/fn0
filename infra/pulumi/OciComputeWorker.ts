@@ -117,6 +117,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         statements: [
           pulumi.interpolate`Allow group ${group.name} to manage instance-family in compartment id ${compartment.id}`,
           pulumi.interpolate`Allow group ${group.name} to manage instance-configurations in compartment id ${compartment.id}`,
+          pulumi.interpolate`Allow group ${group.name} to manage compute-container-family in compartment id ${compartment.id}`,
           pulumi.interpolate`Allow group ${group.name} to use virtual-network-family in compartment id ${compartment.id}`,
           pulumi.interpolate`Allow group ${group.name} to read app-catalog-listing in compartment id ${compartment.id}`,
           pulumi.interpolate`Allow group ${group.name} to use tag-namespaces in tenancy`,
