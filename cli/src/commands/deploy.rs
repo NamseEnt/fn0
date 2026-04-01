@@ -2,7 +2,7 @@ use color_eyre::{eyre::eyre, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-const HQ_URL: &str = "http://fn0-hq.fn0.dev:8080";
+pub(crate) const HQ_URL: &str = "http://fn0-hq.fn0.dev:8080";
 const GITHUB_CLIENT_ID: &str = "Ov23liRuIJf1NSe9ccP8";
 
 #[derive(Serialize, Deserialize)]
@@ -109,7 +109,7 @@ async fn github_device_flow() -> Result<String> {
     }
 }
 
-async fn get_github_token() -> Result<String> {
+pub(crate) async fn get_github_token() -> Result<String> {
     if let Some(creds) = load_credentials()? {
         return Ok(creds.github_token);
     }

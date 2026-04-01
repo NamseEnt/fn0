@@ -2152,7 +2152,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2182,7 +2182,6 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
- "uuid",
  "wasmtime",
  "wasmtime-wasi",
  "wasmtime-wasi-http",

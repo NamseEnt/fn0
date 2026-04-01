@@ -25,6 +25,9 @@ async fn main() -> Result<()> {
         Commands::Deploy => {
             commands::deploy::execute().await?;
         }
+        Commands::Destroy => {
+            commands::destroy::execute().await?;
+        }
         Commands::Local { port } => {
             commands::local::execute(port).await?;
         }

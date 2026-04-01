@@ -6,6 +6,7 @@ mod dns;
 mod host_connection;
 mod host_id;
 mod host_provider;
+mod job_processor;
 mod random_sleep;
 mod site;
 mod telemetry;
@@ -35,12 +36,23 @@ fn main() -> Result<()> {
             deploy_context,
         } = HqArgs::parse().await?;
 
+        deploy_context.doc_db.ensure_job_tables().await?;
+
         let mut set = JoinSet::new();
 
         set.spawn(async move {
             deployment_cache.run_sync().await;
             Ok(())
         });
+
+        {
+            let doc_db = deploy_context.doc_db.clone();
+            let s3_client = deploy_context.s3_client.clone();
+            set.spawn(async move {
+                job_processor::run(doc_db, s3_client).await;
+                Ok(())
+            });
+        }
         for mut site in sites {
             set.spawn(async move {
                 site.run().await;
@@ -98,6 +110,9 @@ async fn route(
         }
         (&Method::POST, "/deploy/finish") => {
             Ok(deploy::handle_deploy_finish(req, ctx).await)
+        }
+        (&Method::POST, "/deploy/destroy") => {
+            Ok(deploy::handle_deploy_destroy(req, ctx).await)
         }
         _ => Ok(Response::builder()
             .status(404)
