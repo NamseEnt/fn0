@@ -2405,7 +2405,9 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.2"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1118a9e5d52fe25797fa35ffee118d1fc90bf1d5a8ce26dfebbede430ab79d6b"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2514,7 +2516,9 @@ dependencies = [
 
 [[package]]
 name = "fn0-host-hq-protocol"
-version = "0.2.0"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13a900e1f255967e776c6a7f02ad2e9f65f267b26a049a748000e5ac369edf5c"
 dependencies = [
  "bytes",
  "postcard",

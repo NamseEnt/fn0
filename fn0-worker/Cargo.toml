@@ -7,9 +7,9 @@ edition = "2024"
 debug = true
 
 [dependencies]
-fn0 = { version = "0.2.0", path = "../fn0" }
+fn0 = "0.2"
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
-host-hq-protocol = { package = "fn0-host-hq-protocol", version = "0.2.0", path = "../host-hq-protocol" }
+host-hq-protocol = { package = "fn0-host-hq-protocol", version = "0.2" }
 aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
 aws-sdk-s3 = { version = "=1.115.0", default-features = false }
 bytes = "1"
