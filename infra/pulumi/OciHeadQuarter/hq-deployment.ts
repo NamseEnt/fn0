@@ -39,6 +39,7 @@ export function deployHqApplication(
       metadata: { labels: appLabels },
       spec: {
         replicas: 1,
+        strategy: { type: "Recreate" },
         selector: { matchLabels: appLabels },
         template: {
           metadata: {
