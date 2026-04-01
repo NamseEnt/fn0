@@ -1,6 +1,7 @@
 import * as fn0 from "@pulumi/fn0";
 import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
+import * as aws from "@pulumi/aws";
 
 const config = new pulumi.Config();
 
@@ -59,6 +60,30 @@ new fn0.AwsLambdaCwasmCompiler("cwasm-compiler", {
   queueArn: wasmS3.queueArn,
 });
 
+const hqAwsUser = new aws.iam.User("hq-aws-user", {
+  name: "fn0-hq",
+});
+
+const hqAwsAccessKey = new aws.iam.AccessKey("hq-aws-access-key", {
+  user: hqAwsUser.name,
+});
+
+new aws.iam.UserPolicy("hq-aws-user-policy", {
+  user: hqAwsUser.name,
+  policy: wasmS3.bucket.apply((bucket) =>
+    JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: ["s3:PutObject"],
+          Resource: `arn:aws:s3:::${bucket}/*`,
+        },
+      ],
+    })
+  ),
+});
+
 const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   suffix,
   ociRegion: config.require("ociHeadQuarterRegion"),
@@ -72,6 +97,8 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   certificate: dns.certificate,
   awsRegion: awsRegion,
   wasmBucket: wasmS3.bucket,
+  awsAccessKeyId: hqAwsAccessKey.id,
+  awsSecretAccessKey: hqAwsAccessKey.secret,
   githubClientId: config.require("githubClientId"),
   sites: [
     {

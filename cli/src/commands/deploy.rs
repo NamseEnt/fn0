@@ -133,8 +133,9 @@ pub async fn execute() -> Result<()> {
 
     let github_token = get_github_token().await?;
 
-    println!("Starting build...");
-    crate::commands::build::execute().await?;
+    // TODO: integrate with forte build
+    // println!("Starting build...");
+    // crate::commands::build::execute().await?;
 
     let client = reqwest::Client::new();
 

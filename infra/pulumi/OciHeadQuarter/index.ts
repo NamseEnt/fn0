@@ -21,6 +21,8 @@ export interface OciHeadQuarterArgs {
   certificate: pulumi.Input<string>;
   awsRegion: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
+  awsAccessKeyId: pulumi.Input<string>;
+  awsSecretAccessKey: pulumi.Input<string>;
   githubClientId: pulumi.Input<string>;
 }
 
@@ -100,6 +102,8 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
         aws: {
           region: args.awsRegion,
           wasmBucket: args.wasmBucket,
+          accessKeyId: args.awsAccessKeyId,
+          secretAccessKey: args.awsSecretAccessKey,
         },
         githubClientId: args.githubClientId,
       },
