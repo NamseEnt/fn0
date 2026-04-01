@@ -1,6 +1,6 @@
 [package]
 name = "fn0-host-hq-protocol"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "Protocol definitions for fn0 host-HQ communication"
 license = "AGPL-3.0-only"
