@@ -86,3 +86,4 @@ required-features = ["containerinstances"]
 name = "simple_container_instance"
 required-features = ["containerinstances"]
 
+
