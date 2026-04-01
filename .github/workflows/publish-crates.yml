@@ -22,7 +22,7 @@ jobs:
         working-directory: oci-rust-sdk
         run: cargo publish --allow-dirty
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.OCI_RUST_SDK_CARGO_TOKEN }}
 
       - name: Publish fn0-host-hq-protocol
         continue-on-error: true
