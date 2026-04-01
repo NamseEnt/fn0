@@ -1,7 +1,6 @@
 use color_eyre::eyre::{Result, eyre};
 use host_hq_protocol::{HqToHostDatagram, HqToHostReliable};
 use quinn::{ClientConfig, Connection, Endpoint, ReadDatagram};
-use rustls::pki_types::CertificateDer;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::Arc,
@@ -13,14 +12,14 @@ pub struct HostConnection {
 }
 
 impl HostConnection {
-    pub async fn connect(addr: SocketAddr, cert: &str) -> Result<Self> {
+    pub async fn connect(addr: SocketAddr, ca_cert_pem: &str) -> Result<Self> {
         let local = if addr.is_ipv4() {
             LOCAL_IPV4
         } else {
             LOCAL_IPV6
         };
         let endpoint = Endpoint::client(local)?;
-        let client_config = configure_client(cert)?;
+        let client_config = configure_client(ca_cert_pem)?;
         let connection = endpoint
             .connect_with(client_config, addr, "host.fn0")?
             .await?;
@@ -54,9 +53,13 @@ const LOCAL_IPV4: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0,
 const LOCAL_IPV6: SocketAddr =
     SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), 0);
 
-fn configure_client(server_cert: &str) -> Result<ClientConfig> {
-    let mut certs = rustls::RootCertStore::empty();
-    certs.add(CertificateDer::from(server_cert.as_bytes()))?;
-
-    Ok(ClientConfig::with_root_certificates(Arc::new(certs))?)
+fn configure_client(ca_cert_pem: &str) -> Result<ClientConfig> {
+    let mut root_store = rustls::RootCertStore::empty();
+    for cert in rustls_pemfile::certs(&mut ca_cert_pem.as_bytes()) {
+        root_store.add(cert?)?;
+    }
+    if root_store.is_empty() {
+        return Err(eyre!("No valid CA certificates found in PEM"));
+    }
+    Ok(ClientConfig::with_root_certificates(Arc::new(root_store))?)
 }

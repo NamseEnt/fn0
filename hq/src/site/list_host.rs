@@ -1,5 +1,7 @@
 use super::*;
 use crate::{host_connection::HostConnection, random_sleep::random_sleep, telemetry, *};
+use std::collections::HashSet;
+use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use tokio::time::{MissedTickBehavior, timeout};
 
@@ -24,33 +26,58 @@ impl Site {
                 }
             };
 
-            for host in hosts {
-                if self.dead_hosts.contains_key(&host) {
-                    self.on_dead_host_in_list(host);
+            let current_hosts: HashSet<_> = hosts.iter().cloned().collect();
+
+            for host in &hosts {
+                if self.dead_hosts.contains_key(host) {
+                    self.on_dead_host_in_list(host.clone());
                     continue;
                 }
-                if !self.host_connections.contains_key(&host) {
-                    self.on_new_host_in_list(host, new_host_tx.clone());
+                if !self.host_connections.contains_key(host) {
+                    self.on_new_host_in_list(host.clone(), new_host_tx.clone());
                 }
+            }
+
+            // Clean up hosts that are no longer in the list (e.g. DWS removed from doc-db)
+            let stale: Vec<_> = self
+                .host_connections
+                .iter()
+                .filter(|e| !current_hosts.contains(e.key()))
+                .map(|e| e.key().clone())
+                .collect();
+            for host in stale {
+                if let Some((_, conn)) = self.host_connections.remove(&host) {
+                    conn.close();
+                }
+                self.hosts_status.remove(&host);
+                self.dead_hosts.remove(&host);
+                self.graceful_shutdown_hosts.remove(&host);
             }
         }
     }
-    #[tracing::instrument(skip(self), fields(host_id = %host.id, host_ip = %host.ip))]
+    #[tracing::instrument(skip(self), fields(host_id = %host.id, host_addr = %host.addr))]
     fn on_dead_host_in_list(&self, host: Host) {
         let host_provider = self.host_provider.clone();
+        let dead_hosts = self.dead_hosts.clone();
+        let is_dedicated = matches!(self.host_provider, HostProvider::Dedicated(_));
         tokio::spawn(async move {
             random_sleep(1000).await;
             if let Err(err) = host_provider.terminate(&host.id).await {
                 warn!(%err, "Failed to terminate host");
+            } else if is_dedicated {
+                // For dedicated hosts, terminate means restart via SSH.
+                // Remove from dead_hosts to allow reconnection.
+                dead_hosts.remove(&host);
             }
         });
     }
-    #[tracing::instrument(skip(self, new_host_tx), fields(host_id = %host.id, host_ip = %host.ip))]
+    #[tracing::instrument(skip(self, new_host_tx), fields(host_id = %host.id, host_addr = %host.addr))]
     fn on_new_host_in_list(&self, host: Host, new_host_tx: mpsc::UnboundedSender<Host>) {
         self.known_hosts.insert(host.clone());
 
-        let cert = self.cert.clone();
-        let addr = SocketAddr::new(host.ip, 10000);
+        let ca_cert_pem = self.ca_cert_pem.clone();
+        let host_addr = host.addr.clone();
+        let host_port = host.port;
         let dead_hosts = self.dead_hosts.clone();
         let host_connections = self.host_connections.clone();
 
@@ -58,6 +85,16 @@ impl Site {
             let start_time = Instant::now();
             let deadline = start_time + Duration::from_secs(180);
             let connect_timeout = Duration::from_secs(2);
+
+            let resolved_addr = match resolve_addr(&host_addr, host_port).await {
+                Ok(addr) => addr,
+                Err(err) => {
+                    warn!(%err, "Failed to resolve host addr");
+                    dead_hosts.insert(host.clone(), Instant::now());
+                    telemetry::host_connect_status(&host.id, false);
+                    return;
+                }
+            };
 
             loop {
                 random_sleep(1000).await;
@@ -72,7 +109,7 @@ impl Site {
 
                 let connect_start = Instant::now();
                 let connect_result =
-                    timeout(connect_timeout, HostConnection::connect(addr, &cert)).await;
+                    timeout(connect_timeout, HostConnection::connect(resolved_addr, &ca_cert_pem)).await;
 
                 match connect_result {
                     Ok(Ok(connection)) => {
@@ -95,6 +132,17 @@ impl Site {
             }
         });
     }
+}
+
+async fn resolve_addr(addr: &str, port: u16) -> color_eyre::Result<SocketAddr> {
+    if let Ok(ip) = addr.parse::<IpAddr>() {
+        return Ok(SocketAddr::new(ip, port));
+    }
+    let resolved = tokio::net::lookup_host(format!("{addr}:{port}"))
+        .await?
+        .next()
+        .ok_or_else(|| color_eyre::eyre::eyre!("DNS resolution returned no results for {addr}"))?;
+    Ok(resolved)
 }
 
 fn list_host_info_interval_ms() -> Duration {

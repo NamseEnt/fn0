@@ -8,6 +8,13 @@ use tokio::time::MissedTickBehavior;
 impl Site {
     #[tracing::instrument(skip_all)]
     pub async fn run_scaler(&self) {
+        let (Some(host_cpu_cores), Some(host_memory_in_gb)) =
+            (self.host_cpu_cores, self.host_memory_in_gb)
+        else {
+            std::future::pending::<()>().await;
+            return;
+        };
+
         let mut interval = tokio::time::interval(scale_interval_ms());
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -51,11 +58,11 @@ impl Site {
 
             let max_instances_per_host = (scale_config
                 .instances_per_core
-                .saturating_mul(self.host_cpu_cores))
+                .saturating_mul(host_cpu_cores))
             .min(
                 scale_config
                     .instances_per_gb
-                    .saturating_mul(self.host_memory_in_gb),
+                    .saturating_mul(host_memory_in_gb),
             );
 
             telemetry::scaler_max_instances_per_host(max_instances_per_host.get() as u64);

@@ -1,6 +1,6 @@
 use super::*;
 use crate::args::CloudflareDnsProviderArgs;
-use std::{collections::BTreeSet, net::IpAddr};
+use std::net::IpAddr;
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
@@ -69,30 +69,51 @@ impl CloudflareDnsProvider {
             .result
             .unwrap_or_default()
             .into_iter()
-            .filter(|record| record.r#type == "A" || record.r#type == "AAAA")
+            .filter(|record| {
+                record.r#type == "A" || record.r#type == "AAAA" || record.r#type == "CNAME"
+            })
             .map(|record| Record {
-                ip: record.content.parse().unwrap(),
+                content: record.content,
+                record_type: record.r#type,
                 id: record.id,
             })
             .collect())
     }
 }
 
+fn addr_to_record_type(addr: &str) -> &'static str {
+    match addr.parse::<IpAddr>() {
+        Ok(IpAddr::V4(_)) => "A",
+        Ok(IpAddr::V6(_)) => "AAAA",
+        Err(_) => "CNAME",
+    }
+}
+
 impl DnsProvide for CloudflareDnsProvider {
-    async fn sync_ips(&self, ips: BTreeSet<IpAddr>) -> color_eyre::Result<()> {
+    async fn sync_addrs(&self, addrs: BTreeSet<String>) -> color_eyre::Result<()> {
         let old_records = self.list_records().await?;
 
-        let new_ips = ips
+        let new_addrs: Vec<_> = addrs
             .iter()
-            .filter(|ip| old_records.iter().all(|record| record.ip != **ip))
-            .collect::<BTreeSet<_>>();
+            .filter(|addr| {
+                let record_type = addr_to_record_type(addr);
+                old_records
+                    .iter()
+                    .all(|r| !(r.content == **addr && r.record_type == record_type))
+            })
+            .collect();
 
-        let deleted_ips = old_records
+        let deleted_records: Vec<_> = old_records
             .iter()
-            .filter(|record| ips.iter().all(|ip| record.ip != *ip))
-            .collect::<BTreeSet<_>>();
+            .filter(|record| {
+                addrs.iter().all(|addr| {
+                    let record_type = addr_to_record_type(addr);
+                    !(record.content == *addr && record.record_type == record_type)
+                })
+            })
+            .collect();
 
-        if new_ips.is_empty() && deleted_ips.is_empty() {
+        if new_addrs.is_empty() && deleted_records.is_empty() {
             return Ok(());
         }
 
@@ -112,7 +133,7 @@ impl DnsProvide for CloudflareDnsProvider {
             name: &'a str,
             ttl: usize,
             r#type: &'static str,
-            content: String,
+            content: &'a str,
             proxied: bool,
         }
 
@@ -125,22 +146,19 @@ impl DnsProvide for CloudflareDnsProvider {
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", self.api_token))
             .body(serde_json::to_string(&Body {
-                deletes: deleted_ips
+                deletes: deleted_records
                     .into_iter()
                     .map(|record| Delete {
                         id: record.id.as_str(),
                     })
                     .collect(),
-                posts: new_ips
+                posts: new_addrs
                     .into_iter()
-                    .map(|ip| Post {
+                    .map(|addr| Post {
                         name: &self.asterisk_domain,
                         ttl: 60,
-                        r#type: match ip {
-                            IpAddr::V4(_) => "A",
-                            IpAddr::V6(_) => "AAAA",
-                        },
-                        content: ip.to_string(),
+                        r#type: addr_to_record_type(addr),
+                        content: addr,
                         proxied: true,
                     })
                     .collect(),
@@ -151,7 +169,7 @@ impl DnsProvide for CloudflareDnsProvider {
             .text()
             .await?;
 
-        println!("cloudflare sync_ips dns_records/batch Response: {response}");
+        println!("cloudflare sync_addrs dns_records/batch Response: {response}");
 
         Ok(())
     }
@@ -159,6 +177,7 @@ impl DnsProvide for CloudflareDnsProvider {
 
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
 struct Record {
-    ip: IpAddr,
+    content: String,
+    record_type: String,
     id: String,
 }

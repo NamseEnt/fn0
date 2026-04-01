@@ -5,8 +5,8 @@ use oci_rust_sdk::auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 use oci_rust_sdk::core::{self, region::Region, *};
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
+use std::str::FromStr;
 use std::sync::Arc;
-use std::{net::IpAddr, str::FromStr};
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -136,12 +136,11 @@ impl HostProvide for OciComputeVmHostProvider {
                         .await?;
 
                     if let Some(public_ip) = &vnic_response.vnic.public_ip {
-                        if let Ok(ip) = IpAddr::from_str(public_ip) {
-                            hosts.push(Host {
-                                id: HostId::new(instance.id.clone()),
-                                ip,
-                            });
-                        }
+                        hosts.push(Host {
+                            id: HostId::new(instance.id.clone()),
+                            addr: public_ip.clone(),
+                            port: 10000,
+                        });
                     }
                 }
             }

@@ -1,13 +1,12 @@
 use crate::*;
 use color_eyre::eyre::Result;
-use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::{MissedTickBehavior, interval, sleep};
 
 pub struct HealthCheck {
     client: reqwest::Client,
-    pub ip: IpAddr,
+    pub addr: String,
     pub last_check_time: Instant,
 }
 pub type HealthCheckMap = Arc<DashMap<HostId, HealthCheck>>;
@@ -58,7 +57,7 @@ fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMa
     const DOMAIN: &str = "fn0.dev";
 
     for info in host_info_map.iter() {
-        let Some(ip) = info.ip else { continue };
+        let Some(ref addr) = info.addr else { continue };
         if info.instance_state != HostInstanceState::Running {
             continue;
         }
@@ -68,7 +67,6 @@ fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMa
             .map(|info| info.client.clone())
             .unwrap_or_else(|| {
                 reqwest::ClientBuilder::new()
-                    .resolve(&format!("health.{DOMAIN}"), SocketAddr::new(ip, 443))
                     .timeout(HEALTH_CHECK_TIMEOUT)
                     .build()
                     .unwrap()
@@ -76,7 +74,8 @@ fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMa
 
         let health_check_map = health_check_map.clone();
         let host_id = info.id.clone();
-        let span = tracing::info_span!("health_check_host", host_id = %host_id.clone(), %ip);
+        let addr = addr.clone();
+        let span = tracing::info_span!("health_check_host", host_id = %host_id.clone(), %addr);
 
         tokio::spawn(
             async move {
@@ -108,7 +107,7 @@ fn send_health_check(host_info_map: HostInfoMap, health_check_map: HealthCheckMa
                     })
                     .or_insert_with(|| HealthCheck {
                         last_check_time: Instant::now(),
-                        ip,
+                        addr,
                         client,
                     });
             }
