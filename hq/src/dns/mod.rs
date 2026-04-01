@@ -1,9 +1,9 @@
 pub mod cloudflare;
 
-use std::{collections::BTreeSet, net::IpAddr};
+use std::collections::BTreeSet;
 
 pub trait DnsProvide: Send + Sync {
-    async fn sync_ips(&self, ips: BTreeSet<IpAddr>) -> color_eyre::Result<()>;
+    async fn sync_addrs(&self, addrs: BTreeSet<String>) -> color_eyre::Result<()>;
 }
 
 pub enum DnsProvider {
@@ -11,9 +11,9 @@ pub enum DnsProvider {
 }
 
 impl DnsProvide for DnsProvider {
-    async fn sync_ips(&self, ips: BTreeSet<IpAddr>) -> color_eyre::Result<()> {
+    async fn sync_addrs(&self, addrs: BTreeSet<String>) -> color_eyre::Result<()> {
         match self {
-            DnsProvider::Cloudflare(cloudflare) => cloudflare.sync_ips(ips).await,
+            DnsProvider::Cloudflare(cloudflare) => cloudflare.sync_addrs(addrs).await,
         }
     }
 }

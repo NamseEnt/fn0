@@ -21,15 +21,15 @@ pub struct Site {
     dns_provider: DnsProvider,
     host_connections: Arc<DashMap<Host, HostConnection>>,
     hosts_status: Arc<DashMap<Host, HostStatus>>,
-    cert: String,
+    ca_cert_pem: String,
     pub deployment_cache: DeploymentCache,
     // Below fields won't be cleared so may occur out-of-memory.
     // But the size is expected to be too small to cause out-of-memory.
     known_hosts: Arc<DashSet<Host>>,
     dead_hosts: Arc<DashMap<Host, Instant>>,
     graceful_shutdown_hosts: Arc<DashMap<Host, Instant>>,
-    host_cpu_cores: NonZeroUsize,
-    host_memory_in_gb: NonZeroUsize,
+    host_cpu_cores: Option<NonZeroUsize>,
+    host_memory_in_gb: Option<NonZeroUsize>,
     doc_db: DocDb,
 }
 
@@ -37,10 +37,10 @@ impl Site {
     pub fn new(
         host_provider: HostProvider,
         dns_provider: DnsProvider,
-        cert: String,
+        ca_cert_pem: String,
         deployment_cache: DeploymentCache,
-        host_cpu_cores: NonZeroUsize,
-        host_memory_in_gb: NonZeroUsize,
+        host_cpu_cores: Option<NonZeroUsize>,
+        host_memory_in_gb: Option<NonZeroUsize>,
         doc_db: DocDb,
     ) -> Self {
         Site {
@@ -51,7 +51,7 @@ impl Site {
             known_hosts: Default::default(),
             dead_hosts: Default::default(),
             graceful_shutdown_hosts: Default::default(),
-            cert,
+            ca_cert_pem,
             deployment_cache,
             host_cpu_cores,
             host_memory_in_gb,

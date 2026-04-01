@@ -1,7 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
   aws: pulumi.Input<AwsArgs>;
-  cert: pulumi.Input<string>;
+  caCertPem: pulumi.Input<string>;
   docDb: pulumi.Input<DocDbArgs>;
   githubClientId: pulumi.Input<string>;
   sites: pulumi.Input<Array<SiteArgs>>;
@@ -17,6 +17,12 @@ export interface CloudflareDnsProviderArgs {
   asteriskDomain: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
 }
+export interface DedicatedHostProviderArgs {
+  envs: pulumi.Input<Record<string, string>>;
+  sshPrivateKeyBase64: pulumi.Input<string>;
+  sshUser: pulumi.Input<string>;
+  workerImage: pulumi.Input<string>;
+}
 export interface DnsProviderArg {
   cloudflare?: pulumi.Input<CloudflareDnsProviderArgs>;
 }
@@ -27,6 +33,7 @@ export interface DocDbArgs {
 export interface HostProviderArg {
   ociContainerInstance?: pulumi.Input<OciContainerInstanceHostProviderArgs>;
   ociComputeVm?: pulumi.Input<OciComputeVmHostProviderArgs>;
+  dedicated?: pulumi.Input<DedicatedHostProviderArgs>;
 }
 export interface OciComputeVmHostProviderArgs {
   availabilityDomain: pulumi.Input<string>;

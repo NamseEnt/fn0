@@ -65,17 +65,27 @@ impl HqArgs {
                 let (host_cpu_cores, host_memory_in_gb, host_provider) =
                     match site_args.host_provider {
                         HostProviderArg::OciContainerInstance(args) => (
-                            args.physics_cpu_cores,
-                            args.memory_in_gbs,
+                            Some(args.physics_cpu_cores),
+                            Some(args.memory_in_gbs),
                             HostProvider::OciContainerInstance(
                                 OciContainerInstanceHostProvider::new(args),
                             ),
                         ),
                         HostProviderArg::OciComputeVm(args) => (
-                            args.physics_cpu_cores,
-                            args.memory_in_gbs,
+                            Some(args.physics_cpu_cores),
+                            Some(args.memory_in_gbs),
                             HostProvider::OciComputeVm(
                                 host_provider::oci_compute_vm::OciComputeVmHostProvider::new(args),
+                            ),
+                        ),
+                        HostProviderArg::Dedicated(args) => (
+                            None,
+                            None,
+                            HostProvider::Dedicated(
+                                host_provider::dedicated::DedicatedHostProvider::new(
+                                    args,
+                                    doc_db.clone(),
+                                ),
                             ),
                         ),
                     };
@@ -88,7 +98,7 @@ impl HqArgs {
                 Site::new(
                     host_provider,
                     dns_provider,
-                    args.cert.clone(),
+                    args.ca_cert_pem.clone(),
                     deployment_cache.clone(),
                     host_cpu_cores,
                     host_memory_in_gb,

@@ -1,9 +1,9 @@
 use adapt_cache::s3::S3AdaptCache;
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Result, eyre};
 use fn0::{CodeKind, Fn0};
 use host_hq_protocol::{HostToHq, HqToHostDatagram, HqToHostReliable};
 use quinn::Endpoint;
-use rcgen::generate_simple_self_signed;
+use rcgen::{CertificateParams, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use std::net::SocketAddr;
 use std::string::FromUtf8Error;
@@ -20,9 +20,22 @@ pub async fn run_quic_server(
     graceful_shutdown: Arc<AtomicBool>,
     fn0: Arc<Fn0<JsCache>>,
 ) -> Result<()> {
-    let cert = generate_simple_self_signed(vec!["host.fn0".to_string()])?;
-    let cert_der = CertificateDer::from(cert.cert);
-    let key_der = PrivatePkcs8KeyDer::from(cert.key_pair.serialize_der());
+    let ca_cert_pem = std::env::var("CA_CERT_PEM")
+        .map_err(|_| eyre!("CA_CERT_PEM env var not set"))?;
+    let ca_key_pem = std::env::var("CA_KEY_PEM")
+        .map_err(|_| eyre!("CA_KEY_PEM env var not set"))?;
+
+    let ca_key_pair = KeyPair::from_pem(&ca_key_pem)?;
+    let ca_params = CertificateParams::from_ca_cert_pem(&ca_cert_pem)?;
+    let ca_cert = ca_params.self_signed(&ca_key_pair)?;
+
+    let mut worker_params = CertificateParams::new(vec!["host.fn0".to_string()])?;
+    worker_params.is_ca = rcgen::IsCa::NoCa;
+    let worker_key_pair = KeyPair::generate()?;
+    let worker_cert = worker_params.signed_by(&worker_key_pair, &ca_cert, &ca_key_pair)?;
+
+    let cert_der = CertificateDer::from(worker_cert.der().to_vec());
+    let key_der = PrivatePkcs8KeyDer::from(worker_key_pair.serialize_der());
 
     let server_config = rustls::ServerConfig::builder()
         .with_no_client_auth()
