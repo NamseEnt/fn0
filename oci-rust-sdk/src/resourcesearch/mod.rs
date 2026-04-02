@@ -28,14 +28,22 @@ pub fn client(config: ClientConfig) -> Result<ResourceSearchClient> {
     Ok(ResourceSearchClient { client })
 }
 
+#[async_trait::async_trait]
+pub trait ResourceSearchApi: Send + Sync {
+    async fn search_resources(
+        &self,
+        request: SearchResourcesRequest,
+    ) -> Result<SearchResourcesResponse>;
+}
+
 /// Resource Search API client
 pub struct ResourceSearchClient {
     client: OciClient,
 }
 
-impl ResourceSearchClient {
-    /// Search for resources
-    pub async fn search_resources(
+#[async_trait::async_trait]
+impl ResourceSearchApi for ResourceSearchClient {
+    async fn search_resources(
         &self,
         request: SearchResourcesRequest,
     ) -> Result<SearchResourcesResponse> {

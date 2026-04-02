@@ -35,14 +35,107 @@ pub fn client(config: ClientConfig) -> Result<ContainerinstancesClient> {
     Ok(ContainerinstancesClient { client })
 }
 
+#[async_trait::async_trait]
+pub trait ContainerinstancesApi: Send + Sync {
+    async fn change_container_instance_compartment(
+        &self,
+        request: ChangeContainerInstanceCompartmentRequest,
+    ) -> Result<ChangeContainerInstanceCompartmentResponse>;
+
+    async fn create_container_instance(
+        &self,
+        request: CreateContainerInstanceRequest,
+    ) -> Result<CreateContainerInstanceResponse>;
+
+    async fn delete_container_instance(
+        &self,
+        request: DeleteContainerInstanceRequest,
+    ) -> Result<DeleteContainerInstanceResponse>;
+
+    async fn get_container(
+        &self,
+        request: GetContainerRequest,
+    ) -> Result<GetContainerResponse>;
+
+    async fn get_container_instance(
+        &self,
+        request: GetContainerInstanceRequest,
+    ) -> Result<GetContainerInstanceResponse>;
+
+    async fn get_work_request(
+        &self,
+        request: GetWorkRequestRequest,
+    ) -> Result<GetWorkRequestResponse>;
+
+    async fn list_container_instance_shapes(
+        &self,
+        request: ListContainerInstanceShapesRequest,
+    ) -> Result<ListContainerInstanceShapesResponse>;
+
+    async fn list_container_instances(
+        &self,
+        request: ListContainerInstancesRequest,
+    ) -> Result<ListContainerInstancesResponse>;
+
+    async fn list_containers(
+        &self,
+        request: ListContainersRequest,
+    ) -> Result<ListContainersResponse>;
+
+    async fn list_work_request_errors(
+        &self,
+        request: ListWorkRequestErrorsRequest,
+    ) -> Result<ListWorkRequestErrorsResponse>;
+
+    async fn list_work_request_logs(
+        &self,
+        request: ListWorkRequestLogsRequest,
+    ) -> Result<ListWorkRequestLogsResponse>;
+
+    async fn list_work_requests(
+        &self,
+        request: ListWorkRequestsRequest,
+    ) -> Result<ListWorkRequestsResponse>;
+
+    async fn restart_container_instance(
+        &self,
+        request: RestartContainerInstanceRequest,
+    ) -> Result<RestartContainerInstanceResponse>;
+
+    async fn retrieve_logs(
+        &self,
+        request: RetrieveLogsRequest,
+    ) -> Result<RetrieveLogsResponse>;
+
+    async fn start_container_instance(
+        &self,
+        request: StartContainerInstanceRequest,
+    ) -> Result<StartContainerInstanceResponse>;
+
+    async fn stop_container_instance(
+        &self,
+        request: StopContainerInstanceRequest,
+    ) -> Result<StopContainerInstanceResponse>;
+
+    async fn update_container(
+        &self,
+        request: UpdateContainerRequest,
+    ) -> Result<UpdateContainerResponse>;
+
+    async fn update_container_instance(
+        &self,
+        request: UpdateContainerInstanceRequest,
+    ) -> Result<UpdateContainerInstanceResponse>;
+}
+
 /// Containerinstances API client
 pub struct ContainerinstancesClient {
     client: OciClient,
 }
 
-impl ContainerinstancesClient {
-    /// changeContainerInstanceCompartment
-    pub async fn change_container_instance_compartment(
+#[async_trait::async_trait]
+impl ContainerinstancesApi for ContainerinstancesClient {
+    async fn change_container_instance_compartment(
         &self,
         request: ChangeContainerInstanceCompartmentRequest,
     ) -> Result<ChangeContainerInstanceCompartmentResponse> {
@@ -81,8 +174,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// createContainerInstance
-    pub async fn create_container_instance(
+    async fn create_container_instance(
         &self,
         request: CreateContainerInstanceRequest,
     ) -> Result<CreateContainerInstanceResponse> {
@@ -116,8 +208,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// deleteContainerInstance
-    pub async fn delete_container_instance(
+    async fn delete_container_instance(
         &self,
         request: DeleteContainerInstanceRequest,
     ) -> Result<DeleteContainerInstanceResponse> {
@@ -150,8 +241,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// getContainer
-    pub async fn get_container(
+    async fn get_container(
         &self,
         request: GetContainerRequest,
     ) -> Result<GetContainerResponse> {
@@ -185,8 +275,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// getContainerInstance
-    pub async fn get_container_instance(
+    async fn get_container_instance(
         &self,
         request: GetContainerInstanceRequest,
     ) -> Result<GetContainerInstanceResponse> {
@@ -220,8 +309,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// getWorkRequest
-    pub async fn get_work_request(
+    async fn get_work_request(
         &self,
         request: GetWorkRequestRequest,
     ) -> Result<GetWorkRequestResponse> {
@@ -255,8 +343,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// listContainerInstanceShapes
-    pub async fn list_container_instance_shapes(
+    async fn list_container_instance_shapes(
         &self,
         request: ListContainerInstanceShapesRequest,
     ) -> Result<ListContainerInstanceShapesResponse> {
@@ -287,8 +374,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// listContainerInstances
-    pub async fn list_container_instances(
+    async fn list_container_instances(
         &self,
         request: ListContainerInstancesRequest,
     ) -> Result<ListContainerInstancesResponse> {
@@ -319,8 +405,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// listContainers
-    pub async fn list_containers(
+    async fn list_containers(
         &self,
         request: ListContainersRequest,
     ) -> Result<ListContainersResponse> {
@@ -351,8 +436,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// listWorkRequestErrors
-    pub async fn list_work_request_errors(
+    async fn list_work_request_errors(
         &self,
         request: ListWorkRequestErrorsRequest,
     ) -> Result<ListWorkRequestErrorsResponse> {
@@ -386,8 +470,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// listWorkRequestLogs
-    pub async fn list_work_request_logs(
+    async fn list_work_request_logs(
         &self,
         request: ListWorkRequestLogsRequest,
     ) -> Result<ListWorkRequestLogsResponse> {
@@ -421,8 +504,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// listWorkRequests
-    pub async fn list_work_requests(
+    async fn list_work_requests(
         &self,
         request: ListWorkRequestsRequest,
     ) -> Result<ListWorkRequestsResponse> {
@@ -453,8 +535,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// restartContainerInstance
-    pub async fn restart_container_instance(
+    async fn restart_container_instance(
         &self,
         request: RestartContainerInstanceRequest,
     ) -> Result<RestartContainerInstanceResponse> {
@@ -488,8 +569,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// retrieveLogs
-    pub async fn retrieve_logs(
+    async fn retrieve_logs(
         &self,
         request: RetrieveLogsRequest,
     ) -> Result<RetrieveLogsResponse> {
@@ -524,8 +604,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// startContainerInstance
-    pub async fn start_container_instance(
+    async fn start_container_instance(
         &self,
         request: StartContainerInstanceRequest,
     ) -> Result<StartContainerInstanceResponse> {
@@ -559,8 +638,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// stopContainerInstance
-    pub async fn stop_container_instance(
+    async fn stop_container_instance(
         &self,
         request: StopContainerInstanceRequest,
     ) -> Result<StopContainerInstanceResponse> {
@@ -594,8 +672,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// updateContainer
-    pub async fn update_container(
+    async fn update_container(
         &self,
         request: UpdateContainerRequest,
     ) -> Result<UpdateContainerResponse> {
@@ -631,8 +708,7 @@ impl ContainerinstancesClient {
         })
     }
 
-    /// updateContainerInstance
-    pub async fn update_container_instance(
+    async fn update_container_instance(
         &self,
         request: UpdateContainerInstanceRequest,
     ) -> Result<UpdateContainerInstanceResponse> {

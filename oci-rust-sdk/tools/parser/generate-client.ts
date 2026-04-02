@@ -46,13 +46,22 @@ function toPascalCase(str: string): string {
   return snakeCase.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
 }
 
+function generateTraitMethodSignature(method: ClientMethod): string {
+  const rustMethodName = toSnakeCase(method.methodName);
+  let code = `    async fn ${rustMethodName}(\n`;
+  code += `        &self,\n`;
+  code += `        request: ${method.requestType},\n`;
+  code += `    ) -> Result<${method.responseType}>;\n`;
+  return code;
+}
+
 function generateMethod(method: ClientMethod, apiVersion: string): string {
   const rustMethodName = toSnakeCase(method.methodName);
   const pathTemplate = method.httpPath.replace(/\{(\w+)\}/g, '{}');
   const pathParams = method.pathParams.map(p => toSnakeCase(p));
 
   let code = `    /// ${method.methodName}\n`;
-  code += `    pub async fn ${rustMethodName}(\n`;
+  code += `    async fn ${rustMethodName}(\n`;
   code += `        &self,\n`;
   code += `        request: ${method.requestType},\n`;
   code += `    ) -> Result<${method.responseType}> {\n`;
@@ -161,6 +170,7 @@ function generateMethod(method: ClientMethod, apiVersion: string): string {
 
 function generateClient(serviceName: string, clientMethods: ClientMethod[], apiVersion: string, endpointPrefix: string): string {
   const clientName = `${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Client`;
+  const traitName = `${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}Api`;
 
   let code = `//! ${serviceName} service module\n`;
   code += `pub mod models;\n`;
@@ -193,11 +203,21 @@ function generateClient(serviceName: string, clientMethods: ClientMethod[], apiV
   code += `    let client = OciClient::new(config.auth_provider, endpoint)?.with_retrier(config.retry);\n\n`;
   code += `    Ok(${clientName} { client })\n`;
   code += `}\n\n`;
+
+  // Generate trait
+  code += `#[async_trait::async_trait]\n`;
+  code += `pub trait ${traitName}: Send + Sync {\n`;
+  for (const method of clientMethods) {
+    code += generateTraitMethodSignature(method) + '\n';
+  }
+  code += `}\n\n`;
+
   code += `/// ${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)} API client\n`;
   code += `pub struct ${clientName} {\n`;
   code += `    client: OciClient,\n`;
   code += `}\n\n`;
-  code += `impl ${clientName} {\n`;
+  code += `#[async_trait::async_trait]\n`;
+  code += `impl ${traitName} for ${clientName} {\n`;
 
   for (const method of clientMethods) {
     code += generateMethod(method, apiVersion) + '\n';

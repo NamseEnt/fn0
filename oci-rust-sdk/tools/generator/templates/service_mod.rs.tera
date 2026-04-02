@@ -36,15 +36,26 @@ pub fn client(config: ClientConfig) -> Result<{{ client_name}}> {
     Ok({{ client_name }} { client })
 }
 
+#[async_trait::async_trait]
+pub trait {{ trait_name }}: Send + Sync {
+{%- for method in methods %}
+    async fn {{ method.rust_name }}(
+        &self,
+        request: {{ method.request_type }},
+    ) -> Result<{{ method.response_type }}>;
+{% endfor -%}
+}
+
 /// {{ service_display_name }} API client
 pub struct {{ client_name }} {
     client: OciClient,
 }
 
-impl {{ client_name }} {
+#[async_trait::async_trait]
+impl {{ trait_name }} for {{ client_name }} {
 {%- for method in methods %}
     /// {{ method.documentation }}
-    pub async fn {{ method.rust_name }}(
+    async fn {{ method.rust_name }}(
         &self,
         request: {{ method.request_type }},
     ) -> Result<{{ method.response_type }}> {

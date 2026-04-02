@@ -41,14 +41,46 @@ pub fn client(config: ClientConfig) -> Result<CoreClient> {
     Ok(CoreClient { client })
 }
 
+#[async_trait::async_trait]
+pub trait CoreApi: Send + Sync {
+    async fn list_instances(
+        &self,
+        request: ListInstancesRequest,
+    ) -> Result<ListInstancesResponse>;
+
+    async fn launch_instance(
+        &self,
+        request: LaunchInstanceRequest,
+    ) -> Result<LaunchInstanceResponse>;
+
+    async fn get_instance(&self, request: GetInstanceRequest) -> Result<GetInstanceResponse>;
+
+    async fn terminate_instance(
+        &self,
+        request: TerminateInstanceRequest,
+    ) -> Result<TerminateInstanceResponse>;
+
+    async fn list_vnic_attachments(
+        &self,
+        request: ListVnicAttachmentsRequest,
+    ) -> Result<ListVnicAttachmentsResponse>;
+
+    async fn get_vnic(&self, request: GetVnicRequest) -> Result<GetVnicResponse>;
+
+    async fn list_public_ips(
+        &self,
+        request: ListPublicIpsRequest,
+    ) -> Result<ListPublicIpsResponse>;
+}
+
 /// Core Services API client
 pub struct CoreClient {
     client: OciClient,
 }
 
-impl CoreClient {
-    /// List compute instances in a compartment
-    pub async fn list_instances(
+#[async_trait::async_trait]
+impl CoreApi for CoreClient {
+    async fn list_instances(
         &self,
         request: ListInstancesRequest,
     ) -> Result<ListInstancesResponse> {
@@ -93,8 +125,7 @@ impl CoreClient {
         })
     }
 
-    /// Launch a new compute instance
-    pub async fn launch_instance(
+    async fn launch_instance(
         &self,
         request: LaunchInstanceRequest,
     ) -> Result<LaunchInstanceResponse> {
@@ -112,8 +143,7 @@ impl CoreClient {
         })
     }
 
-    /// Get details of a specific compute instance
-    pub async fn get_instance(&self, request: GetInstanceRequest) -> Result<GetInstanceResponse> {
+    async fn get_instance(&self, request: GetInstanceRequest) -> Result<GetInstanceResponse> {
         let path = format!("/20160918/instances/{}", request.instance_id);
         let response = self.client.get(&path).await?;
 
@@ -124,7 +154,7 @@ impl CoreClient {
         })
     }
 
-    pub async fn terminate_instance(
+    async fn terminate_instance(
         &self,
         request: TerminateInstanceRequest,
     ) -> Result<TerminateInstanceResponse> {
@@ -155,7 +185,7 @@ impl CoreClient {
         })
     }
 
-    pub async fn list_vnic_attachments(
+    async fn list_vnic_attachments(
         &self,
         request: ListVnicAttachmentsRequest,
     ) -> Result<ListVnicAttachmentsResponse> {
@@ -190,7 +220,7 @@ impl CoreClient {
         })
     }
 
-    pub async fn get_vnic(&self, request: GetVnicRequest) -> Result<GetVnicResponse> {
+    async fn get_vnic(&self, request: GetVnicRequest) -> Result<GetVnicResponse> {
         let path = format!("/20160918/vnics/{}", request.vnic_id);
         let response = self.client.get(&path).await?;
 
@@ -201,8 +231,7 @@ impl CoreClient {
         })
     }
 
-    /// List public IPs in a scope
-    pub async fn list_public_ips(
+    async fn list_public_ips(
         &self,
         request: ListPublicIpsRequest,
     ) -> Result<ListPublicIpsResponse> {
