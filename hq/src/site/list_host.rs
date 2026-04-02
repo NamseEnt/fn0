@@ -82,8 +82,7 @@ impl Site {
         let host_connections = self.host_connections.clone();
 
         tokio::spawn(async move {
-            let start_time = Instant::now();
-            let deadline = start_time + Duration::from_secs(180);
+            let deadline = Instant::now() + Duration::from_secs(180);
             let connect_timeout = Duration::from_secs(2);
 
             let resolved_addr = match resolve_addr(&host_addr, host_port).await {
