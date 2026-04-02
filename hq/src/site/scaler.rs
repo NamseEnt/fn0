@@ -1,5 +1,5 @@
 use super::*;
-use crate::{random_sleep::random_sleep, telemetry, *};
+use crate::{host_provider::HostProvide, random_sleep::random_sleep, telemetry, *};
 use host_hq_protocol::HqToHostReliable;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
@@ -134,9 +134,21 @@ impl Site {
                     continue;
                 }
 
+                let provisioned_hosts = match self.host_provider.list_hosts().await {
+                    Ok(h) => h.len(),
+                    Err(err) => {
+                        warn!(%err, "Fail to list hosts for scale out check");
+                        continue;
+                    }
+                };
+
+                if provisioned_hosts >= scale_out_target {
+                    continue;
+                }
+
                 last_scale_out_at = Some(Instant::now());
 
-                let count = scale_out_target - hosts;
+                let count = scale_out_target - provisioned_hosts;
 
                 telemetry::scaler_action_triggered("scale_out", count);
 
