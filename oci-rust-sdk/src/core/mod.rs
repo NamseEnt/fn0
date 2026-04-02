@@ -36,7 +36,7 @@ pub struct ClientConfig {
 /// Create a new core services client
 pub fn client(config: ClientConfig) -> Result<CoreClient> {
     let endpoint = format!("https://iaas.{}.oraclecloud.com", config.region.id());
-    let client = OciClient::new(config.auth_provider, endpoint)?.with_retrier(config.retry);
+    let client = OciClient::with_timeout(config.auth_provider, endpoint, config.timeout)?.with_retrier(config.retry);
 
     Ok(CoreClient { client })
 }

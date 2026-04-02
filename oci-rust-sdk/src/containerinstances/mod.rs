@@ -30,7 +30,7 @@ pub fn client(config: ClientConfig) -> Result<ContainerinstancesClient> {
         "https://containerinstances.{}.oci.oraclecloud.com",
         config.region.id()
     );
-    let client = OciClient::new(config.auth_provider, endpoint)?.with_retrier(config.retry);
+    let client = OciClient::with_timeout(config.auth_provider, endpoint, config.timeout)?.with_retrier(config.retry);
 
     Ok(ContainerinstancesClient { client })
 }

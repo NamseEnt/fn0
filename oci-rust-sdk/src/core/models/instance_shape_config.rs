@@ -8,11 +8,11 @@ use super::*;
 pub struct InstanceShapeConfig {
     /// The total number of OCPUs available to the instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ocpus: Option<i64>,
+    pub ocpus: Option<f64>,
 
     /// The total amount of memory available to the instance, in gigabytes. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub memory_in_gbs: Option<i64>,
+    pub memory_in_gbs: Option<f64>,
 
     /// The baseline OCPU utilization for a subcore burstable VM instance. Leave this attribute blank for a non-burstable instance, or explicitly specify non-burstable with {@code BASELINE_1_1}. <p> The following values are supported: - {@code BASELINE_1_8} - baseline usage is 1/8 of an OCPU. - {@code BASELINE_1_2} - baseline usage is 1/2 of an OCPU. - {@code BASELINE_1_1} - baseline usage is the entire OCPU. This represents a non-burstable instance.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -24,15 +24,15 @@ pub struct InstanceShapeConfig {
 
     /// The networking bandwidth available to the instance, in gigabits per second. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub networking_bandwidth_in_gbps: Option<i64>,
+    pub networking_bandwidth_in_gbps: Option<f64>,
 
     /// The maximum number of VNIC attachments for the instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_vnic_attachments: Option<i64>,
+    pub max_vnic_attachments: Option<f64>,
 
     /// The number of GPUs available to the instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gpus: Option<i64>,
+    pub gpus: Option<f64>,
 
     /// A short description of the instance's graphics processing unit (GPU). <p> If the instance does not have any GPUs, this field is {@code null}.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -40,11 +40,11 @@ pub struct InstanceShapeConfig {
 
     /// The number of local disks available to the instance. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub local_disks: Option<i64>,
+    pub local_disks: Option<f64>,
 
     /// The aggregate size of all local disks, in gigabytes. <p> If the instance does not have any local disks, this field is {@code null}. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub local_disks_total_size_in_gbs: Option<i64>,
+    pub local_disks_total_size_in_gbs: Option<f64>,
 
     /// A short description of the local disks available to this instance. <p> If the instance does not have any local disks, this field is {@code null}.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -52,7 +52,7 @@ pub struct InstanceShapeConfig {
 
     /// The total number of VCPUs available to the instance. This can be used instead of OCPUs, in which case the actual number of OCPUs will be calculated based on this value and the actual hardware. This must be a multiple of 2. Note: Numbers greater than Number.MAX_SAFE_INTEGER will result in rounding issues.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub vcpus: Option<i64>,
+    pub vcpus: Option<f64>,
 
     /// This field is reserved for internal use.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -92,13 +92,13 @@ impl InstanceShapeConfig {
     }
 
     /// Set ocpus
-    pub fn set_ocpus(mut self, value: Option<i64>) -> Self {
+    pub fn set_ocpus(mut self, value: Option<f64>) -> Self {
         self.ocpus = value;
         self
     }
 
     /// Set memory_in_gbs
-    pub fn set_memory_in_gbs(mut self, value: Option<i64>) -> Self {
+    pub fn set_memory_in_gbs(mut self, value: Option<f64>) -> Self {
         self.memory_in_gbs = value;
         self
     }
@@ -119,19 +119,19 @@ impl InstanceShapeConfig {
     }
 
     /// Set networking_bandwidth_in_gbps
-    pub fn set_networking_bandwidth_in_gbps(mut self, value: Option<i64>) -> Self {
+    pub fn set_networking_bandwidth_in_gbps(mut self, value: Option<f64>) -> Self {
         self.networking_bandwidth_in_gbps = value;
         self
     }
 
     /// Set max_vnic_attachments
-    pub fn set_max_vnic_attachments(mut self, value: Option<i64>) -> Self {
+    pub fn set_max_vnic_attachments(mut self, value: Option<f64>) -> Self {
         self.max_vnic_attachments = value;
         self
     }
 
     /// Set gpus
-    pub fn set_gpus(mut self, value: Option<i64>) -> Self {
+    pub fn set_gpus(mut self, value: Option<f64>) -> Self {
         self.gpus = value;
         self
     }
@@ -143,13 +143,13 @@ impl InstanceShapeConfig {
     }
 
     /// Set local_disks
-    pub fn set_local_disks(mut self, value: Option<i64>) -> Self {
+    pub fn set_local_disks(mut self, value: Option<f64>) -> Self {
         self.local_disks = value;
         self
     }
 
     /// Set local_disks_total_size_in_gbs
-    pub fn set_local_disks_total_size_in_gbs(mut self, value: Option<i64>) -> Self {
+    pub fn set_local_disks_total_size_in_gbs(mut self, value: Option<f64>) -> Self {
         self.local_disks_total_size_in_gbs = value;
         self
     }
@@ -161,7 +161,7 @@ impl InstanceShapeConfig {
     }
 
     /// Set vcpus
-    pub fn set_vcpus(mut self, value: Option<i64>) -> Self {
+    pub fn set_vcpus(mut self, value: Option<f64>) -> Self {
         self.vcpus = value;
         self
     }
@@ -176,13 +176,13 @@ impl InstanceShapeConfig {
     }
 
     /// Set ocpus (unwraps Option)
-    pub fn with_ocpus(mut self, value: i64) -> Self {
+    pub fn with_ocpus(mut self, value: f64) -> Self {
         self.ocpus = Some(value);
         self
     }
 
     /// Set memory_in_gbs (unwraps Option)
-    pub fn with_memory_in_gbs(mut self, value: i64) -> Self {
+    pub fn with_memory_in_gbs(mut self, value: f64) -> Self {
         self.memory_in_gbs = Some(value);
         self
     }
@@ -203,19 +203,19 @@ impl InstanceShapeConfig {
     }
 
     /// Set networking_bandwidth_in_gbps (unwraps Option)
-    pub fn with_networking_bandwidth_in_gbps(mut self, value: i64) -> Self {
+    pub fn with_networking_bandwidth_in_gbps(mut self, value: f64) -> Self {
         self.networking_bandwidth_in_gbps = Some(value);
         self
     }
 
     /// Set max_vnic_attachments (unwraps Option)
-    pub fn with_max_vnic_attachments(mut self, value: i64) -> Self {
+    pub fn with_max_vnic_attachments(mut self, value: f64) -> Self {
         self.max_vnic_attachments = Some(value);
         self
     }
 
     /// Set gpus (unwraps Option)
-    pub fn with_gpus(mut self, value: i64) -> Self {
+    pub fn with_gpus(mut self, value: f64) -> Self {
         self.gpus = Some(value);
         self
     }
@@ -227,13 +227,13 @@ impl InstanceShapeConfig {
     }
 
     /// Set local_disks (unwraps Option)
-    pub fn with_local_disks(mut self, value: i64) -> Self {
+    pub fn with_local_disks(mut self, value: f64) -> Self {
         self.local_disks = Some(value);
         self
     }
 
     /// Set local_disks_total_size_in_gbs (unwraps Option)
-    pub fn with_local_disks_total_size_in_gbs(mut self, value: i64) -> Self {
+    pub fn with_local_disks_total_size_in_gbs(mut self, value: f64) -> Self {
         self.local_disks_total_size_in_gbs = Some(value);
         self
     }
@@ -245,7 +245,7 @@ impl InstanceShapeConfig {
     }
 
     /// Set vcpus (unwraps Option)
-    pub fn with_vcpus(mut self, value: i64) -> Self {
+    pub fn with_vcpus(mut self, value: f64) -> Self {
         self.vcpus = Some(value);
         self
     }

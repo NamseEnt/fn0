@@ -24,8 +24,18 @@ impl OciClient {
         auth_provider: Arc<dyn AuthProvider>,
         endpoint: String,
     ) -> crate::core::Result<Self> {
+        Self::with_timeout(auth_provider, endpoint, std::time::Duration::from_secs(30))
+    }
+
+    pub fn with_timeout(
+        auth_provider: Arc<dyn AuthProvider>,
+        endpoint: String,
+        timeout: std::time::Duration,
+    ) -> crate::core::Result<Self> {
         let client = reqwest::Client::builder()
             .user_agent(format!("oci-rust-sdk/{}", env!("CARGO_PKG_VERSION")))
+            .timeout(timeout)
+            .gzip(true)
             .build()
             .map_err(OciError::HttpError)?;
 
