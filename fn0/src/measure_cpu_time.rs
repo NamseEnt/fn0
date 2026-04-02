@@ -450,37 +450,42 @@ mod tests {
 
     #[tokio::test]
     async fn test_duration_increases_with_work() {
-        let future1 = async {
-            sleep(Duration::from_millis(5)).await;
-        };
-        let future2 = async {
-            sleep(Duration::from_millis(5)).await;
-            sleep(Duration::from_millis(5)).await;
-        };
-        let future3 = async {
-            sleep(Duration::from_millis(5)).await;
-            sleep(Duration::from_millis(5)).await;
-            sleep(Duration::from_millis(5)).await;
-        };
+        struct PollNFuture {
+            clock: MockClock,
+            polls_remaining: u32,
+        }
 
-        let tracker1 = TimeTracker::<SystemClock>::default();
+        impl Future for PollNFuture {
+            type Output = ();
+
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                self.clock.advance(Duration::from_millis(10));
+                if self.polls_remaining > 0 {
+                    self.polls_remaining -= 1;
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            }
+        }
+
+        let clock1 = MockClock::new(Instant::now());
+        let tracker1 = TimeTracker::new(clock1.clone());
+        let future1 = PollNFuture { clock: clock1, polls_remaining: 1 };
         let measured1 = measure_cpu_time(tracker1.clone(), future1);
         let _ = measured1.await;
         let elapsed1 = tracker1.duration();
 
-        let tracker2 = TimeTracker::<SystemClock>::default();
-        let measured2 = measure_cpu_time(tracker2.clone(), future2);
-        let _ = measured2.await;
-        let elapsed2 = tracker2.duration();
-
-        let tracker3 = TimeTracker::<SystemClock>::default();
+        let clock3 = MockClock::new(Instant::now());
+        let tracker3 = TimeTracker::new(clock3.clone());
+        let future3 = PollNFuture { clock: clock3, polls_remaining: 3 };
         let measured3 = measure_cpu_time(tracker3.clone(), future3);
         let _ = measured3.await;
         let elapsed3 = tracker3.duration();
 
-        assert!(elapsed1.as_micros() > 0);
-        assert!(elapsed2.as_micros() > 0);
-        assert!(elapsed3.as_micros() > 0);
+        assert_eq!(elapsed1, Duration::from_millis(20));
+        assert_eq!(elapsed3, Duration::from_millis(40));
         assert!(elapsed3 > elapsed1);
     }
 
