@@ -108,6 +108,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   githubClientId: config.require("githubClientId"),
   sites: [
     {
+      name: "oci-compute-vm",
       hostProvider: {
         ociComputeVm: {
           privateKeyBase64: ociComputeWorker.infraEnvs.OCI_PRIVATE_KEY_BASE64,
@@ -142,6 +143,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
       },
     },
     {
+      name: "dedicated",
       hostProvider: {
         dedicated: {
           sshUser: "fn0",

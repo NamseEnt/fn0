@@ -32,21 +32,27 @@ pub struct ScaleConfig {
 }
 
 impl DocDb {
-    pub async fn get_scale_config(&self) -> Result<Option<ScaleConfig>> {
+    pub async fn get_scale_config(&self, site_name: &str) -> Result<Option<ScaleConfig>> {
         let conn = self.db.connect()?;
+        let pk = format!("scale-config:{site_name}");
         let mut rows = conn
             .query(
-                "SELECT value FROM docs WHERE pk = 'scale-config' AND sk = 0",
-                libsql::params!(),
+                "SELECT value FROM docs WHERE pk = ? AND sk = 0",
+                libsql::params![pk],
             )
             .await?;
         Ok(rows.next().await?.map(|row| row.into()))
     }
-    pub async fn set_scale_config(&self, scale_config: ScaleConfig) -> Result<()> {
+    pub async fn set_scale_config(
+        &self,
+        site_name: &str,
+        scale_config: ScaleConfig,
+    ) -> Result<()> {
         let conn = self.db.connect()?;
+        let pk = format!("scale-config:{site_name}");
         conn.execute(
-            "REPLACE INTO docs (pk, sk, value) VALUES ('scale-config', 0, ?)",
-            libsql::params![serde_json::to_string(&scale_config).unwrap()],
+            "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
+            libsql::params![pk, serde_json::to_string(&scale_config).unwrap()],
         )
         .await?;
         Ok(())

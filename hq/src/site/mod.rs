@@ -17,6 +17,7 @@ use tokio::sync::mpsc;
 use tokio::time::MissedTickBehavior;
 
 pub struct Site {
+    name: String,
     host_provider: HostProvider,
     dns_provider: DnsProvider,
     host_connections: Arc<DashMap<Host, HostConnection>>,
@@ -35,6 +36,7 @@ pub struct Site {
 
 impl Site {
     pub fn new(
+        name: String,
         host_provider: HostProvider,
         dns_provider: DnsProvider,
         ca_cert_pem: String,
@@ -44,6 +46,7 @@ impl Site {
         doc_db: DocDb,
     ) -> Self {
         Site {
+            name,
             host_provider,
             dns_provider,
             host_connections: Default::default(),

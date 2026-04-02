@@ -96,6 +96,7 @@ impl HqArgs {
                 };
 
                 Site::new(
+                    site_args.name,
                     host_provider,
                     dns_provider,
                     args.ca_cert_pem.clone(),
