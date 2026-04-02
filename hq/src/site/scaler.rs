@@ -1,6 +1,5 @@
 use super::*;
 use crate::{random_sleep::random_sleep, telemetry, *};
-use doc_db::ScaleConfig;
 use host_hq_protocol::HqToHostReliable;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
@@ -32,7 +31,8 @@ impl Site {
                 }
                 Ok(None) => {
                     telemetry::scaler_config_fetch_status(true);
-                    ScaleConfig::default()
+                    warn!("No scale config found in DocDB, skipping scaling");
+                    continue;
                 }
                 Err(err) => {
                     telemetry::scaler_config_fetch_status(false);
