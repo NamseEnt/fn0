@@ -140,7 +140,7 @@ impl HostProvide for DedicatedHostProvider {
         self.ssh_exec(&record.1.addr, 22, &command).await
     }
 
-    async fn launch_instance(&self) -> color_eyre::Result<()> {
+    async fn scale_to(&self, _n: usize) -> color_eyre::Result<()> {
         Ok(())
     }
 }

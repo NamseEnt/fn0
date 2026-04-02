@@ -8,6 +8,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroUsize;
 use std::str::FromStr;
 use std::sync::Arc;
+use super::oci_scaler::{OciScaler, ScaleAction};
+use tracing::*;
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
@@ -22,6 +24,7 @@ pub struct OciContainerInstanceHostProvider {
     subnet_id: String,
     image: String,
     envs: BTreeMap<String, String>,
+    scaler: Arc<OciScaler>,
 }
 
 impl OciContainerInstanceHostProvider {
@@ -63,7 +66,86 @@ impl OciContainerInstanceHostProvider {
             subnet_id: args.subnet_id,
             image: args.image,
             envs: args.envs,
+            scaler: Arc::new(OciScaler::new()),
         }
+    }
+
+    async fn count_managed_instances(&self) -> color_eyre::Result<usize> {
+        let mut count = 0;
+
+        for state in ["CREATING", "UPDATING", "ACTIVE"] {
+            let mut page = None;
+            loop {
+                let response = self
+                    .container_instance_client
+                    .list_container_instances(
+                        ListContainerInstancesRequest::new(
+                            ListContainerInstancesRequestRequired {
+                                compartment_id: self.compartment_id.clone(),
+                            },
+                        )
+                        .with_lifecycle_state(state)
+                        .set_page(page),
+                    )
+                    .await?;
+
+                count += response.items.len();
+
+                if let Some(next_page) = response.opc_next_page {
+                    page = Some(next_page);
+                } else {
+                    break;
+                }
+            }
+        }
+
+        Ok(count)
+    }
+
+    async fn launch_one(&self) -> color_eyre::Result<()> {
+        let environment_variables: HashMap<String, String> = self
+            .envs
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        let create_container_instance_details = CreateContainerInstanceDetails::new(
+            CreateContainerInstanceDetailsRequired {
+                compartment_id: self.compartment_id.clone(),
+                availability_domain: self.availability_domain.clone(),
+                shape: self.shape.clone(),
+                shape_config: CreateContainerInstanceShapeConfigDetails::new(
+                    CreateContainerInstanceShapeConfigDetailsRequired {
+                        ocpus: self.ocpus.get() as i64,
+                    },
+                )
+                .with_memory_in_gbs(self.memory_in_gbs.get() as i64),
+                containers: vec![CreateContainerDetails::new(CreateContainerDetailsRequired {
+                    image_url: self.image.clone(),
+                })
+                .with_display_name("fn0-host")
+                .set_environment_variables(Some(environment_variables))],
+                vnics: vec![CreateContainerVnicDetails::new(
+                    CreateContainerVnicDetailsRequired {
+                        subnet_id: self.subnet_id.clone(),
+                    },
+                )
+                .with_is_public_ip_assigned(true)],
+            },
+        )
+        .with_container_restart_policy("ALWAYS");
+
+        self.container_instance_client
+            .create_container_instance(
+                CreateContainerInstanceRequest::new(
+                    CreateContainerInstanceRequestRequired {
+                        create_container_instance_details,
+                    },
+                ),
+            )
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -124,48 +206,29 @@ impl HostProvide for OciContainerInstanceHostProvider {
         Ok(())
     }
 
-    async fn launch_instance(&self) -> color_eyre::Result<()> {
-        let environment_variables: HashMap<String, String> = self
-            .envs
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
+    async fn scale_to(&self, n: usize) -> color_eyre::Result<()> {
+        let count = self.count_managed_instances().await?;
 
-        let create_container_instance_details = CreateContainerInstanceDetails::new(
-            CreateContainerInstanceDetailsRequired {
-                compartment_id: self.compartment_id.clone(),
-                availability_domain: self.availability_domain.clone(),
-                shape: self.shape.clone(),
-                shape_config: CreateContainerInstanceShapeConfigDetails::new(
-                    CreateContainerInstanceShapeConfigDetailsRequired {
-                        ocpus: self.ocpus.get() as i64,
-                    },
-                )
-                .with_memory_in_gbs(self.memory_in_gbs.get() as i64),
-                containers: vec![CreateContainerDetails::new(CreateContainerDetailsRequired {
-                    image_url: self.image.clone(),
-                })
-                .with_display_name("fn0-host")
-                .set_environment_variables(Some(environment_variables))],
-                vnics: vec![CreateContainerVnicDetails::new(
-                    CreateContainerVnicDetailsRequired {
-                        subnet_id: self.subnet_id.clone(),
-                    },
-                )
-                .with_is_public_ip_assigned(true)],
-            },
-        )
-        .with_container_restart_policy("ALWAYS");
-
-        self.container_instance_client
-            .create_container_instance(
-                CreateContainerInstanceRequest::new(
-                    CreateContainerInstanceRequestRequired {
-                        create_container_instance_details,
-                    },
-                ),
-            )
-            .await?;
+        match self.scaler.decide(count, n).await {
+            ScaleAction::ScaleOut(deficit) => {
+                info!(current = count, target = n, launching = deficit, "Scaling out");
+                for _ in 0..deficit {
+                    if let Err(err) = self.launch_one().await {
+                        warn!(%err, "Failed to launch container instance");
+                    }
+                }
+            }
+            ScaleAction::ScaleIn(surplus) => {
+                info!(current = count, target = n, terminating = surplus, "Scaling in");
+                let hosts = self.list_hosts().await?;
+                for host in hosts.into_iter().take(surplus) {
+                    if let Err(err) = self.terminate(&host.id).await {
+                        warn!(%err, "Failed to terminate container instance");
+                    }
+                }
+            }
+            ScaleAction::Locked | ScaleAction::NoOp => {}
+        }
 
         Ok(())
     }
