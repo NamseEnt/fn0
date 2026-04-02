@@ -1,8 +1,9 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
     containerinstances::{
-        self, ClientConfig as ContainerInstancesConfig, ContainerInstanceLifecycleState,
-        ListContainerInstancesRequest, ListContainerInstancesRequestRequired,
+        self, ClientConfig as ContainerInstancesConfig, ContainerinstancesApi,
+        ContainerInstanceLifecycleState, ListContainerInstancesRequest,
+        ListContainerInstancesRequestRequired,
     },
     core::{region::Region, retry::Retrier},
 };

@@ -1,7 +1,7 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
     containerinstances::{
-        self, ContainerInstanceLifecycleState, CreateContainerDetails,
+        self, ContainerinstancesApi, ContainerInstanceLifecycleState, CreateContainerDetails,
         CreateContainerDetailsRequired, CreateContainerInstanceDetails,
         CreateContainerInstanceDetailsRequired, CreateContainerInstanceRequest,
         CreateContainerInstanceRequestRequired, CreateContainerInstanceShapeConfigDetails,

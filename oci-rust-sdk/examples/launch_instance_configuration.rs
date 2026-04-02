@@ -1,8 +1,8 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
     core::{
-        self, LaunchInstanceDetails, LaunchInstanceDetailsRequired, LaunchInstanceRequest,
-        LaunchInstanceRequestRequired, Retrier, region::Region,
+        self, CoreApi, LaunchInstanceDetails, LaunchInstanceDetailsRequired,
+        LaunchInstanceRequest, LaunchInstanceRequestRequired, Retrier, region::Region,
     },
 };
 use std::sync::Arc;

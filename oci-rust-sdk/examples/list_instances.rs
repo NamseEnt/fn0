@@ -1,6 +1,6 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
-    core::{self, ListInstancesRequest, ListInstancesRequestRequired, Retrier, region::Region},
+    core::{self, CoreApi, ListInstancesRequest, ListInstancesRequestRequired, Retrier, region::Region},
 };
 use std::sync::Arc;
 use std::time::Duration;

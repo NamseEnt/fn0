@@ -6,7 +6,8 @@
 use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
     containerinstances::{
-        self, ListContainerInstancesRequest, ListContainerInstancesRequestRequired,
+        self, ContainerinstancesApi, ListContainerInstancesRequest,
+        ListContainerInstancesRequestRequired,
     },
     core::{Result, Retrier, region::Region},
 };

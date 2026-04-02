@@ -2,8 +2,8 @@ use oci_rust_sdk::{
     auth::ConfigFileAuthProvider,
     core::{Retrier, region::Region},
     resourcesearch::{
-        self, SearchDetails, SearchDetailsMatchingContextType, SearchDetailsRequired,
-        SearchResourcesRequest, SearchResourcesRequestRequired,
+        self, ResourceSearchApi, SearchDetails, SearchDetailsMatchingContextType,
+        SearchDetailsRequired, SearchResourcesRequest, SearchResourcesRequestRequired,
     },
 };
 use std::sync::Arc;
