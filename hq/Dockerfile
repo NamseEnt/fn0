@@ -11,6 +11,7 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 COPY doc-db/ doc-db/
 COPY host-hq-protocol/ host-hq-protocol/
+COPY oci-rust-sdk/ oci-rust-sdk/
 COPY hq/ hq/
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
