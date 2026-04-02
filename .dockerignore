@@ -7,7 +7,7 @@ cli/
 sample-wasi-http-rust/
 ski/
 measure-cpu-time/
-oci-rust-sdk/
+oci-rust-sdk/target/
 wasmtime/
 docker/
 dist-workspace.toml
