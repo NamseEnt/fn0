@@ -99,7 +99,7 @@ impl Site {
             loop {
                 random_sleep(1000).await;
 
-                if deadline < start_time {
+                if Instant::now() > deadline {
                     dead_hosts.insert(host.clone(), Instant::now());
                     telemetry::host_connect_status(&host.id, false);
                     break;
