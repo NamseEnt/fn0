@@ -80,39 +80,57 @@ sudo chown -R "$DWS_USER:$DWS_USER" "$SSH_DIR"
 echo ""
 echo "--- Step 3: Register host in doc-db ---"
 
-TURSO_DB_URL=$(pulumi config get fn0Cloud:tursoDbUrl -s "$PULUMI_STACK" -C "$INFRA_DIR" 2>/dev/null) || {
-  echo "ERROR: Failed to get tursoDbUrl from Pulumi config."
+TURSO_API_TOKEN=$(pulumi config get turso:apiToken -s "$PULUMI_STACK" -C "$INFRA_DIR" 2>/dev/null) || {
+  echo "ERROR: Failed to get turso:apiToken from Pulumi config."
   exit 1
 }
 
-TURSO_DB_TOKEN=$(pulumi config get fn0Cloud:tursoDbToken -s "$PULUMI_STACK" -C "$INFRA_DIR" 2>/dev/null) || {
-  echo "ERROR: Failed to get tursoDbToken from Pulumi config."
+TURSO_ORG=$(pulumi config get fn0Cloud:tursoOrganizationSlug -s "$PULUMI_STACK" -C "$INFRA_DIR" 2>/dev/null) || {
+  echo "ERROR: Failed to get tursoOrganizationSlug from Pulumi config."
   exit 1
 }
 
-HTTP_URL="${TURSO_DB_URL/libsql:\/\//https://}"
+DB_NAME=$(curl -sf "https://api.turso.tech/v1/organizations/${TURSO_ORG}/databases" \
+  -H "Authorization: Bearer ${TURSO_API_TOKEN}" \
+  | python3 -c "import sys,json; dbs=json.load(sys.stdin)['databases']; print(next(d['Name'] for d in dbs if d['Name'].startswith('fn0-doc-db')))") || {
+  echo "ERROR: Failed to find doc-db database via Turso API."
+  exit 1
+}
+
+DB_TOKEN=$(curl -sf "https://api.turso.tech/v1/organizations/${TURSO_ORG}/databases/${DB_NAME}/auth/tokens" \
+  -X POST \
+  -H "Authorization: Bearer ${TURSO_API_TOKEN}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['jwt'])") || {
+  echo "ERROR: Failed to get database auth token."
+  exit 1
+}
+
+HTTP_URL="https://${DB_NAME}-${TURSO_ORG}.aws-ap-northeast-1.turso.io"
 
 VALUE=$(printf '{"addr":"%s","port":%d}' "$ADDR" "$QUIC_PORT")
 PK="dws-host:$HOST_ID"
 
 RESPONSE=$(curl -sf -X POST "${HTTP_URL}/v2/pipeline" \
-  -H "Authorization: Bearer ${TURSO_DB_TOKEN}" \
+  -H "Authorization: Bearer ${DB_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "$(printf '{
-    "requests": [
-      {
-        "type": "execute",
-        "stmt": {
-          "sql": "INSERT OR REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
-          "args": [
-            {"type": "text", "value": "%s"},
-            {"type": "text", "value": "%s"}
-          ]
-        }
-      },
-      {"type": "close"}
+  -d "$(python3 -c "
+import json, sys
+pk = sys.argv[1]
+value = sys.argv[2]
+payload = {
+    'requests': [
+        {'type': 'execute', 'stmt': {
+            'sql': 'INSERT OR REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)',
+            'args': [
+                {'type': 'text', 'value': pk},
+                {'type': 'text', 'value': value},
+            ],
+        }},
+        {'type': 'close'},
     ]
-  }' "$PK" "$VALUE")"
+}
+print(json.dumps(payload))
+" "$PK" "$VALUE")"
 ) || {
   echo "ERROR: Failed to register host in doc-db."
   echo "Check your network and Turso credentials."
