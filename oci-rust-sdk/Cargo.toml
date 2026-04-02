@@ -1,6 +1,6 @@
 [package]
 name = "oci-rust-sdk"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2024"
 description = "Unofficial Oracle OCI SDK for Rust"
 authors = ["namse"]
@@ -22,6 +22,7 @@ audit = []
 reqwest = { version = "0.12", features = [
     "json",
     "rustls-tls",
+    "gzip",
 ], default-features = false }
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"

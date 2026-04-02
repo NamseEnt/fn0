@@ -1,5 +1,5 @@
 use super::*;
-use crate::{host_provider::HostProvide, random_sleep::random_sleep, telemetry, *};
+use crate::{telemetry, *};
 use host_hq_protocol::HqToHostReliable;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
@@ -18,8 +18,8 @@ impl Site {
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         let mut scale_in_tick_count = 0;
-        let mut last_scale_out_at: Option<Instant> = None;
         let mut last_scale_in_at: Option<Instant> = None;
+        let mut last_scale_to_at: Option<Instant> = None;
 
         loop {
             interval.tick().await;
@@ -126,44 +126,17 @@ impl Site {
 
             scale_in_tick_count = 0;
 
-            if hosts < scale_out_target {
-                if let Some(last_scale_out_at) = last_scale_out_at
-                    && last_scale_out_at.elapsed().as_secs()
-                        < scale_config.scale_out_cooldown_secs.get() as _
-                {
-                    continue;
-                }
+            if let Some(last) = last_scale_to_at
+                && last.elapsed().as_secs()
+                    < scale_config.scale_out_cooldown_secs.get() as _
+            {
+                continue;
+            }
 
-                let provisioned_hosts = match self.host_provider.list_hosts().await {
-                    Ok(h) => h.len(),
-                    Err(err) => {
-                        warn!(%err, "Fail to list hosts for scale out check");
-                        continue;
-                    }
-                };
+            last_scale_to_at = Some(Instant::now());
 
-                if provisioned_hosts >= scale_out_target {
-                    continue;
-                }
-
-                last_scale_out_at = Some(Instant::now());
-
-                let count = scale_out_target - provisioned_hosts;
-
-                telemetry::scaler_action_triggered("scale_out", count);
-
-                for _ in 0..count {
-                    let host_provider = self.host_provider.clone();
-                    tokio::spawn(async move {
-                        random_sleep(1000).await;
-                        let result = host_provider.launch_instance().await;
-                        telemetry::scaler_launch_attempt_status(result.is_ok());
-
-                        if let Err(err) = result {
-                            warn!(%err, "Fail to scale out");
-                        };
-                    });
-                }
+            if let Err(err) = self.host_provider.scale_to(scale_out_target).await {
+                warn!(%err, "Fail to scale_to");
             }
         }
     }

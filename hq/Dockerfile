@@ -15,13 +15,14 @@ COPY oci-rust-sdk/ oci-rust-sdk/
 COPY hq/ hq/
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/hq/target \
+    --mount=type=cache,id=hq-target-${TARGETARCH},target=/app/hq/target \
     if [ "$TARGETARCH" = "arm64" ]; then \
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       cargo build --release --target aarch64-unknown-linux-gnu --manifest-path hq/Cargo.toml && \
       cp hq/target/aarch64-unknown-linux-gnu/release/hq /app/hq-bin; \
     else \
-      cd hq && cargo build --release && cp target/release/hq /app/hq-bin; \
+      cargo build --release --manifest-path hq/Cargo.toml && \
+      cp hq/target/release/hq /app/hq-bin; \
     fi
 
 FROM debian:bookworm-slim

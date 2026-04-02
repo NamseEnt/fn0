@@ -1,4 +1,4 @@
-target/
+**/target/
 infra/
 ls-news/
 fn0-compiler/
@@ -7,7 +7,6 @@ cli/
 sample-wasi-http-rust/
 ski/
 measure-cpu-time/
-oci-rust-sdk/target/
 wasmtime/
 docker/
 dist-workspace.toml

@@ -254,18 +254,6 @@ pub fn scaler_action_triggered(action: &'static str, count: usize) {
     counter.add(count as u64, &[KeyValue::new("action", action)]);
 }
 
-pub fn scaler_launch_attempt_status(success: bool) {
-    let counter = global::meter("hq")
-        .u64_counter("scaler_launch_attempt_status")
-        .build();
-    counter.add(
-        1,
-        &[KeyValue::new(
-            "result",
-            if success { "success" } else { "failure" },
-        )],
-    );
-}
 
 pub fn scaler_shutdown_command_status(success: bool) {
     let counter = global::meter("hq")
