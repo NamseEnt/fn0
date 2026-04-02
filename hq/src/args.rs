@@ -24,6 +24,7 @@ pub struct AwsArgs {
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SiteArgs {
+    pub name: String,
     pub host_provider: HostProviderArg,
     pub dns_provider: DnsProviderArg,
 }

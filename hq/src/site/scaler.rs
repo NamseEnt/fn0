@@ -24,7 +24,7 @@ impl Site {
         loop {
             interval.tick().await;
 
-            let scale_config = match self.doc_db.get_scale_config().await {
+            let scale_config = match self.doc_db.get_scale_config(&self.name).await {
                 Ok(Some(scale_config)) => {
                     telemetry::scaler_config_fetch_status(true);
                     scale_config

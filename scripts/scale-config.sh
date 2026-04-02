@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 #
-# scale-config.sh - Manage the HQ autoscaler's ScaleConfig stored in DocDB (Turso).
+# scale-config.sh - Manage per-site ScaleConfig stored in DocDB (Turso).
 #
 # Prerequisites:
 #   - Pulumi CLI logged in with access to the fn0Cloud stack
 #   - curl, python3
 #
 # Commands:
-#   get              Print the current scale config (or "No scale config set" if absent).
-#   set '<json>'     Validate and write a new scale config to DocDB.
+#   get <site_name>              Print the scale config for the given site.
+#   set <site_name> '<json>'     Validate and write a new scale config for the given site.
+#
+# The site_name must match the "name" field in the site's hq-args.json config.
+# For example: "oci-compute-vm", "oci-container-instance"
 #
 # Fields (all required, integer >= 1):
 #   instances_per_gb               Max instances per GB of host memory.
@@ -23,9 +26,9 @@
 #   min_hosts                      Lower bound on running hosts. Must be <= max_hosts.
 #
 # Examples:
-#   ./scripts/scale-config.sh get
+#   ./scripts/scale-config.sh get oci-compute-vm
 #
-#   ./scripts/scale-config.sh set '{
+#   ./scripts/scale-config.sh set oci-compute-vm '{
 #     "instances_per_gb": 4,
 #     "instances_per_core": 1,
 #     "scale_out_threshold_percent": 80,
@@ -61,35 +64,53 @@ get_turso_jwt() {
   TURSO_URL="https://${db_name}-${org_slug}.aws-ap-northeast-1.turso.io"
 }
 
-turso_query() {
-  local sql="$1"
+turso_pipeline() {
+  local body="$1"
   curl -sf "${TURSO_URL}/v2/pipeline" \
     -H "Authorization: Bearer ${TURSO_JWT}" \
     -H "Content-Type: application/json" \
-    -d "{\"requests\":[{\"type\":\"execute\",\"stmt\":{\"sql\":\"${sql}\"}},{\"type\":\"close\"}]}"
+    -d "$body"
 }
 
 cmd_get() {
+  local site_name="$1"
   get_turso_jwt
-  local result
-  result=$(turso_query "SELECT value FROM docs WHERE pk = 'scale-config' AND sk = 0")
 
-  local value
-  value=$(echo "$result" | python3 -c "
+  local pk="scale-config:${site_name}"
+  local body
+  body=$(python3 -c "
+import json, sys
+pk = sys.argv[1]
+payload = {
+    'requests': [
+        {'type': 'execute', 'stmt': {
+            'sql': 'SELECT value FROM docs WHERE pk = ? AND sk = 0',
+            'args': [{'type': 'text', 'value': pk}],
+        }},
+        {'type': 'close'},
+    ]
+}
+print(json.dumps(payload))
+" "$pk")
+
+  local result
+  result=$(turso_pipeline "$body")
+
+  echo "$result" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 rows = data['results'][0]['response']['result']['rows']
 if not rows:
-    print('No scale config set')
+    print('No scale config set for this site')
 else:
     config = json.loads(rows[0][0]['value'])
     print(json.dumps(config, indent=2))
-")
-  echo "$value"
+"
 }
 
 cmd_set() {
-  local json_arg="${1:-}"
+  local site_name="$1"
+  local json_arg="${2:-}"
   if [ -z "$json_arg" ]; then
     echo "Error: JSON argument required. Run '$0' without arguments to see usage."
     exit 1
@@ -122,21 +143,47 @@ if config['min_hosts'] > config['max_hosts']:
 
   get_turso_jwt
 
-  local escaped_json
-  escaped_json=$(echo "$json_arg" | python3 -c "import sys; s=sys.stdin.read().strip(); print(s.replace(\"'\", \"''\"))")
+  local pk="scale-config:${site_name}"
+  local body
+  body=$(python3 -c "
+import json, sys
+pk = sys.argv[1]
+value = sys.argv[2]
+payload = {
+    'requests': [
+        {'type': 'execute', 'stmt': {
+            'sql': 'REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)',
+            'args': [
+                {'type': 'text', 'value': pk},
+                {'type': 'text', 'value': value},
+            ],
+        }},
+        {'type': 'close'},
+    ]
+}
+print(json.dumps(payload))
+" "$pk" "$json_arg")
 
-  turso_query "REPLACE INTO docs (pk, sk, value) VALUES ('scale-config', 0, '${escaped_json}')" > /dev/null
+  turso_pipeline "$body" > /dev/null
 
-  echo "Scale config updated."
-  cmd_get
+  echo "Scale config for '${site_name}' updated."
+  cmd_get "$site_name"
 }
 
 case "${1:-}" in
   get)
-    cmd_get
+    if [ -z "${2:-}" ]; then
+      echo "Error: site_name required. Usage: $0 get <site_name>"
+      exit 1
+    fi
+    cmd_get "$2"
     ;;
   set)
-    cmd_set "${2:-}"
+    if [ -z "${2:-}" ]; then
+      echo "Error: site_name required. Usage: $0 set <site_name> '<json>'"
+      exit 1
+    fi
+    cmd_set "$2" "${3:-}"
     ;;
   *)
     sed -n '2,/^set -euo/{ /^#/s/^# \?//p }' "$0"

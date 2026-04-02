@@ -71,4 +71,5 @@ export interface OciContainerInstanceHostProviderArgs {
 export interface SiteArgs {
   dnsProvider: pulumi.Input<DnsProviderArg>;
   hostProvider: pulumi.Input<HostProviderArg>;
+  name: pulumi.Input<string>;
 }
