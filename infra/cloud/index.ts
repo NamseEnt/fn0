@@ -147,7 +147,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
       hostProvider: {
         dedicated: {
           sshUser: "fn0",
-          sshPrivateKeyBase64: dwsSshKey.privateKeyPem.apply((pem) =>
+          sshPrivateKeyBase64: dwsSshKey.privateKeyPem.apply((pem: string) =>
             Buffer.from(pem).toString("base64")
           ),
           workerImage: ociComputeWorker.workerImageMultiArch,

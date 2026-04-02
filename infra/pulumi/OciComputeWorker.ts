@@ -428,7 +428,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     const manifestCreate = new command.local.Command(
       "worker-manifest-create",
       {
-        create: pulumi.interpolate`docker login ${registryUrl} -u ${workerRepo.namespace}/${workerDockerUser.name} -p ${workerAuthToken.token} && docker manifest create --amend ${multiArchTag} ${workerImage.imageName} ${workerImageAmd64.imageName} && docker manifest push ${multiArchTag}`,
+        create: pulumi.interpolate`docker login ${registryUrl} -u ${workerRepo.namespace}/${workerDockerUser.name} -p '${workerAuthToken.token}' && docker manifest create --amend ${multiArchTag} ${workerImage.imageName} ${workerImageAmd64.imageName} && docker manifest push ${multiArchTag}`,
         triggers: [workerImage.repoDigest, workerImageAmd64.repoDigest],
       },
       { parent: this, dependsOn: [workerImage, workerImageAmd64] }
