@@ -197,14 +197,11 @@ impl RequestSigner {
 
     /// Sign a string using RSA-SHA256
     fn sign_string(&self, data: &str) -> crate::core::Result<String> {
-        // Hash the data
         let mut hasher = Sha256::new();
         hasher.update(data.as_bytes());
         let hashed = hasher.finalize();
 
-        // Sign with RSA PKCS#1 v1.5
-        // Use unpadded signing since we already hashed the data
-        let padding = Pkcs1v15Sign::new_unprefixed();
+        let padding = Pkcs1v15Sign::new::<Sha256>();
         let signature = self
             .private_key
             .sign(padding, &hashed)
