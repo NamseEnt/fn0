@@ -82,8 +82,8 @@ export function createDockerRegistry(
     {
       imageName: pulumi.interpolate`${registryUrl}/${repo.namespace}/${repo.displayName}:v1`,
       build: {
-        context: "../../..",
-        dockerfile: "../../../hq/Dockerfile",
+        context: "../..",
+        dockerfile: "../../hq/Dockerfile",
         platform: "linux/arm64",
       },
       registry: {
