@@ -16,12 +16,6 @@ echo "QUIC Port:    $QUIC_PORT"
 echo "Pulumi Stack: $PULUMI_STACK"
 echo ""
 
-if [ "$(id -u)" -ne 0 ]; then
-  echo "ERROR: This script must be run as root (for user creation)."
-  echo "Usage: sudo $0"
-  exit 1
-fi
-
 if ! command -v pulumi &>/dev/null; then
   echo "ERROR: pulumi CLI is not installed."
   echo "Install: https://www.pulumi.com/docs/install/"
@@ -43,16 +37,16 @@ echo "--- Step 1: Create user '$DWS_USER' ---"
 if id "$DWS_USER" &>/dev/null; then
   echo "User '$DWS_USER' already exists."
 else
-  useradd -m -s /bin/bash "$DWS_USER"
+  sudo useradd -m -s /bin/bash "$DWS_USER"
   echo "User '$DWS_USER' created."
 fi
 
 if getent group docker &>/dev/null; then
-  usermod -aG docker "$DWS_USER"
+  sudo usermod -aG docker "$DWS_USER"
   echo "User '$DWS_USER' added to docker group."
 else
   echo "WARNING: docker group does not exist. Create it after installing Docker:"
-  echo "  groupadd docker && usermod -aG docker $DWS_USER"
+  echo "  sudo groupadd docker && sudo usermod -aG docker $DWS_USER"
 fi
 
 DWS_HOME=$(eval echo "~$DWS_USER")
@@ -69,19 +63,19 @@ SSH_PUBLIC_KEY=$(pulumi stack output dwsSshPublicKey -s "$PULUMI_STACK" -C "$INF
 SSH_DIR="$DWS_HOME/.ssh"
 AUTH_KEYS="$SSH_DIR/authorized_keys"
 
-mkdir -p "$SSH_DIR"
-chmod 700 "$SSH_DIR"
-touch "$AUTH_KEYS"
-chmod 600 "$AUTH_KEYS"
+sudo mkdir -p "$SSH_DIR"
+sudo chmod 700 "$SSH_DIR"
+sudo touch "$AUTH_KEYS"
+sudo chmod 600 "$AUTH_KEYS"
 
-if grep -qF "$SSH_PUBLIC_KEY" "$AUTH_KEYS" 2>/dev/null; then
+if sudo grep -qF "$SSH_PUBLIC_KEY" "$AUTH_KEYS" 2>/dev/null; then
   echo "SSH public key is already registered."
 else
-  echo "$SSH_PUBLIC_KEY" >> "$AUTH_KEYS"
+  echo "$SSH_PUBLIC_KEY" | sudo tee -a "$AUTH_KEYS" > /dev/null
   echo "SSH public key registered in $AUTH_KEYS"
 fi
 
-chown -R "$DWS_USER:$DWS_USER" "$SSH_DIR"
+sudo chown -R "$DWS_USER:$DWS_USER" "$SSH_DIR"
 
 echo ""
 echo "--- Step 3: Register host in doc-db ---"
