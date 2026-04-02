@@ -31,22 +31,6 @@ pub struct ScaleConfig {
     pub min_hosts: NonZeroUsize,
 }
 
-impl Default for ScaleConfig {
-    fn default() -> Self {
-        Self {
-            instances_per_gb: NonZeroUsize::new(4).unwrap(),
-            instances_per_core: NonZeroUsize::new(1).unwrap(),
-            scale_out_threshold_percent: NonZeroUsize::new(80).unwrap(),
-            scale_in_threshold_percent: NonZeroUsize::new(40).unwrap(),
-            scale_out_cooldown_secs: NonZeroUsize::new(60).unwrap(),
-            scale_in_threshold_ticks: NonZeroUsize::new(3).unwrap(),
-            scale_in_cooldown_secs: NonZeroUsize::new(300).unwrap(),
-            max_hosts: NonZeroUsize::new(2).unwrap(),
-            min_hosts: NonZeroUsize::new(2).unwrap(),
-        }
-    }
-}
-
 impl DocDb {
     pub async fn get_scale_config(&self) -> Result<Option<ScaleConfig>> {
         let conn = self.db.connect()?;
