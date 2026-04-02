@@ -3,6 +3,7 @@ import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
 import * as docker from "@pulumi/docker";
+import * as command from "@pulumi/command";
 
 export interface OciComputeWorkerArgs {
   region: pulumi.Input<string>;
@@ -35,6 +36,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly instanceConfigurationId: pulumi.Output<string>;
   public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
   public readonly workerImageUrl: pulumi.Output<string>;
+  public readonly workerImageMultiArch: pulumi.Output<string>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
 
@@ -403,6 +405,36 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     );
 
     this.workerImageUrl = workerImage.repoDigest;
+
+    const workerImageAmd64 = new docker.Image(
+      "worker-image-amd64",
+      {
+        imageName: pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1-amd64`,
+        build: {
+          context: "../../fn0-worker",
+          platform: "linux/amd64",
+        },
+        registry: {
+          server: registryUrl,
+          username: pulumi.interpolate`${workerRepo.namespace}/${workerDockerUser.name}`,
+          password: workerAuthToken.token,
+        },
+      },
+      { parent: this }
+    );
+
+    const multiArchTag = pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
+
+    const manifestCreate = new command.local.Command(
+      "worker-manifest-create",
+      {
+        create: pulumi.interpolate`docker login ${registryUrl} -u ${workerRepo.namespace}/${workerDockerUser.name} -p ${workerAuthToken.token} && docker manifest create --amend ${multiArchTag} ${workerImage.imageName} ${workerImageAmd64.imageName} && docker manifest push ${multiArchTag}`,
+        triggers: [workerImage.repoDigest, workerImageAmd64.repoDigest],
+      },
+      { parent: this, dependsOn: [workerImage, workerImageAmd64] }
+    );
+
+    this.workerImageMultiArch = multiArchTag;
     this.osImageId = imageId;
 
     const cwasmBucketUser = new oci.identity.User(
