@@ -8,7 +8,7 @@
 #   - curl, python3
 #
 # Usage:
-#   HOST_ID=<unique-id> ./scripts/setup-dws.sh
+#   ./scripts/setup-dws.sh <HOST_ID>
 #
 # What it does:
 #   1. Fetches worker image and S3 credentials from Pulumi stack output
@@ -26,7 +26,12 @@
 #
 set -euo pipefail
 
-HOST_ID="${HOST_ID:?HOST_ID is required}"
+if [ -z "${1:-}" ]; then
+  echo "Usage: $0 <HOST_ID>"
+  exit 1
+fi
+
+HOST_ID="$1"
 PULUMI_STACK="${PULUMI_STACK:-prod}"
 HTTP_PORT="${HTTP_PORT:-8080}"
 WS_PORT="${WS_PORT:-10000}"
