@@ -89,7 +89,7 @@ impl Site {
         let host_connections = self.host_connections.clone();
 
         tokio::spawn(async move {
-            let deadline = Instant::now() + Duration::from_secs(180);
+            let deadline = Instant::now() + Duration::from_secs(600);
             let connect_timeout = Duration::from_secs(2);
 
             let connect_target = match &host_transport {
