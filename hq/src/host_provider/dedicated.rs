@@ -117,10 +117,17 @@ impl HostProvide for DedicatedHostProvider {
 
         Ok(records
             .into_iter()
-            .map(|(id, record)| Host {
-                id: HostId::new(id),
-                addr: record.addr,
-                port: record.port,
+            .map(|(id, record)| {
+                let transport = match record.transport {
+                    doc_db::DwsTransport::Quic => HostTransport::Quic,
+                    doc_db::DwsTransport::WebSocket => HostTransport::WebSocket,
+                };
+                Host {
+                    id: HostId::new(id),
+                    addr: record.addr,
+                    port: record.port,
+                    transport,
+                }
             })
             .collect())
     }

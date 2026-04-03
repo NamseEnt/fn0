@@ -6,6 +6,18 @@ use super::*;
 pub struct DedicatedHostRecord {
     pub addr: String,
     pub port: u16,
+    #[serde(default)]
+    pub transport: DwsTransport,
+    #[serde(default)]
+    pub http_host: Option<String>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum DwsTransport {
+    #[default]
+    Quic,
+    WebSocket,
 }
 
 impl DocDb {
@@ -46,6 +58,8 @@ mod tests {
                 serde_json::to_string(&DedicatedHostRecord {
                     addr: "1.2.3.4".to_string(),
                     port: 10000,
+                    transport: DwsTransport::Quic,
+                    http_host: None,
                 })
                 .unwrap()
             ],
@@ -59,6 +73,8 @@ mod tests {
                 serde_json::to_string(&DedicatedHostRecord {
                     addr: "my-host.example.com".to_string(),
                     port: 10000,
+                    transport: DwsTransport::WebSocket,
+                    http_host: Some("my-host-http.example.com".to_string()),
                 })
                 .unwrap()
             ],

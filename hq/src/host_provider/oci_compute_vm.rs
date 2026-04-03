@@ -246,6 +246,7 @@ impl HostProvide for OciComputeVmHostProvider {
                             id: HostId::new(instance.id.clone()),
                             addr: public_ip.clone(),
                             port: 10000,
+                            transport: HostTransport::Quic,
                         });
                     }
                 }

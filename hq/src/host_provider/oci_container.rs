@@ -179,6 +179,7 @@ impl HostProvide for OciContainerInstanceHostProvider {
                     id: HostId::new(instance.id),
                     addr: ip_str,
                     port: 10000,
+                    transport: HostTransport::Quic,
                 };
                 hosts.push(host);
             });
