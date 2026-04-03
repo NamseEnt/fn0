@@ -48,7 +48,7 @@ pub async fn run_quic_server(
         quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,
     ));
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 0], port));
     let endpoint = Endpoint::server(quinn_config, addr)?;
     tracing::info!(%addr, "QUIC server listening");
 
