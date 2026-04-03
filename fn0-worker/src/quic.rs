@@ -20,8 +20,11 @@ pub async fn run_quic_server(
     graceful_shutdown: Arc<AtomicBool>,
     fn0: Arc<Fn0<JsCache>>,
 ) -> Result<()> {
-    let ca_cert_pem = std::env::var("CA_CERT_PEM")
-        .map_err(|_| eyre!("CA_CERT_PEM env var not set"))?;
+    let Ok(ca_cert_pem) = std::env::var("CA_CERT_PEM") else {
+        tracing::info!("CA_CERT_PEM not set, QUIC server disabled");
+        std::future::pending::<()>().await;
+        return Ok(());
+    };
     let ca_key_pem = std::env::var("CA_KEY_PEM")
         .map_err(|_| eyre!("CA_KEY_PEM env var not set"))?;
 
