@@ -392,7 +392,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       {
         imageName: pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1`,
         build: {
-          context: "../../fn0-worker",
+          context: "../..",
+          dockerfile: "../../fn0-worker/Dockerfile",
           platform: "linux/arm64",
         },
         registry: {
@@ -411,7 +412,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       {
         imageName: pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1-amd64`,
         build: {
-          context: "../../fn0-worker",
+          context: "../..",
+          dockerfile: "../../fn0-worker/Dockerfile",
           platform: "linux/amd64",
         },
         registry: {
