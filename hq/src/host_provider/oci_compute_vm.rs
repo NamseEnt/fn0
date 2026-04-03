@@ -89,26 +89,27 @@ impl OciComputeVmHostProvider {
     }
 
     fn build_cloud_init(&self) -> String {
-        let env_file_content: String = self
+        let env_flags: String = self
             .envs
             .iter()
             .map(|(k, v)| {
-                let escaped = v.replace('\\', "\\\\").replace('\'', "'\\''");
-                format!("{k}='{escaped}'")
+                if v.contains('\n') {
+                    let encoded = base64::engine::general_purpose::STANDARD.encode(v.as_bytes());
+                    format!("-e {k}_BASE64={encoded}")
+                } else {
+                    format!("-e {k}={v}")
+                }
             })
             .collect::<Vec<_>>()
-            .join("\n");
+            .join(" ");
 
         format!(
             r#"#!/bin/bash
-cat > /tmp/fn0-worker.env << 'ENVEOF'
-{env_file_content}
-ENVEOF
 podman pull {image}
-podman run -d --restart=always --network=host --name fn0-worker --env-file /tmp/fn0-worker.env {image}
+podman run -d --restart=always --network=host --name fn0-worker {env_flags} {image}
 "#,
             image = self.worker_image_url,
-            env_file_content = env_file_content,
+            env_flags = env_flags,
         )
     }
 

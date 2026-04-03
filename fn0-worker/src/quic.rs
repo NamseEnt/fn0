@@ -1,4 +1,5 @@
 use adapt_cache::s3::S3AdaptCache;
+use base64::Engine;
 use color_eyre::eyre::{Result, eyre};
 use fn0::{CodeKind, Fn0};
 use host_hq_protocol::{HostToHq, HqToHostDatagram, HqToHostReliable};
@@ -11,6 +12,15 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+fn read_pem_env(name: &str) -> Option<String> {
+    if let Ok(v) = std::env::var(name) {
+        return Some(v);
+    }
+    let b64 = std::env::var(format!("{name}_BASE64")).ok()?;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(&b64).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
 type JsCache = S3AdaptCache<String, FromUtf8Error>;
 
 pub async fn run_quic_server(
@@ -20,13 +30,16 @@ pub async fn run_quic_server(
     graceful_shutdown: Arc<AtomicBool>,
     fn0: Arc<Fn0<JsCache>>,
 ) -> Result<()> {
-    let Ok(ca_cert_pem) = std::env::var("CA_CERT_PEM") else {
-        tracing::info!("CA_CERT_PEM not set, QUIC server disabled");
-        std::future::pending::<()>().await;
-        return Ok(());
+    let ca_cert_pem = match read_pem_env("CA_CERT_PEM") {
+        Some(v) => v,
+        None => {
+            tracing::info!("CA_CERT_PEM not set, QUIC server disabled");
+            std::future::pending::<()>().await;
+            return Ok(());
+        }
     };
-    let ca_key_pem = std::env::var("CA_KEY_PEM")
-        .map_err(|_| eyre!("CA_KEY_PEM env var not set"))?;
+    let ca_key_pem = read_pem_env("CA_KEY_PEM")
+        .ok_or_else(|| eyre!("CA_KEY_PEM env var not set"))?;
 
     let ca_key_pair = KeyPair::from_pem(&ca_key_pem)?;
     let ca_params = CertificateParams::from_ca_cert_pem(&ca_cert_pem)?;
