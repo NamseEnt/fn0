@@ -114,7 +114,7 @@ config = {
     'config': {
         'ingress': [
             {'hostname': '${HTTP_HOSTNAME}', 'service': 'http://localhost:${HTTP_PORT}'},
-            {'hostname': '${WS_HOSTNAME}', 'service': 'http://localhost:${WS_PORT}'},
+            {'hostname': '${WS_HOSTNAME}', 'service': 'http://localhost:${WS_PORT}', 'originRequest': {'http2Origin': False}},
             {'service': 'http_status:404'}
         ]
     }
