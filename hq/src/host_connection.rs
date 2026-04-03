@@ -59,11 +59,17 @@ impl HostConnection {
         })
     }
 
-    pub async fn connect_websocket(url: &str) -> Result<Self> {
+    pub async fn connect_websocket(url: &str, secret: Option<&str>) -> Result<Self> {
         let (ws_stream, _) = tokio_tungstenite::connect_async(url).await
             .map_err(|e| eyre!("WebSocket connect failed: {e}"))?;
 
-        let (sink, stream) = ws_stream.split();
+        let (mut sink, stream) = ws_stream.split();
+
+        if let Some(secret) = secret {
+            sink.send(Message::Text(secret.to_string().into()))
+                .await
+                .map_err(|e| eyre!("WebSocket auth send failed: {e}"))?;
+        }
 
         Ok(Self {
             inner: Arc::new(HostConnectionInner::WebSocket {

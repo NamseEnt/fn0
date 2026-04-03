@@ -24,6 +24,7 @@ export interface OciHeadQuarterArgs {
   awsAccessKeyId: pulumi.Input<string>;
   awsSecretAccessKey: pulumi.Input<string>;
   githubClientId: pulumi.Input<string>;
+  wsSecret: pulumi.Input<string>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
@@ -106,6 +107,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           secretAccessKey: args.awsSecretAccessKey,
         },
         githubClientId: args.githubClientId,
+        wsSecret: args.wsSecret,
       },
     });
 

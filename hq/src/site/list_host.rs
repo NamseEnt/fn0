@@ -84,6 +84,7 @@ impl Site {
         let host_addr = host.addr.clone();
         let host_port = host.port;
         let host_transport = host.transport.clone();
+        let ws_secret = self.ws_secret.clone();
         let dead_hosts = self.dead_hosts.clone();
         let host_connections = self.host_connections.clone();
 
@@ -126,7 +127,8 @@ impl Site {
                         timeout(connect_timeout, HostConnection::connect_quic(*addr, ca_pem)).await
                     }
                     ConnectTarget::WebSocket(url) => {
-                        timeout(connect_timeout, HostConnection::connect_websocket(url)).await
+                        let secret = if ws_secret.is_empty() { None } else { Some(ws_secret.as_str()) };
+                        timeout(connect_timeout, HostConnection::connect_websocket(url, secret)).await
                     }
                 };
 
