@@ -9,7 +9,8 @@ debug = true
 [dependencies]
 fn0 = "0.2"
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
-host-hq-protocol = { package = "fn0-host-hq-protocol", version = "0.2" }
+host-hq-protocol = { package = "fn0-host-hq-protocol", path = "../host-hq-protocol", version = "0.2" }
+futures = "0.3"
 aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
 aws-sdk-s3 = { version = "=1.115.0", default-features = false }
 bytes = "1"
@@ -25,5 +26,6 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+tokio-tungstenite = "0.26"
 anyhow = "1"
 zstd = "0.13"

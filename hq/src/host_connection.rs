@@ -1,18 +1,48 @@
+use bytes::Bytes;
 use color_eyre::eyre::{Result, eyre};
-use host_hq_protocol::{HqToHostDatagram, HqToHostReliable};
-use quinn::{ClientConfig, Connection, Endpoint, ReadDatagram};
+use futures::{SinkExt, StreamExt};
+use host_hq_protocol::{HqToHostDatagram, HqToHostReliable, HostToHq, WsHostToHq, WsHqToHost};
+use quinn::{ClientConfig, Connection, Endpoint};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::Arc,
 };
+use tokio::sync::Mutex;
+use tokio_tungstenite::tungstenite::Message;
+
+type WsSink = futures::stream::SplitSink<
+    tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
+    Message,
+>;
+type WsStream = futures::stream::SplitStream<
+    tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
+>;
 
 #[derive(Clone)]
 pub struct HostConnection {
-    connection: Connection,
+    inner: Arc<HostConnectionInner>,
+}
+
+enum HostConnectionInner {
+    Quic {
+        connection: Connection,
+    },
+    WebSocket {
+        sink: Mutex<WsSink>,
+        stream: Mutex<WsStream>,
+    },
 }
 
 impl HostConnection {
     pub async fn connect(addr: SocketAddr, ca_cert_pem: &str) -> Result<Self> {
+        Self::connect_quic(addr, ca_cert_pem).await
+    }
+
+    pub async fn connect_quic(addr: SocketAddr, ca_cert_pem: &str) -> Result<Self> {
         let local = if addr.is_ipv4() {
             LOCAL_IPV4
         } else {
@@ -24,28 +54,130 @@ impl HostConnection {
             .connect_with(client_config, addr, "host.fn0")?
             .await?;
 
-        Ok(Self { connection })
+        Ok(Self {
+            inner: Arc::new(HostConnectionInner::Quic { connection }),
+        })
     }
+
+    pub async fn connect_websocket(url: &str) -> Result<Self> {
+        let (ws_stream, _) = tokio_tungstenite::connect_async(url).await
+            .map_err(|e| eyre!("WebSocket connect failed: {e}"))?;
+
+        let (sink, stream) = ws_stream.split();
+
+        Ok(Self {
+            inner: Arc::new(HostConnectionInner::WebSocket {
+                sink: Mutex::new(sink),
+                stream: Mutex::new(stream),
+            }),
+        })
+    }
+
     pub fn send_datagram(&self, datagram: HqToHostDatagram) -> Result<()> {
-        let bytes = datagram.to_bytes()?;
-        if bytes.len() > 1200 {
-            return Err(eyre!("Datagram is too large"));
+        match self.inner.as_ref() {
+            HostConnectionInner::Quic { connection } => {
+                let bytes = datagram.to_bytes()?;
+                if bytes.len() > 1200 {
+                    return Err(eyre!("Datagram is too large"));
+                }
+                connection.send_datagram(bytes)?;
+                Ok(())
+            }
+            HostConnectionInner::WebSocket { .. } => {
+                Err(eyre!("Use send_datagram_async for WebSocket"))
+            }
         }
-        self.connection.send_datagram(bytes)?;
-        Ok(())
     }
+
+    pub async fn send_datagram_async(&self, datagram: HqToHostDatagram) -> Result<()> {
+        match self.inner.as_ref() {
+            HostConnectionInner::Quic { connection } => {
+                let bytes = datagram.to_bytes()?;
+                if bytes.len() > 1200 {
+                    return Err(eyre!("Datagram is too large"));
+                }
+                connection.send_datagram(bytes)?;
+                Ok(())
+            }
+            HostConnectionInner::WebSocket { sink, .. } => {
+                let msg = WsHqToHost::Datagram(datagram);
+                let bytes = msg.to_bytes()?;
+                sink.lock()
+                    .await
+                    .send(Message::Binary(bytes.to_vec().into()))
+                    .await
+                    .map_err(|e| eyre!("WebSocket send failed: {e}"))?;
+                Ok(())
+            }
+        }
+    }
+
     pub async fn send_reliable(&self, message: HqToHostReliable) -> Result<()> {
-        let bytes = message.to_bytes()?;
-        let mut send = self.connection.open_uni().await?;
-        send.write_all(&bytes).await?;
-        send.finish()?;
-        Ok(())
+        match self.inner.as_ref() {
+            HostConnectionInner::Quic { connection } => {
+                let bytes = message.to_bytes()?;
+                let mut send = connection.open_uni().await?;
+                send.write_all(&bytes).await?;
+                send.finish()?;
+                Ok(())
+            }
+            HostConnectionInner::WebSocket { sink, .. } => {
+                let msg = WsHqToHost::Reliable(message);
+                let bytes = msg.to_bytes()?;
+                sink.lock()
+                    .await
+                    .send(Message::Binary(bytes.to_vec().into()))
+                    .await
+                    .map_err(|e| eyre!("WebSocket send failed: {e}"))?;
+                Ok(())
+            }
+        }
     }
-    pub fn read_unreliable_small_message(&self) -> ReadDatagram<'_> {
-        self.connection.read_datagram()
+
+    pub async fn read_message(&self) -> Result<HostToHq> {
+        match self.inner.as_ref() {
+            HostConnectionInner::Quic { connection } => {
+                let bytes = connection.read_datagram().await?;
+                let msg = HostToHq::from_bytes(bytes)?;
+                Ok(msg)
+            }
+            HostConnectionInner::WebSocket { stream, .. } => {
+                let mut stream = stream.lock().await;
+                loop {
+                    match stream.next().await {
+                        Some(Ok(Message::Binary(data))) => {
+                            let msg = WsHostToHq::from_bytes(&data)
+                                .map_err(|e| eyre!("Failed to parse WebSocket message: {e}"))?;
+                            match msg {
+                                WsHostToHq::Datagram(host_msg) => return Ok(host_msg),
+                            }
+                        }
+                        Some(Ok(Message::Close(_))) | None => {
+                            return Err(eyre!("WebSocket connection closed"));
+                        }
+                        Some(Err(e)) => {
+                            return Err(eyre!("WebSocket read error: {e}"));
+                        }
+                        _ => continue,
+                    }
+                }
+            }
+        }
     }
+
     pub fn close(&self) {
-        self.connection.close(0_u8.into(), &[]);
+        match self.inner.as_ref() {
+            HostConnectionInner::Quic { connection } => {
+                connection.close(0_u8.into(), &[]);
+            }
+            HostConnectionInner::WebSocket { .. } => {
+                // WebSocket will be closed when dropped
+            }
+        }
+    }
+
+    pub fn is_quic(&self) -> bool {
+        matches!(self.inner.as_ref(), HostConnectionInner::Quic { .. })
     }
 }
 

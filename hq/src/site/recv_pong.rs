@@ -17,14 +17,7 @@ impl Site {
             let deployment_cache = self.deployment_cache.clone();
 
             tokio::spawn(async move {
-                while let Ok(bytes) = connection.read_unreliable_small_message().await {
-                    let host_to_hq = match HostToHq::from_bytes(bytes) {
-                        Ok(host_to_hq) => host_to_hq,
-                        Err(err) => {
-                            warn!(%err, "Failed to parse host message");
-                            return;
-                        }
-                    };
+                while let Ok(host_to_hq) = connection.read_message().await {
 
                     telemetry::pong_received(&new_host.id);
 

@@ -1,4 +1,5 @@
 mod quic;
+mod websocket;
 
 use adapt_cache::s3::S3AdaptCache;
 use bytes::Bytes;
@@ -75,6 +76,11 @@ async fn run() -> Result<()> {
     let instance_count = Arc::new(AtomicU64::new(0));
     let graceful_shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
+    let ws_port: u16 = std::env::var("WS_PORT")
+        .unwrap_or_else(|_| "10000".to_string())
+        .parse()
+        .expect("WS_PORT must be a valid port");
+
     let quic_handle = tokio::spawn({
         let deployment_id = deployment_id.clone();
         let instance_count = instance_count.clone();
@@ -83,6 +89,18 @@ async fn run() -> Result<()> {
         async move {
             if let Err(err) = quic::run_quic_server(quic_port, deployment_id, instance_count, graceful_shutdown, fn0).await {
                 tracing::error!(%err, "QUIC server error");
+            }
+        }
+    });
+
+    let ws_handle = tokio::spawn({
+        let deployment_id = deployment_id.clone();
+        let instance_count = instance_count.clone();
+        let graceful_shutdown = graceful_shutdown.clone();
+        let fn0 = fn0.clone();
+        async move {
+            if let Err(err) = websocket::run_websocket_server(ws_port, deployment_id, instance_count, graceful_shutdown, fn0).await {
+                tracing::error!(%err, "WebSocket server error");
             }
         }
     });
@@ -99,6 +117,7 @@ async fn run() -> Result<()> {
 
     tokio::select! {
         _ = quic_handle => {},
+        _ = ws_handle => {},
         _ = http_handle => {},
         _ = tokio::signal::ctrl_c() => {
             tracing::info!("Received ctrl-c, shutting down");
