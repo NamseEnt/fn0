@@ -21,7 +21,7 @@ impl Site {
                 let datagram = datagram.clone();
                 tokio::spawn(async move {
                     random_sleep(250).await;
-                    match connection.send_datagram_async(datagram).await {
+                    match connection.send_datagram(datagram).await {
                         Ok(_) => {
                             telemetry::ping_sent_status(true);
                         }

@@ -3,7 +3,7 @@ use super::*;
 use crate::args::OciComputeVmHostProviderArgs;
 use base64::Engine;
 use oci_rust_sdk::auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields};
-use oci_rust_sdk::core::{self, models::InstanceLifecycleState, region::Region, *};
+use oci_rust_sdk::core::{self, region::Region, *};
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
@@ -172,7 +172,8 @@ podman run -d --restart=always --network=host --name fn0-worker {env_flags} {ima
         .with_create_vnic_details(
             CreateVnicDetails::new()
                 .with_subnet_id(&self.subnet_id)
-                .with_assign_public_ip(true),
+                .with_assign_public_ip(true)
+                .with_assign_ipv6_ip(true),
         )
         .with_shape_config(
             LaunchInstanceShapeConfigDetails::new()
@@ -241,15 +242,24 @@ impl HostProvide for OciComputeVmHostProvider {
                         }))
                         .await?;
 
-                    if let Some(public_ip) = &vnic_response.vnic.public_ip {
-                        hosts.push(Host {
-                            id: HostId::new(instance.id.clone()),
-                            addr: public_ip.clone(),
-                            port: 10000,
-                            transport: HostTransport::Quic,
-                            dns_addr: None,
-                        });
-                    }
+                    let vnic = &vnic_response.vnic;
+                    let Some(addr) = vnic
+                        .ipv6_addresses
+                        .as_ref()
+                        .and_then(|addrs| addrs.first())
+                        .cloned()
+                    else {
+                        warn!(instance_id = %instance.id, "No IPv6 address, skipping");
+                        continue;
+                    };
+
+                    hosts.push(Host {
+                        id: HostId::new(instance.id.clone()),
+                        addr,
+                        port: 10000,
+                        transport: HostTransport::Quic,
+                        dns_addr: vnic.public_ip.clone(),
+                    });
                 }
             }
 
@@ -399,7 +409,8 @@ mod tests {
                 lifecycle_state: VnicLifecycleState::Available,
                 time_created: Utc::now(),
             })
-            .with_public_ip("1.2.3.4"),
+            .with_public_ip("1.2.3.4")
+            .with_ipv6_addresses(vec!["2603:c023:b:1600::1".to_string()]),
         }))
     }
 

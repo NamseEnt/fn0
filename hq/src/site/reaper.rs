@@ -13,13 +13,14 @@ impl Site {
             interval.tick().await;
 
             let timeout_threshold = host_connection_timeout_ms();
-            let terminate_candidates = self
+            let alive_hosts = self
                 .hosts_status
                 .iter()
                 .filter(|entry| entry.value().received_at.elapsed() < timeout_threshold)
                 .count();
+            let timed_out_hosts = self.hosts_status.len() - alive_hosts;
 
-            telemetry::reaper_terminate_candidates(terminate_candidates);
+            telemetry::reaper_terminate_candidates(timed_out_hosts);
             telemetry::active_connections(self.host_connections.len());
 
             let mut removed_count = 0;
