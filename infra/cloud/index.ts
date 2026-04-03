@@ -175,6 +175,12 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
 
 export const kubeconfig = pulumi.secret(ociHeadQuarter.kubeconfig);
 export const dwsSshPublicKey = dwsSshKey.publicKeyOpenssh;
+export const workerImage = ociComputeWorker.workerImageMultiArch;
+export const cwasmBucket = ociComputeWorker.cwasmBucket.bucketName;
+export const s3Endpoint = ociComputeWorker.cwasmBucket.endpoint;
+export const s3Region = ociComputeWorker.cwasmBucket.region;
+export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKeyId);
+export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
 
 new cloudflare.DnsRecord("hq-dns-record", {
   zoneId,
