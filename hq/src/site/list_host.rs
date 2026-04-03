@@ -1,9 +1,14 @@
 use super::*;
-use crate::{host_connection::HostConnection, random_sleep::random_sleep, telemetry, *};
+use crate::{host_connection::HostConnection, host_provider::HostTransport, random_sleep::random_sleep, telemetry, *};
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use tokio::time::{MissedTickBehavior, timeout};
+
+enum ConnectTarget {
+    Quic(SocketAddr, String),
+    WebSocket(String),
+}
 
 impl Site {
     #[tracing::instrument(skip_all)]
@@ -78,20 +83,29 @@ impl Site {
         let ca_cert_pem = self.ca_cert_pem.clone();
         let host_addr = host.addr.clone();
         let host_port = host.port;
+        let host_transport = host.transport.clone();
         let dead_hosts = self.dead_hosts.clone();
         let host_connections = self.host_connections.clone();
 
         tokio::spawn(async move {
             let deadline = Instant::now() + Duration::from_secs(180);
-            let connect_timeout = Duration::from_secs(2);
+            let connect_timeout = Duration::from_secs(5);
 
-            let resolved_addr = match resolve_addr(&host_addr, host_port).await {
-                Ok(addr) => addr,
-                Err(err) => {
-                    warn!(%err, "Failed to resolve host addr");
-                    dead_hosts.insert(host.clone(), Instant::now());
-                    telemetry::host_connect_status(&host.id, false);
-                    return;
+            let connect_target = match &host_transport {
+                HostTransport::Quic => {
+                    let resolved_addr = match resolve_addr(&host_addr, host_port).await {
+                        Ok(addr) => addr,
+                        Err(err) => {
+                            warn!(%err, "Failed to resolve host addr");
+                            dead_hosts.insert(host.clone(), Instant::now());
+                            telemetry::host_connect_status(&host.id, false);
+                            return;
+                        }
+                    };
+                    ConnectTarget::Quic(resolved_addr, ca_cert_pem)
+                }
+                HostTransport::WebSocket => {
+                    ConnectTarget::WebSocket(format!("wss://{}",  host_addr))
                 }
             };
 
@@ -107,8 +121,14 @@ impl Site {
                 telemetry::host_connect_attempt(&host.id);
 
                 let connect_start = Instant::now();
-                let connect_result =
-                    timeout(connect_timeout, HostConnection::connect(resolved_addr, &ca_cert_pem)).await;
+                let connect_result = match &connect_target {
+                    ConnectTarget::Quic(addr, ca_pem) => {
+                        timeout(connect_timeout, HostConnection::connect_quic(*addr, ca_pem)).await
+                    }
+                    ConnectTarget::WebSocket(url) => {
+                        timeout(connect_timeout, HostConnection::connect_websocket(url)).await
+                    }
+                };
 
                 match connect_result {
                     Ok(Ok(connection)) => {
