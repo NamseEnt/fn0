@@ -2,7 +2,6 @@ import * as fn0 from "@pulumi/fn0";
 import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as aws from "@pulumi/aws";
-import * as tls from "@pulumi/tls";
 
 const config = new pulumi.Config();
 
@@ -85,11 +84,6 @@ new aws.iam.UserPolicy("hq-aws-user-policy", {
   ),
 });
 
-const dwsSshKey = new tls.PrivateKey("dws-ssh-key", {
-  algorithm: "RSA",
-  rsaBits: 4096,
-});
-
 const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   suffix,
   ociRegion: config.require("ociHeadQuarterRegion"),
@@ -145,22 +139,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
     {
       name: "dedicated",
       hostProvider: {
-        dedicated: {
-          sshUser: "fn0",
-          sshPrivateKeyBase64: dwsSshKey.privateKeyPem.apply((pem: string) =>
-            Buffer.from(pem).toString("base64")
-          ),
-          workerImage: ociComputeWorker.workerImageMultiArch,
-          envs: {
-            CA_CERT_PEM: dns.certificate,
-            CA_KEY_PEM: dns.privateKeyPem,
-            CWASM_BUCKET: ociComputeWorker.cwasmBucket.bucketName,
-            S3_ENDPOINT: ociComputeWorker.cwasmBucket.endpoint,
-            S3_REGION: ociComputeWorker.cwasmBucket.region,
-            AWS_ACCESS_KEY_ID: ociComputeWorker.cwasmBucket.accessKeyId,
-            AWS_SECRET_ACCESS_KEY: ociComputeWorker.cwasmBucket.secretAccessKey,
-          },
-        },
+        dedicated: {},
       },
       dnsProvider: {
         cloudflare: {
@@ -174,7 +153,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
 });
 
 export const kubeconfig = pulumi.secret(ociHeadQuarter.kubeconfig);
-export const dwsSshPublicKey = dwsSshKey.publicKeyOpenssh;
 export const workerImage = ociComputeWorker.workerImageMultiArch;
 export const cwasmBucket = ociComputeWorker.cwasmBucket.bucketName;
 export const s3Endpoint = ociComputeWorker.cwasmBucket.endpoint;
