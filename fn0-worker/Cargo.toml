@@ -26,6 +26,6 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-tokio-tungstenite = "0.26"
+axum = { version = "0.8", features = ["ws"] }
 anyhow = "1"
 zstd = "0.13"
