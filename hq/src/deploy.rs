@@ -25,7 +25,6 @@ struct DeployStartResponse {
 #[derive(Deserialize)]
 struct DeployFinishRequest {
     github_token: String,
-    deploy_job_id: String,
     subdomain: String,
     code_id: u64,
 }
@@ -143,7 +142,7 @@ pub async fn handle_deploy_finish(
         Err(_) => return json_response(400, &ErrorResponse { error: "Invalid request body".to_string() }),
     };
 
-    let username = match verify_github_user(&request.github_token).await {
+    let _username = match verify_github_user(&request.github_token).await {
         Ok(u) => u,
         Err(e) => return json_response(401, &ErrorResponse { error: e }),
     };

@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use color_eyre::eyre::{Result, eyre};
 use futures::{SinkExt, StreamExt};
 use host_hq_protocol::{HqToHostDatagram, HqToHostReliable, HostToHq, WsHostToHq, WsHqToHost};
@@ -38,10 +37,6 @@ enum HostConnectionInner {
 }
 
 impl HostConnection {
-    pub async fn connect(addr: SocketAddr, ca_cert_pem: &str) -> Result<Self> {
-        Self::connect_quic(addr, ca_cert_pem).await
-    }
-
     pub async fn connect_quic(addr: SocketAddr, ca_cert_pem: &str) -> Result<Self> {
         let local = if addr.is_ipv4() {
             LOCAL_IPV4
@@ -79,23 +74,7 @@ impl HostConnection {
         })
     }
 
-    pub fn send_datagram(&self, datagram: HqToHostDatagram) -> Result<()> {
-        match self.inner.as_ref() {
-            HostConnectionInner::Quic { connection } => {
-                let bytes = datagram.to_bytes()?;
-                if bytes.len() > 1200 {
-                    return Err(eyre!("Datagram is too large"));
-                }
-                connection.send_datagram(bytes)?;
-                Ok(())
-            }
-            HostConnectionInner::WebSocket { .. } => {
-                Err(eyre!("Use send_datagram_async for WebSocket"))
-            }
-        }
-    }
-
-    pub async fn send_datagram_async(&self, datagram: HqToHostDatagram) -> Result<()> {
+    pub async fn send_datagram(&self, datagram: HqToHostDatagram) -> Result<()> {
         match self.inner.as_ref() {
             HostConnectionInner::Quic { connection } => {
                 let bytes = datagram.to_bytes()?;
@@ -182,9 +161,6 @@ impl HostConnection {
         }
     }
 
-    pub fn is_quic(&self) -> bool {
-        matches!(self.inner.as_ref(), HostConnectionInner::Quic { .. })
-    }
 }
 
 const LOCAL_IPV4: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);

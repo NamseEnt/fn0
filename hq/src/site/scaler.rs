@@ -126,6 +126,10 @@ impl Site {
 
             scale_in_tick_count = 0;
 
+            if scale_out_target <= hosts {
+                continue;
+            }
+
             if let Some(last) = last_scale_to_at
                 && last.elapsed().as_secs()
                     < scale_config.scale_out_cooldown_secs.get() as _
