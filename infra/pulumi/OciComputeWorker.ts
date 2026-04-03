@@ -246,7 +246,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         .getImages({
           compartmentId,
           operatingSystem: "Oracle Linux",
-          operatingSystemVersion: "9",
+          operatingSystemVersion: "10",
           sortOrder: "DESC",
         })
         .then((x) => {
