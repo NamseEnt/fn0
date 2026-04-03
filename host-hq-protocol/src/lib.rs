@@ -61,6 +61,35 @@ impl HostToHq {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub enum WsHqToHost {
+    Datagram(HqToHostDatagram),
+    Reliable(HqToHostReliable),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum WsHostToHq {
+    Datagram(HostToHq),
+}
+
+impl WsHqToHost {
+    pub fn to_bytes(&self) -> Result<Bytes> {
+        Ok(postcard::to_stdvec(self)?.into())
+    }
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        postcard::from_bytes(bytes)
+    }
+}
+
+impl WsHostToHq {
+    pub fn to_bytes(&self) -> Result<Bytes> {
+        Ok(postcard::to_stdvec(self)?.into())
+    }
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        postcard::from_bytes(bytes)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
