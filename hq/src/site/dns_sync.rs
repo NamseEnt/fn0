@@ -16,7 +16,10 @@ impl Site {
             let addrs = self
                 .host_connections
                 .iter()
-                .map(|conn| conn.key().addr.clone())
+                .map(|conn| {
+                    let host = conn.key();
+                    host.dns_addr.clone().unwrap_or_else(|| host.addr.clone())
+                })
                 .collect::<BTreeSet<_>>();
 
             telemetry::dns_healthy_ips(addrs.len());

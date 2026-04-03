@@ -11,6 +11,7 @@ pub struct Host {
     pub addr: String,
     pub port: u16,
     pub transport: HostTransport,
+    pub dns_addr: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]

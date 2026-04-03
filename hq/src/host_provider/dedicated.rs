@@ -127,6 +127,7 @@ impl HostProvide for DedicatedHostProvider {
                     addr: record.addr,
                     port: record.port,
                     transport,
+                    dns_addr: record.http_host,
                 }
             })
             .collect())
