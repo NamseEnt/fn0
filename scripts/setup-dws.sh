@@ -55,6 +55,7 @@ S3_ENDPOINT=$(cd "$INFRA_DIR" && pulumi stack output s3Endpoint -s "$PULUMI_STAC
 S3_REGION=$(cd "$INFRA_DIR" && pulumi stack output s3Region -s "$PULUMI_STACK")
 S3_ACCESS_KEY_ID=$(cd "$INFRA_DIR" && pulumi stack output s3AccessKeyId -s "$PULUMI_STACK" --show-secrets)
 S3_SECRET_ACCESS_KEY=$(cd "$INFRA_DIR" && pulumi stack output s3SecretAccessKey -s "$PULUMI_STACK" --show-secrets)
+WS_SECRET=$(cd "$INFRA_DIR" && pulumi stack output dwsWsSecret -s "$PULUMI_STACK" --show-secrets)
 
 CF_ACCOUNT_ID=$(cd "$INFRA_DIR" && pulumi config get fn0Cloud:cloudflareAccountId -s "$PULUMI_STACK")
 CF_ZONE_ID=$(cd "$INFRA_DIR" && pulumi config get fn0Cloud:cloudflareZoneId -s "$PULUMI_STACK")
@@ -186,6 +187,7 @@ docker run -d \
   -e "AWS_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}" \
   -e "HTTP_PORT=${HTTP_PORT}" \
   -e "WS_PORT=${WS_PORT}" \
+  -e "WS_SECRET=${WS_SECRET}" \
   "$WORKER_IMAGE"
 echo "Worker container started"
 

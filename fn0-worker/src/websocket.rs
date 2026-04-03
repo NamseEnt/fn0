@@ -20,6 +20,8 @@ pub async fn run_websocket_server(
     graceful_shutdown: Arc<AtomicBool>,
     fn0: Arc<Fn0<JsCache>>,
 ) -> Result<()> {
+    let ws_secret = std::env::var("WS_SECRET").ok();
+
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(%addr, "WebSocket server listening");
@@ -29,10 +31,21 @@ pub async fn run_websocket_server(
         let instance_count = instance_count.clone();
         let graceful_shutdown = graceful_shutdown.clone();
         let fn0 = fn0.clone();
+        let ws_secret = ws_secret.clone();
 
         tokio::spawn(async move {
             match tokio_tungstenite::accept_async(stream).await {
-                Ok(ws_stream) => {
+                Ok(mut ws_stream) => {
+                    if let Some(secret) = &ws_secret {
+                        match ws_stream.next().await {
+                            Some(Ok(Message::Text(token))) if token.as_str() == secret.as_str() => {}
+                            _ => {
+                                tracing::warn!(%remote, "WebSocket auth failed");
+                                let _ = ws_stream.close(None).await;
+                                return;
+                            }
+                        }
+                    }
                     tracing::info!(%remote, "HQ connected via WebSocket");
                     handle_connection(
                         ws_stream,

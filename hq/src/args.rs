@@ -10,6 +10,8 @@ pub struct HqArgs {
     pub ca_cert_pem: String,
     pub aws: AwsArgs,
     pub github_client_id: String,
+    #[serde(default)]
+    pub ws_secret: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]

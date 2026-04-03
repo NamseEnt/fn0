@@ -5,6 +5,7 @@ export interface HqArgs {
   docDb: pulumi.Input<DocDbArgs>;
   githubClientId: pulumi.Input<string>;
   sites: pulumi.Input<Array<SiteArgs>>;
+  wsSecret: pulumi.Input<string>;
 }
 export interface AwsArgs {
   accessKeyId: pulumi.Input<string>;

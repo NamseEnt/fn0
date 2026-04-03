@@ -32,6 +32,7 @@ pub struct Site {
     host_cpu_cores: Option<NonZeroUsize>,
     host_memory_in_gb: Option<NonZeroUsize>,
     doc_db: DocDb,
+    ws_secret: String,
 }
 
 impl Site {
@@ -44,6 +45,7 @@ impl Site {
         host_cpu_cores: Option<NonZeroUsize>,
         host_memory_in_gb: Option<NonZeroUsize>,
         doc_db: DocDb,
+        ws_secret: String,
     ) -> Self {
         Site {
             name,
@@ -59,6 +61,7 @@ impl Site {
             host_cpu_cores,
             host_memory_in_gb,
             doc_db,
+            ws_secret,
         }
     }
     #[tracing::instrument(skip_all)]

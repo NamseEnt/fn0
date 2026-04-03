@@ -2,6 +2,7 @@ import * as fn0 from "@pulumi/fn0";
 import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as aws from "@pulumi/aws";
+import * as random from "@pulumi/random";
 
 const config = new pulumi.Config();
 
@@ -84,6 +85,11 @@ new aws.iam.UserPolicy("hq-aws-user-policy", {
   ),
 });
 
+const wsSecret = new random.RandomPassword("ws-secret", {
+  length: 64,
+  special: false,
+});
+
 const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   suffix,
   ociRegion: config.require("ociHeadQuarterRegion"),
@@ -100,6 +106,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   awsAccessKeyId: hqAwsAccessKey.id,
   awsSecretAccessKey: hqAwsAccessKey.secret,
   githubClientId: config.require("githubClientId"),
+  wsSecret: wsSecret.result,
   sites: [
     {
       name: "oci-compute-vm",
@@ -159,6 +166,7 @@ export const s3Endpoint = ociComputeWorker.cwasmBucket.endpoint;
 export const s3Region = ociComputeWorker.cwasmBucket.region;
 export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKeyId);
 export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
+export const dwsWsSecret = pulumi.secret(wsSecret.result);
 
 new cloudflare.DnsRecord("hq-dns-record", {
   zoneId,
