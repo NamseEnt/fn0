@@ -78,12 +78,11 @@ impl HqArgs {
                                 host_provider::oci_compute_vm::OciComputeVmHostProvider::new(args),
                             ),
                         ),
-                        HostProviderArg::Dedicated(args) => (
+                        HostProviderArg::Dedicated(_) => (
                             None,
                             None,
                             HostProvider::Dedicated(
                                 host_provider::dedicated::DedicatedHostProvider::new(
-                                    args,
                                     doc_db.clone(),
                                 ),
                             ),

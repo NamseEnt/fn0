@@ -18,10 +18,6 @@ export interface CloudflareDnsProviderArgs {
   zoneId: pulumi.Input<string>;
 }
 export interface DedicatedHostProviderArgs {
-  envs: pulumi.Input<Record<string, string>>;
-  sshPrivateKeyBase64: pulumi.Input<string>;
-  sshUser: pulumi.Input<string>;
-  workerImage: pulumi.Input<string>;
 }
 export interface DnsProviderArg {
   cloudflare?: pulumi.Input<CloudflareDnsProviderArgs>;
