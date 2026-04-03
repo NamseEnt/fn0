@@ -90,10 +90,7 @@ impl Site {
 
         tokio::spawn(async move {
             let deadline = Instant::now() + Duration::from_secs(180);
-            let connect_timeout = match &host_transport {
-                HostTransport::Quic => Duration::from_secs(2),
-                HostTransport::WebSocket => Duration::from_secs(15),
-            };
+            let connect_timeout = Duration::from_secs(2);
 
             let connect_target = match &host_transport {
                 HostTransport::Quic => {

@@ -26,6 +26,7 @@ use tracing::*;
 use crate::args_parse::HqArgsParsed;
 
 fn main() -> Result<()> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let rt = tokio::runtime::Runtime::new()?;
 
     rt.block_on(async move {
