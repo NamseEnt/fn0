@@ -105,6 +105,7 @@ impl OciComputeVmHostProvider {
 
         format!(
             r#"#!/bin/bash
+dnf install -y podman
 podman pull {image}
 podman run -d --restart=always --network=host --name fn0-worker {env_flags} {image}
 "#,
