@@ -247,6 +247,7 @@ impl HostProvide for OciComputeVmHostProvider {
                             addr: public_ip.clone(),
                             port: 10000,
                             transport: HostTransport::Quic,
+                            dns_addr: None,
                         });
                     }
                 }
