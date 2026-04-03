@@ -63,29 +63,39 @@ echo "Worker image:  $WORKER_IMAGE"
 echo "Domain:        $DOMAIN"
 echo ""
 
-# --- Step 2: Create Cloudflare Tunnel ---
-echo "--- Step 2: Creating Cloudflare Tunnel ---"
+# --- Step 2: Create or reuse Cloudflare Tunnel ---
+echo "--- Step 2: Cloudflare Tunnel ---"
 
 TUNNEL_NAME="dws-${HOST_ID}"
 HTTP_HOSTNAME="${HOST_ID}-http.${DOMAIN}"
 WS_HOSTNAME="${HOST_ID}-ws.${DOMAIN}"
 
-TUNNEL_RESPONSE=$(curl -sf "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/tunnels" \
+TUNNEL_ID=$(curl -sf "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/tunnels?name=${TUNNEL_NAME}&is_deleted=false" \
   -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"${TUNNEL_NAME}\",\"tunnel_secret\":\"$(python3 -c 'import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())')\"}")
+  | python3 -c "
+import sys,json
+tunnels = json.load(sys.stdin)['result']
+active = [t for t in tunnels if t.get('deleted_at') is None]
+print(active[0]['id'] if active else '')
+")
 
-TUNNEL_ID=$(echo "$TUNNEL_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['id'])")
-echo "Tunnel created: $TUNNEL_ID ($TUNNEL_NAME)"
+if [ -z "$TUNNEL_ID" ]; then
+  TUNNEL_RESPONSE=$(curl -sf "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/tunnels" \
+    -H "Authorization: Bearer ${CF_API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"${TUNNEL_NAME}\",\"tunnel_secret\":\"$(python3 -c 'import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())')\"}")
+  TUNNEL_ID=$(echo "$TUNNEL_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['id'])")
+  echo "Tunnel created: $TUNNEL_ID"
+else
+  echo "Tunnel exists: $TUNNEL_ID"
+fi
 
-# Get tunnel token
-TUNNEL_TOKEN=$(curl -sf "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/tunnels/${TUNNEL_ID}/token" \
+TUNNEL_TOKEN=$(curl -sf "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/token" \
   -H "Authorization: Bearer ${CF_API_TOKEN}" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['result'])")
-
 echo "Tunnel token obtained"
 
-# --- Step 3: Configure tunnel ingress ---
+# --- Step 3: Configure tunnel ingress (PUT is idempotent) ---
 echo "--- Step 3: Configuring tunnel ingress ---"
 
 curl -sf "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/configurations" \
@@ -106,27 +116,34 @@ config = {
 print(json.dumps(config))
 ")" > /dev/null
 
-echo "Ingress configured: $HTTP_HOSTNAME -> :$HTTP_PORT, $WS_HOSTNAME -> :$WS_PORT"
+echo "Ingress: $HTTP_HOSTNAME -> :$HTTP_PORT, $WS_HOSTNAME -> :$WS_PORT"
 
-# --- Step 4: Create DNS CNAME records ---
-echo "--- Step 4: Creating DNS CNAME records ---"
+# --- Step 4: Create DNS CNAME records (skip if exists) ---
+echo "--- Step 4: DNS CNAME records ---"
+
+EXISTING_RECORDS=$(curl -sf "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records?type=CNAME" \
+  -H "Authorization: Bearer ${CF_API_TOKEN}" \
+  | python3 -c "import sys,json; print(' '.join(r['name'] for r in json.load(sys.stdin)['result']))")
 
 for HOSTNAME in "$HTTP_HOSTNAME" "$WS_HOSTNAME"; do
-  curl -sf "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records" \
-    -H "Authorization: Bearer ${CF_API_TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d "$(python3 -c "
+  if echo "$EXISTING_RECORDS" | grep -qw "$HOSTNAME"; then
+    echo "  DNS exists: $HOSTNAME"
+  else
+    curl -sf "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records" \
+      -H "Authorization: Bearer ${CF_API_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d "$(python3 -c "
 import json
-record = {
+print(json.dumps({
     'type': 'CNAME',
     'name': '${HOSTNAME}',
     'content': '${TUNNEL_ID}.cfargotunnel.com',
     'proxied': True,
     'ttl': 1
-}
-print(json.dumps(record))
+}))
 ")" > /dev/null
-  echo "  DNS: $HOSTNAME -> ${TUNNEL_ID}.cfargotunnel.com"
+    echo "  DNS created: $HOSTNAME"
+  fi
 done
 
 # --- Step 5: Install cloudflared ---
