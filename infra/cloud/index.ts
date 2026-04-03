@@ -125,7 +125,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
           memoryInGbs: 6,
           subnetId: ociComputeWorker.subnetId,
           imageId: ociComputeWorker.osImageId,
-          workerImageUrl: ociComputeWorker.workerImageUrl,
+          workerImageUrl: ociComputeWorker.workerImageMultiArch,
           envs: {
             CWASM_BUCKET: ociComputeWorker.cwasmBucket.bucketName,
             S3_ENDPOINT: ociComputeWorker.cwasmBucket.endpoint,
