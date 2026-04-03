@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::*;
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DedicatedHostRecord {
     pub addr: String,
     pub port: u16,
