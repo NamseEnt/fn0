@@ -28,6 +28,7 @@ pub fn setup_otlp() -> Result<(SdkTracerProvider, SdkMeterProvider)> {
 
     let tracer = tracer_provider.tracer("hq-tracer");
     tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new("info"))
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .init();
