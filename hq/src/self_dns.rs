@@ -72,7 +72,9 @@ pub async fn register(args: SelfDnsArgs) -> Result<()> {
 }
 
 async fn detect_public_ip() -> Result<String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()?;
 
     let resp = client
         .get("http://169.254.169.254/opc/v2/vnics/")
