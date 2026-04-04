@@ -115,8 +115,9 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       oci.containerengine
         .getNodePool({ nodePoolId })
         .then((np) => {
-          const nodeIp = np.nodes?.[0]?.publicIp;
-          if (!nodeIp) throw new Error("No node public IP found");
+          const activeNode = np.nodes?.find((n) => n.lifecycleState === "ACTIVE");
+          const nodeIp = activeNode?.publicIp;
+          if (!nodeIp) throw new Error("No active node public IP found");
           return nodeIp;
         })
     );
