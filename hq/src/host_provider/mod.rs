@@ -1,6 +1,5 @@
 pub mod dedicated;
 pub mod oci_compute_vm;
-pub mod oci_container;
 pub mod oci_scaler;
 
 use crate::*;
@@ -56,7 +55,6 @@ pub trait HostProvide: Send + Sync {
 
 #[derive(Clone)]
 pub enum HostProvider {
-    OciContainerInstance(oci_container::OciContainerInstanceHostProvider),
     OciComputeVm(oci_compute_vm::OciComputeVmHostProvider),
     Dedicated(dedicated::DedicatedHostProvider),
 }
@@ -64,7 +62,6 @@ pub enum HostProvider {
 impl HostProvide for HostProvider {
     async fn list_hosts(&self) -> color_eyre::Result<Vec<Host>> {
         match self {
-            HostProvider::OciContainerInstance(p) => p.list_hosts().await,
             HostProvider::OciComputeVm(p) => p.list_hosts().await,
             HostProvider::Dedicated(p) => p.list_hosts().await,
         }
@@ -72,7 +69,6 @@ impl HostProvide for HostProvider {
 
     async fn terminate(&self, host_id: &HostId) -> color_eyre::Result<()> {
         match self {
-            HostProvider::OciContainerInstance(p) => p.terminate(host_id).await,
             HostProvider::OciComputeVm(p) => p.terminate(host_id).await,
             HostProvider::Dedicated(p) => p.terminate(host_id).await,
         }
@@ -80,7 +76,6 @@ impl HostProvide for HostProvider {
 
     async fn scale_to(&self, n: usize) -> color_eyre::Result<()> {
         match self {
-            HostProvider::OciContainerInstance(p) => p.scale_to(n).await,
             HostProvider::OciComputeVm(p) => p.scale_to(n).await,
             HostProvider::Dedicated(p) => p.scale_to(n).await,
         }

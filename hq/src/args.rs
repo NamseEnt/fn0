@@ -34,28 +34,8 @@ pub struct SiteArgs {
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum HostProviderArg {
-    OciContainerInstance(OciContainerInstanceHostProviderArgs),
     OciComputeVm(OciComputeVmHostProviderArgs),
     Dedicated(DedicatedHostProviderArgs),
-}
-
-#[derive(serde::Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct OciContainerInstanceHostProviderArgs {
-    pub private_key_base64: String,
-    pub user_id: String,
-    pub fingerprint: String,
-    pub tenancy_id: String,
-    pub region: String,
-    pub compartment_id: String,
-    pub availability_domain: String,
-    pub shape: String,
-    pub ocpus: NonZeroUsize,
-    pub physics_cpu_cores: NonZeroUsize,
-    pub memory_in_gbs: NonZeroUsize,
-    pub subnet_id: String,
-    pub image: String,
-    pub envs: BTreeMap<String, String>,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]

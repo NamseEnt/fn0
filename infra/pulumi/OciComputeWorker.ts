@@ -4,6 +4,7 @@ import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
 import * as docker from "@pulumi/docker";
 import * as command from "@pulumi/command";
+import { CustomWorkerImage } from "./CustomWorkerImage";
 
 export interface OciComputeWorkerArgs {
   region: pulumi.Input<string>;
@@ -127,6 +128,29 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         ],
       },
       { parent: this }
+    );
+
+    const imageBuilderDynGroup = new oci.identity.DynamicGroup(
+      "image-builder-dyn-group",
+      {
+        compartmentId: workerManager.compartmentId,
+        description: "Instances that can self-terminate for image building",
+        matchingRule: pulumi.interpolate`ANY {instance.compartment.id = '${compartment.id}'}`,
+        name: pulumi.interpolate`fn0-image-builder-${compartmentSuffix}`,
+      },
+      { parent: this }
+    );
+
+    new oci.identity.Policy(
+      "image-builder-self-terminate-policy",
+      {
+        compartmentId: workerManager.compartmentId,
+        description: "Allow image builder instances to terminate themselves",
+        statements: [
+          pulumi.interpolate`Allow dynamic-group ${imageBuilderDynGroup.name} to manage instance-family in compartment id ${compartment.id}`,
+        ],
+      },
+      { parent: this, dependsOn: [imageBuilderDynGroup] }
     );
 
     const vcn = new oci.core.Vcn(
@@ -262,18 +286,19 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         })
     );
 
-    const customImageBuild = new command.local.Command(
-      "build-custom-image",
+    const customWorkerImage = new CustomWorkerImage(
+      "custom-worker-image",
       {
-        create: pulumi.interpolate`bash ${__dirname}/build-custom-image.sh ${compartment.id} ${availabilityDomain} ${subnet.id} ${baseImageId}`,
-        environment: {
-          OCI_CLI_AUTH: "api_key",
-        },
+        compartmentId: compartment.id,
+        availabilityDomain,
+        subnetId: subnet.id,
+        baseImageId,
+        displayName: "fn0-ol10-podman-aarch64",
       },
       { parent: this }
     );
 
-    const imageId = customImageBuild.stdout.apply((s) => s.trim());
+    const imageId = customWorkerImage.imageId;
 
     const instanceConfiguration = new oci.core.InstanceConfiguration(
       "instance-configuration",
