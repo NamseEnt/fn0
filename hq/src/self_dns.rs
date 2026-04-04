@@ -73,11 +73,11 @@ pub async fn register(args: SelfDnsArgs) -> Result<()> {
 
 async fn detect_public_ip() -> Result<String> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(5))
         .build()?;
 
     let ip = client
-        .get("https://ifconfig.me")
+        .get("https://checkip.amazonaws.com")
         .send()
         .await?
         .text()
