@@ -35,6 +35,7 @@ struct WasmCache {
 type JsCache = S3AdaptCache<String, FromUtf8Error>;
 
 fn main() -> Result<()> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     color_eyre::install()?;
     tracing_subscriber::fmt::init();
 
