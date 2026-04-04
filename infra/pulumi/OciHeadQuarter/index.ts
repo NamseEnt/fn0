@@ -1,4 +1,5 @@
 import * as pulumi from "@pulumi/pulumi";
+import * as oci from "@pulumi/oci";
 import { hqGrafana } from "./grafana";
 import { createNetworking } from "./networking";
 import { createOkeCluster } from "./oke-cluster";
@@ -88,11 +89,10 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       region: ociRegion,
     });
 
-    const { service } = deployHqApplication(this, {
+    deployHqApplication(this, {
       k8sProvider,
       hqImage,
       otlpEndpoint,
-      regionalSubnetId: regionalSubnet.id,
       hqArgs: {
         sites,
         docDb: {
@@ -111,8 +111,14 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       },
     });
 
-    this.hqServiceIp = service.status.apply(
-      (status) => status?.loadBalancer?.ingress?.[0]?.ip ?? ""
+    this.hqServiceIp = nodePool.id.apply((nodePoolId) =>
+      oci.containerengine
+        .getNodePool({ nodePoolId })
+        .then((np) => {
+          const nodeIp = np.nodes?.[0]?.publicIp;
+          if (!nodeIp) throw new Error("No node public IP found");
+          return nodeIp;
+        })
     );
   }
 }

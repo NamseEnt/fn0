@@ -241,7 +241,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         })
     );
 
-    const imageId = compartment.id.apply((compartmentId) =>
+    const baseImageId = compartment.id.apply((compartmentId) =>
       oci.core
         .getImages({
           compartmentId,
@@ -261,6 +261,19 @@ export class OciComputeWorker extends pulumi.ComponentResource {
           return imageId;
         })
     );
+
+    const customImageBuild = new command.local.Command(
+      "build-custom-image",
+      {
+        create: pulumi.interpolate`bash ${__dirname}/build-custom-image.sh ${compartment.id} ${availabilityDomain} ${subnet.id} ${baseImageId}`,
+        environment: {
+          OCI_CLI_AUTH: "api_key",
+        },
+      },
+      { parent: this }
+    );
+
+    const imageId = customImageBuild.stdout.apply((s) => s.trim());
 
     const instanceConfiguration = new oci.core.InstanceConfiguration(
       "instance-configuration",
