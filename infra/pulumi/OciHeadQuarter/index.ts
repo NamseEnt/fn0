@@ -61,7 +61,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
     const fingerprint = config.require("fingerprint");
     const privateKey = config.require("privateKey");
 
-    const { k8sProvider, kubeconfig } = createOkeCluster(this, {
+    const { k8sProvider, kubeconfig, nodePool } = createOkeCluster(this, {
       compartmentId,
       vcnId,
       regionalSubnetId: regionalSubnet.id,

@@ -28,7 +28,6 @@ export interface DocDbArgs {
   url: pulumi.Input<string>;
 }
 export interface HostProviderArg {
-  ociContainerInstance?: pulumi.Input<OciContainerInstanceHostProviderArgs>;
   ociComputeVm?: pulumi.Input<OciComputeVmHostProviderArgs>;
   dedicated?: pulumi.Input<DedicatedHostProviderArgs>;
 }
@@ -48,22 +47,6 @@ export interface OciComputeVmHostProviderArgs {
   tenancyId: pulumi.Input<string>;
   userId: pulumi.Input<string>;
   workerImageUrl: pulumi.Input<string>;
-}
-export interface OciContainerInstanceHostProviderArgs {
-  availabilityDomain: pulumi.Input<string>;
-  compartmentId: pulumi.Input<string>;
-  envs: pulumi.Input<Record<string, string>>;
-  fingerprint: pulumi.Input<string>;
-  image: pulumi.Input<string>;
-  memoryInGbs: pulumi.Input<number>;
-  ocpus: pulumi.Input<number>;
-  physicsCpuCores: pulumi.Input<number>;
-  privateKeyBase64: pulumi.Input<string>;
-  region: pulumi.Input<string>;
-  shape: pulumi.Input<string>;
-  subnetId: pulumi.Input<string>;
-  tenancyId: pulumi.Input<string>;
-  userId: pulumi.Input<string>;
 }
 export interface SiteArgs {
   dnsProvider: pulumi.Input<DnsProviderArg>;
