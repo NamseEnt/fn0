@@ -39,9 +39,7 @@ fn main() -> Result<()> {
             self_dns_args,
         } = HqArgs::parse().await?;
 
-        if let Err(err) = self_dns::register(self_dns_args).await {
-            tracing::warn!(%err, "Failed to register self DNS");
-        }
+        self_dns::register(self_dns_args).await?;
 
         deploy_context.doc_db.ensure_job_tables().await?;
 

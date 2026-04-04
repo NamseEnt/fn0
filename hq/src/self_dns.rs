@@ -73,31 +73,8 @@ pub async fn register(args: SelfDnsArgs) -> Result<()> {
 
 async fn detect_public_ip() -> Result<String> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(10))
         .build()?;
-
-    let resp = client
-        .get("http://169.254.169.254/opc/v2/vnics/")
-        .header("Authorization", "Bearer Oracle")
-        .send()
-        .await;
-
-    if let Ok(resp) = resp {
-        #[derive(serde::Deserialize)]
-        struct Vnic {
-            #[serde(rename = "publicIp")]
-            public_ip: Option<String>,
-        }
-        if let Ok(vnics) = resp.json::<Vec<Vnic>>().await {
-            for vnic in vnics {
-                if let Some(ip) = vnic.public_ip {
-                    if !ip.is_empty() {
-                        return Ok(ip);
-                    }
-                }
-            }
-        }
-    }
 
     let ip = client
         .get("https://ifconfig.me")
