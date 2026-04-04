@@ -22,6 +22,7 @@ pub struct HqArgsParsed {
     pub sites: Vec<Site>,
     pub deployment_cache: DeploymentCache,
     pub deploy_context: Arc<DeployContext>,
+    pub self_dns_args: crate::args::SelfDnsArgs,
 }
 
 impl HqArgs {
@@ -103,6 +104,7 @@ impl HqArgs {
             sites,
             deployment_cache,
             deploy_context,
+            self_dns_args: args.self_dns.clone(),
         })
     }
 }

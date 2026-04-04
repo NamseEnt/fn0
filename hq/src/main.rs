@@ -8,6 +8,7 @@ mod host_id;
 mod host_provider;
 mod job_processor;
 mod random_sleep;
+mod self_dns;
 mod site;
 mod telemetry;
 
@@ -35,7 +36,12 @@ fn main() -> Result<()> {
             sites,
             deployment_cache,
             deploy_context,
+            self_dns_args,
         } = HqArgs::parse().await?;
+
+        if let Err(err) = self_dns::register(self_dns_args).await {
+            tracing::warn!(%err, "Failed to register self DNS");
+        }
 
         deploy_context.doc_db.ensure_job_tables().await?;
 

@@ -24,13 +24,14 @@ export interface OciHeadQuarterArgs {
   wasmBucket: pulumi.Input<string>;
   awsAccessKeyId: pulumi.Input<string>;
   awsSecretAccessKey: pulumi.Input<string>;
-  githubClientId: pulumi.Input<string>;
   wsSecret: pulumi.Input<string>;
+  selfDnsHostname: pulumi.Input<string>;
+  selfDnsCloudflareZoneId: pulumi.Input<string>;
+  selfDnsCloudflareApiToken: pulumi.Input<string>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
   kubeconfig: pulumi.Output<string>;
-  hqServiceIp: pulumi.Output<string>;
   constructor(
     name: string,
     args: OciHeadQuarterArgs,
@@ -106,20 +107,13 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           accessKeyId: args.awsAccessKeyId,
           secretAccessKey: args.awsSecretAccessKey,
         },
-        githubClientId: args.githubClientId,
         wsSecret: args.wsSecret,
+        selfDns: {
+          hostname: args.selfDnsHostname,
+          cloudflareZoneId: args.selfDnsCloudflareZoneId,
+          cloudflareApiToken: args.selfDnsCloudflareApiToken,
+        },
       },
     });
-
-    this.hqServiceIp = nodePool.id.apply((nodePoolId) =>
-      oci.containerengine
-        .getNodePool({ nodePoolId })
-        .then((np) => {
-          const activeNode = np.nodes?.find((n) => (n as any).state === "ACTIVE");
-          const nodeIp = activeNode?.publicIp;
-          if (!nodeIp) throw new Error("No active node public IP found");
-          return nodeIp;
-        })
-    );
   }
 }

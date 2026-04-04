@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{collections::BTreeMap, num::NonZeroUsize};
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -9,9 +7,16 @@ pub struct HqArgs {
     pub doc_db: DocDbArgs,
     pub ca_cert_pem: String,
     pub aws: AwsArgs,
-    pub github_client_id: String,
-    #[serde(default)]
     pub ws_secret: String,
+    pub self_dns: SelfDnsArgs,
+}
+
+#[derive(Clone, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelfDnsArgs {
+    pub hostname: String,
+    pub cloudflare_zone_id: String,
+    pub cloudflare_api_token: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
