@@ -135,6 +135,7 @@ impl Site {
                 match connect_result {
                     Ok(Ok(connection)) => {
                         let connect_duration = connect_start.elapsed();
+                        info!(host_id = %host.id, host_addr = %host_addr, ?connect_duration, "Connected to host");
                         telemetry::host_connect_status(&host.id, true);
                         telemetry::host_connect_duration(&host.id, connect_duration);
                         host_connections.insert(host.clone(), connection);
@@ -142,11 +143,11 @@ impl Site {
                         break;
                     }
                     Ok(Err(err)) => {
-                        warn!(%err, "Failed to connect to host");
+                        warn!(host_id = %host.id, host_addr = %host_addr, %err, "Failed to connect to host");
                         telemetry::host_connect_status(&host.id, false);
                     }
                     Err(_elapsed) => {
-                        warn!("Timeout to connect to host");
+                        warn!(host_id = %host.id, host_addr = %host_addr, "Timeout to connect to host");
                         telemetry::host_connect_status(&host.id, false);
                     }
                 }
