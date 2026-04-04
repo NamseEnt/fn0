@@ -290,10 +290,11 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       "custom-worker-image",
       {
         compartmentId: compartment.id,
+        vcnId: vcn.id,
         availabilityDomain,
-        subnetId: subnet.id,
         baseImageId,
         displayName: "fn0-ol10-podman-aarch64",
+        internetGatewayId: internetGateway.id,
       },
       { parent: this }
     );
