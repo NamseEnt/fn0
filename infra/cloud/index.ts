@@ -152,7 +152,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             AWS_ACCESS_KEY_ID: ociComputeWorker.cwasmBucket.accessKeyId,
             AWS_SECRET_ACCESS_KEY: ociComputeWorker.cwasmBucket.secretAccessKey,
             CA_CERT_PEM: quicCaCert.certPem,
-            CA_KEY_PEM: quicCaKey.privateKeyPem,
+            CA_KEY_PEM: quicCaKey.privateKeyPemPkcs8,
           },
         },
       },
