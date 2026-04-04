@@ -4,6 +4,7 @@ use schemars::{
 };
 
 #[path = "src/args.rs"]
+#[allow(dead_code)]
 mod args;
 
 fn main() {

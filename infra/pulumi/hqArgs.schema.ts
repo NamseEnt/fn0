@@ -3,7 +3,7 @@ export interface HqArgs {
   aws: pulumi.Input<AwsArgs>;
   caCertPem: pulumi.Input<string>;
   docDb: pulumi.Input<DocDbArgs>;
-  githubClientId: pulumi.Input<string>;
+  selfDns: pulumi.Input<SelfDnsArgs>;
   sites: pulumi.Input<Array<SiteArgs>>;
   wsSecret: pulumi.Input<string>;
 }
@@ -47,6 +47,11 @@ export interface OciComputeVmHostProviderArgs {
   tenancyId: pulumi.Input<string>;
   userId: pulumi.Input<string>;
   workerImageUrl: pulumi.Input<string>;
+}
+export interface SelfDnsArgs {
+  cloudflareApiToken: pulumi.Input<string>;
+  cloudflareZoneId: pulumi.Input<string>;
+  hostname: pulumi.Input<string>;
 }
 export interface SiteArgs {
   dnsProvider: pulumi.Input<DnsProviderArg>;

@@ -122,8 +122,10 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   wasmBucket: wasmS3.bucket,
   awsAccessKeyId: hqAwsAccessKey.id,
   awsSecretAccessKey: hqAwsAccessKey.secret,
-  githubClientId: config.require("githubClientId"),
   wsSecret: wsSecret.result,
+  selfDnsHostname: `fn0-hq.${domain}`,
+  selfDnsCloudflareZoneId: zoneId,
+  selfDnsCloudflareApiToken: dns.dnsApiToken,
   sites: [
     {
       name: "oci-compute-vm",
@@ -187,11 +189,3 @@ export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKe
 export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
 export const dwsWsSecret = pulumi.secret(wsSecret.result);
 
-new cloudflare.DnsRecord("hq-dns-record", {
-  zoneId,
-  name: `fn0-hq.${domain}`,
-  type: "A",
-  content: ociHeadQuarter.hqServiceIp,
-  ttl: 60,
-  proxied: false,
-});
