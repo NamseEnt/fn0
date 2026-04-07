@@ -12,10 +12,10 @@ ski = { package = "fn0-ski", version = "0.1.0" }
 fn0-wasmtime = { path = "../fn0-wasmtime" }
 wasmtime = { version = "42", default-features = false, features = [
     "runtime",
+    "cranelift",
     "component-model",
     "component-model-async",
     "memory-protection-keys",
-    "winch",
     "parallel-compilation",
     "cache",
 ] }
