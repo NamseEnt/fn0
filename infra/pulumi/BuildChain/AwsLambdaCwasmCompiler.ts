@@ -110,6 +110,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         region,
         runtime: "nodejs24.x",
         handler: "index.handler",
+        architectures: ["x86_64"],
         layers: [wasmtimeLayer.arn, zstdLayer.arn],
         timeout: 20,
         memorySize: 10240,
