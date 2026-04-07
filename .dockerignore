@@ -1,7 +1,7 @@
 **/target/
 infra/
 ls-news/
-fn0-compiler/
+fn0-compiler/target/
 forte/
 cli/
 sample-wasi-http-rust/
