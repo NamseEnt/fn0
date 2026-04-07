@@ -2460,15 +2460,16 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1118a9e5d52fe25797fa35ffee118d1fc90bf1d5a8ce26dfebbede430ab79d6b"
+checksum = "54bad7d0670e64c52bd5917c0b17ec618a620ec44401e4aa91e59fbcdb7f59a3"
 dependencies = [
  "anyhow",
  "bytes",
  "chrono",
  "fn0-adapt-cache",
  "fn0-ski",
+ "fn0-wasmtime",
  "futures",
  "http-body-util",
  "hyper 1.8.1",
@@ -2602,6 +2603,18 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "fn0-wasmtime"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a381c2fb5f7545e0b5549368e3632b429588e1ccf23ee56ec2559229c87d2d1a"
+dependencies = [
+ "anyhow",
+ "sysinfo",
+ "wasmtime",
+ "zstd",
 ]
 
 [[package]]
