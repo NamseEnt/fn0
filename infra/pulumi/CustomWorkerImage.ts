@@ -282,7 +282,7 @@ const provider: pulumi.dynamic.ResourceProvider = {
     });
     try {
       const { image } = await computeClient.getImage({ imageId: id });
-      if (image.lifecycleState === "AVAILABLE") return { id, props };
+      if (image.lifecycleState === "AVAILABLE") return { id, props: { ...props, imageId: id } };
     } catch {}
     return { id: "", props: undefined as any };
   },
