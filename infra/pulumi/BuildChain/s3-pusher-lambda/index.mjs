@@ -38,6 +38,7 @@ export async function handler(event) {
       const s3Client = new S3Client({
         region: target.region,
         endpoint: target.endpoint,
+        forcePathStyle: true,
         credentials: {
           accessKeyId: target.accessKeyId,
           secretAccessKey: target.secretAccessKey,
