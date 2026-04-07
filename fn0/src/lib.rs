@@ -95,21 +95,5 @@ where
     }
 }
 
-pub fn compile(wasm_bytes: &[u8]) -> Result<Vec<u8>> {
-    compile_for_target(wasm_bytes, None)
-}
-
-pub fn compile_for_target(wasm_bytes: &[u8], target: Option<&str>) -> Result<Vec<u8>> {
-    let mut config = engine_config();
-    if let Some(target) = target {
-        config.target(target).map_err(|e| anyhow!("{e}"))?;
-    }
-    let engine = Engine::new(&config).map_err(|e| anyhow!("{e}"))?;
-
-    let result = if wasm_bytes.len() > 8 && wasm_bytes[4..8] == [0x0d, 0x00, 0x01, 0x00] {
-        engine.precompile_component(wasm_bytes)
-    } else {
-        engine.precompile_module(wasm_bytes)
-    };
-    result.map_err(|e| anyhow!("{e}"))
-}
+pub use fn0_wasmtime::compile;
+pub use fn0_wasmtime::compile_for_target;

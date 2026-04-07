@@ -1,0 +1,17 @@
+[package]
+name = "fn0-wasmtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wasmtime = { version = "42", default-features = false, features = [
+    "runtime",
+    "component-model",
+    "component-model-async",
+    "memory-protection-keys",
+    "winch",
+    "parallel-compilation",
+    "cache",
+] }
+sysinfo = "0.37.2"
+anyhow = "1"
