@@ -11,6 +11,7 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 COPY host-hq-protocol/Cargo.toml host-hq-protocol/Cargo.toml
 COPY fn0-worker/Cargo.toml fn0-worker/Cargo.toml
+COPY fn0-worker/Cargo.lock fn0-worker/Cargo.lock
 RUN mkdir -p host-hq-protocol/src && echo "" > host-hq-protocol/src/lib.rs && \
     mkdir -p fn0-worker/src && echo "fn main(){}" > fn0-worker/src/main.rs && \
     if [ "$TARGETARCH" = "arm64" ]; then \
