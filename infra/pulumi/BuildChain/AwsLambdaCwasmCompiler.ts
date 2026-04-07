@@ -35,12 +35,12 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    const fn0CompilerLayerDir = path.join(__dirname, "./fn0-compiler-layer");
+    const fn0CompilerLayerZip = path.join(__dirname, "./fn0-compiler-layer.zip");
 
     const extractBinary = new command.local.Command(
       "extract-fn0-compiler",
       {
-        create: pulumi.interpolate`mkdir -p ${fn0CompilerLayerDir} && docker create --name fn0-compiler-extract ${fn0CompilerImage.imageName} && docker cp fn0-compiler-extract:/fn0-compiler ${fn0CompilerLayerDir}/fn0-compiler && docker rm fn0-compiler-extract && chmod +x ${fn0CompilerLayerDir}/fn0-compiler`,
+        create: pulumi.interpolate`TMPDIR=$(mktemp -d) && docker create --name fn0-compiler-extract ${fn0CompilerImage.imageName} && docker cp fn0-compiler-extract:/fn0-compiler $TMPDIR/fn0-compiler && docker rm fn0-compiler-extract && chmod +x $TMPDIR/fn0-compiler && cd $TMPDIR && zip ${fn0CompilerLayerZip} fn0-compiler && rm -rf $TMPDIR`,
         triggers: [fn0CompilerImage.repoDigest],
       },
       { parent: this }
@@ -51,7 +51,9 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       {
         region,
         layerName: "fn0-compiler",
-        code: new pulumi.asset.FileArchive(fn0CompilerLayerDir),
+        code: extractBinary.stdout.apply(
+          () => new pulumi.asset.FileArchive(fn0CompilerLayerZip)
+        ),
       },
       { parent: this, dependsOn: [extractBinary] }
     );
