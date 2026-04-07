@@ -119,6 +119,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         environment: {
           variables: {
             CWASM_BUCKET: cWasmBucket,
+            XDG_CACHE_HOME: "/tmp",
           },
         },
       },
