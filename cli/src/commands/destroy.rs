@@ -1,6 +1,6 @@
 use color_eyre::{eyre::eyre, Result};
 
-use super::deploy::{HQ_URL, get_github_token};
+use fn0_deploy::HQ_URL;
 
 pub async fn execute() -> Result<()> {
     let config = crate::config::Config::load("fn0.toml")
@@ -10,7 +10,7 @@ pub async fn execute() -> Result<()> {
         .name
         .ok_or_else(|| eyre!("'name' field missing in fn0.toml"))?;
 
-    let github_token = get_github_token().await?;
+    let github_token = fn0_deploy::get_github_token().await.map_err(|e| eyre!(e))?;
 
     let client = reqwest::Client::new();
 

@@ -41,6 +41,11 @@ async fn main() -> Result<()> {
             cli::build::run(options).await?;
         }
 
+        Commands::Deploy { project } => {
+            let project_dir = project.unwrap_or_else(|| ".".into());
+            cli::deploy::run(project_dir).await?;
+        }
+
         Commands::Queue { command } => match command {
             QueueCommands::Flush {
                 project,

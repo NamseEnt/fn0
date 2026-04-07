@@ -2573,6 +2573,7 @@ dependencies = [
  "dirs 6.0.0",
  "fn0",
  "fn0-adapt-cache",
+ "fn0-deploy",
  "http-body-util",
  "hyper 1.8.1",
  "hyper-util",
@@ -2642,6 +2643,17 @@ dependencies = [
  "tokio",
  "urlpattern",
  "uuid",
+]
+
+[[package]]
+name = "fn0-deploy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

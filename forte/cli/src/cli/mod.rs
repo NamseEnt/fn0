@@ -1,5 +1,6 @@
 pub mod add;
 pub mod build;
+pub mod deploy;
 pub mod dev;
 pub mod init;
 pub mod queue;
@@ -42,6 +43,13 @@ pub enum Commands {
 
     /// Build the project for production
     Build {
+        /// Project directory (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+
+    /// Deploy the project to fn0 cloud
+    Deploy {
         /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
