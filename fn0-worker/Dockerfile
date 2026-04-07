@@ -12,9 +12,7 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 COPY host-hq-protocol/ host-hq-protocol/
 COPY fn0-worker/ fn0-worker/
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=fn0-worker-target-${TARGETARCH},target=/app/fn0-worker/target \
-    if [ "$TARGETARCH" = "arm64" ]; then \
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       cargo build --release --target aarch64-unknown-linux-gnu --manifest-path fn0-worker/Cargo.toml && \
       cp fn0-worker/target/aarch64-unknown-linux-gnu/release/fn0-worker /app/fn0-worker-bin; \
