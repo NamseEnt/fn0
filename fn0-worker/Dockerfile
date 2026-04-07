@@ -23,7 +23,7 @@ RUN mkdir -p host-hq-protocol/src && echo "" > host-hq-protocol/src/lib.rs && \
 
 COPY host-hq-protocol/src/ host-hq-protocol/src/
 COPY fn0-worker/src/ fn0-worker/src/
-RUN touch fn0-worker/src/main.rs && \
+RUN touch host-hq-protocol/src/lib.rs fn0-worker/src/main.rs && \
     if [ "$TARGETARCH" = "arm64" ]; then \
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       cargo build --release --target aarch64-unknown-linux-gnu --manifest-path fn0-worker/Cargo.toml && \
