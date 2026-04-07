@@ -38,7 +38,6 @@ const ociHeadQuarterVcn = new fn0.OciHeadQuarterVcn("oci-head-quarter-vcn", {
 const ociComputeWorker = new fn0.OciComputeWorker("oci-compute-worker", {
   region: config.require("ociComputeWorkerRegion"),
   hqIpv6CidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
-  drgId: ociHeadQuarterVcn.drgId,
 });
 
 const cwasmS3Pusher = new fn0.CwasmS3Pusher("cwasm-s3-pusher", {
@@ -127,8 +126,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   selfDnsHostname: `fn0-hq.${domain}`,
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
-  drgId: ociHeadQuarterVcn.drgId,
-  workerIpv6CidrBlocks: ociComputeWorker.ipv6CidrBlocks,
   sites: [
     {
       name: "oci-compute-vm",

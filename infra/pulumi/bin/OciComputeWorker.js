@@ -1,0 +1,367 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OciRegion = exports.OciComputeWorker = void 0;
+const pulumi = require("@pulumi/pulumi");
+const oci = require("@pulumi/oci");
+const tls = require("@pulumi/tls");
+const random = require("@pulumi/random");
+const docker = require("@pulumi/docker");
+const command = require("@pulumi/command");
+class OciComputeWorker extends pulumi.ComponentResource {
+    constructor(name, args, opts) {
+        super("pkg:index:oci-compute-worker", name, args, opts);
+        const compartmentSuffix = new random.RandomString("compartment-suffix", {
+            length: 8,
+            special: false,
+            upper: false,
+        }, { parent: this }).result;
+        const compartment = new oci.identity.Compartment("compartment", {
+            description: "Compartment for fn0 OCI Compute Worker",
+            name: pulumi.interpolate `fn0-host-${compartmentSuffix}`,
+            enableDelete: true,
+        }, { parent: this });
+        this.compartmentId = compartment.id;
+        const privateKey = new tls.PrivateKey("oci-api-key-pair", {
+            algorithm: "RSA",
+            rsaBits: 2048,
+        }, { parent: this });
+        const workerManager = new oci.identity.User("worker-manager", {
+            description: "fn0 worker manager",
+        }, { parent: this });
+        const apiKey = new oci.identity.ApiKey("worker-api-key", {
+            userId: workerManager.id,
+            keyValue: privateKey.publicKeyPem,
+        }, { parent: this });
+        const group = new oci.identity.Group("worker-manager-group", {
+            description: "fn0 worker manager group",
+        }, { parent: this });
+        new oci.identity.UserGroupMembership("worker-manager-group-membership", {
+            userId: workerManager.id,
+            groupId: group.id,
+        }, { parent: this });
+        new oci.identity.Policy("worker-manager-policy", {
+            compartmentId: workerManager.compartmentId,
+            description: "Policy for fn0 worker manager",
+            statements: [
+                pulumi.interpolate `Allow group ${group.name} to manage instance-family in compartment id ${compartment.id}`,
+                pulumi.interpolate `Allow group ${group.name} to manage instance-configurations in compartment id ${compartment.id}`,
+                pulumi.interpolate `Allow group ${group.name} to manage compute-container-family in compartment id ${compartment.id}`,
+                pulumi.interpolate `Allow group ${group.name} to use virtual-network-family in compartment id ${compartment.id}`,
+                pulumi.interpolate `Allow group ${group.name} to read app-catalog-listing in compartment id ${compartment.id}`,
+                pulumi.interpolate `Allow group ${group.name} to use tag-namespaces in tenancy`,
+            ],
+        }, { parent: this });
+        const vcn = new oci.core.Vcn("vcn", {
+            compartmentId: compartment.id,
+            isIpv6enabled: true,
+            isOracleGuaAllocationEnabled: true,
+            cidrBlocks: ["10.0.0.0/16"],
+        }, { parent: this });
+        const securityList = new oci.core.SecurityList("security-list", {
+            compartmentId: compartment.id,
+            vcnId: vcn.id,
+            ingressSecurityRules: pulumi
+                .all([args.hqIpv6CidrBlocks])
+                .apply(([hqIpv6CidrBlocks]) => [
+                ...[...cloudflareIpv4Ranges, ...clareflareIpv6Ranges].map((source) => ({
+                    protocol: "6",
+                    source,
+                    tcpOptions: { min: 8080, max: 8080 },
+                })),
+                ...hqIpv6CidrBlocks.map((source) => ({
+                    protocol: "6",
+                    source,
+                    tcpOptions: { min: 8080, max: 8080 },
+                })),
+                ...hqIpv6CidrBlocks.map((source) => ({
+                    protocol: "17",
+                    source,
+                    udpOptions: { min: 10000, max: 10000 },
+                })),
+            ]),
+            egressSecurityRules: [
+                {
+                    destination: "0.0.0.0/0",
+                    protocol: "all",
+                },
+                {
+                    destination: "::/0",
+                    protocol: "all",
+                },
+            ],
+        }, { parent: this });
+        const internetGateway = new oci.core.InternetGateway("igw", {
+            compartmentId: compartment.id,
+            vcnId: vcn.id,
+        }, { parent: this });
+        const routeTable = new oci.core.RouteTable("route-table", {
+            compartmentId: compartment.id,
+            vcnId: vcn.id,
+            routeRules: [
+                {
+                    destination: "::/0",
+                    destinationType: "CIDR_BLOCK",
+                    networkEntityId: internetGateway.id,
+                },
+                {
+                    destination: "0.0.0.0/0",
+                    destinationType: "CIDR_BLOCK",
+                    networkEntityId: internetGateway.id,
+                },
+            ],
+        }, { parent: this });
+        const subnet = new oci.core.Subnet("subnet", {
+            compartmentId: compartment.id,
+            vcnId: vcn.id,
+            ipv4cidrBlocks: ["10.0.0.0/24"],
+            ipv6cidrBlocks: vcn.ipv6cidrBlocks.apply((x) => x.map((x) => x.replace("/56", "/64"))),
+            prohibitInternetIngress: false,
+            prohibitPublicIpOnVnic: false,
+            securityListIds: [securityList.id],
+            routeTableId: routeTable.id,
+        }, { parent: this });
+        const availabilityDomain = compartment.id.apply((compartmentId) => oci.identity
+            .getAvailabilityDomains({
+            compartmentId,
+        })
+            .then((x) => {
+            const ad = x.availabilityDomains[0]?.name;
+            if (!ad) {
+                throw new Error("can not find availability domain");
+            }
+            return ad;
+        }));
+        const imageId = compartment.id.apply((compartmentId) => oci.core
+            .getImages({
+            compartmentId,
+            operatingSystem: "Oracle Linux",
+            operatingSystemVersion: "10",
+            sortOrder: "DESC",
+        })
+            .then((x) => {
+            const imageId = x.images.find((x) => x.createImageAllowed && x.displayName.includes("-aarch64-"))?.id;
+            if (!imageId) {
+                throw new Error("can not find image");
+            }
+            return imageId;
+        }));
+        const instanceConfiguration = new oci.core.InstanceConfiguration("instance-configuration", {
+            compartmentId: compartment.id,
+            instanceDetails: {
+                instanceType: "compute",
+                launchDetails: {
+                    shape: "VM.Standard.A1.Flex",
+                    shapeConfig: {
+                        ocpus: 1,
+                        memoryInGbs: 6,
+                    },
+                    sourceDetails: {
+                        sourceType: "image",
+                        imageId,
+                    },
+                    createVnicDetails: {
+                        subnetId: subnet.id,
+                        assignIpv6ip: true,
+                        assignPublicIp: true,
+                    },
+                },
+            },
+        }, { parent: this });
+        this.subnetId = subnet.id;
+        this.instanceConfigurationId = instanceConfiguration.id;
+        this.infraEnvs = pulumi
+            .all([
+            privateKey.privateKeyPemPkcs8,
+            workerManager.id,
+            workerManager.compartmentId,
+            compartment.id,
+            instanceConfiguration.id,
+            apiKey.fingerprint,
+            pulumi.output(availabilityDomain),
+            pulumi.output(args.region),
+        ])
+            .apply(([privateKeyPem, userId, tenancyId, compartmentId, instanceConfigurationId, fingerprint, availabilityDomain, region,]) => ({
+            OCI_PRIVATE_KEY_BASE64: Buffer.from(privateKeyPem).toString("base64"),
+            OCI_USER_ID: userId,
+            OCI_FINGERPRINT: fingerprint,
+            OCI_TENANCY_ID: tenancyId,
+            OCI_REGION: region,
+            OCI_COMPARTMENT_ID: compartmentId,
+            OCI_INSTANCE_CONFIGURATION_ID: instanceConfigurationId,
+            OCI_AVAILABILITY_DOMAIN: availabilityDomain,
+        }));
+        const workerRepo = new oci.artifacts.ContainerRepository("worker-repo", {
+            compartmentId: compartment.id,
+            displayName: pulumi.interpolate `fn0-worker-${compartmentSuffix}`,
+            isPublic: true,
+        }, { parent: this, retainOnDelete: false });
+        const workerDockerUser = new oci.identity.User("worker-docker-user", {
+            name: pulumi.interpolate `fn0-worker-docker-${compartmentSuffix}`,
+            description: "User for fn0-worker image push",
+        }, { parent: this });
+        const workerDockerGroup = new oci.identity.Group("worker-docker-group", {
+            name: pulumi.interpolate `fn0-worker-pushers-${compartmentSuffix}`,
+            description: "Group allowed to push worker images",
+        }, { parent: this });
+        new oci.identity.UserGroupMembership("worker-docker-membership", {
+            userId: workerDockerUser.id,
+            groupId: workerDockerGroup.id,
+        }, { parent: this });
+        new oci.identity.Policy("worker-ocir-push-policy", {
+            compartmentId: compartment.id,
+            name: pulumi.interpolate `allow-worker-push-${compartmentSuffix}`,
+            description: "Policy to allow worker image push",
+            statements: [
+                pulumi.interpolate `Allow group ${workerDockerGroup.name} to manage repos in compartment id ${compartment.id}`,
+            ],
+        }, { dependsOn: [workerDockerGroup], parent: this });
+        const workerAuthToken = new oci.identity.AuthToken("worker-auth-token", {
+            userId: workerDockerUser.id,
+            description: "AuthToken for fn0-worker image push",
+        }, { parent: this });
+        const ociConfig = new pulumi.Config("oci");
+        const registryUrl = pulumi.interpolate `ocir.${args.region}.oci.oraclecloud.com`;
+        const workerImage = new docker.Image("worker-image", {
+            imageName: pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1`,
+            build: {
+                context: "../../fn0-worker",
+                platform: "linux/arm64",
+            },
+            registry: {
+                server: registryUrl,
+                username: pulumi.interpolate `${workerRepo.namespace}/${workerDockerUser.name}`,
+                password: workerAuthToken.token,
+            },
+        }, { parent: this });
+        this.workerImageUrl = workerImage.repoDigest;
+        const workerImageAmd64 = new docker.Image("worker-image-amd64", {
+            imageName: pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1-amd64`,
+            build: {
+                context: "../../fn0-worker",
+                platform: "linux/amd64",
+            },
+            registry: {
+                server: registryUrl,
+                username: pulumi.interpolate `${workerRepo.namespace}/${workerDockerUser.name}`,
+                password: workerAuthToken.token,
+            },
+        }, { parent: this });
+        const multiArchTag = pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
+        const manifestCreate = new command.local.Command("worker-manifest-create", {
+            create: pulumi.interpolate `docker login ${registryUrl} -u ${workerRepo.namespace}/${workerDockerUser.name} -p ${workerAuthToken.token} && docker manifest create --amend ${multiArchTag} ${workerImage.imageName} ${workerImageAmd64.imageName} && docker manifest push ${multiArchTag}`,
+            triggers: [workerImage.repoDigest, workerImageAmd64.repoDigest],
+        }, { parent: this, dependsOn: [workerImage, workerImageAmd64] });
+        this.workerImageMultiArch = multiArchTag;
+        this.osImageId = imageId;
+        const cwasmBucketUser = new oci.identity.User("cwasm-bucket-user", {
+            name: pulumi.interpolate `fn0-cwasm-${compartmentSuffix}`,
+            description: "User for cwasm S3-compatible access",
+        }, { parent: this });
+        const cwasmBucketGroup = new oci.identity.Group("cwasm-bucket-group", {
+            name: pulumi.interpolate `fn0-cwasm-group-${compartmentSuffix}`,
+            description: "Group for cwasm bucket access",
+        }, { parent: this });
+        new oci.identity.UserGroupMembership("cwasm-bucket-membership", {
+            userId: cwasmBucketUser.id,
+            groupId: cwasmBucketGroup.id,
+        }, { parent: this });
+        new oci.identity.Policy("cwasm-bucket-policy", {
+            compartmentId: compartment.id,
+            name: pulumi.interpolate `allow-cwasm-access-${compartmentSuffix}`,
+            description: "Policy for cwasm bucket access",
+            statements: [
+                pulumi.interpolate `Allow group ${cwasmBucketGroup.name} to manage objects in compartment id ${compartment.id}`,
+                pulumi.interpolate `Allow group ${cwasmBucketGroup.name} to manage buckets in compartment id ${compartment.id}`,
+            ],
+        }, { dependsOn: [cwasmBucketGroup], parent: this });
+        const customerSecretKey = new oci.identity.CustomerSecretKey("cwasm-s3-key", {
+            userId: cwasmBucketUser.id,
+            displayName: "cwasm-s3-compatible-key",
+        }, { parent: this });
+        const ociObjectStorageBucket = new oci.objectstorage.Bucket("cwasm-bucket", {
+            compartmentId: compartment.id,
+            name: pulumi.interpolate `fn0-cwasm-${compartmentSuffix}`,
+            namespace: workerRepo.namespace,
+            accessType: "NoPublicAccess",
+        }, { parent: this });
+        this.cwasmBucket = {
+            endpoint: pulumi.interpolate `https://${workerRepo.namespace}.compat.objectstorage.${args.region}.oraclecloud.com`,
+            region: pulumi.output(args.region),
+            bucketName: ociObjectStorageBucket.name,
+            accessKeyId: customerSecretKey.id,
+            secretAccessKey: customerSecretKey.key,
+            namespace: workerRepo.namespace,
+        };
+    }
+}
+exports.OciComputeWorker = OciComputeWorker;
+var OciRegion;
+(function (OciRegion) {
+    OciRegion["AP_SYDNEY_1"] = "ap-sydney-1";
+    OciRegion["AP_MELBOURNE_1"] = "ap-melbourne-1";
+    OciRegion["SA_SAOPAULO_1"] = "sa-saopaulo-1";
+    OciRegion["SA_VINHEDO_1"] = "sa-vinhedo-1";
+    OciRegion["CA_MONTREAL_1"] = "ca-montreal-1";
+    OciRegion["CA_TORONTO_1"] = "ca-toronto-1";
+    OciRegion["SA_SANTIAGO_1"] = "sa-santiago-1";
+    OciRegion["SA_VALPARAISO_1"] = "sa-valparaiso-1";
+    OciRegion["SA_BOGOTA_1"] = "sa-bogota-1";
+    OciRegion["EU_PARIS_1"] = "eu-paris-1";
+    OciRegion["EU_MARSEILLE_1"] = "eu-marseille-1";
+    OciRegion["EU_FRANKFURT_1"] = "eu-frankfurt-1";
+    OciRegion["AP_HYDERABAD_1"] = "ap-hyderabad-1";
+    OciRegion["AP_MUMBAI_1"] = "ap-mumbai-1";
+    OciRegion["IL_JERUSALEM_1"] = "il-jerusalem-1";
+    OciRegion["EU_MILAN_1"] = "eu-milan-1";
+    OciRegion["AP_OSAKA_1"] = "ap-osaka-1";
+    OciRegion["AP_TOKYO_1"] = "ap-tokyo-1";
+    OciRegion["MX_QUERETARO_1"] = "mx-queretaro-1";
+    OciRegion["MX_MONTERREY_1"] = "mx-monterrey-1";
+    OciRegion["EU_AMSTERDAM_1"] = "eu-amsterdam-1";
+    OciRegion["ME_RIYADH_1"] = "me-riyadh-1";
+    OciRegion["ME_JEDDAH_1"] = "me-jeddah-1";
+    OciRegion["AP_SINGAPORE_1"] = "ap-singapore-1";
+    OciRegion["AP_SINGAPORE_2"] = "ap-singapore-2";
+    OciRegion["AF_JOHANNESBURG_1"] = "af-johannesburg-1";
+    OciRegion["AP_SEOUL_1"] = "ap-seoul-1";
+    OciRegion["AP_CHUNCHEON_1"] = "ap-chuncheon-1";
+    OciRegion["EU_MADRID_1"] = "eu-madrid-1";
+    OciRegion["EU_STOCKHOLM_1"] = "eu-stockholm-1";
+    OciRegion["EU_ZURICH_1"] = "eu-zurich-1";
+    OciRegion["ME_ABU_DHABI_1"] = "me-abudhabi-1";
+    OciRegion["ME_DUBAI_1"] = "me-dubai-1";
+    OciRegion["UK_LONDON_1"] = "uk-london-1";
+    OciRegion["UK_CARDIFF_1"] = "uk-cardiff-1";
+    OciRegion["US_ASHBURN_1"] = "us-ashburn-1";
+    OciRegion["US_CHICAGO_1"] = "us-chicago-1";
+    OciRegion["US_PHOENIX_1"] = "us-phoenix-1";
+    OciRegion["US_SALT_LAKE_2"] = "us-saltlake-2";
+    OciRegion["US_SAN_JOSE_1"] = "us-sanjose-1";
+})(OciRegion || (exports.OciRegion = OciRegion = {}));
+const cloudflareIpv4Ranges = [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "141.101.64.0/18",
+    "108.162.192.0/18",
+    "190.93.240.0/20",
+    "188.114.96.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+    "162.158.0.0/15",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "172.64.0.0/13",
+    "131.0.72.0/22",
+];
+const clareflareIpv6Ranges = [
+    "2400:cb00::/32",
+    "2606:4700::/32",
+    "2803:f800::/32",
+    "2405:b500::/32",
+    "2405:8100::/32",
+    "2a06:98c0::/29",
+    "2c0f:f248::/32",
+];
+//# sourceMappingURL=OciComputeWorker.js.map

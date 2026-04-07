@@ -10,7 +10,6 @@ export class OciHeadQuarterVcn extends pulumi.ComponentResource {
   ipv6cidrBlocks: pulumi.Output<string[]>;
   compartmentId: pulumi.Output<string>;
   vcnId: pulumi.Output<string>;
-  drgId: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -47,26 +46,6 @@ export class OciHeadQuarterVcn extends pulumi.ComponentResource {
     );
     this.vcnId = vcn.id;
     this.ipv6cidrBlocks = vcn.ipv6cidrBlocks;
-
-    const drg = new oci.core.Drg(
-      "drg",
-      {
-        compartmentId: compartment.id,
-        displayName: pulumi.interpolate`fn0-drg-${suffix}`,
-      },
-      { parent: this, provider }
-    );
-    this.drgId = drg.id;
-
-    new oci.core.DrgAttachment(
-      "drg-hq-attachment",
-      {
-        drgId: drg.id,
-        vcnId: vcn.id,
-        displayName: "hq-vcn",
-      },
-      { parent: this, provider }
-    );
   }
 }
 

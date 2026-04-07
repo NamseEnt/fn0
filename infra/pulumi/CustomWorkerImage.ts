@@ -225,7 +225,7 @@ const provider: pulumi.dynamic.ResourceProvider = {
       if (!publicIp) throw new Error("No public IP found");
 
       await waitForSsh(publicIp, sshPrivateKey);
-      await sshExec(publicIp, sshPrivateKey, "sudo dnf install -y podman", 300_000);
+      await sshExec(publicIp, sshPrivateKey, "sudo dnf install -y podman && sudo systemctl disable --now firewalld", 300_000);
 
       await computeClient.instanceAction({ instanceId, action: "STOP" });
       await waitForState(
