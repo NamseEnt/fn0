@@ -9,10 +9,21 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
       rustup target add aarch64-unknown-linux-gnu; \
     fi
 
-COPY host-hq-protocol/ host-hq-protocol/
-COPY fn0-worker/ fn0-worker/
+COPY host-hq-protocol/Cargo.toml host-hq-protocol/Cargo.toml
+COPY fn0-worker/Cargo.toml fn0-worker/Cargo.toml
+RUN mkdir -p host-hq-protocol/src && echo "" > host-hq-protocol/src/lib.rs && \
+    mkdir -p fn0-worker/src && echo "fn main(){}" > fn0-worker/src/main.rs && \
+    if [ "$TARGETARCH" = "arm64" ]; then \
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+      cargo build --release --target aarch64-unknown-linux-gnu --manifest-path fn0-worker/Cargo.toml; \
+    else \
+      cargo build --release --manifest-path fn0-worker/Cargo.toml; \
+    fi
 
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
+COPY host-hq-protocol/src/ host-hq-protocol/src/
+COPY fn0-worker/src/ fn0-worker/src/
+RUN touch fn0-worker/src/main.rs && \
+    if [ "$TARGETARCH" = "arm64" ]; then \
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       cargo build --release --target aarch64-unknown-linux-gnu --manifest-path fn0-worker/Cargo.toml && \
       cp fn0-worker/target/aarch64-unknown-linux-gnu/release/fn0-worker /app/fn0-worker-bin; \
