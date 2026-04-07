@@ -1,4 +1,3 @@
-mod dns_sync;
 mod list_host;
 mod reaper;
 mod recv_pong;
@@ -6,7 +5,7 @@ mod scaler;
 mod send_ping;
 
 use crate::{
-    deployment_cache::DeploymentCache, dns::DnsProvider, host_connection::HostConnection,
+    deployment_cache::DeploymentCache, host_connection::HostConnection,
     telemetry, *,
 };
 use dashmap::{DashMap, DashSet};
@@ -19,8 +18,7 @@ use tokio::time::MissedTickBehavior;
 pub struct Site {
     name: String,
     host_provider: HostProvider,
-    dns_provider: DnsProvider,
-    host_connections: Arc<DashMap<Host, HostConnection>>,
+    pub host_connections: Arc<DashMap<Host, HostConnection>>,
     hosts_status: Arc<DashMap<Host, HostStatus>>,
     ca_cert_pem: String,
     pub deployment_cache: DeploymentCache,
@@ -39,7 +37,6 @@ impl Site {
     pub fn new(
         name: String,
         host_provider: HostProvider,
-        dns_provider: DnsProvider,
         ca_cert_pem: String,
         deployment_cache: DeploymentCache,
         host_cpu_cores: Option<NonZeroUsize>,
@@ -50,7 +47,6 @@ impl Site {
         Site {
             name,
             host_provider,
-            dns_provider,
             host_connections: Default::default(),
             hosts_status: Default::default(),
             known_hosts: Default::default(),
@@ -72,7 +68,6 @@ impl Site {
             self.run_send_ping_loop(),
             self.run_recv_pong_loop(new_host_rx),
             self.run_reaper(),
-            self.run_dns_sync(),
             self.run_metrics_reporter(),
             self.run_scaler()
         );

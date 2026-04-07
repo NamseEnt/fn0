@@ -107,6 +107,14 @@ const quicCaCert = new tls.SelfSignedCert("quic-ca-cert", {
   },
 });
 
+const dnsProvider = {
+  cloudflare: {
+    zoneId,
+    asteriskDomain: `*.${domain}`,
+    apiToken: dns.dnsApiToken,
+  },
+};
+
 const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   suffix,
   ociRegion: config.require("ociHeadQuarterRegion"),
@@ -126,6 +134,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   selfDnsHostname: `fn0-hq.${domain}`,
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
+  dnsProvider,
   sites: [
     {
       name: "oci-compute-vm",
@@ -157,25 +166,11 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
           sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
         },
       },
-      dnsProvider: {
-        cloudflare: {
-          zoneId,
-          asteriskDomain: `*.${domain}`,
-          apiToken: dns.dnsApiToken,
-        },
-      },
     },
     {
       name: "dedicated",
       hostProvider: {
         dedicated: {},
-      },
-      dnsProvider: {
-        cloudflare: {
-          zoneId,
-          asteriskDomain: `*.${domain}`,
-          apiToken: dns.dnsApiToken,
-        },
       },
     },
   ],

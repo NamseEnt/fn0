@@ -9,6 +9,7 @@ pub struct HqArgs {
     pub aws: AwsArgs,
     pub ws_secret: String,
     pub self_dns: SelfDnsArgs,
+    pub dns_provider: DnsProviderArg,
 }
 
 #[derive(Clone, serde::Deserialize, schemars::JsonSchema)]
@@ -33,7 +34,6 @@ pub struct AwsArgs {
 pub struct SiteArgs {
     pub name: String,
     pub host_provider: HostProviderArg,
-    pub dns_provider: DnsProviderArg,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
