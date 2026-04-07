@@ -360,12 +360,22 @@ export class CwasmS3Pusher extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    const lambda = new aws.lambda.CallbackFunction<aws.sqs.QueueEvent, void>(
+    const lambdaArchive = new pulumi.asset.AssetArchive({
+      "index.mjs": new pulumi.asset.FileAsset(
+        path.join(__dirname, "s3-pusher-lambda/index.mjs")
+      ),
+    });
+
+    const lambda = new aws.lambda.Function(
       "s3-pusher-lambda",
       {
         region: awsS3Region,
+        runtime: "nodejs24.x",
+        handler: "index.handler",
         timeout: 60,
         memorySize: 128,
+        role: lambdaRole.arn,
+        code: lambdaArchive,
         environment: {
           variables: {
             DISTRIBUTION_DOMAIN: distribution.domainName,
@@ -376,103 +386,8 @@ export class CwasmS3Pusher extends pulumi.ComponentResource {
             TARGET_BUCKETS: pulumi.jsonStringify(targetBuckets),
           },
         },
-        callback: async (event) => {
-          const { getSignedUrl } = await import("@aws-sdk/cloudfront-signer");
-          const { getSignedUrl: getS3SignedUrl } = await import(
-            "@aws-sdk/s3-request-presigner"
-          );
-          const { S3Client, DeleteObjectCommand, PutObjectCommand } =
-            await import("@aws-sdk/client-s3");
-
-          const distributionDomain = process.env.DISTRIBUTION_DOMAIN!;
-          const keyPairId = process.env.CLOUDFRONT_KEY_PAIR_ID!;
-          const privateKey = process.env.CLOUDFRONT_PRIVATE_KEY!;
-          const workerUrl = process.env.WORKER_URL!;
-          const workerSecretKey = process.env.WORKER_SECRET_KEY!;
-          const targetBuckets = JSON.parse(process.env.TARGET_BUCKETS!);
-
-          if (event.Records.length !== 1) {
-            throw new Error(`Expected 1 record, got ${event.Records.length}`);
-          }
-
-          const [record] = event.Records;
-          const bucketRecord = JSON.parse(record.body) as aws.s3.BucketRecord;
-          const bucket = bucketRecord.s3.bucket.name;
-          const key = bucketRecord.s3.object.key;
-
-          console.log(`Processing s3://${bucket}/${key}`);
-
-          const url = `https://${distributionDomain}/${key}`;
-          const dateLessThan = new Date(
-            Date.now() + 5 * 60 * 1000
-          ).toISOString();
-
-          const sourceUrl = getSignedUrl({
-            url,
-            keyPairId,
-            dateLessThan,
-            privateKey,
-          });
-
-          const targetUrls = await Promise.all(
-            targetBuckets.map(async (target: any) => {
-              const s3Client = new S3Client({
-                region: target.region,
-                endpoint: target.endpoint,
-                credentials: {
-                  accessKeyId: target.accessKeyId,
-                  secretAccessKey: target.secretAccessKey,
-                },
-              });
-
-              const command = new PutObjectCommand({
-                Bucket: target.bucketName,
-                Key: key,
-              });
-
-              return await getS3SignedUrl(s3Client, command, {
-                expiresIn: 300,
-              });
-            })
-          );
-
-          console.log("Calling Cloudflare Worker");
-
-          const workerResponse = await fetch(workerUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Worker-Secret": workerSecretKey,
-            },
-            body: JSON.stringify({ sourceUrl, targetUrls }),
-          });
-
-          if (!workerResponse.ok) {
-            const errorText = await workerResponse.text();
-            throw new Error(
-              `Worker failed: ${workerResponse.status} - ${errorText}`
-            );
-          }
-
-          const result = await workerResponse.text();
-          if (result !== "OK") {
-            throw new Error(`Unexpected worker response: ${result}`);
-          }
-
-          console.log("Worker succeeded, deleting from S3");
-
-          const s3Client = new S3Client({});
-          await s3Client.send(
-            new DeleteObjectCommand({
-              Bucket: bucket,
-              Key: key,
-            })
-          );
-
-          console.log("Upload complete");
-        },
-        role: lambdaRole.arn,
-      }
+      },
+      { parent: this }
     );
 
     new aws.lambda.EventSourceMapping(
