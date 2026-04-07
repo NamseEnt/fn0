@@ -15,9 +15,11 @@ export async function handler(event) {
   }
 
   const [record] = event.Records;
-  const bucketRecord = JSON.parse(record.body);
-  const bucket = bucketRecord.s3.bucket.name;
-  const key = bucketRecord.s3.object.key;
+  const s3Event = JSON.parse(record.body);
+  const s3Record = s3Event.Records[0];
+
+  const bucket = s3Record.s3.bucket.name;
+  const key = s3Record.s3.object.key;
 
   console.log(`Processing s3://${bucket}/${key}`);
 
