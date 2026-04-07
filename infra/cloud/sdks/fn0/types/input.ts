@@ -39,6 +39,7 @@ export interface OciComputeVmHostProviderArgsArgs {
     tenancyId: pulumi.Input<string>;
     userId: pulumi.Input<string>;
     workerImageUrl: pulumi.Input<string>;
+    sshAuthorizedKeys: pulumi.Input<string>;
 }
 
 export interface S3CompatibleBucketArgs {
