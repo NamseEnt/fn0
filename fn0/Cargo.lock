@@ -2152,13 +2152,14 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "bytes",
  "chrono",
  "fn0-adapt-cache",
  "fn0-ski",
+ "fn0-wasmtime",
  "futures",
  "http-body-util",
  "hyper",
@@ -2283,6 +2284,15 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "fn0-wasmtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "sysinfo",
+ "wasmtime",
 ]
 
 [[package]]

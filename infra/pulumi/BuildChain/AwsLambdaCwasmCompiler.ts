@@ -22,12 +22,12 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
     const { region, wasmBucket, queueArn, cWasmBucket } = args;
 
     const fn0CompilerImage = new docker.Image(
-      "fn0-compiler-image",
+      "fn0-wasmtime-image",
       {
-        imageName: "fn0-compiler:latest",
+        imageName: "fn0-wasmtime:latest",
         build: {
           context: "../..",
-          dockerfile: "../../fn0-compiler/Dockerfile",
+          dockerfile: "../../fn0-wasmtime/Dockerfile",
           platform: "linux/amd64",
         },
         skipPush: true,
@@ -35,19 +35,19 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    const fn0CompilerLayerZip = path.join(__dirname, "./fn0-compiler-layer.zip");
+    const fn0CompilerLayerZip = path.join(__dirname, "./fn0-wasmtime-layer.zip");
 
     const extractBinary = new command.local.Command(
       "extract-fn0-compiler",
       {
-        create: pulumi.interpolate`TMPDIR=$(mktemp -d) && docker create --name fn0-compiler-extract ${fn0CompilerImage.imageName} /bin/true && docker cp fn0-compiler-extract:/fn0-compiler $TMPDIR/fn0-compiler && docker rm fn0-compiler-extract && chmod +x $TMPDIR/fn0-compiler && cd $TMPDIR && zip ${fn0CompilerLayerZip} fn0-compiler && rm -rf $TMPDIR`,
+        create: pulumi.interpolate`TMPDIR=$(mktemp -d) && docker create --name fn0-wasmtime-extract ${fn0CompilerImage.imageName} /bin/true && docker cp fn0-wasmtime-extract:/fn0-wasmtime $TMPDIR/fn0-wasmtime && docker rm fn0-wasmtime-extract && chmod +x $TMPDIR/fn0-wasmtime && cd $TMPDIR && zip ${fn0CompilerLayerZip} fn0-compiler && rm -rf $TMPDIR`,
         triggers: [fn0CompilerImage.repoDigest],
       },
       { parent: this }
     );
 
     const fn0CompilerLayer = new aws.lambda.LayerVersion(
-      "fn0-compiler-layer",
+      "fn0-wasmtime-layer",
       {
         region,
         layerName: "fn0-compiler",

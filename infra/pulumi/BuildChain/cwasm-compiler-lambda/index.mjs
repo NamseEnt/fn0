@@ -9,7 +9,7 @@ export async function handler(event) {
   const s3Client = new S3Client({});
 
   const cWasmBucketName = process.env.CWASM_BUCKET;
-  const fn0CompilerPath = `/opt/fn0-compiler`;
+  const fn0CompilerPath = `/opt/fn0-wasmtime`;
   const zstdPath = `/opt/zstd`;
 
   if (event.Records.length !== 1) {
