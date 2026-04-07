@@ -28,7 +28,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         build: {
           context: "../..",
           dockerfile: "../../fn0-wasmtime/Dockerfile",
-          platform: "linux/amd64",
+          platform: "linux/arm64",
         },
         skipPush: true,
       },
@@ -56,18 +56,6 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         ),
       },
       { parent: this, dependsOn: [extractBinary] }
-    );
-
-    const zstdLayer = new aws.lambda.LayerVersion(
-      "zstd-layer",
-      {
-        region,
-        layerName: "zstd",
-        code: new pulumi.asset.FileArchive(
-          path.join(__dirname, "./zstd-layer")
-        ),
-      },
-      { parent: this }
     );
 
     const wasmBucketArn = pulumi.interpolate`arn:aws:s3:::${wasmBucket}`;
@@ -135,8 +123,8 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         region,
         runtime: "nodejs24.x",
         handler: "index.handler",
-        architectures: ["x86_64"],
-        layers: [fn0WasmtimeLayer.arn, zstdLayer.arn],
+        architectures: ["arm64"],
+        layers: [fn0WasmtimeLayer.arn],
         timeout: 20,
         memorySize: 10240,
         role: lambdaRole.arn,

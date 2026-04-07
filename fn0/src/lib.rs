@@ -96,4 +96,3 @@ where
 }
 
 pub use fn0_wasmtime::compile;
-pub use fn0_wasmtime::compile_for_target;

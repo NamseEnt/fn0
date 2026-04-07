@@ -378,6 +378,7 @@ dependencies = [
  "anyhow",
  "sysinfo",
  "wasmtime",
+ "zstd",
 ]
 
 [[package]]
