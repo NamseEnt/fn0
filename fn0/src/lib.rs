@@ -96,7 +96,15 @@ where
 }
 
 pub fn compile(wasm_bytes: &[u8]) -> Result<Vec<u8>> {
-    let engine = Engine::new(&engine_config()).map_err(|e| anyhow!("{e}"))?;
+    compile_for_target(wasm_bytes, None)
+}
+
+pub fn compile_for_target(wasm_bytes: &[u8], target: Option<&str>) -> Result<Vec<u8>> {
+    let mut config = engine_config();
+    if let Some(target) = target {
+        config.target(target).map_err(|e| anyhow!("{e}"))?;
+    }
+    let engine = Engine::new(&config).map_err(|e| anyhow!("{e}"))?;
 
     let result = if wasm_bytes.len() > 8 && wasm_bytes[4..8] == [0x0d, 0x00, 0x01, 0x00] {
         engine.precompile_component(wasm_bytes)
