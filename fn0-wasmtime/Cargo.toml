@@ -16,3 +16,4 @@ wasmtime = { version = "42", default-features = false, features = [
 ] }
 sysinfo = "0.37.2"
 anyhow = "1"
+zstd = "0.13"
