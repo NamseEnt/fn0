@@ -154,6 +154,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             CA_CERT_PEM: quicCaCert.certPem,
             CA_KEY_PEM: quicCaKey.privateKeyPemPkcs8,
           },
+          sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
         },
       },
       dnsProvider: {
@@ -188,4 +189,5 @@ export const s3Region = ociComputeWorker.cwasmBucket.region;
 export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKeyId);
 export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
 export const dwsWsSecret = pulumi.secret(wsSecret.result);
+export const workerSshPrivateKey = pulumi.secret(ociComputeWorker.sshPrivateKey);
 
