@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 wasmtime = { version = "42", default-features = false, features = [
     "runtime",
+    "cranelift",
     "component-model",
     "component-model-async",
     "memory-protection-keys",
