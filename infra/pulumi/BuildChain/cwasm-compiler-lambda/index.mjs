@@ -51,7 +51,7 @@ export async function handler(event) {
   );
 
   console.log("compile wasm to cwasm");
-  execSync(`${wasmtimePath} compile "${wasmPath}" -o "${cwasmPath}"`, {
+  execSync(`${wasmtimePath} compile --target aarch64-unknown-linux "${wasmPath}" -o "${cwasmPath}"`, {
     stdio: "inherit",
   });
 
