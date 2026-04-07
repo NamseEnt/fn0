@@ -61,7 +61,11 @@ async fn run() -> Result<()> {
         .endpoint_url(&s3_endpoint)
         .load()
         .await;
-    let s3_client = aws_sdk_s3::Client::new(&s3_config);
+    let s3_client = aws_sdk_s3::Client::from_conf(
+        aws_sdk_s3::config::Builder::from(&s3_config)
+            .force_path_style(true)
+            .build(),
+    );
 
     let wasm_cache = WasmCache {
         inner: S3AdaptCache::new(s3_client.clone(), cwasm_bucket.clone(), None, 512 * 1024 * 1024),
