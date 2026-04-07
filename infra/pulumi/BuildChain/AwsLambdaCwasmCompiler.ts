@@ -40,7 +40,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
     const extractBinary = new command.local.Command(
       "extract-fn0-compiler",
       {
-        create: pulumi.interpolate`TMPDIR=$(mktemp -d) && docker create --name fn0-compiler-extract ${fn0CompilerImage.imageName} && docker cp fn0-compiler-extract:/fn0-compiler $TMPDIR/fn0-compiler && docker rm fn0-compiler-extract && chmod +x $TMPDIR/fn0-compiler && cd $TMPDIR && zip ${fn0CompilerLayerZip} fn0-compiler && rm -rf $TMPDIR`,
+        create: pulumi.interpolate`TMPDIR=$(mktemp -d) && docker create --name fn0-compiler-extract ${fn0CompilerImage.imageName} /bin/true && docker cp fn0-compiler-extract:/fn0-compiler $TMPDIR/fn0-compiler && docker rm fn0-compiler-extract && chmod +x $TMPDIR/fn0-compiler && cd $TMPDIR && zip ${fn0CompilerLayerZip} fn0-compiler && rm -rf $TMPDIR`,
         triggers: [fn0CompilerImage.repoDigest],
       },
       { parent: this }
