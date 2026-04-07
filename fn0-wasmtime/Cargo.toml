@@ -10,7 +10,6 @@ wasmtime = { version = "42", default-features = false, features = [
     "component-model",
     "component-model-async",
     "memory-protection-keys",
-    "winch",
     "parallel-compilation",
     "cache",
 ] }
