@@ -1,0 +1,147 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as outputs from "../types/output";
+/**
+ * Provides details about an Image builder Container Recipe.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.imagebuilder.getContainerRecipe({
+ *     arn: "arn:aws:imagebuilder:us-east-1:aws:container-recipe/example/1.0.0",
+ * });
+ * ```
+ */
+export declare function getContainerRecipe(args: GetContainerRecipeArgs, opts?: pulumi.InvokeOptions): Promise<GetContainerRecipeResult>;
+/**
+ * A collection of arguments for invoking getContainerRecipe.
+ */
+export interface GetContainerRecipeArgs {
+    /**
+     * ARN of the container recipe.
+     */
+    arn: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    /**
+     * Key-value map of resource tags for the container recipe.
+     */
+    tags?: {
+        [key: string]: string;
+    };
+}
+/**
+ * A collection of values returned by getContainerRecipe.
+ */
+export interface GetContainerRecipeResult {
+    readonly arn: string;
+    /**
+     * List of objects with components for the container recipe.
+     */
+    readonly components: outputs.imagebuilder.GetContainerRecipeComponent[];
+    /**
+     * Type of the container.
+     */
+    readonly containerType: string;
+    /**
+     * Date the container recipe was created.
+     */
+    readonly dateCreated: string;
+    /**
+     * Description of the container recipe.
+     */
+    readonly description: string;
+    /**
+     * Dockerfile template used to build the image.
+     */
+    readonly dockerfileTemplateData: string;
+    /**
+     * Whether to encrypt the volume. Defaults to unset, which is the value inherited from the parent image.
+     */
+    readonly encrypted: boolean;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * List of objects with instance configurations for building and testing container images.
+     */
+    readonly instanceConfigurations: outputs.imagebuilder.GetContainerRecipeInstanceConfiguration[];
+    /**
+     * KMS key used to encrypt the container image.
+     */
+    readonly kmsKeyId: string;
+    /**
+     * Name of the container recipe.
+     */
+    readonly name: string;
+    /**
+     * Owner of the container recipe.
+     */
+    readonly owner: string;
+    /**
+     * Base image for the container recipe.
+     */
+    readonly parentImage: string;
+    /**
+     * Platform of the container recipe.
+     */
+    readonly platform: string;
+    readonly region: string;
+    /**
+     * Key-value map of resource tags for the container recipe.
+     */
+    readonly tags: {
+        [key: string]: string;
+    };
+    /**
+     * Destination repository for the container image.
+     */
+    readonly targetRepositories: outputs.imagebuilder.GetContainerRecipeTargetRepository[];
+    /**
+     * Version of the container recipe.
+     */
+    readonly version: string;
+    /**
+     * Working directory used during build and test workflows.
+     */
+    readonly workingDirectory: string;
+}
+/**
+ * Provides details about an Image builder Container Recipe.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.imagebuilder.getContainerRecipe({
+ *     arn: "arn:aws:imagebuilder:us-east-1:aws:container-recipe/example/1.0.0",
+ * });
+ * ```
+ */
+export declare function getContainerRecipeOutput(args: GetContainerRecipeOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetContainerRecipeResult>;
+/**
+ * A collection of arguments for invoking getContainerRecipe.
+ */
+export interface GetContainerRecipeOutputArgs {
+    /**
+     * ARN of the container recipe.
+     */
+    arn: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * Key-value map of resource tags for the container recipe.
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+}

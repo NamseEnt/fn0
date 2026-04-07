@@ -1,0 +1,140 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as inputs from "../types/input";
+import * as outputs from "../types/output";
+/**
+ * `aws.route53.ResolverEndpoint` provides details about a specific Route53 Resolver Endpoint.
+ *
+ * This data source allows to find a list of IPaddresses associated with a specific Route53 Resolver Endpoint.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.route53.getResolverEndpoint({
+ *     resolverEndpointId: "rslvr-in-1abc2345ef678g91h",
+ * });
+ * ```
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.route53.getResolverEndpoint({
+ *     filters: [{
+ *         name: "NAME",
+ *         values: ["MyResolverExampleName"],
+ *     }],
+ * });
+ * ```
+ */
+export declare function getResolverEndpoint(args?: GetResolverEndpointArgs, opts?: pulumi.InvokeOptions): Promise<GetResolverEndpointResult>;
+/**
+ * A collection of arguments for invoking getResolverEndpoint.
+ */
+export interface GetResolverEndpointArgs {
+    /**
+     * One or more name/value pairs to use as filters. There are
+     * several valid keys, for a full reference, check out
+     * [Route53resolver Filter value in the AWS API reference][1].
+     */
+    filters?: inputs.route53.GetResolverEndpointFilter[];
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    /**
+     * ID of the Route53 Resolver Endpoint.
+     */
+    resolverEndpointId?: string;
+}
+/**
+ * A collection of values returned by getResolverEndpoint.
+ */
+export interface GetResolverEndpointResult {
+    /**
+     * Computed ARN of the Route53 Resolver Endpoint.
+     */
+    readonly arn: string;
+    /**
+     * Direction of the queries to or from the Resolver Endpoint .
+     */
+    readonly direction: string;
+    readonly filters?: outputs.route53.GetResolverEndpointFilter[];
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * List of IPaddresses that have been associated with the Resolver Endpoint.
+     */
+    readonly ipAddresses: string[];
+    readonly name: string;
+    /**
+     * The protocols used by the Resolver endpoint.
+     */
+    readonly protocols: string[];
+    readonly region: string;
+    readonly resolverEndpointId?: string;
+    /**
+     * The Resolver endpoint IP address type.
+     */
+    readonly resolverEndpointType: string;
+    /**
+     * Current status of the Resolver Endpoint.
+     */
+    readonly status: string;
+    /**
+     * ID of the Host VPC that the Resolver Endpoint resides in.
+     */
+    readonly vpcId: string;
+}
+/**
+ * `aws.route53.ResolverEndpoint` provides details about a specific Route53 Resolver Endpoint.
+ *
+ * This data source allows to find a list of IPaddresses associated with a specific Route53 Resolver Endpoint.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.route53.getResolverEndpoint({
+ *     resolverEndpointId: "rslvr-in-1abc2345ef678g91h",
+ * });
+ * ```
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.route53.getResolverEndpoint({
+ *     filters: [{
+ *         name: "NAME",
+ *         values: ["MyResolverExampleName"],
+ *     }],
+ * });
+ * ```
+ */
+export declare function getResolverEndpointOutput(args?: GetResolverEndpointOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetResolverEndpointResult>;
+/**
+ * A collection of arguments for invoking getResolverEndpoint.
+ */
+export interface GetResolverEndpointOutputArgs {
+    /**
+     * One or more name/value pairs to use as filters. There are
+     * several valid keys, for a full reference, check out
+     * [Route53resolver Filter value in the AWS API reference][1].
+     */
+    filters?: pulumi.Input<pulumi.Input<inputs.route53.GetResolverEndpointFilterArgs>[]>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * ID of the Route53 Resolver Endpoint.
+     */
+    resolverEndpointId?: pulumi.Input<string>;
+}

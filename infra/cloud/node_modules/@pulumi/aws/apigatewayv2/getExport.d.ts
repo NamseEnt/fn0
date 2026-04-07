@@ -1,0 +1,121 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Exports a definition of an API in a particular output format and specification.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const test = aws.apigatewayv2.getExport({
+ *     apiId: testAwsApigatewayv2Route.apiId,
+ *     specification: "OAS30",
+ *     outputType: "JSON",
+ * });
+ * ```
+ */
+export declare function getExport(args: GetExportArgs, opts?: pulumi.InvokeOptions): Promise<GetExportResult>;
+/**
+ * A collection of arguments for invoking getExport.
+ */
+export interface GetExportArgs {
+    /**
+     * API identifier.
+     */
+    apiId: string;
+    /**
+     * Version of the API Gateway export algorithm. API Gateway uses the latest version by default. Currently, the only supported version is `1.0`.
+     */
+    exportVersion?: string;
+    /**
+     * Whether to include API Gateway extensions in the exported API definition. API Gateway extensions are included by default.
+     */
+    includeExtensions?: boolean;
+    /**
+     * Output type of the exported definition file. Valid values are `JSON` and `YAML`.
+     */
+    outputType: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    /**
+     * Version of the API specification to use. `OAS30`, for OpenAPI 3.0, is the only supported value.
+     */
+    specification: string;
+    /**
+     * Name of the API stage to export. If you don't specify this property, a representation of the latest API configuration is exported.
+     */
+    stageName?: string;
+}
+/**
+ * A collection of values returned by getExport.
+ */
+export interface GetExportResult {
+    readonly apiId: string;
+    /**
+     * ID of the API.
+     */
+    readonly body: string;
+    readonly exportVersion?: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    readonly includeExtensions?: boolean;
+    readonly outputType: string;
+    readonly region: string;
+    readonly specification: string;
+    readonly stageName?: string;
+}
+/**
+ * Exports a definition of an API in a particular output format and specification.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const test = aws.apigatewayv2.getExport({
+ *     apiId: testAwsApigatewayv2Route.apiId,
+ *     specification: "OAS30",
+ *     outputType: "JSON",
+ * });
+ * ```
+ */
+export declare function getExportOutput(args: GetExportOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetExportResult>;
+/**
+ * A collection of arguments for invoking getExport.
+ */
+export interface GetExportOutputArgs {
+    /**
+     * API identifier.
+     */
+    apiId: pulumi.Input<string>;
+    /**
+     * Version of the API Gateway export algorithm. API Gateway uses the latest version by default. Currently, the only supported version is `1.0`.
+     */
+    exportVersion?: pulumi.Input<string>;
+    /**
+     * Whether to include API Gateway extensions in the exported API definition. API Gateway extensions are included by default.
+     */
+    includeExtensions?: pulumi.Input<boolean>;
+    /**
+     * Output type of the exported definition file. Valid values are `JSON` and `YAML`.
+     */
+    outputType: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * Version of the API specification to use. `OAS30`, for OpenAPI 3.0, is the only supported value.
+     */
+    specification: pulumi.Input<string>;
+    /**
+     * Name of the API stage to export. If you don't specify this property, a representation of the latest API configuration is exported.
+     */
+    stageName?: pulumi.Input<string>;
+}

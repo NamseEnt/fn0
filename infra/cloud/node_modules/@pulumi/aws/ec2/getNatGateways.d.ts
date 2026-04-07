@@ -1,0 +1,118 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as inputs from "../types/input";
+import * as outputs from "../types/output";
+/**
+ * This resource can be useful for getting back a list of NAT gateway ids to be referenced elsewhere.
+ *
+ * ## Example Usage
+ *
+ * The following returns all NAT gateways in a specified VPC that are marked as available
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const ngws = aws.ec2.getNatGateways({
+ *     vpcId: vpcId,
+ *     filters: [{
+ *         name: "state",
+ *         values: ["available"],
+ *     }],
+ * });
+ * const ngw = .map(__index => (aws.ec2.getNatGateway({
+ *     id: _arg0_.ids[__index],
+ * })));
+ * ```
+ */
+export declare function getNatGateways(args?: GetNatGatewaysArgs, opts?: pulumi.InvokeOptions): Promise<GetNatGatewaysResult>;
+/**
+ * A collection of arguments for invoking getNatGateways.
+ */
+export interface GetNatGatewaysArgs {
+    /**
+     * Custom filter block as described below.
+     */
+    filters?: inputs.ec2.GetNatGatewaysFilter[];
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    /**
+     * Map of tags, each pair of which must exactly match
+     * a pair on the desired NAT Gateways.
+     */
+    tags?: {
+        [key: string]: string;
+    };
+    /**
+     * VPC ID that you want to filter from.
+     */
+    vpcId?: string;
+}
+/**
+ * A collection of values returned by getNatGateways.
+ */
+export interface GetNatGatewaysResult {
+    readonly filters?: outputs.ec2.GetNatGatewaysFilter[];
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * List of all the NAT gateway ids found.
+     */
+    readonly ids: string[];
+    readonly region: string;
+    readonly tags: {
+        [key: string]: string;
+    };
+    readonly vpcId?: string;
+}
+/**
+ * This resource can be useful for getting back a list of NAT gateway ids to be referenced elsewhere.
+ *
+ * ## Example Usage
+ *
+ * The following returns all NAT gateways in a specified VPC that are marked as available
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const ngws = aws.ec2.getNatGateways({
+ *     vpcId: vpcId,
+ *     filters: [{
+ *         name: "state",
+ *         values: ["available"],
+ *     }],
+ * });
+ * const ngw = .map(__index => (aws.ec2.getNatGateway({
+ *     id: _arg0_.ids[__index],
+ * })));
+ * ```
+ */
+export declare function getNatGatewaysOutput(args?: GetNatGatewaysOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetNatGatewaysResult>;
+/**
+ * A collection of arguments for invoking getNatGateways.
+ */
+export interface GetNatGatewaysOutputArgs {
+    /**
+     * Custom filter block as described below.
+     */
+    filters?: pulumi.Input<pulumi.Input<inputs.ec2.GetNatGatewaysFilterArgs>[]>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * Map of tags, each pair of which must exactly match
+     * a pair on the desired NAT Gateways.
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+    /**
+     * VPC ID that you want to filter from.
+     */
+    vpcId?: pulumi.Input<string>;
+}

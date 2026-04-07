@@ -1,0 +1,83 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as outputs from "../types/output";
+/**
+ * Data source for managing AWS Service Quotas Templates.
+ *
+ * ## Example Usage
+ *
+ * ### Basic Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.servicequotas.getTemplates({
+ *     awsRegion: "us-east-1",
+ * });
+ * ```
+ */
+export declare function getTemplates(args?: GetTemplatesArgs, opts?: pulumi.InvokeOptions): Promise<GetTemplatesResult>;
+/**
+ * A collection of arguments for invoking getTemplates.
+ */
+export interface GetTemplatesArgs {
+    /**
+     * AWS Region to which the quota increases apply.
+     */
+    awsRegion?: string;
+    /**
+     * AWS Region to which the quota increases apply. Use `aws.getRegion` instead.
+     *
+     * @deprecated region is deprecated. Use aws.getRegion instead.
+     */
+    region?: string;
+}
+/**
+ * A collection of values returned by getTemplates.
+ */
+export interface GetTemplatesResult {
+    readonly awsRegion?: string;
+    readonly id: string;
+    /**
+     * AWS Region to which the template applies.
+     *
+     * @deprecated region is deprecated. Use aws.getRegion instead.
+     */
+    readonly region?: string;
+    /**
+     * A list of quota increase templates for specified region. See `templates`.
+     */
+    readonly templates: outputs.servicequotas.GetTemplatesTemplate[];
+}
+/**
+ * Data source for managing AWS Service Quotas Templates.
+ *
+ * ## Example Usage
+ *
+ * ### Basic Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.servicequotas.getTemplates({
+ *     awsRegion: "us-east-1",
+ * });
+ * ```
+ */
+export declare function getTemplatesOutput(args?: GetTemplatesOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetTemplatesResult>;
+/**
+ * A collection of arguments for invoking getTemplates.
+ */
+export interface GetTemplatesOutputArgs {
+    /**
+     * AWS Region to which the quota increases apply.
+     */
+    awsRegion?: pulumi.Input<string>;
+    /**
+     * AWS Region to which the quota increases apply. Use `aws.getRegion` instead.
+     *
+     * @deprecated region is deprecated. Use aws.getRegion instead.
+     */
+    region?: pulumi.Input<string>;
+}

@@ -1,0 +1,67 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Use this data source to get ARNs and Identity Store IDs of Single Sign-On (SSO) Instances.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.ssoadmin.getInstances({});
+ * export const arn = example.then(example => example.arns?.[0]);
+ * export const identityStoreId = example.then(example => example.identityStoreIds?.[0]);
+ * ```
+ */
+export declare function getInstances(args?: GetInstancesArgs, opts?: pulumi.InvokeOptions): Promise<GetInstancesResult>;
+/**
+ * A collection of arguments for invoking getInstances.
+ */
+export interface GetInstancesArgs {
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+}
+/**
+ * A collection of values returned by getInstances.
+ */
+export interface GetInstancesResult {
+    /**
+     * Set of Amazon Resource Names (ARNs) of the SSO Instances.
+     */
+    readonly arns: string[];
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * Set of identifiers of the identity stores connected to the SSO Instances.
+     */
+    readonly identityStoreIds: string[];
+    readonly region: string;
+}
+/**
+ * Use this data source to get ARNs and Identity Store IDs of Single Sign-On (SSO) Instances.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.ssoadmin.getInstances({});
+ * export const arn = example.then(example => example.arns?.[0]);
+ * export const identityStoreId = example.then(example => example.identityStoreIds?.[0]);
+ * ```
+ */
+export declare function getInstancesOutput(args?: GetInstancesOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetInstancesResult>;
+/**
+ * A collection of arguments for invoking getInstances.
+ */
+export interface GetInstancesOutputArgs {
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+}

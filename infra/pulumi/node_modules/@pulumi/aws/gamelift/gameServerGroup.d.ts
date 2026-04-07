@@ -1,0 +1,326 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as inputs from "../types/input";
+import * as outputs from "../types/output";
+/**
+ * Provides an GameLift Game Server Group resource.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = new aws.gamelift.GameServerGroup("example", {
+ *     gameServerGroupName: "example",
+ *     instanceDefinitions: [
+ *         {
+ *             instanceType: "c5.large",
+ *         },
+ *         {
+ *             instanceType: "c5a.large",
+ *         },
+ *     ],
+ *     launchTemplate: {
+ *         id: exampleAwsLaunchTemplate.id,
+ *     },
+ *     maxSize: 1,
+ *     minSize: 1,
+ *     roleArn: exampleAwsIamRole.arn,
+ * }, {
+ *     dependsOn: [exampleAwsIamRolePolicyAttachment],
+ * });
+ * ```
+ *
+ * Full usage:
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = new aws.gamelift.GameServerGroup("example", {
+ *     autoScalingPolicy: {
+ *         estimatedInstanceWarmup: 60,
+ *         targetTrackingConfiguration: {
+ *             targetValue: 75,
+ *         },
+ *     },
+ *     balancingStrategy: "SPOT_ONLY",
+ *     gameServerGroupName: "example",
+ *     gameServerProtectionPolicy: "FULL_PROTECTION",
+ *     instanceDefinitions: [
+ *         {
+ *             instanceType: "c5.large",
+ *             weightedCapacity: "1",
+ *         },
+ *         {
+ *             instanceType: "c5.2xlarge",
+ *             weightedCapacity: "2",
+ *         },
+ *     ],
+ *     launchTemplate: {
+ *         id: exampleAwsLaunchTemplate.id,
+ *         version: "1",
+ *     },
+ *     maxSize: 1,
+ *     minSize: 1,
+ *     roleArn: exampleAwsIamRole.arn,
+ *     tags: {
+ *         Name: "example",
+ *     },
+ *     vpcSubnets: [
+ *         "subnet-12345678",
+ *         "subnet-23456789",
+ *     ],
+ * }, {
+ *     dependsOn: [exampleAwsIamRolePolicyAttachment],
+ * });
+ * ```
+ *
+ * ### Example IAM Role for GameLift Game Server Group
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const current = aws.getPartition({});
+ * const assumeRole = aws.iam.getPolicyDocument({
+ *     statements: [{
+ *         effect: "Allow",
+ *         principals: [{
+ *             type: "Service",
+ *             identifiers: [
+ *                 "autoscaling.amazonaws.com",
+ *                 "gamelift.amazonaws.com",
+ *             ],
+ *         }],
+ *         actions: ["sts:AssumeRole"],
+ *     }],
+ * });
+ * const example = new aws.iam.Role("example", {
+ *     assumeRolePolicy: assumeRole.then(assumeRole => assumeRole.json),
+ *     name: "gamelift-game-server-group-example",
+ * });
+ * const exampleRolePolicyAttachment = new aws.iam.RolePolicyAttachment("example", {
+ *     policyArn: current.then(current => `arn:${current.partition}:iam::aws:policy/GameLiftGameServerGroupPolicy`),
+ *     role: example.name,
+ * });
+ * ```
+ *
+ * ## Import
+ *
+ * Using `pulumi import`, import GameLift Game Server Group using the `name`. For example:
+ *
+ * ```sh
+ * $ pulumi import aws:gamelift/gameServerGroup:GameServerGroup example example
+ * ```
+ */
+export declare class GameServerGroup extends pulumi.CustomResource {
+    /**
+     * Get an existing GameServerGroup resource's state with the given name, ID, and optional extra
+     * properties used to qualify the lookup.
+     *
+     * @param name The _unique_ name of the resulting resource.
+     * @param id The _unique_ provider ID of the resource to lookup.
+     * @param state Any extra arguments used during the lookup.
+     * @param opts Optional settings to control the behavior of the CustomResource.
+     */
+    static get(name: string, id: pulumi.Input<pulumi.ID>, state?: GameServerGroupState, opts?: pulumi.CustomResourceOptions): GameServerGroup;
+    /**
+     * Returns true if the given object is an instance of GameServerGroup.  This is designed to work even
+     * when multiple copies of the Pulumi SDK have been loaded into the same process.
+     */
+    static isInstance(obj: any): obj is GameServerGroup;
+    /**
+     * The ARN of the GameLift Game Server Group.
+     */
+    readonly arn: pulumi.Output<string>;
+    /**
+     * The ARN of the created EC2 Auto Scaling group.
+     */
+    readonly autoScalingGroupArn: pulumi.Output<string>;
+    readonly autoScalingPolicy: pulumi.Output<outputs.gamelift.GameServerGroupAutoScalingPolicy | undefined>;
+    /**
+     * Indicates how GameLift FleetIQ balances the use of Spot Instances and On-Demand Instances.
+     * Valid values: `SPOT_ONLY`, `SPOT_PREFERRED`, `ON_DEMAND_ONLY`. Defaults to `SPOT_PREFERRED`.
+     */
+    readonly balancingStrategy: pulumi.Output<string>;
+    /**
+     * Name of the game server group.
+     * This value is used to generate unique ARN identifiers for the EC2 Auto Scaling group and the GameLift FleetIQ game server group.
+     */
+    readonly gameServerGroupName: pulumi.Output<string>;
+    /**
+     * Indicates whether instances in the game server group are protected from early termination.
+     * Unprotected instances that have active game servers running might be terminated during a scale-down event,
+     * causing players to be dropped from the game.
+     * Protected instances cannot be terminated while there are active game servers running except in the event
+     * of a forced game server group deletion.
+     * Valid values: `NO_PROTECTION`, `FULL_PROTECTION`. Defaults to `NO_PROTECTION`.
+     */
+    readonly gameServerProtectionPolicy: pulumi.Output<string>;
+    readonly instanceDefinitions: pulumi.Output<outputs.gamelift.GameServerGroupInstanceDefinition[]>;
+    readonly launchTemplate: pulumi.Output<outputs.gamelift.GameServerGroupLaunchTemplate>;
+    /**
+     * The maximum number of instances allowed in the EC2 Auto Scaling group.
+     * During automatic scaling events, GameLift FleetIQ and EC2 do not scale up the group above this maximum.
+     */
+    readonly maxSize: pulumi.Output<number>;
+    /**
+     * The minimum number of instances allowed in the EC2 Auto Scaling group.
+     * During automatic scaling events, GameLift FleetIQ and EC2 do not scale down the group below this minimum.
+     */
+    readonly minSize: pulumi.Output<number>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    readonly region: pulumi.Output<string>;
+    /**
+     * ARN for an IAM role that allows Amazon GameLift to access your EC2 Auto Scaling groups.
+     */
+    readonly roleArn: pulumi.Output<string>;
+    /**
+     * Key-value map of resource tags
+     */
+    readonly tags: pulumi.Output<{
+        [key: string]: string;
+    } | undefined>;
+    readonly tagsAll: pulumi.Output<{
+        [key: string]: string;
+    }>;
+    /**
+     * A list of VPC subnets to use with instances in the game server group.
+     * By default, all GameLift FleetIQ-supported Availability Zones are used.
+     */
+    readonly vpcSubnets: pulumi.Output<string[] | undefined>;
+    /**
+     * Create a GameServerGroup resource with the given unique name, arguments, and options.
+     *
+     * @param name The _unique_ name of the resource.
+     * @param args The arguments to use to populate this resource's properties.
+     * @param opts A bag of options that control this resource's behavior.
+     */
+    constructor(name: string, args: GameServerGroupArgs, opts?: pulumi.CustomResourceOptions);
+}
+/**
+ * Input properties used for looking up and filtering GameServerGroup resources.
+ */
+export interface GameServerGroupState {
+    /**
+     * The ARN of the GameLift Game Server Group.
+     */
+    arn?: pulumi.Input<string>;
+    /**
+     * The ARN of the created EC2 Auto Scaling group.
+     */
+    autoScalingGroupArn?: pulumi.Input<string>;
+    autoScalingPolicy?: pulumi.Input<inputs.gamelift.GameServerGroupAutoScalingPolicy>;
+    /**
+     * Indicates how GameLift FleetIQ balances the use of Spot Instances and On-Demand Instances.
+     * Valid values: `SPOT_ONLY`, `SPOT_PREFERRED`, `ON_DEMAND_ONLY`. Defaults to `SPOT_PREFERRED`.
+     */
+    balancingStrategy?: pulumi.Input<string>;
+    /**
+     * Name of the game server group.
+     * This value is used to generate unique ARN identifiers for the EC2 Auto Scaling group and the GameLift FleetIQ game server group.
+     */
+    gameServerGroupName?: pulumi.Input<string>;
+    /**
+     * Indicates whether instances in the game server group are protected from early termination.
+     * Unprotected instances that have active game servers running might be terminated during a scale-down event,
+     * causing players to be dropped from the game.
+     * Protected instances cannot be terminated while there are active game servers running except in the event
+     * of a forced game server group deletion.
+     * Valid values: `NO_PROTECTION`, `FULL_PROTECTION`. Defaults to `NO_PROTECTION`.
+     */
+    gameServerProtectionPolicy?: pulumi.Input<string>;
+    instanceDefinitions?: pulumi.Input<pulumi.Input<inputs.gamelift.GameServerGroupInstanceDefinition>[]>;
+    launchTemplate?: pulumi.Input<inputs.gamelift.GameServerGroupLaunchTemplate>;
+    /**
+     * The maximum number of instances allowed in the EC2 Auto Scaling group.
+     * During automatic scaling events, GameLift FleetIQ and EC2 do not scale up the group above this maximum.
+     */
+    maxSize?: pulumi.Input<number>;
+    /**
+     * The minimum number of instances allowed in the EC2 Auto Scaling group.
+     * During automatic scaling events, GameLift FleetIQ and EC2 do not scale down the group below this minimum.
+     */
+    minSize?: pulumi.Input<number>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * ARN for an IAM role that allows Amazon GameLift to access your EC2 Auto Scaling groups.
+     */
+    roleArn?: pulumi.Input<string>;
+    /**
+     * Key-value map of resource tags
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+    tagsAll?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+    /**
+     * A list of VPC subnets to use with instances in the game server group.
+     * By default, all GameLift FleetIQ-supported Availability Zones are used.
+     */
+    vpcSubnets?: pulumi.Input<pulumi.Input<string>[]>;
+}
+/**
+ * The set of arguments for constructing a GameServerGroup resource.
+ */
+export interface GameServerGroupArgs {
+    autoScalingPolicy?: pulumi.Input<inputs.gamelift.GameServerGroupAutoScalingPolicy>;
+    /**
+     * Indicates how GameLift FleetIQ balances the use of Spot Instances and On-Demand Instances.
+     * Valid values: `SPOT_ONLY`, `SPOT_PREFERRED`, `ON_DEMAND_ONLY`. Defaults to `SPOT_PREFERRED`.
+     */
+    balancingStrategy?: pulumi.Input<string>;
+    /**
+     * Name of the game server group.
+     * This value is used to generate unique ARN identifiers for the EC2 Auto Scaling group and the GameLift FleetIQ game server group.
+     */
+    gameServerGroupName: pulumi.Input<string>;
+    /**
+     * Indicates whether instances in the game server group are protected from early termination.
+     * Unprotected instances that have active game servers running might be terminated during a scale-down event,
+     * causing players to be dropped from the game.
+     * Protected instances cannot be terminated while there are active game servers running except in the event
+     * of a forced game server group deletion.
+     * Valid values: `NO_PROTECTION`, `FULL_PROTECTION`. Defaults to `NO_PROTECTION`.
+     */
+    gameServerProtectionPolicy?: pulumi.Input<string>;
+    instanceDefinitions: pulumi.Input<pulumi.Input<inputs.gamelift.GameServerGroupInstanceDefinition>[]>;
+    launchTemplate: pulumi.Input<inputs.gamelift.GameServerGroupLaunchTemplate>;
+    /**
+     * The maximum number of instances allowed in the EC2 Auto Scaling group.
+     * During automatic scaling events, GameLift FleetIQ and EC2 do not scale up the group above this maximum.
+     */
+    maxSize: pulumi.Input<number>;
+    /**
+     * The minimum number of instances allowed in the EC2 Auto Scaling group.
+     * During automatic scaling events, GameLift FleetIQ and EC2 do not scale down the group below this minimum.
+     */
+    minSize: pulumi.Input<number>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * ARN for an IAM role that allows Amazon GameLift to access your EC2 Auto Scaling groups.
+     */
+    roleArn: pulumi.Input<string>;
+    /**
+     * Key-value map of resource tags
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+    /**
+     * A list of VPC subnets to use with instances in the game server group.
+     * By default, all GameLift FleetIQ-supported Availability Zones are used.
+     */
+    vpcSubnets?: pulumi.Input<pulumi.Input<string>[]>;
+}

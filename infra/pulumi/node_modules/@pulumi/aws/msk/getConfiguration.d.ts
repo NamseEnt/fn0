@@ -1,0 +1,88 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Get information on an Amazon MSK Configuration.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.msk.getConfiguration({
+ *     name: "example",
+ * });
+ * ```
+ */
+export declare function getConfiguration(args: GetConfigurationArgs, opts?: pulumi.InvokeOptions): Promise<GetConfigurationResult>;
+/**
+ * A collection of arguments for invoking getConfiguration.
+ */
+export interface GetConfigurationArgs {
+    /**
+     * Name of the configuration.
+     */
+    name: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+}
+/**
+ * A collection of values returned by getConfiguration.
+ */
+export interface GetConfigurationResult {
+    /**
+     * ARN of the configuration.
+     */
+    readonly arn: string;
+    /**
+     * Description of the configuration.
+     */
+    readonly description: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * List of Apache Kafka versions which can use this configuration.
+     */
+    readonly kafkaVersions: string[];
+    /**
+     * Latest revision of the configuration.
+     */
+    readonly latestRevision: number;
+    readonly name: string;
+    readonly region: string;
+    /**
+     * Contents of the server.properties file.
+     */
+    readonly serverProperties: string;
+}
+/**
+ * Get information on an Amazon MSK Configuration.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.msk.getConfiguration({
+ *     name: "example",
+ * });
+ * ```
+ */
+export declare function getConfigurationOutput(args: GetConfigurationOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetConfigurationResult>;
+/**
+ * A collection of arguments for invoking getConfiguration.
+ */
+export interface GetConfigurationOutputArgs {
+    /**
+     * Name of the configuration.
+     */
+    name: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+}

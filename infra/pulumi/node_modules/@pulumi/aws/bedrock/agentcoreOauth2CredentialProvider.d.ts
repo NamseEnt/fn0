@@ -1,0 +1,189 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as inputs from "../types/input";
+import * as outputs from "../types/output";
+/**
+ * ## Example Usage
+ *
+ * ### GitHub OAuth Provider
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const github = new aws.bedrock.AgentcoreOauth2CredentialProvider("github", {
+ *     name: "github-oauth-provider",
+ *     credentialProviderVendor: "GithubOauth2",
+ *     oauth2ProviderConfig: {
+ *         githubOauth2ProviderConfig: {
+ *             clientId: "your-github-client-id",
+ *             clientSecret: "your-github-client-secret",
+ *         },
+ *     },
+ * });
+ * ```
+ *
+ * ### Custom OAuth Provider with Discovery URL
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const auth0 = new aws.bedrock.AgentcoreOauth2CredentialProvider("auth0", {
+ *     name: "auth0-oauth-provider",
+ *     credentialProviderVendor: "CustomOauth2",
+ *     customOauth2ProviderConfig: [{
+ *         custom: [{
+ *             clientIdWo: "auth0-client-id",
+ *             clientSecretWo: "auth0-client-secret",
+ *             clientCredentialsWoVersion: 1,
+ *             oauthDiscovery: [{
+ *                 discoveryUrl: "https://dev-company.auth0.com/.well-known/openid-configuration",
+ *             }],
+ *         }],
+ *     }],
+ * });
+ * ```
+ *
+ * ### Custom OAuth Provider with Authorization Server Metadata
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const keycloak = new aws.bedrock.AgentcoreOauth2CredentialProvider("keycloak", {
+ *     name: "keycloak-oauth-provider",
+ *     credentialProviderVendor: "CustomOauth2",
+ *     oauth2ProviderConfig: {
+ *         customOauth2ProviderConfig: {
+ *             clientIdWo: "keycloak-client-id",
+ *             clientSecretWo: "keycloak-client-secret",
+ *             clientCredentialsWoVersion: 1,
+ *             oauthDiscovery: {
+ *                 authorizationServerMetadata: {
+ *                     issuer: "https://auth.company.com/realms/production",
+ *                     authorizationEndpoint: "https://auth.company.com/realms/production/protocol/openid-connect/auth",
+ *                     tokenEndpoint: "https://auth.company.com/realms/production/protocol/openid-connect/token",
+ *                     responseTypes: [
+ *                         "code",
+ *                         "id_token",
+ *                     ],
+ *                 },
+ *             },
+ *         },
+ *     },
+ * });
+ * ```
+ *
+ * ## Import
+ *
+ * Using `pulumi import`, import Bedrock AgentCore OAuth2 Credential Provider using the provider name. For example:
+ *
+ * ```sh
+ * $ pulumi import aws:bedrock/agentcoreOauth2CredentialProvider:AgentcoreOauth2CredentialProvider example oauth2-provider-name
+ * ```
+ */
+export declare class AgentcoreOauth2CredentialProvider extends pulumi.CustomResource {
+    /**
+     * Get an existing AgentcoreOauth2CredentialProvider resource's state with the given name, ID, and optional extra
+     * properties used to qualify the lookup.
+     *
+     * @param name The _unique_ name of the resulting resource.
+     * @param id The _unique_ provider ID of the resource to lookup.
+     * @param state Any extra arguments used during the lookup.
+     * @param opts Optional settings to control the behavior of the CustomResource.
+     */
+    static get(name: string, id: pulumi.Input<pulumi.ID>, state?: AgentcoreOauth2CredentialProviderState, opts?: pulumi.CustomResourceOptions): AgentcoreOauth2CredentialProvider;
+    /**
+     * Returns true if the given object is an instance of AgentcoreOauth2CredentialProvider.  This is designed to work even
+     * when multiple copies of the Pulumi SDK have been loaded into the same process.
+     */
+    static isInstance(obj: any): obj is AgentcoreOauth2CredentialProvider;
+    /**
+     * ARN of the AWS Secrets Manager secret containing the client secret.
+     */
+    readonly clientSecretArns: pulumi.Output<outputs.bedrock.AgentcoreOauth2CredentialProviderClientSecretArn[]>;
+    /**
+     * ARN of the OAuth2 credential provider.
+     */
+    readonly credentialProviderArn: pulumi.Output<string>;
+    /**
+     * Vendor of the OAuth2 credential provider. Valid values: `CustomOauth2`, `GithubOauth2`, `GoogleOauth2`, `Microsoft`, `SalesforceOauth2`, `SlackOauth2`.
+     */
+    readonly credentialProviderVendor: pulumi.Output<string>;
+    /**
+     * Name of the OAuth2 credential provider.
+     */
+    readonly name: pulumi.Output<string>;
+    /**
+     * OAuth2 provider configuration. Must contain exactly one provider type. See `oauth2ProviderConfig` below.
+     *
+     * The following arguments are optional:
+     */
+    readonly oauth2ProviderConfig: pulumi.Output<outputs.bedrock.AgentcoreOauth2CredentialProviderOauth2ProviderConfig | undefined>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    readonly region: pulumi.Output<string>;
+    /**
+     * Create a AgentcoreOauth2CredentialProvider resource with the given unique name, arguments, and options.
+     *
+     * @param name The _unique_ name of the resource.
+     * @param args The arguments to use to populate this resource's properties.
+     * @param opts A bag of options that control this resource's behavior.
+     */
+    constructor(name: string, args: AgentcoreOauth2CredentialProviderArgs, opts?: pulumi.CustomResourceOptions);
+}
+/**
+ * Input properties used for looking up and filtering AgentcoreOauth2CredentialProvider resources.
+ */
+export interface AgentcoreOauth2CredentialProviderState {
+    /**
+     * ARN of the AWS Secrets Manager secret containing the client secret.
+     */
+    clientSecretArns?: pulumi.Input<pulumi.Input<inputs.bedrock.AgentcoreOauth2CredentialProviderClientSecretArn>[]>;
+    /**
+     * ARN of the OAuth2 credential provider.
+     */
+    credentialProviderArn?: pulumi.Input<string>;
+    /**
+     * Vendor of the OAuth2 credential provider. Valid values: `CustomOauth2`, `GithubOauth2`, `GoogleOauth2`, `Microsoft`, `SalesforceOauth2`, `SlackOauth2`.
+     */
+    credentialProviderVendor?: pulumi.Input<string>;
+    /**
+     * Name of the OAuth2 credential provider.
+     */
+    name?: pulumi.Input<string>;
+    /**
+     * OAuth2 provider configuration. Must contain exactly one provider type. See `oauth2ProviderConfig` below.
+     *
+     * The following arguments are optional:
+     */
+    oauth2ProviderConfig?: pulumi.Input<inputs.bedrock.AgentcoreOauth2CredentialProviderOauth2ProviderConfig>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+}
+/**
+ * The set of arguments for constructing a AgentcoreOauth2CredentialProvider resource.
+ */
+export interface AgentcoreOauth2CredentialProviderArgs {
+    /**
+     * Vendor of the OAuth2 credential provider. Valid values: `CustomOauth2`, `GithubOauth2`, `GoogleOauth2`, `Microsoft`, `SalesforceOauth2`, `SlackOauth2`.
+     */
+    credentialProviderVendor: pulumi.Input<string>;
+    /**
+     * Name of the OAuth2 credential provider.
+     */
+    name?: pulumi.Input<string>;
+    /**
+     * OAuth2 provider configuration. Must contain exactly one provider type. See `oauth2ProviderConfig` below.
+     *
+     * The following arguments are optional:
+     */
+    oauth2ProviderConfig?: pulumi.Input<inputs.bedrock.AgentcoreOauth2CredentialProviderOauth2ProviderConfig>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+}

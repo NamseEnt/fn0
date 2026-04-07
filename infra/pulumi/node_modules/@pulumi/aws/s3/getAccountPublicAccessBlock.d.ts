@@ -1,0 +1,71 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * The S3 account public access block data source returns account-level public access block configuration.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.s3.getAccountPublicAccessBlock({});
+ * ```
+ */
+export declare function getAccountPublicAccessBlock(args?: GetAccountPublicAccessBlockArgs, opts?: pulumi.InvokeOptions): Promise<GetAccountPublicAccessBlockResult>;
+/**
+ * A collection of arguments for invoking getAccountPublicAccessBlock.
+ */
+export interface GetAccountPublicAccessBlockArgs {
+    /**
+     * AWS account ID to configure. Defaults to automatically determined account ID of the AWS provider.
+     */
+    accountId?: string;
+}
+/**
+ * A collection of values returned by getAccountPublicAccessBlock.
+ */
+export interface GetAccountPublicAccessBlockResult {
+    readonly accountId?: string;
+    /**
+     * Whether or not Amazon S3 should block public ACLs for buckets in this account is enabled. Returns as `true` or `false`.
+     */
+    readonly blockPublicAcls: boolean;
+    /**
+     * Whether or not Amazon S3 should block public bucket policies for buckets in this account is enabled. Returns as `true` or `false`.
+     */
+    readonly blockPublicPolicy: boolean;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * Whether or not Amazon S3 should ignore public ACLs for buckets in this account is enabled. Returns as `true` or `false`.
+     */
+    readonly ignorePublicAcls: boolean;
+    /**
+     * Whether or not Amazon S3 should restrict public bucket policies for buckets in this account is enabled. Returns as `true` or `false`.
+     */
+    readonly restrictPublicBuckets: boolean;
+}
+/**
+ * The S3 account public access block data source returns account-level public access block configuration.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.s3.getAccountPublicAccessBlock({});
+ * ```
+ */
+export declare function getAccountPublicAccessBlockOutput(args?: GetAccountPublicAccessBlockOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetAccountPublicAccessBlockResult>;
+/**
+ * A collection of arguments for invoking getAccountPublicAccessBlock.
+ */
+export interface GetAccountPublicAccessBlockOutputArgs {
+    /**
+     * AWS account ID to configure. Defaults to automatically determined account ID of the AWS provider.
+     */
+    accountId?: pulumi.Input<string>;
+}

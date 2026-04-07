@@ -9,7 +9,6 @@ import { CustomWorkerImage } from "./CustomWorkerImage";
 export interface OciComputeWorkerArgs {
   region: pulumi.Input<string>;
   hqIpv6CidrBlocks: pulumi.Input<string[]>;
-  drgId: pulumi.Input<string>;
 }
 
 export interface OciCwasmBucketInfo {
@@ -168,16 +167,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
 
     this.ipv6CidrBlocks = vcn.ipv6cidrBlocks;
 
-    new oci.core.DrgAttachment(
-      "drg-worker-attachment",
-      {
-        drgId: args.drgId,
-        vcnId: vcn.id,
-        displayName: "worker-vcn",
-      },
-      { parent: this }
-    );
-
     const securityList = new oci.core.SecurityList(
       "security-list",
       {
@@ -232,25 +221,18 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
-        routeRules: pulumi
-          .all([args.hqIpv6CidrBlocks])
-          .apply(([hqIpv6CidrBlocks]) => [
-            {
-              destination: "::/0",
-              destinationType: "CIDR_BLOCK",
-              networkEntityId: internetGateway.id,
-            },
-            {
-              destination: "0.0.0.0/0",
-              destinationType: "CIDR_BLOCK",
-              networkEntityId: internetGateway.id,
-            },
-            ...hqIpv6CidrBlocks.map((cidr) => ({
-              destination: cidr,
-              destinationType: "CIDR_BLOCK",
-              networkEntityId: args.drgId as string,
-            })),
-          ]),
+        routeRules: [
+          {
+            destination: "::/0",
+            destinationType: "CIDR_BLOCK",
+            networkEntityId: internetGateway.id,
+          },
+          {
+            destination: "0.0.0.0/0",
+            destinationType: "CIDR_BLOCK",
+            networkEntityId: internetGateway.id,
+          },
+        ],
       },
       { parent: this }
     );

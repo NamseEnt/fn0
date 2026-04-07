@@ -1,0 +1,116 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * This data source can be used to fetch information about a specific
+ * IAM OpenID Connect provider. By using this data source, you can retrieve the
+ * the resource information by either its `arn` or `url`.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.iam.getOpenIdConnectProvider({
+ *     arn: "arn:aws:iam::123456789012:oidc-provider/accounts.google.com",
+ * });
+ * ```
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.iam.getOpenIdConnectProvider({
+ *     url: "https://accounts.google.com",
+ * });
+ * ```
+ */
+export declare function getOpenIdConnectProvider(args?: GetOpenIdConnectProviderArgs, opts?: pulumi.InvokeOptions): Promise<GetOpenIdConnectProviderResult>;
+/**
+ * A collection of arguments for invoking getOpenIdConnectProvider.
+ */
+export interface GetOpenIdConnectProviderArgs {
+    /**
+     * ARN of the OpenID Connect provider.
+     */
+    arn?: string;
+    /**
+     * Map of resource tags for the IAM OIDC provider.
+     */
+    tags?: {
+        [key: string]: string;
+    };
+    /**
+     * URL of the OpenID Connect provider.
+     */
+    url?: string;
+}
+/**
+ * A collection of values returned by getOpenIdConnectProvider.
+ */
+export interface GetOpenIdConnectProviderResult {
+    readonly arn: string;
+    /**
+     * List of client IDs (also known as audiences). When a mobile or web app registers with an OpenID Connect provider, they establish a value that identifies the application. (This is the value that's sent as the clientId parameter on OAuth requests.)
+     */
+    readonly clientIdLists: string[];
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * Map of resource tags for the IAM OIDC provider.
+     */
+    readonly tags: {
+        [key: string]: string;
+    };
+    /**
+     * List of server certificate thumbprints for the OpenID Connect (OIDC) identity provider's server certificate(s).
+     */
+    readonly thumbprintLists: string[];
+    readonly url: string;
+}
+/**
+ * This data source can be used to fetch information about a specific
+ * IAM OpenID Connect provider. By using this data source, you can retrieve the
+ * the resource information by either its `arn` or `url`.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.iam.getOpenIdConnectProvider({
+ *     arn: "arn:aws:iam::123456789012:oidc-provider/accounts.google.com",
+ * });
+ * ```
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.iam.getOpenIdConnectProvider({
+ *     url: "https://accounts.google.com",
+ * });
+ * ```
+ */
+export declare function getOpenIdConnectProviderOutput(args?: GetOpenIdConnectProviderOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetOpenIdConnectProviderResult>;
+/**
+ * A collection of arguments for invoking getOpenIdConnectProvider.
+ */
+export interface GetOpenIdConnectProviderOutputArgs {
+    /**
+     * ARN of the OpenID Connect provider.
+     */
+    arn?: pulumi.Input<string>;
+    /**
+     * Map of resource tags for the IAM OIDC provider.
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+    /**
+     * URL of the OpenID Connect provider.
+     */
+    url?: pulumi.Input<string>;
+}

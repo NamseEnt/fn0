@@ -1,0 +1,72 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Retrieves the summary of a WAFv2 Web ACL.
+ */
+export declare function getWebAcl(args: GetWebAclArgs, opts?: pulumi.InvokeOptions): Promise<GetWebAclResult>;
+/**
+ * A collection of arguments for invoking getWebAcl.
+ */
+export interface GetWebAclArgs {
+    /**
+     * Name of the WAFv2 Web ACL. Exactly one of `name` or `resourceArn` must be specified.
+     */
+    name?: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    /**
+     * ARN of the AWS resource associated with the Web ACL. This can be an ARN of an Application Load Balancer, Amazon API Gateway REST API, AWS AppSync GraphQL API, Amazon Cognito user pool, AWS App Runner service, AWS Verified Access instance, or AWS Amplify application. Exactly one of `name` or `resourceArn` must be specified.
+     */
+    resourceArn?: string;
+    /**
+     * Specifies whether this is for an AWS CloudFront distribution or for a regional application. Valid values are `CLOUDFRONT` or `REGIONAL`. To work with CloudFront, you must also specify the region `us-east-1` (N. Virginia) on the AWS provider.
+     */
+    scope: string;
+}
+/**
+ * A collection of values returned by getWebAcl.
+ */
+export interface GetWebAclResult {
+    /**
+     * ARN of the entity.
+     */
+    readonly arn: string;
+    /**
+     * Description of the WebACL that helps with identification.
+     */
+    readonly description: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    readonly name?: string;
+    readonly region: string;
+    readonly resourceArn?: string;
+    readonly scope: string;
+}
+/**
+ * Retrieves the summary of a WAFv2 Web ACL.
+ */
+export declare function getWebAclOutput(args: GetWebAclOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetWebAclResult>;
+/**
+ * A collection of arguments for invoking getWebAcl.
+ */
+export interface GetWebAclOutputArgs {
+    /**
+     * Name of the WAFv2 Web ACL. Exactly one of `name` or `resourceArn` must be specified.
+     */
+    name?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * ARN of the AWS resource associated with the Web ACL. This can be an ARN of an Application Load Balancer, Amazon API Gateway REST API, AWS AppSync GraphQL API, Amazon Cognito user pool, AWS App Runner service, AWS Verified Access instance, or AWS Amplify application. Exactly one of `name` or `resourceArn` must be specified.
+     */
+    resourceArn?: pulumi.Input<string>;
+    /**
+     * Specifies whether this is for an AWS CloudFront distribution or for a regional application. Valid values are `CLOUDFRONT` or `REGIONAL`. To work with CloudFront, you must also specify the region `us-east-1` (N. Virginia) on the AWS provider.
+     */
+    scope: pulumi.Input<string>;
+}

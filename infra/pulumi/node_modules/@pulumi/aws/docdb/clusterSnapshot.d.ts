@@ -1,0 +1,171 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Manages a DocumentDB database cluster snapshot for DocumentDB clusters.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = new aws.docdb.ClusterSnapshot("example", {
+ *     dbClusterIdentifier: exampleAwsDocdbCluster.id,
+ *     dbClusterSnapshotIdentifier: "resourcetestsnapshot1234",
+ * });
+ * ```
+ *
+ * ## Import
+ *
+ * Using `pulumi import`, import `aws_docdb_cluster_snapshot` using the cluster snapshot identifier. For example:
+ *
+ * ```sh
+ * $ pulumi import aws:docdb/clusterSnapshot:ClusterSnapshot example my-cluster-snapshot
+ * ```
+ */
+export declare class ClusterSnapshot extends pulumi.CustomResource {
+    /**
+     * Get an existing ClusterSnapshot resource's state with the given name, ID, and optional extra
+     * properties used to qualify the lookup.
+     *
+     * @param name The _unique_ name of the resulting resource.
+     * @param id The _unique_ provider ID of the resource to lookup.
+     * @param state Any extra arguments used during the lookup.
+     * @param opts Optional settings to control the behavior of the CustomResource.
+     */
+    static get(name: string, id: pulumi.Input<pulumi.ID>, state?: ClusterSnapshotState, opts?: pulumi.CustomResourceOptions): ClusterSnapshot;
+    /**
+     * Returns true if the given object is an instance of ClusterSnapshot.  This is designed to work even
+     * when multiple copies of the Pulumi SDK have been loaded into the same process.
+     */
+    static isInstance(obj: any): obj is ClusterSnapshot;
+    /**
+     * List of EC2 Availability Zones that instances in the DocumentDB cluster snapshot can be restored in.
+     */
+    readonly availabilityZones: pulumi.Output<string[]>;
+    /**
+     * The DocumentDB Cluster Identifier from which to take the snapshot.
+     */
+    readonly dbClusterIdentifier: pulumi.Output<string>;
+    /**
+     * The Amazon Resource Name (ARN) for the DocumentDB Cluster Snapshot.
+     */
+    readonly dbClusterSnapshotArn: pulumi.Output<string>;
+    /**
+     * The Identifier for the snapshot.
+     */
+    readonly dbClusterSnapshotIdentifier: pulumi.Output<string>;
+    /**
+     * Specifies the name of the database engine.
+     */
+    readonly engine: pulumi.Output<string>;
+    /**
+     * Version of the database engine for this DocumentDB cluster snapshot.
+     */
+    readonly engineVersion: pulumi.Output<string>;
+    /**
+     * If storageEncrypted is true, the AWS KMS key identifier for the encrypted DocumentDB cluster snapshot.
+     */
+    readonly kmsKeyId: pulumi.Output<string>;
+    /**
+     * Port that the DocumentDB cluster was listening on at the time of the snapshot.
+     */
+    readonly port: pulumi.Output<number>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    readonly region: pulumi.Output<string>;
+    readonly snapshotType: pulumi.Output<string>;
+    readonly sourceDbClusterSnapshotArn: pulumi.Output<string>;
+    /**
+     * The status of this DocumentDB Cluster Snapshot.
+     */
+    readonly status: pulumi.Output<string>;
+    /**
+     * Specifies whether the DocumentDB cluster snapshot is encrypted.
+     */
+    readonly storageEncrypted: pulumi.Output<boolean>;
+    /**
+     * The VPC ID associated with the DocumentDB cluster snapshot.
+     */
+    readonly vpcId: pulumi.Output<string>;
+    /**
+     * Create a ClusterSnapshot resource with the given unique name, arguments, and options.
+     *
+     * @param name The _unique_ name of the resource.
+     * @param args The arguments to use to populate this resource's properties.
+     * @param opts A bag of options that control this resource's behavior.
+     */
+    constructor(name: string, args: ClusterSnapshotArgs, opts?: pulumi.CustomResourceOptions);
+}
+/**
+ * Input properties used for looking up and filtering ClusterSnapshot resources.
+ */
+export interface ClusterSnapshotState {
+    /**
+     * List of EC2 Availability Zones that instances in the DocumentDB cluster snapshot can be restored in.
+     */
+    availabilityZones?: pulumi.Input<pulumi.Input<string>[]>;
+    /**
+     * The DocumentDB Cluster Identifier from which to take the snapshot.
+     */
+    dbClusterIdentifier?: pulumi.Input<string>;
+    /**
+     * The Amazon Resource Name (ARN) for the DocumentDB Cluster Snapshot.
+     */
+    dbClusterSnapshotArn?: pulumi.Input<string>;
+    /**
+     * The Identifier for the snapshot.
+     */
+    dbClusterSnapshotIdentifier?: pulumi.Input<string>;
+    /**
+     * Specifies the name of the database engine.
+     */
+    engine?: pulumi.Input<string>;
+    /**
+     * Version of the database engine for this DocumentDB cluster snapshot.
+     */
+    engineVersion?: pulumi.Input<string>;
+    /**
+     * If storageEncrypted is true, the AWS KMS key identifier for the encrypted DocumentDB cluster snapshot.
+     */
+    kmsKeyId?: pulumi.Input<string>;
+    /**
+     * Port that the DocumentDB cluster was listening on at the time of the snapshot.
+     */
+    port?: pulumi.Input<number>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    snapshotType?: pulumi.Input<string>;
+    sourceDbClusterSnapshotArn?: pulumi.Input<string>;
+    /**
+     * The status of this DocumentDB Cluster Snapshot.
+     */
+    status?: pulumi.Input<string>;
+    /**
+     * Specifies whether the DocumentDB cluster snapshot is encrypted.
+     */
+    storageEncrypted?: pulumi.Input<boolean>;
+    /**
+     * The VPC ID associated with the DocumentDB cluster snapshot.
+     */
+    vpcId?: pulumi.Input<string>;
+}
+/**
+ * The set of arguments for constructing a ClusterSnapshot resource.
+ */
+export interface ClusterSnapshotArgs {
+    /**
+     * The DocumentDB Cluster Identifier from which to take the snapshot.
+     */
+    dbClusterIdentifier: pulumi.Input<string>;
+    /**
+     * The Identifier for the snapshot.
+     */
+    dbClusterSnapshotIdentifier: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+}

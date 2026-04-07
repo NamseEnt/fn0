@@ -1,0 +1,109 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Retrieves information about a Service Discovery private or public DNS namespace.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const test = aws.servicediscovery.getDnsNamespace({
+ *     name: "example.service.local",
+ *     type: "DNS_PRIVATE",
+ * });
+ * ```
+ */
+export declare function getDnsNamespace(args: GetDnsNamespaceArgs, opts?: pulumi.InvokeOptions): Promise<GetDnsNamespaceResult>;
+/**
+ * A collection of arguments for invoking getDnsNamespace.
+ */
+export interface GetDnsNamespaceArgs {
+    /**
+     * Name of the namespace.
+     */
+    name: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    /**
+     * Map of tags for the resource.
+     */
+    tags?: {
+        [key: string]: string;
+    };
+    /**
+     * Type of the namespace. Allowed values are `DNS_PUBLIC` or `DNS_PRIVATE`.
+     */
+    type: string;
+}
+/**
+ * A collection of values returned by getDnsNamespace.
+ */
+export interface GetDnsNamespaceResult {
+    /**
+     * ARN of the namespace.
+     */
+    readonly arn: string;
+    /**
+     * Description of the namespace.
+     */
+    readonly description: string;
+    /**
+     * ID for the hosted zone that Amazon Route 53 creates when you create a namespace.
+     */
+    readonly hostedZone: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    readonly name: string;
+    readonly region: string;
+    /**
+     * Map of tags for the resource.
+     */
+    readonly tags: {
+        [key: string]: string;
+    };
+    readonly type: string;
+}
+/**
+ * Retrieves information about a Service Discovery private or public DNS namespace.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const test = aws.servicediscovery.getDnsNamespace({
+ *     name: "example.service.local",
+ *     type: "DNS_PRIVATE",
+ * });
+ * ```
+ */
+export declare function getDnsNamespaceOutput(args: GetDnsNamespaceOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetDnsNamespaceResult>;
+/**
+ * A collection of arguments for invoking getDnsNamespace.
+ */
+export interface GetDnsNamespaceOutputArgs {
+    /**
+     * Name of the namespace.
+     */
+    name: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * Map of tags for the resource.
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+    /**
+     * Type of the namespace. Allowed values are `DNS_PUBLIC` or `DNS_PRIVATE`.
+     */
+    type: pulumi.Input<string>;
+}

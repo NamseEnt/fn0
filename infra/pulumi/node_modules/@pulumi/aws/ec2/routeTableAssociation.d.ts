@@ -1,0 +1,133 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Provides a resource to create an association between a route table and a subnet or a route table and an
+ * internet gateway or virtual private gateway.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const a = new aws.ec2.RouteTableAssociation("a", {
+ *     subnetId: foo.id,
+ *     routeTableId: bar.id,
+ * });
+ * ```
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const b = new aws.ec2.RouteTableAssociation("b", {
+ *     gatewayId: foo.id,
+ *     routeTableId: bar.id,
+ * });
+ * ```
+ *
+ * ## Import
+ *
+ * With EC2 Internet Gateways:
+ *
+ * __Using `pulumi import` to import__ EC2 Route Table Associations using the associated resource ID and Route Table ID separated by a forward slash (`/`). For example:
+ *
+ * With EC2 Subnets:
+ *
+ * ```sh
+ * $ pulumi import aws:ec2/routeTableAssociation:RouteTableAssociation assoc subnet-6777656e646f6c796e/rtb-656c65616e6f72
+ * ```
+ * With EC2 Internet Gateways:
+ *
+ * ```sh
+ * $ pulumi import aws:ec2/routeTableAssociation:RouteTableAssociation assoc igw-01b3a60780f8d034a/rtb-656c65616e6f72
+ * ```
+ */
+export declare class RouteTableAssociation extends pulumi.CustomResource {
+    /**
+     * Get an existing RouteTableAssociation resource's state with the given name, ID, and optional extra
+     * properties used to qualify the lookup.
+     *
+     * @param name The _unique_ name of the resulting resource.
+     * @param id The _unique_ provider ID of the resource to lookup.
+     * @param state Any extra arguments used during the lookup.
+     * @param opts Optional settings to control the behavior of the CustomResource.
+     */
+    static get(name: string, id: pulumi.Input<pulumi.ID>, state?: RouteTableAssociationState, opts?: pulumi.CustomResourceOptions): RouteTableAssociation;
+    /**
+     * Returns true if the given object is an instance of RouteTableAssociation.  This is designed to work even
+     * when multiple copies of the Pulumi SDK have been loaded into the same process.
+     */
+    static isInstance(obj: any): obj is RouteTableAssociation;
+    /**
+     * The gateway ID to create an association. Conflicts with `subnetId`.
+     */
+    readonly gatewayId: pulumi.Output<string | undefined>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    readonly region: pulumi.Output<string>;
+    /**
+     * The ID of the routing table to associate with.
+     *
+     * > **NOTE:** Please note that one of either `subnetId` or `gatewayId` is required.
+     */
+    readonly routeTableId: pulumi.Output<string>;
+    /**
+     * The subnet ID to create an association. Conflicts with `gatewayId`.
+     */
+    readonly subnetId: pulumi.Output<string | undefined>;
+    /**
+     * Create a RouteTableAssociation resource with the given unique name, arguments, and options.
+     *
+     * @param name The _unique_ name of the resource.
+     * @param args The arguments to use to populate this resource's properties.
+     * @param opts A bag of options that control this resource's behavior.
+     */
+    constructor(name: string, args: RouteTableAssociationArgs, opts?: pulumi.CustomResourceOptions);
+}
+/**
+ * Input properties used for looking up and filtering RouteTableAssociation resources.
+ */
+export interface RouteTableAssociationState {
+    /**
+     * The gateway ID to create an association. Conflicts with `subnetId`.
+     */
+    gatewayId?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * The ID of the routing table to associate with.
+     *
+     * > **NOTE:** Please note that one of either `subnetId` or `gatewayId` is required.
+     */
+    routeTableId?: pulumi.Input<string>;
+    /**
+     * The subnet ID to create an association. Conflicts with `gatewayId`.
+     */
+    subnetId?: pulumi.Input<string>;
+}
+/**
+ * The set of arguments for constructing a RouteTableAssociation resource.
+ */
+export interface RouteTableAssociationArgs {
+    /**
+     * The gateway ID to create an association. Conflicts with `subnetId`.
+     */
+    gatewayId?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * The ID of the routing table to associate with.
+     *
+     * > **NOTE:** Please note that one of either `subnetId` or `gatewayId` is required.
+     */
+    routeTableId: pulumi.Input<string>;
+    /**
+     * The subnet ID to create an association. Conflicts with `gatewayId`.
+     */
+    subnetId?: pulumi.Input<string>;
+}

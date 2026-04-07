@@ -1,0 +1,113 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Provides an Inspector Classic Assessment Target
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const bar = new aws.inspector.ResourceGroup("bar", {tags: {
+ *     Name: "foo",
+ *     Env: "bar",
+ * }});
+ * const foo = new aws.inspector.AssessmentTarget("foo", {
+ *     name: "assessment target",
+ *     resourceGroupArn: bar.arn,
+ * });
+ * ```
+ *
+ * ## Import
+ *
+ * ### Identity Schema
+ *
+ * #### Required
+ *
+ * - `arn` (String) Amazon Resource Name (ARN) of the Inspector assessment target.
+ *
+ * Using `pulumi import`, import Inspector Classic Assessment Targets using their Amazon Resource Name (ARN). For example:
+ *
+ * console
+ *
+ * % pulumi import aws_inspector_assessment_target.example arn:aws:inspector:us-east-1:123456789012:target/0-xxxxxxx
+ */
+export declare class AssessmentTarget extends pulumi.CustomResource {
+    /**
+     * Get an existing AssessmentTarget resource's state with the given name, ID, and optional extra
+     * properties used to qualify the lookup.
+     *
+     * @param name The _unique_ name of the resulting resource.
+     * @param id The _unique_ provider ID of the resource to lookup.
+     * @param state Any extra arguments used during the lookup.
+     * @param opts Optional settings to control the behavior of the CustomResource.
+     */
+    static get(name: string, id: pulumi.Input<pulumi.ID>, state?: AssessmentTargetState, opts?: pulumi.CustomResourceOptions): AssessmentTarget;
+    /**
+     * Returns true if the given object is an instance of AssessmentTarget.  This is designed to work even
+     * when multiple copies of the Pulumi SDK have been loaded into the same process.
+     */
+    static isInstance(obj: any): obj is AssessmentTarget;
+    /**
+     * The target assessment ARN.
+     */
+    readonly arn: pulumi.Output<string>;
+    /**
+     * The name of the assessment target.
+     */
+    readonly name: pulumi.Output<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    readonly region: pulumi.Output<string>;
+    /**
+     * Inspector Resource Group Amazon Resource Name (ARN) stating tags for instance matching. If not specified, all EC2 instances in the current AWS account and region are included in the assessment target.
+     */
+    readonly resourceGroupArn: pulumi.Output<string | undefined>;
+    /**
+     * Create a AssessmentTarget resource with the given unique name, arguments, and options.
+     *
+     * @param name The _unique_ name of the resource.
+     * @param args The arguments to use to populate this resource's properties.
+     * @param opts A bag of options that control this resource's behavior.
+     */
+    constructor(name: string, args?: AssessmentTargetArgs, opts?: pulumi.CustomResourceOptions);
+}
+/**
+ * Input properties used for looking up and filtering AssessmentTarget resources.
+ */
+export interface AssessmentTargetState {
+    /**
+     * The target assessment ARN.
+     */
+    arn?: pulumi.Input<string>;
+    /**
+     * The name of the assessment target.
+     */
+    name?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * Inspector Resource Group Amazon Resource Name (ARN) stating tags for instance matching. If not specified, all EC2 instances in the current AWS account and region are included in the assessment target.
+     */
+    resourceGroupArn?: pulumi.Input<string>;
+}
+/**
+ * The set of arguments for constructing a AssessmentTarget resource.
+ */
+export interface AssessmentTargetArgs {
+    /**
+     * The name of the assessment target.
+     */
+    name?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * Inspector Resource Group Amazon Resource Name (ARN) stating tags for instance matching. If not specified, all EC2 instances in the current AWS account and region are included in the assessment target.
+     */
+    resourceGroupArn?: pulumi.Input<string>;
+}

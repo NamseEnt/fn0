@@ -1,0 +1,93 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as outputs from "../types/output";
+/**
+ * Data source for managing an AWS QuickSight Analysis.
+ *
+ * ## Example Usage
+ *
+ * ### Basic Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.quicksight.getQuicksightAnalysis({
+ *     analysisId: "example-id",
+ * });
+ * ```
+ */
+export declare function getQuicksightAnalysis(args: GetQuicksightAnalysisArgs, opts?: pulumi.InvokeOptions): Promise<GetQuicksightAnalysisResult>;
+/**
+ * A collection of arguments for invoking getQuicksightAnalysis.
+ */
+export interface GetQuicksightAnalysisArgs {
+    /**
+     * Identifier for the analysis.
+     */
+    analysisId: string;
+    awsAccountId?: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    tags?: {
+        [key: string]: string;
+    };
+}
+/**
+ * A collection of values returned by getQuicksightAnalysis.
+ */
+export interface GetQuicksightAnalysisResult {
+    readonly analysisId: string;
+    readonly arn: string;
+    readonly awsAccountId: string;
+    readonly createdTime: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    readonly lastPublishedTime: string;
+    readonly lastUpdatedTime: string;
+    readonly name: string;
+    readonly permissions: outputs.quicksight.GetQuicksightAnalysisPermission[];
+    readonly region: string;
+    readonly status: string;
+    readonly tags: {
+        [key: string]: string;
+    };
+    readonly themeArn: string;
+}
+/**
+ * Data source for managing an AWS QuickSight Analysis.
+ *
+ * ## Example Usage
+ *
+ * ### Basic Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.quicksight.getQuicksightAnalysis({
+ *     analysisId: "example-id",
+ * });
+ * ```
+ */
+export declare function getQuicksightAnalysisOutput(args: GetQuicksightAnalysisOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetQuicksightAnalysisResult>;
+/**
+ * A collection of arguments for invoking getQuicksightAnalysis.
+ */
+export interface GetQuicksightAnalysisOutputArgs {
+    /**
+     * Identifier for the analysis.
+     */
+    analysisId: pulumi.Input<string>;
+    awsAccountId?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+}

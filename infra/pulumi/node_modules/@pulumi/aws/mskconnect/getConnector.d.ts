@@ -1,0 +1,98 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Get information on an Amazon MSK Connect Connector.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.mskconnect.getConnector({
+ *     name: "example-mskconnector",
+ * });
+ * ```
+ */
+export declare function getConnector(args: GetConnectorArgs, opts?: pulumi.InvokeOptions): Promise<GetConnectorResult>;
+/**
+ * A collection of arguments for invoking getConnector.
+ */
+export interface GetConnectorArgs {
+    /**
+     * Name of the connector.
+     */
+    name: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    /**
+     * A map of tags assigned to the resource.
+     */
+    tags?: {
+        [key: string]: string;
+    };
+}
+/**
+ * A collection of values returned by getConnector.
+ */
+export interface GetConnectorResult {
+    /**
+     * ARN of the connector.
+     */
+    readonly arn: string;
+    /**
+     * Summary description of the connector.
+     */
+    readonly description: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    readonly name: string;
+    readonly region: string;
+    /**
+     * A map of tags assigned to the resource.
+     */
+    readonly tags: {
+        [key: string]: string;
+    };
+    /**
+     * Current version of the connector.
+     */
+    readonly version: string;
+}
+/**
+ * Get information on an Amazon MSK Connect Connector.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.mskconnect.getConnector({
+ *     name: "example-mskconnector",
+ * });
+ * ```
+ */
+export declare function getConnectorOutput(args: GetConnectorOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetConnectorResult>;
+/**
+ * A collection of arguments for invoking getConnector.
+ */
+export interface GetConnectorOutputArgs {
+    /**
+     * Name of the connector.
+     */
+    name: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * A map of tags assigned to the resource.
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+}

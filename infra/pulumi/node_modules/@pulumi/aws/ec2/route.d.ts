@@ -1,0 +1,370 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Provides a resource to create a routing table entry (a route) in a VPC routing table.
+ *
+ * > **NOTE on `gatewayId` attribute:** The AWS API is very forgiving with the resource ID passed in the `gatewayId` attribute. For example an `aws.ec2.Route` resource can be created with an `aws.ec2.NatGateway` or `aws.ec2.EgressOnlyInternetGateway` ID specified for the `gatewayId` attribute. Specifying anything other than an `aws.ec2.InternetGateway` or `aws.ec2.VpnGateway` ID will lead to this provider reporting a permanent diff between your configuration and recorded state, as the AWS API returns the more-specific attribute. If you are experiencing constant diffs with an `aws.ec2.Route` resource, the first thing to check is that the correct attribute is being specified.
+ *
+ * > **NOTE on combining `vpcEndpointId` and `destinationPrefixListId` attributes:** To associate a Gateway VPC Endpoint (such as S3) with destination prefix list, use the `aws.ec2.VpcEndpointRouteTableAssociation` resource instead.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const r = new aws.ec2.Route("r", {
+ *     routeTableId: testing.id,
+ *     destinationCidrBlock: "10.0.1.0/22",
+ *     vpcPeeringConnectionId: "pcx-45ff3dc1",
+ * });
+ * ```
+ *
+ * ## Example IPv6 Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const vpc = new aws.ec2.Vpc("vpc", {
+ *     cidrBlock: "10.1.0.0/16",
+ *     assignGeneratedIpv6CidrBlock: true,
+ * });
+ * const egress = new aws.ec2.EgressOnlyInternetGateway("egress", {vpcId: vpc.id});
+ * const r = new aws.ec2.Route("r", {
+ *     routeTableId: "rtb-4fbb3ac4",
+ *     destinationIpv6CidrBlock: "::/0",
+ *     egressOnlyGatewayId: egress.id,
+ * });
+ * ```
+ *
+ * ## Import
+ *
+ * ### Identity Schema
+ *
+ * #### Required
+ *
+ * * `route_table_id` - (String) ID of the route table.
+ *
+ * #### Optional
+ *
+ * ~> Exactly one of of `destination_cidr_block`, `destination_ipv6_cidr_block`, or `destination_prefix_list_id` is required.
+ *
+ * * `account_id` (String) AWS Account where this resource is managed.
+ *
+ * * `destination_cidr_block` - (String) Destination IPv4 CIDR block.
+ *
+ * * `destination_ipv6_cidr_block` - (String) Destination IPv6 CIDR block.
+ *
+ * * `destination_prefix_list_id` - (String) Destination IPv6 CIDR block.
+ *
+ * * `region` (String) Region where this resource is managed.
+ *
+ * Import a route in route table `rtb-656C65616E6F72` with an IPv6 destination CIDR of `2620:0:2d0:200::8/125`:
+ *
+ * terraform
+ *
+ * import {
+ *
+ *   to = aws_route.my_route
+ *
+ *   id = "rtb-656C65616E6F72_2620:0:2d0:200::8/125"
+ *
+ * }
+ *
+ * Import a route in route table `rtb-656C65616E6F72` with a managed prefix list destination of `pl-0570a1d2d725c16be`:
+ *
+ * terraform
+ *
+ * import {
+ *
+ *   to = aws_route.my_route
+ *
+ *   id = "rtb-656C65616E6F72_pl-0570a1d2d725c16be"
+ *
+ * }
+ *
+ * **Using `pulumi import` to import** individual routes using `ROUTETABLEID_DESTINATION`. Import [local routes](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html#RouteTables) using the VPC's IPv4 or IPv6 CIDR blocks. For example:
+ *
+ * Import a route in route table `rtb-656C65616E6F72` with an IPv4 destination CIDR of `10.42.0.0/16`:
+ *
+ * console
+ *
+ * % pulumi import aws_route.my_route rtb-656C65616E6F72_10.42.0.0/16
+ *
+ * Import a route in route table `rtb-656C65616E6F72` with an IPv6 destination CIDR of `2620:0:2d0:200::8/125`:
+ *
+ * console
+ *
+ * % pulumi import aws_route.my_route rtb-656C65616E6F72_2620:0:2d0:200::8/125
+ *
+ * Import a route in route table `rtb-656C65616E6F72` with a managed prefix list destination of `pl-0570a1d2d725c16be`:
+ *
+ * console
+ *
+ * % pulumi import aws_route.my_route rtb-656C65616E6F72_pl-0570a1d2d725c16be
+ */
+export declare class Route extends pulumi.CustomResource {
+    /**
+     * Get an existing Route resource's state with the given name, ID, and optional extra
+     * properties used to qualify the lookup.
+     *
+     * @param name The _unique_ name of the resulting resource.
+     * @param id The _unique_ provider ID of the resource to lookup.
+     * @param state Any extra arguments used during the lookup.
+     * @param opts Optional settings to control the behavior of the CustomResource.
+     */
+    static get(name: string, id: pulumi.Input<pulumi.ID>, state?: RouteState, opts?: pulumi.CustomResourceOptions): Route;
+    /**
+     * Returns true if the given object is an instance of Route.  This is designed to work even
+     * when multiple copies of the Pulumi SDK have been loaded into the same process.
+     */
+    static isInstance(obj: any): obj is Route;
+    /**
+     * Identifier of a carrier gateway. This attribute can only be used when the VPC contains a subnet which is associated with a Wavelength Zone.
+     */
+    readonly carrierGatewayId: pulumi.Output<string | undefined>;
+    /**
+     * The Amazon Resource Name (ARN) of a core network.
+     */
+    readonly coreNetworkArn: pulumi.Output<string | undefined>;
+    /**
+     * The destination CIDR block.
+     */
+    readonly destinationCidrBlock: pulumi.Output<string | undefined>;
+    /**
+     * The destination IPv6 CIDR block.
+     */
+    readonly destinationIpv6CidrBlock: pulumi.Output<string | undefined>;
+    /**
+     * The ID of a managed prefix list destination.
+     *
+     * One of the following target arguments must be supplied:
+     */
+    readonly destinationPrefixListId: pulumi.Output<string | undefined>;
+    /**
+     * Identifier of a VPC Egress Only Internet Gateway.
+     */
+    readonly egressOnlyGatewayId: pulumi.Output<string | undefined>;
+    /**
+     * Identifier of a VPC internet gateway or a virtual private gateway. Specify `local` when updating a previously imported local route.
+     */
+    readonly gatewayId: pulumi.Output<string | undefined>;
+    /**
+     * Identifier of an EC2 instance.
+     */
+    readonly instanceId: pulumi.Output<string>;
+    /**
+     * The AWS account ID of the owner of the EC2 instance.
+     */
+    readonly instanceOwnerId: pulumi.Output<string>;
+    /**
+     * Identifier of a Outpost local gateway.
+     */
+    readonly localGatewayId: pulumi.Output<string | undefined>;
+    /**
+     * Identifier of a VPC NAT gateway.
+     */
+    readonly natGatewayId: pulumi.Output<string | undefined>;
+    /**
+     * Identifier of an EC2 network interface.
+     */
+    readonly networkInterfaceId: pulumi.Output<string>;
+    /**
+     * How the route was created - `CreateRouteTable`, `CreateRoute` or `EnableVgwRoutePropagation`.
+     */
+    readonly origin: pulumi.Output<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    readonly region: pulumi.Output<string>;
+    /**
+     * The ID of the routing table.
+     *
+     * One of the following destination arguments must be supplied:
+     */
+    readonly routeTableId: pulumi.Output<string>;
+    /**
+     * The state of the route - `active` or `blackhole`.
+     */
+    readonly state: pulumi.Output<string>;
+    /**
+     * Identifier of an EC2 Transit Gateway.
+     */
+    readonly transitGatewayId: pulumi.Output<string | undefined>;
+    /**
+     * Identifier of a VPC Endpoint.
+     */
+    readonly vpcEndpointId: pulumi.Output<string | undefined>;
+    /**
+     * Identifier of a VPC peering connection.
+     *
+     * Note that the default route, mapping the VPC's CIDR block to "local", is created implicitly and cannot be specified.
+     */
+    readonly vpcPeeringConnectionId: pulumi.Output<string | undefined>;
+    /**
+     * Create a Route resource with the given unique name, arguments, and options.
+     *
+     * @param name The _unique_ name of the resource.
+     * @param args The arguments to use to populate this resource's properties.
+     * @param opts A bag of options that control this resource's behavior.
+     */
+    constructor(name: string, args: RouteArgs, opts?: pulumi.CustomResourceOptions);
+}
+/**
+ * Input properties used for looking up and filtering Route resources.
+ */
+export interface RouteState {
+    /**
+     * Identifier of a carrier gateway. This attribute can only be used when the VPC contains a subnet which is associated with a Wavelength Zone.
+     */
+    carrierGatewayId?: pulumi.Input<string>;
+    /**
+     * The Amazon Resource Name (ARN) of a core network.
+     */
+    coreNetworkArn?: pulumi.Input<string>;
+    /**
+     * The destination CIDR block.
+     */
+    destinationCidrBlock?: pulumi.Input<string>;
+    /**
+     * The destination IPv6 CIDR block.
+     */
+    destinationIpv6CidrBlock?: pulumi.Input<string>;
+    /**
+     * The ID of a managed prefix list destination.
+     *
+     * One of the following target arguments must be supplied:
+     */
+    destinationPrefixListId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC Egress Only Internet Gateway.
+     */
+    egressOnlyGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC internet gateway or a virtual private gateway. Specify `local` when updating a previously imported local route.
+     */
+    gatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of an EC2 instance.
+     */
+    instanceId?: pulumi.Input<string>;
+    /**
+     * The AWS account ID of the owner of the EC2 instance.
+     */
+    instanceOwnerId?: pulumi.Input<string>;
+    /**
+     * Identifier of a Outpost local gateway.
+     */
+    localGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC NAT gateway.
+     */
+    natGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of an EC2 network interface.
+     */
+    networkInterfaceId?: pulumi.Input<string>;
+    /**
+     * How the route was created - `CreateRouteTable`, `CreateRoute` or `EnableVgwRoutePropagation`.
+     */
+    origin?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * The ID of the routing table.
+     *
+     * One of the following destination arguments must be supplied:
+     */
+    routeTableId?: pulumi.Input<string>;
+    /**
+     * The state of the route - `active` or `blackhole`.
+     */
+    state?: pulumi.Input<string>;
+    /**
+     * Identifier of an EC2 Transit Gateway.
+     */
+    transitGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC Endpoint.
+     */
+    vpcEndpointId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC peering connection.
+     *
+     * Note that the default route, mapping the VPC's CIDR block to "local", is created implicitly and cannot be specified.
+     */
+    vpcPeeringConnectionId?: pulumi.Input<string>;
+}
+/**
+ * The set of arguments for constructing a Route resource.
+ */
+export interface RouteArgs {
+    /**
+     * Identifier of a carrier gateway. This attribute can only be used when the VPC contains a subnet which is associated with a Wavelength Zone.
+     */
+    carrierGatewayId?: pulumi.Input<string>;
+    /**
+     * The Amazon Resource Name (ARN) of a core network.
+     */
+    coreNetworkArn?: pulumi.Input<string>;
+    /**
+     * The destination CIDR block.
+     */
+    destinationCidrBlock?: pulumi.Input<string>;
+    /**
+     * The destination IPv6 CIDR block.
+     */
+    destinationIpv6CidrBlock?: pulumi.Input<string>;
+    /**
+     * The ID of a managed prefix list destination.
+     *
+     * One of the following target arguments must be supplied:
+     */
+    destinationPrefixListId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC Egress Only Internet Gateway.
+     */
+    egressOnlyGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC internet gateway or a virtual private gateway. Specify `local` when updating a previously imported local route.
+     */
+    gatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of a Outpost local gateway.
+     */
+    localGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC NAT gateway.
+     */
+    natGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of an EC2 network interface.
+     */
+    networkInterfaceId?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    /**
+     * The ID of the routing table.
+     *
+     * One of the following destination arguments must be supplied:
+     */
+    routeTableId: pulumi.Input<string>;
+    /**
+     * Identifier of an EC2 Transit Gateway.
+     */
+    transitGatewayId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC Endpoint.
+     */
+    vpcEndpointId?: pulumi.Input<string>;
+    /**
+     * Identifier of a VPC peering connection.
+     *
+     * Note that the default route, mapping the VPC's CIDR block to "local", is created implicitly and cannot be specified.
+     */
+    vpcPeeringConnectionId?: pulumi.Input<string>;
+}

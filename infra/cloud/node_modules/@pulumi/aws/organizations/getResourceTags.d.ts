@@ -1,0 +1,77 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Get tags attached to the specified AWS Organizations resource.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const account = aws.organizations.getResourceTags({
+ *     resourceId: "123456123846",
+ * });
+ * ```
+ */
+export declare function getResourceTags(args: GetResourceTagsArgs, opts?: pulumi.InvokeOptions): Promise<GetResourceTagsResult>;
+/**
+ * A collection of arguments for invoking getResourceTags.
+ */
+export interface GetResourceTagsArgs {
+    /**
+     * ID of the resource with the tags to list. See details below.
+     */
+    resourceId: string;
+    /**
+     * Map of key=value pairs for each tag set on the resource.
+     */
+    tags?: {
+        [key: string]: string;
+    };
+}
+/**
+ * A collection of values returned by getResourceTags.
+ */
+export interface GetResourceTagsResult {
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    readonly resourceId: string;
+    /**
+     * Map of key=value pairs for each tag set on the resource.
+     */
+    readonly tags: {
+        [key: string]: string;
+    };
+}
+/**
+ * Get tags attached to the specified AWS Organizations resource.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const account = aws.organizations.getResourceTags({
+ *     resourceId: "123456123846",
+ * });
+ * ```
+ */
+export declare function getResourceTagsOutput(args: GetResourceTagsOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetResourceTagsResult>;
+/**
+ * A collection of arguments for invoking getResourceTags.
+ */
+export interface GetResourceTagsOutputArgs {
+    /**
+     * ID of the resource with the tags to list. See details below.
+     */
+    resourceId: pulumi.Input<string>;
+    /**
+     * Map of key=value pairs for each tag set on the resource.
+     */
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+}

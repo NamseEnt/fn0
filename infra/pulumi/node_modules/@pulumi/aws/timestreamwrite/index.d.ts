@@ -1,0 +1,12 @@
+export { DatabaseArgs, DatabaseState } from "./database";
+export type Database = import("./database").Database;
+export declare const Database: typeof import("./database").Database;
+export { GetDatabaseArgs, GetDatabaseResult, GetDatabaseOutputArgs } from "./getDatabase";
+export declare const getDatabase: typeof import("./getDatabase").getDatabase;
+export declare const getDatabaseOutput: typeof import("./getDatabase").getDatabaseOutput;
+export { GetTableArgs, GetTableResult, GetTableOutputArgs } from "./getTable";
+export declare const getTable: typeof import("./getTable").getTable;
+export declare const getTableOutput: typeof import("./getTable").getTableOutput;
+export { TableArgs, TableState } from "./table";
+export type Table = import("./table").Table;
+export declare const Table: typeof import("./table").Table;

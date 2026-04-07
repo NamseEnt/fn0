@@ -1,0 +1,15 @@
+export { NamespaceArgs, NamespaceState } from "./namespace";
+export type Namespace = import("./namespace").Namespace;
+export declare const Namespace: typeof import("./namespace").Namespace;
+export { TableArgs, TableState } from "./table";
+export type Table = import("./table").Table;
+export declare const Table: typeof import("./table").Table;
+export { TableBucketArgs, TableBucketState } from "./tableBucket";
+export type TableBucket = import("./tableBucket").TableBucket;
+export declare const TableBucket: typeof import("./tableBucket").TableBucket;
+export { TableBucketPolicyArgs, TableBucketPolicyState } from "./tableBucketPolicy";
+export type TableBucketPolicy = import("./tableBucketPolicy").TableBucketPolicy;
+export declare const TableBucketPolicy: typeof import("./tableBucketPolicy").TableBucketPolicy;
+export { TablePolicyArgs, TablePolicyState } from "./tablePolicy";
+export type TablePolicy = import("./tablePolicy").TablePolicy;
+export declare const TablePolicy: typeof import("./tablePolicy").TablePolicy;

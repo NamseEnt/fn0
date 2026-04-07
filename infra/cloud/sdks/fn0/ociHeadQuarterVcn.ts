@@ -20,7 +20,6 @@ export class OciHeadQuarterVcn extends pulumi.ComponentResource {
     }
 
     declare public /*out*/ readonly compartmentId: pulumi.Output<string>;
-    declare public /*out*/ readonly drgId: pulumi.Output<string>;
     declare public /*out*/ readonly ipv6cidrBlocks: pulumi.Output<string[]>;
     declare public /*out*/ readonly vcnId: pulumi.Output<string>;
 
@@ -44,12 +43,10 @@ export class OciHeadQuarterVcn extends pulumi.ComponentResource {
             resourceInputs["region"] = args?.region;
             resourceInputs["suffix"] = args?.suffix;
             resourceInputs["compartmentId"] = undefined /*out*/;
-            resourceInputs["drgId"] = undefined /*out*/;
             resourceInputs["ipv6cidrBlocks"] = undefined /*out*/;
             resourceInputs["vcnId"] = undefined /*out*/;
         } else {
             resourceInputs["compartmentId"] = undefined /*out*/;
-            resourceInputs["drgId"] = undefined /*out*/;
             resourceInputs["ipv6cidrBlocks"] = undefined /*out*/;
             resourceInputs["vcnId"] = undefined /*out*/;
         }

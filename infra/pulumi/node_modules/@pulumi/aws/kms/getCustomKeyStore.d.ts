@@ -1,0 +1,94 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Use this data source to get the metadata KMS custom key store.
+ * By using this data source, you can reference KMS custom key store
+ * without having to hard code the ID as input.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const keystore = aws.kms.getCustomKeyStore({
+ *     customKeyStoreName: "my_cloudhsm",
+ * });
+ * ```
+ */
+export declare function getCustomKeyStore(args?: GetCustomKeyStoreArgs, opts?: pulumi.InvokeOptions): Promise<GetCustomKeyStoreResult>;
+/**
+ * A collection of arguments for invoking getCustomKeyStore.
+ */
+export interface GetCustomKeyStoreArgs {
+    /**
+     * The ID for the custom key store.
+     */
+    customKeyStoreId?: string;
+    /**
+     * The user-specified friendly name for the custom key store.
+     */
+    customKeyStoreName?: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+}
+/**
+ * A collection of values returned by getCustomKeyStore.
+ */
+export interface GetCustomKeyStoreResult {
+    readonly cloudHsmClusterId: string;
+    /**
+     * Indicates whether the custom key store is connected to its CloudHSM cluster.
+     */
+    readonly connectionState: string;
+    /**
+     * The date and time when the custom key store was created.
+     */
+    readonly creationDate: string;
+    readonly customKeyStoreId: string;
+    readonly customKeyStoreName: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    readonly region: string;
+    /**
+     * The trust anchor certificate of the associated CloudHSM cluster.
+     */
+    readonly trustAnchorCertificate: string;
+}
+/**
+ * Use this data source to get the metadata KMS custom key store.
+ * By using this data source, you can reference KMS custom key store
+ * without having to hard code the ID as input.
+ *
+ * ## Example Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const keystore = aws.kms.getCustomKeyStore({
+ *     customKeyStoreName: "my_cloudhsm",
+ * });
+ * ```
+ */
+export declare function getCustomKeyStoreOutput(args?: GetCustomKeyStoreOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetCustomKeyStoreResult>;
+/**
+ * A collection of arguments for invoking getCustomKeyStore.
+ */
+export interface GetCustomKeyStoreOutputArgs {
+    /**
+     * The ID for the custom key store.
+     */
+    customKeyStoreId?: pulumi.Input<string>;
+    /**
+     * The user-specified friendly name for the custom key store.
+     */
+    customKeyStoreName?: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+}

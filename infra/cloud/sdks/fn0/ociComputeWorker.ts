@@ -42,16 +42,12 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         let resourceInputs: pulumi.Inputs = {};
         opts = opts || {};
         if (!opts.id) {
-            if (args?.drgId === undefined && !opts.urn) {
-                throw new Error("Missing required property 'drgId'");
-            }
             if (args?.hqIpv6CidrBlocks === undefined && !opts.urn) {
                 throw new Error("Missing required property 'hqIpv6CidrBlocks'");
             }
             if (args?.region === undefined && !opts.urn) {
                 throw new Error("Missing required property 'region'");
             }
-            resourceInputs["drgId"] = args?.drgId;
             resourceInputs["hqIpv6CidrBlocks"] = args?.hqIpv6CidrBlocks;
             resourceInputs["region"] = args?.region;
             resourceInputs["compartmentId"] = undefined /*out*/;
@@ -83,7 +79,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
  * The set of arguments for constructing a OciComputeWorker resource.
  */
 export interface OciComputeWorkerArgs {
-    drgId: pulumi.Input<string>;
     hqIpv6CidrBlocks: pulumi.Input<string[]>;
     region: pulumi.Input<string>;
 }

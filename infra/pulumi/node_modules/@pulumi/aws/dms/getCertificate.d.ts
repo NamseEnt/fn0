@@ -1,0 +1,117 @@
+import * as pulumi from "@pulumi/pulumi";
+/**
+ * Data source for managing an AWS DMS (Database Migration) Certificate.
+ *
+ * ## Example Usage
+ *
+ * ### Basic Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.dms.getCertificate({
+ *     certificateId: test.certificateId,
+ * });
+ * ```
+ */
+export declare function getCertificate(args: GetCertificateArgs, opts?: pulumi.InvokeOptions): Promise<GetCertificateResult>;
+/**
+ * A collection of arguments for invoking getCertificate.
+ */
+export interface GetCertificateArgs {
+    /**
+     * A customer-assigned name for the certificate. Identifiers must begin with a letter and must contain only ASCII letters, digits, and hyphens. They can't end with a hyphen or contain two consecutive hyphens.
+     */
+    certificateId: string;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: string;
+    tags?: {
+        [key: string]: string;
+    };
+}
+/**
+ * A collection of values returned by getCertificate.
+ */
+export interface GetCertificateResult {
+    /**
+     * The Amazon Resource Name (ARN) for the certificate.
+     */
+    readonly certificateArn: string;
+    /**
+     * The date that the certificate was created.
+     */
+    readonly certificateCreationDate: string;
+    readonly certificateId: string;
+    /**
+     * The owner of the certificate.
+     */
+    readonly certificateOwner: string;
+    /**
+     * The contents of a .pem file, which contains an X.509 certificate.
+     */
+    readonly certificatePem: string;
+    /**
+     * The owner of the certificate.
+     */
+    readonly certificateWallet: string;
+    /**
+     * The provider-assigned unique ID for this managed resource.
+     */
+    readonly id: string;
+    /**
+     * The key length of the cryptographic algorithm being used.
+     */
+    readonly keyLength: number;
+    readonly region: string;
+    /**
+     * The algorithm for the certificate.
+     */
+    readonly signingAlgorithm: string;
+    readonly tags: {
+        [key: string]: string;
+    };
+    /**
+     * The beginning date that the certificate is valid.
+     */
+    readonly validFromDate: string;
+    /**
+     * The final date that the certificate is valid.
+     */
+    readonly validToDate: string;
+}
+/**
+ * Data source for managing an AWS DMS (Database Migration) Certificate.
+ *
+ * ## Example Usage
+ *
+ * ### Basic Usage
+ *
+ * ```typescript
+ * import * as pulumi from "@pulumi/pulumi";
+ * import * as aws from "@pulumi/aws";
+ *
+ * const example = aws.dms.getCertificate({
+ *     certificateId: test.certificateId,
+ * });
+ * ```
+ */
+export declare function getCertificateOutput(args: GetCertificateOutputArgs, opts?: pulumi.InvokeOutputOptions): pulumi.Output<GetCertificateResult>;
+/**
+ * A collection of arguments for invoking getCertificate.
+ */
+export interface GetCertificateOutputArgs {
+    /**
+     * A customer-assigned name for the certificate. Identifiers must begin with a letter and must contain only ASCII letters, digits, and hyphens. They can't end with a hyphen or contain two consecutive hyphens.
+     */
+    certificateId: pulumi.Input<string>;
+    /**
+     * Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the provider configuration.
+     */
+    region?: pulumi.Input<string>;
+    tags?: pulumi.Input<{
+        [key: string]: pulumi.Input<string>;
+    }>;
+}

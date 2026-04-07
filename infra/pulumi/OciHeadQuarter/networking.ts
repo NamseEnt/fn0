@@ -9,14 +9,10 @@ export function createNetworking(
     compartmentId,
     vcnId,
     ipv6cidrBlocks,
-    drgId,
-    workerIpv6CidrBlocks,
   }: {
     compartmentId: pulumi.Input<string>;
     vcnId: pulumi.Input<string>;
     ipv6cidrBlocks: pulumi.Input<string[]>;
-    drgId: pulumi.Input<string>;
-    workerIpv6CidrBlocks: pulumi.Input<string[]>;
   }
 ): {
   regionalSubnet: oci.core.Subnet;
@@ -35,25 +31,18 @@ export function createNetworking(
     {
       compartmentId,
       vcnId,
-      routeRules: pulumi
-        .all([workerIpv6CidrBlocks])
-        .apply(([workerCidrs]) => [
-          {
-            destination: "::/0",
-            destinationType: "CIDR_BLOCK",
-            networkEntityId: internetGateway.id,
-          },
-          {
-            destination: "0.0.0.0/0",
-            destinationType: "CIDR_BLOCK",
-            networkEntityId: internetGateway.id,
-          },
-          ...workerCidrs.map((cidr: string) => ({
-            destination: cidr,
-            destinationType: "CIDR_BLOCK",
-            networkEntityId: drgId as string,
-          })),
-        ]),
+      routeRules: [
+        {
+          destination: "::/0",
+          destinationType: "CIDR_BLOCK",
+          networkEntityId: internetGateway.id,
+        },
+        {
+          destination: "0.0.0.0/0",
+          destinationType: "CIDR_BLOCK",
+          networkEntityId: internetGateway.id,
+        },
+      ],
     },
     { parent }
   );
