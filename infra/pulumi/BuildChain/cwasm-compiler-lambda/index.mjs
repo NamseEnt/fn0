@@ -9,7 +9,7 @@ export async function handler(event) {
   const s3Client = new S3Client({});
 
   const cWasmBucketName = process.env.CWASM_BUCKET;
-  const wasmtimePath = `/opt/wasmtime`;
+  const fn0CompilerPath = `/opt/fn0-compiler`;
   const zstdPath = `/opt/zstd`;
 
   if (event.Records.length !== 1) {
@@ -51,7 +51,7 @@ export async function handler(event) {
   );
 
   console.log("compile wasm to cwasm");
-  execSync(`${wasmtimePath} compile --target aarch64-unknown-linux "${wasmPath}" -o "${cwasmPath}"`, {
+  execSync(`${fn0CompilerPath} "${wasmPath}" "${cwasmPath}"`, {
     stdio: "inherit",
   });
 
