@@ -1,5 +1,7 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
+import * as docker from "@pulumi/docker";
+import * as command from "@pulumi/command";
 import * as path from "node:path";
 
 export interface AwsLambdaCwasmCompilerArgs {
@@ -19,18 +21,39 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
 
     const { region, wasmBucket, queueArn, cWasmBucket } = args;
 
-    const wasmtimeVersion = "42.0.1";
-
-    const wasmtimeLayer = new aws.lambda.LayerVersion(
-      "wasmtime-layer",
+    const fn0CompilerImage = new docker.Image(
+      "fn0-compiler-image",
       {
-        region,
-        layerName: `wasmtime-${wasmtimeVersion.replace(/\./g, "-")}`,
-        code: new pulumi.asset.FileArchive(
-          path.join(__dirname, "./wasmtime-layer")
-        ),
+        imageName: "fn0-compiler:latest",
+        build: {
+          context: "../..",
+          dockerfile: "../../fn0-compiler/Dockerfile",
+          platform: "linux/amd64",
+        },
+        skipPush: true,
       },
       { parent: this }
+    );
+
+    const fn0CompilerLayerDir = path.join(__dirname, "./fn0-compiler-layer");
+
+    const extractBinary = new command.local.Command(
+      "extract-fn0-compiler",
+      {
+        create: pulumi.interpolate`mkdir -p ${fn0CompilerLayerDir} && docker create --name fn0-compiler-extract ${fn0CompilerImage.imageName} && docker cp fn0-compiler-extract:/fn0-compiler ${fn0CompilerLayerDir}/fn0-compiler && docker rm fn0-compiler-extract && chmod +x ${fn0CompilerLayerDir}/fn0-compiler`,
+        triggers: [fn0CompilerImage.repoDigest],
+      },
+      { parent: this }
+    );
+
+    const fn0CompilerLayer = new aws.lambda.LayerVersion(
+      "fn0-compiler-layer",
+      {
+        region,
+        layerName: "fn0-compiler",
+        code: new pulumi.asset.FileArchive(fn0CompilerLayerDir),
+      },
+      { parent: this, dependsOn: [extractBinary] }
     );
 
     const zstdLayer = new aws.lambda.LayerVersion(
@@ -111,7 +134,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         runtime: "nodejs24.x",
         handler: "index.handler",
         architectures: ["x86_64"],
-        layers: [wasmtimeLayer.arn, zstdLayer.arn],
+        layers: [fn0CompilerLayer.arn, zstdLayer.arn],
         timeout: 20,
         memorySize: 10240,
         role: lambdaRole.arn,
