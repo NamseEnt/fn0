@@ -43,6 +43,7 @@ export interface OciComputeVmHostProviderArgs {
   privateKeyBase64: pulumi.Input<string>;
   region: pulumi.Input<string>;
   shape: pulumi.Input<string>;
+  sshAuthorizedKeys: pulumi.Input<string>;
   subnetId: pulumi.Input<string>;
   tenancyId: pulumi.Input<string>;
   userId: pulumi.Input<string>;

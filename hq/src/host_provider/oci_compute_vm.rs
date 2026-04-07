@@ -24,6 +24,7 @@ pub struct OciComputeVmHostProvider {
     image_id: String,
     worker_image_url: String,
     envs: BTreeMap<String, String>,
+    ssh_authorized_keys: String,
     scaler: Arc<OciScaler>,
 }
 
@@ -67,6 +68,7 @@ impl OciComputeVmHostProvider {
             image_id: args.image_id,
             worker_image_url: args.worker_image_url,
             envs: args.envs,
+            ssh_authorized_keys: args.ssh_authorized_keys,
             scaler: Arc::new(OciScaler::new()),
         }
     }
@@ -160,6 +162,9 @@ podman run -d --restart=always --network=host --name fn0-worker {env_flags} {ima
 
         let mut metadata = std::collections::HashMap::new();
         metadata.insert("user_data".to_string(), user_data);
+        if !self.ssh_authorized_keys.is_empty() {
+            metadata.insert("ssh_authorized_keys".to_string(), self.ssh_authorized_keys.clone());
+        }
 
         let mut freeform_tags = std::collections::HashMap::new();
         freeform_tags.insert("managed_by".to_string(), "fn0-hq".to_string());

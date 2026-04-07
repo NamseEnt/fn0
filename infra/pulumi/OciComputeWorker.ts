@@ -41,6 +41,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
   public readonly ipv6CidrBlocks: pulumi.Output<string[]>;
+  public readonly sshPublicKey: pulumi.Output<string>;
+  public readonly sshPrivateKey: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -167,6 +169,18 @@ export class OciComputeWorker extends pulumi.ComponentResource {
 
     this.ipv6CidrBlocks = vcn.ipv6cidrBlocks;
 
+    const workerSshKey = new tls.PrivateKey(
+      "worker-ssh-key",
+      {
+        algorithm: "RSA",
+        rsaBits: 4096,
+      },
+      { parent: this }
+    );
+
+    this.sshPublicKey = workerSshKey.publicKeyOpenssh;
+    this.sshPrivateKey = workerSshKey.privateKeyPem;
+
     const securityList = new oci.core.SecurityList(
       "security-list",
       {
@@ -175,6 +189,16 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         ingressSecurityRules: pulumi
           .all([args.hqIpv6CidrBlocks])
           .apply(([hqIpv6CidrBlocks]) => [
+            {
+              protocol: "6",
+              source: "0.0.0.0/0",
+              tcpOptions: { min: 22, max: 22 },
+            },
+            {
+              protocol: "6",
+              source: "::/0",
+              tcpOptions: { min: 22, max: 22 },
+            },
             ...[...cloudflareIpv4Ranges, ...clareflareIpv6Ranges].map(
               (source) => ({
                 protocol: "6",
