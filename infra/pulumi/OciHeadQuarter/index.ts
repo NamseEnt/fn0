@@ -27,6 +27,8 @@ export interface OciHeadQuarterArgs {
   wsSecret: pulumi.Input<string>;
   selfDnsHostname: pulumi.Input<string>;
   selfDnsCloudflareZoneId: pulumi.Input<string>;
+  drgId: pulumi.Input<string>;
+  workerIpv6CidrBlocks: pulumi.Input<string[]>;
   selfDnsCloudflareApiToken: pulumi.Input<string>;
 }
 
@@ -54,6 +56,8 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       compartmentId,
       vcnId,
       ipv6cidrBlocks: args.ipv6cidrBlocks,
+      drgId: args.drgId,
+      workerIpv6CidrBlocks: args.workerIpv6CidrBlocks,
     });
 
     const config = new pulumi.Config("oci");

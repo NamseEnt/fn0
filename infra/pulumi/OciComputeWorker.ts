@@ -9,6 +9,7 @@ import { CustomWorkerImage } from "./CustomWorkerImage";
 export interface OciComputeWorkerArgs {
   region: pulumi.Input<string>;
   hqIpv6CidrBlocks: pulumi.Input<string[]>;
+  drgId: pulumi.Input<string>;
 }
 
 export interface OciCwasmBucketInfo {
@@ -40,6 +41,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly workerImageMultiArch: pulumi.Output<string>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
+  public readonly ipv6CidrBlocks: pulumi.Output<string[]>;
 
   constructor(
     name: string,
@@ -164,6 +166,18 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       { parent: this }
     );
 
+    this.ipv6CidrBlocks = vcn.ipv6cidrBlocks;
+
+    new oci.core.DrgAttachment(
+      "drg-worker-attachment",
+      {
+        drgId: args.drgId,
+        vcnId: vcn.id,
+        displayName: "worker-vcn",
+      },
+      { parent: this }
+    );
+
     const securityList = new oci.core.SecurityList(
       "security-list",
       {
@@ -218,18 +232,25 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
-        routeRules: [
-          {
-            destination: "::/0",
-            destinationType: "CIDR_BLOCK",
-            networkEntityId: internetGateway.id,
-          },
-          {
-            destination: "0.0.0.0/0",
-            destinationType: "CIDR_BLOCK",
-            networkEntityId: internetGateway.id,
-          },
-        ],
+        routeRules: pulumi
+          .all([args.hqIpv6CidrBlocks])
+          .apply(([hqIpv6CidrBlocks]) => [
+            {
+              destination: "::/0",
+              destinationType: "CIDR_BLOCK",
+              networkEntityId: internetGateway.id,
+            },
+            {
+              destination: "0.0.0.0/0",
+              destinationType: "CIDR_BLOCK",
+              networkEntityId: internetGateway.id,
+            },
+            ...hqIpv6CidrBlocks.map((cidr) => ({
+              destination: cidr,
+              destinationType: "CIDR_BLOCK",
+              networkEntityId: args.drgId as string,
+            })),
+          ]),
       },
       { parent: this }
     );

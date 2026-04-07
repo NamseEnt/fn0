@@ -55,6 +55,9 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             if (args?.docDbUrl === undefined && !opts.urn) {
                 throw new Error("Missing required property 'docDbUrl'");
             }
+            if (args?.drgId === undefined && !opts.urn) {
+                throw new Error("Missing required property 'drgId'");
+            }
             if (args?.grafanaRegion === undefined && !opts.urn) {
                 throw new Error("Missing required property 'grafanaRegion'");
             }
@@ -88,6 +91,9 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             if (args?.wasmBucket === undefined && !opts.urn) {
                 throw new Error("Missing required property 'wasmBucket'");
             }
+            if (args?.workerIpv6CidrBlocks === undefined && !opts.urn) {
+                throw new Error("Missing required property 'workerIpv6CidrBlocks'");
+            }
             if (args?.wsSecret === undefined && !opts.urn) {
                 throw new Error("Missing required property 'wsSecret'");
             }
@@ -98,6 +104,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             resourceInputs["compartmentId"] = args?.compartmentId;
             resourceInputs["docDbToken"] = args?.docDbToken;
             resourceInputs["docDbUrl"] = args?.docDbUrl;
+            resourceInputs["drgId"] = args?.drgId;
             resourceInputs["grafanaRegion"] = args?.grafanaRegion;
             resourceInputs["grafanaSlug"] = args?.grafanaSlug;
             resourceInputs["ipv6cidrBlocks"] = args?.ipv6cidrBlocks;
@@ -109,6 +116,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             resourceInputs["suffix"] = args?.suffix;
             resourceInputs["vcnId"] = args?.vcnId;
             resourceInputs["wasmBucket"] = args?.wasmBucket;
+            resourceInputs["workerIpv6CidrBlocks"] = args?.workerIpv6CidrBlocks;
             resourceInputs["wsSecret"] = args?.wsSecret;
             resourceInputs["kubeconfig"] = undefined /*out*/;
         } else {
@@ -130,6 +138,7 @@ export interface OciHeadQuarterArgs {
     compartmentId: pulumi.Input<string>;
     docDbToken: pulumi.Input<string>;
     docDbUrl: pulumi.Input<string>;
+    drgId: pulumi.Input<string>;
     grafanaRegion: pulumi.Input<string>;
     grafanaSlug: pulumi.Input<string>;
     ipv6cidrBlocks: pulumi.Input<string[]>;
@@ -141,5 +150,6 @@ export interface OciHeadQuarterArgs {
     suffix: pulumi.Input<string>;
     vcnId: pulumi.Input<string>;
     wasmBucket: pulumi.Input<string>;
+    workerIpv6CidrBlocks: pulumi.Input<string[]>;
     wsSecret: pulumi.Input<string>;
 }

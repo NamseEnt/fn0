@@ -25,6 +25,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     declare public /*out*/ readonly cwasmBucket: pulumi.Output<outputs.OciCwasmBucketInfo>;
     declare public /*out*/ readonly infraEnvs: pulumi.Output<outputs.OciWorkerInfraEnvs>;
     declare public /*out*/ readonly instanceConfigurationId: pulumi.Output<string>;
+    declare public /*out*/ readonly ipv6CidrBlocks: pulumi.Output<string[]>;
     declare public /*out*/ readonly osImageId: pulumi.Output<string>;
     declare public /*out*/ readonly subnetId: pulumi.Output<string>;
     declare public /*out*/ readonly workerImageMultiArch: pulumi.Output<string>;
@@ -41,18 +42,23 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         let resourceInputs: pulumi.Inputs = {};
         opts = opts || {};
         if (!opts.id) {
+            if (args?.drgId === undefined && !opts.urn) {
+                throw new Error("Missing required property 'drgId'");
+            }
             if (args?.hqIpv6CidrBlocks === undefined && !opts.urn) {
                 throw new Error("Missing required property 'hqIpv6CidrBlocks'");
             }
             if (args?.region === undefined && !opts.urn) {
                 throw new Error("Missing required property 'region'");
             }
+            resourceInputs["drgId"] = args?.drgId;
             resourceInputs["hqIpv6CidrBlocks"] = args?.hqIpv6CidrBlocks;
             resourceInputs["region"] = args?.region;
             resourceInputs["compartmentId"] = undefined /*out*/;
             resourceInputs["cwasmBucket"] = undefined /*out*/;
             resourceInputs["infraEnvs"] = undefined /*out*/;
             resourceInputs["instanceConfigurationId"] = undefined /*out*/;
+            resourceInputs["ipv6CidrBlocks"] = undefined /*out*/;
             resourceInputs["osImageId"] = undefined /*out*/;
             resourceInputs["subnetId"] = undefined /*out*/;
             resourceInputs["workerImageMultiArch"] = undefined /*out*/;
@@ -62,6 +68,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
             resourceInputs["cwasmBucket"] = undefined /*out*/;
             resourceInputs["infraEnvs"] = undefined /*out*/;
             resourceInputs["instanceConfigurationId"] = undefined /*out*/;
+            resourceInputs["ipv6CidrBlocks"] = undefined /*out*/;
             resourceInputs["osImageId"] = undefined /*out*/;
             resourceInputs["subnetId"] = undefined /*out*/;
             resourceInputs["workerImageMultiArch"] = undefined /*out*/;
@@ -76,6 +83,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
  * The set of arguments for constructing a OciComputeWorker resource.
  */
 export interface OciComputeWorkerArgs {
+    drgId: pulumi.Input<string>;
     hqIpv6CidrBlocks: pulumi.Input<string[]>;
     region: pulumi.Input<string>;
 }
