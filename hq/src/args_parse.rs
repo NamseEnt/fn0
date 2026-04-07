@@ -23,6 +23,7 @@ pub struct HqArgsParsed {
     pub deployment_cache: DeploymentCache,
     pub deploy_context: Arc<DeployContext>,
     pub self_dns_args: crate::args::SelfDnsArgs,
+    pub dns_provider: DnsProvider,
 }
 
 impl HqArgs {
@@ -80,16 +81,9 @@ impl HqArgs {
                             ),
                         ),
                     };
-                let dns_provider = match site_args.dns_provider {
-                    DnsProviderArg::Cloudflare(args) => {
-                        DnsProvider::Cloudflare(CloudflareDnsProvider::new(args, None))
-                    }
-                };
-
                 Site::new(
                     site_args.name,
                     host_provider,
-                    dns_provider,
                     args.ca_cert_pem.clone(),
                     deployment_cache.clone(),
                     host_cpu_cores,
@@ -100,11 +94,18 @@ impl HqArgs {
             })
             .collect();
 
+        let dns_provider = match args.dns_provider {
+            DnsProviderArg::Cloudflare(dns_args) => {
+                DnsProvider::Cloudflare(CloudflareDnsProvider::new(dns_args, None))
+            }
+        };
+
         Ok(HqArgsParsed {
             sites,
             deployment_cache,
             deploy_context,
             self_dns_args: args.self_dns.clone(),
+            dns_provider,
         })
     }
 }

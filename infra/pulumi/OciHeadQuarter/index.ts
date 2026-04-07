@@ -6,7 +6,7 @@ import { createOkeCluster } from "./oke-cluster";
 import { createDockerRegistry } from "./docker-registry";
 import { deployK8sDashboard } from "./k8s-dashboard";
 import { deployHqApplication } from "./hq-deployment";
-import { SiteArgs } from "../hqArgs.schema";
+import { SiteArgs, DnsProviderArg } from "../hqArgs.schema";
 
 export interface OciHeadQuarterArgs {
   suffix: pulumi.Input<string>;
@@ -28,6 +28,7 @@ export interface OciHeadQuarterArgs {
   selfDnsHostname: pulumi.Input<string>;
   selfDnsCloudflareZoneId: pulumi.Input<string>;
   selfDnsCloudflareApiToken: pulumi.Input<string>;
+  dnsProvider: pulumi.Input<DnsProviderArg>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
@@ -96,6 +97,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       otlpEndpoint,
       hqArgs: {
         sites,
+        dnsProvider: args.dnsProvider,
         docDb: {
           url: docDbUrl,
           token: docDbToken,

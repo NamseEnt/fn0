@@ -3,6 +3,7 @@ mod args_parse;
 mod deploy;
 mod deployment_cache;
 mod dns;
+mod dns_sync;
 mod host_connection;
 mod host_id;
 mod host_provider;
@@ -37,6 +38,7 @@ fn main() -> Result<()> {
             deployment_cache,
             deploy_context,
             self_dns_args,
+            dns_provider,
         } = HqArgs::parse().await?;
 
         self_dns::register(self_dns_args).await?;
@@ -58,12 +60,22 @@ fn main() -> Result<()> {
                 Ok(())
             });
         }
+        let all_host_connections: Vec<_> = sites
+            .iter()
+            .map(|s| s.host_connections.clone())
+            .collect();
+
         for mut site in sites {
             set.spawn(async move {
                 site.run().await;
                 Ok(())
             });
         }
+
+        set.spawn(async move {
+            dns_sync::run(dns_provider, all_host_connections).await;
+            Ok(())
+        });
         set.spawn(async {
             tokio::signal::ctrl_c().await?;
             Ok(())

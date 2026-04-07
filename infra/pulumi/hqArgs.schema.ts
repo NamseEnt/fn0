@@ -2,6 +2,7 @@ import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
   aws: pulumi.Input<AwsArgs>;
   caCertPem: pulumi.Input<string>;
+  dnsProvider: pulumi.Input<DnsProviderArg>;
   docDb: pulumi.Input<DocDbArgs>;
   selfDns: pulumi.Input<SelfDnsArgs>;
   sites: pulumi.Input<Array<SiteArgs>>;
@@ -55,7 +56,6 @@ export interface SelfDnsArgs {
   hostname: pulumi.Input<string>;
 }
 export interface SiteArgs {
-  dnsProvider: pulumi.Input<DnsProviderArg>;
   hostProvider: pulumi.Input<HostProviderArg>;
   name: pulumi.Input<string>;
 }

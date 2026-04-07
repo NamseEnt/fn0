@@ -51,7 +51,6 @@ export interface S3CompatibleBucketArgs {
 }
 
 export interface SiteArgsArgs {
-    dnsProvider: pulumi.Input<inputs.DnsProviderArgArgs>;
     hostProvider: pulumi.Input<inputs.HostProviderArgArgs>;
     name: pulumi.Input<string>;
 }
