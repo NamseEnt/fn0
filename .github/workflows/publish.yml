@@ -52,6 +52,7 @@ jobs:
           publish_if_needed "forte/db" "forte-db"
           publish_if_needed "forte/macros" "forte-macros"
           publish_if_needed "forte/rs-sdk" "forte-sdk"
+          publish_if_needed "fn0-deploy" "fn0-deploy"
           publish_if_needed "forte/cli" "forte-cli"
 
       - name: Create release tags
