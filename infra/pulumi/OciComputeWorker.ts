@@ -2,8 +2,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
-import * as docker from "@pulumi/docker";
-import * as command from "@pulumi/command";
+import * as dockerBuild from "@pulumi/docker-build";
 import { CustomWorkerImage } from "./CustomWorkerImage";
 
 export interface OciComputeWorkerArgs {
@@ -450,59 +449,38 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    const ociConfig = new pulumi.Config("oci");
     const registryUrl = pulumi.interpolate`ocir.${args.region}.oci.oraclecloud.com`;
 
-    const workerImage = new docker.Image(
+    const workerImage = new dockerBuild.Image(
       "worker-image",
       {
-        imageName: pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1`,
-        build: {
-          context: "../..",
-          dockerfile: "../../fn0-worker/Dockerfile",
-          platform: "linux/arm64",
+        tags: [
+          pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`,
+        ],
+        context: {
+          location: "../..",
         },
-        registry: {
-          server: registryUrl,
-          username: pulumi.interpolate`${workerRepo.namespace}/${workerDockerUser.name}`,
-          password: workerAuthToken.token,
+        dockerfile: {
+          location: "../../fn0-worker/Dockerfile",
         },
+        platforms: [
+          dockerBuild.Platform.Linux_arm64,
+          dockerBuild.Platform.Linux_amd64,
+        ],
+        push: true,
+        registries: [
+          {
+            address: registryUrl,
+            username: pulumi.interpolate`${workerRepo.namespace}/${workerDockerUser.name}`,
+            password: workerAuthToken.token,
+          },
+        ],
       },
       { parent: this }
     );
 
-    this.workerImageUrl = workerImage.repoDigest;
-
-    const workerImageAmd64 = new docker.Image(
-      "worker-image-amd64",
-      {
-        imageName: pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1-amd64`,
-        build: {
-          context: "../..",
-          dockerfile: "../../fn0-worker/Dockerfile",
-          platform: "linux/amd64",
-        },
-        registry: {
-          server: registryUrl,
-          username: pulumi.interpolate`${workerRepo.namespace}/${workerDockerUser.name}`,
-          password: workerAuthToken.token,
-        },
-      },
-      { parent: this }
-    );
-
-    const multiArchTag = pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
-
-    const manifestCreate = new command.local.Command(
-      "worker-manifest-create",
-      {
-        create: pulumi.interpolate`docker login ${registryUrl} -u ${workerRepo.namespace}/${workerDockerUser.name} -p '${workerAuthToken.token}' && docker manifest create --amend ${multiArchTag} ${workerImage.imageName} ${workerImageAmd64.imageName} && docker manifest push ${multiArchTag}`,
-        triggers: [workerImage.repoDigest, workerImageAmd64.repoDigest],
-      },
-      { parent: this, dependsOn: [workerImage, workerImageAmd64] }
-    );
-
-    this.workerImageMultiArch = multiArchTag;
+    this.workerImageUrl = workerImage.ref;
+    this.workerImageMultiArch = pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
     this.osImageId = imageId;
 
     const cwasmBucketUser = new oci.identity.User(

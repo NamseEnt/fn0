@@ -8,6 +8,7 @@
   "dependencies": {
     "@pulumi/aws": "^7.24.0",
     "@pulumi/cloudflare": "^6.11.0",
+    "@pulumi/docker-build": "^0.0.15",
     "@pulumi/fn0": "file:sdks/fn0",
     "@pulumi/oci": "^4.5.1",
     "@pulumi/pulumi": "^3.113.0",
