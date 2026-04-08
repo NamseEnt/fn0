@@ -19,8 +19,6 @@ export interface CloudflareDnsProviderArgs {
   asteriskDomain: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
 }
-export interface DedicatedHostProviderArgs {
-}
 export interface DnsProviderArg {
   cloudflare?: pulumi.Input<CloudflareDnsProviderArgs>;
 }
@@ -30,7 +28,6 @@ export interface DocDbArgs {
 }
 export interface HostProviderArg {
   ociComputeVm?: pulumi.Input<OciComputeVmHostProviderArgs>;
-  dedicated?: pulumi.Input<DedicatedHostProviderArgs>;
 }
 export interface OciComputeVmHostProviderArgs {
   availabilityDomain: pulumi.Input<string>;

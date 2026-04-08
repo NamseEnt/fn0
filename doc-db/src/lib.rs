@@ -1,10 +1,8 @@
-mod dedicated_host;
 mod deployment;
 mod job_queue;
 mod project;
 mod scale_config;
 
-pub use dedicated_host::*;
 pub use deployment::*;
 pub use job_queue::*;
 use libsql::{Builder, Database, Result};

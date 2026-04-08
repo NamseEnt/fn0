@@ -6,6 +6,7 @@ mod send_ping;
 
 use crate::{
     deployment_cache::DeploymentCache, host_connection::HostConnection,
+    host_provider::oci_compute_vm::OciComputeVmHostProvider,
     telemetry, *,
 };
 use dashmap::{DashMap, DashSet};
@@ -17,18 +18,16 @@ use tokio::time::MissedTickBehavior;
 
 pub struct Site {
     name: String,
-    host_provider: HostProvider,
+    host_provider: OciComputeVmHostProvider,
     pub host_connections: Arc<DashMap<Host, HostConnection>>,
     hosts_status: Arc<DashMap<Host, HostStatus>>,
     ca_cert_pem: String,
     pub deployment_cache: DeploymentCache,
-    // Below fields won't be cleared so may occur out-of-memory.
-    // But the size is expected to be too small to cause out-of-memory.
     known_hosts: Arc<DashSet<Host>>,
     dead_hosts: Arc<DashMap<Host, Instant>>,
     graceful_shutdown_hosts: Arc<DashMap<Host, Instant>>,
-    host_cpu_cores: Option<NonZeroUsize>,
-    host_memory_in_gb: Option<NonZeroUsize>,
+    host_cpu_cores: NonZeroUsize,
+    host_memory_in_gb: NonZeroUsize,
     doc_db: DocDb,
     ws_secret: String,
 }
@@ -36,11 +35,11 @@ pub struct Site {
 impl Site {
     pub fn new(
         name: String,
-        host_provider: HostProvider,
+        host_provider: OciComputeVmHostProvider,
         ca_cert_pem: String,
         deployment_cache: DeploymentCache,
-        host_cpu_cores: Option<NonZeroUsize>,
-        host_memory_in_gb: Option<NonZeroUsize>,
+        host_cpu_cores: NonZeroUsize,
+        host_memory_in_gb: NonZeroUsize,
         doc_db: DocDb,
         ws_secret: String,
     ) -> Self {

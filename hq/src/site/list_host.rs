@@ -1,5 +1,5 @@
 use super::*;
-use crate::{host_connection::HostConnection, host_provider::HostTransport, random_sleep::random_sleep, telemetry, *};
+use crate::{host_connection::HostConnection, host_provider::HostTransport, random_sleep::random_sleep, telemetry};
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
@@ -63,16 +63,10 @@ impl Site {
     #[tracing::instrument(skip(self), fields(host_id = %host.id, host_addr = %host.addr))]
     fn on_dead_host_in_list(&self, host: Host) {
         let host_provider = self.host_provider.clone();
-        let dead_hosts = self.dead_hosts.clone();
-        let is_dedicated = matches!(self.host_provider, HostProvider::Dedicated(_));
         tokio::spawn(async move {
             random_sleep(1000).await;
             if let Err(err) = host_provider.terminate(&host.id).await {
                 warn!(%err, "Failed to terminate host");
-            } else if is_dedicated {
-                // For dedicated hosts, terminate means restart via SSH.
-                // Remove from dead_hosts to allow reconnection.
-                dead_hosts.remove(&host);
             }
         });
     }
