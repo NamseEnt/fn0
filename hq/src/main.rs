@@ -11,6 +11,7 @@ mod job_processor;
 mod random_sleep;
 mod self_dns;
 mod site;
+mod ssh;
 mod telemetry;
 
 use args::HqArgs;
