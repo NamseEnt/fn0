@@ -111,13 +111,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let public_dir = public_dir_clone.clone();
                         let frontend_path = frontend_path_clone.clone();
                         let vite_socket = vite_socket_path_clone.clone();
-                        handle_request(
-                            req,
-                            fn0,
-                            public_dir,
-                            frontend_path,
-                            vite_socket,
-                        )
+                        handle_request(req, fn0, public_dir, frontend_path, vite_socket)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
