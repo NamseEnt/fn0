@@ -27,6 +27,10 @@ new cloudflare.ZoneSetting("ssl-mode", {
   value: "strict",
 });
 
+
+
+
+
 const docDb = new fn0.TursoDocDb("doc-db", {
   organizationSlug: config.require("tursoOrganizationSlug"),
   location: config.require("tursoLocation"),

@@ -28,6 +28,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
       WORKERS_SCRIPTS_WRITE: "e086da7e2179491d91ee5f35b3ca210a",
       WORKERS_ROUTES_WRITE: "28f4b596e7d643029c524985477ae49a",
       ZONE_WAF_WRITE: "fb6778dc191143babbfaa57993f1d275",
+      ZONE_SETTINGS_WRITE: "3030687196b94b638145a3953da2b699",
     };
 
     const cloudflareApiToken = new cloudflare.AccountToken(
@@ -45,6 +46,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
               { id: PERMISSION_IDS.DNS_WRITE },
               { id: PERMISSION_IDS.WORKERS_ROUTES_WRITE },
               { id: PERMISSION_IDS.ZONE_WAF_WRITE },
+              { id: PERMISSION_IDS.ZONE_SETTINGS_WRITE },
             ],
           },
           {
