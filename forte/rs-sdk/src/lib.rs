@@ -30,7 +30,9 @@ pub fn now() -> DateTime {
 
 pub struct ForteRequest<'a, Body = ()> {
     pub uri_authority: &'a str,
+    pub method: &'a http::Method,
     pub headers: &'a http::HeaderMap,
     pub jar: &'a mut CookieJar,
+    pub raw_body: &'a [u8],
     pub body: Body,
 }
