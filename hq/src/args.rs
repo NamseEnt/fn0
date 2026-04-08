@@ -67,6 +67,7 @@ pub struct OciComputeVmHostProviderArgs {
     pub worker_image_url: String,
     pub envs: BTreeMap<String, String>,
     pub ssh_authorized_keys: String,
+    pub ssh_private_key_base64: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
