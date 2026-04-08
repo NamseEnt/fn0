@@ -139,17 +139,10 @@ impl OciComputeVmHostProvider {
             r#"#!/bin/bash
 systemctl disable --now firewalld 2>/dev/null || true
 podman pull {image}
-podman create --name fn0-worker --network=host --label io.containers.autoupdate=registry {env_flags} {image}
+podman create --name fn0-worker --network=host {env_flags} {image}
 podman generate systemd --new --name fn0-worker > /etc/systemd/system/fn0-worker.service
-mkdir -p /etc/systemd/system/podman-auto-update.timer.d
-cat > /etc/systemd/system/podman-auto-update.timer.d/override.conf << 'TIMER'
-[Timer]
-OnCalendar=
-OnCalendar=*-*-* *:*:00
-TIMER
 systemctl daemon-reload
 systemctl enable --now fn0-worker
-systemctl enable --now podman-auto-update.timer
 "#,
             image = self.worker_image_url,
             env_flags = env_flags,
