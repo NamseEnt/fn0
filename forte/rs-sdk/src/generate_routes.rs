@@ -5,6 +5,7 @@ use std::{env, fs, path::Path};
 pub fn generate_routes() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let pages_dir = Path::new(&manifest_dir).join("src/pages");
+    let api_dir = Path::new(&manifest_dir).join("src/api");
     let hooks_dir = Path::new(&manifest_dir).join("src/hooks");
     let actions_dir = Path::new(&manifest_dir).join("src/actions");
     let queue_task_dir = Path::new(&manifest_dir).join("src/queue_task");
@@ -12,11 +13,13 @@ pub fn generate_routes() {
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
     println!("cargo:rerun-if-changed=src/pages");
+    println!("cargo:rerun-if-changed=src/api");
     println!("cargo:rerun-if-changed=src/hooks");
     println!("cargo:rerun-if-changed=src/actions");
     println!("cargo:rerun-if-changed=src/queue_task");
 
-    let pages = discover_pages(&pages_dir);
+    let mut pages = discover_pages(&pages_dir);
+    pages.extend(discover_api(&api_dir));
     let hooks = discover_hooks(&hooks_dir);
     let actions = discover_actions(&actions_dir);
     let queue_tasks = discover_queue_tasks(&queue_task_dir);
@@ -56,6 +59,7 @@ struct PageInfo {
     path_params: Option<Vec<PathParamField>>,
     search_params: Option<Vec<SearchParamField>>,
     is_redirect_only: bool,
+    is_api: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -444,16 +448,37 @@ fn extract_type_info(ty: &syn::Type) -> (bool, String) {
 
 fn discover_pages(pages_dir: &Path) -> Vec<PageInfo> {
     let mut pages = Vec::new();
-
     if !pages_dir.exists() {
         return pages;
     }
-
-    discover_pages_recursive(pages_dir, pages_dir, &mut pages);
+    discover_endpoints_recursive(pages_dir, pages_dir, &mut pages, "pages", &[], false);
     pages
 }
 
-fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec<PageInfo>) {
+fn discover_api(api_dir: &Path) -> Vec<PageInfo> {
+    let mut endpoints = Vec::new();
+    if !api_dir.exists() {
+        return endpoints;
+    }
+    discover_endpoints_recursive(
+        api_dir,
+        api_dir,
+        &mut endpoints,
+        "api",
+        &["api".to_string()],
+        true,
+    );
+    endpoints
+}
+
+fn discover_endpoints_recursive(
+    base_dir: &Path,
+    current_dir: &Path,
+    pages: &mut Vec<PageInfo>,
+    module_prefix: &str,
+    route_prefix: &[String],
+    is_api: bool,
+) {
     let Ok(entries) = fs::read_dir(current_dir) else {
         return;
     };
@@ -462,10 +487,8 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
         let path = entry.path();
 
         if path.is_dir() {
-            // Recurse into subdirectories
-            discover_pages_recursive(base_dir, &path, pages);
+            discover_endpoints_recursive(base_dir, &path, pages, module_prefix, route_prefix, is_api);
         } else if path.extension().map(|e| e == "rs").unwrap_or(false) {
-            // Check if this .rs file has a handler
             let Some(content) = fs::read_to_string(&path).ok() else {
                 continue;
             };
@@ -477,7 +500,6 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
                 HandlerType::Redirect => true,
             };
 
-            // Build route info from file path
             let relative_path = path.strip_prefix(base_dir).unwrap();
             let file_name = path.file_stem().unwrap().to_string_lossy().to_string();
             let parent_segments: Vec<_> = relative_path
@@ -489,9 +511,6 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
                 })
                 .unwrap_or_default();
 
-            // Determine route segments
-            // - index.rs or mod.rs -> use parent path only
-            // - other.rs -> use parent path + filename
             let mut route_segments: Vec<String> = if file_name == "index" || file_name == "mod" {
                 parent_segments.clone()
             } else {
@@ -500,20 +519,22 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
                 segments
             };
 
-            // Remove trailing "index" from route segments
-            // e.g., ["index"] -> [], ["post", "index"] -> ["post"]
             if route_segments.last() == Some(&"index".to_string()) {
                 route_segments.pop();
             }
 
-            // Generate module name (valid Rust identifier)
-            let module_name = if route_segments.is_empty() {
-                "pages_index".to_string()
+            let mut full_route_segments = route_prefix.to_vec();
+            full_route_segments.extend(route_segments);
+
+            let module_name = if full_route_segments.is_empty() {
+                format!("{}_index", module_prefix)
             } else {
                 format!(
-                    "pages_{}",
-                    route_segments
+                    "{}_{}",
+                    module_prefix,
+                    full_route_segments
                         .iter()
+                        .skip(route_prefix.len())
                         .map(|s| {
                             if s.starts_with('[') && s.ends_with(']') {
                                 format!("_{}_", &s[1..s.len() - 1])
@@ -526,18 +547,15 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
                 )
             };
 
-            // Generate module path (actual file path)
-            let module_path = format!("pages/{}", relative_path.to_string_lossy());
+            let module_path = format!("{}/{}", module_prefix, relative_path.to_string_lossy());
 
-            // Generate route path
-            let route_path = if route_segments.is_empty() {
+            let route_path = if full_route_segments.is_empty() {
                 "/".to_string()
             } else {
-                format!("/{}", route_segments.join("/"))
+                format!("/{}", full_route_segments.join("/"))
             };
 
-            // Parse route segments for pattern matching
-            let parsed_route_segments: Vec<RouteSegment> = route_segments
+            let parsed_route_segments: Vec<RouteSegment> = full_route_segments
                 .iter()
                 .map(|s| {
                     if s.starts_with('[') && s.ends_with(']') {
@@ -559,6 +577,7 @@ fn discover_pages_recursive(base_dir: &Path, current_dir: &Path, pages: &mut Vec
                 path_params,
                 search_params,
                 is_redirect_only,
+                is_api,
             });
         }
     }
@@ -629,9 +648,11 @@ fn generate_code(
 
         #[forte_sdk::wstd::http_server]
         pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
-            let (parts, body) = request.into_parts();
+            let (parts, mut body) = request.into_parts();
             let headers = parts.headers;
             let path = parts.uri.path();
+            let method = parts.method;
+            let body_bytes = body.contents().await?.to_vec();
             let mut cookie_jar = make_cookie_jar(&headers);
 
             let Some(uri_authority) = parts.uri.authority() else {
@@ -643,15 +664,15 @@ fn generate_code(
             let uri_authority = uri_authority.as_str();
 
             if let Some(hook_name) = path.strip_prefix("/__forte_hook/") {
-                return handle_hook(hook_name, uri_authority, &headers, &mut cookie_jar, body).await;
+                return handle_hook(hook_name, uri_authority, &method, &headers, &mut cookie_jar, &body_bytes).await;
             }
 
             if let Some(action_name) = path.strip_prefix("/__forte_action/") {
-                return handle_action(action_name, uri_authority, &headers, &mut cookie_jar, body).await;
+                return handle_action(action_name, uri_authority, &method, &headers, &mut cookie_jar, &body_bytes).await;
             }
 
             if path == "/__forte_queue_task/execute" {
-                return handle_queue_task_execute(body).await;
+                return handle_queue_task_execute(&body_bytes).await;
             }
 
             #route_chain
@@ -815,11 +836,24 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                     }
                 }
             } else {
+                let ok_response = if page.is_api {
+                    quote! {
+                        Response::builder()
+                            .status(StatusCode::OK)
+                            .header("content-type", "application/json")
+                            .body(Body::from_stream(stream))
+                            .unwrap()
+                    }
+                } else {
+                    quote! {
+                        Response::new(Body::from_stream(stream))
+                    }
+                };
                 quote! {
                     match #handler_call {
                         Ok(props) => {
                             let stream = forte_json::to_stream(&props);
-                            Ok(build_response_with_cookies(Response::new(Body::from_stream(stream)), &cookie_jar))
+                            Ok(build_response_with_cookies(#ok_response, &cookie_jar))
                         }
                         Err(e) => {
                             if let Some(redirect) = e.downcast_ref::<Redirect>() {
@@ -850,8 +884,10 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
 
                     let req = ForteRequest {
                         uri_authority,
+                        method: &method,
                         headers: &headers,
                         jar: &mut cookie_jar,
+                        raw_body: &body_bytes,
                         body: (),
                     };
 
@@ -1115,9 +1151,10 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
             async fn handle_hook(
                 hook_name: &str,
                 _uri_authority: &str,
+                _method: &http::Method,
                 _headers: &HeaderMap,
                 _cookie_jar: &mut cookie::CookieJar,
-                _body: Body,
+                _body_bytes: &[u8],
             ) -> Result<Response<Body>, Error> {
                 Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
@@ -1139,8 +1176,10 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                         .map_err(|e| Error::msg(e.to_string()))?;
                     let req = ForteRequest {
                         uri_authority,
+                        method,
                         headers,
                         jar: cookie_jar,
+                        raw_body: body_bytes,
                         body: input,
                     };
                     let output = #module_name::handler(req);
@@ -1162,12 +1201,11 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
         async fn handle_hook(
             hook_name: &str,
             uri_authority: &str,
+            method: &http::Method,
             headers: &HeaderMap,
             cookie_jar: &mut cookie::CookieJar,
-            mut body: Body,
+            body_bytes: &[u8],
         ) -> Result<Response<Body>, Error> {
-            let body_bytes = body.contents().await?;
-
             match hook_name {
                 #(#hook_matches)*
                 _ => Ok(Response::builder()
@@ -1200,9 +1238,10 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
             async fn handle_action(
                 action_name: &str,
                 _uri_authority: &str,
+                _method: &http::Method,
                 _headers: &HeaderMap,
                 _cookie_jar: &mut cookie::CookieJar,
-                _body: Body,
+                _body_bytes: &[u8],
             ) -> Result<Response<Body>, Error> {
                 Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
@@ -1224,8 +1263,10 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
                         .map_err(|e| Error::msg(e.to_string()))?;
                     let req = ForteRequest {
                         uri_authority,
+                        method,
                         headers,
                         jar: cookie_jar,
+                        raw_body: body_bytes,
                         body: input,
                     };
                     let output = #module_name::handler(req).await;
@@ -1247,12 +1288,11 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
         async fn handle_action(
             action_name: &str,
             uri_authority: &str,
+            method: &http::Method,
             headers: &HeaderMap,
             cookie_jar: &mut cookie::CookieJar,
-            mut body: Body,
+            body_bytes: &[u8],
         ) -> Result<Response<Body>, Error> {
-            let body_bytes = body.contents().await?;
-
             match action_name {
                 #(#action_matches)*
                 _ => Ok(Response::builder()
@@ -1311,7 +1351,7 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
     if queue_tasks.is_empty() {
         return quote! {
             async fn handle_queue_task_execute(
-                _body: Body,
+                _body_bytes: &[u8],
             ) -> Result<Response<Body>, Error> {
                 Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
@@ -1339,9 +1379,8 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
 
     quote! {
         async fn handle_queue_task_execute(
-            mut body: Body,
+            body_bytes: &[u8],
         ) -> Result<Response<Body>, Error> {
-            let body_bytes = body.contents().await?;
             let request: forte_sdk::serde_json::Value = forte_sdk::serde_json::from_slice(&body_bytes)
                 .map_err(|e| Error::msg(e.to_string()))?;
             let task_name = request["task_name"]
@@ -1454,4 +1493,3 @@ fn rust_type_to_ts(rust_type: &str) -> &str {
         _ => "string",
     }
 }
-
