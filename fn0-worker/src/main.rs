@@ -1,4 +1,5 @@
 mod quic;
+mod telemetry;
 mod websocket;
 
 use adapt_cache::s3::S3AdaptCache;
@@ -48,10 +49,17 @@ pub fn read_pem_env(name: &str) -> Option<String> {
 fn main() -> Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     color_eyre::install()?;
-    tracing_subscriber::fmt::init();
+
+    let otlp_endpoint = std::env::var("OTLP_ENDPOINT").expect("OTLP_ENDPOINT is required");
+    let otlp_basic_auth = std::env::var("OTLP_BASIC_AUTH").ok();
+    let telemetry_providers =
+        telemetry::setup(&otlp_endpoint, otlp_basic_auth.as_deref())?;
 
     let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(run())
+    let result = rt.block_on(run());
+
+    telemetry::shutdown(telemetry_providers)?;
+    result
 }
 
 async fn run() -> Result<()> {

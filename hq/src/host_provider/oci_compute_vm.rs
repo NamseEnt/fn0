@@ -57,6 +57,14 @@ impl OciComputeVmHostProvider {
             .unwrap(),
         );
 
+        let mut envs = args.envs;
+        if let Ok(endpoint) = std::env::var("WORKER_OTLP_ENDPOINT") {
+            envs.insert("OTLP_ENDPOINT".to_string(), endpoint);
+        }
+        if let Ok(auth) = std::env::var("WORKER_OTLP_BASIC_AUTH") {
+            envs.insert("OTLP_BASIC_AUTH".to_string(), auth);
+        }
+
         Self {
             core_client,
             compartment_id: args.compartment_id,
@@ -67,7 +75,7 @@ impl OciComputeVmHostProvider {
             subnet_id: args.subnet_id,
             image_id: args.image_id,
             worker_image_url: args.worker_image_url,
-            envs: args.envs,
+            envs,
             ssh_authorized_keys: args.ssh_authorized_keys,
             scaler: Arc::new(OciScaler::new()),
         }
