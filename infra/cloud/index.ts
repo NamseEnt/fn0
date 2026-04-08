@@ -176,6 +176,9 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             ORIGIN_KEY_PEM: dns.privateKeyPem,
           },
           sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
+          sshPrivateKeyBase64: ociComputeWorker.sshPrivateKey.apply(
+            (key) => Buffer.from(key).toString("base64")
+          ),
         },
       },
     },

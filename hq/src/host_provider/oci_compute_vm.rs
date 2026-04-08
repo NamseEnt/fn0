@@ -25,6 +25,7 @@ pub struct OciComputeVmHostProvider {
     worker_image_url: String,
     envs: BTreeMap<String, String>,
     ssh_authorized_keys: String,
+    ssh_private_key_pem: String,
     scaler: Arc<OciScaler>,
 }
 
@@ -65,6 +66,13 @@ impl OciComputeVmHostProvider {
             envs.insert("OTLP_BASIC_AUTH".to_string(), auth);
         }
 
+        let ssh_private_key_pem = String::from_utf8_lossy(
+            &base64::engine::general_purpose::STANDARD
+                .decode(&args.ssh_private_key_base64)
+                .expect("Invalid ssh_private_key_base64"),
+        )
+        .to_string();
+
         Self {
             core_client,
             compartment_id: args.compartment_id,
@@ -77,6 +85,7 @@ impl OciComputeVmHostProvider {
             worker_image_url: args.worker_image_url,
             envs,
             ssh_authorized_keys: args.ssh_authorized_keys,
+            ssh_private_key_pem,
             scaler: Arc::new(OciScaler::new()),
         }
     }
@@ -94,8 +103,21 @@ impl OciComputeVmHostProvider {
             image_id: "test-image".to_string(),
             worker_image_url: "test-image:latest".to_string(),
             envs: BTreeMap::new(),
+            ssh_private_key_pem: String::new(),
             scaler: Arc::new(OciScaler::new()),
         }
+    }
+
+    pub fn ssh_private_key_pem(&self) -> &str {
+        &self.ssh_private_key_pem
+    }
+
+    pub fn worker_image_url(&self) -> &str {
+        &self.worker_image_url
+    }
+
+    pub fn envs(&self) -> &BTreeMap<String, String> {
+        &self.envs
     }
 
     fn build_cloud_init(&self) -> String {
