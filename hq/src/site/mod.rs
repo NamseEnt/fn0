@@ -3,6 +3,7 @@ mod reaper;
 mod recv_pong;
 mod scaler;
 mod send_ping;
+mod worker_update;
 
 use crate::{
     deployment_cache::DeploymentCache, host_connection::HostConnection,
@@ -68,7 +69,8 @@ impl Site {
             self.run_recv_pong_loop(new_host_rx),
             self.run_reaper(),
             self.run_metrics_reporter(),
-            self.run_scaler()
+            self.run_scaler(),
+            self.run_worker_update_loop(),
         );
     }
 
