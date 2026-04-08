@@ -29,6 +29,11 @@ tokio-rustls = "0.26"
 rustls-pemfile = "2"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+tracing-opentelemetry = "0.32"
+opentelemetry = { version = "0.31", features = ["metrics"] }
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.31", features = ["grpc-tonic", "metrics"] }
+tonic = "0.14"
 axum = { version = "0.8", features = ["ws"] }
 anyhow = "1"
 zstd = "0.13"

@@ -2635,6 +2635,9 @@ dependencies = [
  "http-body-util",
  "hyper 1.8.1",
  "hyper-util",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
  "quinn",
  "rcgen",
  "rustls 0.23.28",
@@ -2643,7 +2646,9 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-rustls 0.26.4",
+ "tonic",
  "tracing",
+ "tracing-opentelemetry",
  "tracing-subscriber",
  "zstd",
 ]
@@ -6473,8 +6478,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fec7c61a0695dc1887c1b53952990f3ad2e3a31453e1f49f10e75424943a93ec"
 dependencies = [
  "async-trait",
+ "axum",
  "base64 0.22.1",
  "bytes",
+ "h2 0.4.13",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
@@ -6483,6 +6490,7 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "pin-project",
+ "socket2 0.6.3",
  "sync_wrapper",
  "tokio",
  "tokio-stream",

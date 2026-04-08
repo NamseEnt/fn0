@@ -30,8 +30,11 @@ fn main() {
 fn write_schema(output: &mut String, name: &str, schema: SchemaObject) {
     *output += &format!("export interface {name} {{\n");
     if let Some(object) = schema.object {
+        let required: std::collections::HashSet<_> = object.required.iter().cloned().collect();
         for (name, schema) in object.properties {
-            *output += &format!("  {name}: pulumi.Input<");
+            let optional = !required.contains(&name);
+            let opt_marker = if optional { "?" } else { "" };
+            *output += &format!("  {name}{opt_marker}: pulumi.Input<");
             *output += &name_of_properties(schema.into_object());
             *output += ">;\n";
         }
@@ -55,6 +58,17 @@ fn write_schema(output: &mut String, name: &str, schema: SchemaObject) {
 }
 
 fn name_of_properties(schema: SchemaObject) -> String {
+    if let Some(ref subschemas) = schema.subschemas {
+        if let Some(ref any_of) = subschemas.any_of {
+            for s in any_of {
+                let obj = s.clone().into_object();
+                if obj.instance_type == Some(SingleOrVec::Single(Box::new(InstanceType::Null))) {
+                    continue;
+                }
+                return name_of_properties(obj);
+            }
+        }
+    }
     if let Some(array) = schema.array {
         match array.items.unwrap() {
             SingleOrVec::Single(single) => {

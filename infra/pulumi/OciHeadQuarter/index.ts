@@ -76,12 +76,13 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
     });
     this.kubeconfig = kubeconfig;
 
-    const { otlpEndpoint } = hqGrafana(this, {
-      regionSlug: args.grafanaRegion,
-      slug: args.grafanaSlug,
-      k8sProvider: k8sProvider,
-      suffix,
-    });
+    const { otlpEndpoint, workerOtlpEndpoint, workerOtlpBasicAuth } =
+      hqGrafana(this, {
+        regionSlug: args.grafanaRegion,
+        slug: args.grafanaSlug,
+        k8sProvider: k8sProvider,
+        suffix,
+      });
 
     const { hqImage } = createDockerRegistry(this, {
       compartmentId,
@@ -93,6 +94,8 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       k8sProvider,
       hqImage,
       otlpEndpoint,
+      workerOtlpEndpoint,
+      workerOtlpBasicAuth,
       hqArgs: {
         sites,
         dnsProvider: args.dnsProvider,

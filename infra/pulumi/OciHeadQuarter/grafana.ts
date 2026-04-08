@@ -17,6 +17,8 @@ export function hqGrafana(
   }
 ): {
   otlpEndpoint: pulumi.Output<string>;
+  workerOtlpEndpoint: pulumi.Output<string>;
+  workerOtlpBasicAuth: pulumi.Output<string>;
   release: k8s.helm.v3.Release;
 } {
   const stack = pulumi.all([slug]).apply(([slug]) =>
@@ -139,8 +141,19 @@ export function hqGrafana(
     { provider: k8sProvider, parent }
   );
 
+  const workerOtlpEndpoint = stack.otlpUrl.apply(
+    (url) => `${url}:443`
+  );
+  const workerOtlpBasicAuth = pulumi
+    .all([stack.id, password])
+    .apply(([id, pw]) =>
+      Buffer.from(`${id}:${pw}`).toString("base64")
+    );
+
   return {
     otlpEndpoint: pulumi.interpolate`http://${releaseName}-alloy-receiver.${namespace}:4317`,
+    workerOtlpEndpoint,
+    workerOtlpBasicAuth,
     release,
   };
 }

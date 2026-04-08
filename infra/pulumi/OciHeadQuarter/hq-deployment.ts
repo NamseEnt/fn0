@@ -9,12 +9,21 @@ export function deployHqApplication(
     k8sProvider: k8s.Provider;
     hqImage: docker.Image;
     otlpEndpoint: pulumi.Output<string>;
+    workerOtlpEndpoint: pulumi.Output<string>;
+    workerOtlpBasicAuth: pulumi.Output<string>;
     hqArgs: HqArgs;
   }
 ): {
   deployment: k8s.apps.v1.Deployment;
 } {
-  const { k8sProvider, hqImage, otlpEndpoint, hqArgs } = args;
+  const {
+    k8sProvider,
+    hqImage,
+    otlpEndpoint,
+    workerOtlpEndpoint,
+    workerOtlpBasicAuth,
+    hqArgs,
+  } = args;
   const appLabels = { app: "hq" };
 
   const hqArgsSecret = new k8s.core.v1.Secret(
@@ -76,6 +85,14 @@ export function deployHqApplication(
                   {
                     name: "HQ_ARGS_PATH",
                     value: configFilePath,
+                  },
+                  {
+                    name: "WORKER_OTLP_ENDPOINT",
+                    value: workerOtlpEndpoint,
+                  },
+                  {
+                    name: "WORKER_OTLP_BASIC_AUTH",
+                    value: workerOtlpBasicAuth,
                   },
                 ],
               },
