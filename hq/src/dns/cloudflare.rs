@@ -16,7 +16,7 @@ impl CloudflareDnsProvider {
     pub fn new(args: CloudflareDnsProviderArgs, api_url: Option<String>) -> Self {
         Self {
             client: reqwest::Client::builder()
-                .local_address("[::]:0".parse().ok())
+                .local_address("::".parse().ok())
                 .build()
                 .unwrap(),
             zone_id: args.zone_id,

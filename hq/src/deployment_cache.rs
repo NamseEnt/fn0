@@ -75,11 +75,7 @@ pub struct DeploymentId(pub u64);
 
 fn deployment_id_sync_interval_ms() -> Duration {
     match std::env::var("DEPLOYMENT_ID_SYNC_INTERVAL_MS") {
-        Ok(s) => match s.parse() {
-            Ok(v) => return Duration::from_millis(v),
-            Err(err) => warn!(%err, "DEPLOYMENT_ID_SYNC_INTERVAL_MS is not a valid number"),
-        },
-        Err(err) => warn!(%err, "Fail to get DEPLOYMENT_ID_SYNC_INTERVAL_MS from env"),
+        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(2)),
+        Err(_) => Duration::from_secs(2),
     }
-    Duration::from_secs(2)
 }

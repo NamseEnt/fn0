@@ -169,11 +169,7 @@ async fn resolve_addr(addr: &str, port: u16) -> color_eyre::Result<SocketAddr> {
 
 fn list_host_info_interval_ms() -> Duration {
     match std::env::var("LIST_HOST_INFO_INTERVAL_MS") {
-        Ok(s) => match s.parse() {
-            Ok(v) => return Duration::from_millis(v),
-            Err(err) => warn!(%err, "LIST_HOST_INFO_INTERVAL_MS is not a valid number"),
-        },
-        Err(err) => warn!(%err, "Fail to get LIST_HOST_INFO_INTERVAL_MS from env"),
+        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(10)),
+        Err(_) => Duration::from_secs(10),
     }
-    Duration::from_secs(10)
 }
