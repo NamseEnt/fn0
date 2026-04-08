@@ -262,7 +262,7 @@ fn build_backend_remote(project_dir: &Path, ssh_target: &str) -> Result<()> {
     let status = Command::new("ssh")
         .arg(ssh_target)
         .arg(format!(
-            "cd {}/rs && cargo build --release --target wasm32-wasip2",
+            "cd {}/rs && ~/.cargo/bin/cargo build --release --target wasm32-wasip2",
             remote_path
         ))
         .status()
