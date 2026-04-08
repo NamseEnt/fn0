@@ -179,12 +179,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
         },
       },
     },
-    {
-      name: "dedicated",
-      hostProvider: {
-        dedicated: {},
-      },
-    },
   ],
 });
 

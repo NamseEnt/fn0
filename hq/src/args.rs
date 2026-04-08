@@ -40,7 +40,6 @@ pub struct SiteArgs {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum HostProviderArg {
     OciComputeVm(OciComputeVmHostProviderArgs),
-    Dedicated(DedicatedHostProviderArgs),
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -69,10 +68,6 @@ pub struct OciComputeVmHostProviderArgs {
     pub envs: BTreeMap<String, String>,
     pub ssh_authorized_keys: String,
 }
-
-#[derive(serde::Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct DedicatedHostProviderArgs {}
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
