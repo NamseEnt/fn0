@@ -76,14 +76,12 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
     });
     this.kubeconfig = kubeconfig;
 
-    // TODO: Fix grafana helm chart schema for new k8s-monitoring version
-    // const { release: grafanaRelease, otlpEndpoint } = hqGrafana(this, {
-    //   regionSlug: args.grafanaRegion,
-    //   slug: args.grafanaSlug,
-    //   k8sProvider: k8sProvider,
-    //   suffix,
-    // });
-    const otlpEndpoint = pulumi.output("");
+    const { otlpEndpoint } = hqGrafana(this, {
+      regionSlug: args.grafanaRegion,
+      slug: args.grafanaSlug,
+      k8sProvider: k8sProvider,
+      suffix,
+    });
 
     const { hqImage } = createDockerRegistry(this, {
       compartmentId,

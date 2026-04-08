@@ -1,13 +1,15 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
 use std::path::PathBuf;
+
+use super::build::{BuildOptions, run_build};
 
 #[derive(Deserialize)]
 struct ForteConfig {
     name: Option<String>,
 }
 
-pub async fn run(project_dir: PathBuf) -> Result<()> {
+pub async fn run(project_dir: PathBuf, build_on_remote: Option<&str>) -> Result<()> {
     let config_path = project_dir.join("Forte.toml");
     let content = std::fs::read_to_string(&config_path)
         .map_err(|_| anyhow!("Forte.toml not found. Are you in a Forte project directory?"))?;
@@ -17,6 +19,12 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
     let project_name = config
         .name
         .ok_or_else(|| anyhow!("'name' field missing in Forte.toml"))?;
+
+    run_build(BuildOptions {
+        project_dir: project_dir.clone(),
+        remote_host: build_on_remote.map(String::from),
+    })
+    .await?;
 
     let wasm_path = project_dir.join("dist/backend.wasm");
 

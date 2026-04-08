@@ -452,4 +452,3 @@ async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()
     handle.cache.invalidate("backend").await;
     Ok(())
 }
-

@@ -34,23 +34,16 @@ async fn main() -> Result<()> {
             }
         },
 
-        Commands::Build { project } => {
-            let options = cli::build::BuildOptions {
-                project_dir: project.unwrap_or_else(|| ".".into()),
-            };
-            cli::build::run(options).await?;
-        }
-
-        Commands::Deploy { project } => {
+        Commands::Deploy {
+            project,
+            build_on_remote,
+        } => {
             let project_dir = project.unwrap_or_else(|| ".".into());
-            cli::deploy::run(project_dir).await?;
+            cli::deploy::run(project_dir, build_on_remote.as_deref()).await?;
         }
 
         Commands::Queue { command } => match command {
-            QueueCommands::Flush {
-                project,
-                task_name,
-            } => {
+            QueueCommands::Flush { project, task_name } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
                 cli::queue::flush(&project_dir, task_name.as_deref()).await?;
             }

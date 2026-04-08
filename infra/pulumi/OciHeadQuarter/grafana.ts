@@ -31,7 +31,6 @@ export function hqGrafana(
   const clusterName = pulumi.interpolate`fn0-${suffix}`;
   const namespace = "monitoring";
   const destinationName = "grafana-cloud-metrics";
-  const secretName = pulumi.interpolate`${destinationName}-${releaseName}`;
 
   const release = new k8s.helm.v3.Release(
     `grafana-k8s-monitoring`,
@@ -86,35 +85,38 @@ export function hqGrafana(
             },
           },
         },
+        telemetryServices: {
+          "kube-state-metrics": {
+            deploy: true,
+          },
+        },
         clusterMetrics: {
           enabled: true,
-          opencost: {
-            enabled: true,
-            metricsSource: destinationName,
-            opencost: {
-              exporter: {
-                defaultClusterId: clusterName,
-              },
-              prometheus: {
-                existingSecretName: secretName,
-                external: {
-                  url: stack.prometheusRemoteEndpoint,
-                },
-              },
-            },
-          },
-          kepler: {
-            enabled: true,
-          },
+          collector: "alloy-receiver",
         },
         clusterEvents: {
           enabled: true,
+          collector: "alloy-receiver",
         },
-        podLogs: {
+        podLogsViaLoki: {
           enabled: true,
+          collector: "alloy-logs",
+        },
+        collectors: {
+          "alloy-receiver": {
+            alloy: {},
+          },
+          "alloy-logs": {
+            alloy: {
+              mounts: {
+                varlog: true,
+              },
+            },
+          },
         },
         applicationObservability: {
           enabled: true,
+          collector: "alloy-receiver",
           receivers: {
             otlp: {
               grpc: {
@@ -130,34 +132,6 @@ export function hqGrafana(
               enabled: true,
               port: 9411,
             },
-          },
-        },
-        "alloy-metrics": {
-          enabled: true,
-          alloy: {},
-          remoteConfig: {
-            enabled: false,
-          },
-        },
-        "alloy-singleton": {
-          enabled: true,
-          alloy: {},
-          remoteConfig: {
-            enabled: false,
-          },
-        },
-        "alloy-logs": {
-          enabled: true,
-          alloy: {},
-          remoteConfig: {
-            enabled: false,
-          },
-        },
-        "alloy-receiver": {
-          enabled: true,
-          alloy: {},
-          remoteConfig: {
-            enabled: false,
           },
         },
       },
