@@ -37,5 +37,5 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/fn0-worker-bin ./fn0-worker
-EXPOSE 8080 10000
+EXPOSE 443 10000
 CMD ["/bin/sh", "-c", "ulimit -n 100000 && ./fn0-worker"]

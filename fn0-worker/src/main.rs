@@ -15,6 +15,8 @@ use std::string::FromUtf8Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
+use base64::Engine;
+use tokio_rustls::TlsAcceptor;
 
 #[derive(Debug, Clone)]
 struct WasmCacheError(String);
@@ -34,6 +36,15 @@ struct WasmCache {
 
 type JsCache = S3AdaptCache<String, FromUtf8Error>;
 
+pub fn read_pem_env(name: &str) -> Option<String> {
+    if let Ok(v) = std::env::var(name) {
+        return Some(v);
+    }
+    let b64 = std::env::var(format!("{name}_BASE64")).ok()?;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(&b64).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
 fn main() -> Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     color_eyre::install()?;
@@ -52,7 +63,7 @@ async fn run() -> Result<()> {
         .parse()
         .expect("QUIC_PORT must be a valid port");
     let http_port: u16 = std::env::var("HTTP_PORT")
-        .unwrap_or_else(|_| "8080".to_string())
+        .unwrap_or_else(|_| "443".to_string())
         .parse()
         .expect("HTTP_PORT must be a valid port");
 
@@ -165,30 +176,59 @@ async fn run_http_server(
     fn0: Arc<Fn0<JsCache>>,
     graceful_shutdown: Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<()> {
+    let tls_acceptor = match (read_pem_env("ORIGIN_CERT_PEM"), read_pem_env("ORIGIN_KEY_PEM")) {
+        (Some(cert_pem), Some(key_pem)) => {
+            let certs: Vec<_> = rustls_pemfile::certs(&mut cert_pem.as_bytes())
+                .collect::<std::result::Result<_, _>>()?;
+            let key = rustls_pemfile::private_key(&mut key_pem.as_bytes())?
+                .ok_or_else(|| color_eyre::eyre::eyre!("no private key found in ORIGIN_KEY_PEM"))?;
+            let config = rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)?;
+            Some(TlsAcceptor::from(Arc::new(config)))
+        }
+        _ => {
+            tracing::warn!("ORIGIN_CERT_PEM/ORIGIN_KEY_PEM not set, running plain HTTP");
+            None
+        }
+    };
+
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await?;
-    tracing::info!(%addr, "HTTP server listening");
+    tracing::info!(%addr, tls = tls_acceptor.is_some(), "HTTP(S) server listening");
 
     loop {
         let (socket, _) = listener.accept().await?;
         let fn0 = fn0.clone();
         let graceful_shutdown = graceful_shutdown.clone();
+        let tls_acceptor = tls_acceptor.clone();
 
         tokio::spawn(async move {
-            let io = TokioIo::new(socket);
-            if let Err(err) = http1::Builder::new()
-                .serve_connection(
-                    io,
-                    service_fn(move |req| {
-                        let fn0 = fn0.clone();
-                        let graceful_shutdown = graceful_shutdown.clone();
-                        async move {
-                            handle_request(req, fn0, graceful_shutdown).await
-                        }
-                    }),
-                )
-                .await
-            {
+            let service = service_fn(move |req| {
+                let fn0 = fn0.clone();
+                let graceful_shutdown = graceful_shutdown.clone();
+                async move { handle_request(req, fn0, graceful_shutdown).await }
+            });
+
+            let result = if let Some(acceptor) = tls_acceptor {
+                match acceptor.accept(socket).await {
+                    Ok(tls_stream) => {
+                        http1::Builder::new()
+                            .serve_connection(TokioIo::new(tls_stream), service)
+                            .await
+                    }
+                    Err(err) => {
+                        tracing::error!(%err, "TLS handshake failed");
+                        return;
+                    }
+                }
+            } else {
+                http1::Builder::new()
+                    .serve_connection(TokioIo::new(socket), service)
+                    .await
+            };
+
+            if let Err(err) = result {
                 tracing::error!(%err, "Failed to serve connection");
             }
         });

@@ -1,5 +1,4 @@
 use adapt_cache::s3::S3AdaptCache;
-use base64::Engine;
 use color_eyre::eyre::{Result, eyre};
 use fn0::{CodeKind, Fn0};
 use host_hq_protocol::{HostToHq, HqToHostDatagram, HqToHostReliable};
@@ -12,14 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn read_pem_env(name: &str) -> Option<String> {
-    if let Ok(v) = std::env::var(name) {
-        return Some(v);
-    }
-    let b64 = std::env::var(format!("{name}_BASE64")).ok()?;
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&b64).ok()?;
-    String::from_utf8(bytes).ok()
-}
+use super::read_pem_env;
 
 type JsCache = S3AdaptCache<String, FromUtf8Error>;
 

@@ -202,13 +202,13 @@ export class OciComputeWorker extends pulumi.ComponentResource {
               (source) => ({
                 protocol: "6",
                 source,
-                tcpOptions: { min: 8080, max: 8080 },
+                tcpOptions: { min: 443, max: 443 },
               })
             ),
             ...hqIpv6CidrBlocks.map((source) => ({
               protocol: "6",
               source,
-              tcpOptions: { min: 8080, max: 8080 },
+              tcpOptions: { min: 443, max: 443 },
             })),
             ...hqIpv6CidrBlocks.map((source) => ({
               protocol: "17",

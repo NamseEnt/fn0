@@ -21,6 +21,12 @@ const dns = new fn0.CloudflareDns("cloudflare-dns", {
   domain,
 });
 
+new cloudflare.ZoneSetting("ssl-mode", {
+  zoneId,
+  settingId: "ssl",
+  value: "strict",
+});
+
 const docDb = new fn0.TursoDocDb("doc-db", {
   organizationSlug: config.require("tursoOrganizationSlug"),
   location: config.require("tursoLocation"),
@@ -162,6 +168,8 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             AWS_SECRET_ACCESS_KEY: ociComputeWorker.cwasmBucket.secretAccessKey,
             CA_CERT_PEM: quicCaCert.certPem,
             CA_KEY_PEM: quicCaKey.privateKeyPemPkcs8,
+            ORIGIN_CERT_PEM: dns.certificate,
+            ORIGIN_KEY_PEM: dns.privateKeyPem,
           },
           sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
         },
