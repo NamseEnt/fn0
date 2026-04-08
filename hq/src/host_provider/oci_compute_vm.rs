@@ -103,6 +103,7 @@ impl OciComputeVmHostProvider {
             image_id: "test-image".to_string(),
             worker_image_url: "test-image:latest".to_string(),
             envs: BTreeMap::new(),
+            ssh_authorized_keys: String::new(),
             ssh_private_key_pem: String::new(),
             scaler: Arc::new(OciScaler::new()),
         }

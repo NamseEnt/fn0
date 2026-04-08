@@ -1,4 +1,5 @@
 use super::*;
+use base64::Engine;
 use crate::host_provider::HostProvide;
 use crate::ssh::SshClient;
 use std::collections::BTreeMap;
