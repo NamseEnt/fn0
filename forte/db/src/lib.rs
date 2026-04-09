@@ -1,8 +1,14 @@
+mod trx;
 mod turso;
 
 use anyhow::Result;
 pub use libsql_hrana::proto::Value;
-use turso::{TursoDatabase, TursoTransaction};
+use std::future::Future;
+pub use trx::{
+    ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
+    TrxResult,
+};
+use turso::{StoredDoc, TursoDatabase, TursoTransaction};
 use wstd::http::body::Bytes;
 
 pub fn text_value(s: impl Into<String>) -> Value {
@@ -39,6 +45,7 @@ pub fn turso_with_config(url: String, auth_token: String) -> Database {
     }
 }
 
+#[derive(Clone)]
 pub struct Database {
     inner: DatabaseInner,
 }
@@ -97,6 +104,15 @@ impl Database {
         }
     }
 
+    pub async fn trx<F, Fut, Out, Cancel, E>(&self, f: F) -> TrxResult<Out, Cancel, E>
+    where
+        F: FnOnce(Trx) -> Fut,
+        Fut: Future<Output = Result<TrxControl<Out, Cancel>, E>>,
+        E: From<anyhow::Error>,
+    {
+        trx::run(self.clone(), f).await
+    }
+
     pub async fn execute_raw(
         &self,
         sql: &str,
@@ -113,8 +129,15 @@ impl Database {
             DatabaseInner::Turso(db) => db.execute_ops(ops).await,
         }
     }
+
+    pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
+        match &self.inner {
+            DatabaseInner::Turso(db) => db.get_with_version(pk, sk).await,
+        }
+    }
 }
 
+#[derive(Clone)]
 enum DatabaseInner {
     Turso(TursoDatabase),
 }
@@ -157,13 +180,57 @@ impl<'a> Transaction<'a> {
             TransactionInner::Turso(tx) => tx.rollback().await,
         }
     }
+
+    pub(crate) async fn get_with_version(
+        &mut self,
+        pk: &str,
+        sk: &str,
+    ) -> Result<Option<StoredDoc>> {
+        match &mut self.inner {
+            TransactionInner::Turso(tx) => tx.get_with_version(pk, sk).await,
+        }
+    }
+
+    pub(crate) async fn execute_stmt(
+        &mut self,
+        sql: &str,
+        args: Vec<Value>,
+        want_rows: bool,
+    ) -> Result<libsql_hrana::proto::StmtResult> {
+        match &mut self.inner {
+            TransactionInner::Turso(tx) => tx.execute_stmt(sql, args, want_rows).await,
+        }
+    }
+}
+
+pub async fn trx<F, Fut, Out, Cancel, E>(f: F) -> TrxResult<Out, Cancel, E>
+where
+    F: FnOnce(Trx) -> Fut,
+    Fut: Future<Output = Result<TrxControl<Out, Cancel>, E>>,
+    E: From<anyhow::Error>,
+{
+    turso().trx(f).await
 }
 
 pub enum DbOp {
-    Get { pk: String, sk: String },
-    Query { pk: String, after_sk: Option<String>, limit: Option<usize> },
-    Put { pk: String, sk: String, data: Vec<u8> },
-    Delete { pk: String, sk: String },
+    Get {
+        pk: String,
+        sk: String,
+    },
+    Query {
+        pk: String,
+        after_sk: Option<String>,
+        limit: Option<usize>,
+    },
+    Put {
+        pk: String,
+        sk: String,
+        data: Vec<u8>,
+    },
+    Delete {
+        pk: String,
+        sk: String,
+    },
 }
 
 pub enum DbResult {
@@ -226,11 +293,16 @@ impl_db_request_tuple!(A, B, C, D, E, F, G, H, I, J);
 impl_db_request_tuple!(A, B, C, D, E, F, G, H, I, J, K);
 impl_db_request_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
 
-impl<T: DbRequest> DbRequest for Vec<T> where T::Output: 'static {
+impl<T: DbRequest> DbRequest for Vec<T>
+where
+    T::Output: 'static,
+{
     type Output = Vec<T::Output>;
     fn prepare(self) -> Prepared<Self::Output> {
         let mut all_ops = Vec::new();
-        let mut parsers: Vec<Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<T::Output>>> = Vec::new();
+        let mut parsers: Vec<
+            Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<T::Output>>,
+        > = Vec::new();
         for item in self {
             let p = item.prepare();
             all_ops.extend(p.ops);
@@ -238,9 +310,7 @@ impl<T: DbRequest> DbRequest for Vec<T> where T::Output: 'static {
         }
         Prepared {
             ops: all_ops,
-            parse: Box::new(move |iter| {
-                parsers.into_iter().map(|p| p(iter)).collect()
-            }),
+            parse: Box::new(move |iter| parsers.into_iter().map(|p| p(iter)).collect()),
         }
     }
 }

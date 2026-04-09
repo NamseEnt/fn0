@@ -4,10 +4,22 @@ use libsql_hrana::proto::*;
 use std::{str::FromStr, sync::Arc};
 use wstd::http::{Client, HeaderValue, Request, Uri, body::Bytes};
 
+const CREATE_DOCS_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS docs (pk TEXT, sk TEXT, data BLOB, version INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (pk, sk))";
+const ADD_VERSION_COLUMN_SQL: &str =
+    "ALTER TABLE docs ADD COLUMN version INTEGER NOT NULL DEFAULT 0";
+const UPSERT_DOC_SQL: &str = "INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0) ON CONFLICT(pk, sk) DO UPDATE SET data = excluded.data, version = docs.version + 1";
+
+#[derive(Clone)]
 pub(crate) struct TursoDatabase {
     http_url: Uri,
     client: Client,
     auth_token: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct StoredDoc {
+    pub(crate) data: Bytes,
+    pub(crate) version: i64,
 }
 
 impl TursoDatabase {
@@ -70,10 +82,17 @@ impl TursoDatabase {
             .execute_pipeline(vec![
                 StreamRequest::Execute(ExecuteStreamReq {
                     stmt: Stmt {
-                        sql: Some(
-                            "CREATE TABLE IF NOT EXISTS docs (pk TEXT, sk TEXT, data BLOB, PRIMARY KEY (pk, sk))"
-                                .to_string(),
-                        ),
+                        sql: Some(CREATE_DOCS_TABLE_SQL.to_string()),
+                        sql_id: None,
+                        args: vec![],
+                        named_args: vec![],
+                        want_rows: Some(false),
+                        replication_index: None,
+                    },
+                }),
+                StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: Stmt {
+                        sql: Some(ADD_VERSION_COLUMN_SQL.to_string()),
                         sql_id: None,
                         args: vec![],
                         named_args: vec![],
@@ -85,8 +104,11 @@ impl TursoDatabase {
             ])
             .await?;
 
-        for result in response.results {
+        for (idx, result) in response.results.into_iter().enumerate() {
             if let StreamResult::Error { error } = result {
+                if idx == 1 && Self::is_duplicate_column_error(&error.message) {
+                    continue;
+                }
                 bail!("Create table error: {}", error.message);
             }
         }
@@ -96,6 +118,20 @@ impl TursoDatabase {
 
     fn is_table_not_found_error(error_message: &str) -> bool {
         error_message.contains("no such table")
+    }
+
+    fn is_duplicate_column_error(error_message: &str) -> bool {
+        error_message.contains("duplicate column name")
+    }
+
+    fn is_missing_version_column_error(error_message: &str) -> bool {
+        error_message.contains("no such column: version")
+            || error_message.contains("has no column named version")
+    }
+
+    fn is_schema_error(error_message: &str) -> bool {
+        Self::is_table_not_found_error(error_message)
+            || Self::is_missing_version_column_error(error_message)
     }
 
     pub(crate) async fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
@@ -161,16 +197,83 @@ impl TursoDatabase {
         Ok(None)
     }
 
-    pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
+    pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
         for retry in 0..2 {
             let response = self
                 .execute_pipeline(vec![
                     StreamRequest::Execute(ExecuteStreamReq {
                         stmt: Stmt {
                             sql: Some(
-                                "INSERT OR REPLACE INTO docs (pk, sk, data) VALUES (?, ?, ?)"
+                                "SELECT data, version FROM docs WHERE pk = ? AND sk = ?"
                                     .to_string(),
                             ),
+                            sql_id: None,
+                            args: vec![
+                                Value::Text {
+                                    value: pk.to_string().into(),
+                                },
+                                Value::Text {
+                                    value: sk.to_string().into(),
+                                },
+                            ],
+                            named_args: vec![],
+                            want_rows: Some(true),
+                            replication_index: None,
+                        },
+                    }),
+                    StreamRequest::Close(CloseStreamReq {}),
+                ])
+                .await?;
+
+            let mut should_retry = false;
+            for result in response.results {
+                match result {
+                    StreamResult::Ok { response } => match response {
+                        StreamResponse::Execute(exec_resp) => {
+                            if let Some(row) = exec_resp.result.rows.first() {
+                                if let (
+                                    Some(Value::Blob { value: data }),
+                                    Some(Value::Integer { value: version }),
+                                ) = (row.values.first(), row.values.get(1))
+                                {
+                                    return Ok(Some(StoredDoc {
+                                        data: data.clone(),
+                                        version: *version,
+                                    }));
+                                }
+                            }
+                            return Ok(None);
+                        }
+                        StreamResponse::Close(_) => continue,
+                        _ => {}
+                    },
+                    StreamResult::Error { error } => {
+                        if retry == 0 && Self::is_schema_error(&error.message) {
+                            self.create_table().await?;
+                            should_retry = true;
+                            break;
+                        }
+                        bail!("Turso error: {}", error.message);
+                    }
+                    StreamResult::None => {}
+                }
+            }
+
+            if !should_retry {
+                return Ok(None);
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
+        for retry in 0..2 {
+            let response = self
+                .execute_pipeline(vec![
+                    StreamRequest::Execute(ExecuteStreamReq {
+                        stmt: Stmt {
+                            sql: Some(UPSERT_DOC_SQL.to_string()),
                             sql_id: None,
                             args: vec![
                                 Value::Text {
@@ -195,7 +298,7 @@ impl TursoDatabase {
             let mut should_retry = false;
             for result in response.results {
                 if let StreamResult::Error { error } = result {
-                    if retry == 0 && Self::is_table_not_found_error(&error.message) {
+                    if retry == 0 && Self::is_schema_error(&error.message) {
                         self.create_table().await?;
                         should_retry = true;
                         break;
@@ -443,9 +546,7 @@ impl TursoDatabase {
             .iter()
             .map(|op| match op {
                 BatchOp::Put { pk, sk, data } => Stmt {
-                    sql: Some(
-                        "INSERT OR REPLACE INTO docs (pk, sk, data) VALUES (?, ?, ?)".to_string(),
-                    ),
+                    sql: Some(UPSERT_DOC_SQL.to_string()),
                     sql_id: None,
                     args: vec![
                         Value::Text {
@@ -507,7 +608,7 @@ impl TursoDatabase {
                         _ => {}
                     },
                     StreamResult::Error { error } => {
-                        if retry == 0 && Self::is_table_not_found_error(&error.message) {
+                        if retry == 0 && Self::is_schema_error(&error.message) {
                             self.create_table().await?;
                             should_retry = true;
                             break;
@@ -575,9 +676,7 @@ impl TursoDatabase {
                                 sql_parts.push("ORDER BY sk".to_string());
                                 if let Some(lim) = limit {
                                     sql_parts.push("LIMIT ?".to_string());
-                                    args.push(Value::Integer {
-                                        value: *lim as i64,
-                                    });
+                                    args.push(Value::Integer { value: *lim as i64 });
                                 }
                                 Stmt {
                                     sql: Some(sql_parts.join(" ")),
@@ -589,10 +688,7 @@ impl TursoDatabase {
                                 }
                             }
                             DbOp::Put { pk, sk, data } => Stmt {
-                                sql: Some(
-                                    "INSERT OR REPLACE INTO docs (pk, sk, data) VALUES (?, ?, ?)"
-                                        .to_string(),
-                                ),
+                                sql: Some(UPSERT_DOC_SQL.to_string()),
                                 sql_id: None,
                                 args: vec![
                                     Value::Text {
@@ -610,9 +706,7 @@ impl TursoDatabase {
                                 replication_index: None,
                             },
                             DbOp::Delete { pk, sk } => Stmt {
-                                sql: Some(
-                                    "DELETE FROM docs WHERE pk = ? AND sk = ?".to_string(),
-                                ),
+                                sql: Some("DELETE FROM docs WHERE pk = ? AND sk = ?".to_string()),
                                 sql_id: None,
                                 args: vec![
                                     Value::Text {
@@ -687,7 +781,7 @@ impl TursoDatabase {
                         _ => {}
                     },
                     StreamResult::Error { error } => {
-                        if retry == 0 && Self::is_table_not_found_error(&error.message) {
+                        if retry == 0 && Self::is_schema_error(&error.message) {
                             self.create_table().await?;
                             should_retry = true;
                             break;
@@ -803,34 +897,7 @@ impl TursoDatabase {
     }
 
     async fn ensure_table(&self) -> Result<()> {
-        // Try a simple query to check if table exists
-        let response = self
-            .execute_pipeline(vec![
-                StreamRequest::Execute(ExecuteStreamReq {
-                    stmt: Stmt {
-                        sql: Some("SELECT 1 FROM docs LIMIT 1".to_string()),
-                        sql_id: None,
-                        args: vec![],
-                        named_args: vec![],
-                        want_rows: Some(false),
-                        replication_index: None,
-                    },
-                }),
-                StreamRequest::Close(CloseStreamReq {}),
-            ])
-            .await?;
-
-        for result in response.results {
-            if let StreamResult::Error { error } = result {
-                if Self::is_table_not_found_error(&error.message) {
-                    self.create_table().await?;
-                    return Ok(());
-                }
-                bail!("Table check error: {}", error.message);
-            }
-        }
-
-        Ok(())
+        self.create_table().await
     }
 }
 
@@ -857,22 +924,20 @@ impl<'a> TursoTransaction<'a> {
         Ok(response)
     }
 
-    pub(crate) async fn get(&mut self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
+    pub(crate) async fn execute_stmt(
+        &mut self,
+        sql: &str,
+        args: Vec<Value>,
+        want_rows: bool,
+    ) -> Result<StmtResult> {
         let response = self
             .execute_in_tx(vec![StreamRequest::Execute(ExecuteStreamReq {
                 stmt: Stmt {
-                    sql: Some("SELECT data FROM docs WHERE pk = ? AND sk = ?".to_string()),
+                    sql: Some(sql.to_string()),
                     sql_id: None,
-                    args: vec![
-                        Value::Text {
-                            value: pk.to_string().into(),
-                        },
-                        Value::Text {
-                            value: sk.to_string().into(),
-                        },
-                    ],
+                    args,
                     named_args: vec![],
-                    want_rows: Some(true),
+                    want_rows: Some(want_rows),
                     replication_index: None,
                 },
             })])
@@ -882,21 +947,71 @@ impl<'a> TursoTransaction<'a> {
             match result {
                 StreamResult::Ok { response } => {
                     if let StreamResponse::Execute(exec_resp) = response {
-                        if let Some(Value::Blob { value }) = exec_resp
-                            .result
-                            .rows
-                            .first()
-                            .and_then(|row| row.values.first())
-                        {
-                            return Ok(Some(value.clone()));
-                        }
-                        return Ok(None);
+                        return Ok(exec_resp.result);
                     }
                 }
                 StreamResult::Error { error } => {
-                    bail!("Transaction get error: {}", error.message);
+                    bail!("Transaction execute error: {}", error.message);
                 }
                 StreamResult::None => {}
+            }
+        }
+
+        bail!("Missing transaction execute result")
+    }
+
+    pub(crate) async fn get(&mut self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
+        let result = self
+            .execute_stmt(
+                "SELECT data FROM docs WHERE pk = ? AND sk = ?",
+                vec![
+                    Value::Text {
+                        value: pk.to_string().into(),
+                    },
+                    Value::Text {
+                        value: sk.to_string().into(),
+                    },
+                ],
+                true,
+            )
+            .await?;
+
+        if let Some(Value::Blob { value }) = result.rows.first().and_then(|row| row.values.first())
+        {
+            return Ok(Some(value.clone()));
+        }
+
+        Ok(None)
+    }
+
+    pub(crate) async fn get_with_version(
+        &mut self,
+        pk: &str,
+        sk: &str,
+    ) -> Result<Option<StoredDoc>> {
+        let result = self
+            .execute_stmt(
+                "SELECT data, version FROM docs WHERE pk = ? AND sk = ?",
+                vec![
+                    Value::Text {
+                        value: pk.to_string().into(),
+                    },
+                    Value::Text {
+                        value: sk.to_string().into(),
+                    },
+                ],
+                true,
+            )
+            .await?;
+
+        if let Some(row) = result.rows.first() {
+            if let (Some(Value::Blob { value: data }), Some(Value::Integer { value: version })) =
+                (row.values.first(), row.values.get(1))
+            {
+                return Ok(Some(StoredDoc {
+                    data: data.clone(),
+                    version: *version,
+                }));
             }
         }
 
@@ -904,36 +1019,22 @@ impl<'a> TursoTransaction<'a> {
     }
 
     pub(crate) async fn put(&mut self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
-        let response = self
-            .execute_in_tx(vec![StreamRequest::Execute(ExecuteStreamReq {
-                stmt: Stmt {
-                    sql: Some(
-                        "INSERT OR REPLACE INTO docs (pk, sk, data) VALUES (?, ?, ?)".to_string(),
-                    ),
-                    sql_id: None,
-                    args: vec![
-                        Value::Text {
-                            value: pk.to_string().into(),
-                        },
-                        Value::Text {
-                            value: sk.to_string().into(),
-                        },
-                        Value::Blob {
-                            value: data.to_vec().into(),
-                        },
-                    ],
-                    named_args: vec![],
-                    want_rows: Some(false),
-                    replication_index: None,
+        self.execute_stmt(
+            UPSERT_DOC_SQL,
+            vec![
+                Value::Text {
+                    value: pk.to_string().into(),
                 },
-            })])
-            .await?;
-
-        for result in response.results {
-            if let StreamResult::Error { error } = result {
-                bail!("Transaction put error: {}", error.message);
-            }
-        }
+                Value::Text {
+                    value: sk.to_string().into(),
+                },
+                Value::Blob {
+                    value: data.to_vec().into(),
+                },
+            ],
+            false,
+        )
+        .await?;
 
         Ok(())
     }

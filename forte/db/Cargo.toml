@@ -1,6 +1,6 @@
 [package]
 name = "forte-db"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 description = "Database layer for the Forte web framework (Turso/libSQL)"
 license = "AGPL-3.0-only"
@@ -8,6 +8,7 @@ repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
 anyhow = "1.0.100"
+serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
 wstd = "0.6.3"
 libsql-hrana = "0.9.29"

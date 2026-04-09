@@ -1,6 +1,6 @@
 [package]
 name = "forte-macros"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 description = "Procedural macros for the Forte web framework"
 license = "AGPL-3.0-only"
