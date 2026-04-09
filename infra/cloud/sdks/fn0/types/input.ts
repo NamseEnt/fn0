@@ -11,15 +11,11 @@ export interface CloudflareDnsProviderArgsArgs {
     zoneId: pulumi.Input<string>;
 }
 
-export interface DedicatedHostProviderArgsArgs {
-}
-
 export interface DnsProviderArgArgs {
     cloudflare?: pulumi.Input<inputs.CloudflareDnsProviderArgsArgs>;
 }
 
 export interface HostProviderArgArgs {
-    dedicated?: pulumi.Input<inputs.DedicatedHostProviderArgsArgs>;
     ociComputeVm?: pulumi.Input<inputs.OciComputeVmHostProviderArgsArgs>;
 }
 
@@ -35,11 +31,12 @@ export interface OciComputeVmHostProviderArgsArgs {
     privateKeyBase64: pulumi.Input<string>;
     region: pulumi.Input<string>;
     shape: pulumi.Input<string>;
+    sshAuthorizedKeys: pulumi.Input<string>;
+    sshPrivateKeyBase64: pulumi.Input<string>;
     subnetId: pulumi.Input<string>;
     tenancyId: pulumi.Input<string>;
     userId: pulumi.Input<string>;
     workerImageUrl: pulumi.Input<string>;
-    sshAuthorizedKeys: pulumi.Input<string>;
 }
 
 export interface S3CompatibleBucketArgs {

@@ -27,8 +27,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     declare public /*out*/ readonly instanceConfigurationId: pulumi.Output<string>;
     declare public /*out*/ readonly ipv6CidrBlocks: pulumi.Output<string[]>;
     declare public /*out*/ readonly osImageId: pulumi.Output<string>;
-    declare public /*out*/ readonly sshPublicKey: pulumi.Output<string>;
     declare public /*out*/ readonly sshPrivateKey: pulumi.Output<string>;
+    declare public /*out*/ readonly sshPublicKey: pulumi.Output<string>;
     declare public /*out*/ readonly subnetId: pulumi.Output<string>;
     declare public /*out*/ readonly workerImageMultiArch: pulumi.Output<string>;
     declare public /*out*/ readonly workerImageUrl: pulumi.Output<string>;
@@ -58,8 +58,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
             resourceInputs["instanceConfigurationId"] = undefined /*out*/;
             resourceInputs["ipv6CidrBlocks"] = undefined /*out*/;
             resourceInputs["osImageId"] = undefined /*out*/;
-            resourceInputs["sshPublicKey"] = undefined /*out*/;
             resourceInputs["sshPrivateKey"] = undefined /*out*/;
+            resourceInputs["sshPublicKey"] = undefined /*out*/;
             resourceInputs["subnetId"] = undefined /*out*/;
             resourceInputs["workerImageMultiArch"] = undefined /*out*/;
             resourceInputs["workerImageUrl"] = undefined /*out*/;
@@ -70,8 +70,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
             resourceInputs["instanceConfigurationId"] = undefined /*out*/;
             resourceInputs["ipv6CidrBlocks"] = undefined /*out*/;
             resourceInputs["osImageId"] = undefined /*out*/;
-            resourceInputs["sshPublicKey"] = undefined /*out*/;
             resourceInputs["sshPrivateKey"] = undefined /*out*/;
+            resourceInputs["sshPublicKey"] = undefined /*out*/;
             resourceInputs["subnetId"] = undefined /*out*/;
             resourceInputs["workerImageMultiArch"] = undefined /*out*/;
             resourceInputs["workerImageUrl"] = undefined /*out*/;
