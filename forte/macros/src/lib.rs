@@ -31,7 +31,7 @@
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Fields, ItemStruct};
+use syn::{Fields, ItemStruct, parse_macro_input};
 
 fn format_placeholder(ty: &syn::Type) -> String {
     if let syn::Type::Path(type_path) = ty {
@@ -55,7 +55,9 @@ fn wrap_expr(ty: &syn::Type, expr: proc_macro2::TokenStream) -> proc_macro2::Tok
                 "i8" => return quote! { (#expr as u8).wrapping_add(128u8) },
                 "i16" => return quote! { (#expr as u16).wrapping_add(32768u16) },
                 "i32" => return quote! { (#expr as u32).wrapping_add(2147483648u32) },
-                "i64" | "isize" => return quote! { (#expr as u64).wrapping_add(9223372036854775808u64) },
+                "i64" | "isize" => {
+                    return quote! { (#expr as u64).wrapping_add(9223372036854775808u64) };
+                }
                 _ => {}
             }
         }
@@ -75,7 +77,10 @@ fn is_string_type(ty: &syn::Type) -> bool {
 fn make_generics(
     pk_is_string: &[bool],
     sk_is_string: &[bool],
-) -> (Vec<Option<proc_macro2::Ident>>, Vec<Option<proc_macro2::Ident>>) {
+) -> (
+    Vec<Option<proc_macro2::Ident>>,
+    Vec<Option<proc_macro2::Ident>>,
+) {
     let mut counter = 0usize;
     let pk = pk_is_string
         .iter()
@@ -345,6 +350,36 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { format!(#pk_format_string, #(#pk_format_args),*) }
     };
 
+    let doc_pk_str = if pk_fields.is_empty() {
+        let name_str = name.to_string();
+        quote! { #name_str.to_string() }
+    } else {
+        let name_str = name.to_string();
+        let pk_format_parts: Vec<_> = pk_field_names
+            .iter()
+            .zip(pk_field_types.iter())
+            .map(|(n, ty)| {
+                let name_str = n.as_ref().unwrap().to_string();
+                format!("{}={}", name_str, format_placeholder(ty))
+            })
+            .collect();
+        let pk_format_string = format!("{}/{}", name_str, pk_format_parts.join("&"));
+        let pk_format_args: Vec<_> = pk_field_names
+            .iter()
+            .zip(pk_field_types.iter())
+            .zip(pk_is_string.iter())
+            .map(|((n, ty), &is_str)| {
+                let field_name = n.as_ref().unwrap();
+                if is_str {
+                    quote! { self.#field_name.as_str() }
+                } else {
+                    wrap_expr(ty, quote! { self.#field_name })
+                }
+            })
+            .collect();
+        quote! { format!(#pk_format_string, #(#pk_format_args),*) }
+    };
+
     let put_sk_format_args: Vec<_> = sk_field_names
         .iter()
         .zip(sk_field_types.iter())
@@ -354,11 +389,26 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         })
         .collect();
 
+    let doc_sk_format_args: Vec<_> = sk_field_names
+        .iter()
+        .zip(sk_field_types.iter())
+        .zip(sk_is_string.iter())
+        .map(|((n, ty), &is_str)| {
+            let field_name = n.as_ref().unwrap();
+            if is_str {
+                quote! { self.#field_name.as_str() }
+            } else {
+                wrap_expr(ty, quote! { self.#field_name })
+            }
+        })
+        .collect();
+
     let clean_fields: Vec<_> = fields
         .iter()
         .map(|f| {
             let mut f = f.clone();
-            f.attrs.retain(|a| !a.path().is_ident("pk") && !a.path().is_ident("sk"));
+            f.attrs
+                .retain(|a| !a.path().is_ident("pk") && !a.path().is_ident("sk"));
             f
         })
         .collect();
@@ -367,6 +417,14 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[derive(serde::Serialize, serde::Deserialize, Clone)]
         #vis struct #name {
             #(#clean_fields,)*
+        }
+
+        impl forte_db::Document for #name {
+            fn key(&self) -> forte_db::DocKey {
+                let pk = #doc_pk_str;
+                let sk = format!(#sk_format_string, #(#doc_sk_format_args),*);
+                forte_db::DocKey::new(pk, sk)
+            }
         }
 
         #vis struct #put_name(pub #name);
@@ -392,6 +450,16 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #vis struct #get_name #generic_def {
             #(#get_pk_fields,)*
             #(#get_sk_fields,)*
+        }
+
+        impl #generic_def forte_db::DocGet for #get_name #generic_use {
+            type Doc = #name;
+
+            fn key(&self) -> forte_db::DocKey {
+                let pk = #pk_str;
+                let sk = format!(#sk_format_string, #(#sk_format_args),*);
+                forte_db::DocKey::new(pk, sk)
+            }
         }
 
         impl #generic_def forte_db::DbRequest for #get_name #generic_use {

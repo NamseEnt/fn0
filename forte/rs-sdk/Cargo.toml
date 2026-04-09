@@ -1,6 +1,6 @@
 [package]
 name = "forte-sdk"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 description = "Core SDK for the Forte web framework"
 license = "AGPL-3.0-only"
@@ -13,7 +13,7 @@ serde_json = "1"
 http = "1"
 wstd = "0.6"
 forte-json = { version = "0.1.0", path = "../forte-json" }
-forte-db = { version = "0.2.1", path = "../db" }
+forte-db = { version = "0.2.2", path = "../db" }
 cookie = { version = "0.18", features = ["percent-encode"] }
 syn = { version = "2.0", features = ["full"] }
 quote = "1"
@@ -27,4 +27,4 @@ futures = "0.3.31"
 time = "0.3.44"
 uuid = { version = "1.19.0", features = ["v7"] }
 form_urlencoded = "1.2.2"
-forte-macros = { version = "0.4.1", path = "../macros" }
+forte-macros = { version = "0.4.2", path = "../macros" }
