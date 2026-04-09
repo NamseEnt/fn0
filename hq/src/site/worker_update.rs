@@ -10,7 +10,7 @@ use tracing::*;
 const SSH_USER: &str = "opc";
 
 struct WorkerState {
-    image: String,
+    image_digest: String,
     envs: BTreeMap<String, String>,
 }
 
@@ -46,20 +46,25 @@ impl Site {
                 let ssh_key = ssh_key.clone();
                 let host_id = host.id.to_string();
 
-                tokio::spawn(async move {
-                    if let Err(err) =
-                        update_worker_if_needed(&ssh_addr, &ssh_key, &desired_image, &desired_envs)
-                            .await
-                    {
-                        warn!(host_id, %err, "Failed to update worker");
-                    }
-                });
+                let result = update_worker_if_needed(
+                    &host_id,
+                    &ssh_addr,
+                    &ssh_key,
+                    &desired_image,
+                    &desired_envs,
+                )
+                .await;
+
+                if let Err(err) = result {
+                    warn!(host_id, %err, "Failed to update worker");
+                }
             }
         }
     }
 }
 
 async fn update_worker_if_needed(
+    host_id: &str,
     ssh_addr: &str,
     ssh_key: &str,
     desired_image: &str,
@@ -67,17 +72,18 @@ async fn update_worker_if_needed(
 ) -> color_eyre::Result<()> {
     let ssh = SshClient::connect(ssh_addr, SSH_USER, ssh_key).await?;
 
-    let current = match get_worker_state(&ssh).await {
+    let current = match get_worker_state(&ssh, desired_envs).await {
         Ok(state) => state,
         Err(err) => {
-            info!(%err, "Worker container not found or not inspectable, will deploy");
+            info!(host_id, %err, "Worker container not found or not inspectable, will deploy");
             deploy_worker(&ssh, desired_image, desired_envs).await?;
             let _ = ssh.close().await;
             return Ok(());
         }
     };
 
-    let image_changed = current.image != *desired_image;
+    let desired_digest = get_remote_image_digest(&ssh, desired_image).await?;
+    let image_changed = current.image_digest != desired_digest;
     let envs_changed = current.envs != *desired_envs;
 
     if !image_changed && !envs_changed {
@@ -87,13 +93,14 @@ async fn update_worker_if_needed(
 
     if image_changed {
         info!(
-            current = current.image,
-            desired = desired_image,
+            host_id,
+            current_digest = current.image_digest,
+            desired_digest,
             "Worker image mismatch, updating"
         );
     }
     if envs_changed {
-        info!("Worker envs mismatch, updating");
+        info!(host_id, "Worker envs mismatch, updating");
     }
 
     deploy_worker(&ssh, desired_image, desired_envs).await?;
@@ -101,9 +108,54 @@ async fn update_worker_if_needed(
     Ok(())
 }
 
-async fn get_worker_state(ssh: &SshClient) -> color_eyre::Result<WorkerState> {
+async fn get_remote_image_digest(
+    ssh: &SshClient,
+    image: &str,
+) -> color_eyre::Result<String> {
     let (status, output) = ssh
-        .exec("podman inspect fn0-worker --format '{{.ImageName}}'")
+        .exec(&format!(
+            "podman image inspect {image} --format '{{{{.Digest}}}}' 2>/dev/null || echo ''"
+        ))
+        .await?;
+
+    let digest = output.trim().to_string();
+
+    if status != 0 || digest.is_empty() {
+        let (pull_status, pull_output) = ssh
+            .exec(&format!("podman pull {image}"))
+            .await?;
+        if pull_status != 0 {
+            return Err(color_eyre::eyre::eyre!(
+                "podman pull failed (exit {}): {}",
+                pull_status,
+                pull_output
+            ));
+        }
+
+        let (status, output) = ssh
+            .exec(&format!(
+                "podman image inspect {image} --format '{{{{.Digest}}}}'"
+            ))
+            .await?;
+        if status != 0 {
+            return Err(color_eyre::eyre::eyre!(
+                "podman image inspect failed (exit {}): {}",
+                status,
+                output
+            ));
+        }
+        return Ok(output.trim().to_string());
+    }
+
+    Ok(digest)
+}
+
+async fn get_worker_state(
+    ssh: &SshClient,
+    desired_envs: &BTreeMap<String, String>,
+) -> color_eyre::Result<WorkerState> {
+    let (status, output) = ssh
+        .exec("podman inspect fn0-worker --format '{{.Image}}'")
         .await?;
     if status != 0 {
         return Err(color_eyre::eyre::eyre!(
@@ -112,7 +164,7 @@ async fn get_worker_state(ssh: &SshClient) -> color_eyre::Result<WorkerState> {
             output
         ));
     }
-    let image = output.trim().to_string();
+    let image_digest = output.trim().to_string();
 
     let (status, output) = ssh
         .exec("podman inspect fn0-worker --format '{{json .Config.Env}}'")
@@ -124,9 +176,31 @@ async fn get_worker_state(ssh: &SshClient) -> color_eyre::Result<WorkerState> {
             output
         ));
     }
-    let envs = parse_container_envs(output.trim());
+    let container_envs = parse_container_envs(output.trim());
 
-    Ok(WorkerState { image, envs })
+    let envs = filter_envs_by_desired_keys(&container_envs, desired_envs);
+
+    Ok(WorkerState { image_digest, envs })
+}
+
+fn filter_envs_by_desired_keys(
+    container_envs: &BTreeMap<String, String>,
+    desired_envs: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    let mut result = BTreeMap::new();
+    for key in desired_envs.keys() {
+        if let Some(value) = container_envs.get(key) {
+            result.insert(key.clone(), value.clone());
+        } else if let Some(value) = container_envs.get(&format!("{key}_BASE64")) {
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(value.as_bytes())
+                .ok()
+                .and_then(|b| String::from_utf8(b).ok())
+                .unwrap_or_default();
+            result.insert(key.clone(), decoded);
+        }
+    }
+    result
 }
 
 fn parse_container_envs(json_str: &str) -> BTreeMap<String, String> {
