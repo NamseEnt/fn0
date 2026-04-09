@@ -1,6 +1,8 @@
 use color_eyre::eyre::{Result, eyre};
 use russh::*;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::timeout;
 
 struct ClientHandler;
 
@@ -25,14 +27,17 @@ impl SshClient {
             .map_err(|e| eyre!("Failed to decode SSH private key: {e}"))?;
 
         let config = client::Config::default();
-        let mut session =
-            client::connect(Arc::new(config), (addr, 22), ClientHandler)
-                .await
-                .map_err(|e| eyre!("SSH connect to {addr} failed: {e}"))?;
+        let mut session = timeout(
+            Duration::from_secs(10),
+            client::connect(Arc::new(config), (addr, 22), ClientHandler),
+        )
+        .await
+        .map_err(|_| eyre!("SSH connect to {addr} timed out"))?
+        .map_err(|e| eyre!("SSH connect to {addr} failed: {e}"))?;
 
         let key_with_hash = keys::PrivateKeyWithHashAlg::new(
             Arc::new(key_pair),
-            None,
+            Some(keys::HashAlg::Sha512),
         );
 
         let auth_result = session
@@ -62,6 +67,8 @@ impl SshClient {
 
         let mut output = String::new();
         let mut exit_status = 0i32;
+        let mut eof_received = false;
+        let mut exit_received = false;
 
         loop {
             match channel.wait().await {
@@ -75,8 +82,18 @@ impl SshClient {
                 }
                 Some(ChannelMsg::ExitStatus { exit_status: code }) => {
                     exit_status = code as i32;
+                    exit_received = true;
+                    if eof_received {
+                        break;
+                    }
                 }
-                Some(ChannelMsg::Eof) | None => break,
+                Some(ChannelMsg::Eof) => {
+                    eof_received = true;
+                    if exit_received {
+                        break;
+                    }
+                }
+                None => break,
                 _ => {}
             }
         }

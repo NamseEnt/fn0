@@ -140,8 +140,8 @@ impl OciComputeVmHostProvider {
             r#"#!/bin/bash
 systemctl disable --now firewalld 2>/dev/null || true
 podman pull {image}
-podman create --name fn0-worker --network=host {env_flags} {image}
-podman generate systemd --new --name fn0-worker > /etc/systemd/system/fn0-worker.service
+podman create --replace --name fn0-worker --network=host {env_flags} {image}
+podman generate systemd --name fn0-worker > /etc/systemd/system/fn0-worker.service
 systemctl daemon-reload
 systemctl enable --now fn0-worker
 "#,

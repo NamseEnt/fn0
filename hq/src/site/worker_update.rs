@@ -10,7 +10,7 @@ use tracing::*;
 const SSH_USER: &str = "opc";
 
 struct WorkerState {
-    image_digest: String,
+    image_id: String,
     envs: BTreeMap<String, String>,
 }
 
@@ -30,6 +30,8 @@ impl Site {
                     continue;
                 }
             };
+
+            info!(host_count = hosts.len(), "Worker update tick");
 
             let desired_image = self.host_provider.worker_image_url().to_string();
             let desired_envs = self.host_provider.envs().clone();
@@ -82,8 +84,8 @@ async fn update_worker_if_needed(
         }
     };
 
-    let desired_digest = get_remote_image_digest(&ssh, desired_image).await?;
-    let image_changed = current.image_digest != desired_digest;
+    let desired_id = get_remote_image_id(&ssh, desired_image).await?;
+    let image_changed = current.image_id != desired_id;
     let envs_changed = current.envs != *desired_envs;
 
     if !image_changed && !envs_changed {
@@ -94,8 +96,8 @@ async fn update_worker_if_needed(
     if image_changed {
         info!(
             host_id,
-            current_digest = current.image_digest,
-            desired_digest,
+            current_id = current.image_id,
+            desired_id,
             "Worker image mismatch, updating"
         );
     }
@@ -108,21 +110,21 @@ async fn update_worker_if_needed(
     Ok(())
 }
 
-async fn get_remote_image_digest(
+async fn get_remote_image_id(
     ssh: &SshClient,
     image: &str,
 ) -> color_eyre::Result<String> {
     let (status, output) = ssh
         .exec(&format!(
-            "podman image inspect {image} --format '{{{{.Digest}}}}' 2>/dev/null || echo ''"
+            "sudo podman image inspect {image} --format '{{{{.Id}}}}' 2>/dev/null || echo ''"
         ))
         .await?;
 
-    let digest = output.trim().to_string();
+    let id = output.trim().to_string();
 
-    if status != 0 || digest.is_empty() {
+    if status != 0 || id.is_empty() {
         let (pull_status, pull_output) = ssh
-            .exec(&format!("podman pull {image}"))
+            .exec(&format!("sudo podman pull {image}"))
             .await?;
         if pull_status != 0 {
             return Err(color_eyre::eyre::eyre!(
@@ -134,7 +136,7 @@ async fn get_remote_image_digest(
 
         let (status, output) = ssh
             .exec(&format!(
-                "podman image inspect {image} --format '{{{{.Digest}}}}'"
+                "sudo podman image inspect {image} --format '{{{{.Id}}}}'"
             ))
             .await?;
         if status != 0 {
@@ -144,10 +146,10 @@ async fn get_remote_image_digest(
                 output
             ));
         }
-        return Ok(output.trim().to_string());
+        return Ok(normalize_image_id(output.trim()));
     }
 
-    Ok(digest)
+    Ok(normalize_image_id(&id))
 }
 
 async fn get_worker_state(
@@ -155,7 +157,7 @@ async fn get_worker_state(
     desired_envs: &BTreeMap<String, String>,
 ) -> color_eyre::Result<WorkerState> {
     let (status, output) = ssh
-        .exec("podman inspect fn0-worker --format '{{.Image}}'")
+        .exec("sudo podman inspect fn0-worker --format '{{.Image}}'")
         .await?;
     if status != 0 {
         return Err(color_eyre::eyre::eyre!(
@@ -164,10 +166,10 @@ async fn get_worker_state(
             output
         ));
     }
-    let image_digest = output.trim().to_string();
+    let image_id = normalize_image_id(output.trim());
 
     let (status, output) = ssh
-        .exec("podman inspect fn0-worker --format '{{json .Config.Env}}'")
+        .exec("sudo podman inspect fn0-worker --format '{{json .Config.Env}}'")
         .await?;
     if status != 0 {
         return Err(color_eyre::eyre::eyre!(
@@ -180,7 +182,7 @@ async fn get_worker_state(
 
     let envs = filter_envs_by_desired_keys(&container_envs, desired_envs);
 
-    Ok(WorkerState { image_digest, envs })
+    Ok(WorkerState { image_id, envs })
 }
 
 fn filter_envs_by_desired_keys(
@@ -214,6 +216,10 @@ fn parse_container_envs(json_str: &str) -> BTreeMap<String, String> {
     envs
 }
 
+fn normalize_image_id(id: &str) -> String {
+    id.strip_prefix("sha256:").unwrap_or(id).to_string()
+}
+
 fn build_env_flags(envs: &BTreeMap<String, String>) -> String {
     envs.iter()
         .map(|(k, v)| {
@@ -239,10 +245,12 @@ async fn deploy_worker(
     let script = format!(
         r#"set -e
 systemctl stop fn0-worker 2>/dev/null || true
+systemctl disable fn0-worker 2>/dev/null || true
+podman stop fn0-worker 2>/dev/null || true
 podman rm -f fn0-worker 2>/dev/null || true
 podman pull {image}
-podman create --name fn0-worker --network=host {env_flags} {image}
-podman generate systemd --new --name fn0-worker > /etc/systemd/system/fn0-worker.service
+podman create --replace --name fn0-worker --network=host {env_flags} {image}
+podman generate systemd --name fn0-worker > /etc/systemd/system/fn0-worker.service
 systemctl daemon-reload
 systemctl enable --now fn0-worker"#,
     );
@@ -256,7 +264,14 @@ systemctl enable --now fn0-worker"#,
         ));
     }
 
-    info!("Worker deployed successfully");
+    let (check_status, check_output) = ssh
+        .exec("sudo podman ps --filter name=fn0-worker --format '{{.Status}}'")
+        .await?;
+    info!(
+        container_status = check_output.trim(),
+        check_exit = check_status,
+        "Worker deployed"
+    );
     Ok(())
 }
 
