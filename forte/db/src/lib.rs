@@ -106,7 +106,7 @@ impl Database {
 
     pub async fn trx<F, Fut, Out, Cancel, E>(&self, f: F) -> TrxResult<Out, Cancel, E>
     where
-        F: FnOnce(Trx) -> Fut,
+        F: FnMut(Trx) -> Fut,
         Fut: Future<Output = Result<TrxControl<Out, Cancel>, E>>,
         E: From<anyhow::Error>,
     {
@@ -205,7 +205,7 @@ impl<'a> Transaction<'a> {
 
 pub async fn trx<F, Fut, Out, Cancel, E>(f: F) -> TrxResult<Out, Cancel, E>
 where
-    F: FnOnce(Trx) -> Fut,
+    F: FnMut(Trx) -> Fut,
     Fut: Future<Output = Result<TrxControl<Out, Cancel>, E>>,
     E: From<anyhow::Error>,
 {
