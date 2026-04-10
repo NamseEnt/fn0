@@ -239,9 +239,11 @@ pub enum DbResult {
     Done,
 }
 
+pub type DbResultParser<O> = Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<O>>;
+
 pub struct Prepared<O> {
     pub ops: Vec<DbOp>,
-    pub parse: Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<O>>,
+    pub parse: DbResultParser<O>,
 }
 
 #[allow(async_fn_in_trait)]
@@ -300,9 +302,7 @@ where
     type Output = Vec<T::Output>;
     fn prepare(self) -> Prepared<Self::Output> {
         let mut all_ops = Vec::new();
-        let mut parsers: Vec<
-            Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<T::Output>>,
-        > = Vec::new();
+        let mut parsers: Vec<DbResultParser<T::Output>> = Vec::new();
         for item in self {
             let p = item.prepare();
             all_ops.extend(p.ops);

@@ -34,42 +34,42 @@ use quote::{format_ident, quote};
 use syn::{Fields, ItemStruct, parse_macro_input};
 
 fn format_placeholder(ty: &syn::Type) -> String {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            match segment.ident.to_string().as_str() {
-                "u8" | "i8" => return "{:03}".to_string(),
-                "u16" | "i16" => return "{:05}".to_string(),
-                "u32" | "i32" => return "{:010}".to_string(),
-                "u64" | "i64" | "usize" | "isize" => return "{:020}".to_string(),
-                _ => {}
-            }
+    if let syn::Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        match segment.ident.to_string().as_str() {
+            "u8" | "i8" => return "{:03}".to_string(),
+            "u16" | "i16" => return "{:05}".to_string(),
+            "u32" | "i32" => return "{:010}".to_string(),
+            "u64" | "i64" | "usize" | "isize" => return "{:020}".to_string(),
+            _ => {}
         }
     }
     "{}".to_string()
 }
 
 fn wrap_expr(ty: &syn::Type, expr: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            match segment.ident.to_string().as_str() {
-                "i8" => return quote! { (#expr as u8).wrapping_add(128u8) },
-                "i16" => return quote! { (#expr as u16).wrapping_add(32768u16) },
-                "i32" => return quote! { (#expr as u32).wrapping_add(2147483648u32) },
-                "i64" | "isize" => {
-                    return quote! { (#expr as u64).wrapping_add(9223372036854775808u64) };
-                }
-                _ => {}
+    if let syn::Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        match segment.ident.to_string().as_str() {
+            "i8" => return quote! { (#expr as u8).wrapping_add(128u8) },
+            "i16" => return quote! { (#expr as u16).wrapping_add(32768u16) },
+            "i32" => return quote! { (#expr as u32).wrapping_add(2147483648u32) },
+            "i64" | "isize" => {
+                return quote! { (#expr as u64).wrapping_add(9223372036854775808u64) };
             }
+            _ => {}
         }
     }
     expr
 }
 
 fn is_string_type(ty: &syn::Type) -> bool {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            return segment.ident == "String";
-        }
+    if let syn::Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        return segment.ident == "String";
     }
     false
 }
@@ -178,7 +178,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .zip(pk_field_types.iter())
         .zip(gpk.iter())
         .map(|((name, ty), gp)| {
-            let field_name = format_ident!("pk_{}", name.as_ref().unwrap());
+            let field_name = name.as_ref().unwrap();
             if let Some(g) = gp {
                 quote! { pub #field_name: #g }
             } else {
@@ -192,7 +192,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .zip(sk_field_types.iter())
         .zip(gsk.iter())
         .map(|((name, ty), gp)| {
-            let field_name = format_ident!("sk_{}", name.as_ref().unwrap());
+            let field_name = name.as_ref().unwrap();
             if let Some(g) = gp {
                 quote! { pub #field_name: #g }
             } else {
@@ -206,7 +206,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .zip(pk_field_types.iter())
         .zip(gpk.iter())
         .map(|((name, ty), gp)| {
-            let field_name = format_ident!("pk_{}", name.as_ref().unwrap());
+            let field_name = name.as_ref().unwrap();
             if let Some(g) = gp {
                 quote! { pub #field_name: #g }
             } else {
@@ -219,7 +219,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .iter()
         .zip(sk_field_types.iter())
         .map(|(name, ty)| {
-            let field_name = format_ident!("sk_{}", name.as_ref().unwrap());
+            let field_name = name.as_ref().unwrap();
             quote! { pub #field_name: Option<#ty> }
         })
         .collect();
@@ -243,7 +243,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             .zip(pk_field_types.iter())
             .zip(pk_is_string.iter())
             .map(|((n, ty), &is_str)| {
-                let field_name = format_ident!("pk_{}", n.as_ref().unwrap());
+                let field_name = n.as_ref().unwrap();
                 if is_str {
                     quote! { self.#field_name.as_ref() }
                 } else {
@@ -259,7 +259,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .zip(sk_field_types.iter())
         .map(|(n, ty)| {
             let name_str = n.as_ref().unwrap().to_string();
-            let field_name = format_ident!("sk_{}", n.as_ref().unwrap());
+            let field_name = n.as_ref().unwrap();
             let fmt = format!("{}={}", name_str, format_placeholder(ty));
             let val_expr = wrap_expr(ty, quote! { *v });
             quote! {
@@ -291,7 +291,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             .zip(pk_field_types.iter())
             .zip(pk_is_string.iter())
             .map(|((n, ty), &is_str)| {
-                let field_name = format_ident!("pk_{}", n.as_ref().unwrap());
+                let field_name = n.as_ref().unwrap();
                 if is_str {
                     quote! { self.#field_name.as_ref() }
                 } else {
@@ -316,7 +316,7 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .zip(sk_field_types.iter())
         .zip(sk_is_string.iter())
         .map(|((n, ty), &is_str)| {
-            let field_name = format_ident!("sk_{}", n.as_ref().unwrap());
+            let field_name = n.as_ref().unwrap();
             if is_str {
                 quote! { self.#field_name.as_ref() }
             } else {

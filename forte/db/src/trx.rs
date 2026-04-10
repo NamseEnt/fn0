@@ -355,14 +355,14 @@ impl TrxState {
 
     fn take_entries(&mut self) -> Result<(Database, Vec<TrackedEntry>)> {
         for entry in &self.entries {
-            if let TrackedState::Managed { shared, .. } = &entry.state {
-                if shared.handle_alive.upgrade().is_some() {
-                    bail!(
-                        "live doc handle escaped trx for key {}/{}; commit outputs must not contain DocHandle values",
-                        entry.key.pk,
-                        entry.key.sk
-                    );
-                }
+            if let TrackedState::Managed { shared, .. } = &entry.state
+                && shared.handle_alive.upgrade().is_some()
+            {
+                bail!(
+                    "live doc handle escaped trx for key {}/{}; commit outputs must not contain DocHandle values",
+                    entry.key.pk,
+                    entry.key.sk
+                );
             }
         }
 
