@@ -42,10 +42,10 @@ fn to_snake_case(s: &str) -> String {
 fn transform_keys_to_snake_case(value: Value) -> Value {
     match value {
         Value::Object(map) => {
-            if map.len() == 1 {
-                if let Some(variant) = map.get("t").and_then(|v| v.as_str()) {
-                    return Value::String(to_snake_case(variant));
-                }
+            if map.len() == 1
+                && let Some(variant) = map.get("t").and_then(|v| v.as_str())
+            {
+                return Value::String(to_snake_case(variant));
             }
             let new_map = map
                 .into_iter()

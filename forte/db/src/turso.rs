@@ -230,17 +230,16 @@ impl TursoDatabase {
                 match result {
                     StreamResult::Ok { response } => match response {
                         StreamResponse::Execute(exec_resp) => {
-                            if let Some(row) = exec_resp.result.rows.first() {
-                                if let (
+                            if let Some(row) = exec_resp.result.rows.first()
+                                && let (
                                     Some(Value::Blob { value: data }),
                                     Some(Value::Integer { value: version }),
                                 ) = (row.values.first(), row.values.get(1))
-                                {
-                                    return Ok(Some(StoredDoc {
-                                        data: data.clone(),
-                                        version: *version,
-                                    }));
-                                }
+                            {
+                                return Ok(Some(StoredDoc {
+                                    data: data.clone(),
+                                    version: *version,
+                                }));
                             }
                             return Ok(None);
                         }
@@ -1004,15 +1003,14 @@ impl<'a> TursoTransaction<'a> {
             )
             .await?;
 
-        if let Some(row) = result.rows.first() {
-            if let (Some(Value::Blob { value: data }), Some(Value::Integer { value: version })) =
+        if let Some(row) = result.rows.first()
+            && let (Some(Value::Blob { value: data }), Some(Value::Integer { value: version })) =
                 (row.values.first(), row.values.get(1))
-            {
-                return Ok(Some(StoredDoc {
-                    data: data.clone(),
-                    version: *version,
-                }));
-            }
+        {
+            return Ok(Some(StoredDoc {
+                data: data.clone(),
+                version: *version,
+            }));
         }
 
         Ok(None)
