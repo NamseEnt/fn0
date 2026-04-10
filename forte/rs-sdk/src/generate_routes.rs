@@ -283,9 +283,7 @@ fn discover_queue_tasks(queue_task_dir: &Path) -> Vec<QueueTaskInfo> {
             };
 
             if has_queue_task_handler(&content) {
-                queue_tasks.push(QueueTaskInfo {
-                    name: file_name,
-                });
+                queue_tasks.push(QueueTaskInfo { name: file_name });
             }
         }
     }
@@ -342,18 +340,20 @@ fn get_handler_type(content: &str) -> HandlerType {
             let is_async = func.sig.asyncness.is_some();
             let is_handler = func.sig.ident == "handler";
 
-            if is_pub && is_async && is_handler {
-                if let syn::ReturnType::Type(_, ty) = &func.sig.output {
-                    let type_str = quote!(#ty).to_string();
-                    if type_str.contains("Result") && type_str.contains("Props") {
-                        if is_props_redirect(content) {
-                            return HandlerType::Redirect;
-                        }
-                        return HandlerType::Props;
-                    }
-                    if type_str.contains("Result") && type_str.contains("Redirect") {
+            if is_pub
+                && is_async
+                && is_handler
+                && let syn::ReturnType::Type(_, ty) = &func.sig.output
+            {
+                let type_str = quote!(#ty).to_string();
+                if type_str.contains("Result") && type_str.contains("Props") {
+                    if is_props_redirect(content) {
                         return HandlerType::Redirect;
                     }
+                    return HandlerType::Props;
+                }
+                if type_str.contains("Result") && type_str.contains("Redirect") {
+                    return HandlerType::Redirect;
                 }
             }
         }
@@ -487,7 +487,14 @@ fn discover_endpoints_recursive(
         let path = entry.path();
 
         if path.is_dir() {
-            discover_endpoints_recursive(base_dir, &path, pages, module_prefix, route_prefix, is_api);
+            discover_endpoints_recursive(
+                base_dir,
+                &path,
+                pages,
+                module_prefix,
+                route_prefix,
+                is_api,
+            );
         } else if path.extension().map(|e| e == "rs").unwrap_or(false) {
             let Some(content) = fs::read_to_string(&path).ok() else {
                 continue;
@@ -607,7 +614,9 @@ fn generate_code(
                 .unwrap())
         }
     } else {
-        let needs_path_segments = pages.iter().any(|p| has_dynamic_segments(&p.route_segments));
+        let needs_path_segments = pages
+            .iter()
+            .any(|p| has_dynamic_segments(&p.route_segments));
         let path_segments_decl = if needs_path_segments {
             quote! {
                 let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
@@ -771,8 +780,8 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
 
 
             // Generate path params extraction (if dynamic)
-            let path_params_extraction = if page.path_params.is_some() {
-                generate_path_params_extraction(&module_name, &page.route_segments, page.path_params.as_ref().unwrap())
+            let path_params_extraction = if let Some(path_params) = &page.path_params {
+                generate_path_params_extraction(&module_name, &page.route_segments, path_params)
             } else {
                 quote! {}
             };
@@ -1369,7 +1378,7 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
 
             quote! {
                 #name => {
-                    let input: crate::#(#module_path)::*::Input = forte_sdk::serde_json::from_str(&payload)
+                    let input: crate::#(#module_path)::*::Input = forte_sdk::serde_json::from_str(payload)
                         .map_err(|e| Error::msg(e.to_string()))?;
                     crate::#(#module_path)::*::handle(input).await
                 }
@@ -1381,7 +1390,7 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
         async fn handle_queue_task_execute(
             body_bytes: &[u8],
         ) -> Result<Response<Body>, Error> {
-            let request: forte_sdk::serde_json::Value = forte_sdk::serde_json::from_slice(&body_bytes)
+            let request: forte_sdk::serde_json::Value = forte_sdk::serde_json::from_slice(body_bytes)
                 .map_err(|e| Error::msg(e.to_string()))?;
             let task_name = request["task_name"]
                 .as_str()
@@ -1471,10 +1480,7 @@ fn generate_fe_paths(pages: &[PageInfo]) -> String {
             ));
         } else {
             // No params: "/": () => "/"
-            content.push_str(&format!(
-                "  \"{}\": () => \"{}\"",
-                route_path, route_path
-            ));
+            content.push_str(&format!("  \"{}\": () => \"{}\"", route_path, route_path));
         }
 
         content.push_str(",\n");
