@@ -190,37 +190,66 @@ pub struct ConflictKey {
     pub actual_version: Option<i64>,
 }
 
-pub(crate) async fn run<F, Fut, Out, Cancel, E>(db: Database, f: F) -> TrxResult<Out, Cancel, E>
+const MAX_ATTEMPTS: u32 = 5;
+const BACKOFF_BASE_MS: u64 = 50;
+const BACKOFF_CAP_MS: u64 = 1000;
+
+pub(crate) async fn run<F, Fut, Out, Cancel, E>(
+    db: Database,
+    mut f: F,
+) -> TrxResult<Out, Cancel, E>
 where
-    F: FnOnce(Trx) -> Fut,
+    F: FnMut(Trx) -> Fut,
     Fut: std::future::Future<Output = Result<TrxControl<Out, Cancel>, E>>,
     E: From<anyhow::Error>,
 {
-    let state = Rc::new(RefCell::new(TrxState::new(db)));
-    let tx = Trx {
-        inner: state.clone(),
-    };
+    let mut attempt: u32 = 0;
+    loop {
+        let state = Rc::new(RefCell::new(TrxState::new(db.clone())));
+        let tx = Trx {
+            inner: state.clone(),
+        };
 
-    let control = match f(tx).await {
-        Ok(control) => control,
-        Err(err) => return TrxResult::Err(err),
-    };
+        let control = match f(tx).await {
+            Ok(control) => control,
+            Err(err) => return TrxResult::Err(err),
+        };
 
-    match control.inner {
-        TrxControlInner::Commit(out) => {
-            let (db, entries) = match take_entries(state) {
-                Ok(value) => value,
-                Err(err) => return TrxResult::Err(E::from(err)),
-            };
+        match control.inner {
+            TrxControlInner::Commit(out) => {
+                let (commit_db, entries) = match take_entries(state) {
+                    Ok(value) => value,
+                    Err(err) => return TrxResult::Err(E::from(err)),
+                };
 
-            match commit_entries(db.clone(), entries).await {
-                Ok(()) => TrxResult::Committed(out),
-                Err(CommitFailure::Conflict(details)) => TrxResult::Conflict(details),
-                Err(CommitFailure::Err(err)) => TrxResult::Err(E::from(err)),
+                match commit_entries(commit_db, entries).await {
+                    Ok(()) => return TrxResult::Committed(out),
+                    Err(CommitFailure::Conflict(details)) => {
+                        if attempt + 1 >= MAX_ATTEMPTS {
+                            return TrxResult::Conflict(details);
+                        }
+                        let backoff = conflict_backoff(attempt);
+                        wstd::time::Timer::after(backoff).wait().await;
+                        attempt += 1;
+                    }
+                    Err(CommitFailure::Err(err)) => return TrxResult::Err(E::from(err)),
+                }
             }
+            TrxControlInner::Cancel(reason) => return TrxResult::Cancelled(reason),
         }
-        TrxControlInner::Cancel(reason) => TrxResult::Cancelled(reason),
     }
+}
+
+fn conflict_backoff(attempt: u32) -> wstd::time::Duration {
+    let ceiling = BACKOFF_BASE_MS
+        .checked_shl(attempt)
+        .unwrap_or(BACKOFF_CAP_MS)
+        .min(BACKOFF_CAP_MS);
+    let mut buf = [0u8; 8];
+    wstd::rand::get_insecure_random_bytes(&mut buf);
+    let raw = u64::from_le_bytes(buf);
+    let delay_ms = raw % (ceiling + 1);
+    wstd::time::Duration::from_millis(delay_ms)
 }
 
 struct TrxState {
