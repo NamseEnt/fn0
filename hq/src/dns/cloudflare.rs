@@ -2,7 +2,7 @@ use super::*;
 use crate::args::CloudflareDnsProviderArgs;
 use std::net::IpAddr;
 
-const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub struct CloudflareDnsProvider {
     client: reqwest::Client,
