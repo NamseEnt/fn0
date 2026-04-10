@@ -52,10 +52,12 @@ fn main() -> Result<()> {
 
     let otlp_endpoint = std::env::var("OTLP_ENDPOINT").expect("OTLP_ENDPOINT is required");
     let otlp_basic_auth = std::env::var("OTLP_BASIC_AUTH").ok();
+
+    let rt = tokio::runtime::Runtime::new()?;
+    let _guard = rt.enter();
     let telemetry_providers =
         telemetry::setup(&otlp_endpoint, otlp_basic_auth.as_deref())?;
 
-    let rt = tokio::runtime::Runtime::new()?;
     let result = rt.block_on(run());
 
     telemetry::shutdown(telemetry_providers)?;
