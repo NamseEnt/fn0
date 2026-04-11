@@ -663,6 +663,7 @@ fn generate_code(
             let method = parts.method;
             let body_bytes = body.contents().await?.to_vec();
             let mut cookie_jar = make_cookie_jar(&headers);
+            let db = forte_sdk::forte_db::default_db();
 
             let Some(uri_authority) = parts.uri.authority() else {
                 return Ok(Response::builder()
@@ -673,11 +674,11 @@ fn generate_code(
             let uri_authority = uri_authority.as_str();
 
             if let Some(hook_name) = path.strip_prefix("/__forte_hook/") {
-                return handle_hook(hook_name, uri_authority, &method, &headers, &mut cookie_jar, &body_bytes).await;
+                return handle_hook(hook_name, uri_authority, &method, &headers, &mut cookie_jar, &body_bytes, &db).await;
             }
 
             if let Some(action_name) = path.strip_prefix("/__forte_action/") {
-                return handle_action(action_name, uri_authority, &method, &headers, &mut cookie_jar, &body_bytes).await;
+                return handle_action(action_name, uri_authority, &method, &headers, &mut cookie_jar, &body_bytes, &db).await;
             }
 
             if path == "/__forte_queue_task/execute" {
@@ -898,6 +899,7 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                         jar: &mut cookie_jar,
                         raw_body: &body_bytes,
                         body: (),
+                        db: &db,
                     };
 
                     #response_handling
@@ -1164,6 +1166,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                 _headers: &HeaderMap,
                 _cookie_jar: &mut cookie::CookieJar,
                 _body_bytes: &[u8],
+                _db: &forte_sdk::forte_db::Database,
             ) -> Result<Response<Body>, Error> {
                 Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
@@ -1190,6 +1193,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                         jar: cookie_jar,
                         raw_body: body_bytes,
                         body: input,
+                        db,
                     };
                     let output = #module_name::handler(req);
                     let json = forte_json::to_vec(&output);
@@ -1214,6 +1218,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
             headers: &HeaderMap,
             cookie_jar: &mut cookie::CookieJar,
             body_bytes: &[u8],
+            db: &forte_sdk::forte_db::Database,
         ) -> Result<Response<Body>, Error> {
             match hook_name {
                 #(#hook_matches)*
@@ -1251,6 +1256,7 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
                 _headers: &HeaderMap,
                 _cookie_jar: &mut cookie::CookieJar,
                 _body_bytes: &[u8],
+                _db: &forte_sdk::forte_db::Database,
             ) -> Result<Response<Body>, Error> {
                 Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
@@ -1277,6 +1283,7 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
                         jar: cookie_jar,
                         raw_body: body_bytes,
                         body: input,
+                        db,
                     };
                     let output = #module_name::handler(req).await;
                     let json = forte_json::to_vec(&output);
@@ -1301,6 +1308,7 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
             headers: &HeaderMap,
             cookie_jar: &mut cookie::CookieJar,
             body_bytes: &[u8],
+            db: &forte_sdk::forte_db::Database,
         ) -> Result<Response<Body>, Error> {
             match action_name {
                 #(#action_matches)*

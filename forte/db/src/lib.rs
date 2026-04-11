@@ -1,4 +1,5 @@
 mod memory;
+pub mod mock;
 mod trx;
 mod turso;
 
@@ -44,6 +45,7 @@ pub fn turso() -> Database {
 pub fn turso_with_config(url: String, auth_token: String) -> Database {
     Database {
         inner: DatabaseInner::Turso(TursoDatabase::new(url, auth_token)),
+        mock_state: mock::MockState::default(),
     }
 }
 
@@ -60,16 +62,25 @@ pub fn turso_with_config(url: String, auth_token: String) -> Database {
 pub fn memory() -> Database {
     Database {
         inner: DatabaseInner::Memory(MemoryDatabase::new()),
+        mock_state: mock::MockState::default(),
     }
 }
 
 #[derive(Clone)]
 pub struct Database {
     inner: DatabaseInner,
+    mock_state: mock::MockState,
 }
 
 impl Database {
     pub async fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
+        if let Some(result) = self.mock_state.try_match(mock::MockOp::Get, pk, sk) {
+            return match result {
+                mock::MockResult::OkGet(data) => Ok(data.map(Bytes::from)),
+                mock::MockResult::Err(msg) => Err(anyhow::anyhow!("{}", msg)),
+                _ => unreachable!(),
+            };
+        }
         match &self.inner {
             DatabaseInner::Turso(db) => db.get(pk, sk).await,
             DatabaseInner::Memory(db) => db.get(pk, sk).await,
@@ -77,6 +88,13 @@ impl Database {
     }
 
     pub async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
+        if let Some(result) = self.mock_state.try_match(mock::MockOp::Put, pk, sk) {
+            return match result {
+                mock::MockResult::OkVoid => Ok(()),
+                mock::MockResult::Err(msg) => Err(anyhow::anyhow!("{}", msg)),
+                _ => unreachable!(),
+            };
+        }
         match &self.inner {
             DatabaseInner::Turso(db) => db.put(pk, sk, data).await,
             DatabaseInner::Memory(db) => db.put(pk, sk, data).await,
@@ -84,10 +102,39 @@ impl Database {
     }
 
     pub async fn delete(&self, pk: &str, sk: &str) -> Result<()> {
+        if let Some(result) = self.mock_state.try_match(mock::MockOp::Delete, pk, sk) {
+            return match result {
+                mock::MockResult::OkVoid => Ok(()),
+                mock::MockResult::Err(msg) => Err(anyhow::anyhow!("{}", msg)),
+                _ => unreachable!(),
+            };
+        }
         match &self.inner {
             DatabaseInner::Turso(db) => db.delete(pk, sk).await,
             DatabaseInner::Memory(db) => db.delete(pk, sk).await,
         }
+    }
+
+    // --- Mock API ---
+
+    pub fn mock_get(&self, pk: &str, sk: &str) -> mock::MockGetBuilder<'_> {
+        mock::MockGetBuilder::new(self, pk.to_string(), sk.to_string())
+    }
+
+    pub fn mock_put(&self, pk: &str, sk: &str) -> mock::MockPutBuilder<'_> {
+        mock::MockPutBuilder::new(self, pk.to_string(), sk.to_string())
+    }
+
+    pub fn mock_delete(&self, pk: &str, sk: &str) -> mock::MockDeleteBuilder<'_> {
+        mock::MockDeleteBuilder::new(self, pk.to_string(), sk.to_string())
+    }
+
+    pub fn clear_mocks(&self) {
+        self.mock_state.clear();
+    }
+
+    pub(crate) fn add_mock_rule(&self, rule: mock::MockRule) {
+        self.mock_state.push(rule);
     }
 
     pub async fn query<S1: AsRef<str>, S2: AsRef<str>>(
@@ -242,7 +289,7 @@ impl<'a> Transaction<'a> {
     }
 }
 
-fn default_db() -> Database {
+pub fn default_db() -> Database {
     #[cfg(feature = "dev-test")]
     {
         memory()
@@ -301,11 +348,15 @@ pub trait DbRequest: Sized {
     type Output;
     fn prepare(self) -> Prepared<Self::Output>;
 
-    async fn send(self) -> Result<Self::Output> {
+    async fn send_with(self, db: &Database) -> Result<Self::Output> {
         let prepared = self.prepare();
-        let results = default_db().execute_ops(prepared.ops).await?;
+        let results = db.execute_ops(prepared.ops).await?;
         let mut iter = results.into_iter();
         (prepared.parse)(&mut iter)
+    }
+
+    async fn send(self) -> Result<Self::Output> {
+        self.send_with(&default_db()).await
     }
 }
 

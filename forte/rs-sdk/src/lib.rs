@@ -35,4 +35,5 @@ pub struct ForteRequest<'a, Body = ()> {
     pub jar: &'a mut CookieJar,
     pub raw_body: &'a [u8],
     pub body: Body,
+    pub db: &'a forte_db::Database,
 }
