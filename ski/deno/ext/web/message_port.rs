@@ -266,7 +266,7 @@ pub fn op_message_port_post_message(
   resource.port.send(state, data)
 }
 
-#[op2(async)]
+#[op2(async(lazy), nofast)]
 #[serde]
 pub async fn op_message_port_recv_message(
   state: Rc<RefCell<OpState>>,

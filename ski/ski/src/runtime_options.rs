@@ -50,7 +50,7 @@ fn op_get_request_parts(state: &mut OpState) -> Result<OpGetRequestParts, JsErro
     Ok((parts.url, parts.method, parts.headers, parts.rid))
 }
 
-#[op2(async)]
+#[op2(async(lazy))]
 async fn op_respond(
     state: Rc<RefCell<OpState>>,
     #[smi] status: u16,

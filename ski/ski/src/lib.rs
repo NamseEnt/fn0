@@ -94,7 +94,7 @@ pub struct FetchInterceptResult {
     pub body: Vec<u8>,
 }
 
-#[op2(async)]
+#[op2(async(lazy))]
 #[serde]
 async fn op_fetch_intercept(
     state: Rc<RefCell<OpState>>,
