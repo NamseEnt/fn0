@@ -8,7 +8,6 @@ pub mod turso_queue;
 use adapt_cache::AdaptCache;
 use anyhow::*;
 use bytes::Bytes;
-use deployment::*;
 pub use deployment::{CodeKind, DeploymentMap};
 use execute::*;
 pub use execute::EnvVars;
@@ -16,7 +15,6 @@ use http_body_util::combinators::UnsyncBoxBody;
 use crate::measure_cpu_time::SystemClock;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, RwLock};
-use wasmtime::Engine;
 use wasmtime_wasi_http::bindings::ProxyPre;
 
 pub use ski::{FetchHandler, FetchHandlerFuture};

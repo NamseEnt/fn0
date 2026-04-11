@@ -28,7 +28,6 @@ pub fn engine_config() -> Config {
     let mut config = Config::new();
 
     config
-        .async_support(true)
         .allocation_strategy(InstanceAllocationStrategy::Pooling(
             pooling_allocation_config,
         ))
