@@ -46,6 +46,8 @@ jobs:
           }
 
           publish_if_needed "adapt-cache" "fn0-adapt-cache"
+          publish_if_needed "ski/deno/ext/web" "fn0-deno-web"
+          publish_if_needed "ski/deno/ext/fetch" "fn0-deno-fetch"
           publish_if_needed "ski/ski" "fn0-ski"
           publish_if_needed "fn0" "fn0"
           publish_if_needed "forte/forte-json" "forte-json"
