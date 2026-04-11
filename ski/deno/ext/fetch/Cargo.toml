@@ -2,7 +2,7 @@
 
 [package]
 name = "fn0-deno-fetch"
-version = "0.249.0"
+version = "0.250.0"
 authors = ["the Deno authors"]
 edition = "2024"
 license = "MIT"

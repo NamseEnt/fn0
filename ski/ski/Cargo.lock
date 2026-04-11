@@ -717,7 +717,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -744,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-deno-fetch"
-version = "0.249.0"
+version = "0.250.0"
 dependencies = [
  "base64",
  "bytes",
@@ -779,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-deno-web"
-version = "0.256.0"
+version = "0.257.0"
 dependencies = [
  "async-trait",
  "base64-simd",
@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-ski"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64",
  "bytes",
@@ -2277,7 +2277,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
