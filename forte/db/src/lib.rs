@@ -1,8 +1,11 @@
+mod memory;
+pub mod mock;
 mod trx;
 mod turso;
 
 use anyhow::Result;
 pub use libsql_hrana::proto::Value;
+use memory::{MemoryDatabase, MemoryTransaction};
 use std::future::Future;
 pub use trx::{
     ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
@@ -42,31 +45,96 @@ pub fn turso() -> Database {
 pub fn turso_with_config(url: String, auth_token: String) -> Database {
     Database {
         inner: DatabaseInner::Turso(TursoDatabase::new(url, auth_token)),
+        mock_state: mock::MockState::default(),
+    }
+}
+
+/// Creates an in-memory database for unit testing.
+///
+/// This backend uses a `BTreeMap` to store data entirely in memory,
+/// requiring no external server (sqld, Turso, etc.). It supports all
+/// standard forte-db operations including optimistic transactions (`trx`).
+///
+/// ```ignore
+/// let db = forte_db::memory();
+/// db.put("pk", "sk", b"data").await?;
+/// ```
+pub fn memory() -> Database {
+    Database {
+        inner: DatabaseInner::Memory(MemoryDatabase::new()),
+        mock_state: mock::MockState::default(),
     }
 }
 
 #[derive(Clone)]
 pub struct Database {
     inner: DatabaseInner,
+    mock_state: mock::MockState,
 }
 
 impl Database {
     pub async fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
+        if let Some(result) = self.mock_state.try_match(mock::MockOp::Get, pk, sk) {
+            return match result {
+                mock::MockResult::OkGet(data) => Ok(data.map(Bytes::from)),
+                mock::MockResult::Err(msg) => Err(anyhow::anyhow!("{}", msg)),
+                _ => unreachable!(),
+            };
+        }
         match &self.inner {
             DatabaseInner::Turso(db) => db.get(pk, sk).await,
+            DatabaseInner::Memory(db) => db.get(pk, sk).await,
         }
     }
 
     pub async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
+        if let Some(result) = self.mock_state.try_match(mock::MockOp::Put, pk, sk) {
+            return match result {
+                mock::MockResult::OkVoid => Ok(()),
+                mock::MockResult::Err(msg) => Err(anyhow::anyhow!("{}", msg)),
+                _ => unreachable!(),
+            };
+        }
         match &self.inner {
             DatabaseInner::Turso(db) => db.put(pk, sk, data).await,
+            DatabaseInner::Memory(db) => db.put(pk, sk, data).await,
         }
     }
 
     pub async fn delete(&self, pk: &str, sk: &str) -> Result<()> {
+        if let Some(result) = self.mock_state.try_match(mock::MockOp::Delete, pk, sk) {
+            return match result {
+                mock::MockResult::OkVoid => Ok(()),
+                mock::MockResult::Err(msg) => Err(anyhow::anyhow!("{}", msg)),
+                _ => unreachable!(),
+            };
+        }
         match &self.inner {
             DatabaseInner::Turso(db) => db.delete(pk, sk).await,
+            DatabaseInner::Memory(db) => db.delete(pk, sk).await,
         }
+    }
+
+    // --- Mock API ---
+
+    pub fn mock_get(&self, pk: &str, sk: &str) -> mock::MockGetBuilder<'_> {
+        mock::MockGetBuilder::new(self, pk.to_string(), sk.to_string())
+    }
+
+    pub fn mock_put(&self, pk: &str, sk: &str) -> mock::MockPutBuilder<'_> {
+        mock::MockPutBuilder::new(self, pk.to_string(), sk.to_string())
+    }
+
+    pub fn mock_delete(&self, pk: &str, sk: &str) -> mock::MockDeleteBuilder<'_> {
+        mock::MockDeleteBuilder::new(self, pk.to_string(), sk.to_string())
+    }
+
+    pub fn clear_mocks(&self) {
+        self.mock_state.clear();
+    }
+
+    pub(crate) fn add_mock_rule(&self, rule: mock::MockRule) {
+        self.mock_state.push(rule);
     }
 
     pub async fn query<S1: AsRef<str>, S2: AsRef<str>>(
@@ -77,6 +145,7 @@ impl Database {
     ) -> Result<Vec<(String, Bytes)>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.query(pk, after_sk, limit).await,
+            DatabaseInner::Memory(db) => db.query(pk, after_sk, limit).await,
         }
     }
 
@@ -87,12 +156,14 @@ impl Database {
     ) -> Result<Vec<(String, String, Bytes)>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.scan(after, limit).await,
+            DatabaseInner::Memory(db) => db.scan(after, limit).await,
         }
     }
 
     pub async fn batch(&self, ops: &[BatchOp<'_>]) -> Result<()> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.batch(ops).await,
+            DatabaseInner::Memory(db) => db.batch(ops).await,
         }
     }
 
@@ -100,6 +171,9 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => Ok(Transaction {
                 inner: TransactionInner::Turso(db.transaction().await?),
+            }),
+            DatabaseInner::Memory(db) => Ok(Transaction {
+                inner: TransactionInner::Memory(db.transaction().await?),
             }),
         }
     }
@@ -121,18 +195,21 @@ impl Database {
     ) -> Result<Vec<Vec<Value>>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_raw(sql, args, want_rows).await,
+            DatabaseInner::Memory(db) => db.execute_raw(sql, args, want_rows).await,
         }
     }
 
     pub async fn execute_ops(&self, ops: Vec<DbOp>) -> Result<Vec<DbResult>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_ops(ops).await,
+            DatabaseInner::Memory(db) => db.execute_ops(ops).await,
         }
     }
 
     pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.get_with_version(pk, sk).await,
+            DatabaseInner::Memory(db) => db.get_with_version(pk, sk).await,
         }
     }
 }
@@ -140,6 +217,7 @@ impl Database {
 #[derive(Clone)]
 enum DatabaseInner {
     Turso(TursoDatabase),
+    Memory(MemoryDatabase),
 }
 
 pub struct Transaction<'a> {
@@ -148,36 +226,42 @@ pub struct Transaction<'a> {
 
 enum TransactionInner<'a> {
     Turso(TursoTransaction<'a>),
+    Memory(MemoryTransaction<'a>),
 }
 
 impl<'a> Transaction<'a> {
     pub async fn get(&mut self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.get(pk, sk).await,
+            TransactionInner::Memory(tx) => tx.get(pk, sk).await,
         }
     }
 
     pub async fn put(&mut self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.put(pk, sk, data).await,
+            TransactionInner::Memory(tx) => tx.put(pk, sk, data).await,
         }
     }
 
     pub async fn delete(&mut self, pk: &str, sk: &str) -> Result<()> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.delete(pk, sk).await,
+            TransactionInner::Memory(tx) => tx.delete(pk, sk).await,
         }
     }
 
     pub async fn commit(self) -> Result<()> {
         match self.inner {
             TransactionInner::Turso(tx) => tx.commit().await,
+            TransactionInner::Memory(tx) => tx.commit().await,
         }
     }
 
     pub async fn rollback(self) -> Result<()> {
         match self.inner {
             TransactionInner::Turso(tx) => tx.rollback().await,
+            TransactionInner::Memory(tx) => tx.rollback().await,
         }
     }
 
@@ -188,6 +272,7 @@ impl<'a> Transaction<'a> {
     ) -> Result<Option<StoredDoc>> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.get_with_version(pk, sk).await,
+            TransactionInner::Memory(tx) => tx.get_with_version(pk, sk).await,
         }
     }
 
@@ -199,7 +284,19 @@ impl<'a> Transaction<'a> {
     ) -> Result<libsql_hrana::proto::StmtResult> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.execute_stmt(sql, args, want_rows).await,
+            TransactionInner::Memory(tx) => tx.execute_stmt(sql, args, want_rows).await,
         }
+    }
+}
+
+pub fn default_db() -> Database {
+    #[cfg(feature = "dev-test")]
+    {
+        memory()
+    }
+    #[cfg(not(feature = "dev-test"))]
+    {
+        turso()
     }
 }
 
@@ -209,7 +306,7 @@ where
     Fut: Future<Output = Result<TrxControl<Out, Cancel>, E>>,
     E: From<anyhow::Error>,
 {
-    turso().trx(f).await
+    default_db().trx(f).await
 }
 
 pub enum DbOp {
@@ -251,11 +348,15 @@ pub trait DbRequest: Sized {
     type Output;
     fn prepare(self) -> Prepared<Self::Output>;
 
-    async fn send(self) -> Result<Self::Output> {
+    async fn send_with(self, db: &Database) -> Result<Self::Output> {
         let prepared = self.prepare();
-        let results = turso().execute_ops(prepared.ops).await?;
+        let results = db.execute_ops(prepared.ops).await?;
         let mut iter = results.into_iter();
         (prepared.parse)(&mut iter)
+    }
+
+    async fn send(self) -> Result<Self::Output> {
+        self.send_with(&default_db()).await
     }
 }
 
