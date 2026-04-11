@@ -220,7 +220,7 @@ pub fn op_blob_slice_part(
   Ok(id)
 }
 
-#[op2(async)]
+#[op2(async(lazy))]
 #[serde]
 pub async fn op_blob_read_part(
   state: Rc<RefCell<OpState>>,

@@ -564,7 +564,7 @@ pub struct FetchResponse {
   pub error: Option<(String, String)>,
 }
 
-#[op2(async)]
+#[op2(async(lazy), nofast)]
 #[serde]
 pub async fn op_fetch_send(
   state: Rc<RefCell<OpState>>,

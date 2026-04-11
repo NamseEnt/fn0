@@ -16,13 +16,11 @@ pub use crate::blob::InMemoryBlobPart;
 use crate::blob::op_blob_create_object_url;
 use crate::blob::op_blob_create_part;
 use crate::blob::op_blob_from_object_url;
-use crate::blob::op_blob_read_part;
 use crate::blob::op_blob_remove_part;
 use crate::blob::op_blob_revoke_object_url;
 use crate::blob::op_blob_slice_part;
 use crate::message_port::op_message_port_create_entangled;
 use crate::message_port::op_message_port_post_message;
-use crate::message_port::op_message_port_recv_message;
 use crate::message_port::op_message_port_recv_message_sync;
 pub use crate::timers::StartTime;
 use crate::timers::op_defer;
@@ -59,14 +57,14 @@ deno_core::extension!(deno_web,
     op_encoding_encode_into,
     op_blob_create_part,
     op_blob_slice_part,
-    op_blob_read_part,
+    blob::op_blob_read_part,
     op_blob_remove_part,
     op_blob_create_object_url,
     op_blob_revoke_object_url,
     op_blob_from_object_url,
     op_message_port_create_entangled,
     op_message_port_post_message,
-    op_message_port_recv_message,
+    message_port::op_message_port_recv_message,
     op_message_port_recv_message_sync,
     compression::op_compression_new,
     compression::op_compression_write,
@@ -368,12 +366,11 @@ fn op_encoding_encode_into(
   let s = v8::Local::<v8::String>::try_from(input)?;
 
   let mut nchars = 0;
-  out_buf[1] = s.write_utf8(
+  out_buf[1] = s.write_utf8_v2(
     scope,
     buffer,
+    v8::WriteFlags::kReplaceInvalidUtf8,
     Some(&mut nchars),
-    v8::WriteOptions::NO_NULL_TERMINATION
-      | v8::WriteOptions::REPLACE_INVALID_UTF8,
   ) as u32;
   out_buf[0] = nchars as u32;
   Ok(())
