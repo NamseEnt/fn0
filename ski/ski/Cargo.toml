@@ -9,11 +9,11 @@ repository = "https://github.com/NamseEnt/fn0"
 [dependencies]
 base64 = "0.22"
 bytes = "1.10"
-deno_core = "0.376"
+deno_core = "0.394"
 deno_error = "0.7"
-deno_web = { package = "fn0-deno-web", version = "0.256.0" }
-deno_fetch = { package = "fn0-deno-fetch", version = "0.249.0" }
-deno_webidl = "0.225"
+deno_web = { package = "fn0-deno-web", path = "../deno/ext/web" }
+deno_fetch = { package = "fn0-deno-fetch", path = "../deno/ext/fetch" }
+deno_webidl = "0.241"
 encoding_rs = "0.8"
 futures = "0.3"
 http = "1.3"
@@ -29,8 +29,8 @@ tokio-util = "0.7.17"
 http-body-util = "0.1.3"
 
 [build-dependencies]
-deno_core = "0.376"
+deno_core = "0.394"
 deno_error = "0.7"
-deno_web = { package = "fn0-deno-web", version = "0.256.0" }
-deno_fetch = { package = "fn0-deno-fetch", version = "0.249.0" }
-deno_webidl = "0.225"
+deno_web = { package = "fn0-deno-web", path = "../deno/ext/web" }
+deno_fetch = { package = "fn0-deno-fetch", path = "../deno/ext/fetch" }
+deno_webidl = "0.241"
