@@ -213,18 +213,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "645cbb3a84e60b7531617d5ae4e57f7e27308f6445f5abf653209ea76dec8dff"
 
 [[package]]
+name = "form_urlencoded"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
+dependencies = [
+ "percent-encoding",
+]
+
+[[package]]
 name = "forte-db"
-version = "0.1.0"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "libsql-hrana",
+ "serde",
  "serde_json",
  "wstd",
 ]
 
 [[package]]
 name = "forte-json"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "futures",
@@ -234,7 +244,7 @@ dependencies = [
 
 [[package]]
 name = "forte-macros"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -243,13 +253,15 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
  "cookie",
+ "form_urlencoded",
  "forte-db",
  "forte-json",
+ "forte-macros",
  "futures",
  "hex",
  "hmac",
