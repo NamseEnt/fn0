@@ -1,8 +1,10 @@
+mod memory;
 mod trx;
 mod turso;
 
 use anyhow::Result;
 pub use libsql_hrana::proto::Value;
+use memory::{MemoryDatabase, MemoryTransaction};
 use std::future::Future;
 pub use trx::{
     ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
@@ -45,6 +47,22 @@ pub fn turso_with_config(url: String, auth_token: String) -> Database {
     }
 }
 
+/// Creates an in-memory database for unit testing.
+///
+/// This backend uses a `BTreeMap` to store data entirely in memory,
+/// requiring no external server (sqld, Turso, etc.). It supports all
+/// standard forte-db operations including optimistic transactions (`trx`).
+///
+/// ```ignore
+/// let db = forte_db::memory();
+/// db.put("pk", "sk", b"data").await?;
+/// ```
+pub fn memory() -> Database {
+    Database {
+        inner: DatabaseInner::Memory(MemoryDatabase::new()),
+    }
+}
+
 #[derive(Clone)]
 pub struct Database {
     inner: DatabaseInner,
@@ -54,18 +72,21 @@ impl Database {
     pub async fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.get(pk, sk).await,
+            DatabaseInner::Memory(db) => db.get(pk, sk).await,
         }
     }
 
     pub async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.put(pk, sk, data).await,
+            DatabaseInner::Memory(db) => db.put(pk, sk, data).await,
         }
     }
 
     pub async fn delete(&self, pk: &str, sk: &str) -> Result<()> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.delete(pk, sk).await,
+            DatabaseInner::Memory(db) => db.delete(pk, sk).await,
         }
     }
 
@@ -77,6 +98,7 @@ impl Database {
     ) -> Result<Vec<(String, Bytes)>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.query(pk, after_sk, limit).await,
+            DatabaseInner::Memory(db) => db.query(pk, after_sk, limit).await,
         }
     }
 
@@ -87,12 +109,14 @@ impl Database {
     ) -> Result<Vec<(String, String, Bytes)>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.scan(after, limit).await,
+            DatabaseInner::Memory(db) => db.scan(after, limit).await,
         }
     }
 
     pub async fn batch(&self, ops: &[BatchOp<'_>]) -> Result<()> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.batch(ops).await,
+            DatabaseInner::Memory(db) => db.batch(ops).await,
         }
     }
 
@@ -100,6 +124,9 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => Ok(Transaction {
                 inner: TransactionInner::Turso(db.transaction().await?),
+            }),
+            DatabaseInner::Memory(db) => Ok(Transaction {
+                inner: TransactionInner::Memory(db.transaction().await?),
             }),
         }
     }
@@ -121,18 +148,21 @@ impl Database {
     ) -> Result<Vec<Vec<Value>>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_raw(sql, args, want_rows).await,
+            DatabaseInner::Memory(db) => db.execute_raw(sql, args, want_rows).await,
         }
     }
 
     pub async fn execute_ops(&self, ops: Vec<DbOp>) -> Result<Vec<DbResult>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_ops(ops).await,
+            DatabaseInner::Memory(db) => db.execute_ops(ops).await,
         }
     }
 
     pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
         match &self.inner {
             DatabaseInner::Turso(db) => db.get_with_version(pk, sk).await,
+            DatabaseInner::Memory(db) => db.get_with_version(pk, sk).await,
         }
     }
 }
@@ -140,6 +170,7 @@ impl Database {
 #[derive(Clone)]
 enum DatabaseInner {
     Turso(TursoDatabase),
+    Memory(MemoryDatabase),
 }
 
 pub struct Transaction<'a> {
@@ -148,36 +179,42 @@ pub struct Transaction<'a> {
 
 enum TransactionInner<'a> {
     Turso(TursoTransaction<'a>),
+    Memory(MemoryTransaction<'a>),
 }
 
 impl<'a> Transaction<'a> {
     pub async fn get(&mut self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.get(pk, sk).await,
+            TransactionInner::Memory(tx) => tx.get(pk, sk).await,
         }
     }
 
     pub async fn put(&mut self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.put(pk, sk, data).await,
+            TransactionInner::Memory(tx) => tx.put(pk, sk, data).await,
         }
     }
 
     pub async fn delete(&mut self, pk: &str, sk: &str) -> Result<()> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.delete(pk, sk).await,
+            TransactionInner::Memory(tx) => tx.delete(pk, sk).await,
         }
     }
 
     pub async fn commit(self) -> Result<()> {
         match self.inner {
             TransactionInner::Turso(tx) => tx.commit().await,
+            TransactionInner::Memory(tx) => tx.commit().await,
         }
     }
 
     pub async fn rollback(self) -> Result<()> {
         match self.inner {
             TransactionInner::Turso(tx) => tx.rollback().await,
+            TransactionInner::Memory(tx) => tx.rollback().await,
         }
     }
 
@@ -188,6 +225,7 @@ impl<'a> Transaction<'a> {
     ) -> Result<Option<StoredDoc>> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.get_with_version(pk, sk).await,
+            TransactionInner::Memory(tx) => tx.get_with_version(pk, sk).await,
         }
     }
 
@@ -199,6 +237,7 @@ impl<'a> Transaction<'a> {
     ) -> Result<libsql_hrana::proto::StmtResult> {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.execute_stmt(sql, args, want_rows).await,
+            TransactionInner::Memory(tx) => tx.execute_stmt(sql, args, want_rows).await,
         }
     }
 }
