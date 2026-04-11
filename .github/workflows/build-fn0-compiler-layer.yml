@@ -3,9 +3,6 @@ name: Build fn0-compiler Lambda Layer
 on:
   push:
     branches: [main]
-    paths:
-      - "fn0-compiler/**"
-      - "fn0/**"
 
 jobs:
   build:
