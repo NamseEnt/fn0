@@ -242,13 +242,24 @@ impl<'a> Transaction<'a> {
     }
 }
 
+fn default_db() -> Database {
+    #[cfg(feature = "dev-test")]
+    {
+        memory()
+    }
+    #[cfg(not(feature = "dev-test"))]
+    {
+        turso()
+    }
+}
+
 pub async fn trx<F, Fut, Out, Cancel, E>(f: F) -> TrxResult<Out, Cancel, E>
 where
     F: FnMut(Trx) -> Fut,
     Fut: Future<Output = Result<TrxControl<Out, Cancel>, E>>,
     E: From<anyhow::Error>,
 {
-    turso().trx(f).await
+    default_db().trx(f).await
 }
 
 pub enum DbOp {
@@ -292,7 +303,7 @@ pub trait DbRequest: Sized {
 
     async fn send(self) -> Result<Self::Output> {
         let prepared = self.prepare();
-        let results = turso().execute_ops(prepared.ops).await?;
+        let results = default_db().execute_ops(prepared.ops).await?;
         let mut iter = results.into_iter();
         (prepared.parse)(&mut iter)
     }

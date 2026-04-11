@@ -6,6 +6,9 @@ description = "Core SDK for the Forte web framework"
 license = "AGPL-3.0-only"
 repository = "https://github.com/NamseEnt/fn0"
 
+[features]
+dev-test = ["forte-db/dev-test"]
+
 [dependencies]
 anyhow = { version = "1", features = ["backtrace"] }
 serde = { version = "1", features = ["derive"] }
