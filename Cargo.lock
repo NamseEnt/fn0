@@ -2705,7 +2705,7 @@ dependencies = [
 
 [[package]]
 name = "forte-db"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "libsql-hrana",
@@ -2736,7 +2736,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",

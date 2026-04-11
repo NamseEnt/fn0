@@ -1,10 +1,13 @@
 [package]
 name = "forte-db"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 description = "Database layer for the Forte web framework (Turso/libSQL)"
 license = "AGPL-3.0-only"
 repository = "https://github.com/NamseEnt/fn0"
+
+[features]
+dev-test = []
 
 [dependencies]
 anyhow = "1.0.100"
