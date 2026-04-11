@@ -9,3 +9,4 @@ infra/pulumi/BuildChain/sdks/
 infra/cloud/sdks/
 package-lock.json
 infra/pulumi/BuildChain/wasmtime-v42.0.1-x86_64-linux/
+vendor/
