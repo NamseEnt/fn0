@@ -1,15 +1,46 @@
+use bytes::Bytes;
 use opentelemetry::{global, trace::TracerProvider};
+use opentelemetry_http::{HttpClient, HttpError};
 use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use std::collections::HashMap;
 use std::time::Duration;
+use tokio::runtime::Handle;
 use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 pub type TelemetryProviders = (SdkTracerProvider, SdkMeterProvider);
+
+#[derive(Debug, Clone)]
+struct TokioHttpClient {
+    client: reqwest::Client,
+    handle: Handle,
+}
+
+#[async_trait::async_trait]
+impl HttpClient for TokioHttpClient {
+    async fn send_bytes(
+        &self,
+        request: http::Request<Bytes>,
+    ) -> Result<http::Response<Bytes>, HttpError> {
+        let client = self.client.clone();
+        self.handle
+            .spawn(async move {
+                let request = request.try_into()?;
+                let mut response = client.execute(request).await?.error_for_status()?;
+                let headers = std::mem::take(response.headers_mut());
+                let status = response.status();
+                let body = response.bytes().await?;
+                let mut http_response = http::Response::builder().status(status).body(body)?;
+                *http_response.headers_mut() = headers;
+                Ok::<_, HttpError>(http_response)
+            })
+            .await?
+    }
+}
 
 pub fn setup(
     endpoint: &str,
@@ -19,7 +50,10 @@ pub fn setup(
     let traces_endpoint = format!("{}/v1/traces", endpoint.trim_end_matches('/'));
     let metrics_endpoint = format!("{}/v1/metrics", endpoint.trim_end_matches('/'));
 
-    let http_client = reqwest::Client::builder().build()?;
+    let http_client = TokioHttpClient {
+        client: reqwest::Client::builder().build()?,
+        handle: Handle::current(),
+    };
 
     let tracer_exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_http()

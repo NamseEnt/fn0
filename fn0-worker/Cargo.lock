@@ -2622,6 +2622,7 @@ name = "fn0-worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "aws-config",
  "aws-sdk-s3",
  "axum",
@@ -2632,6 +2633,7 @@ dependencies = [
  "fn0-adapt-cache",
  "fn0-host-hq-protocol",
  "futures",
+ "http 1.4.0",
  "http-body-util",
  "hyper 1.8.1",
  "hyper-util",
