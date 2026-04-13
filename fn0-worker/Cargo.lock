@@ -2460,9 +2460,9 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54bad7d0670e64c52bd5917c0b17ec618a620ec44401e4aa91e59fbcdb7f59a3"
+checksum = "cad23a6768f5c7a9ec2d37b195ea345cbb9dcb6b6f60b8ff5927166fa6b8545e"
 dependencies = [
  "anyhow",
  "bytes",

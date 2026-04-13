@@ -135,6 +135,9 @@ impl Site {
 
             last_scale_to_at = Some(Instant::now());
 
+            let count = scale_out_target - hosts;
+            telemetry::scaler_action_triggered("scale_out", count);
+
             if let Err(err) = self.host_provider.scale_to(scale_out_target).await {
                 warn!(%err, "Fail to scale_to");
             }

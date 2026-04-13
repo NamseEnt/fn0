@@ -76,7 +76,11 @@ where
         let Some(code_kind) = code_kind else {
             return Err(anyhow!("code_id not found"));
         };
-        match code_kind {
+
+        telemetry::function_invocation(code_id);
+        let start = std::time::Instant::now();
+
+        let result = match code_kind {
             CodeKind::Wasm => Ok(self.wasm_executor.run(code_id, request).await?),
             CodeKind::Js => {
                 let js_code = self
@@ -89,7 +93,11 @@ where
                 let response = ski::run(&js_code, script_path, request, fetch_handler).await?;
                 Ok(response)
             }
-        }
+        };
+
+        telemetry::execution_time(code_id, start.elapsed());
+
+        result
     }
 }
 
