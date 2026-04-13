@@ -120,9 +120,15 @@ async fn handle_connection(mut socket: WebSocket, state: Arc<AppState>) {
 
                     for code in &codes {
                         match code {
-                            host_hq_protocol::CodeDeployment::Deploy { subdomain, .. } => {
-                                if let Err(err) =
-                                    state.bundle_fetcher.fetch_and_register(subdomain).await
+                            host_hq_protocol::CodeDeployment::Deploy {
+                                subdomain,
+                                code_id,
+                                code_version,
+                            } => {
+                                if let Err(err) = state
+                                    .bundle_fetcher
+                                    .fetch_and_register(subdomain, *code_id, *code_version)
+                                    .await
                                 {
                                     tracing::error!(%err, %subdomain, "Failed to fetch bundle");
                                 }

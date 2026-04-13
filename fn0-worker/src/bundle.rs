@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Read;
 use std::string::FromUtf8Error;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
@@ -24,6 +24,7 @@ pub struct BundleFetcher {
     wasm_cache: BundleCache<WasmProxyPre, fn0::wasmtime::Error>,
     js_cache: BundleCache<String, FromUtf8Error>,
     fn0: Arc<Fn0<BundleCache<String, FromUtf8Error>>>,
+    loaded: Mutex<HashMap<String, (u64, u64)>>,
 }
 
 impl BundleFetcher {
@@ -42,10 +43,22 @@ impl BundleFetcher {
             wasm_cache,
             js_cache,
             fn0,
+            loaded: Mutex::new(HashMap::new()),
         }
     }
 
-    pub async fn fetch_and_register(&self, subdomain: &str) -> Result<()> {
+    pub async fn fetch_and_register(
+        &self,
+        subdomain: &str,
+        code_id: u64,
+        code_version: u64,
+    ) -> Result<()> {
+        if let Some(&existing) = self.loaded.lock().unwrap().get(subdomain) {
+            if existing == (code_id, code_version) {
+                return Ok(());
+            }
+        }
+
         let key = format!("bundles/{subdomain}.tar.zst");
         let output = self
             .s3_client
@@ -123,10 +136,16 @@ impl BundleFetcher {
             self.fn0.set_public_assets(subdomain, assets);
         }
 
+        self.loaded
+            .lock()
+            .unwrap()
+            .insert(subdomain.to_string(), (code_id, code_version));
+
         Ok(())
     }
 
     pub async fn unregister(&self, subdomain: &str) {
+        self.loaded.lock().unwrap().remove(subdomain);
         let backend_key = format!("{subdomain}::backend");
         let frontend_key = format!("{subdomain}::frontend");
         self.store.remove(&backend_key);

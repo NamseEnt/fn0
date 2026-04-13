@@ -58,10 +58,37 @@ impl DeploymentCache {
             return Vec::new();
         }
         assert!((deployment_id_start_excluded.0 as usize) < self.cache.count());
-        self.cache
+
+        let mut last_idx_by_subdomain: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let skip = deployment_id_start_excluded.0 as usize;
+        let collected: Vec<Deployment> = self
+            .cache
             .iter()
-            .skip(deployment_id_start_excluded.0 as usize)
-            .map(|(_, deployment)| deployment.clone())
+            .skip(skip)
+            .map(|(_, d)| d.clone())
+            .collect();
+        for (idx, d) in collected.iter().enumerate() {
+            let subdomain = match d {
+                Deployment::Deploy { subdomain, .. } => subdomain,
+                Deployment::Undeploy { subdomain } => subdomain,
+            };
+            last_idx_by_subdomain.insert(subdomain.clone(), idx);
+        }
+        collected
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, d)| {
+                let subdomain = match &d {
+                    Deployment::Deploy { subdomain, .. } => subdomain,
+                    Deployment::Undeploy { subdomain } => subdomain,
+                };
+                if last_idx_by_subdomain.get(subdomain) == Some(&idx) {
+                    Some(d)
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
