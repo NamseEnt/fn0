@@ -114,42 +114,30 @@ async fn get_remote_image_id(
     ssh: &SshClient,
     image: &str,
 ) -> color_eyre::Result<String> {
-    let (status, output) = ssh
-        .exec(&format!(
-            "sudo podman image inspect {image} --format '{{{{.Id}}}}' 2>/dev/null || echo ''"
-        ))
+    let (pull_status, pull_output) = ssh
+        .exec(&format!("sudo podman pull {image}"))
         .await?;
-
-    let id = output.trim().to_string();
-
-    if status != 0 || id.is_empty() {
-        let (pull_status, pull_output) = ssh
-            .exec(&format!("sudo podman pull {image}"))
-            .await?;
-        if pull_status != 0 {
-            return Err(color_eyre::eyre::eyre!(
-                "podman pull failed (exit {}): {}",
-                pull_status,
-                pull_output
-            ));
-        }
-
-        let (status, output) = ssh
-            .exec(&format!(
-                "sudo podman image inspect {image} --format '{{{{.Id}}}}'"
-            ))
-            .await?;
-        if status != 0 {
-            return Err(color_eyre::eyre::eyre!(
-                "podman image inspect failed (exit {}): {}",
-                status,
-                output
-            ));
-        }
-        return Ok(normalize_image_id(output.trim()));
+    if pull_status != 0 {
+        return Err(color_eyre::eyre::eyre!(
+            "podman pull failed (exit {}): {}",
+            pull_status,
+            pull_output
+        ));
     }
 
-    Ok(normalize_image_id(&id))
+    let (status, output) = ssh
+        .exec(&format!(
+            "sudo podman image inspect {image} --format '{{{{.Id}}}}'"
+        ))
+        .await?;
+    if status != 0 {
+        return Err(color_eyre::eyre::eyre!(
+            "podman image inspect failed (exit {}): {}",
+            status,
+            output
+        ));
+    }
+    Ok(normalize_image_id(output.trim()))
 }
 
 async fn get_worker_state(

@@ -150,6 +150,44 @@ export function hqGrafana(
       Buffer.from(`${id}:${pw}`).toString("base64")
     );
 
+  const serviceAccount = new grafana.cloud.StackServiceAccount(
+    "dashboard-sa",
+    {
+      stackSlug: slug,
+      name: "pulumi-dashboard-deployer",
+      role: "Editor",
+    },
+    { parent }
+  );
+
+  const saToken = new grafana.cloud.StackServiceAccountToken(
+    "dashboard-sa-token",
+    {
+      stackSlug: slug,
+      serviceAccountId: serviceAccount.id,
+      name: "pulumi-token",
+    },
+    { parent }
+  );
+
+  const grafanaInstanceProvider = new grafana.Provider(
+    "grafana-instance",
+    {
+      url: stack.url,
+      auth: saToken.key,
+    },
+    { parent }
+  );
+
+  const dashboardJson = require("./fn0-cloud-dashboard.json");
+  new grafana.oss.Dashboard(
+    "fn0-cloud-dashboard",
+    {
+      configJson: JSON.stringify(dashboardJson),
+    },
+    { provider: grafanaInstanceProvider, parent }
+  );
+
   return {
     otlpEndpoint: pulumi.interpolate`http://${releaseName}-alloy-receiver.${namespace}:4317`,
     workerOtlpEndpoint,
