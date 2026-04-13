@@ -1,3 +1,4 @@
+.claude/
 /docker/
 target/
 infra/pulumi/BuildChain/fn0-compiler-layer/
