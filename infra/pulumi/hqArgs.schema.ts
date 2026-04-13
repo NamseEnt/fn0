@@ -10,6 +10,7 @@ export interface HqArgs {
 }
 export interface AwsArgs {
   accessKeyId: pulumi.Input<string>;
+  cwasmBucket: pulumi.Input<string>;
   region: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;

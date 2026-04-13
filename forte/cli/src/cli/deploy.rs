@@ -26,9 +26,12 @@ pub async fn run(project_dir: PathBuf, build_on_remote: Option<&str>) -> Result<
     })
     .await?;
 
-    let wasm_path = project_dir.join("dist/backend.wasm");
+    let dist_dir = project_dir.join("dist");
+    let bundle_path = dist_dir.join("bundle.raw.tar");
 
-    fn0_deploy::deploy(&project_name, &wasm_path).await?;
+    fn0_deploy::create_raw_bundle_forte(&dist_dir, &bundle_path)?;
+
+    fn0_deploy::deploy(&project_name, &bundle_path).await?;
 
     Ok(())
 }

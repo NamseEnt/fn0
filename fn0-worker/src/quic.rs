@@ -1,26 +1,24 @@
-use adapt_cache::s3::S3AdaptCache;
+use crate::WorkerFn0;
+use crate::bundle::BundleFetcher;
 use color_eyre::eyre::{Result, eyre};
-use fn0::{CodeKind, Fn0};
 use host_hq_protocol::{HostToHq, HqToHostDatagram, HqToHostReliable};
 use quinn::Endpoint;
 use rcgen::{CertificateParams, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use std::net::SocketAddr;
-use std::string::FromUtf8Error;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::read_pem_env;
 
-type JsCache = S3AdaptCache<String, FromUtf8Error>;
-
 pub async fn run_quic_server(
     port: u16,
     deployment_id: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
     graceful_shutdown: Arc<AtomicBool>,
-    fn0: Arc<Fn0<JsCache>>,
+    _fn0: Arc<WorkerFn0>,
+    bundle_fetcher: Arc<BundleFetcher>,
 ) -> Result<()> {
     let ca_cert_pem = match read_pem_env("CA_CERT_PEM") {
         Some(v) => v,
@@ -61,13 +59,13 @@ pub async fn run_quic_server(
         let deployment_id = deployment_id.clone();
         let instance_count = instance_count.clone();
         let graceful_shutdown = graceful_shutdown.clone();
-        let fn0 = fn0.clone();
+        let bundle_fetcher = bundle_fetcher.clone();
 
         tokio::spawn(async move {
             match incoming.await {
                 Ok(connection) => {
                     tracing::info!(remote = %connection.remote_address(), "HQ connected");
-                    handle_connection(connection, deployment_id, instance_count, graceful_shutdown, fn0).await;
+                    handle_connection(connection, deployment_id, instance_count, graceful_shutdown, bundle_fetcher).await;
                 }
                 Err(err) => {
                     tracing::warn!(%err, "Failed to accept QUIC connection");
@@ -84,7 +82,7 @@ async fn handle_connection(
     deployment_id: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
     graceful_shutdown: Arc<AtomicBool>,
-    fn0: Arc<Fn0<JsCache>>,
+    bundle_fetcher: Arc<BundleFetcher>,
 ) {
     let datagram_handle = tokio::spawn({
         let connection = connection.clone();
@@ -131,6 +129,7 @@ async fn handle_connection(
         let connection = connection.clone();
         let deployment_id = deployment_id.clone();
         let graceful_shutdown = graceful_shutdown.clone();
+        let bundle_fetcher = bundle_fetcher.clone();
         async move {
             loop {
                 match connection.accept_uni().await {
@@ -162,10 +161,14 @@ async fn handle_connection(
                                 for code in &codes {
                                     match code {
                                         host_hq_protocol::CodeDeployment::Deploy { subdomain, .. } => {
-                                            fn0.register_code(subdomain, CodeKind::Wasm);
+                                            if let Err(err) =
+                                                bundle_fetcher.fetch_and_register(subdomain).await
+                                            {
+                                                tracing::error!(%err, %subdomain, "Failed to fetch bundle");
+                                            }
                                         }
                                         host_hq_protocol::CodeDeployment::Undeploy { subdomain } => {
-                                            fn0.unregister_code(subdomain);
+                                            bundle_fetcher.unregister(subdomain).await;
                                         }
                                     }
                                 }

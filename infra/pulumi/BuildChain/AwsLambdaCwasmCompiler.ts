@@ -3,6 +3,8 @@ import * as aws from "@pulumi/aws";
 import * as docker from "@pulumi/docker";
 import * as command from "@pulumi/command";
 import * as path from "node:path";
+import * as fs from "node:fs";
+import * as crypto from "node:crypto";
 
 export interface AwsLambdaCwasmCompilerArgs {
   region: pulumi.Input<string>;
@@ -111,11 +113,24 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    const lambdaArchive = new pulumi.asset.AssetArchive({
-      "index.mjs": new pulumi.asset.FileAsset(
-        path.join(__dirname, "cwasm-compiler-lambda/index.mjs")
-      ),
-    });
+    const lambdaDir = path.join(__dirname, "cwasm-compiler-lambda");
+    const lambdaLockHash = crypto
+      .createHash("sha256")
+      .update(fs.readFileSync(path.join(lambdaDir, "package-lock.json")))
+      .digest("hex");
+
+    const installLambdaDeps = new command.local.Command(
+      "install-cwasm-compiler-lambda-deps",
+      {
+        create: `cd ${lambdaDir} && npm ci --omit=dev`,
+        triggers: [lambdaLockHash],
+      },
+      { parent: this }
+    );
+
+    const lambdaArchive = installLambdaDeps.stdout.apply(
+      () => new pulumi.asset.FileArchive(lambdaDir)
+    );
 
     const lambda = new aws.lambda.Function(
       "cwasm-compiler-lambda",
@@ -125,7 +140,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         handler: "index.handler",
         architectures: ["arm64"],
         layers: [fn0WasmtimeLayer.arn],
-        timeout: 20,
+        timeout: 60,
         memorySize: 10240,
         role: lambdaRole.arn,
         code: lambdaArchive,
@@ -136,7 +151,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
           },
         },
       },
-      { parent: this }
+      { parent: this, dependsOn: [installLambdaDeps] }
     );
 
     new aws.lambda.EventSourceMapping(

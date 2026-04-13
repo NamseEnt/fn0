@@ -48,9 +48,9 @@ impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for S
         let bytes = if let Some(data) = cache.get(id) {
             Bytes::copy_from_slice(data)
         } else {
-            let path = match id {
-                "backend" => &self.backend_path,
-                "frontend" => &self.frontend_path,
+            let (path, is_backend) = match id {
+                "app::backend" => (&self.backend_path, true),
+                "app::frontend" => (&self.frontend_path, false),
                 _ => return Err(adapt_cache::Error::NotFound),
             };
 
@@ -62,7 +62,7 @@ impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for S
                 }
             };
 
-            if id == "backend" {
+            if is_backend {
                 match fn0::compile(&data) {
                     Ok(cwasm) => {
                         data = cwasm;

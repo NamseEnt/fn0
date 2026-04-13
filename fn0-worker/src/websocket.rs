@@ -1,26 +1,23 @@
-use adapt_cache::s3::S3AdaptCache;
+use crate::WorkerFn0;
+use crate::bundle::BundleFetcher;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::WebSocketUpgrade;
 use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::Router;
 use color_eyre::eyre::Result;
-use fn0::{CodeKind, Fn0};
 use futures::{SinkExt, StreamExt};
 use host_hq_protocol::{HostToHq, WsHostToHq, WsHqToHost};
 use std::net::SocketAddr;
-use std::string::FromUtf8Error;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-type JsCache = S3AdaptCache<String, FromUtf8Error>;
 
 struct AppState {
     deployment_id: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
     graceful_shutdown: Arc<AtomicBool>,
-    fn0: Arc<Fn0<JsCache>>,
+    bundle_fetcher: Arc<BundleFetcher>,
     ws_secret: Option<String>,
 }
 
@@ -29,7 +26,8 @@ pub async fn run_websocket_server(
     deployment_id: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
     graceful_shutdown: Arc<AtomicBool>,
-    fn0: Arc<Fn0<JsCache>>,
+    _fn0: Arc<WorkerFn0>,
+    bundle_fetcher: Arc<BundleFetcher>,
 ) -> Result<()> {
     let ws_secret = std::env::var("WS_SECRET").ok();
 
@@ -37,7 +35,7 @@ pub async fn run_websocket_server(
         deployment_id,
         instance_count,
         graceful_shutdown,
-        fn0,
+        bundle_fetcher,
         ws_secret,
     });
 
@@ -123,10 +121,14 @@ async fn handle_connection(mut socket: WebSocket, state: Arc<AppState>) {
                     for code in &codes {
                         match code {
                             host_hq_protocol::CodeDeployment::Deploy { subdomain, .. } => {
-                                state.fn0.register_code(subdomain, CodeKind::Wasm);
+                                if let Err(err) =
+                                    state.bundle_fetcher.fetch_and_register(subdomain).await
+                                {
+                                    tracing::error!(%err, %subdomain, "Failed to fetch bundle");
+                                }
                             }
                             host_hq_protocol::CodeDeployment::Undeploy { subdomain } => {
-                                state.fn0.unregister_code(subdomain);
+                                state.bundle_fetcher.unregister(subdomain).await;
                             }
                         }
                     }

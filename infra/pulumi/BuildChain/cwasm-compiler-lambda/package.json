@@ -1,0 +1,9 @@
+{
+  "name": "cwasm-compiler-lambda",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "tar": "^7.4.3"
+  }
+}

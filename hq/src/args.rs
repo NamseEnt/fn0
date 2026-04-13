@@ -25,6 +25,7 @@ pub struct SelfDnsArgs {
 pub struct AwsArgs {
     pub region: String,
     pub wasm_bucket: String,
+    pub cwasm_bucket: String,
     pub access_key_id: String,
     pub secret_access_key: String,
 }

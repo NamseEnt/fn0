@@ -7,7 +7,7 @@ edition = "2024"
 debug = true
 
 [dependencies]
-fn0 = "0.2"
+fn0 = { path = "../fn0" }
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
 host-hq-protocol = { package = "fn0-host-hq-protocol", path = "../host-hq-protocol", version = "0.2" }
 futures = "0.3"
@@ -40,3 +40,4 @@ async-trait = "0.1"
 axum = { version = "0.8", features = ["ws"] }
 anyhow = "1"
 zstd = "0.13"
+tar = "0.4"

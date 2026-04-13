@@ -449,6 +449,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
 async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()> {
     run_codegen(project_dir).await?;
     build_backend(project_dir)?;
-    handle.cache.invalidate("backend").await;
+    handle.cache.invalidate("app::backend").await;
     Ok(())
 }

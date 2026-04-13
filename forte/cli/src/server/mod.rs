@@ -1,16 +1,15 @@
 mod cache;
-mod fetch_handler;
 pub mod vite_dev;
 
 use anyhow::Result;
 pub use cache::SimpleCache;
-use fetch_handler::ForteFetchHandler;
-use fn0::{CodeKind, DeploymentMap, EnvVars, Fn0};
+use fn0::{Deployment, DeploymentMap, EnvVars, Fn0};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -61,10 +60,39 @@ pub fn create_env_vars(project_root: &Path) -> EnvVars {
     Arc::new(RwLock::new(load_env_file(project_root)))
 }
 
+async fn load_public_assets(public_dir: &Path) -> HashMap<String, Vec<u8>> {
+    let mut assets = HashMap::new();
+    if !public_dir.exists() {
+        return assets;
+    }
+    let mut stack = vec![public_dir.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(mut rd) = tokio::fs::read_dir(&dir).await else {
+            continue;
+        };
+        while let Ok(Some(entry)) = rd.next_entry().await {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if let Ok(bytes) = tokio::fs::read(&path).await {
+                if let Ok(rel) = path.strip_prefix(public_dir) {
+                    let key = format!("/{}", rel.to_string_lossy().replace('\\', "/"));
+                    assets.insert(key, bytes);
+                }
+            }
+        }
+    }
+    assets
+}
+
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let mut deployment_map = DeploymentMap::new();
-    deployment_map.register_code("backend", CodeKind::Wasm);
-    deployment_map.register_code("frontend", CodeKind::Js);
+    deployment_map.register_deployment(
+        "app",
+        Deployment::Forte {
+            frontend_script_path: config.frontend_path.clone(),
+        },
+    );
 
     let cache = SimpleCache::new(config.backend_path.clone(), config.frontend_path.clone());
 
@@ -77,17 +105,22 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
         config.env_vars,
     ));
 
+    let public_dir = Arc::new(config.public_dir);
+
+    if vite_socket_path.is_none() {
+        let assets = load_public_assets(&public_dir).await;
+        fn0.set_public_assets("app", assets);
+    }
+
     let handle = ServerHandle {
         cache: cache.clone(),
         fn0: fn0.clone(),
     };
-    let public_dir = Arc::new(config.public_dir);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://localhost:{}", config.port);
 
-    let frontend_path = Arc::new(config.frontend_path);
     tokio::spawn(async move {
         loop {
             let (socket, _) = match listener.accept().await {
@@ -99,7 +132,6 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
             };
             let fn0_clone = fn0.clone();
             let public_dir_clone = public_dir.clone();
-            let frontend_path_clone = frontend_path.clone();
             let vite_socket_path_clone = vite_socket_path.clone();
 
             tokio::spawn(async move {
@@ -109,9 +141,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                     service_fn(move |req| {
                         let fn0 = fn0_clone.clone();
                         let public_dir = public_dir_clone.clone();
-                        let frontend_path = frontend_path_clone.clone();
                         let vite_socket = vite_socket_path_clone.clone();
-                        handle_request(req, fn0, public_dir, frontend_path, vite_socket)
+                        handle_request(req, fn0, public_dir, vite_socket)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -128,7 +159,6 @@ async fn handle_request(
     req: Request<hyper::body::Incoming>,
     fn0: Arc<Fn0<SimpleCache>>,
     public_dir: Arc<PathBuf>,
-    frontend_path: Arc<String>,
     vite_socket_path: Option<Arc<PathBuf>>,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
@@ -152,119 +182,95 @@ async fn handle_request(
         }
     }
 
-    if let Some(static_response) = try_serve_static(&public_dir, path).await {
-        return Ok(static_response);
-    }
-
-    let original_headers = req.headers().clone();
-
-    let backend_response = match fn0
-        .run(
-            "backend",
-            "",
-            req.map(|body| {
-                UnsyncBoxBody::new(body)
-                    .map_err(|e| anyhow::anyhow!(e))
-                    .boxed_unsync()
-            }),
-            None,
-        )
-        .await
-    {
-        Ok(resp) => resp,
-        Err(e) => {
-            eprintln!("Backend error: {:?}", e);
-            return Err(anyhow::anyhow!("Backend error: {:?}", e));
+    if vite_socket_path.is_some() {
+        if let Some(static_response) = try_serve_static(&public_dir, path).await {
+            return Ok(static_response);
         }
-    };
-
-    let backend_status = backend_response.status();
-
-    if backend_status.is_redirection() {
-        return Ok(backend_response);
     }
 
-    if backend_status.is_client_error() || backend_status.is_server_error() {
-        let (parts, body) = backend_response.into_parts();
-        let body_bytes = body.collect().await?.to_bytes();
-        let body_str = String::from_utf8_lossy(&body_bytes);
-        if backend_status != StatusCode::NOT_FOUND {
-            eprintln!("Backend error: {} {} - {}", backend_status, path, body_str);
+    let mapped_req = req.map(|body| {
+        UnsyncBoxBody::new(body)
+            .map_err(|e| anyhow::anyhow!(e))
+            .boxed_unsync()
+    });
+
+    if let Some(socket_path) = &vite_socket_path {
+        let original_headers = mapped_req.headers().clone();
+
+        let backend_response = match fn0.run_backend_only("app", mapped_req).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                eprintln!("Backend error: {:?}", e);
+                return Err(anyhow::anyhow!("Backend error: {:?}", e));
+            }
+        };
+
+        let backend_status = backend_response.status();
+
+        if backend_status.is_redirection() {
+            return Ok(backend_response);
         }
 
-        return Ok(fn0::Response::from_parts(
-            parts,
-            UnsyncBoxBody::new(body_str.to_string())
-                .map_err(|e| anyhow::anyhow!(e))
-                .boxed_unsync(),
-        ));
-    }
-
-    if path.starts_with("/__forte_hook/") || path.starts_with("/__forte_action/") {
-        return Ok(backend_response);
-    }
-
-    {
-        if let Some(socket_path) = &vite_socket_path {
-            let backend_set_cookies: Vec<_> = backend_response
-                .headers()
-                .get_all(http::header::SET_COOKIE)
-                .iter()
-                .cloned()
-                .collect();
-
-            let (_, body) = backend_response.into_parts();
+        if backend_status.is_client_error() || backend_status.is_server_error() {
+            let (parts, body) = backend_response.into_parts();
             let body_bytes = body.collect().await?.to_bytes();
-            let props: serde_json::Value = serde_json::from_slice(&body_bytes)?;
-
-            let cookie_header = original_headers
-                .get(http::header::COOKIE)
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string());
-
-            let host = original_headers
-                .get(http::header::HOST)
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("localhost");
-            let full_url = format!("http://{}{}", host, uri);
-            let mut ssr_response =
-                call_vite_ssr_uds(socket_path, &full_url, props, cookie_header).await?;
-
-            for cookie_value in backend_set_cookies {
-                ssr_response
-                    .headers_mut()
-                    .append(http::header::SET_COOKIE, cookie_value);
+            let body_str = String::from_utf8_lossy(&body_bytes);
+            if backend_status != StatusCode::NOT_FOUND {
+                eprintln!("Backend error: {} {} - {}", backend_status, path, body_str);
             }
 
-            return Ok(ssr_response);
+            return Ok(fn0::Response::from_parts(
+                parts,
+                UnsyncBoxBody::new(body_str.to_string())
+                    .map_err(|e| anyhow::anyhow!(e))
+                    .boxed_unsync(),
+            ));
         }
-    }
 
-    let frontend_request = Request::builder()
-        .method("POST")
-        .uri(uri)
-        .header("content-type", "application/json")
-        .body(backend_response.into_body())?;
+        if path.starts_with("/__forte_hook/") || path.starts_with("/__forte_action/") {
+            return Ok(backend_response);
+        }
 
-    let fetch_handler = Arc::new(ForteFetchHandler::new(fn0.clone(), original_headers));
-    let mut ssr_response = fn0
-        .run(
-            "frontend",
-            &frontend_path,
-            frontend_request,
-            Some(fetch_handler.clone()),
-        )
-        .await?;
+        let backend_set_cookies: Vec<_> = backend_response
+            .headers()
+            .get_all(http::header::SET_COOKIE)
+            .iter()
+            .cloned()
+            .collect();
 
-    for cookie in fetch_handler.get_collected_cookies() {
-        if let Ok(value) = cookie.parse() {
+        let (_, body) = backend_response.into_parts();
+        let body_bytes = body.collect().await?.to_bytes();
+        let props: serde_json::Value = serde_json::from_slice(&body_bytes)?;
+
+        let cookie_header = original_headers
+            .get(http::header::COOKIE)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        let host = original_headers
+            .get(http::header::HOST)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("localhost");
+        let full_url = format!("http://{}{}", host, uri);
+        let mut ssr_response =
+            call_vite_ssr_uds(socket_path, &full_url, props, cookie_header).await?;
+
+        for cookie_value in backend_set_cookies {
             ssr_response
                 .headers_mut()
-                .append(http::header::SET_COOKIE, value);
+                .append(http::header::SET_COOKIE, cookie_value);
         }
+
+        return Ok(ssr_response);
     }
 
-    Ok(ssr_response)
+    match fn0.run("app", "", mapped_req, None).await {
+        Ok(resp) => Ok(resp),
+        Err(e) => {
+            eprintln!("Request error: {:?}", e);
+            Err(anyhow::anyhow!("Request error: {:?}", e))
+        }
+    }
 }
 
 async fn try_serve_static(public_dir: &PathBuf, path: &str) -> Option<fn0::Response> {

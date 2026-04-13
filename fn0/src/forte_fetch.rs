@@ -1,33 +1,46 @@
+use crate::Fn0;
+use adapt_cache::AdaptCache;
 use bytes::Bytes;
-use fn0::{FetchHandler, FetchHandlerFuture, Fn0};
-use http::HeaderMap;
+use hyper::HeaderMap;
+use hyper::http;
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
+use ski::{FetchHandler, FetchHandlerFuture};
+use std::string::FromUtf8Error;
 use std::sync::{Arc, Mutex};
 
-use super::SimpleCache;
-
-pub struct ForteFetchHandler {
-    fn0: Arc<Fn0<SimpleCache>>,
+pub(crate) struct ForteFetchHandler<J>
+where
+    J: AdaptCache<String, FromUtf8Error> + 'static,
+{
+    fn0: Arc<Fn0<J>>,
+    code_id: String,
     original_headers: HeaderMap,
     collected_cookies: Arc<Mutex<Vec<String>>>,
 }
 
-impl ForteFetchHandler {
-    pub fn new(fn0: Arc<Fn0<SimpleCache>>, original_headers: HeaderMap) -> Self {
+impl<J> ForteFetchHandler<J>
+where
+    J: AdaptCache<String, FromUtf8Error> + 'static,
+{
+    pub(crate) fn new(fn0: Arc<Fn0<J>>, code_id: String, original_headers: HeaderMap) -> Self {
         Self {
             fn0,
+            code_id,
             original_headers,
             collected_cookies: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    pub fn get_collected_cookies(&self) -> Vec<String> {
+    pub(crate) fn get_collected_cookies(&self) -> Vec<String> {
         self.collected_cookies.lock().unwrap().clone()
     }
 }
 
-impl FetchHandler for ForteFetchHandler {
-    fn handle(&self, req: fn0::Request) -> FetchHandlerFuture {
+impl<J> FetchHandler for ForteFetchHandler<J>
+where
+    J: AdaptCache<String, FromUtf8Error> + Send + Sync + 'static,
+{
+    fn handle(&self, req: crate::Request) -> FetchHandlerFuture {
         let path = req.uri().path().to_string();
 
         if !path.starts_with("/__forte_hook/") {
@@ -35,6 +48,7 @@ impl FetchHandler for ForteFetchHandler {
         }
 
         let fn0 = self.fn0.clone();
+        let code_id = self.code_id.clone();
         let original_headers = self.original_headers.clone();
         let collected_cookies = self.collected_cookies.clone();
 
@@ -88,7 +102,7 @@ impl FetchHandler for ForteFetchHandler {
             parts.uri = uri;
 
             let req = hyper::Request::from_parts(parts, body);
-            let response = fn0.run("backend", "", req, None).await;
+            let response = fn0.run_forte_backend(&code_id, "", req, None).await;
 
             match response {
                 Ok(resp) => {
