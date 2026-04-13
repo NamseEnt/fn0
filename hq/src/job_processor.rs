@@ -3,7 +3,14 @@ use doc_db::DocDb;
 use std::time::Duration;
 use tracing::*;
 
-pub async fn run(doc_db: DocDb, s3_client: S3Client) {
+use crate::wasmtime_migration;
+
+pub async fn run(
+    doc_db: DocDb,
+    s3_client: S3Client,
+    wasm_bucket: String,
+    cwasm_bucket: String,
+) {
     let mut interval = tokio::time::interval(Duration::from_secs(2));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -23,6 +30,22 @@ pub async fn run(doc_db: DocDb, s3_client: S3Client) {
 
         let result = match job.task_name.as_str() {
             "delete_wasm" => process_delete_wasm(&s3_client, &job.payload).await,
+            "wasmtime_rebuild" => {
+                wasmtime_migration::process_rebuild(
+                    &s3_client,
+                    &doc_db,
+                    &wasm_bucket,
+                    &cwasm_bucket,
+                    &job.payload,
+                )
+                .await
+            }
+            "wasmtime_finalize" => {
+                wasmtime_migration::process_finalize(&doc_db, &cwasm_bucket, &job.payload).await
+            }
+            "wasmtime_cleanup" => {
+                wasmtime_migration::process_cleanup(&s3_client, &doc_db, &job.payload).await
+            }
             other => {
                 warn!(task = other, "Unknown job task");
                 Ok(())

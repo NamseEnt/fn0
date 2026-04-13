@@ -1,4 +1,10 @@
-import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  PutObjectCommand,
+  CopyObjectCommand,
+} from "@aws-sdk/client-s3";
 import { execSync } from "node:child_process";
 import { readFileSync, createWriteStream, existsSync, promises as fsp } from "node:fs";
 import { rm, mkdir, readdir } from "node:fs/promises";
@@ -11,6 +17,10 @@ export async function handler(event) {
   const s3Client = new S3Client({});
 
   const cWasmBucketName = process.env.CWASM_BUCKET;
+  const wasmtimeVersion = process.env.WASMTIME_VERSION;
+  if (!wasmtimeVersion) {
+    throw new Error("WASMTIME_VERSION env var is required");
+  }
   const fn0WasmtimePath = `/opt/fn0-wasmtime`;
 
   if (event.Records.length !== 1) {
@@ -82,7 +92,7 @@ export async function handler(event) {
   await fsp.writeFile(outputTarZstPath, zstBytes);
 
   const subdomain = key.replace(/\.raw\.tar$/, "").replace(/^bundles\//, "");
-  const outKey = `bundles/${subdomain}.tar.zst`;
+  const outKey = `bundles/wasmtime-${wasmtimeVersion}/${subdomain}.tar.zst`;
 
   console.log(`put ${outKey} to ${cWasmBucketName}`);
   const outBytes = readFileSync(outputTarZstPath);
@@ -94,7 +104,17 @@ export async function handler(event) {
     })
   );
 
-  console.log("delete raw.tar from source bucket");
+  const archiveKey = `raw/${subdomain}.raw.tar`;
+  console.log(`archive raw.tar -> ${archiveKey}`);
+  await s3Client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      Key: archiveKey,
+      CopySource: encodeURIComponent(`${bucket}/${key}`),
+    })
+  );
+
+  console.log("delete original raw.tar from upload location");
   await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 
   await Promise.all([

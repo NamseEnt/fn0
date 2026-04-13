@@ -2471,7 +2471,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2639,6 +2639,7 @@ dependencies = [
  "fn0",
  "fn0-adapt-cache",
  "fn0-host-hq-protocol",
+ "fn0-wasmtime",
  "futures",
  "http 1.4.0",
  "http-body-util",

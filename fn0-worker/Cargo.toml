@@ -8,6 +8,7 @@ debug = true
 
 [dependencies]
 fn0 = { path = "../fn0" }
+fn0-wasmtime = { path = "../fn0-wasmtime" }
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
 host-hq-protocol = { package = "fn0-host-hq-protocol", path = "../host-hq-protocol", version = "0.2" }
 futures = "0.3"

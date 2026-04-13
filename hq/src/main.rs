@@ -13,6 +13,7 @@ mod self_dns;
 mod site;
 mod ssh;
 mod telemetry;
+mod wasmtime_migration;
 
 use args::HqArgs;
 use args_parse::DeployContext;
@@ -45,6 +46,21 @@ fn main() -> Result<()> {
         self_dns::register(self_dns_args).await?;
 
         deploy_context.doc_db.ensure_job_tables().await?;
+        deploy_context.doc_db.ensure_wasmtime_tables().await?;
+
+        let initial_deployments = deploy_context
+            .doc_db
+            .all_deployments()
+            .await
+            .unwrap_or_default();
+        if let Err(err) = wasmtime_migration::ensure_migration(
+            &deploy_context.doc_db,
+            &initial_deployments,
+        )
+        .await
+        {
+            warn!(%err, "Failed to ensure wasmtime migration on startup");
+        }
 
         let mut set = JoinSet::new();
 
@@ -56,8 +72,10 @@ fn main() -> Result<()> {
         {
             let doc_db = deploy_context.doc_db.clone();
             let s3_client = deploy_context.s3_client.clone();
+            let wasm_bucket = deploy_context.wasm_bucket.clone();
+            let cwasm_bucket = deploy_context.cwasm_bucket.clone();
             set.spawn(async move {
-                job_processor::run(doc_db, s3_client).await;
+                job_processor::run(doc_db, s3_client, wasm_bucket, cwasm_bucket).await;
                 Ok(())
             });
         }

@@ -46,7 +46,8 @@ impl BundleFetcher {
     }
 
     pub async fn fetch_and_register(&self, subdomain: &str) -> Result<()> {
-        let key = format!("bundles/{subdomain}.tar.zst");
+        let wasmtime_version = fn0_wasmtime::WASMTIME_VERSION;
+        let key = format!("bundles/wasmtime-{wasmtime_version}/{subdomain}.tar.zst");
         let output = self
             .s3_client
             .get_object()

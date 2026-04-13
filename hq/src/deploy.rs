@@ -184,22 +184,49 @@ pub async fn handle_deploy_destroy(
         Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get project: {}", e) }),
     };
 
-    let job_id = uuid::Uuid::new_v4().to_string();
-    let s3_key = format!("bundles/{}.tar.zst", project.subdomain);
-    let job_payload = serde_json::json!({
-        "s3_key": s3_key,
-        "bucket": ctx.cwasm_bucket,
+    let raw_job_id = format!("delete_raw:{}", project.subdomain);
+    let raw_job_payload = serde_json::json!({
+        "s3_key": format!("raw/{}.raw.tar", project.subdomain),
+        "bucket": ctx.wasm_bucket,
     })
     .to_string();
 
     if let Err(e) = ctx
         .doc_db
-        .insert_undeployment_with_job(&project.subdomain, &job_id, &job_payload)
+        .insert_undeployment_with_job(&project.subdomain, &raw_job_id, &raw_job_payload)
         .await
     {
         return json_response(500, &ErrorResponse {
             error: format!("Failed to destroy deployment: {}", e),
         });
+    }
+
+    let state = match ctx.doc_db.get_wasmtime_state().await {
+        Ok(s) => s,
+        Err(e) => {
+            return json_response(500, &ErrorResponse {
+                error: format!("Failed to read wasmtime state: {}", e),
+            });
+        }
+    };
+
+    for version in state.known_versions {
+        let cleanup_payload = serde_json::json!({
+            "bucket": ctx.cwasm_bucket,
+            "key": format!("bundles/wasmtime-{}/{}.tar.zst", version, project.subdomain),
+            "forget_version": serde_json::Value::Null,
+        })
+        .to_string();
+        let job_id = format!("delete_cwasm:{}:{}", version, project.subdomain);
+        if let Err(e) = ctx
+            .doc_db
+            .insert_job(&job_id, "wasmtime_cleanup", &cleanup_payload)
+            .await
+        {
+            return json_response(500, &ErrorResponse {
+                error: format!("Failed to enqueue cleanup job: {}", e),
+            });
+        }
     }
 
     json_response(200, &serde_json::json!({"ok": true, "subdomain": project.subdomain}))

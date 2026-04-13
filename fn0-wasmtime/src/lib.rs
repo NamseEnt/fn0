@@ -3,6 +3,15 @@ use wasmtime::*;
 
 pub use wasmtime;
 
+/// Identifier of the wasmtime build that this binary uses to precompile/run modules.
+///
+/// Bump this whenever the underlying `wasmtime` crate version changes or whenever
+/// any setting in [`engine_config`] changes in a way that invalidates previously
+/// produced cwasm artifacts. HQ uses this constant to decide when to rebuild all
+/// user wasm bundles, and workers use it to look up the cwasm bundles they can
+/// actually load.
+pub const WASMTIME_VERSION: &str = "42";
+
 pub fn engine_config() -> Config {
     const MB: usize = 1024 * 1024;
 

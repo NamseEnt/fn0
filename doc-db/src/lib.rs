@@ -2,9 +2,11 @@ mod deployment;
 mod job_queue;
 mod project;
 mod scale_config;
+mod wasmtime_migration;
 
 pub use deployment::*;
 pub use job_queue::*;
+pub use wasmtime_migration::*;
 use libsql::{Builder, Database, Result};
 pub use scale_config::*;
 use std::sync::Arc;

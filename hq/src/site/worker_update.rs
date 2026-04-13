@@ -23,6 +23,25 @@ impl Site {
         loop {
             interval.tick().await;
 
+            match self.doc_db.get_wasmtime_state().await {
+                Ok(state) => {
+                    let hq_version = fn0_wasmtime::WASMTIME_VERSION;
+                    let active = state.active_version.as_deref().unwrap_or("");
+                    if active != hq_version {
+                        info!(
+                            active,
+                            hq = hq_version,
+                            "Skipping worker rolling update; cwasm rebuild not finalized yet"
+                        );
+                        continue;
+                    }
+                }
+                Err(err) => {
+                    warn!(%err, "Failed to read wasmtime state; skipping worker update");
+                    continue;
+                }
+            }
+
             let hosts = match self.host_provider.list_hosts().await {
                 Ok(hosts) => hosts,
                 Err(err) => {
