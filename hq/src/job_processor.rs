@@ -53,7 +53,7 @@ async fn process_delete_wasm(s3_client: &S3Client, payload: &str) -> Result<(), 
     #[derive(serde::Deserialize)]
     struct DeleteWasmPayload {
         s3_key: String,
-        wasm_bucket: String,
+        bucket: String,
     }
 
     let payload: DeleteWasmPayload =
@@ -61,7 +61,7 @@ async fn process_delete_wasm(s3_client: &S3Client, payload: &str) -> Result<(), 
 
     s3_client
         .delete_object()
-        .bucket(&payload.wasm_bucket)
+        .bucket(&payload.bucket)
         .key(&payload.s3_key)
         .send()
         .await

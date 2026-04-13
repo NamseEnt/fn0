@@ -101,7 +101,7 @@ pub async fn handle_deploy_start(
     };
 
     let deploy_job_id = uuid::Uuid::new_v4().to_string();
-    let s3_key = format!("{}.wasm", project.subdomain);
+    let s3_key = format!("bundles/{}.raw.tar", project.subdomain);
 
     let presigning_config = match PresigningConfig::expires_in(std::time::Duration::from_secs(300)) {
         Ok(c) => c,
@@ -185,10 +185,10 @@ pub async fn handle_deploy_destroy(
     };
 
     let job_id = uuid::Uuid::new_v4().to_string();
-    let s3_key = format!("{}.wasm", project.subdomain);
+    let s3_key = format!("bundles/{}.tar.zst", project.subdomain);
     let job_payload = serde_json::json!({
         "s3_key": s3_key,
-        "wasm_bucket": ctx.wasm_bucket,
+        "bucket": ctx.cwasm_bucket,
     })
     .to_string();
 

@@ -138,6 +138,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   certificate: quicCaCert.certPem,
   awsRegion: awsRegion,
   wasmBucket: wasmS3.bucket,
+  cwasmBucket: cwasmS3Pusher.cwasmZstBucket,
   awsAccessKeyId: hqAwsAccessKey.id,
   awsSecretAccessKey: hqAwsAccessKey.secret,
   wsSecret: wsSecret.result,

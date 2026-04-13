@@ -15,6 +15,7 @@ use crate::{
 pub struct DeployContext {
     pub s3_client: S3Client,
     pub wasm_bucket: String,
+    pub cwasm_bucket: String,
     pub doc_db: DocDb,
 }
 
@@ -55,6 +56,7 @@ impl HqArgs {
         let deploy_context = Arc::new(DeployContext {
             s3_client,
             wasm_bucket: args.aws.wasm_bucket,
+            cwasm_bucket: args.aws.cwasm_bucket,
             doc_db: doc_db.clone(),
         });
 

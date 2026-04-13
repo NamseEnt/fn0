@@ -123,7 +123,7 @@ pub async fn get_github_token() -> Result<String> {
     Ok(token)
 }
 
-pub async fn deploy(project_name: &str, wasm_path: &Path) -> Result<()> {
+pub async fn deploy(project_name: &str, bundle_tar_path: &Path) -> Result<()> {
     let github_token = get_github_token().await?;
 
     let client = reqwest::Client::new();
@@ -144,17 +144,18 @@ pub async fn deploy(project_name: &str, wasm_path: &Path) -> Result<()> {
 
     println!("Subdomain: {}.fn0.dev", start_resp.subdomain);
 
-    println!("Uploading WASM...");
-    let wasm_bytes = std::fs::read(wasm_path)
-        .map_err(|e| anyhow!("Failed to read {}: {}", wasm_path.display(), e))?;
+    println!("Uploading bundle...");
+    let bundle_bytes = std::fs::read(bundle_tar_path)
+        .map_err(|e| anyhow!("Failed to read {}: {}", bundle_tar_path.display(), e))?;
 
     client
         .put(&start_resp.presigned_url)
-        .body(wasm_bytes)
+        .header("content-type", "application/x-tar")
+        .body(bundle_bytes)
         .send()
         .await?
         .error_for_status()
-        .map_err(|e| anyhow!("WASM upload failed: {}", e))?;
+        .map_err(|e| anyhow!("Bundle upload failed: {}", e))?;
 
     println!("Requesting deploy finish...");
     client
@@ -172,5 +173,75 @@ pub async fn deploy(project_name: &str, wasm_path: &Path) -> Result<()> {
 
     println!("Deploy complete!");
 
+    Ok(())
+}
+
+pub fn create_raw_bundle_wasm(wasm_path: &Path, output_path: &Path) -> Result<()> {
+    let file = std::fs::File::create(output_path)
+        .map_err(|e| anyhow!("Failed to create {}: {}", output_path.display(), e))?;
+    let mut builder = tar::Builder::new(file);
+
+    let manifest = br#"{"kind":"wasm"}"#;
+    append_bytes(&mut builder, "manifest.json", manifest)?;
+
+    let wasm_bytes = std::fs::read(wasm_path)
+        .map_err(|e| anyhow!("Failed to read {}: {}", wasm_path.display(), e))?;
+    append_bytes(&mut builder, "backend.wasm", &wasm_bytes)?;
+
+    builder.finish()?;
+    Ok(())
+}
+
+pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()> {
+    let file = std::fs::File::create(output_path)
+        .map_err(|e| anyhow!("Failed to create {}: {}", output_path.display(), e))?;
+    let mut builder = tar::Builder::new(file);
+
+    let manifest = br#"{"kind":"forte","frontend_script_path":"/frontend.js"}"#;
+    append_bytes(&mut builder, "manifest.json", manifest)?;
+
+    let backend_wasm = dist_dir.join("backend.wasm");
+    let wasm_bytes = std::fs::read(&backend_wasm)
+        .map_err(|e| anyhow!("Failed to read {}: {}", backend_wasm.display(), e))?;
+    append_bytes(&mut builder, "backend.wasm", &wasm_bytes)?;
+
+    let server_js = dist_dir.join("server.js");
+    let server_bytes = std::fs::read(&server_js)
+        .map_err(|e| anyhow!("Failed to read {}: {}", server_js.display(), e))?;
+    append_bytes(&mut builder, "frontend.js", &server_bytes)?;
+
+    let public_dir = dist_dir.join("public");
+    if public_dir.exists() {
+        for entry in walkdir::WalkDir::new(&public_dir).into_iter().filter_map(|e| e.ok()) {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let rel = entry
+                .path()
+                .strip_prefix(&public_dir)
+                .map_err(|e| anyhow!("strip_prefix failed: {}", e))?;
+            let tar_path = format!("public/{}", rel.to_string_lossy().replace('\\', "/"));
+            let bytes = std::fs::read(entry.path())
+                .map_err(|e| anyhow!("Failed to read {}: {}", entry.path().display(), e))?;
+            append_bytes(&mut builder, &tar_path, &bytes)?;
+        }
+    }
+
+    builder.finish()?;
+    Ok(())
+}
+
+fn append_bytes<W: std::io::Write>(
+    builder: &mut tar::Builder<W>,
+    path: &str,
+    data: &[u8],
+) -> Result<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_size(data.len() as u64);
+    header.set_mode(0o644);
+    header.set_cksum();
+    builder
+        .append_data(&mut header, path, data)
+        .map_err(|e| anyhow!("tar append failed for {}: {}", path, e))?;
     Ok(())
 }

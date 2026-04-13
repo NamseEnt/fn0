@@ -3,3 +3,4 @@
 /bin/
 /node_modules/
 /.layer-cache/
+BuildChain/cwasm-compiler-lambda/node_modules/

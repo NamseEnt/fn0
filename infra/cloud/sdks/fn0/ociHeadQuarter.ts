@@ -49,6 +49,9 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             if (args?.compartmentId === undefined && !opts.urn) {
                 throw new Error("Missing required property 'compartmentId'");
             }
+            if (args?.cwasmBucket === undefined && !opts.urn) {
+                throw new Error("Missing required property 'cwasmBucket'");
+            }
             if (args?.dnsProvider === undefined && !opts.urn) {
                 throw new Error("Missing required property 'dnsProvider'");
             }
@@ -99,6 +102,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             resourceInputs["awsSecretAccessKey"] = args?.awsSecretAccessKey;
             resourceInputs["certificate"] = args?.certificate;
             resourceInputs["compartmentId"] = args?.compartmentId;
+            resourceInputs["cwasmBucket"] = args?.cwasmBucket;
             resourceInputs["dnsProvider"] = args?.dnsProvider;
             resourceInputs["docDbToken"] = args?.docDbToken;
             resourceInputs["docDbUrl"] = args?.docDbUrl;
@@ -132,6 +136,7 @@ export interface OciHeadQuarterArgs {
     awsSecretAccessKey: pulumi.Input<string>;
     certificate: pulumi.Input<string>;
     compartmentId: pulumi.Input<string>;
+    cwasmBucket: pulumi.Input<string>;
     dnsProvider: pulumi.Input<inputs.DnsProviderArgArgs>;
     docDbToken: pulumi.Input<string>;
     docDbUrl: pulumi.Input<string>;

@@ -1,5 +1,5 @@
 use color_eyre::{eyre::eyre, Result};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub async fn execute() -> Result<()> {
     let config = crate::config::Config::load("fn0.toml")
@@ -9,7 +9,14 @@ pub async fn execute() -> Result<()> {
         .name
         .ok_or_else(|| eyre!("'name' field missing in fn0.toml"))?;
 
-    fn0_deploy::deploy(&project_name, Path::new("dist/component.wasm"))
+    let wasm_path = PathBuf::from("dist/component.wasm");
+    let dist_dir = Path::new("dist");
+    let bundle_path = dist_dir.join("bundle.raw.tar");
+
+    fn0_deploy::create_raw_bundle_wasm(&wasm_path, &bundle_path)
+        .map_err(|e| eyre!(e))?;
+
+    fn0_deploy::deploy(&project_name, &bundle_path)
         .await
         .map_err(|e| eyre!(e))?;
 

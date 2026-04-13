@@ -1,7 +1,7 @@
 use fn0_adapt_cache::AdaptCache;
 use bytes::Bytes;
 use color_eyre::Result;
-use fn0::{CodeKind, DeploymentMap, Fn0};
+use fn0::{Deployment, DeploymentMap, Fn0};
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -26,7 +26,7 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     }
 
     let mut deployment_map = DeploymentMap::new();
-    deployment_map.register_code("local", CodeKind::Wasm);
+    deployment_map.register_deployment("local", Deployment::Wasm);
 
     let cache = LocalCache::new(wasm_path);
     let env_vars = std::sync::Arc::new(std::sync::RwLock::new(Vec::new()));
@@ -118,7 +118,7 @@ impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for L
         let bytes = if let Some(data) = cache.get(id) {
             Bytes::copy_from_slice(data)
         } else {
-            if id != "local" {
+            if id != "local::backend" {
                 return Err(fn0_adapt_cache::Error::NotFound);
             }
 
