@@ -141,9 +141,7 @@ export function hqGrafana(
     { provider: k8sProvider, parent }
   );
 
-  const workerOtlpEndpoint = stack.otlpUrl.apply(
-    (url) => `${url}:443`
-  );
+  const workerOtlpEndpoint = stack.otlpUrl.apply((url) => `${url}/otlp`);
   const workerOtlpBasicAuth = pulumi
     .all([stack.id, password])
     .apply(([id, pw]) =>

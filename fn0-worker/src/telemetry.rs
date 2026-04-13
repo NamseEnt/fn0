@@ -1,10 +1,10 @@
 use opentelemetry::{global, trace::TracerProvider};
-use opentelemetry_otlp::{Protocol, WithExportConfig, WithTonicConfig};
+use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
+use std::collections::HashMap;
 use std::time::Duration;
-use tonic::metadata::MetadataMap;
 use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -15,13 +15,18 @@ pub fn setup(
     endpoint: &str,
     basic_auth: Option<&str>,
 ) -> color_eyre::eyre::Result<TelemetryProviders> {
-    let metadata = build_metadata(basic_auth);
+    let headers = build_headers(basic_auth);
+    let traces_endpoint = format!("{}/v1/traces", endpoint.trim_end_matches('/'));
+    let metrics_endpoint = format!("{}/v1/metrics", endpoint.trim_end_matches('/'));
+
+    let http_client = reqwest::Client::builder().build()?;
 
     let tracer_exporter = opentelemetry_otlp::SpanExporter::builder()
-        .with_tonic()
-        .with_endpoint(endpoint)
-        .with_protocol(Protocol::Grpc)
-        .with_metadata(metadata.clone())
+        .with_http()
+        .with_http_client(http_client.clone())
+        .with_endpoint(&traces_endpoint)
+        .with_protocol(Protocol::HttpBinary)
+        .with_headers(headers.clone())
         .build()?;
 
     let tracer_provider = SdkTracerProvider::builder()
@@ -38,10 +43,11 @@ pub fn setup(
         .init();
 
     let metric_exporter = opentelemetry_otlp::MetricExporter::builder()
-        .with_tonic()
-        .with_endpoint(endpoint)
-        .with_protocol(Protocol::Grpc)
-        .with_metadata(metadata)
+        .with_http()
+        .with_http_client(http_client)
+        .with_endpoint(&metrics_endpoint)
+        .with_protocol(Protocol::HttpBinary)
+        .with_headers(headers)
         .build()?;
 
     let reader = PeriodicReader::builder(metric_exporter)
@@ -67,13 +73,10 @@ pub fn shutdown(
     Ok(())
 }
 
-fn build_metadata(basic_auth: Option<&str>) -> MetadataMap {
-    let mut metadata = MetadataMap::new();
+fn build_headers(basic_auth: Option<&str>) -> HashMap<String, String> {
+    let mut headers = HashMap::new();
     if let Some(auth) = basic_auth {
-        metadata.insert(
-            "authorization",
-            format!("Basic {auth}").parse().unwrap(),
-        );
+        headers.insert("authorization".to_string(), format!("Basic {auth}"));
     }
-    metadata
+    headers
 }
