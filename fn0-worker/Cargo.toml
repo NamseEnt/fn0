@@ -41,3 +41,8 @@ axum = { version = "0.8", features = ["ws"] }
 anyhow = "1"
 zstd = "0.13"
 tar = "0.4"
+
+[patch.crates-io]
+fn0 = { path = "../fn0" }
+fn0-wasmtime = { path = "../fn0-wasmtime" }
+fn0-ski = { path = "../ski/ski" }

@@ -5,7 +5,6 @@ fn0-compiler/target/
 forte/
 cli/
 sample-wasi-http-rust/
-ski/
 measure-cpu-time/
 wasmtime/
 docker/

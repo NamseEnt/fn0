@@ -8,6 +8,7 @@ import { CustomWorkerImage } from "./CustomWorkerImage";
 export interface OciComputeWorkerArgs {
   region: pulumi.Input<string>;
   hqIpv6CidrBlocks: pulumi.Input<string[]>;
+  workerStageDir: pulumi.Input<string>;
 }
 
 export interface OciCwasmBucketInfo {
@@ -458,15 +459,12 @@ export class OciComputeWorker extends pulumi.ComponentResource {
           pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`,
         ],
         context: {
-          location: "../..",
+          location: args.workerStageDir,
         },
         dockerfile: {
-          location: "../../fn0-worker/Dockerfile",
+          location: pulumi.interpolate`${args.workerStageDir}/Dockerfile`,
         },
-        platforms: [
-          dockerBuild.Platform.Linux_arm64,
-          dockerBuild.Platform.Linux_amd64,
-        ],
+        platforms: [dockerBuild.Platform.Linux_arm64],
         push: true,
         registries: [
           {

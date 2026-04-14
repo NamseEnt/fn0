@@ -10,9 +10,14 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
     fi
 
 COPY host-hq-protocol/Cargo.toml host-hq-protocol/Cargo.toml
+COPY fn0/Cargo.toml fn0/Cargo.toml
+COPY fn0-wasmtime/Cargo.toml fn0-wasmtime/Cargo.toml
+COPY ski/ ski/
 COPY fn0-worker/Cargo.toml fn0-worker/Cargo.toml
 COPY fn0-worker/Cargo.lock fn0-worker/Cargo.lock
 RUN mkdir -p host-hq-protocol/src && echo "" > host-hq-protocol/src/lib.rs && \
+    mkdir -p fn0/src && echo "" > fn0/src/lib.rs && \
+    mkdir -p fn0-wasmtime/src && echo "" > fn0-wasmtime/src/lib.rs && \
     mkdir -p fn0-worker/src && echo "fn main(){}" > fn0-worker/src/main.rs && \
     if [ "$TARGETARCH" = "arm64" ]; then \
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
@@ -22,8 +27,10 @@ RUN mkdir -p host-hq-protocol/src && echo "" > host-hq-protocol/src/lib.rs && \
     fi
 
 COPY host-hq-protocol/src/ host-hq-protocol/src/
+COPY fn0/src/ fn0/src/
+COPY fn0-wasmtime/src/ fn0-wasmtime/src/
 COPY fn0-worker/src/ fn0-worker/src/
-RUN touch host-hq-protocol/src/lib.rs fn0-worker/src/main.rs && \
+RUN touch host-hq-protocol/src/lib.rs fn0/src/lib.rs fn0-wasmtime/src/lib.rs fn0-worker/src/main.rs ski/ski/src/lib.rs && \
     if [ "$TARGETARCH" = "arm64" ]; then \
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       cargo build --release --target aarch64-unknown-linux-gnu --manifest-path fn0-worker/Cargo.toml && \

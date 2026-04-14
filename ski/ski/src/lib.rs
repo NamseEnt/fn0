@@ -180,6 +180,12 @@ pub async fn run(
     let code = code.to_string();
     let script_url = format!("file://{}", script_path);
 
+    static V8_INIT: std::sync::Once = std::sync::Once::new();
+    V8_INIT.call_once(|| {
+        let platform = v8::new_unprotected_default_platform(0, false).make_shared();
+        JsRuntime::init_platform(Some(platform));
+    });
+
     tokio::task::spawn_blocking(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()

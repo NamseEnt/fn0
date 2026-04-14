@@ -45,9 +45,15 @@ const ociHeadQuarterVcn = new fn0.OciHeadQuarterVcn("oci-head-quarter-vcn", {
   region: config.require("ociHeadQuarterRegion"),
 });
 
+const workerBinaryBuilder = new fn0.WorkerBinaryLambdaBuilder(
+  "worker-binary-builder",
+  { region: awsRegion },
+);
+
 const ociComputeWorker = new fn0.OciComputeWorker("oci-compute-worker", {
   region: config.require("ociComputeWorkerRegion"),
   hqIpv6CidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
+  workerStageDir: workerBinaryBuilder.stageDir,
 });
 
 const cwasmS3Pusher = new fn0.CwasmS3Pusher("cwasm-s3-pusher", {
