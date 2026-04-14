@@ -1,4 +1,5 @@
 .claude/
+**/.DS_Store
 /docker/
 target/
 infra/pulumi/BuildChain/fn0-compiler-layer/
