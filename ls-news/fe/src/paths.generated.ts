@@ -3,7 +3,7 @@
 export const paths = {
   "/post/:id": ({id}: {id: string}) => `/post/${id}`,
   "/write": () => "/write",
-  "/signout": () => "/signout",
   "/": () => "/",
+  "/signout": () => "/signout",
   "/api/auth/callback/github": () => "/api/auth/callback/github",
 } as const;

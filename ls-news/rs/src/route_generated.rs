@@ -3,10 +3,10 @@
 mod pages_post__id_;
 #[path = "pages/write.rs"]
 mod pages_write;
-#[path = "pages/signout.rs"]
-mod pages_signout;
 #[path = "pages/index/mod.rs"]
 mod pages_index;
+#[path = "pages/signout.rs"]
+mod pages_signout;
 #[path = "api/auth/callback/github.rs"]
 mod api_auth_callback_github;
 #[path = "hooks/me.rs"]
@@ -23,8 +23,8 @@ pub enum Redirect {
     External { url: String },
     Post_id_ { id: String },
     Write,
-    Signout,
     Index,
+    Signout,
     ApiAuthCallbackGithub,
 }
 impl Redirect {
@@ -35,8 +35,8 @@ impl Redirect {
                 format!("/{}", ["post".to_string(), id.to_string()].join("/"))
             }
             Redirect::Write => "/write".to_string(),
-            Redirect::Signout => "/signout".to_string(),
             Redirect::Index => "/".to_string(),
+            Redirect::Signout => "/signout".to_string(),
             Redirect::ApiAuthCallbackGithub => "/api/auth/callback/github".to_string(),
         }
     }
@@ -181,39 +181,6 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                 }
             }
         }
-    } else if path == "/signout" {
-        let req = ForteRequest {
-            uri_authority,
-            method: &method,
-            headers: &headers,
-            jar: &mut cookie_jar,
-            raw_body: &body_bytes,
-            body: (),
-            db: &db,
-        };
-        match pages_signout::handler(req).await {
-            Ok(redirect) => {
-                Ok(
-                    build_response_with_cookies(
-                        Response::builder()
-                            .status(StatusCode::FOUND)
-                            .header(LOCATION, redirect.to_path())
-                            .body(Body::empty())
-                            .unwrap(),
-                        &cookie_jar,
-                    ),
-                )
-            }
-            Err(e) => {
-                eprintln!("Error at {}: {:?}", path, e);
-                Ok(
-                    Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Body::from("Internal Server Error"))
-                        .unwrap(),
-                )
-            }
-        }
     } else if path == "/" {
         use std::collections::HashMap;
         let query = parts.uri.query().unwrap_or("");
@@ -264,6 +231,39 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                             .unwrap(),
                     )
                 }
+            }
+        }
+    } else if path == "/signout" {
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+            db: &db,
+        };
+        match pages_signout::handler(req).await {
+            Ok(redirect) => {
+                Ok(
+                    build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ),
+                )
+            }
+            Err(e) => {
+                eprintln!("Error at {}: {:?}", path, e);
+                Ok(
+                    Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap(),
+                )
             }
         }
     } else if path == "/api/auth/callback/github" {
