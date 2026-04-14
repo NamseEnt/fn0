@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
 use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::types::MetadataDirective;
 use http_body_util::BodyExt;
 use hyper::{Request, Response, body::Bytes};
 use http_body_util::Full;
 use serde::{Deserialize, Serialize};
 
 use crate::args_parse::DeployContext;
+use crate::wasmtime;
 
 #[derive(Deserialize)]
 struct DeployStartRequest {
@@ -25,6 +27,7 @@ struct DeployStartResponse {
 #[derive(Deserialize)]
 struct DeployFinishRequest {
     github_token: String,
+    deploy_job_id: String,
     subdomain: String,
     code_id: u64,
 }
@@ -101,7 +104,22 @@ pub async fn handle_deploy_start(
     };
 
     let deploy_job_id = uuid::Uuid::new_v4().to_string();
-    let s3_key = format!("bundles/{}.raw.tar", project.subdomain);
+    let s3_key = format!("uploads/{deploy_job_id}/bundle.raw.tar");
+
+    if let Err(e) = ctx
+        .doc_db
+        .insert_deploy_upload_session(
+            &deploy_job_id,
+            project.code_id,
+            &project.subdomain,
+            &s3_key,
+        )
+        .await
+    {
+        return json_response(500, &ErrorResponse {
+            error: format!("Failed to store deploy session: {}", e),
+        });
+    }
 
     let presigning_config = match PresigningConfig::expires_in(std::time::Duration::from_secs(300)) {
         Ok(c) => c,
@@ -152,8 +170,78 @@ pub async fn handle_deploy_finish(
         Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get next version: {}", e) }),
     };
 
-    if let Err(e) = ctx.doc_db.insert_deployment(&request.subdomain, request.code_id, code_version).await {
-        return json_response(500, &ErrorResponse { error: format!("Failed to insert deployment: {}", e) });
+    let session = match ctx
+        .doc_db
+        .get_deploy_upload_session(&request.deploy_job_id)
+        .await
+    {
+        Ok(Some(session)) => session,
+        Ok(None) => {
+            return json_response(400, &ErrorResponse {
+                error: "Unknown deploy_job_id".to_string(),
+            });
+        }
+        Err(e) => {
+            return json_response(500, &ErrorResponse {
+                error: format!("Failed to read deploy session: {}", e),
+            });
+        }
+    };
+
+    if session.code_id != request.code_id || session.subdomain != request.subdomain {
+        return json_response(400, &ErrorResponse {
+            error: "deploy_job_id does not match code_id/subdomain".to_string(),
+        });
+    }
+
+    let source_bundle_key = format!("sources/{}/{}/bundle.raw.tar", request.code_id, code_version);
+    if let Err(e) = ctx
+        .s3_client
+        .copy_object()
+        .bucket(&ctx.wasm_bucket)
+        .copy_source(format!("{}/{}", ctx.wasm_bucket, session.source_bundle_key))
+        .key(&source_bundle_key)
+        .metadata_directive(MetadataDirective::Copy)
+        .send()
+        .await
+    {
+        return json_response(500, &ErrorResponse {
+            error: format!("Failed to persist source bundle: {}", e),
+        });
+    }
+
+    let compile_targets = match wasmtime::compile_targets_for_deploy(
+        &ctx,
+        request.code_id,
+        &request.subdomain,
+        code_version,
+        &source_bundle_key,
+    )
+    .await
+    {
+        Ok(targets) => targets,
+        Err(e) => {
+            return json_response(500, &ErrorResponse {
+                error: format!("Failed to determine compile targets: {}", e),
+            });
+        }
+    };
+
+    if let Err(e) = ctx
+        .doc_db
+        .finalize_deploy(
+            &request.deploy_job_id,
+            &request.subdomain,
+            request.code_id,
+            code_version,
+            &source_bundle_key,
+            &compile_targets,
+        )
+        .await
+    {
+        return json_response(500, &ErrorResponse {
+            error: format!("Failed to finalize deployment: {}", e),
+        });
     }
 
     json_response(200, &serde_json::json!({"ok": true, "code_version": code_version}))

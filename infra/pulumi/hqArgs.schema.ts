@@ -6,14 +6,15 @@ export interface HqArgs {
   docDb: pulumi.Input<DocDbArgs>;
   selfDns: pulumi.Input<SelfDnsArgs>;
   sites: pulumi.Input<Array<SiteArgs>>;
-  wsSecret: pulumi.Input<string>;
 }
 export interface AwsArgs {
   accessKeyId: pulumi.Input<string>;
+  activeWasmtimeId: pulumi.Input<string>;
   cwasmBucket: pulumi.Input<string>;
   region: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
+  wasmtimeLambdas: pulumi.Input<Record<string, string>>;
 }
 export interface CloudflareDnsProviderArgs {
   apiToken: pulumi.Input<string>;

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use aws_sdk_lambda::Client as LambdaClient;
 use aws_sdk_s3::Client as S3Client;
 use color_eyre::eyre::{Result, eyre};
 use doc_db::DocDb;
@@ -14,8 +15,11 @@ use crate::{
 
 pub struct DeployContext {
     pub s3_client: S3Client,
+    pub lambda_client: LambdaClient,
     pub wasm_bucket: String,
     pub cwasm_bucket: String,
+    pub active_wasmtime_id: String,
+    pub wasmtime_lambdas: std::collections::BTreeMap<String, String>,
     pub doc_db: DocDb,
 }
 
@@ -40,6 +44,17 @@ impl HqArgs {
         let doc_db = DocDb::new(args.doc_db.url, args.doc_db.token).await?;
         let deployment_cache = DeploymentCache::new(doc_db.clone()).await?;
 
+        if !args
+            .aws
+            .wasmtime_lambdas
+            .contains_key(&args.aws.active_wasmtime_id)
+        {
+            return Err(eyre!(
+                "active wasmtime id '{}' is missing from wasmtimeLambdas",
+                args.aws.active_wasmtime_id
+            ));
+        }
+
         let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .region(aws_config::Region::new(args.aws.region))
             .credentials_provider(aws_sdk_s3::config::Credentials::new(
@@ -52,11 +67,15 @@ impl HqArgs {
             .load()
             .await;
         let s3_client = S3Client::new(&aws_config);
+        let lambda_client = LambdaClient::new(&aws_config);
 
         let deploy_context = Arc::new(DeployContext {
             s3_client,
+            lambda_client,
             wasm_bucket: args.aws.wasm_bucket,
             cwasm_bucket: args.aws.cwasm_bucket,
+            active_wasmtime_id: args.aws.active_wasmtime_id,
+            wasmtime_lambdas: args.aws.wasmtime_lambdas,
             doc_db: doc_db.clone(),
         });
 
@@ -80,7 +99,6 @@ impl HqArgs {
                     host_cpu_cores,
                     host_memory_in_gb,
                     doc_db.clone(),
-                    args.ws_secret.clone(),
                 )
             })
             .collect();

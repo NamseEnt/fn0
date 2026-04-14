@@ -13,6 +13,7 @@ mod self_dns;
 mod site;
 mod ssh;
 mod telemetry;
+mod wasmtime;
 
 use args::HqArgs;
 use args_parse::DeployContext;
@@ -45,6 +46,11 @@ fn main() -> Result<()> {
         self_dns::register(self_dns_args).await?;
 
         deploy_context.doc_db.ensure_job_tables().await?;
+        deploy_context
+            .doc_db
+            .ensure_wasmtime_tables(&deploy_context.active_wasmtime_id)
+            .await?;
+        wasmtime::reconcile_running_migration(&deploy_context).await?;
 
         let mut set = JoinSet::new();
 
@@ -54,10 +60,9 @@ fn main() -> Result<()> {
         });
 
         {
-            let doc_db = deploy_context.doc_db.clone();
-            let s3_client = deploy_context.s3_client.clone();
+            let ctx = deploy_context.clone();
             set.spawn(async move {
-                job_processor::run(doc_db, s3_client).await;
+                job_processor::run(ctx).await;
                 Ok(())
             });
         }
@@ -131,6 +136,12 @@ async fn route(
         }
         (&Method::POST, "/deploy/destroy") => {
             Ok(deploy::handle_deploy_destroy(req, ctx).await)
+        }
+        (&Method::POST, "/admin/wasmtime/change") => {
+            Ok(wasmtime::handle_change_post(req, ctx).await)
+        }
+        (&Method::GET, "/admin/wasmtime/change") => {
+            Ok(wasmtime::handle_change_get(ctx).await)
         }
         _ => Ok(Response::builder()
             .status(404)

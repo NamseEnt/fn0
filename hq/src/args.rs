@@ -7,7 +7,6 @@ pub struct HqArgs {
     pub doc_db: DocDbArgs,
     pub ca_cert_pem: String,
     pub aws: AwsArgs,
-    pub ws_secret: String,
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,
 }
@@ -28,6 +27,8 @@ pub struct AwsArgs {
     pub cwasm_bucket: String,
     pub access_key_id: String,
     pub secret_access_key: String,
+    pub active_wasmtime_id: String,
+    pub wasmtime_lambdas: BTreeMap<String, String>,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]

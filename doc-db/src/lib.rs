@@ -2,12 +2,16 @@ mod deployment;
 mod job_queue;
 mod project;
 mod scale_config;
+mod wasmtime;
 
 pub use deployment::*;
 pub use job_queue::*;
 use libsql::{Builder, Database, Result};
 pub use scale_config::*;
+pub use wasmtime::*;
 use std::sync::Arc;
+
+pub type DocDbResult<T> = Result<T>;
 
 #[derive(Clone)]
 pub struct DocDb {

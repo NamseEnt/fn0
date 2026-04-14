@@ -11,6 +11,7 @@ async-trait = "0.1"
 host-hq-protocol = { package = "fn0-host-hq-protocol", path = "../host-hq-protocol", version = "0.2" }
 doc-db = { path = "../doc-db", version = "0.1" }
 aws-config = "1"
+aws-sdk-lambda = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3 = { version = "1", features = ["behavior-version-latest"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4.42"
@@ -48,7 +49,6 @@ rustls-pemfile = "2"
 bytes = "1.11.0"
 singleflight = "0.3.0"
 boxcar = "0.2.14"
-tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 russh = "0.60.0"
 
 [dev-dependencies]

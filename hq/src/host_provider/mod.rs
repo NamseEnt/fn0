@@ -16,7 +16,6 @@ pub struct Host {
 pub enum HostTransport {
     #[default]
     Quic,
-    WebSocket,
 }
 
 impl PartialEq for Host {
