@@ -1,7 +1,8 @@
 use super::*;
-use base64::Engine;
 use crate::host_provider::HostProvide;
 use crate::ssh::SshClient;
+use base64::Engine;
+use doc_db::WasmtimeRolloutPhase;
 use std::collections::BTreeMap;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
@@ -12,6 +13,18 @@ const SSH_USER: &str = "opc";
 struct WorkerState {
     image_id: String,
     envs: BTreeMap<String, String>,
+}
+
+impl WorkerState {
+    fn wasmtime_version(&self) -> Option<&str> {
+        self.envs.get("FN0_WASMTIME_VERSION").map(String::as_str)
+    }
+}
+
+struct HostSnapshot {
+    host_id: String,
+    ssh_addr: String,
+    current: Option<WorkerState>,
 }
 
 impl Site {
@@ -36,33 +49,173 @@ impl Site {
             let desired_image = self.host_provider.worker_image_url().to_string();
             let desired_envs = self.host_provider.envs().clone();
             let ssh_key = self.host_provider.ssh_private_key_pem().to_string();
+            let rollout_state = match self.reconcile_wasmtime_rollout().await {
+                Ok(state) => state,
+                Err(err) => {
+                    warn!(%err, "Failed to reconcile wasmtime rollout");
+                    continue;
+                }
+            };
 
-            for host in hosts {
-                let ssh_addr = match &host.dns_addr {
-                    Some(addr) => addr.clone(),
-                    None => host.addr.clone(),
-                };
+            let host_snapshots = inspect_hosts(&hosts, &desired_envs, &ssh_key).await;
 
-                let desired_image = desired_image.clone();
-                let desired_envs = desired_envs.clone();
-                let ssh_key = ssh_key.clone();
-                let host_id = host.id.to_string();
+            match rollout_state.phase {
+                WasmtimeRolloutPhase::Idle => {
+                    for snapshot in &host_snapshots {
+                        let result = update_worker_if_needed(
+                            &snapshot.host_id,
+                            &snapshot.ssh_addr,
+                            &ssh_key,
+                            &desired_image,
+                            &desired_envs,
+                        )
+                        .await;
 
-                let result = update_worker_if_needed(
-                    &host_id,
-                    &ssh_addr,
-                    &ssh_key,
-                    &desired_image,
-                    &desired_envs,
-                )
-                .await;
+                        if let Err(err) = result {
+                            warn!(host_id = snapshot.host_id, %err, "Failed to update worker");
+                        }
+                    }
+                }
+                WasmtimeRolloutPhase::Rebundling => {
+                    info!(
+                        site = %self.name,
+                        target_version = %rollout_state.target_version,
+                        "Wasmtime rollout waiting for bundle rebuilds"
+                    );
+                }
+                WasmtimeRolloutPhase::ReadyToRoll | WasmtimeRolloutPhase::Rolling => {
+                    let stale_hosts: Vec<_> = host_snapshots
+                        .iter()
+                        .filter(|snapshot| {
+                            snapshot
+                                .current
+                                .as_ref()
+                                .and_then(WorkerState::wasmtime_version)
+                                != Some(rollout_state.target_version.as_str())
+                        })
+                        .collect();
 
-                if let Err(err) = result {
-                    warn!(host_id, %err, "Failed to update worker");
+                    if stale_hosts.is_empty() {
+                        let mut cleaning_state = rollout_state.clone();
+                        cleaning_state.current_version = cleaning_state.target_version.clone();
+                        if let Some(previous_version) = &rollout_state.previous_version {
+                            cleaning_state.previous_version = Some(previous_version.clone());
+                        }
+                        if let Err(err) = self
+                            .set_wasmtime_rollout_phase(
+                                &cleaning_state,
+                                WasmtimeRolloutPhase::Cleaning,
+                            )
+                            .await
+                        {
+                            warn!(%err, "Failed to move rollout to cleaning");
+                        }
+                        continue;
+                    }
+
+                    if rollout_state.phase == WasmtimeRolloutPhase::ReadyToRoll {
+                        if let Err(err) = self
+                            .set_wasmtime_rollout_phase(
+                                &rollout_state,
+                                WasmtimeRolloutPhase::Rolling,
+                            )
+                            .await
+                        {
+                            warn!(%err, "Failed to move rollout to rolling");
+                            continue;
+                        }
+                    }
+
+                    let next_host = stale_hosts[0];
+                    let result = update_worker_if_needed(
+                        &next_host.host_id,
+                        &next_host.ssh_addr,
+                        &ssh_key,
+                        &desired_image,
+                        &desired_envs,
+                    )
+                    .await;
+
+                    if let Err(err) = result {
+                        warn!(host_id = next_host.host_id, %err, "Failed to roll worker");
+                    } else {
+                        info!(
+                            host_id = next_host.host_id,
+                            target_version = %rollout_state.target_version,
+                            "Rolled one worker to the target wasmtime version"
+                        );
+                    }
+                }
+                WasmtimeRolloutPhase::Cleaning => {
+                    let stale_hosts = host_snapshots.iter().any(|snapshot| {
+                        snapshot
+                            .current
+                            .as_ref()
+                            .and_then(WorkerState::wasmtime_version)
+                            != Some(rollout_state.target_version.as_str())
+                    });
+                    if stale_hosts {
+                        if let Err(err) = self
+                            .set_wasmtime_rollout_phase(
+                                &rollout_state,
+                                WasmtimeRolloutPhase::Rolling,
+                            )
+                            .await
+                        {
+                            warn!(%err, "Failed to move rollout back to rolling");
+                        }
+                        continue;
+                    }
+
+                    if let Err(err) = self.finish_wasmtime_rollout_cleanup(&rollout_state).await {
+                        warn!(%err, "Failed to finish wasmtime rollout cleanup");
+                    } else {
+                        info!(
+                            site = %self.name,
+                            current_version = %rollout_state.target_version,
+                            "Wasmtime rollout completed"
+                        );
+                    }
                 }
             }
         }
     }
+}
+
+async fn inspect_hosts(
+    hosts: &[Host],
+    desired_envs: &BTreeMap<String, String>,
+    ssh_key: &str,
+) -> Vec<HostSnapshot> {
+    let mut snapshots = Vec::with_capacity(hosts.len());
+
+    for host in hosts {
+        let ssh_addr = match &host.dns_addr {
+            Some(addr) => addr.clone(),
+            None => host.addr.clone(),
+        };
+        let host_id = host.id.to_string();
+
+        let current = match SshClient::connect(&ssh_addr, SSH_USER, ssh_key).await {
+            Ok(ssh) => {
+                let state = get_worker_state(&ssh, desired_envs).await.ok();
+                let _ = ssh.close().await;
+                state
+            }
+            Err(err) => {
+                warn!(host_id, %err, "Failed to inspect worker");
+                None
+            }
+        };
+
+        snapshots.push(HostSnapshot {
+            host_id,
+            ssh_addr,
+            current,
+        });
+    }
+
+    snapshots
 }
 
 async fn update_worker_if_needed(
@@ -110,13 +263,8 @@ async fn update_worker_if_needed(
     Ok(())
 }
 
-async fn get_remote_image_id(
-    ssh: &SshClient,
-    image: &str,
-) -> color_eyre::Result<String> {
-    let (pull_status, pull_output) = ssh
-        .exec(&format!("sudo podman pull {image}"))
-        .await?;
+async fn get_remote_image_id(ssh: &SshClient, image: &str) -> color_eyre::Result<String> {
+    let (pull_status, pull_output) = ssh.exec(&format!("sudo podman pull {image}")).await?;
     if pull_status != 0 {
         return Err(color_eyre::eyre::eyre!(
             "podman pull failed (exit {}): {}",
@@ -212,8 +360,7 @@ fn build_env_flags(envs: &BTreeMap<String, String>) -> String {
     envs.iter()
         .map(|(k, v)| {
             if v.contains('\n') {
-                let encoded =
-                    base64::engine::general_purpose::STANDARD.encode(v.as_bytes());
+                let encoded = base64::engine::general_purpose::STANDARD.encode(v.as_bytes());
                 format!("-e {k}_BASE64={encoded}")
             } else {
                 format!("-e {k}={v}")

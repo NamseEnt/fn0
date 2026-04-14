@@ -21,12 +21,15 @@ pub async fn register(args: SelfDnsArgs) -> Result<()> {
     }
 
     let list: ListResponse = client
-        .get(format!("{api_url}/zones/{}/dns_records", args.cloudflare_zone_id))
-        .header("Authorization", format!("Bearer {}", args.cloudflare_api_token))
-        .query(&[
-            ("type", "A"),
-            ("name", &args.hostname),
-        ])
+        .get(format!(
+            "{api_url}/zones/{}/dns_records",
+            args.cloudflare_zone_id
+        ))
+        .header(
+            "Authorization",
+            format!("Bearer {}", args.cloudflare_api_token),
+        )
+        .query(&[("type", "A"), ("name", &args.hostname)])
         .send()
         .await?
         .json()
@@ -43,7 +46,10 @@ pub async fn register(args: SelfDnsArgs) -> Result<()> {
                     "{api_url}/zones/{}/dns_records/{}",
                     args.cloudflare_zone_id, record.id
                 ))
-                .header("Authorization", format!("Bearer {}", args.cloudflare_api_token))
+                .header(
+                    "Authorization",
+                    format!("Bearer {}", args.cloudflare_api_token),
+                )
                 .json(&serde_json::json!({
                     "content": public_ip,
                 }))
@@ -55,8 +61,14 @@ pub async fn register(args: SelfDnsArgs) -> Result<()> {
     }
 
     client
-        .post(format!("{api_url}/zones/{}/dns_records", args.cloudflare_zone_id))
-        .header("Authorization", format!("Bearer {}", args.cloudflare_api_token))
+        .post(format!(
+            "{api_url}/zones/{}/dns_records",
+            args.cloudflare_zone_id
+        ))
+        .header(
+            "Authorization",
+            format!("Bearer {}", args.cloudflare_api_token),
+        )
         .json(&serde_json::json!({
             "type": "A",
             "name": args.hostname,

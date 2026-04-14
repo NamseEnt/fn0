@@ -1,16 +1,16 @@
 use crate::WorkerFn0;
 use crate::bundle::BundleFetcher;
-use axum::extract::ws::{Message, WebSocket};
+use axum::Router;
 use axum::extract::WebSocketUpgrade;
+use axum::extract::ws::{Message, WebSocket};
 use axum::response::IntoResponse;
 use axum::routing::any;
-use axum::Router;
 use color_eyre::eyre::Result;
 use futures::{SinkExt, StreamExt};
 use host_hq_protocol::{HostToHq, WsHostToHq, WsHqToHost};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 struct AppState {
@@ -39,9 +39,7 @@ pub async fn run_websocket_server(
         ws_secret,
     });
 
-    let app = Router::new()
-        .route("/", any(ws_handler))
-        .with_state(state);
+    let app = Router::new().route("/", any(ws_handler)).with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -118,6 +116,8 @@ async fn handle_connection(mut socket: WebSocket, state: Arc<AppState>) {
                         "Received deployment update via WebSocket"
                     );
 
+                    let mut all_applied = true;
+
                     for code in &codes {
                         match code {
                             host_hq_protocol::CodeDeployment::Deploy {
@@ -131,6 +131,7 @@ async fn handle_connection(mut socket: WebSocket, state: Arc<AppState>) {
                                     .await
                                 {
                                     tracing::error!(%err, %subdomain, "Failed to fetch bundle");
+                                    all_applied = false;
                                 }
                             }
                             host_hq_protocol::CodeDeployment::Undeploy { subdomain } => {
@@ -139,9 +140,16 @@ async fn handle_connection(mut socket: WebSocket, state: Arc<AppState>) {
                         }
                     }
 
-                    state
-                        .deployment_id
-                        .store(new_deployment_id, Ordering::Relaxed);
+                    if all_applied {
+                        state
+                            .deployment_id
+                            .store(new_deployment_id, Ordering::Relaxed);
+                    } else {
+                        tracing::warn!(
+                            new_deployment_id,
+                            "Deployment update was only partially applied; will retry on next HQ ping"
+                        );
+                    }
                 }
                 host_hq_protocol::HqToHostReliable::GracefulShutdown => {
                     tracing::info!("Received graceful shutdown via WebSocket");

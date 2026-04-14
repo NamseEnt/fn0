@@ -1,5 +1,8 @@
 use super::*;
-use crate::{host_connection::HostConnection, host_provider::HostTransport, random_sleep::random_sleep, telemetry};
+use crate::{
+    host_connection::HostConnection, host_provider::HostTransport, random_sleep::random_sleep,
+    telemetry,
+};
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
@@ -100,7 +103,7 @@ impl Site {
                     ConnectTarget::Quic(resolved_addr, ca_cert_pem)
                 }
                 HostTransport::WebSocket => {
-                    ConnectTarget::WebSocket(format!("wss://{}",  host_addr))
+                    ConnectTarget::WebSocket(format!("wss://{}", host_addr))
                 }
             };
 
@@ -121,8 +124,16 @@ impl Site {
                         timeout(connect_timeout, HostConnection::connect_quic(*addr, ca_pem)).await
                     }
                     ConnectTarget::WebSocket(url) => {
-                        let secret = if ws_secret.is_empty() { None } else { Some(ws_secret.as_str()) };
-                        timeout(connect_timeout, HostConnection::connect_websocket(url, secret)).await
+                        let secret = if ws_secret.is_empty() {
+                            None
+                        } else {
+                            Some(ws_secret.as_str())
+                        };
+                        timeout(
+                            connect_timeout,
+                            HostConnection::connect_websocket(url, secret),
+                        )
+                        .await
                     }
                 };
 
@@ -163,7 +174,10 @@ async fn resolve_addr(addr: &str, port: u16) -> color_eyre::Result<SocketAddr> {
 
 fn list_host_info_interval_ms() -> Duration {
     match std::env::var("LIST_HOST_INFO_INTERVAL_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(10)),
+        Ok(s) => s
+            .parse()
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(10)),
         Err(_) => Duration::from_secs(10),
     }
 }

@@ -11,6 +11,7 @@ const accountId = config.require("cloudflareAccountId");
 const zoneId = config.require("cloudflareZoneId");
 const domain = config.require("domain");
 const awsRegion = "ap-northeast-1";
+const wasmtimeVersion = config.require("wasmtimeVersion");
 
 const suffix = new fn0.Suffix("suffix").result;
 
@@ -70,6 +71,7 @@ new fn0.AwsLambdaCwasmCompiler("cwasm-compiler", {
   wasmBucket: wasmS3.bucket,
   cWasmBucket: cwasmS3Pusher.cwasmZstBucket,
   queueArn: wasmS3.queueArn,
+  wasmtimeVersion,
 });
 
 const hqAwsUser = new aws.iam.User("hq-aws-user", {
@@ -167,6 +169,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
           workerImageUrl: ociComputeWorker.workerImageMultiArch,
           envs: {
             CWASM_BUCKET: ociComputeWorker.cwasmBucket.bucketName,
+            FN0_WASMTIME_VERSION: wasmtimeVersion,
             S3_ENDPOINT: ociComputeWorker.cwasmBucket.endpoint,
             S3_REGION: ociComputeWorker.cwasmBucket.region,
             AWS_ACCESS_KEY_ID: ociComputeWorker.cwasmBucket.accessKeyId,
@@ -195,4 +198,3 @@ export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKe
 export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
 export const dwsWsSecret = pulumi.secret(wsSecret.result);
 export const workerSshPrivateKey = pulumi.secret(ociComputeWorker.sshPrivateKey);
-

@@ -45,6 +45,10 @@ fn main() -> Result<()> {
         self_dns::register(self_dns_args).await?;
 
         deploy_context.doc_db.ensure_job_tables().await?;
+        deploy_context
+            .doc_db
+            .ensure_wasmtime_rollout_tables()
+            .await?;
 
         let mut set = JoinSet::new();
 
@@ -61,10 +65,8 @@ fn main() -> Result<()> {
                 Ok(())
             });
         }
-        let all_host_connections: Vec<_> = sites
-            .iter()
-            .map(|s| s.host_connections.clone())
-            .collect();
+        let all_host_connections: Vec<_> =
+            sites.iter().map(|s| s.host_connections.clone()).collect();
 
         for mut site in sites {
             set.spawn(async move {
@@ -102,10 +104,13 @@ async fn web_server(deploy_context: Arc<DeployContext>) -> Result<()> {
 
         tokio::task::spawn(async move {
             if let Err(err) = http1::Builder::new()
-                .serve_connection(io, service_fn(move |req| {
-                    let ctx = ctx.clone();
-                    async move { route(req, ctx).await }
-                }))
+                .serve_connection(
+                    io,
+                    service_fn(move |req| {
+                        let ctx = ctx.clone();
+                        async move { route(req, ctx).await }
+                    }),
+                )
                 .await
             {
                 eprintln!("Error serving connection: {:?}", err);
@@ -123,15 +128,9 @@ async fn route(
             info!("health check");
             Ok(Response::new(Full::new(Bytes::from("ok"))))
         }
-        (&Method::POST, "/deploy/start") => {
-            Ok(deploy::handle_deploy_start(req, ctx).await)
-        }
-        (&Method::POST, "/deploy/finish") => {
-            Ok(deploy::handle_deploy_finish(req, ctx).await)
-        }
-        (&Method::POST, "/deploy/destroy") => {
-            Ok(deploy::handle_deploy_destroy(req, ctx).await)
-        }
+        (&Method::POST, "/deploy/start") => Ok(deploy::handle_deploy_start(req, ctx).await),
+        (&Method::POST, "/deploy/finish") => Ok(deploy::handle_deploy_finish(req, ctx).await),
+        (&Method::POST, "/deploy/destroy") => Ok(deploy::handle_deploy_destroy(req, ctx).await),
         _ => Ok(Response::builder()
             .status(404)
             .body(Full::new(Bytes::from("not found")))

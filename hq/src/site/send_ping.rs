@@ -38,7 +38,10 @@ impl Site {
 
 fn send_ping_interval_ms() -> Duration {
     match std::env::var("SEND_PING_INTERVAL_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(2)),
+        Ok(s) => s
+            .parse()
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(2)),
         Err(_) => Duration::from_secs(2),
     }
 }

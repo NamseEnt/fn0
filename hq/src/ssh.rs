@@ -35,10 +35,8 @@ impl SshClient {
         .map_err(|_| eyre!("SSH connect to {addr} timed out"))?
         .map_err(|e| eyre!("SSH connect to {addr} failed: {e}"))?;
 
-        let key_with_hash = keys::PrivateKeyWithHashAlg::new(
-            Arc::new(key_pair),
-            Some(keys::HashAlg::Sha512),
-        );
+        let key_with_hash =
+            keys::PrivateKeyWithHashAlg::new(Arc::new(key_pair), Some(keys::HashAlg::Sha512));
 
         let auth_result = session
             .authenticate_publickey(user, key_with_hash)

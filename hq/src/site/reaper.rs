@@ -48,14 +48,20 @@ impl Site {
 
 fn reaper_interval_ms() -> Duration {
     match std::env::var("REAPER_INTERVAL_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(1)),
+        Ok(s) => s
+            .parse()
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(1)),
         Err(_) => Duration::from_secs(1),
     }
 }
 
 fn host_connection_timeout_ms() -> Duration {
     match std::env::var("HOST_CONNECTION_TIMEOUT_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(6)),
+        Ok(s) => s
+            .parse()
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(6)),
         Err(_) => Duration::from_secs(6),
     }
 }

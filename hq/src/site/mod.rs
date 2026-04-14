@@ -3,12 +3,12 @@ mod reaper;
 mod recv_pong;
 mod scaler;
 mod send_ping;
+mod wasmtime_rollout;
 mod worker_update;
 
 use crate::{
-    deployment_cache::DeploymentCache, host_connection::HostConnection,
-    host_provider::oci_compute_vm::OciComputeVmHostProvider,
-    telemetry, *,
+    args_parse::DeployContext, deployment_cache::DeploymentCache, host_connection::HostConnection,
+    host_provider::oci_compute_vm::OciComputeVmHostProvider, telemetry, *,
 };
 use dashmap::{DashMap, DashSet};
 use doc_db::DocDb;
@@ -30,6 +30,7 @@ pub struct Site {
     host_cpu_cores: NonZeroUsize,
     host_memory_in_gb: NonZeroUsize,
     doc_db: DocDb,
+    deploy_context: Arc<DeployContext>,
     ws_secret: String,
 }
 
@@ -42,6 +43,7 @@ impl Site {
         host_cpu_cores: NonZeroUsize,
         host_memory_in_gb: NonZeroUsize,
         doc_db: DocDb,
+        deploy_context: Arc<DeployContext>,
         ws_secret: String,
     ) -> Self {
         Site {
@@ -57,6 +59,7 @@ impl Site {
             host_cpu_cores,
             host_memory_in_gb,
             doc_db,
+            deploy_context,
             ws_secret,
         }
     }

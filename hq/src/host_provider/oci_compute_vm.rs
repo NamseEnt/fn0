@@ -197,18 +197,20 @@ systemctl enable --now fn0-worker
         let mut metadata = std::collections::HashMap::new();
         metadata.insert("user_data".to_string(), user_data);
         if !self.ssh_authorized_keys.is_empty() {
-            metadata.insert("ssh_authorized_keys".to_string(), self.ssh_authorized_keys.clone());
+            metadata.insert(
+                "ssh_authorized_keys".to_string(),
+                self.ssh_authorized_keys.clone(),
+            );
         }
 
         let mut freeform_tags = std::collections::HashMap::new();
         freeform_tags.insert("managed_by".to_string(), "fn0-hq".to_string());
 
-        let source_details = InstanceSourceViaImageDetails::new(
-            InstanceSourceViaImageDetailsRequired {
+        let source_details =
+            InstanceSourceViaImageDetails::new(InstanceSourceViaImageDetailsRequired {
                 source_type: "image".to_string(),
-            },
-        )
-        .with_image_id(&self.image_id);
+            })
+            .with_image_id(&self.image_id);
 
         let launch_details = LaunchInstanceDetails::new(LaunchInstanceDetailsRequired {
             availability_domain: self.availability_domain.clone(),
@@ -337,7 +339,12 @@ impl HostProvide for OciComputeVmHostProvider {
 
         match self.scaler.decide(count, n).await {
             ScaleAction::ScaleOut(deficit) => {
-                info!(current = count, target = n, launching = deficit, "Scaling out");
+                info!(
+                    current = count,
+                    target = n,
+                    launching = deficit,
+                    "Scaling out"
+                );
                 for _ in 0..deficit {
                     if let Err(err) = self.launch_one().await {
                         warn!(%err, "Failed to launch instance");
@@ -345,7 +352,12 @@ impl HostProvide for OciComputeVmHostProvider {
                 }
             }
             ScaleAction::ScaleIn(surplus) => {
-                info!(current = count, target = n, terminating = surplus, "Scaling in");
+                info!(
+                    current = count,
+                    target = n,
+                    terminating = surplus,
+                    "Scaling in"
+                );
                 let hosts = self.list_hosts().await?;
                 for host in hosts.into_iter().take(surplus) {
                     if let Err(err) = self.terminate(&host.id).await {
@@ -427,20 +439,24 @@ mod tests {
         ))
     }
 
-    fn make_vnic_attachments_response(instance_id: &str) -> core::Result<ListVnicAttachmentsResponse> {
+    fn make_vnic_attachments_response(
+        instance_id: &str,
+    ) -> core::Result<ListVnicAttachmentsResponse> {
         Ok(ListVnicAttachmentsResponse::new(
             ListVnicAttachmentsResponseRequired {
                 opc_next_page: String::new(),
                 opc_request_id: "req-id".to_string(),
-                items: vec![VnicAttachment::new(VnicAttachmentRequired {
-                    availability_domain: "ad".to_string(),
-                    compartment_id: "test-compartment".to_string(),
-                    id: format!("vnic-attach-{instance_id}"),
-                    instance_id: instance_id.to_string(),
-                    lifecycle_state: VnicAttachmentLifecycleState::Attached,
-                    time_created: Utc::now(),
-                })
-                .with_vnic_id(format!("vnic-{instance_id}"))],
+                items: vec![
+                    VnicAttachment::new(VnicAttachmentRequired {
+                        availability_domain: "ad".to_string(),
+                        compartment_id: "test-compartment".to_string(),
+                        id: format!("vnic-attach-{instance_id}"),
+                        instance_id: instance_id.to_string(),
+                        lifecycle_state: VnicAttachmentLifecycleState::Attached,
+                        time_created: Utc::now(),
+                    })
+                    .with_vnic_id(format!("vnic-{instance_id}")),
+                ],
             },
         ))
     }
@@ -469,8 +485,10 @@ mod tests {
 
         mock.expect_list_instances()
             .returning(|_| empty_list_response());
-        mock.expect_launch_instance()
-            .returning(move |_| { lc.fetch_add(1, Ordering::SeqCst); make_launch_response() });
+        mock.expect_launch_instance().returning(move |_| {
+            lc.fetch_add(1, Ordering::SeqCst);
+            make_launch_response()
+        });
 
         let provider = OciComputeVmHostProvider::new_with_client(Arc::new(mock));
         provider.scale_to(2).await.unwrap();
@@ -486,13 +504,18 @@ mod tests {
 
         mock.expect_list_instances().returning(|req| {
             if req.lifecycle_state.as_deref() == Some("RUNNING") {
-                list_response_with(vec![make_managed_instance("i1"), make_managed_instance("i2")])
+                list_response_with(vec![
+                    make_managed_instance("i1"),
+                    make_managed_instance("i2"),
+                ])
             } else {
                 empty_list_response()
             }
         });
-        mock.expect_launch_instance()
-            .returning(move |_| { lc.fetch_add(1, Ordering::SeqCst); make_launch_response() });
+        mock.expect_launch_instance().returning(move |_| {
+            lc.fetch_add(1, Ordering::SeqCst);
+            make_launch_response()
+        });
 
         let provider = OciComputeVmHostProvider::new_with_client(Arc::new(mock));
         provider.scale_to(2).await.unwrap();
@@ -508,8 +531,10 @@ mod tests {
 
         mock.expect_list_instances()
             .returning(|_| empty_list_response());
-        mock.expect_launch_instance()
-            .returning(move |_| { lc.fetch_add(1, Ordering::SeqCst); make_launch_response() });
+        mock.expect_launch_instance().returning(move |_| {
+            lc.fetch_add(1, Ordering::SeqCst);
+            make_launch_response()
+        });
 
         let provider = OciComputeVmHostProvider::new_with_client(Arc::new(mock));
 
@@ -517,7 +542,11 @@ mod tests {
         assert_eq!(launch_count.load(Ordering::SeqCst), 2);
 
         provider.scale_to(2).await.unwrap();
-        assert_eq!(launch_count.load(Ordering::SeqCst), 2, "Should be locked, no additional launches");
+        assert_eq!(
+            launch_count.load(Ordering::SeqCst),
+            2,
+            "Should be locked, no additional launches"
+        );
 
         provider.scale_to(2).await.unwrap();
         assert_eq!(launch_count.load(Ordering::SeqCst), 2, "Still locked");
@@ -536,13 +565,18 @@ mod tests {
             let n = cc.fetch_add(1, Ordering::SeqCst);
             let state = req.lifecycle_state.as_deref().unwrap_or("");
             if n >= 3 && state == "PROVISIONING" {
-                list_response_with(vec![make_managed_instance("i1"), make_managed_instance("i2")])
+                list_response_with(vec![
+                    make_managed_instance("i1"),
+                    make_managed_instance("i2"),
+                ])
             } else {
                 empty_list_response()
             }
         });
-        mock.expect_launch_instance()
-            .returning(move |_| { lc.fetch_add(1, Ordering::SeqCst); make_launch_response() });
+        mock.expect_launch_instance().returning(move |_| {
+            lc.fetch_add(1, Ordering::SeqCst);
+            make_launch_response()
+        });
 
         let provider = OciComputeVmHostProvider::new_with_client(Arc::new(mock));
 
@@ -550,7 +584,11 @@ mod tests {
         assert_eq!(launch_count.load(Ordering::SeqCst), 2);
 
         provider.scale_to(2).await.unwrap();
-        assert_eq!(launch_count.load(Ordering::SeqCst), 2, "count=2 matches target, no more launches");
+        assert_eq!(
+            launch_count.load(Ordering::SeqCst),
+            2,
+            "count=2 matches target, no more launches"
+        );
     }
 
     #[tokio::test]
@@ -576,11 +614,12 @@ mod tests {
             let id = req.instance_id.clone().unwrap_or_default();
             make_vnic_attachments_response(&id)
         });
-        mock.expect_get_vnic().returning(|req| {
-            make_get_vnic_response(&req.vnic_id)
+        mock.expect_get_vnic()
+            .returning(|req| make_get_vnic_response(&req.vnic_id));
+        mock.expect_terminate_instance().returning(move |_| {
+            tc.fetch_add(1, Ordering::SeqCst);
+            make_terminate_response()
         });
-        mock.expect_terminate_instance()
-            .returning(move |_| { tc.fetch_add(1, Ordering::SeqCst); make_terminate_response() });
 
         let provider = OciComputeVmHostProvider::new_with_client(Arc::new(mock));
         provider.scale_to(2).await.unwrap();
@@ -597,8 +636,10 @@ mod tests {
 
         mock.expect_list_instances()
             .returning(|_| empty_list_response());
-        mock.expect_launch_instance()
-            .returning(move |_| { lc.fetch_add(1, Ordering::SeqCst); make_launch_response() });
+        mock.expect_launch_instance().returning(move |_| {
+            lc.fetch_add(1, Ordering::SeqCst);
+            make_launch_response()
+        });
 
         let provider = OciComputeVmHostProvider::new_with_client(Arc::new(mock));
 
@@ -606,6 +647,10 @@ mod tests {
             provider.scale_to(2).await.unwrap();
         }
 
-        assert_eq!(launch_count.load(Ordering::SeqCst), 2, "Should launch exactly 2 despite 10 calls");
+        assert_eq!(
+            launch_count.load(Ordering::SeqCst),
+            2,
+            "Should launch exactly 2 despite 10 calls"
+        );
     }
 }

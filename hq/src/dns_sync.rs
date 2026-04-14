@@ -1,4 +1,4 @@
-use crate::{dns::DnsProvide, dns::DnsProvider, host_connection::HostConnection, telemetry, Host};
+use crate::{Host, dns::DnsProvide, dns::DnsProvider, host_connection::HostConnection, telemetry};
 use dashmap::DashMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -42,7 +42,10 @@ pub async fn run(
 
 fn dns_sync_interval() -> Duration {
     match std::env::var("DNS_SYNC_INTERVAL_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(1)),
+        Ok(s) => s
+            .parse()
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(1)),
         Err(_) => Duration::from_secs(1),
     }
 }

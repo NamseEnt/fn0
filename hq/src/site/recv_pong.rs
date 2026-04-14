@@ -18,7 +18,6 @@ impl Site {
 
             tokio::spawn(async move {
                 while let Ok(host_to_hq) = connection.read_message().await {
-
                     telemetry::pong_received(&new_host.id);
 
                     match host_to_hq {
@@ -79,9 +78,7 @@ fn send_updates(
                     code_id,
                     code_version,
                 },
-                Deployment::Undeploy { subdomain } => {
-                    CodeDeployment::Undeploy { subdomain }
-                }
+                Deployment::Undeploy { subdomain } => CodeDeployment::Undeploy { subdomain },
             })
             .collect(),
     };

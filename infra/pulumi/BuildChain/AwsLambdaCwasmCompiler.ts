@@ -11,6 +11,7 @@ export interface AwsLambdaCwasmCompilerArgs {
   wasmBucket: pulumi.Input<string>;
   cWasmBucket: pulumi.Input<string>;
   queueArn: pulumi.Input<string>;
+  wasmtimeVersion: pulumi.Input<string>;
 }
 
 export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
@@ -21,7 +22,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
   ) {
     super("pkg:index:aws-lambda-cwasm-compiler", name, args, opts);
 
-    const { region, wasmBucket, queueArn, cWasmBucket } = args;
+    const { region, wasmBucket, queueArn, cWasmBucket, wasmtimeVersion } = args;
 
     const fn0WasmtimeImage = new docker.Image(
       "fn0-wasmtime-image",
@@ -147,6 +148,7 @@ export class AwsLambdaCwasmCompiler extends pulumi.ComponentResource {
         environment: {
           variables: {
             CWASM_BUCKET: cWasmBucket,
+            FN0_WASMTIME_VERSION: wasmtimeVersion,
             XDG_CACHE_HOME: "/tmp",
           },
         },

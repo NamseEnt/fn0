@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { execSync } from "node:child_process";
 import { readFileSync, createWriteStream, existsSync, promises as fsp } from "node:fs";
 import { rm, mkdir, readdir } from "node:fs/promises";
@@ -11,7 +11,12 @@ export async function handler(event) {
   const s3Client = new S3Client({});
 
   const cWasmBucketName = process.env.CWASM_BUCKET;
+  const wasmtimeVersion = process.env.FN0_WASMTIME_VERSION;
   const fn0WasmtimePath = `/opt/fn0-wasmtime`;
+
+  if (!wasmtimeVersion) {
+    throw new Error("FN0_WASMTIME_VERSION is required");
+  }
 
   if (event.Records.length !== 1) {
     throw new Error(`Expected exactly one record, got ${event.Records.length}`);
@@ -27,6 +32,10 @@ export async function handler(event) {
 
   if (!key.endsWith(".raw.tar")) {
     console.log(`Ignoring non raw.tar key: ${key}`);
+    return;
+  }
+  if (!key.startsWith("sources/")) {
+    console.log(`Ignoring non source bundle key: ${key}`);
     return;
   }
 
@@ -81,8 +90,12 @@ export async function handler(event) {
   const zstBytes = zstdCompressSync(tarBytes);
   await fsp.writeFile(outputTarZstPath, zstBytes);
 
-  const subdomain = key.replace(/\.raw\.tar$/, "").replace(/^bundles\//, "");
-  const outKey = `bundles/${subdomain}.tar.zst`;
+  const match = key.match(/^sources\/(.+)\/(\d+)\.raw\.tar$/);
+  if (!match) {
+    throw new Error(`Unexpected source key format: ${key}`);
+  }
+  const [, subdomain, codeVersion] = match;
+  const outKey = `bundles/${wasmtimeVersion}/${subdomain}/${codeVersion}.tar.zst`;
 
   console.log(`put ${outKey} to ${cWasmBucketName}`);
   const outBytes = readFileSync(outputTarZstPath);
@@ -93,10 +106,6 @@ export async function handler(event) {
       Body: outBytes,
     })
   );
-
-  console.log("delete raw.tar from source bucket");
-  await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-
   await Promise.all([
     rm(inputTarPath, { force: true }),
     rm(extractDir, { recursive: true, force: true }),

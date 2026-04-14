@@ -12,6 +12,7 @@ host-hq-protocol = { package = "fn0-host-hq-protocol", path = "../host-hq-protoc
 doc-db = { path = "../doc-db", version = "0.1" }
 aws-config = "1"
 aws-sdk-s3 = { version = "1", features = ["behavior-version-latest"] }
+fn0-wasmtime = { path = "../fn0-wasmtime", version = "0.1" }
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4.42"
 color-eyre = "0.6.5"
@@ -50,6 +51,8 @@ singleflight = "0.3.0"
 boxcar = "0.2.14"
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 russh = "0.60.0"
+tar = "0.4"
+zstd = "0.13"
 
 [dev-dependencies]
 wiremock = "0.6"

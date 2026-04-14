@@ -30,6 +30,7 @@ struct DeployStartResponse {
     deploy_job_id: String,
     subdomain: String,
     code_id: u64,
+    code_version: u64,
 }
 
 fn credentials_path() -> Result<PathBuf> {
@@ -62,10 +63,7 @@ async fn github_device_flow() -> Result<String> {
     let resp: DeviceCodeResponse = client
         .post("https://github.com/login/device/code")
         .header("Accept", "application/json")
-        .form(&[
-            ("client_id", GITHUB_CLIENT_ID),
-            ("scope", "read:user"),
-        ])
+        .form(&[("client_id", GITHUB_CLIENT_ID), ("scope", "read:user")])
         .send()
         .await?
         .json()
@@ -165,6 +163,7 @@ pub async fn deploy(project_name: &str, bundle_tar_path: &Path) -> Result<()> {
             "deploy_job_id": start_resp.deploy_job_id,
             "subdomain": start_resp.subdomain,
             "code_id": start_resp.code_id,
+            "code_version": start_resp.code_version,
         }))
         .send()
         .await?
@@ -212,7 +211,10 @@ pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()
 
     let public_dir = dist_dir.join("public");
     if public_dir.exists() {
-        for entry in walkdir::WalkDir::new(&public_dir).into_iter().filter_map(|e| e.ok()) {
+        for entry in walkdir::WalkDir::new(&public_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }

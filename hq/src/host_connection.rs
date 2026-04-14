@@ -1,6 +1,6 @@
 use color_eyre::eyre::{Result, eyre};
 use futures::{SinkExt, StreamExt};
-use host_hq_protocol::{HqToHostDatagram, HqToHostReliable, HostToHq, WsHostToHq, WsHqToHost};
+use host_hq_protocol::{HostToHq, HqToHostDatagram, HqToHostReliable, WsHostToHq, WsHqToHost};
 use quinn::{ClientConfig, Connection, Endpoint};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
@@ -10,15 +10,11 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
 
 type WsSink = futures::stream::SplitSink<
-    tokio_tungstenite::WebSocketStream<
-        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-    >,
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
     Message,
 >;
 type WsStream = futures::stream::SplitStream<
-    tokio_tungstenite::WebSocketStream<
-        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-    >,
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
 >;
 
 #[derive(Clone)]
@@ -55,7 +51,8 @@ impl HostConnection {
     }
 
     pub async fn connect_websocket(url: &str, secret: Option<&str>) -> Result<Self> {
-        let (ws_stream, _) = tokio_tungstenite::connect_async(url).await
+        let (ws_stream, _) = tokio_tungstenite::connect_async(url)
+            .await
             .map_err(|e| eyre!("WebSocket connect failed: {e}"))?;
 
         let (mut sink, stream) = ws_stream.split();
@@ -160,7 +157,6 @@ impl HostConnection {
             }
         }
     }
-
 }
 
 const LOCAL_IPV4: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);

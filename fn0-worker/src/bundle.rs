@@ -20,6 +20,7 @@ enum Manifest {
 pub struct BundleFetcher {
     s3_client: Client,
     bucket: String,
+    wasmtime_version: String,
     store: Arc<BundleStore>,
     wasm_cache: BundleCache<WasmProxyPre, fn0::wasmtime::Error>,
     js_cache: BundleCache<String, FromUtf8Error>,
@@ -31,6 +32,7 @@ impl BundleFetcher {
     pub fn new(
         s3_client: Client,
         bucket: String,
+        wasmtime_version: String,
         store: Arc<BundleStore>,
         wasm_cache: BundleCache<WasmProxyPre, fn0::wasmtime::Error>,
         js_cache: BundleCache<String, FromUtf8Error>,
@@ -39,6 +41,7 @@ impl BundleFetcher {
         Self {
             s3_client,
             bucket,
+            wasmtime_version,
             store,
             wasm_cache,
             js_cache,
@@ -59,14 +62,7 @@ impl BundleFetcher {
             }
         }
 
-        let key = format!("bundles/{subdomain}.tar.zst");
-        let output = self
-            .s3_client
-            .get_object()
-            .bucket(&self.bucket)
-            .key(&key)
-            .send()
-            .await?;
+        let (output, key) = self.fetch_bundle_archive(subdomain, code_version).await?;
 
         let compressed = output.body.collect().await?.into_bytes();
         let tar_bytes = zstd::decode_all(compressed.as_ref())?;
@@ -141,6 +137,8 @@ impl BundleFetcher {
             .unwrap()
             .insert(subdomain.to_string(), (code_id, code_version));
 
+        tracing::info!(%subdomain, %code_version, %key, "Loaded bundle");
+
         Ok(())
     }
 
@@ -153,5 +151,43 @@ impl BundleFetcher {
         self.wasm_cache.invalidate(&backend_key).await;
         self.js_cache.invalidate(&frontend_key).await;
         self.fn0.unregister_deployment(subdomain);
+    }
+
+    async fn fetch_bundle_archive(
+        &self,
+        subdomain: &str,
+        code_version: u64,
+    ) -> Result<(aws_sdk_s3::operation::get_object::GetObjectOutput, String)> {
+        let versioned_key = format!(
+            "bundles/{}/{subdomain}/{code_version}.tar.zst",
+            self.wasmtime_version
+        );
+
+        match self
+            .s3_client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(&versioned_key)
+            .send()
+            .await
+        {
+            Ok(output) => Ok((output, versioned_key)),
+            Err(versioned_err) => {
+                let legacy_key = format!("bundles/{subdomain}.tar.zst");
+                let legacy_output = self
+                    .s3_client
+                    .get_object()
+                    .bucket(&self.bucket)
+                    .key(&legacy_key)
+                    .send()
+                    .await
+                    .map_err(|legacy_err| {
+                        eyre!(
+                            "failed to fetch versioned bundle ({versioned_key}): {versioned_err}; legacy fallback ({legacy_key}) also failed: {legacy_err}"
+                        )
+                    })?;
+                Ok((legacy_output, legacy_key))
+            }
+        }
     }
 }

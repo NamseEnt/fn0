@@ -6,8 +6,8 @@ use quinn::Endpoint;
 use rcgen::{CertificateParams, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::read_pem_env;
@@ -28,8 +28,8 @@ pub async fn run_quic_server(
             return Ok(());
         }
     };
-    let ca_key_pem = read_pem_env("CA_KEY_PEM")
-        .ok_or_else(|| eyre!("CA_KEY_PEM env var not set"))?;
+    let ca_key_pem =
+        read_pem_env("CA_KEY_PEM").ok_or_else(|| eyre!("CA_KEY_PEM env var not set"))?;
 
     let ca_key_pair = KeyPair::from_pem(&ca_key_pem)?;
     let ca_params = CertificateParams::from_ca_cert_pem(&ca_cert_pem)?;
@@ -65,7 +65,14 @@ pub async fn run_quic_server(
             match incoming.await {
                 Ok(connection) => {
                     tracing::info!(remote = %connection.remote_address(), "HQ connected");
-                    handle_connection(connection, deployment_id, instance_count, graceful_shutdown, bundle_fetcher).await;
+                    handle_connection(
+                        connection,
+                        deployment_id,
+                        instance_count,
+                        graceful_shutdown,
+                        bundle_fetcher,
+                    )
+                    .await;
                 }
                 Err(err) => {
                     tracing::warn!(%err, "Failed to accept QUIC connection");
@@ -158,6 +165,8 @@ async fn handle_connection(
                                     "Received deployment update"
                                 );
 
+                                let mut all_applied = true;
+
                                 for code in &codes {
                                     match code {
                                         host_hq_protocol::CodeDeployment::Deploy {
@@ -166,19 +175,33 @@ async fn handle_connection(
                                             code_version,
                                         } => {
                                             if let Err(err) = bundle_fetcher
-                                                .fetch_and_register(subdomain, *code_id, *code_version)
+                                                .fetch_and_register(
+                                                    subdomain,
+                                                    *code_id,
+                                                    *code_version,
+                                                )
                                                 .await
                                             {
                                                 tracing::error!(%err, %subdomain, "Failed to fetch bundle");
+                                                all_applied = false;
                                             }
                                         }
-                                        host_hq_protocol::CodeDeployment::Undeploy { subdomain } => {
+                                        host_hq_protocol::CodeDeployment::Undeploy {
+                                            subdomain,
+                                        } => {
                                             bundle_fetcher.unregister(subdomain).await;
                                         }
                                     }
                                 }
 
-                                deployment_id.store(new_deployment_id, Ordering::Relaxed);
+                                if all_applied {
+                                    deployment_id.store(new_deployment_id, Ordering::Relaxed);
+                                } else {
+                                    tracing::warn!(
+                                        new_deployment_id,
+                                        "Deployment update was only partially applied; will retry on next HQ ping"
+                                    );
+                                }
                             }
                             HqToHostReliable::GracefulShutdown => {
                                 tracing::info!("Received graceful shutdown from HQ");

@@ -127,8 +127,7 @@ impl Site {
             }
 
             if let Some(last) = last_scale_to_at
-                && last.elapsed().as_secs()
-                    < scale_config.scale_out_cooldown_secs.get() as _
+                && last.elapsed().as_secs() < scale_config.scale_out_cooldown_secs.get() as _
             {
                 continue;
             }
@@ -147,7 +146,10 @@ impl Site {
 
 fn scale_interval_ms() -> Duration {
     match std::env::var("SCALE_INTERVAL_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(5)),
+        Ok(s) => s
+            .parse()
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(5)),
         Err(_) => Duration::from_secs(5),
     }
 }

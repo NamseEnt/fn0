@@ -2,12 +2,14 @@ mod deployment;
 mod job_queue;
 mod project;
 mod scale_config;
+mod wasmtime_rollout;
 
 pub use deployment::*;
 pub use job_queue::*;
 use libsql::{Builder, Database, Result};
 pub use scale_config::*;
 use std::sync::Arc;
+pub use wasmtime_rollout::*;
 
 #[derive(Clone)]
 pub struct DocDb {
@@ -25,11 +27,8 @@ impl DocDb {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "docdb_test_{}_{}.db",
-            std::process::id(),
-            id
-        ));
+        let path =
+            std::env::temp_dir().join(format!("docdb_test_{}_{}.db", std::process::id(), id));
         let _ = std::fs::remove_file(&path);
         let db = Builder::new_local(path.to_str().unwrap()).build().await?;
         let conn = db.connect()?;

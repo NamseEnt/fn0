@@ -1,7 +1,7 @@
 use crate::telemetry;
 use color_eyre::eyre::Result;
 use doc_db::{Deployment, DocDb};
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tracing::warn;
 
@@ -95,14 +95,54 @@ impl DeploymentCache {
     pub fn last_deployment_id(&self) -> u64 {
         self.cache.count() as _
     }
+
+    pub fn current_deployments(&self) -> Vec<ActiveDeployment> {
+        let mut current = HashMap::<String, Option<ActiveDeployment>>::new();
+
+        for (_, deployment) in self.cache.iter() {
+            match deployment {
+                Deployment::Deploy {
+                    subdomain,
+                    code_id,
+                    code_version,
+                } => {
+                    current.insert(
+                        subdomain.clone(),
+                        Some(ActiveDeployment {
+                            subdomain: subdomain.clone(),
+                            code_id: *code_id,
+                            code_version: *code_version,
+                        }),
+                    );
+                }
+                Deployment::Undeploy { subdomain } => {
+                    current.insert(subdomain.clone(), None);
+                }
+            }
+        }
+
+        let mut deployments: Vec<_> = current.into_values().flatten().collect();
+        deployments.sort_by(|a, b| a.subdomain.cmp(&b.subdomain));
+        deployments
+    }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug, Ord, PartialOrd)]
 pub struct DeploymentId(pub u64);
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ActiveDeployment {
+    pub subdomain: String,
+    pub code_id: u64,
+    pub code_version: u64,
+}
+
 fn deployment_id_sync_interval_ms() -> Duration {
     match std::env::var("DEPLOYMENT_ID_SYNC_INTERVAL_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(2)),
+        Ok(s) => s
+            .parse()
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(2)),
         Err(_) => Duration::from_secs(2),
     }
 }

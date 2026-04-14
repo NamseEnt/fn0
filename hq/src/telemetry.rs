@@ -255,7 +255,6 @@ pub fn scaler_action_triggered(action: &'static str, count: usize) {
     counter.add(count as u64, &[KeyValue::new("action", action)]);
 }
 
-
 pub fn scaler_shutdown_command_status(success: bool) {
     let counter = global::meter("hq")
         .u64_counter("scaler_shutdown_command_status")

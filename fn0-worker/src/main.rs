@@ -5,6 +5,7 @@ mod quic;
 mod telemetry;
 mod websocket;
 
+use base64::Engine;
 use bundle::BundleFetcher;
 use bundle_cache::BundleCache;
 use bundle_store::BundleStore;
@@ -21,7 +22,6 @@ use std::string::FromUtf8Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
-use base64::Engine;
 use tokio_rustls::TlsAcceptor;
 
 pub type WorkerFn0 = Fn0<BundleCache<String, FromUtf8Error>>;
@@ -31,7 +31,9 @@ pub fn read_pem_env(name: &str) -> Option<String> {
         return Some(v);
     }
     let b64 = std::env::var(format!("{name}_BASE64")).ok()?;
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&b64).ok()?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&b64)
+        .ok()?;
     String::from_utf8(bytes).ok()
 }
 
@@ -44,8 +46,7 @@ fn main() -> Result<()> {
 
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
-    let telemetry_providers =
-        telemetry::setup(&otlp_endpoint, otlp_basic_auth.as_deref())?;
+    let telemetry_providers = telemetry::setup(&otlp_endpoint, otlp_basic_auth.as_deref())?;
 
     let result = rt.block_on(run());
 
@@ -55,6 +56,8 @@ fn main() -> Result<()> {
 
 async fn run() -> Result<()> {
     let cwasm_bucket = std::env::var("CWASM_BUCKET").expect("CWASM_BUCKET is required");
+    let wasmtime_version =
+        std::env::var("FN0_WASMTIME_VERSION").expect("FN0_WASMTIME_VERSION is required");
     let s3_endpoint = std::env::var("S3_ENDPOINT").expect("S3_ENDPOINT is required");
     let s3_region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
     let quic_port: u16 = std::env::var("QUIC_PORT")
@@ -94,6 +97,7 @@ async fn run() -> Result<()> {
     let bundle_fetcher = Arc::new(BundleFetcher::new(
         s3_client,
         cwasm_bucket,
+        wasmtime_version,
         store.clone(),
         wasm_cache,
         js_cache,
@@ -116,7 +120,16 @@ async fn run() -> Result<()> {
         let fn0 = fn0.clone();
         let bundle_fetcher = bundle_fetcher.clone();
         async move {
-            if let Err(err) = quic::run_quic_server(quic_port, deployment_id, instance_count, graceful_shutdown, fn0, bundle_fetcher).await {
+            if let Err(err) = quic::run_quic_server(
+                quic_port,
+                deployment_id,
+                instance_count,
+                graceful_shutdown,
+                fn0,
+                bundle_fetcher,
+            )
+            .await
+            {
                 tracing::error!(%err, "QUIC server error");
             }
         }
@@ -129,7 +142,16 @@ async fn run() -> Result<()> {
         let fn0 = fn0.clone();
         let bundle_fetcher = bundle_fetcher.clone();
         async move {
-            if let Err(err) = websocket::run_websocket_server(ws_port, deployment_id, instance_count, graceful_shutdown, fn0, bundle_fetcher).await {
+            if let Err(err) = websocket::run_websocket_server(
+                ws_port,
+                deployment_id,
+                instance_count,
+                graceful_shutdown,
+                fn0,
+                bundle_fetcher,
+            )
+            .await
+            {
                 tracing::error!(%err, "WebSocket server error");
             }
         }
@@ -162,7 +184,10 @@ async fn run_http_server(
     fn0: Arc<WorkerFn0>,
     graceful_shutdown: Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<()> {
-    let tls_acceptor = match (read_pem_env("ORIGIN_CERT_PEM"), read_pem_env("ORIGIN_KEY_PEM")) {
+    let tls_acceptor = match (
+        read_pem_env("ORIGIN_CERT_PEM"),
+        read_pem_env("ORIGIN_KEY_PEM"),
+    ) {
         (Some(cert_pem), Some(key_pem)) => {
             let certs: Vec<_> = rustls_pemfile::certs(&mut cert_pem.as_bytes())
                 .collect::<std::result::Result<_, _>>()?;
@@ -238,12 +263,10 @@ async fn handle_request(
             Ok(hyper::Response::new(Full::new(Bytes::from(body))))
         }
         "/role" => Ok(hyper::Response::new(Full::new(Bytes::from("worker")))),
-        path if path.starts_with("/__forte_queue_task/") => {
-            Ok(hyper::Response::builder()
-                .status(403)
-                .body(Full::new(Bytes::from("Forbidden")))
-                .unwrap())
-        }
+        path if path.starts_with("/__forte_queue_task/") => Ok(hyper::Response::builder()
+            .status(403)
+            .body(Full::new(Bytes::from("Forbidden")))
+            .unwrap()),
         _ => {
             let host = req
                 .headers()
@@ -263,7 +286,10 @@ async fn handle_request(
             match fn0.run(&code_id, "/", mapped_req, None).await {
                 Ok(resp) => {
                     let (parts, body) = resp.into_parts();
-                    let collected: std::result::Result<http_body_util::Collected<Bytes>, anyhow::Error> = body.collect().await;
+                    let collected: std::result::Result<
+                        http_body_util::Collected<Bytes>,
+                        anyhow::Error,
+                    > = body.collect().await;
                     let body_bytes = match collected {
                         Ok(c) => c.to_bytes(),
                         Err(_) => Bytes::new(),
