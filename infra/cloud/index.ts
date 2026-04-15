@@ -2,7 +2,6 @@ import * as fn0 from "@pulumi/fn0";
 import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as aws from "@pulumi/aws";
-import * as random from "@pulumi/random";
 import * as tls from "@pulumi/tls";
 
 const config = new pulumi.Config();
@@ -96,11 +95,6 @@ new aws.iam.UserPolicy("hq-aws-user-policy", {
   ),
 });
 
-const wsSecret = new random.RandomPassword("ws-secret", {
-  length: 64,
-  special: false,
-});
-
 const quicCaKey = new tls.PrivateKey("quic-ca-key", {
   algorithm: "ECDSA",
   ecdsaCurve: "P256",
@@ -141,7 +135,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   cwasmBucket: cwasmS3Pusher.cwasmZstBucket,
   awsAccessKeyId: hqAwsAccessKey.id,
   awsSecretAccessKey: hqAwsAccessKey.secret,
-  wsSecret: wsSecret.result,
   selfDnsHostname: `fn0-hq.${domain}`,
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
@@ -193,6 +186,5 @@ export const s3Endpoint = ociComputeWorker.cwasmBucket.endpoint;
 export const s3Region = ociComputeWorker.cwasmBucket.region;
 export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKeyId);
 export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
-export const dwsWsSecret = pulumi.secret(wsSecret.result);
 export const workerSshPrivateKey = pulumi.secret(ociComputeWorker.sshPrivateKey);
 

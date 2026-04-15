@@ -80,7 +80,6 @@ impl HqArgs {
                     host_cpu_cores,
                     host_memory_in_gb,
                     doc_db.clone(),
-                    args.ws_secret.clone(),
                 )
             })
             .collect();

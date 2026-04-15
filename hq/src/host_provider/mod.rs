@@ -8,15 +8,7 @@ pub struct Host {
     pub id: HostId,
     pub addr: String,
     pub port: u16,
-    pub transport: HostTransport,
     pub dns_addr: Option<String>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub enum HostTransport {
-    #[default]
-    Quic,
-    WebSocket,
 }
 
 impl PartialEq for Host {

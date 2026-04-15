@@ -463,10 +463,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         dockerfile: {
           location: "../../fn0-worker/Dockerfile",
         },
-        platforms: [
-          dockerBuild.Platform.Linux_arm64,
-          dockerBuild.Platform.Linux_amd64,
-        ],
+        platforms: [dockerBuild.Platform.Linux_arm64],
         push: true,
         registries: [
           {

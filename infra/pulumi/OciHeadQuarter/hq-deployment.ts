@@ -1,13 +1,13 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
-import * as docker from "@pulumi/docker";
+import * as dockerBuild from "@pulumi/docker-build";
 import type { HqArgs } from "../hqArgs.schema";
 
 export function deployHqApplication(
   parent: pulumi.Resource,
   args: {
     k8sProvider: k8s.Provider;
-    hqImage: docker.Image;
+    hqImage: dockerBuild.Image;
     otlpEndpoint: pulumi.Output<string>;
     workerOtlpEndpoint: pulumi.Output<string>;
     workerOtlpBasicAuth: pulumi.Output<string>;
@@ -58,7 +58,7 @@ export function deployHqApplication(
             containers: [
               {
                 name: appLabels.app,
-                image: hqImage.repoDigest,
+                image: hqImage.ref,
                 ports: [{ containerPort: 8080 }],
                 livenessProbe: {
                   httpGet: {

@@ -25,7 +25,6 @@ export interface OciHeadQuarterArgs {
   cwasmBucket: pulumi.Input<string>;
   awsAccessKeyId: pulumi.Input<string>;
   awsSecretAccessKey: pulumi.Input<string>;
-  wsSecret: pulumi.Input<string>;
   selfDnsHostname: pulumi.Input<string>;
   selfDnsCloudflareZoneId: pulumi.Input<string>;
   selfDnsCloudflareApiToken: pulumi.Input<string>;
@@ -112,7 +111,6 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           accessKeyId: args.awsAccessKeyId,
           secretAccessKey: args.awsSecretAccessKey,
         },
-        wsSecret: args.wsSecret,
         selfDns: {
           hostname: args.selfDnsHostname,
           cloudflareZoneId: args.selfDnsCloudflareZoneId,

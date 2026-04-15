@@ -6,7 +6,6 @@ export interface HqArgs {
   docDb: pulumi.Input<DocDbArgs>;
   selfDns: pulumi.Input<SelfDnsArgs>;
   sites: pulumi.Input<Array<SiteArgs>>;
-  wsSecret: pulumi.Input<string>;
 }
 export interface AwsArgs {
   accessKeyId: pulumi.Input<string>;
