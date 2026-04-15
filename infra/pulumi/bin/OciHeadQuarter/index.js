@@ -58,6 +58,13 @@ class OciHeadQuarter extends pulumi.ComponentResource {
                     token: docDbToken,
                 },
                 caCertPem: certificate,
+                aws: {
+                    region: args.awsRegion,
+                    wasmBucket: args.wasmBucket,
+                    cwasmBucket: args.cwasmBucket,
+                    accessKeyId: args.awsAccessKeyId,
+                    secretAccessKey: args.awsSecretAccessKey,
+                },
                 selfDns: {
                     hostname: args.selfDnsHostname,
                     cloudflareZoneId: args.selfDnsCloudflareZoneId,
