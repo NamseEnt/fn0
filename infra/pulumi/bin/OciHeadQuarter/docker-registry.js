@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createDockerRegistry = createDockerRegistry;
 const pulumi = require("@pulumi/pulumi");
 const oci = require("@pulumi/oci");
-const docker = require("@pulumi/docker");
+const dockerBuild = require("@pulumi/docker-build");
 function createDockerRegistry(parent, { compartmentId, suffix, region, }) {
     const repo = new oci.artifacts.ContainerRepository("hq-repo", {
         compartmentId,
@@ -35,18 +35,25 @@ function createDockerRegistry(parent, { compartmentId, suffix, region, }) {
         description: "AuthToken for HQ deployment",
     }, { parent });
     const registryUrl = pulumi.interpolate `ocir.${region}.oci.oraclecloud.com`;
-    const hqImage = new docker.Image("hq-image", {
-        imageName: pulumi.interpolate `${registryUrl}/${repo.namespace}/${repo.displayName}:v1`,
-        build: {
-            context: "../..",
-            dockerfile: "../../hq/Dockerfile",
-            platform: "linux/arm64",
+    const hqImage = new dockerBuild.Image("hq-image", {
+        tags: [
+            pulumi.interpolate `${registryUrl}/${repo.namespace}/${repo.displayName}:v1`,
+        ],
+        context: {
+            location: "../..",
         },
-        registry: {
-            server: registryUrl,
-            username: pulumi.interpolate `${repo.namespace}/${user.name}`,
-            password: authToken.token,
+        dockerfile: {
+            location: "../../hq/Dockerfile",
         },
+        platforms: [dockerBuild.Platform.Linux_arm64],
+        push: true,
+        registries: [
+            {
+                address: registryUrl,
+                username: pulumi.interpolate `${repo.namespace}/${user.name}`,
+                password: authToken.token,
+            },
+        ],
     }, { parent });
     return { hqImage };
 }

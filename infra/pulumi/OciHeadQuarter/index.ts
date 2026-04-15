@@ -20,11 +20,6 @@ export interface OciHeadQuarterArgs {
   docDbToken: pulumi.Input<string>;
   sites: pulumi.Input<SiteArgs[]>;
   certificate: pulumi.Input<string>;
-  awsRegion: pulumi.Input<string>;
-  wasmBucket: pulumi.Input<string>;
-  cwasmBucket: pulumi.Input<string>;
-  awsAccessKeyId: pulumi.Input<string>;
-  awsSecretAccessKey: pulumi.Input<string>;
   selfDnsHostname: pulumi.Input<string>;
   selfDnsCloudflareZoneId: pulumi.Input<string>;
   selfDnsCloudflareApiToken: pulumi.Input<string>;
@@ -104,13 +99,6 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           token: docDbToken,
         },
         caCertPem: certificate,
-        aws: {
-          region: args.awsRegion,
-          wasmBucket: args.wasmBucket,
-          cwasmBucket: args.cwasmBucket,
-          accessKeyId: args.awsAccessKeyId,
-          secretAccessKey: args.awsSecretAccessKey,
-        },
         selfDns: {
           hostname: args.selfDnsHostname,
           cloudflareZoneId: args.selfDnsCloudflareZoneId,

@@ -59,7 +59,10 @@ impl BundleFetcher {
             }
         }
 
-        let key = format!("bundles/{subdomain}.tar.zst");
+        let key = format!(
+            "bundles/{version}/{subdomain}.tar.zst",
+            version = fn0::FN0_WASMTIME_VERSION,
+        );
         let output = self
             .s3_client
             .get_object()

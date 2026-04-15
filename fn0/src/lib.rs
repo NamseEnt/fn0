@@ -282,4 +282,4 @@ fn get_content_type(path: &str) -> &'static str {
     }
 }
 
-pub use fn0_wasmtime::compile;
+pub use fn0_wasmtime::{compile, VERSION as FN0_WASMTIME_VERSION};

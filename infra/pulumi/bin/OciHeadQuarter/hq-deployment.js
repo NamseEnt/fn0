@@ -4,7 +4,7 @@ exports.deployHqApplication = deployHqApplication;
 const pulumi = require("@pulumi/pulumi");
 const k8s = require("@pulumi/kubernetes");
 function deployHqApplication(parent, args) {
-    const { k8sProvider, hqImage, otlpEndpoint, hqArgs, regionalSubnetId } = args;
+    const { k8sProvider, hqImage, otlpEndpoint, workerOtlpEndpoint, workerOtlpBasicAuth, hqArgs, } = args;
     const appLabels = { app: "hq" };
     const hqArgsSecret = new k8s.core.v1.Secret("hq-args-secret", {
         metadata: { labels: appLabels },
@@ -30,7 +30,7 @@ function deployHqApplication(parent, args) {
                     containers: [
                         {
                             name: appLabels.app,
-                            image: hqImage.repoDigest,
+                            image: hqImage.ref,
                             ports: [{ containerPort: 8080 }],
                             livenessProbe: {
                                 httpGet: {
@@ -58,6 +58,14 @@ function deployHqApplication(parent, args) {
                                     name: "HQ_ARGS_PATH",
                                     value: configFilePath,
                                 },
+                                {
+                                    name: "WORKER_OTLP_ENDPOINT",
+                                    value: workerOtlpEndpoint,
+                                },
+                                {
+                                    name: "WORKER_OTLP_BASIC_AUTH",
+                                    value: workerOtlpBasicAuth,
+                                },
                             ],
                         },
                     ],
@@ -77,27 +85,6 @@ function deployHqApplication(parent, args) {
         parent,
         customTimeouts: { create: "3m", update: "3m" },
     });
-    const service = new k8s.core.v1.Service("hq-service", {
-        metadata: {
-            labels: appLabels,
-            annotations: {
-                "oci.oraclecloud.com/load-balancer-type": "lb",
-                "service.beta.kubernetes.io/oci-load-balancer-subnet1": regionalSubnetId,
-            },
-        },
-        spec: {
-            type: "LoadBalancer",
-            selector: appLabels,
-            ports: [
-                {
-                    name: "http",
-                    port: 8080,
-                    targetPort: 8080,
-                    protocol: "TCP",
-                },
-            ],
-        },
-    }, { provider: k8sProvider, parent, dependsOn: [deployment] });
-    return { deployment, service };
+    return { deployment };
 }
 //# sourceMappingURL=hq-deployment.js.map

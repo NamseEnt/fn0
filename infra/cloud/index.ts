@@ -1,7 +1,8 @@
 import * as fn0 from "@pulumi/fn0";
 import * as pulumi from "@pulumi/pulumi";
-import * as cloudflare from "@pulumi/cloudflare";
 import * as aws from "@pulumi/aws";
+import * as oci from "@pulumi/oci";
+import * as cloudflare from "@pulumi/cloudflare";
 import * as tls from "@pulumi/tls";
 
 const config = new pulumi.Config();
@@ -9,7 +10,6 @@ const config = new pulumi.Config();
 const accountId = config.require("cloudflareAccountId");
 const zoneId = config.require("cloudflareZoneId");
 const domain = config.require("domain");
-const awsRegion = "ap-northeast-1";
 
 const suffix = new fn0.Suffix("suffix").result;
 
@@ -26,17 +26,147 @@ new cloudflare.ZoneSetting("ssl-mode", {
   value: "strict",
 });
 
-
-
-
-
 const docDb = new fn0.TursoDocDb("doc-db", {
   organizationSlug: config.require("tursoOrganizationSlug"),
   location: config.require("tursoLocation"),
 });
 
-const wasmS3 = new fn0.AwsWasmS3("wasm-s3", {
-  region: awsRegion,
+const sccacheRegion = config.require("ociHeadQuarterRegion");
+
+const sccacheCompartment = new oci.identity.Compartment("sccache-compartment", {
+  name: pulumi.interpolate`fn0-sccache-${suffix}`,
+  description: "Compartment for fn0 sccache S3-compatible bucket",
+  enableDelete: true,
+});
+
+const sccacheNamespace = oci.objectstorage.getNamespaceOutput({
+  compartmentId: sccacheCompartment.id,
+}).namespace;
+
+const sccacheBucket = new oci.objectstorage.Bucket("sccache-bucket", {
+  compartmentId: sccacheCompartment.id,
+  namespace: sccacheNamespace,
+  name: pulumi.interpolate`fn0-sccache-${suffix}`,
+});
+
+const sccacheUser = new oci.identity.User("sccache-user", {
+  name: pulumi.interpolate`fn0-sccache-${suffix}`,
+  description: "User for fn0 sccache S3-compatible access",
+});
+
+const sccacheGroup = new oci.identity.Group("sccache-group", {
+  name: pulumi.interpolate`fn0-sccache-group-${suffix}`,
+  description: "Group for fn0 sccache bucket access",
+});
+
+new oci.identity.UserGroupMembership("sccache-membership", {
+  userId: sccacheUser.id,
+  groupId: sccacheGroup.id,
+});
+
+new oci.identity.Policy("sccache-policy", {
+  compartmentId: sccacheCompartment.id,
+  name: pulumi.interpolate`allow-sccache-${suffix}`,
+  description: "Policy for sccache bucket access",
+  statements: [
+    pulumi.interpolate`Allow group ${sccacheGroup.name} to manage objects in compartment id ${sccacheCompartment.id}`,
+    pulumi.interpolate`Allow group ${sccacheGroup.name} to manage buckets in compartment id ${sccacheCompartment.id}`,
+  ],
+});
+
+const sccacheCustomerKey = new oci.identity.CustomerSecretKey(
+  "sccache-customer-key",
+  {
+    userId: sccacheUser.id,
+    displayName: "fn0-sccache-s3-compat",
+  }
+);
+
+const sccacheEndpoint = pulumi.interpolate`https://${sccacheNamespace}.compat.objectstorage.${sccacheRegion}.oraclecloud.com`;
+
+const cwasmCompilerRegion = "ap-northeast-1";
+
+const cwasmCompilerBucketR = new aws.s3.Bucket("cwasm-compiler-bucket", {
+  region: cwasmCompilerRegion,
+});
+
+const cwasmCompilerEcrR = new aws.ecr.Repository("cwasm-compiler-ecr", {
+  region: cwasmCompilerRegion,
+  imageTagMutability: "IMMUTABLE",
+  forceDelete: true,
+});
+
+const cwasmCompilerRoleR = new aws.iam.Role("cwasm-compiler-role", {
+  assumeRolePolicy: JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    ],
+  }),
+  managedPolicyArns: [aws.iam.ManagedPolicy.AWSLambdaBasicExecutionRole],
+});
+
+new aws.iam.RolePolicy("cwasm-compiler-role-policy", {
+  role: cwasmCompilerRoleR.name,
+  policy: cwasmCompilerBucketR.arn.apply((arn) =>
+    JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: ["s3:ListBucket"],
+          Resource: arn,
+        },
+        {
+          Effect: "Allow",
+          Action: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+          Resource: `${arn}/*`,
+        },
+      ],
+    })
+  ),
+});
+
+const awsCallerIdentity = aws.getCallerIdentityOutput({});
+
+const hqAwsUser = new aws.iam.User("hq-aws-user", {
+  name: "fn0-hq",
+});
+
+const hqAwsAccessKey = new aws.iam.AccessKey("hq-aws-access-key", {
+  user: hqAwsUser.name,
+});
+
+new aws.iam.UserPolicy("hq-aws-user-policy", {
+  user: hqAwsUser.name,
+  policy: pulumi
+    .all([cwasmCompilerBucketR.arn, awsCallerIdentity.accountId])
+    .apply(([bucketArn, accountId]) =>
+      JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Action: ["s3:ListBucket"],
+            Resource: bucketArn,
+          },
+          {
+            Effect: "Allow",
+            Action: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+            Resource: `${bucketArn}/*`,
+          },
+          {
+            Effect: "Allow",
+            Action: ["lambda:InvokeFunction"],
+            Resource: `arn:aws:lambda:${cwasmCompilerRegion}:${accountId}:function:fn0-cwasm-compiler-*`,
+          },
+        ],
+      })
+    ),
 });
 
 const ociHeadQuarterVcn = new fn0.OciHeadQuarterVcn("oci-head-quarter-vcn", {
@@ -49,52 +179,6 @@ const ociComputeWorker = new fn0.OciComputeWorker("oci-compute-worker", {
   hqIpv6CidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
 });
 
-const cwasmS3Pusher = new fn0.CwasmS3Pusher("cwasm-s3-pusher", {
-  awsS3Region: awsRegion,
-  zoneId,
-  cloudflareApiToken: dns.dnsApiToken,
-  targetBuckets: [
-    {
-      endpoint: ociComputeWorker.cwasmBucket.endpoint,
-      region: ociComputeWorker.cwasmBucket.region,
-      bucketName: ociComputeWorker.cwasmBucket.bucketName,
-      accessKeyId: ociComputeWorker.cwasmBucket.accessKeyId,
-      secretAccessKey: ociComputeWorker.cwasmBucket.secretAccessKey,
-    },
-  ],
-});
-
-new fn0.AwsLambdaCwasmCompiler("cwasm-compiler", {
-  region: awsRegion,
-  wasmBucket: wasmS3.bucket,
-  cWasmBucket: cwasmS3Pusher.cwasmZstBucket,
-  queueArn: wasmS3.queueArn,
-});
-
-const hqAwsUser = new aws.iam.User("hq-aws-user", {
-  name: "fn0-hq",
-});
-
-const hqAwsAccessKey = new aws.iam.AccessKey("hq-aws-access-key", {
-  user: hqAwsUser.name,
-});
-
-new aws.iam.UserPolicy("hq-aws-user-policy", {
-  user: hqAwsUser.name,
-  policy: wasmS3.bucket.apply((bucket) =>
-    JSON.stringify({
-      Version: "2012-10-17",
-      Statement: [
-        {
-          Effect: "Allow",
-          Action: ["s3:PutObject"],
-          Resource: `arn:aws:s3:::${bucket}/*`,
-        },
-      ],
-    })
-  ),
-});
-
 const quicCaKey = new tls.PrivateKey("quic-ca-key", {
   algorithm: "ECDSA",
   ecdsaCurve: "P256",
@@ -103,7 +187,7 @@ const quicCaKey = new tls.PrivateKey("quic-ca-key", {
 const quicCaCert = new tls.SelfSignedCert("quic-ca-cert", {
   privateKeyPem: quicCaKey.privateKeyPem,
   isCaCertificate: true,
-  validityPeriodHours: 87600, // 10 years
+  validityPeriodHours: 87600,
   allowedUses: ["cert_signing"],
   subject: {
     commonName: "fn0-quic-ca",
@@ -130,11 +214,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   docDbUrl: docDb.url,
   docDbToken: docDb.token,
   certificate: quicCaCert.certPem,
-  awsRegion: awsRegion,
-  wasmBucket: wasmS3.bucket,
-  cwasmBucket: cwasmS3Pusher.cwasmZstBucket,
-  awsAccessKeyId: hqAwsAccessKey.id,
-  awsSecretAccessKey: hqAwsAccessKey.secret,
   selfDnsHostname: `fn0-hq.${domain}`,
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
@@ -181,10 +260,21 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
 
 export const kubeconfig = pulumi.secret(ociHeadQuarter.kubeconfig);
 export const workerImage = ociComputeWorker.workerImageMultiArch;
+export const workerImageRegistries = pulumi.secret(ociComputeWorker.workerImageRegistries);
 export const cwasmBucket = ociComputeWorker.cwasmBucket.bucketName;
 export const s3Endpoint = ociComputeWorker.cwasmBucket.endpoint;
 export const s3Region = ociComputeWorker.cwasmBucket.region;
 export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKeyId);
 export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
 export const workerSshPrivateKey = pulumi.secret(ociComputeWorker.sshPrivateKey);
-
+export const sccacheBucketName = sccacheBucket.name;
+export const sccacheBucketRegion = sccacheRegion;
+export const sccacheBucketEndpoint = sccacheEndpoint;
+export const sccacheAccessKeyId = pulumi.secret(sccacheCustomerKey.id);
+export const sccacheSecretAccessKey = pulumi.secret(sccacheCustomerKey.key);
+export const cwasmCompilerBucket = cwasmCompilerBucketR.bucket;
+export const cwasmCompilerBucketRegion = cwasmCompilerRegion;
+export const cwasmCompilerEcrRepository = cwasmCompilerEcrR.repositoryUrl;
+export const cwasmCompilerRoleArn = cwasmCompilerRoleR.arn;
+export const hqAwsAccessKeyId = pulumi.secret(hqAwsAccessKey.id);
+export const hqAwsSecretAccessKey = pulumi.secret(hqAwsAccessKey.secret);

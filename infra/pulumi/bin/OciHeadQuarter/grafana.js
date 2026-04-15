@@ -15,7 +15,6 @@ function hqGrafana(parent, { slug, k8sProvider, suffix, }) {
     const clusterName = pulumi.interpolate `fn0-${suffix}`;
     const namespace = "monitoring";
     const destinationName = "grafana-cloud-metrics";
-    const secretName = pulumi.interpolate `${destinationName}-${releaseName}`;
     const release = new k8s.helm.v3.Release(`grafana-k8s-monitoring`, {
         name: releaseName,
         chart: "k8s-monitoring",
@@ -67,35 +66,38 @@ function hqGrafana(parent, { slug, k8sProvider, suffix, }) {
                     },
                 },
             },
+            telemetryServices: {
+                "kube-state-metrics": {
+                    deploy: true,
+                },
+            },
             clusterMetrics: {
                 enabled: true,
-                opencost: {
-                    enabled: true,
-                    metricsSource: destinationName,
-                    opencost: {
-                        exporter: {
-                            defaultClusterId: clusterName,
-                        },
-                        prometheus: {
-                            existingSecretName: secretName,
-                            external: {
-                                url: stack.prometheusRemoteEndpoint,
-                            },
-                        },
-                    },
-                },
-                kepler: {
-                    enabled: true,
-                },
+                collector: "alloy-receiver",
             },
             clusterEvents: {
                 enabled: true,
+                collector: "alloy-receiver",
             },
-            podLogs: {
+            podLogsViaLoki: {
                 enabled: true,
+                collector: "alloy-logs",
+            },
+            collectors: {
+                "alloy-receiver": {
+                    alloy: {},
+                },
+                "alloy-logs": {
+                    alloy: {
+                        mounts: {
+                            varlog: true,
+                        },
+                    },
+                },
             },
             applicationObservability: {
                 enabled: true,
+                collector: "alloy-receiver",
                 receivers: {
                     otlp: {
                         grpc: {
@@ -113,38 +115,34 @@ function hqGrafana(parent, { slug, k8sProvider, suffix, }) {
                     },
                 },
             },
-            "alloy-metrics": {
-                enabled: true,
-                alloy: {},
-                remoteConfig: {
-                    enabled: false,
-                },
-            },
-            "alloy-singleton": {
-                enabled: true,
-                alloy: {},
-                remoteConfig: {
-                    enabled: false,
-                },
-            },
-            "alloy-logs": {
-                enabled: true,
-                alloy: {},
-                remoteConfig: {
-                    enabled: false,
-                },
-            },
-            "alloy-receiver": {
-                enabled: true,
-                alloy: {},
-                remoteConfig: {
-                    enabled: false,
-                },
-            },
         },
     }, { provider: k8sProvider, parent });
+    const workerOtlpEndpoint = stack.otlpUrl.apply((url) => `${url}/otlp`);
+    const workerOtlpBasicAuth = pulumi
+        .all([stack.id, password])
+        .apply(([id, pw]) => Buffer.from(`${id}:${pw}`).toString("base64"));
+    const serviceAccount = new grafana.cloud.StackServiceAccount("dashboard-sa", {
+        stackSlug: slug,
+        name: "pulumi-dashboard-deployer",
+        role: "Editor",
+    }, { parent });
+    const saToken = new grafana.cloud.StackServiceAccountToken("dashboard-sa-token", {
+        stackSlug: slug,
+        serviceAccountId: serviceAccount.id,
+        name: "pulumi-token",
+    }, { parent });
+    const grafanaInstanceProvider = new grafana.Provider("grafana-instance", {
+        url: stack.url,
+        auth: saToken.key,
+    }, { parent });
+    const dashboardJson = require("./fn0-cloud-dashboard.json");
+    new grafana.oss.Dashboard("fn0-cloud-dashboard", {
+        configJson: JSON.stringify(dashboardJson),
+    }, { provider: grafanaInstanceProvider, parent });
     return {
         otlpEndpoint: pulumi.interpolate `http://${releaseName}-alloy-receiver.${namespace}:4317`,
+        workerOtlpEndpoint,
+        workerOtlpBasicAuth,
         release,
     };
 }
