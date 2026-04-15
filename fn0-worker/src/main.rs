@@ -1,7 +1,7 @@
 mod bundle;
 mod bundle_cache;
 mod bundle_store;
-mod quic;
+mod deployments_watcher;
 mod telemetry;
 
 use bundle::BundleFetcher;
@@ -16,6 +16,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
@@ -24,6 +25,8 @@ use base64::Engine;
 use tokio_rustls::TlsAcceptor;
 
 pub type WorkerFn0 = Fn0<BundleCache<String, FromUtf8Error>>;
+
+const DEPLOYMENTS_JSON_PATH: &str = "/etc/fn0-worker/deployments.json";
 
 pub fn read_pem_env(name: &str) -> Option<String> {
     if let Ok(v) = std::env::var(name) {
@@ -56,10 +59,6 @@ async fn run() -> Result<()> {
     let cwasm_bucket = std::env::var("CWASM_BUCKET").expect("CWASM_BUCKET is required");
     let s3_endpoint = std::env::var("S3_ENDPOINT").expect("S3_ENDPOINT is required");
     let s3_region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
-    let quic_port: u16 = std::env::var("QUIC_PORT")
-        .unwrap_or_else(|_| "10000".to_string())
-        .parse()
-        .expect("QUIC_PORT must be a valid port");
     let http_port: u16 = std::env::var("HTTP_PORT")
         .unwrap_or_else(|_| "443".to_string())
         .parse()
@@ -99,35 +98,37 @@ async fn run() -> Result<()> {
         fn0.clone(),
     ));
 
-    let deployment_id = Arc::new(AtomicU64::new(0));
+    let generation = Arc::new(AtomicU64::new(0));
     let instance_count = Arc::new(AtomicU64::new(0));
-    let graceful_shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-    let quic_handle = tokio::spawn({
-        let deployment_id = deployment_id.clone();
-        let instance_count = instance_count.clone();
-        let graceful_shutdown = graceful_shutdown.clone();
-        let fn0 = fn0.clone();
+    let watcher_handle = tokio::spawn({
+        let generation = generation.clone();
         let bundle_fetcher = bundle_fetcher.clone();
         async move {
-            if let Err(err) = quic::run_quic_server(quic_port, deployment_id, instance_count, graceful_shutdown, fn0, bundle_fetcher).await {
-                tracing::error!(%err, "QUIC server error");
-            }
+            deployments_watcher::run(
+                &PathBuf::from(DEPLOYMENTS_JSON_PATH),
+                generation,
+                bundle_fetcher,
+            )
+            .await;
         }
     });
 
     let http_handle = tokio::spawn({
         let fn0 = fn0.clone();
-        let graceful_shutdown = graceful_shutdown.clone();
+        let generation = generation.clone();
+        let instance_count = instance_count.clone();
         async move {
-            if let Err(err) = run_http_server(http_port, fn0, graceful_shutdown).await {
+            if let Err(err) =
+                run_http_server(http_port, fn0, generation, instance_count).await
+            {
                 tracing::error!(%err, "HTTP server error");
             }
         }
     });
 
     tokio::select! {
-        _ = quic_handle => {},
+        _ = watcher_handle => {},
         _ = http_handle => {},
         _ = tokio::signal::ctrl_c() => {
             tracing::info!("Received ctrl-c, shutting down");
@@ -140,7 +141,8 @@ async fn run() -> Result<()> {
 async fn run_http_server(
     port: u16,
     fn0: Arc<WorkerFn0>,
-    graceful_shutdown: Arc<std::sync::atomic::AtomicBool>,
+    generation: Arc<AtomicU64>,
+    instance_count: Arc<AtomicU64>,
 ) -> Result<()> {
     let tls_acceptor = match (read_pem_env("ORIGIN_CERT_PEM"), read_pem_env("ORIGIN_KEY_PEM")) {
         (Some(cert_pem), Some(key_pem)) => {
@@ -164,16 +166,22 @@ async fn run_http_server(
     tracing::info!(%addr, tls = tls_acceptor.is_some(), "HTTP(S) server listening");
 
     loop {
-        let (socket, _) = listener.accept().await?;
+        let (socket, peer_addr) = listener.accept().await?;
+        let is_loopback = peer_addr.ip().is_loopback();
+
         let fn0 = fn0.clone();
-        let graceful_shutdown = graceful_shutdown.clone();
+        let generation = generation.clone();
+        let instance_count = instance_count.clone();
         let tls_acceptor = tls_acceptor.clone();
 
         tokio::spawn(async move {
             let service = service_fn(move |req| {
                 let fn0 = fn0.clone();
-                let graceful_shutdown = graceful_shutdown.clone();
-                async move { handle_request(req, fn0, graceful_shutdown).await }
+                let generation = generation.clone();
+                let instance_count = instance_count.clone();
+                async move {
+                    handle_request(req, fn0, generation, instance_count, is_loopback).await
+                }
             });
 
             let result = if let Some(acceptor) = tls_acceptor {
@@ -201,22 +209,48 @@ async fn run_http_server(
     }
 }
 
+struct InFlightGuard {
+    counter: Arc<AtomicU64>,
+}
+impl InFlightGuard {
+    fn new(counter: Arc<AtomicU64>) -> Self {
+        counter.fetch_add(1, Ordering::Relaxed);
+        Self { counter }
+    }
+}
+impl Drop for InFlightGuard {
+    fn drop(&mut self) {
+        self.counter.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 type HyperResponse = hyper::Response<Full<Bytes>>;
 
 async fn handle_request(
     req: hyper::Request<hyper::body::Incoming>,
     fn0: Arc<WorkerFn0>,
-    graceful_shutdown: Arc<std::sync::atomic::AtomicBool>,
+    generation: Arc<AtomicU64>,
+    instance_count: Arc<AtomicU64>,
+    is_loopback: bool,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     match req.uri().path() {
-        "/health" => {
-            let body = if graceful_shutdown.load(Ordering::Relaxed) {
-                "graceful_shutting_down"
-            } else {
-                "good"
-            };
-            Ok(hyper::Response::new(Full::new(Bytes::from(body))))
+        "/status" if is_loopback => {
+            let body = serde_json::json!({
+                "generation": generation.load(Ordering::Relaxed),
+                "instances": instance_count.load(Ordering::Relaxed),
+            });
+            let s = serde_json::to_string(&body).unwrap();
+            Ok(hyper::Response::builder()
+                .status(200)
+                .header("content-type", "application/json")
+                .body(Full::new(Bytes::from(s)))
+                .unwrap())
         }
+        "/status" => Ok(hyper::Response::builder()
+            .status(404)
+            .body(Full::new(Bytes::from("not found")))
+            .unwrap()),
+        "/health" => Ok(hyper::Response::new(Full::new(Bytes::from("good")))),
         "/role" => Ok(hyper::Response::new(Full::new(Bytes::from("worker")))),
         path if path.starts_with("/__forte_queue_task/") => {
             Ok(hyper::Response::builder()
@@ -225,6 +259,8 @@ async fn handle_request(
                 .unwrap())
         }
         _ => {
+            let _guard = InFlightGuard::new(instance_count);
+
             let host = req
                 .headers()
                 .get("host")

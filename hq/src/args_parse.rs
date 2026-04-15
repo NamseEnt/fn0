@@ -17,6 +17,8 @@ pub struct DeployContext {
     pub wasm_bucket: String,
     pub cwasm_bucket: String,
     pub doc_db: DocDb,
+    pub deployment_cache: DeploymentCache,
+    pub sites: Vec<Site>,
 }
 
 pub struct HqArgsParsed {
@@ -53,14 +55,7 @@ impl HqArgs {
             .await;
         let s3_client = S3Client::new(&aws_config);
 
-        let deploy_context = Arc::new(DeployContext {
-            s3_client,
-            wasm_bucket: args.aws.wasm_bucket,
-            cwasm_bucket: args.aws.cwasm_bucket,
-            doc_db: doc_db.clone(),
-        });
-
-        let sites = args
+        let sites: Vec<Site> = args
             .sites
             .into_iter()
             .map(|site_args| {
@@ -75,7 +70,6 @@ impl HqArgs {
                 Site::new(
                     site_args.name,
                     host_provider,
-                    args.ca_cert_pem.clone(),
                     deployment_cache.clone(),
                     host_cpu_cores,
                     host_memory_in_gb,
@@ -83,6 +77,15 @@ impl HqArgs {
                 )
             })
             .collect();
+
+        let deploy_context = Arc::new(DeployContext {
+            s3_client,
+            wasm_bucket: args.aws.wasm_bucket,
+            cwasm_bucket: args.aws.cwasm_bucket,
+            doc_db: doc_db.clone(),
+            deployment_cache: deployment_cache.clone(),
+            sites: sites.clone(),
+        });
 
         let dns_provider = match args.dns_provider {
             DnsProviderArg::Cloudflare(dns_args) => {

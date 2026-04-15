@@ -1,6 +1,7 @@
 use super::oci_scaler::{OciScaler, ScaleAction};
 use super::*;
 use crate::args::OciComputeVmHostProviderArgs;
+use crate::host_id::HostId;
 use base64::Engine;
 use oci_rust_sdk::auth::{SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 use oci_rust_sdk::core::{self, region::Region, *};
@@ -139,8 +140,9 @@ impl OciComputeVmHostProvider {
         format!(
             r#"#!/bin/bash
 systemctl disable --now firewalld 2>/dev/null || true
+mkdir -p /etc/fn0-worker
 podman pull {image}
-podman create --replace --name fn0-worker --network=host {env_flags} {image}
+podman create --replace --name fn0-worker --network=host -v /etc/fn0-worker:/etc/fn0-worker:ro,Z {env_flags} {image}
 podman generate systemd --name fn0-worker > /etc/systemd/system/fn0-worker.service
 systemctl daemon-reload
 systemctl enable --now fn0-worker

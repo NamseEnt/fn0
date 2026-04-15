@@ -1,7 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
   aws: pulumi.Input<AwsArgs>;
-  caCertPem: pulumi.Input<string>;
   dnsProvider: pulumi.Input<DnsProviderArg>;
   docDb: pulumi.Input<DocDbArgs>;
   selfDns: pulumi.Input<SelfDnsArgs>;

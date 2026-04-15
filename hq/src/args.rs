@@ -5,7 +5,6 @@ use std::{collections::BTreeMap, num::NonZeroUsize};
 pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
     pub doc_db: DocDbArgs,
-    pub ca_cert_pem: String,
     pub aws: AwsArgs,
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,

@@ -1,8 +1,11 @@
 use super::*;
-use crate::{telemetry, *};
-use host_hq_protocol::HqToHostReliable;
-use std::time::Duration;
+use crate::doc_db::GracefulPurpose;
+use crate::host_provider::HostProvide;
+use crate::telemetry;
+use std::num::NonZeroUsize;
+use std::time::{Duration, Instant};
 use tokio::time::MissedTickBehavior;
+use tracing::warn;
 
 impl Site {
     #[tracing::instrument(skip_all)]
@@ -37,17 +40,24 @@ impl Site {
                 }
             };
 
-            let mut running_hosts = self
-                .hosts_status
-                .iter()
-                .filter(|status| {
-                    !self.graceful_shutdown_hosts.contains_key(status.key())
-                        && !self.dead_hosts.contains_key(status.key())
-                })
-                .collect::<Vec<_>>();
+            let statuses = match self.doc_db.list_host_statuses(&self.name).await {
+                Ok(list) => list,
+                Err(err) => {
+                    warn!(%err, "Scaler: failed to list host-status");
+                    continue;
+                }
+            };
 
-            let instances: u64 = running_hosts.iter().map(|status| status.instances).sum();
-            let hosts = running_hosts.len();
+            let mut running: Vec<_> = statuses
+                .into_iter()
+                .filter(|s| s.healthy && !s.graceful)
+                .collect();
+
+            let instances: u64 = running
+                .iter()
+                .map(|s| s.instances.unwrap_or(0))
+                .sum();
+            let hosts = running.len();
 
             telemetry::scaler_running_hosts(hosts);
             telemetry::scaler_total_instances(instances);
@@ -93,27 +103,25 @@ impl Site {
                 last_scale_in_at = Some(Instant::now());
 
                 let count = hosts - scale_in_target;
-
                 telemetry::scaler_action_triggered("scale_in", count);
 
-                running_hosts.sort_by_key(|h| h.instances);
+                running.sort_by_key(|s| s.instances.unwrap_or(0));
 
-                for host in running_hosts.into_iter().take(count) {
-                    self.graceful_shutdown_hosts
-                        .insert(host.key().clone(), Instant::now());
-
-                    if let Some((_host, connection)) = self.host_connections.remove(host.key()) {
-                        tokio::spawn(async move {
-                            let result = connection
-                                .send_reliable(HqToHostReliable::GracefulShutdown)
-                                .await;
-
-                            telemetry::scaler_shutdown_command_status(result.is_ok());
-
-                            if let Err(err) = result {
-                                warn!(%err, "Fail to send graceful shutdown");
-                            };
-                        });
+                let now = chrono::Utc::now().to_rfc3339();
+                for s in running.into_iter().take(count) {
+                    match self
+                        .doc_db
+                        .set_host_graceful(&s.host_id, GracefulPurpose::Terminate, &now)
+                        .await
+                    {
+                        Ok(true) => {
+                            telemetry::scaler_shutdown_command_status(true);
+                        }
+                        Ok(false) => {}
+                        Err(err) => {
+                            telemetry::scaler_shutdown_command_status(false);
+                            warn!(%err, host_id = %s.host_id, "Failed to set graceful");
+                        }
                     }
                 }
 

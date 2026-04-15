@@ -1,12 +1,13 @@
 mod deployment;
+mod host_status;
 mod job_queue;
 mod project;
 mod scale_config;
 
 pub use deployment::*;
-pub use job_queue::*;
+pub use host_status::*;
 use libsql::{Builder, Database, Result};
-pub use scale_config::*;
+pub use scale_config::ScaleConfig;
 use std::sync::Arc;
 
 #[derive(Clone)]
