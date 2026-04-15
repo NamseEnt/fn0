@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use aws_sdk_lambda::Client as LambdaClient;
 use aws_sdk_s3::Client as S3Client;
 use color_eyre::eyre::{Result, eyre};
 use crate::doc_db::DocDb;
@@ -13,7 +14,10 @@ use crate::{
 };
 
 pub struct DeployContext {
-    pub s3_client: S3Client,
+    pub aws_s3_client: S3Client,
+    pub cwasm_s3_client: S3Client,
+    pub lambda_client: LambdaClient,
+    pub aws_region: String,
     pub wasm_bucket: String,
     pub cwasm_bucket: String,
     pub doc_db: DocDb,
@@ -42,6 +46,7 @@ impl HqArgs {
         let doc_db = DocDb::new(args.doc_db.url, args.doc_db.token).await?;
         let deployment_cache = DeploymentCache::new(doc_db.clone()).await?;
 
+        let aws_region = args.aws.region.clone();
         let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .region(aws_config::Region::new(args.aws.region))
             .credentials_provider(aws_sdk_s3::config::Credentials::new(
@@ -49,11 +54,30 @@ impl HqArgs {
                 &args.aws.secret_access_key,
                 None,
                 None,
-                "hq-config",
+                "hq-aws",
             ))
             .load()
             .await;
-        let s3_client = S3Client::new(&aws_config);
+        let aws_s3_client = S3Client::new(&aws_config);
+        let lambda_client = LambdaClient::new(&aws_config);
+
+        let cwasm_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .region(aws_config::Region::new(args.cwasm_bucket.region))
+            .endpoint_url(args.cwasm_bucket.endpoint)
+            .credentials_provider(aws_sdk_s3::config::Credentials::new(
+                &args.cwasm_bucket.access_key_id,
+                &args.cwasm_bucket.secret_access_key,
+                None,
+                None,
+                "hq-cwasm",
+            ))
+            .load()
+            .await;
+        let cwasm_s3_client = S3Client::from_conf(
+            aws_sdk_s3::config::Builder::from(&cwasm_config)
+                .force_path_style(true)
+                .build(),
+        );
 
         let sites: Vec<Site> = args
             .sites
@@ -79,9 +103,12 @@ impl HqArgs {
             .collect();
 
         let deploy_context = Arc::new(DeployContext {
-            s3_client,
+            aws_s3_client,
+            cwasm_s3_client,
+            lambda_client,
+            aws_region,
             wasm_bucket: args.aws.wasm_bucket,
-            cwasm_bucket: args.aws.cwasm_bucket,
+            cwasm_bucket: args.cwasm_bucket.name,
             doc_db: doc_db.clone(),
             deployment_cache: deployment_cache.clone(),
             sites: sites.clone(),

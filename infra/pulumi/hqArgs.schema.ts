@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
   aws: pulumi.Input<AwsArgs>;
+  cwasmBucket: pulumi.Input<CwasmBucketArgs>;
   dnsProvider: pulumi.Input<DnsProviderArg>;
   docDb: pulumi.Input<DocDbArgs>;
   selfDns: pulumi.Input<SelfDnsArgs>;
@@ -8,7 +9,6 @@ export interface HqArgs {
 }
 export interface AwsArgs {
   accessKeyId: pulumi.Input<string>;
-  cwasmBucket: pulumi.Input<string>;
   region: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
@@ -17,6 +17,13 @@ export interface CloudflareDnsProviderArgs {
   apiToken: pulumi.Input<string>;
   asteriskDomain: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
+}
+export interface CwasmBucketArgs {
+  accessKeyId: pulumi.Input<string>;
+  endpoint: pulumi.Input<string>;
+  name: pulumi.Input<string>;
+  region: pulumi.Input<string>;
+  secretAccessKey: pulumi.Input<string>;
 }
 export interface DnsProviderArg {
   cloudflare?: pulumi.Input<CloudflareDnsProviderArgs>;

@@ -12,6 +12,8 @@ chrono = "0.4.42"
 libsql = "0.9"
 aws-config = "1"
 aws-sdk-s3 = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-lambda = { version = "1", features = ["behavior-version-latest"] }
+aws-smithy-types = "1"
 uuid = { version = "1", features = ["v4"] }
 color-eyre = "0.6.5"
 dashmap = "6.1.0"

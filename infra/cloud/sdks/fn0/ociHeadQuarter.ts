@@ -127,7 +127,7 @@ export interface OciHeadQuarterArgs {
     awsRegion: pulumi.Input<string>;
     awsSecretAccessKey: pulumi.Input<string>;
     compartmentId: pulumi.Input<string>;
-    cwasmBucket: pulumi.Input<string>;
+    cwasmBucket: pulumi.Input<inputs.CwasmBucketArgsArgs>;
     dnsProvider: pulumi.Input<inputs.DnsProviderArgArgs>;
     docDbToken: pulumi.Input<string>;
     docDbUrl: pulumi.Input<string>;

@@ -33,6 +33,7 @@ COPY cwasm-compiler/package.json ./
 RUN npm install --omit=dev
 
 FROM public.ecr.aws/lambda/nodejs:20-arm64
+RUN dnf install -y zstd && dnf clean all
 COPY --from=wasmtime-builder /build/fn0-wasmtime-bin /opt/fn0-wasmtime
 COPY --from=handler-deps /handler/node_modules ${LAMBDA_TASK_ROOT}/node_modules
 COPY cwasm-compiler/handler.mjs ${LAMBDA_TASK_ROOT}/handler.mjs

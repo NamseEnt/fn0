@@ -11,6 +11,14 @@ export interface CloudflareDnsProviderArgsArgs {
     zoneId: pulumi.Input<string>;
 }
 
+export interface CwasmBucketArgsArgs {
+    accessKeyId: pulumi.Input<string>;
+    endpoint: pulumi.Input<string>;
+    name: pulumi.Input<string>;
+    region: pulumi.Input<string>;
+    secretAccessKey: pulumi.Input<string>;
+}
+
 export interface DnsProviderArgArgs {
     cloudflare?: pulumi.Input<inputs.CloudflareDnsProviderArgsArgs>;
 }

@@ -1,5 +1,6 @@
 mod args;
 mod args_parse;
+mod cwasm_compile;
 mod deploy;
 mod deployment_cache;
 mod doc_db;
@@ -13,6 +14,7 @@ mod site;
 mod ssh;
 mod ssh_pool;
 mod telemetry;
+mod wasmtime_rollout;
 
 use args::HqArgs;
 use args_parse::DeployContext;
@@ -56,7 +58,7 @@ fn main() -> Result<()> {
 
         {
             let doc_db = deploy_context.doc_db.clone();
-            let s3_client = deploy_context.s3_client.clone();
+            let s3_client = deploy_context.cwasm_s3_client.clone();
             set.spawn(async move {
                 job_processor::run(doc_db, s3_client).await;
                 Ok(())
@@ -75,8 +77,18 @@ fn main() -> Result<()> {
         {
             let doc_db = deploy_context.doc_db.clone();
             let deployment_cache = deployment_cache.clone();
+            let names = site_names.clone();
             set.spawn(async move {
-                dns_sync::run(dns_provider, doc_db, site_names, deployment_cache).await;
+                dns_sync::run(dns_provider, doc_db, names, deployment_cache).await;
+                Ok(())
+            });
+        }
+
+        {
+            let ctx = deploy_context.clone();
+            let names = site_names.clone();
+            set.spawn(async move {
+                wasmtime_rollout::run(ctx, names).await;
                 Ok(())
             });
         }
@@ -137,7 +149,7 @@ async fn route(
             Ok(deploy::handle_deploy_destroy(req, ctx).await)
         }
         (&Method::GET, "/deploy/status") => {
-            Ok(deploy::handle_deploy_status(ctx).await)
+            Ok(deploy::handle_deploy_status(req, ctx).await)
         }
         _ => Ok(Response::builder()
             .status(404)

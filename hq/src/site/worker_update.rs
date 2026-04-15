@@ -29,6 +29,26 @@ impl Site {
                 }
             };
 
+            let ready = match self.doc_db.get_cwasm_ready(&self.name).await {
+                Ok(r) => r,
+                Err(err) => {
+                    warn!(%err, "worker_update: failed to read cwasm-ready");
+                    continue;
+                }
+            };
+            let cwasm_ready = ready
+                .as_ref()
+                .map(|r| r.fn0_wasmtime_version == target.fn0_wasmtime_version)
+                .unwrap_or(false);
+            if !cwasm_ready {
+                debug!(
+                    target_version = %target.fn0_wasmtime_version,
+                    ready_version = ?ready.as_ref().map(|r| r.fn0_wasmtime_version.as_str()),
+                    "worker_update: waiting for cwasm fan-out"
+                );
+                continue;
+            }
+
             let hosts = match self.host_provider.list_hosts().await {
                 Ok(hosts) => hosts,
                 Err(err) => {

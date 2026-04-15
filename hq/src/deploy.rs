@@ -43,9 +43,10 @@ struct DeployDestroyRequest {
 #[derive(Serialize)]
 struct DeployStatusResponse {
     latest_generation: u64,
+    target_generation: u64,
     delivered: bool,
     hosts_total: usize,
-    hosts_at_latest: usize,
+    hosts_at_target: usize,
     hosts_pending: Vec<String>,
     hosts_quarantined: Vec<String>,
 }
@@ -119,7 +120,7 @@ pub async fn handle_deploy_start(
     };
 
     let presigned = match ctx
-        .s3_client
+        .aws_s3_client
         .put_object()
         .bucket(&ctx.wasm_bucket)
         .key(&s3_key)
@@ -157,6 +158,46 @@ pub async fn handle_deploy_finish(
         Err(e) => return json_response(401, &ErrorResponse { error: e }),
     };
 
+    let target_versions: std::collections::BTreeSet<String> = {
+        let mut versions = std::collections::BTreeSet::new();
+        for site in &ctx.sites {
+            match ctx.doc_db.get_worker_target(site.name()).await {
+                Ok(Some(t)) => {
+                    versions.insert(t.fn0_wasmtime_version);
+                }
+                Ok(None) => {
+                    return json_response(409, &ErrorResponse {
+                        error: format!("worker-target not set for site '{}'", site.name()),
+                    });
+                }
+                Err(e) => {
+                    return json_response(500, &ErrorResponse {
+                        error: format!("Failed to read worker-target: {}", e),
+                    });
+                }
+            }
+        }
+        versions
+    };
+
+    for version in &target_versions {
+        if let Err(e) = crate::cwasm_compile::compile_and_publish(
+            &ctx.lambda_client,
+            &ctx.aws_s3_client,
+            &ctx.cwasm_s3_client,
+            &ctx.wasm_bucket,
+            &ctx.cwasm_bucket,
+            version,
+            &request.subdomain,
+        )
+        .await
+        {
+            return json_response(500, &ErrorResponse {
+                error: format!("Compile failed for fn0-wasmtime {}: {}", version, e),
+            });
+        }
+    }
+
     let code_version = match ctx.doc_db.next_code_version(request.code_id).await {
         Ok(v) => v,
         Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get next version: {}", e) }),
@@ -166,9 +207,16 @@ pub async fn handle_deploy_finish(
         return json_response(500, &ErrorResponse { error: format!("Failed to insert deployment: {}", e) });
     }
 
+    ctx.deployment_cache.refresh().await;
+    let generation = ctx.deployment_cache.last_deployment_id();
+
     spawn_immediate_push(&ctx).await;
 
-    json_response(200, &serde_json::json!({"ok": true, "code_version": code_version}))
+    json_response(200, &serde_json::json!({
+        "ok": true,
+        "code_version": code_version,
+        "generation": generation,
+    }))
 }
 
 pub async fn handle_deploy_destroy(
@@ -219,12 +267,35 @@ pub async fn handle_deploy_destroy(
     json_response(200, &serde_json::json!({"ok": true, "subdomain": project.subdomain}))
 }
 
-pub async fn handle_deploy_status(ctx: Arc<DeployContext>) -> Response<Full<Bytes>> {
+pub async fn handle_deploy_status(
+    req: Request<hyper::body::Incoming>,
+    ctx: Arc<DeployContext>,
+) -> Response<Full<Bytes>> {
     ctx.deployment_cache.refresh().await;
     let latest_generation = ctx.deployment_cache.last_deployment_id();
 
+    let target_generation = match req.uri().query() {
+        Some(q) => {
+            let mut parsed: Option<u64> = None;
+            for pair in q.split('&') {
+                if let Some(v) = pair.strip_prefix("generation=") {
+                    match v.parse() {
+                        Ok(n) => parsed = Some(n),
+                        Err(_) => {
+                            return json_response(400, &ErrorResponse {
+                                error: format!("invalid generation '{}'", v),
+                            });
+                        }
+                    }
+                }
+            }
+            parsed.unwrap_or(latest_generation)
+        }
+        None => latest_generation,
+    };
+
     let mut hosts_total = 0usize;
-    let mut hosts_at_latest = 0usize;
+    let mut hosts_at_target = 0usize;
     let mut hosts_pending: Vec<String> = Vec::new();
     let mut hosts_quarantined: Vec<String> = Vec::new();
 
@@ -236,8 +307,8 @@ pub async fn handle_deploy_status(ctx: Arc<DeployContext>) -> Response<Full<Byte
                     if s.consecutive_failures > 0 {
                         hosts_quarantined.push(s.host_id.clone());
                     }
-                    if s.generation.unwrap_or(0) >= latest_generation {
-                        hosts_at_latest += 1;
+                    if s.generation.unwrap_or(0) >= target_generation {
+                        hosts_at_target += 1;
                     } else {
                         hosts_pending.push(s.host_id.clone());
                     }
@@ -252,13 +323,14 @@ pub async fn handle_deploy_status(ctx: Arc<DeployContext>) -> Response<Full<Byte
     }
 
     let delivered =
-        hosts_total > 0 && hosts_total == hosts_at_latest && hosts_quarantined.is_empty();
+        hosts_total > 0 && hosts_total == hosts_at_target && hosts_quarantined.is_empty();
 
     json_response(200, &DeployStatusResponse {
         latest_generation,
+        target_generation,
         delivered,
         hosts_total,
-        hosts_at_latest,
+        hosts_at_target,
         hosts_pending,
         hosts_quarantined,
     })
