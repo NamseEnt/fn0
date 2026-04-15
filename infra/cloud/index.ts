@@ -94,6 +94,29 @@ const cwasmCompilerEcrR = new aws.ecr.Repository("cwasm-compiler-ecr", {
   forceDelete: true,
 });
 
+new aws.ecr.RepositoryPolicy("cwasm-compiler-ecr-policy", {
+  region: cwasmCompilerRegion,
+  repository: cwasmCompilerEcrR.name,
+  policy: aws.getCallerIdentityOutput({}).accountId.apply((accountId) =>
+    JSON.stringify({
+      Version: "2008-10-17",
+      Statement: [
+        {
+          Sid: "LambdaECRImageRetrievalPolicy",
+          Effect: "Allow",
+          Principal: { Service: "lambda.amazonaws.com" },
+          Action: ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
+          Condition: {
+            StringLike: {
+              "aws:sourceArn": `arn:aws:lambda:${cwasmCompilerRegion}:${accountId}:function:*`,
+            },
+          },
+        },
+      ],
+    })
+  ),
+});
+
 const cwasmCompilerRoleR = new aws.iam.Role("cwasm-compiler-role", {
   assumeRolePolicy: JSON.stringify({
     Version: "2012-10-17",
@@ -137,6 +160,69 @@ const hqAwsUser = new aws.iam.User("hq-aws-user", {
 
 const hqAwsAccessKey = new aws.iam.AccessKey("hq-aws-access-key", {
   user: hqAwsUser.name,
+});
+
+const cwasmCompilerBuilderUser = new aws.iam.User("cwasm-compiler-builder-user", {
+  name: "fn0-cwasm-compiler-builder",
+});
+
+const cwasmCompilerBuilderAccessKey = new aws.iam.AccessKey(
+  "cwasm-compiler-builder-access-key",
+  { user: cwasmCompilerBuilderUser.name }
+);
+
+new aws.iam.UserPolicy("cwasm-compiler-builder-user-policy", {
+  user: cwasmCompilerBuilderUser.name,
+  policy: pulumi
+    .all([
+      cwasmCompilerEcrR.arn,
+      cwasmCompilerRoleR.arn,
+      awsCallerIdentity.accountId,
+    ])
+    .apply(([ecrArn, roleArn, accountId]) =>
+      JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Action: "ecr:GetAuthorizationToken",
+            Resource: "*",
+          },
+          {
+            Effect: "Allow",
+            Action: [
+              "ecr:BatchCheckLayerAvailability",
+              "ecr:BatchDeleteImage",
+              "ecr:BatchGetImage",
+              "ecr:CompleteLayerUpload",
+              "ecr:DescribeImages",
+              "ecr:GetDownloadUrlForLayer",
+              "ecr:InitiateLayerUpload",
+              "ecr:PutImage",
+              "ecr:UploadLayerPart",
+            ],
+            Resource: ecrArn,
+          },
+          {
+            Effect: "Allow",
+            Action: [
+              "lambda:CreateFunction",
+              "lambda:GetFunction",
+              "lambda:UpdateFunctionCode",
+            ],
+            Resource: `arn:aws:lambda:${cwasmCompilerRegion}:${accountId}:function:fn0-cwasm-compiler-*`,
+          },
+          {
+            Effect: "Allow",
+            Action: "iam:PassRole",
+            Resource: roleArn,
+            Condition: {
+              StringEquals: { "iam:PassedToService": "lambda.amazonaws.com" },
+            },
+          },
+        ],
+      })
+    ),
 });
 
 new aws.iam.UserPolicy("hq-aws-user-policy", {
@@ -279,5 +365,7 @@ export const cwasmCompilerBucket = cwasmCompilerBucketR.bucket;
 export const cwasmCompilerBucketRegion = cwasmCompilerRegion;
 export const cwasmCompilerEcrRepository = cwasmCompilerEcrR.repositoryUrl;
 export const cwasmCompilerRoleArn = cwasmCompilerRoleR.arn;
+export const cwasmCompilerBuilderAccessKeyId = pulumi.secret(cwasmCompilerBuilderAccessKey.id);
+export const cwasmCompilerBuilderSecretAccessKey = pulumi.secret(cwasmCompilerBuilderAccessKey.secret);
 export const hqAwsAccessKeyId = pulumi.secret(hqAwsAccessKey.id);
 export const hqAwsSecretAccessKey = pulumi.secret(hqAwsAccessKey.secret);
