@@ -1,14 +1,16 @@
-use crate::{dns::DnsProvide, dns::DnsProvider, host_connection::HostConnection, telemetry, Host};
-use dashmap::DashMap;
+use crate::deployment_cache::DeploymentCache;
+use crate::doc_db::DocDb;
+use crate::{dns::DnsProvide, dns::DnsProvider, telemetry};
 use std::collections::BTreeSet;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 use tracing::*;
 
 pub async fn run(
     dns_provider: DnsProvider,
-    all_host_connections: Vec<Arc<DashMap<Host, HostConnection>>>,
+    doc_db: DocDb,
+    site_names: Vec<String>,
+    deployment_cache: DeploymentCache,
 ) {
     let mut interval = tokio::time::interval(dns_sync_interval());
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -16,15 +18,28 @@ pub async fn run(
     loop {
         interval.tick().await;
 
-        let addrs: BTreeSet<String> = all_host_connections
-            .iter()
-            .flat_map(|connections| {
-                connections.iter().map(|conn| {
-                    let host = conn.key();
-                    host.dns_addr.clone().unwrap_or_else(|| host.addr.clone())
-                })
-            })
-            .collect();
+        let latest_generation = deployment_cache.last_deployment_id();
+
+        let mut addrs: BTreeSet<String> = BTreeSet::new();
+        for name in &site_names {
+            match doc_db.list_host_statuses(name).await {
+                Ok(statuses) => {
+                    for s in statuses {
+                        if !s.healthy || s.graceful {
+                            continue;
+                        }
+                        if s.generation.unwrap_or(0) < latest_generation {
+                            continue;
+                        }
+                        let addr = s.dns_addr.clone().unwrap_or_else(|| s.addr.clone());
+                        addrs.insert(addr);
+                    }
+                }
+                Err(err) => {
+                    warn!(%err, site = %name, "dns_sync: failed to list host-status");
+                }
+            }
+        }
 
         telemetry::dns_healthy_ips(addrs.len());
 
@@ -42,7 +57,7 @@ pub async fn run(
 
 fn dns_sync_interval() -> Duration {
     match std::env::var("DNS_SYNC_INTERVAL_MS") {
-        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(1)),
-        Err(_) => Duration::from_secs(1),
+        Ok(s) => s.parse().map(Duration::from_millis).unwrap_or(Duration::from_secs(5)),
+        Err(_) => Duration::from_secs(5),
     }
 }

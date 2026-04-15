@@ -5,21 +5,18 @@ mod deployment_cache;
 mod doc_db;
 mod dns;
 mod dns_sync;
-mod host_connection;
 mod host_id;
 mod host_provider;
 mod job_processor;
-mod random_sleep;
 mod self_dns;
 mod site;
 mod ssh;
+mod ssh_pool;
 mod telemetry;
 
 use args::HqArgs;
 use args_parse::DeployContext;
 use color_eyre::eyre::{Result, eyre};
-use host_id::*;
-use host_provider::*;
 use http_body_util::Full;
 use hyper::{Method, Request, Response, body::Bytes, server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
@@ -49,10 +46,13 @@ fn main() -> Result<()> {
 
         let mut set = JoinSet::new();
 
-        set.spawn(async move {
-            deployment_cache.run_sync().await;
-            Ok(())
-        });
+        {
+            let deployment_cache = deployment_cache.clone();
+            set.spawn(async move {
+                deployment_cache.run_sync().await;
+                Ok(())
+            });
+        }
 
         {
             let doc_db = deploy_context.doc_db.clone();
@@ -62,22 +62,25 @@ fn main() -> Result<()> {
                 Ok(())
             });
         }
-        let all_host_connections: Vec<_> = sites
-            .iter()
-            .map(|s| s.host_connections.clone())
-            .collect();
 
-        for mut site in sites {
+        let site_names: Vec<String> = sites.iter().map(|s| s.name().to_string()).collect();
+
+        for site in sites {
             set.spawn(async move {
                 site.run().await;
                 Ok(())
             });
         }
 
-        set.spawn(async move {
-            dns_sync::run(dns_provider, all_host_connections).await;
-            Ok(())
-        });
+        {
+            let doc_db = deploy_context.doc_db.clone();
+            let deployment_cache = deployment_cache.clone();
+            set.spawn(async move {
+                dns_sync::run(dns_provider, doc_db, site_names, deployment_cache).await;
+                Ok(())
+            });
+        }
+
         set.spawn(async {
             tokio::signal::ctrl_c().await?;
             Ok(())
@@ -132,6 +135,9 @@ async fn route(
         }
         (&Method::POST, "/deploy/destroy") => {
             Ok(deploy::handle_deploy_destroy(req, ctx).await)
+        }
+        (&Method::GET, "/deploy/status") => {
+            Ok(deploy::handle_deploy_status(ctx).await)
         }
         _ => Ok(Response::builder()
             .status(404)

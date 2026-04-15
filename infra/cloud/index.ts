@@ -3,7 +3,6 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as oci from "@pulumi/oci";
 import * as cloudflare from "@pulumi/cloudflare";
-import * as tls from "@pulumi/tls";
 
 const config = new pulumi.Config();
 
@@ -263,22 +262,6 @@ const ociComputeWorker = new fn0.OciComputeWorker("oci-compute-worker", {
   hqIpv6CidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
 });
 
-const quicCaKey = new tls.PrivateKey("quic-ca-key", {
-  algorithm: "ECDSA",
-  ecdsaCurve: "P256",
-});
-
-const quicCaCert = new tls.SelfSignedCert("quic-ca-cert", {
-  privateKeyPem: quicCaKey.privateKeyPem,
-  isCaCertificate: true,
-  validityPeriodHours: 87600,
-  allowedUses: ["cert_signing"],
-  subject: {
-    commonName: "fn0-quic-ca",
-    organization: "fn0",
-  },
-});
-
 const dnsProvider = {
   cloudflare: {
     zoneId,
@@ -297,7 +280,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   grafanaRegion: config.require("grafanaRegion"),
   docDbUrl: docDb.url,
   docDbToken: docDb.token,
-  certificate: quicCaCert.certPem,
   awsRegion: cwasmCompilerRegion,
   wasmBucket: cwasmCompilerBucketR.bucket,
   cwasmBucket: ociComputeWorker.cwasmBucket.bucketName,
@@ -332,8 +314,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             S3_REGION: ociComputeWorker.cwasmBucket.region,
             AWS_ACCESS_KEY_ID: ociComputeWorker.cwasmBucket.accessKeyId,
             AWS_SECRET_ACCESS_KEY: ociComputeWorker.cwasmBucket.secretAccessKey,
-            CA_CERT_PEM: quicCaCert.certPem,
-            CA_KEY_PEM: quicCaKey.privateKeyPemPkcs8,
             ORIGIN_CERT_PEM: dns.certificate,
             ORIGIN_KEY_PEM: dns.privateKeyPem,
           },

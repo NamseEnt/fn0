@@ -1,7 +1,7 @@
 pub mod oci_compute_vm;
 pub mod oci_scaler;
 
-use crate::*;
+use crate::host_id::HostId;
 
 #[derive(Debug, Clone)]
 pub struct Host {

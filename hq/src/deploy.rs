@@ -40,6 +40,16 @@ struct DeployDestroyRequest {
     project_name: String,
 }
 
+#[derive(Serialize)]
+struct DeployStatusResponse {
+    latest_generation: u64,
+    delivered: bool,
+    hosts_total: usize,
+    hosts_at_latest: usize,
+    hosts_pending: Vec<String>,
+    hosts_quarantined: Vec<String>,
+}
+
 fn json_response<T: Serialize>(status: u16, body: &T) -> Response<Full<Bytes>> {
     let json = serde_json::to_string(body).unwrap();
     Response::builder()
@@ -156,6 +166,8 @@ pub async fn handle_deploy_finish(
         return json_response(500, &ErrorResponse { error: format!("Failed to insert deployment: {}", e) });
     }
 
+    spawn_immediate_push(&ctx).await;
+
     json_response(200, &serde_json::json!({"ok": true, "code_version": code_version}))
 }
 
@@ -202,5 +214,73 @@ pub async fn handle_deploy_destroy(
         });
     }
 
+    spawn_immediate_push(&ctx).await;
+
     json_response(200, &serde_json::json!({"ok": true, "subdomain": project.subdomain}))
+}
+
+pub async fn handle_deploy_status(ctx: Arc<DeployContext>) -> Response<Full<Bytes>> {
+    ctx.deployment_cache.refresh().await;
+    let latest_generation = ctx.deployment_cache.last_deployment_id();
+
+    let mut hosts_total = 0usize;
+    let mut hosts_at_latest = 0usize;
+    let mut hosts_pending: Vec<String> = Vec::new();
+    let mut hosts_quarantined: Vec<String> = Vec::new();
+
+    for site in &ctx.sites {
+        match ctx.doc_db.list_host_statuses(site.name()).await {
+            Ok(statuses) => {
+                for s in statuses {
+                    hosts_total += 1;
+                    if s.consecutive_failures > 0 {
+                        hosts_quarantined.push(s.host_id.clone());
+                    }
+                    if s.generation.unwrap_or(0) >= latest_generation {
+                        hosts_at_latest += 1;
+                    } else {
+                        hosts_pending.push(s.host_id.clone());
+                    }
+                }
+            }
+            Err(e) => {
+                return json_response(500, &ErrorResponse {
+                    error: format!("Failed to list host-status: {}", e),
+                });
+            }
+        }
+    }
+
+    let delivered =
+        hosts_total > 0 && hosts_total == hosts_at_latest && hosts_quarantined.is_empty();
+
+    json_response(200, &DeployStatusResponse {
+        latest_generation,
+        delivered,
+        hosts_total,
+        hosts_at_latest,
+        hosts_pending,
+        hosts_quarantined,
+    })
+}
+
+async fn spawn_immediate_push(ctx: &Arc<DeployContext>) {
+    ctx.deployment_cache.refresh().await;
+    for site in &ctx.sites {
+        let pool = site.ssh_pool().clone();
+        let cache = ctx.deployment_cache.clone();
+        let db = ctx.doc_db.clone();
+        let site_name = site.name().to_string();
+        tokio::spawn(async move {
+            let statuses = match db.list_host_statuses(&site_name).await {
+                Ok(list) => list,
+                Err(err) => {
+                    tracing::warn!(%err, "push: list_host_statuses failed");
+                    return;
+                }
+            };
+            let addrs: Vec<String> = statuses.into_iter().map(|s| s.addr).collect();
+            crate::site::push_to_all(&pool, &cache, addrs).await;
+        });
+    }
 }

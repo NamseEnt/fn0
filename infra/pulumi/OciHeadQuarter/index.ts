@@ -19,7 +19,6 @@ export interface OciHeadQuarterArgs {
   docDbUrl: pulumi.Input<string>;
   docDbToken: pulumi.Input<string>;
   sites: pulumi.Input<SiteArgs[]>;
-  certificate: pulumi.Input<string>;
   awsRegion: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
   cwasmBucket: pulumi.Input<string>;
@@ -48,7 +47,6 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       docDbUrl,
       docDbToken,
       sites,
-      certificate,
     } = args;
 
     const { regionalSubnet } = createNetworking(this, {
@@ -103,7 +101,6 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           url: docDbUrl,
           token: docDbToken,
         },
-        caCertPem: certificate,
         aws: {
           region: args.awsRegion,
           wasmBucket: args.wasmBucket,

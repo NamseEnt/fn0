@@ -95,6 +95,21 @@ impl DeploymentCache {
     pub fn last_deployment_id(&self) -> u64 {
         self.cache.count() as _
     }
+
+    pub async fn refresh(&self) {
+        let sk = self.cache.count() as u64;
+        let deployments = match self.doc_db.deployments_after(sk).await {
+            Ok(list) => list,
+            Err(err) => {
+                warn!(%err, "refresh: failed to fetch deployments");
+                return;
+            }
+        };
+        for deployment in deployments {
+            self.cache.push(deployment);
+        }
+        telemetry::deployment_cache_cached_count(self.cache.count());
+    }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug, Ord, PartialOrd)]
