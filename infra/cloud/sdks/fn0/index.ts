@@ -5,16 +5,6 @@ import * as pulumi from "@pulumi/pulumi";
 import * as utilities from "./utilities";
 
 // Export members:
-export { AwsLambdaCwasmCompilerArgs } from "./awsLambdaCwasmCompiler";
-export type AwsLambdaCwasmCompiler = import("./awsLambdaCwasmCompiler").AwsLambdaCwasmCompiler;
-export const AwsLambdaCwasmCompiler: typeof import("./awsLambdaCwasmCompiler").AwsLambdaCwasmCompiler = null as any;
-utilities.lazyLoad(exports, ["AwsLambdaCwasmCompiler"], () => require("./awsLambdaCwasmCompiler"));
-
-export { AwsWasmS3Args } from "./awsWasmS3";
-export type AwsWasmS3 = import("./awsWasmS3").AwsWasmS3;
-export const AwsWasmS3: typeof import("./awsWasmS3").AwsWasmS3 = null as any;
-utilities.lazyLoad(exports, ["AwsWasmS3"], () => require("./awsWasmS3"));
-
 export { B2CloudflareStaticCdnArgs } from "./b2cloudflareStaticCdn";
 export type B2CloudflareStaticCdn = import("./b2cloudflareStaticCdn").B2CloudflareStaticCdn;
 export const B2CloudflareStaticCdn: typeof import("./b2cloudflareStaticCdn").B2CloudflareStaticCdn = null as any;
@@ -24,11 +14,6 @@ export { CloudflareDnsArgs } from "./cloudflareDns";
 export type CloudflareDns = import("./cloudflareDns").CloudflareDns;
 export const CloudflareDns: typeof import("./cloudflareDns").CloudflareDns = null as any;
 utilities.lazyLoad(exports, ["CloudflareDns"], () => require("./cloudflareDns"));
-
-export { CwasmS3PusherArgs } from "./cwasmS3Pusher";
-export type CwasmS3Pusher = import("./cwasmS3Pusher").CwasmS3Pusher;
-export const CwasmS3Pusher: typeof import("./cwasmS3Pusher").CwasmS3Pusher = null as any;
-utilities.lazyLoad(exports, ["CwasmS3Pusher"], () => require("./cwasmS3Pusher"));
 
 export { OciComputeWorkerArgs } from "./ociComputeWorker";
 export type OciComputeWorker = import("./ociComputeWorker").OciComputeWorker;
@@ -72,16 +57,10 @@ const _module = {
     version: utilities.getVersion(),
     construct: (name: string, type: string, urn: string): pulumi.Resource => {
         switch (type) {
-            case "fn0:index:AwsLambdaCwasmCompiler":
-                return new AwsLambdaCwasmCompiler(name, <any>undefined, { urn })
-            case "fn0:index:AwsWasmS3":
-                return new AwsWasmS3(name, <any>undefined, { urn })
             case "fn0:index:B2CloudflareStaticCdn":
                 return new B2CloudflareStaticCdn(name, <any>undefined, { urn })
             case "fn0:index:CloudflareDns":
                 return new CloudflareDns(name, <any>undefined, { urn })
-            case "fn0:index:CwasmS3Pusher":
-                return new CwasmS3Pusher(name, <any>undefined, { urn })
             case "fn0:index:OciComputeWorker":
                 return new OciComputeWorker(name, <any>undefined, { urn })
             case "fn0:index:OciHeadQuarter":

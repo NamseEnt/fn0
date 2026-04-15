@@ -2,7 +2,6 @@ import * as pulumi from "@pulumi/pulumi";
 import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
-import * as dockerBuild from "@pulumi/docker-build";
 import { CustomWorkerImage } from "./CustomWorkerImage";
 
 export interface OciComputeWorkerArgs {
@@ -17,6 +16,13 @@ export interface OciCwasmBucketInfo {
   accessKeyId: pulumi.Output<string>;
   secretAccessKey: pulumi.Output<string>;
   namespace: pulumi.Output<string>;
+}
+
+export interface WorkerImageRegistry {
+  url: string;
+  username: string;
+  password: string;
+  repository: string;
 }
 
 export interface OciWorkerInfraEnvs {
@@ -35,8 +41,8 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
   public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
-  public readonly workerImageUrl: pulumi.Output<string>;
   public readonly workerImageMultiArch: pulumi.Output<string>;
+  public readonly workerImageRegistries: pulumi.Output<WorkerImageRegistry[]>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
   public readonly ipv6CidrBlocks: pulumi.Output<string[]>;
@@ -451,33 +457,23 @@ export class OciComputeWorker extends pulumi.ComponentResource {
 
     const registryUrl = pulumi.interpolate`ocir.${args.region}.oci.oraclecloud.com`;
 
-    const workerImage = new dockerBuild.Image(
-      "worker-image",
-      {
-        tags: [
-          pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`,
-        ],
-        context: {
-          location: "../..",
-        },
-        dockerfile: {
-          location: "../../fn0-worker/Dockerfile",
-        },
-        platforms: [dockerBuild.Platform.Linux_arm64],
-        push: true,
-        registries: [
-          {
-            address: registryUrl,
-            username: pulumi.interpolate`${workerRepo.namespace}/${workerDockerUser.name}`,
-            password: workerAuthToken.token,
-          },
-        ],
-      },
-      { parent: this }
-    );
-
-    this.workerImageUrl = workerImage.ref;
     this.workerImageMultiArch = pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
+    this.workerImageRegistries = pulumi
+      .all([
+        registryUrl,
+        workerRepo.namespace,
+        workerRepo.displayName,
+        workerDockerUser.name,
+        workerAuthToken.token,
+      ])
+      .apply(([url, namespace, repoName, userName, token]) => [
+        {
+          url,
+          username: `${namespace}/${userName}`,
+          password: token,
+          repository: `${namespace}/${repoName}`,
+        },
+      ]);
     this.osImageId = imageId;
 
     const cwasmBucketUser = new oci.identity.User(

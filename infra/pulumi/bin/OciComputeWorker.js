@@ -5,8 +5,7 @@ const pulumi = require("@pulumi/pulumi");
 const oci = require("@pulumi/oci");
 const tls = require("@pulumi/tls");
 const random = require("@pulumi/random");
-const docker = require("@pulumi/docker");
-const command = require("@pulumi/command");
+const CustomWorkerImage_1 = require("./CustomWorkerImage");
 class OciComputeWorker extends pulumi.ComponentResource {
     constructor(name, args, opts) {
         super("pkg:index:oci-compute-worker", name, args, opts);
@@ -51,27 +50,57 @@ class OciComputeWorker extends pulumi.ComponentResource {
                 pulumi.interpolate `Allow group ${group.name} to use tag-namespaces in tenancy`,
             ],
         }, { parent: this });
+        const imageBuilderDynGroup = new oci.identity.DynamicGroup("image-builder-dyn-group", {
+            compartmentId: workerManager.compartmentId,
+            description: "Instances that can self-terminate for image building",
+            matchingRule: pulumi.interpolate `ANY {instance.compartment.id = '${compartment.id}'}`,
+            name: pulumi.interpolate `fn0-image-builder-${compartmentSuffix}`,
+        }, { parent: this });
+        new oci.identity.Policy("image-builder-self-terminate-policy", {
+            compartmentId: workerManager.compartmentId,
+            description: "Allow image builder instances to terminate themselves",
+            statements: [
+                pulumi.interpolate `Allow dynamic-group ${imageBuilderDynGroup.name} to manage instance-family in compartment id ${compartment.id}`,
+            ],
+        }, { parent: this, dependsOn: [imageBuilderDynGroup] });
         const vcn = new oci.core.Vcn("vcn", {
             compartmentId: compartment.id,
             isIpv6enabled: true,
             isOracleGuaAllocationEnabled: true,
             cidrBlocks: ["10.0.0.0/16"],
         }, { parent: this });
+        this.ipv6CidrBlocks = vcn.ipv6cidrBlocks;
+        const workerSshKey = new tls.PrivateKey("worker-ssh-key", {
+            algorithm: "RSA",
+            rsaBits: 4096,
+        }, { parent: this });
+        this.sshPublicKey = workerSshKey.publicKeyOpenssh;
+        this.sshPrivateKey = workerSshKey.privateKeyPem;
         const securityList = new oci.core.SecurityList("security-list", {
             compartmentId: compartment.id,
             vcnId: vcn.id,
             ingressSecurityRules: pulumi
                 .all([args.hqIpv6CidrBlocks])
                 .apply(([hqIpv6CidrBlocks]) => [
+                {
+                    protocol: "6",
+                    source: "0.0.0.0/0",
+                    tcpOptions: { min: 22, max: 22 },
+                },
+                {
+                    protocol: "6",
+                    source: "::/0",
+                    tcpOptions: { min: 22, max: 22 },
+                },
                 ...[...cloudflareIpv4Ranges, ...clareflareIpv6Ranges].map((source) => ({
                     protocol: "6",
                     source,
-                    tcpOptions: { min: 8080, max: 8080 },
+                    tcpOptions: { min: 443, max: 443 },
                 })),
                 ...hqIpv6CidrBlocks.map((source) => ({
                     protocol: "6",
                     source,
-                    tcpOptions: { min: 8080, max: 8080 },
+                    tcpOptions: { min: 443, max: 443 },
                 })),
                 ...hqIpv6CidrBlocks.map((source) => ({
                     protocol: "17",
@@ -131,7 +160,7 @@ class OciComputeWorker extends pulumi.ComponentResource {
             }
             return ad;
         }));
-        const imageId = compartment.id.apply((compartmentId) => oci.core
+        const baseImageId = compartment.id.apply((compartmentId) => oci.core
             .getImages({
             compartmentId,
             operatingSystem: "Oracle Linux",
@@ -145,6 +174,15 @@ class OciComputeWorker extends pulumi.ComponentResource {
             }
             return imageId;
         }));
+        const customWorkerImage = new CustomWorkerImage_1.CustomWorkerImage("custom-worker-image", {
+            compartmentId: compartment.id,
+            vcnId: vcn.id,
+            availabilityDomain,
+            baseImageId,
+            displayName: "fn0-ol10-podman-aarch64",
+            internetGatewayId: internetGateway.id,
+        }, { parent: this });
+        const imageId = customWorkerImage.imageId;
         const instanceConfiguration = new oci.core.InstanceConfiguration("instance-configuration", {
             compartmentId: compartment.id,
             instanceDetails: {
@@ -219,39 +257,24 @@ class OciComputeWorker extends pulumi.ComponentResource {
             userId: workerDockerUser.id,
             description: "AuthToken for fn0-worker image push",
         }, { parent: this });
-        const ociConfig = new pulumi.Config("oci");
         const registryUrl = pulumi.interpolate `ocir.${args.region}.oci.oraclecloud.com`;
-        const workerImage = new docker.Image("worker-image", {
-            imageName: pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1`,
-            build: {
-                context: "../../fn0-worker",
-                platform: "linux/arm64",
+        this.workerImageMultiArch = pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
+        this.workerImageRegistries = pulumi
+            .all([
+            registryUrl,
+            workerRepo.namespace,
+            workerRepo.displayName,
+            workerDockerUser.name,
+            workerAuthToken.token,
+        ])
+            .apply(([url, namespace, repoName, userName, token]) => [
+            {
+                url,
+                username: `${namespace}/${userName}`,
+                password: token,
+                repository: `${namespace}/${repoName}`,
             },
-            registry: {
-                server: registryUrl,
-                username: pulumi.interpolate `${workerRepo.namespace}/${workerDockerUser.name}`,
-                password: workerAuthToken.token,
-            },
-        }, { parent: this });
-        this.workerImageUrl = workerImage.repoDigest;
-        const workerImageAmd64 = new docker.Image("worker-image-amd64", {
-            imageName: pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:v1-amd64`,
-            build: {
-                context: "../../fn0-worker",
-                platform: "linux/amd64",
-            },
-            registry: {
-                server: registryUrl,
-                username: pulumi.interpolate `${workerRepo.namespace}/${workerDockerUser.name}`,
-                password: workerAuthToken.token,
-            },
-        }, { parent: this });
-        const multiArchTag = pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
-        const manifestCreate = new command.local.Command("worker-manifest-create", {
-            create: pulumi.interpolate `docker login ${registryUrl} -u ${workerRepo.namespace}/${workerDockerUser.name} -p ${workerAuthToken.token} && docker manifest create --amend ${multiArchTag} ${workerImage.imageName} ${workerImageAmd64.imageName} && docker manifest push ${multiArchTag}`,
-            triggers: [workerImage.repoDigest, workerImageAmd64.repoDigest],
-        }, { parent: this, dependsOn: [workerImage, workerImageAmd64] });
-        this.workerImageMultiArch = multiArchTag;
+        ]);
         this.osImageId = imageId;
         const cwasmBucketUser = new oci.identity.User("cwasm-bucket-user", {
             name: pulumi.interpolate `fn0-cwasm-${compartmentSuffix}`,

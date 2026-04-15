@@ -3,6 +3,8 @@ use wasmtime::*;
 
 pub use wasmtime;
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub fn engine_config() -> Config {
     const MB: usize = 1024 * 1024;
 

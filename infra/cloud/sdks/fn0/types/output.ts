@@ -25,3 +25,10 @@ export interface OciWorkerInfraEnvs {
     OCI_USER_ID: string;
 }
 
+export interface WorkerImageRegistry {
+    password: string;
+    repository: string;
+    url: string;
+    username: string;
+}
+

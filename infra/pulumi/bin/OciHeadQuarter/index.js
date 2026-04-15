@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OciHeadQuarter = void 0;
 const pulumi = require("@pulumi/pulumi");
+const grafana_1 = require("./grafana");
 const networking_1 = require("./networking");
 const oke_cluster_1 = require("./oke-cluster");
 const docker_registry_1 = require("./docker-registry");
@@ -20,7 +21,7 @@ class OciHeadQuarter extends pulumi.ComponentResource {
         const userOcid = config.require("userOcid");
         const fingerprint = config.require("fingerprint");
         const privateKey = config.require("privateKey");
-        const { k8sProvider, kubeconfig } = (0, oke_cluster_1.createOkeCluster)(this, {
+        const { k8sProvider, kubeconfig, nodePool } = (0, oke_cluster_1.createOkeCluster)(this, {
             compartmentId,
             vcnId,
             regionalSubnetId: regionalSubnet.id,
@@ -32,41 +33,38 @@ class OciHeadQuarter extends pulumi.ComponentResource {
             privateKey,
         });
         this.kubeconfig = kubeconfig;
-        // TODO: Fix grafana helm chart schema for new k8s-monitoring version
-        // const { release: grafanaRelease, otlpEndpoint } = hqGrafana(this, {
-        //   regionSlug: args.grafanaRegion,
-        //   slug: args.grafanaSlug,
-        //   k8sProvider: k8sProvider,
-        //   suffix,
-        // });
-        const otlpEndpoint = pulumi.output("");
+        const { otlpEndpoint, workerOtlpEndpoint, workerOtlpBasicAuth } = (0, grafana_1.hqGrafana)(this, {
+            regionSlug: args.grafanaRegion,
+            slug: args.grafanaSlug,
+            k8sProvider: k8sProvider,
+            suffix,
+        });
         const { hqImage } = (0, docker_registry_1.createDockerRegistry)(this, {
             compartmentId,
             suffix,
             region: ociRegion,
         });
-        const { service } = (0, hq_deployment_1.deployHqApplication)(this, {
+        (0, hq_deployment_1.deployHqApplication)(this, {
             k8sProvider,
             hqImage,
             otlpEndpoint,
-            regionalSubnetId: regionalSubnet.id,
+            workerOtlpEndpoint,
+            workerOtlpBasicAuth,
             hqArgs: {
                 sites,
+                dnsProvider: args.dnsProvider,
                 docDb: {
                     url: docDbUrl,
                     token: docDbToken,
                 },
                 caCertPem: certificate,
-                aws: {
-                    region: args.awsRegion,
-                    wasmBucket: args.wasmBucket,
-                    accessKeyId: args.awsAccessKeyId,
-                    secretAccessKey: args.awsSecretAccessKey,
+                selfDns: {
+                    hostname: args.selfDnsHostname,
+                    cloudflareZoneId: args.selfDnsCloudflareZoneId,
+                    cloudflareApiToken: args.selfDnsCloudflareApiToken,
                 },
-                githubClientId: args.githubClientId,
             },
         });
-        this.hqServiceIp = service.status.apply((status) => status?.loadBalancer?.ingress?.[0]?.ip ?? "");
     }
 }
 exports.OciHeadQuarter = OciHeadQuarter;

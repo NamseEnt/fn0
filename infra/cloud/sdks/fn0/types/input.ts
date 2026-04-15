@@ -39,15 +39,8 @@ export interface OciComputeVmHostProviderArgsArgs {
     workerImageUrl: pulumi.Input<string>;
 }
 
-export interface S3CompatibleBucketArgs {
-    accessKeyId: pulumi.Input<string>;
-    bucketName: pulumi.Input<string>;
-    endpoint: pulumi.Input<string>;
-    region: pulumi.Input<string>;
-    secretAccessKey: pulumi.Input<string>;
-}
-
 export interface SiteArgsArgs {
     hostProvider: pulumi.Input<inputs.HostProviderArgArgs>;
     name: pulumi.Input<string>;
 }
+

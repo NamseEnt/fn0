@@ -13,11 +13,8 @@
         "strict": true
     },
     "files": [
-        "awsLambdaCwasmCompiler.ts",
-        "awsWasmS3.ts",
         "b2cloudflareStaticCdn.ts",
         "cloudflareDns.ts",
-        "cwasmS3Pusher.ts",
         "index.ts",
         "ociComputeWorker.ts",
         "ociHeadQuarter.ts",

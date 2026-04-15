@@ -2,6 +2,27 @@ FROM --platform=$BUILDPLATFORM rust:bookworm AS builder
 WORKDIR /app
 
 ARG TARGETARCH
+ARG SCCACHE_VERSION=0.14.0
+ARG SCCACHE_BUCKET
+ARG SCCACHE_REGION
+ARG SCCACHE_ENDPOINT
+ARG SCCACHE_S3_USE_SSL=true
+ARG AWS_ACCESS_KEY_ID
+ARG AWS_SECRET_ACCESS_KEY
+
+ENV SCCACHE_BUCKET=${SCCACHE_BUCKET} \
+    SCCACHE_REGION=${SCCACHE_REGION} \
+    SCCACHE_ENDPOINT=${SCCACHE_ENDPOINT} \
+    SCCACHE_S3_USE_SSL=${SCCACHE_S3_USE_SSL} \
+    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+    AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+    RUSTC_WRAPPER=sccache
+
+RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl.tar.gz" \
+    | tar -xz -C /tmp \
+ && mv "/tmp/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl/sccache" /usr/local/bin/sccache \
+ && chmod +x /usr/local/bin/sccache \
+ && rm -rf "/tmp/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl"
 
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
       dpkg --add-architecture arm64 && \
@@ -31,7 +52,8 @@ RUN touch host-hq-protocol/src/lib.rs fn0-worker/src/main.rs && \
     else \
       cargo build --release --manifest-path fn0-worker/Cargo.toml && \
       cp fn0-worker/target/release/fn0-worker /app/fn0-worker-bin; \
-    fi
+    fi \
+ && sccache --show-stats
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
