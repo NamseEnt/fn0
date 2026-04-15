@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["doc-db", "forte/db", "forte/rs-sdk", "forte/macros", "cli"]
+members = ["forte/db", "forte/rs-sdk", "forte/macros", "cli"]
 exclude = [
     "ls-news/rs",
     "forte/forte",

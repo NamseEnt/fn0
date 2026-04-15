@@ -1,6 +1,6 @@
 use super::*;
 use crate::{deployment_cache::DeploymentId, telemetry, *};
-use doc_db::Deployment;
+use crate::doc_db::Deployment;
 use host_hq_protocol::{CodeDeployment, HostToHq, HqToHostReliable};
 
 impl Site {

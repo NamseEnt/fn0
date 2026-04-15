@@ -2,6 +2,7 @@ mod args;
 mod args_parse;
 mod deploy;
 mod deployment_cache;
+mod doc_db;
 mod dns;
 mod dns_sync;
 mod host_connection;
