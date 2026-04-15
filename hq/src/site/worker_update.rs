@@ -115,7 +115,7 @@ async fn fetch_current_state(ssh_pool: &SshPool, addr: &str) -> color_eyre::Resu
     let (code, output) = ssh_pool
         .exec(
             addr,
-            "sudo podman inspect fn0-worker --format '{{.State.Running}}|{{.ImageName}}|{{json .Config.Env}}' 2>/dev/null || echo 'MISSING'",
+            "podman inspect fn0-worker --format '{{.State.Running}}|{{.ImageName}}|{{json .Config.Env}}' 2>/dev/null || echo 'MISSING'",
         )
         .await?;
     if code != 0 || output.trim() == "MISSING" {
@@ -203,16 +203,14 @@ fn build_env_flags(envs: &BTreeMap<String, String>) -> String {
 fn build_deploy_script(image: &str, envs: &BTreeMap<String, String>, _target: &WorkerTarget) -> String {
     let env_flags = build_env_flags(envs);
     format!(
-        "sudo bash -c 'set -e; \
-systemctl stop fn0-worker 2>/dev/null || true; \
-systemctl disable fn0-worker 2>/dev/null || true; \
+        "bash -c 'set -e; \
 podman stop fn0-worker 2>/dev/null || true; \
 podman rm -f fn0-worker 2>/dev/null || true; \
-mkdir -p /etc/fn0-worker; \
 podman pull {image}; \
-podman create --replace --name fn0-worker --network=host -v /etc/fn0-worker:/etc/fn0-worker:ro,Z {env_flags} {image}; \
-podman generate systemd --name fn0-worker > /etc/systemd/system/fn0-worker.service; \
-systemctl daemon-reload; \
-systemctl enable --now fn0-worker'"
+podman create --replace --name fn0-worker \
+  --network=host \
+  --restart=always \
+  -v /etc/fn0-worker:/etc/fn0-worker:ro {env_flags} {image}; \
+podman start fn0-worker'"
     )
 }

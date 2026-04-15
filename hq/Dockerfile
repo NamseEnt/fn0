@@ -9,17 +9,18 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
       rustup target add aarch64-unknown-linux-gnu; \
     fi
 
-COPY . .
+COPY hq ./hq
+COPY oci-rust-sdk ./oci-rust-sdk
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=id=hq-target-${TARGETARCH},type=cache,target=/app/target \
+    --mount=id=hq-target-${TARGETARCH},type=cache,target=/app/hq/target \
     if [ "$TARGETARCH" = "arm64" ]; then \
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-      cargo build --release --target aarch64-unknown-linux-gnu --manifest-path Cargo.toml && \
-      cp target/aarch64-unknown-linux-gnu/release/hq /app/hq-bin; \
+      cargo build --release --target aarch64-unknown-linux-gnu --manifest-path hq/Cargo.toml && \
+      cp hq/target/aarch64-unknown-linux-gnu/release/hq /app/hq-bin; \
     else \
-      cargo build --release --manifest-path Cargo.toml && \
-      cp target/release/hq /app/hq-bin; \
+      cargo build --release --manifest-path hq/Cargo.toml && \
+      cp hq/target/release/hq /app/hq-bin; \
     fi
 
 FROM debian:bookworm-slim

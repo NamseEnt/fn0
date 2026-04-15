@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 
 const HOST_INSPECTOR_INTERVAL: Duration = Duration::from_secs(2);
-const SSH_FAILURE_TERMINATE_THRESHOLD: u32 = 15;
+const SSH_FAILURE_TERMINATE_THRESHOLD: u32 = 150;
 const PER_TICK_BACKOFFS: [Duration; 3] = [
     Duration::from_millis(200),
     Duration::from_millis(500),

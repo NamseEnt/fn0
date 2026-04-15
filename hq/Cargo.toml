@@ -26,7 +26,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["full"] }
-oci-rust-sdk = { version = "0.4", features = ["core"] }
+oci-rust-sdk = { path = "../oci-rust-sdk", features = ["core"] }
 base64 = "0.22.1"
 opentelemetry = { version = "0.31.0", features = ["logs", "metrics"] }
 opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }

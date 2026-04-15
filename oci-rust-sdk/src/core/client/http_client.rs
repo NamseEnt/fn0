@@ -182,7 +182,27 @@ impl OciClient {
             // No content to parse
             serde_json::from_str("{}")?
         } else {
-            response.json().await?
+            let bytes = match response.bytes().await {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("OCI_DIAG body.bytes() failed: {:?}", e);
+                    return Err(OciError::HttpError(e));
+                }
+            };
+            match serde_json::from_slice(&bytes) {
+                Ok(body) => body,
+                Err(e) => {
+                    let preview: String =
+                        String::from_utf8_lossy(&bytes).chars().take(2000).collect();
+                    eprintln!(
+                        "OCI_DIAG json parse failed: {} | len={} | body_preview={}",
+                        e,
+                        bytes.len(),
+                        preview
+                    );
+                    return Err(OciError::SerdeError(e));
+                }
+            }
         };
 
         Ok(OciResponse { body, headers })

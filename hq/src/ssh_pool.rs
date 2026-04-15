@@ -6,7 +6,7 @@ use tokio::time::timeout;
 
 use crate::ssh::SshClient;
 
-const EXEC_TIMEOUT: Duration = Duration::from_secs(3);
+const EXEC_TIMEOUT: Duration = Duration::from_secs(90);
 
 #[derive(Clone)]
 pub struct SshPool {
