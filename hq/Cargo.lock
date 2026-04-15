@@ -3166,8 +3166,6 @@ dependencies = [
 [[package]]
 name = "oci-rust-sdk"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "046884cb744da50c028d93252536fcc18ce0387321de2c881398e1b9d29af4df"
 dependencies = [
  "anyhow",
  "async-trait",

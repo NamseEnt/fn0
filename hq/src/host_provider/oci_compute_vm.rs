@@ -119,6 +119,11 @@ impl OciComputeVmHostProvider {
         r#"#!/bin/bash
 systemctl disable --now firewalld 2>/dev/null || true
 mkdir -p /etc/fn0-worker
+chown opc:opc /etc/fn0-worker
+chcon -Rt container_file_t /etc/fn0-worker 2>/dev/null || true
+echo 'net.ipv4.ip_unprivileged_port_start=80' > /etc/sysctl.d/90-fn0-unprivileged.conf
+sysctl -p /etc/sysctl.d/90-fn0-unprivileged.conf
+loginctl enable-linger opc
 "#
         .to_string()
     }
