@@ -6,6 +6,7 @@ pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
     pub doc_db: DocDbArgs,
     pub aws: AwsArgs,
+    pub cwasm_bucket: CwasmBucketArgs,
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,
 }
@@ -23,7 +24,16 @@ pub struct SelfDnsArgs {
 pub struct AwsArgs {
     pub region: String,
     pub wasm_bucket: String,
-    pub cwasm_bucket: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CwasmBucketArgs {
+    pub name: String,
+    pub endpoint: String,
+    pub region: String,
     pub access_key_id: String,
     pub secret_access_key: String,
 }

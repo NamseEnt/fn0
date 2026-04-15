@@ -6,7 +6,7 @@ import { createOkeCluster } from "./oke-cluster";
 import { createDockerRegistry } from "./docker-registry";
 import { deployK8sDashboard } from "./k8s-dashboard";
 import { deployHqApplication } from "./hq-deployment";
-import { SiteArgs, DnsProviderArg } from "../hqArgs.schema";
+import { SiteArgs, DnsProviderArg, CwasmBucketArgs } from "../hqArgs.schema";
 
 export interface OciHeadQuarterArgs {
   suffix: pulumi.Input<string>;
@@ -21,7 +21,7 @@ export interface OciHeadQuarterArgs {
   sites: pulumi.Input<SiteArgs[]>;
   awsRegion: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
-  cwasmBucket: pulumi.Input<string>;
+  cwasmBucket: pulumi.Input<CwasmBucketArgs>;
   awsAccessKeyId: pulumi.Input<string>;
   awsSecretAccessKey: pulumi.Input<string>;
   selfDnsHostname: pulumi.Input<string>;
@@ -104,10 +104,10 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
         aws: {
           region: args.awsRegion,
           wasmBucket: args.wasmBucket,
-          cwasmBucket: args.cwasmBucket,
           accessKeyId: args.awsAccessKeyId,
           secretAccessKey: args.awsSecretAccessKey,
         },
+        cwasmBucket: args.cwasmBucket,
         selfDns: {
           hostname: args.selfDnsHostname,
           cloudflareZoneId: args.selfDnsCloudflareZoneId,

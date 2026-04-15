@@ -52,6 +52,12 @@ if [[ -z "$TAG" ]]; then
   exit 1
 fi
 
+WASMTIME_VERSION="$(awk '/^name = "fn0-wasmtime"/{getline; gsub(/"/, "", $3); print $3; exit}' "${REPO_ROOT}/fn0-worker/Cargo.lock")"
+if [[ -z "$WASMTIME_VERSION" ]]; then
+  echo "failed to read fn0-wasmtime version from fn0-worker/Cargo.lock" >&2
+  exit 1
+fi
+
 HTTPS_URL="${DOC_DB_URL/libsql:\/\//https://}"
 HTTPS_URL="${HTTPS_URL%/}"
 
@@ -59,7 +65,8 @@ TARGET_JSON="$(jq -nc \
   --arg reg "$REGISTRY" \
   --arg repo "$REPOSITORY" \
   --arg tag "$TAG" \
-  '{image_registry: $reg, image_repository: $repo, image_tag: $tag}')"
+  --arg wasmtime "$WASMTIME_VERSION" \
+  '{image_registry: $reg, image_repository: $repo, image_tag: $tag, fn0_wasmtime_version: $wasmtime}')"
 
 PK="worker-target:${SITE_NAME}"
 
@@ -93,7 +100,7 @@ if [[ "$HTTP_CODE" != "200" ]]; then
 fi
 
 if jq -e '.results[0].type == "ok"' <"$RESP_BODY" >/dev/null 2>&1; then
-  echo "worker-target:${SITE_NAME} = ${REGISTRY}/${REPOSITORY}:${TAG}"
+  echo "worker-target:${SITE_NAME} = ${REGISTRY}/${REPOSITORY}:${TAG} (fn0-wasmtime ${WASMTIME_VERSION})"
 else
   echo "doc-db write unexpected response:" >&2
   cat "$RESP_BODY" >&2
