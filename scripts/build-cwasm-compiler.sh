@@ -22,6 +22,8 @@ CWASM_REGION="$(pick cwasmCompilerBucketRegion)"
 CWASM_BUCKET="$(pick cwasmCompilerBucket)"
 CWASM_ECR="$(pick cwasmCompilerEcrRepository)"
 CWASM_ROLE_ARN="$(pick cwasmCompilerRoleArn)"
+BUILDER_AWS_ACCESS_KEY_ID="$(pick cwasmCompilerBuilderAccessKeyId)"
+BUILDER_AWS_SECRET_ACCESS_KEY="$(pick cwasmCompilerBuilderSecretAccessKey)"
 
 SCCACHE_BUCKET="$(pick sccacheBucketName)"
 SCCACHE_REGION="$(pick sccacheBucketRegion)"
@@ -30,6 +32,7 @@ SCCACHE_ACCESS_KEY_ID="$(pick sccacheAccessKeyId)"
 SCCACHE_SECRET_ACCESS_KEY="$(pick sccacheSecretAccessKey)"
 
 for v in CWASM_REGION CWASM_BUCKET CWASM_ECR CWASM_ROLE_ARN \
+         BUILDER_AWS_ACCESS_KEY_ID BUILDER_AWS_SECRET_ACCESS_KEY \
          SCCACHE_BUCKET SCCACHE_REGION SCCACHE_ENDPOINT \
          SCCACHE_ACCESS_KEY_ID SCCACHE_SECRET_ACCESS_KEY; do
   if [[ -z "${!v}" ]]; then
@@ -37,6 +40,11 @@ for v in CWASM_REGION CWASM_BUCKET CWASM_ECR CWASM_ROLE_ARN \
     exit 1
   fi
 done
+
+export AWS_ACCESS_KEY_ID="$BUILDER_AWS_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$BUILDER_AWS_SECRET_ACCESS_KEY"
+export AWS_DEFAULT_REGION="$CWASM_REGION"
+unset AWS_SESSION_TOKEN AWS_PROFILE
 
 echo ">> Attempting cargo publish for fn0-wasmtime"
 PUBLISH_LOG="$(mktemp)"
@@ -75,6 +83,8 @@ aws ecr get-login-password --region "$CWASM_REGION" \
 echo ">> Building & pushing image"
 docker buildx build \
   --platform linux/arm64 \
+  --provenance=false \
+  --sbom=false \
   --file "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
   --build-arg SCCACHE_BUCKET="$SCCACHE_BUCKET" \
   --build-arg SCCACHE_REGION="$SCCACHE_REGION" \
