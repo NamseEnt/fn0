@@ -307,7 +307,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
           memoryInGbs: 6,
           subnetId: ociComputeWorker.subnetId,
           imageId: ociComputeWorker.osImageId,
-          workerImageUrl: ociComputeWorker.workerImageMultiArch,
           envs: {
             CWASM_BUCKET: ociComputeWorker.cwasmBucket.bucketName,
             S3_ENDPOINT: ociComputeWorker.cwasmBucket.endpoint,
@@ -328,7 +327,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
 });
 
 export const kubeconfig = pulumi.secret(ociHeadQuarter.kubeconfig);
-export const workerImage = ociComputeWorker.workerImageMultiArch;
 export const workerImageRegistries = pulumi.secret(ociComputeWorker.workerImageRegistries);
 export const cwasmBucket = ociComputeWorker.cwasmBucket.bucketName;
 export const s3Endpoint = ociComputeWorker.cwasmBucket.endpoint;
@@ -349,3 +347,5 @@ export const cwasmCompilerBuilderAccessKeyId = pulumi.secret(cwasmCompilerBuilde
 export const cwasmCompilerBuilderSecretAccessKey = pulumi.secret(cwasmCompilerBuilderAccessKey.secret);
 export const hqAwsAccessKeyId = pulumi.secret(hqAwsAccessKey.id);
 export const hqAwsSecretAccessKey = pulumi.secret(hqAwsAccessKey.secret);
+export const docDbUrl = docDb.url;
+export const docDbToken = pulumi.secret(docDb.token);
