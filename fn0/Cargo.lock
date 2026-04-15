@@ -2152,7 +2152,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2288,7 +2288,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-wasmtime"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "sysinfo",
