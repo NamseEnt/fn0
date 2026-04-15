@@ -39,9 +39,7 @@ const sccacheCompartment = new oci.identity.Compartment("sccache-compartment", {
   enableDelete: true,
 });
 
-const sccacheNamespace = oci.objectstorage.getNamespaceOutput({
-  compartmentId: sccacheCompartment.id,
-}).namespace;
+const sccacheNamespace = oci.objectstorage.getNamespaceOutput({}).namespace;
 
 const sccacheBucket = new oci.objectstorage.Bucket("sccache-bucket", {
   compartmentId: sccacheCompartment.id,
@@ -214,6 +212,11 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   docDbUrl: docDb.url,
   docDbToken: docDb.token,
   certificate: quicCaCert.certPem,
+  awsRegion: cwasmCompilerRegion,
+  wasmBucket: cwasmCompilerBucketR.bucket,
+  cwasmBucket: ociComputeWorker.cwasmBucket.bucketName,
+  awsAccessKeyId: hqAwsAccessKey.id,
+  awsSecretAccessKey: hqAwsAccessKey.secret,
   selfDnsHostname: `fn0-hq.${domain}`,
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
