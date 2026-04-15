@@ -3,11 +3,13 @@ mod host_status;
 mod job_queue;
 mod project;
 mod scale_config;
+mod worker_target;
 
 pub use deployment::*;
 pub use host_status::*;
 use libsql::{Builder, Database, Result};
 pub use scale_config::ScaleConfig;
+pub use worker_target::*;
 use std::sync::Arc;
 
 #[derive(Clone)]

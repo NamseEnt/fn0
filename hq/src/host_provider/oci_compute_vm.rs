@@ -23,7 +23,6 @@ pub struct OciComputeVmHostProvider {
     memory_in_gbs: NonZeroUsize,
     subnet_id: String,
     image_id: String,
-    worker_image_url: String,
     envs: BTreeMap<String, String>,
     ssh_authorized_keys: String,
     ssh_private_key_pem: String,
@@ -83,7 +82,6 @@ impl OciComputeVmHostProvider {
             memory_in_gbs: args.memory_in_gbs,
             subnet_id: args.subnet_id,
             image_id: args.image_id,
-            worker_image_url: args.worker_image_url,
             envs,
             ssh_authorized_keys: args.ssh_authorized_keys,
             ssh_private_key_pem,
@@ -102,7 +100,6 @@ impl OciComputeVmHostProvider {
             memory_in_gbs: NonZeroUsize::new(6).unwrap(),
             subnet_id: "test-subnet".to_string(),
             image_id: "test-image".to_string(),
-            worker_image_url: "test-image:latest".to_string(),
             envs: BTreeMap::new(),
             ssh_authorized_keys: String::new(),
             ssh_private_key_pem: String::new(),
@@ -114,42 +111,16 @@ impl OciComputeVmHostProvider {
         &self.ssh_private_key_pem
     }
 
-    pub fn worker_image_url(&self) -> &str {
-        &self.worker_image_url
-    }
-
     pub fn envs(&self) -> &BTreeMap<String, String> {
         &self.envs
     }
 
     fn build_cloud_init(&self) -> String {
-        let env_flags: String = self
-            .envs
-            .iter()
-            .map(|(k, v)| {
-                if v.contains('\n') {
-                    let encoded = base64::engine::general_purpose::STANDARD.encode(v.as_bytes());
-                    format!("-e {k}_BASE64={encoded}")
-                } else {
-                    format!("-e {k}={v}")
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
-
-        format!(
-            r#"#!/bin/bash
+        r#"#!/bin/bash
 systemctl disable --now firewalld 2>/dev/null || true
 mkdir -p /etc/fn0-worker
-podman pull {image}
-podman create --replace --name fn0-worker --network=host -v /etc/fn0-worker:/etc/fn0-worker:ro,Z {env_flags} {image}
-podman generate systemd --name fn0-worker > /etc/systemd/system/fn0-worker.service
-systemctl daemon-reload
-systemctl enable --now fn0-worker
-"#,
-            image = self.worker_image_url,
-            env_flags = env_flags,
-        )
+"#
+        .to_string()
     }
 
     async fn count_managed_instances(&self) -> color_eyre::Result<usize> {

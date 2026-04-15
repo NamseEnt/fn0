@@ -36,7 +36,6 @@ export interface OciComputeVmHostProviderArgsArgs {
     subnetId: pulumi.Input<string>;
     tenancyId: pulumi.Input<string>;
     userId: pulumi.Input<string>;
-    workerImageUrl: pulumi.Input<string>;
 }
 
 export interface SiteArgsArgs {

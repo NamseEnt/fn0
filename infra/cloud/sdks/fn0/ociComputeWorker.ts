@@ -30,7 +30,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     declare public /*out*/ readonly sshPrivateKey: pulumi.Output<string>;
     declare public /*out*/ readonly sshPublicKey: pulumi.Output<string>;
     declare public /*out*/ readonly subnetId: pulumi.Output<string>;
-    declare public /*out*/ readonly workerImageMultiArch: pulumi.Output<string>;
     declare public /*out*/ readonly workerImageRegistries: pulumi.Output<outputs.WorkerImageRegistry[]>;
 
     /**
@@ -61,7 +60,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
             resourceInputs["sshPrivateKey"] = undefined /*out*/;
             resourceInputs["sshPublicKey"] = undefined /*out*/;
             resourceInputs["subnetId"] = undefined /*out*/;
-            resourceInputs["workerImageMultiArch"] = undefined /*out*/;
             resourceInputs["workerImageRegistries"] = undefined /*out*/;
         } else {
             resourceInputs["compartmentId"] = undefined /*out*/;
@@ -73,7 +71,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
             resourceInputs["sshPrivateKey"] = undefined /*out*/;
             resourceInputs["sshPublicKey"] = undefined /*out*/;
             resourceInputs["subnetId"] = undefined /*out*/;
-            resourceInputs["workerImageMultiArch"] = undefined /*out*/;
             resourceInputs["workerImageRegistries"] = undefined /*out*/;
         }
         opts = pulumi.mergeOptions(utilities.resourceOptsDefaults(), opts);

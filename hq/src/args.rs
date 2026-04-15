@@ -63,7 +63,6 @@ pub struct OciComputeVmHostProviderArgs {
     pub memory_in_gbs: NonZeroUsize,
     pub subnet_id: String,
     pub image_id: String,
-    pub worker_image_url: String,
     pub envs: BTreeMap<String, String>,
     pub ssh_authorized_keys: String,
     pub ssh_private_key_base64: String,

@@ -1,219 +1,196 @@
 use super::*;
-use base64::Engine;
+use crate::doc_db::WorkerTarget;
 use crate::host_provider::HostProvide;
-use crate::ssh::SshClient;
+use crate::ssh_pool::SshPool;
 use std::collections::BTreeMap;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 use tracing::*;
 
-const SSH_USER: &str = "opc";
-
-struct WorkerState {
-    image_id: String,
-    envs: BTreeMap<String, String>,
-}
+const WORKER_UPDATE_INTERVAL: Duration = Duration::from_secs(10);
 
 impl Site {
     #[tracing::instrument(skip_all)]
     pub async fn run_worker_update_loop(&self) {
-        let mut interval = tokio::time::interval(worker_update_interval());
+        let mut interval = tokio::time::interval(WORKER_UPDATE_INTERVAL);
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
             interval.tick().await;
 
-            let hosts = match self.host_provider.list_hosts().await {
-                Ok(hosts) => hosts,
+            let target = match self.doc_db.get_worker_target(&self.name).await {
+                Ok(Some(t)) => t,
+                Ok(None) => {
+                    continue;
+                }
                 Err(err) => {
-                    warn!(%err, "Failed to list hosts for worker update");
+                    warn!(%err, "worker_update: failed to read worker-target");
                     continue;
                 }
             };
 
-            info!(host_count = hosts.len(), "Worker update tick");
-
-            let desired_image = self.host_provider.worker_image_url().to_string();
-            let desired_envs = self.host_provider.envs().clone();
-            let ssh_key = self.host_provider.ssh_private_key_pem().to_string();
-
-            for host in hosts {
-                let ssh_addr = match &host.dns_addr {
-                    Some(addr) => addr.clone(),
-                    None => host.addr.clone(),
-                };
-
-                let desired_image = desired_image.clone();
-                let desired_envs = desired_envs.clone();
-                let ssh_key = ssh_key.clone();
-                let host_id = host.id.to_string();
-
-                let result = update_worker_if_needed(
-                    &host_id,
-                    &ssh_addr,
-                    &ssh_key,
-                    &desired_image,
-                    &desired_envs,
-                )
-                .await;
-
-                if let Err(err) = result {
-                    warn!(host_id, %err, "Failed to update worker");
+            let hosts = match self.host_provider.list_hosts().await {
+                Ok(hosts) => hosts,
+                Err(err) => {
+                    warn!(%err, "worker_update: failed to list hosts");
+                    continue;
                 }
+            };
+
+            let desired_envs = self.host_provider.envs().clone();
+            let desired_ref = target.image_ref();
+
+            let mut tasks = Vec::with_capacity(hosts.len());
+            for host in hosts {
+                let pool = self.ssh_pool.clone();
+                let envs = desired_envs.clone();
+                let image = desired_ref.clone();
+                let target_clone = target.clone();
+                tasks.push(tokio::spawn(async move {
+                    let addr = host.dns_addr.clone().unwrap_or_else(|| host.addr.clone());
+                    if let Err(err) =
+                        reconcile_one(&pool, &addr, &image, &envs, &target_clone).await
+                    {
+                        warn!(%err, host_id = %host.id, "worker_update: reconcile failed");
+                    }
+                }));
+            }
+            for t in tasks {
+                let _ = t.await;
             }
         }
     }
 }
 
-async fn update_worker_if_needed(
-    host_id: &str,
-    ssh_addr: &str,
-    ssh_key: &str,
-    desired_image: &str,
+async fn reconcile_one(
+    ssh_pool: &SshPool,
+    addr: &str,
+    desired_image_ref: &str,
     desired_envs: &BTreeMap<String, String>,
+    target: &WorkerTarget,
 ) -> color_eyre::Result<()> {
-    let ssh = SshClient::connect(ssh_addr, SSH_USER, ssh_key).await?;
+    let current = fetch_current_state(ssh_pool, addr).await?;
 
-    let current = match get_worker_state(&ssh, desired_envs).await {
-        Ok(state) => state,
-        Err(err) => {
-            info!(host_id, %err, "Worker container not found or not inspectable, will deploy");
-            deploy_worker(&ssh, desired_image, desired_envs).await?;
-            let _ = ssh.close().await;
-            return Ok(());
-        }
-    };
+    let current_ref_matches = current
+        .image_ref
+        .as_ref()
+        .map(|r| normalize_ref(r) == normalize_ref(desired_image_ref))
+        .unwrap_or(false);
+    let envs_match = current
+        .envs
+        .as_ref()
+        .map(|e| subset_matches(e, desired_envs))
+        .unwrap_or(false);
 
-    let desired_id = get_remote_image_id(&ssh, desired_image).await?;
-    let image_changed = current.image_id != desired_id;
-    let envs_changed = current.envs != *desired_envs;
-
-    if !image_changed && !envs_changed {
-        let _ = ssh.close().await;
+    if current_ref_matches && envs_match && current.running {
         return Ok(());
     }
 
-    if image_changed {
-        info!(
-            host_id,
-            current_id = current.image_id,
-            desired_id,
-            "Worker image mismatch, updating"
-        );
-    }
-    if envs_changed {
-        info!(host_id, "Worker envs mismatch, updating");
-    }
+    info!(
+        %addr,
+        current_image = ?current.image_ref,
+        desired_image = %desired_image_ref,
+        running = current.running,
+        "Deploying worker container"
+    );
 
-    deploy_worker(&ssh, desired_image, desired_envs).await?;
-    let _ = ssh.close().await;
+    let script = build_deploy_script(desired_image_ref, desired_envs, target);
+    let (code, output) = ssh_pool.exec(addr, &script).await?;
+    if code != 0 {
+        return Err(color_eyre::eyre::eyre!(
+            "deploy_worker failed on {addr} (exit {code}): {}",
+            output.trim()
+        ));
+    }
     Ok(())
 }
 
-async fn get_remote_image_id(
-    ssh: &SshClient,
-    image: &str,
-) -> color_eyre::Result<String> {
-    let (pull_status, pull_output) = ssh
-        .exec(&format!("sudo podman pull {image}"))
-        .await?;
-    if pull_status != 0 {
-        return Err(color_eyre::eyre::eyre!(
-            "podman pull failed (exit {}): {}",
-            pull_status,
-            pull_output
-        ));
-    }
-
-    let (status, output) = ssh
-        .exec(&format!(
-            "sudo podman image inspect {image} --format '{{{{.Id}}}}'"
-        ))
-        .await?;
-    if status != 0 {
-        return Err(color_eyre::eyre::eyre!(
-            "podman image inspect failed (exit {}): {}",
-            status,
-            output
-        ));
-    }
-    Ok(normalize_image_id(output.trim()))
+struct ContainerState {
+    running: bool,
+    image_ref: Option<String>,
+    envs: Option<BTreeMap<String, String>>,
 }
 
-async fn get_worker_state(
-    ssh: &SshClient,
-    desired_envs: &BTreeMap<String, String>,
-) -> color_eyre::Result<WorkerState> {
-    let (status, output) = ssh
-        .exec("sudo podman inspect fn0-worker --format '{{.Image}}'")
+async fn fetch_current_state(ssh_pool: &SshPool, addr: &str) -> color_eyre::Result<ContainerState> {
+    let (code, output) = ssh_pool
+        .exec(
+            addr,
+            "sudo podman inspect fn0-worker --format '{{.State.Running}}|{{.ImageName}}|{{json .Config.Env}}' 2>/dev/null || echo 'MISSING'",
+        )
         .await?;
-    if status != 0 {
-        return Err(color_eyre::eyre::eyre!(
-            "podman inspect failed (exit {}): {}",
-            status,
-            output
-        ));
+    if code != 0 || output.trim() == "MISSING" {
+        return Ok(ContainerState {
+            running: false,
+            image_ref: None,
+            envs: None,
+        });
     }
-    let image_id = normalize_image_id(output.trim());
-
-    let (status, output) = ssh
-        .exec("sudo podman inspect fn0-worker --format '{{json .Config.Env}}'")
-        .await?;
-    if status != 0 {
-        return Err(color_eyre::eyre::eyre!(
-            "podman inspect envs failed (exit {}): {}",
-            status,
-            output
-        ));
+    let line = output.trim();
+    let parts: Vec<&str> = line.splitn(3, '|').collect();
+    if parts.len() != 3 {
+        return Ok(ContainerState {
+            running: false,
+            image_ref: None,
+            envs: None,
+        });
     }
-    let container_envs = parse_container_envs(output.trim());
-
-    let envs = filter_envs_by_desired_keys(&container_envs, desired_envs);
-
-    Ok(WorkerState { image_id, envs })
+    let running = parts[0] == "true";
+    let image_ref = Some(parts[1].to_string()).filter(|s| !s.is_empty());
+    let envs = parse_env_json(parts[2]);
+    Ok(ContainerState {
+        running,
+        image_ref,
+        envs: Some(envs),
+    })
 }
 
-fn filter_envs_by_desired_keys(
-    container_envs: &BTreeMap<String, String>,
-    desired_envs: &BTreeMap<String, String>,
-) -> BTreeMap<String, String> {
-    let mut result = BTreeMap::new();
-    for key in desired_envs.keys() {
-        if let Some(value) = container_envs.get(key) {
-            result.insert(key.clone(), value.clone());
-        } else if let Some(value) = container_envs.get(&format!("{key}_BASE64")) {
-            let decoded = base64::engine::general_purpose::STANDARD
-                .decode(value.as_bytes())
-                .ok()
-                .and_then(|b| String::from_utf8(b).ok())
-                .unwrap_or_default();
-            result.insert(key.clone(), decoded);
-        }
-    }
-    result
-}
-
-fn parse_container_envs(json_str: &str) -> BTreeMap<String, String> {
-    let env_list: Vec<String> = serde_json::from_str(json_str).unwrap_or_default();
-    let mut envs = BTreeMap::new();
-    for entry in env_list {
+fn parse_env_json(json_str: &str) -> BTreeMap<String, String> {
+    let list: Vec<String> = serde_json::from_str(json_str).unwrap_or_default();
+    let mut m = BTreeMap::new();
+    for entry in list {
         if let Some((k, v)) = entry.split_once('=') {
-            envs.insert(k.to_string(), v.to_string());
+            m.insert(k.to_string(), v.to_string());
         }
     }
-    envs
+    m
 }
 
-fn normalize_image_id(id: &str) -> String {
-    id.strip_prefix("sha256:").unwrap_or(id).to_string()
+fn subset_matches(
+    container_envs: &BTreeMap<String, String>,
+    desired: &BTreeMap<String, String>,
+) -> bool {
+    use base64::Engine;
+    for (k, desired_v) in desired {
+        let got = container_envs
+            .get(k)
+            .cloned()
+            .or_else(|| {
+                container_envs
+                    .get(&format!("{k}_BASE64"))
+                    .and_then(|b64| {
+                        base64::engine::general_purpose::STANDARD
+                            .decode(b64.as_bytes())
+                            .ok()
+                    })
+                    .and_then(|bytes| String::from_utf8(bytes).ok())
+            });
+        if got.as_deref() != Some(desired_v.as_str()) {
+            return false;
+        }
+    }
+    true
+}
+
+fn normalize_ref(s: &str) -> String {
+    s.trim().to_string()
 }
 
 fn build_env_flags(envs: &BTreeMap<String, String>) -> String {
+    use base64::Engine;
     envs.iter()
         .map(|(k, v)| {
             if v.contains('\n') {
-                let encoded =
-                    base64::engine::general_purpose::STANDARD.encode(v.as_bytes());
+                let encoded = base64::engine::general_purpose::STANDARD.encode(v.as_bytes());
                 format!("-e {k}_BASE64={encoded}")
             } else {
                 format!("-e {k}={v}")
@@ -223,53 +200,19 @@ fn build_env_flags(envs: &BTreeMap<String, String>) -> String {
         .join(" ")
 }
 
-async fn deploy_worker(
-    ssh: &SshClient,
-    image: &str,
-    envs: &BTreeMap<String, String>,
-) -> color_eyre::Result<()> {
+fn build_deploy_script(image: &str, envs: &BTreeMap<String, String>, _target: &WorkerTarget) -> String {
     let env_flags = build_env_flags(envs);
-
-    let script = format!(
-        r#"set -e
-systemctl stop fn0-worker 2>/dev/null || true
-systemctl disable fn0-worker 2>/dev/null || true
-podman stop fn0-worker 2>/dev/null || true
-podman rm -f fn0-worker 2>/dev/null || true
-mkdir -p /etc/fn0-worker
-podman pull {image}
-podman create --replace --name fn0-worker --network=host -v /etc/fn0-worker:/etc/fn0-worker:ro,Z {env_flags} {image}
-podman generate systemd --name fn0-worker > /etc/systemd/system/fn0-worker.service
-systemctl daemon-reload
-systemctl enable --now fn0-worker"#,
-    );
-
-    let (status, output) = ssh.exec(&format!("sudo bash -c '{script}'")).await?;
-    if status != 0 {
-        return Err(color_eyre::eyre::eyre!(
-            "Worker deploy failed (exit {}): {}",
-            status,
-            output
-        ));
-    }
-
-    let (check_status, check_output) = ssh
-        .exec("sudo podman ps --filter name=fn0-worker --format '{{.Status}}'")
-        .await?;
-    info!(
-        container_status = check_output.trim(),
-        check_exit = check_status,
-        "Worker deployed"
-    );
-    Ok(())
-}
-
-fn worker_update_interval() -> Duration {
-    match std::env::var("WORKER_UPDATE_INTERVAL_MS") {
-        Ok(s) => s
-            .parse()
-            .map(Duration::from_millis)
-            .unwrap_or(Duration::from_secs(60)),
-        Err(_) => Duration::from_secs(60),
-    }
+    format!(
+        "sudo bash -c 'set -e; \
+systemctl stop fn0-worker 2>/dev/null || true; \
+systemctl disable fn0-worker 2>/dev/null || true; \
+podman stop fn0-worker 2>/dev/null || true; \
+podman rm -f fn0-worker 2>/dev/null || true; \
+mkdir -p /etc/fn0-worker; \
+podman pull {image}; \
+podman create --replace --name fn0-worker --network=host -v /etc/fn0-worker:/etc/fn0-worker:ro,Z {env_flags} {image}; \
+podman generate systemd --name fn0-worker > /etc/systemd/system/fn0-worker.service; \
+systemctl daemon-reload; \
+systemctl enable --now fn0-worker'"
+    )
 }

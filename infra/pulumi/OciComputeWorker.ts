@@ -41,7 +41,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
   public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
-  public readonly workerImageMultiArch: pulumi.Output<string>;
   public readonly workerImageRegistries: pulumi.Output<WorkerImageRegistry[]>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
@@ -457,7 +456,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
 
     const registryUrl = pulumi.interpolate`ocir.${args.region}.oci.oraclecloud.com`;
 
-    this.workerImageMultiArch = pulumi.interpolate`${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
     this.workerImageRegistries = pulumi
       .all([
         registryUrl,
