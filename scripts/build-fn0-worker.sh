@@ -4,12 +4,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PULUMI_DIR="${PULUMI_DIR:-${REPO_ROOT}/infra/cloud}"
 
-if [[ $# -lt 1 ]]; then
-  echo "usage: $0 <site-name>" >&2
-  exit 2
-fi
-SITE_NAME="$1"
-
 need() {
   command -v "$1" >/dev/null 2>&1 || { echo "required command not found: $1" >&2; exit 1; }
 }
@@ -17,7 +11,6 @@ need pulumi
 need jq
 need cargo
 need docker
-need curl
 
 echo ">> Reading Pulumi stack outputs from ${PULUMI_DIR}"
 OUT="$(cd "$PULUMI_DIR" && pulumi stack output --show-secrets --json)"
@@ -28,15 +21,6 @@ if [[ -z "$REGISTRIES_JSON" || "$REGISTRIES_JSON" == "null" ]]; then
   echo "missing Pulumi output: workerImageRegistries" >&2
   exit 1
 fi
-
-DOC_DB_URL="$(pick docDbUrl)"
-DOC_DB_TOKEN="$(pick docDbToken)"
-for v in DOC_DB_URL DOC_DB_TOKEN; do
-  if [[ -z "${!v}" ]]; then
-    echo "missing Pulumi output: ${v}" >&2
-    exit 1
-  fi
-done
 
 SCCACHE_BUCKET="$(pick sccacheBucketName)"
 SCCACHE_REGION="$(pick sccacheBucketRegion)"
@@ -98,9 +82,6 @@ if (( COUNT == 0 )); then
   exit 1
 fi
 
-TARGET_REGISTRY=""
-TARGET_REPOSITORY=""
-
 for i in $(seq 0 $((COUNT - 1))); do
   REG="$(jq -c ".[$i]" <<<"$REGISTRIES_JSON")"
   URL="$(jq -r .url <<<"$REG")"
@@ -108,11 +89,6 @@ for i in $(seq 0 $((COUNT - 1))); do
   PASSWORD="$(jq -r .password <<<"$REG")"
   REPO="$(jq -r .repository <<<"$REG")"
   FULL_REF="${URL}/${REPO}:${TAG}"
-
-  if [[ -z "$TARGET_REGISTRY" ]]; then
-    TARGET_REGISTRY="$URL"
-    TARGET_REPOSITORY="$REPO"
-  fi
 
   echo ">> Login ${URL}"
   echo "$PASSWORD" | docker login "$URL" -u "$USERNAME" --password-stdin >/dev/null
@@ -152,51 +128,4 @@ for i in $(seq 0 $((COUNT - 1))); do
   fi
 done
 
-echo ">> Updating worker-target:${SITE_NAME} in doc-db"
-
-HTTPS_URL="${DOC_DB_URL/libsql:\/\//https://}"
-HTTPS_URL="${HTTPS_URL%/}"
-
-TARGET_JSON="$(jq -nc \
-  --arg reg "$TARGET_REGISTRY" \
-  --arg repo "$TARGET_REPOSITORY" \
-  --arg tag "$TAG" \
-  '{image_registry: $reg, image_repository: $repo, image_tag: $tag}')"
-
-PK="worker-target:${SITE_NAME}"
-
-REQ_BODY="$(jq -nc \
-  --arg sql "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)" \
-  --arg pk "$PK" \
-  --arg val "$TARGET_JSON" \
-  '{
-    requests: [
-      {type: "execute", stmt: {sql: $sql, args: [
-        {type: "text", value: $pk},
-        {type: "text", value: $val}
-      ]}},
-      {type: "close"}
-    ]
-  }')"
-
-HTTP_CODE="$(curl -sS -o "$INSPECT_LOG" -w '%{http_code}' \
-  -X POST "${HTTPS_URL}/v2/pipeline" \
-  -H "Authorization: Bearer ${DOC_DB_TOKEN}" \
-  -H "Content-Type: application/json" \
-  --data-raw "$REQ_BODY")"
-
-if [[ "$HTTP_CODE" != "200" ]]; then
-  echo "doc-db write failed (HTTP ${HTTP_CODE}):" >&2
-  cat "$INSPECT_LOG" >&2
-  exit 1
-fi
-
-if jq -e '.results[0].type == "ok"' <"$INSPECT_LOG" >/dev/null 2>&1; then
-  echo ">> worker-target:${SITE_NAME} = ${TARGET_REGISTRY}/${TARGET_REPOSITORY}:${TAG}"
-else
-  echo "doc-db write unexpected response:" >&2
-  cat "$INSPECT_LOG" >&2
-  exit 1
-fi
-
-echo ">> Done."
+echo ">> Done. TAG=${TAG}"
