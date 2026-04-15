@@ -1,6 +1,6 @@
 [package]
 name = "fn0"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2024"
 description = "FaaS platform powered by wasmtime"
 license = "AGPL-3.0-only"
@@ -9,7 +9,7 @@ repository = "https://github.com/NamseEnt/fn0"
 [dependencies]
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
 ski = { package = "fn0-ski", version = "0.1.0" }
-fn0-wasmtime = { version = "0.1", path = "../fn0-wasmtime" }
+fn0-wasmtime = { version = "=0.1.1", path = "../fn0-wasmtime" }
 wasmtime = { version = "42", default-features = false, features = [
     "runtime",
     "cranelift",
