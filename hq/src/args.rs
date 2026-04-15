@@ -7,7 +7,6 @@ pub struct HqArgs {
     pub doc_db: DocDbArgs,
     pub ca_cert_pem: String,
     pub aws: AwsArgs,
-    pub ws_secret: String,
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,
 }

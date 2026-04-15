@@ -94,9 +94,6 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             if (args?.wasmBucket === undefined && !opts.urn) {
                 throw new Error("Missing required property 'wasmBucket'");
             }
-            if (args?.wsSecret === undefined && !opts.urn) {
-                throw new Error("Missing required property 'wsSecret'");
-            }
             resourceInputs["awsAccessKeyId"] = args?.awsAccessKeyId;
             resourceInputs["awsRegion"] = args?.awsRegion;
             resourceInputs["awsSecretAccessKey"] = args?.awsSecretAccessKey;
@@ -117,7 +114,6 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             resourceInputs["suffix"] = args?.suffix;
             resourceInputs["vcnId"] = args?.vcnId;
             resourceInputs["wasmBucket"] = args?.wasmBucket;
-            resourceInputs["wsSecret"] = args?.wsSecret;
             resourceInputs["kubeconfig"] = undefined /*out*/;
         } else {
             resourceInputs["kubeconfig"] = undefined /*out*/;
@@ -151,5 +147,4 @@ export interface OciHeadQuarterArgs {
     suffix: pulumi.Input<string>;
     vcnId: pulumi.Input<string>;
     wasmBucket: pulumi.Input<string>;
-    wsSecret: pulumi.Input<string>;
 }

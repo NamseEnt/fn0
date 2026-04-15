@@ -1,14 +1,9 @@
 use super::*;
-use crate::{host_connection::HostConnection, host_provider::HostTransport, random_sleep::random_sleep, telemetry};
+use crate::{host_connection::HostConnection, random_sleep::random_sleep, telemetry};
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use tokio::time::{MissedTickBehavior, timeout};
-
-enum ConnectTarget {
-    Quic(SocketAddr, String),
-    WebSocket(String),
-}
 
 impl Site {
     #[tracing::instrument(skip_all)]
@@ -43,7 +38,6 @@ impl Site {
                 }
             }
 
-            // Clean up hosts that are no longer in the list (e.g. DWS removed from doc-db)
             let stale: Vec<_> = self
                 .host_connections
                 .iter()
@@ -77,8 +71,6 @@ impl Site {
         let ca_cert_pem = self.ca_cert_pem.clone();
         let host_addr = host.addr.clone();
         let host_port = host.port;
-        let host_transport = host.transport.clone();
-        let ws_secret = self.ws_secret.clone();
         let dead_hosts = self.dead_hosts.clone();
         let host_connections = self.host_connections.clone();
 
@@ -86,21 +78,13 @@ impl Site {
             let deadline = Instant::now() + Duration::from_secs(180);
             let connect_timeout = Duration::from_secs(2);
 
-            let connect_target = match &host_transport {
-                HostTransport::Quic => {
-                    let resolved_addr = match resolve_addr(&host_addr, host_port).await {
-                        Ok(addr) => addr,
-                        Err(err) => {
-                            warn!(%err, "Failed to resolve host addr");
-                            dead_hosts.insert(host.clone(), Instant::now());
-                            telemetry::host_connect_status(&host.id, false);
-                            return;
-                        }
-                    };
-                    ConnectTarget::Quic(resolved_addr, ca_cert_pem)
-                }
-                HostTransport::WebSocket => {
-                    ConnectTarget::WebSocket(format!("wss://{}",  host_addr))
+            let resolved_addr = match resolve_addr(&host_addr, host_port).await {
+                Ok(addr) => addr,
+                Err(err) => {
+                    warn!(%err, "Failed to resolve host addr");
+                    dead_hosts.insert(host.clone(), Instant::now());
+                    telemetry::host_connect_status(&host.id, false);
+                    return;
                 }
             };
 
@@ -116,15 +100,11 @@ impl Site {
                 telemetry::host_connect_attempt(&host.id);
 
                 let connect_start = Instant::now();
-                let connect_result = match &connect_target {
-                    ConnectTarget::Quic(addr, ca_pem) => {
-                        timeout(connect_timeout, HostConnection::connect_quic(*addr, ca_pem)).await
-                    }
-                    ConnectTarget::WebSocket(url) => {
-                        let secret = if ws_secret.is_empty() { None } else { Some(ws_secret.as_str()) };
-                        timeout(connect_timeout, HostConnection::connect_websocket(url, secret)).await
-                    }
-                };
+                let connect_result = timeout(
+                    connect_timeout,
+                    HostConnection::connect_quic(resolved_addr, &ca_cert_pem),
+                )
+                .await;
 
                 match connect_result {
                     Ok(Ok(connection)) => {

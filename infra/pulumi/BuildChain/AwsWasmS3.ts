@@ -49,6 +49,7 @@ export class AwsWasmS3 extends pulumi.ComponentResource {
       "queue",
       {
         region,
+        visibilityTimeoutSeconds: 360,
       },
       { parent: this }
     );

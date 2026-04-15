@@ -7,7 +7,7 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
-wasmtime = { version = "42", default-features = false, features = [
+wasmtime = { version = "=42.0.2", default-features = false, features = [
     "runtime",
     "cranelift",
     "component-model",
