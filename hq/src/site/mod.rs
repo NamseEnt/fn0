@@ -11,7 +11,7 @@ use crate::{
     telemetry, *,
 };
 use dashmap::{DashMap, DashSet};
-use doc_db::DocDb;
+use crate::doc_db::DocDb;
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;

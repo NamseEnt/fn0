@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
 use color_eyre::eyre::{Result, eyre};
-use doc_db::DocDb;
+use crate::doc_db::DocDb;
 
 use crate::{
     args::*,

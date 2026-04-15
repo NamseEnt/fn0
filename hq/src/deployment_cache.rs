@@ -1,6 +1,6 @@
 use crate::telemetry;
 use color_eyre::eyre::Result;
-use doc_db::{Deployment, DocDb};
+use crate::doc_db::{Deployment, DocDb};
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tracing::warn;

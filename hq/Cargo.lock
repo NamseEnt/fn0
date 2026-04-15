@@ -1543,16 +1543,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-db"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "libsql",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1793,6 +1783,8 @@ dependencies = [
 [[package]]
 name = "fn0-host-hq-protocol"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13a900e1f255967e776c6a7f02ad2e9f65f267b26a049a748000e5ac369edf5c"
 dependencies = [
  "bytes",
  "postcard",
@@ -2190,12 +2182,12 @@ dependencies = [
  "chrono",
  "color-eyre",
  "dashmap",
- "doc-db",
  "fn0-host-hq-protocol",
  "futures",
  "http-body-util",
  "hyper 1.8.1",
  "hyper-util",
+ "libsql",
  "mockall",
  "oci-rust-sdk",
  "opentelemetry",
@@ -3260,6 +3252,8 @@ dependencies = [
 [[package]]
 name = "oci-rust-sdk"
 version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "046884cb744da50c028d93252536fcc18ce0387321de2c881398e1b9d29af4df"
 dependencies = [
  "anyhow",
  "async-trait",

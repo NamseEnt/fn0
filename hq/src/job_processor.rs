@@ -1,5 +1,5 @@
 use aws_sdk_s3::Client as S3Client;
-use doc_db::DocDb;
+use crate::doc_db::DocDb;
 use std::time::Duration;
 use tracing::*;
 
