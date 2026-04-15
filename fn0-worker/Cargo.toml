@@ -1,6 +1,6 @@
 [package]
 name = "fn0-worker"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "Worker binary for the fn0 FaaS platform"
 license = "AGPL-3.0-only"
