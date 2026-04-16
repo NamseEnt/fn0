@@ -28,9 +28,30 @@ fn ready_pk(site_name: &str) -> String {
     format!("cwasm-ready:{site_name}")
 }
 
+fn last_stable_pk(site_name: &str) -> String {
+    format!("worker-last-stable:{site_name}")
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CwasmReady {
     pub fn0_wasmtime_version: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WorkerLastStable {
+    pub image_registry: String,
+    pub image_repository: String,
+    pub image_tag: String,
+    pub fn0_wasmtime_version: String,
+}
+
+impl WorkerLastStable {
+    pub fn image_ref(&self) -> String {
+        format!(
+            "{}/{}:{}",
+            self.image_registry, self.image_repository, self.image_tag
+        )
+    }
 }
 
 impl DocDb {
@@ -74,6 +95,40 @@ impl DocDb {
         conn.execute(
             "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
             libsql::params![ready_pk(site_name), serde_json::to_string(ready).unwrap()],
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_worker_last_stable(
+        &self,
+        site_name: &str,
+    ) -> Result<Option<WorkerLastStable>> {
+        let conn = self.db.connect()?;
+        let mut rows = conn
+            .query(
+                "SELECT value FROM docs WHERE pk = ? AND sk = 0",
+                libsql::params![last_stable_pk(site_name)],
+            )
+            .await?;
+        Ok(rows.next().await?.map(|row| {
+            let json: String = row.get(0).unwrap();
+            serde_json::from_str(&json).unwrap()
+        }))
+    }
+
+    pub async fn set_worker_last_stable(
+        &self,
+        site_name: &str,
+        last_stable: &WorkerLastStable,
+    ) -> Result<()> {
+        let conn = self.db.connect()?;
+        conn.execute(
+            "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
+            libsql::params![
+                last_stable_pk(site_name),
+                serde_json::to_string(last_stable).unwrap()
+            ],
         )
         .await?;
         Ok(())

@@ -185,6 +185,17 @@ pub async fn handle_deploy_finish(
                     });
                 }
             }
+            match ctx.doc_db.get_worker_last_stable(site.name()).await {
+                Ok(Some(l)) => {
+                    versions.insert(l.fn0_wasmtime_version);
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    return json_response(500, &ErrorResponse {
+                        error: format!("Failed to read worker-last-stable: {}", e),
+                    });
+                }
+            }
         }
         versions
     };
