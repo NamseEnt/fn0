@@ -258,7 +258,6 @@ class OciComputeWorker extends pulumi.ComponentResource {
             description: "AuthToken for fn0-worker image push",
         }, { parent: this });
         const registryUrl = pulumi.interpolate `ocir.${args.region}.oci.oraclecloud.com`;
-        this.workerImageMultiArch = pulumi.interpolate `${registryUrl}/${workerRepo.namespace}/${workerRepo.displayName}:latest`;
         this.workerImageRegistries = pulumi
             .all([
             registryUrl,

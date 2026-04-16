@@ -4,6 +4,7 @@ export interface HqArgs {
   cwasmBucket: pulumi.Input<CwasmBucketArgs>;
   dnsProvider: pulumi.Input<DnsProviderArg>;
   docDb: pulumi.Input<DocDbArgs>;
+  envEncryptionKeyBase64: pulumi.Input<string>;
   selfDns: pulumi.Input<SelfDnsArgs>;
   sites: pulumi.Input<Array<SiteArgs>>;
 }

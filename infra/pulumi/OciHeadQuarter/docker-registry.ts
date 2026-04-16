@@ -8,10 +8,20 @@ export function createDockerRegistry(
     compartmentId,
     suffix,
     region,
+    sccacheBucket,
+    sccacheRegion,
+    sccacheEndpoint,
+    sccacheAccessKeyId,
+    sccacheSecretAccessKey,
   }: {
     compartmentId: pulumi.Input<string>;
     suffix: pulumi.Input<string>;
     region: pulumi.Input<string>;
+    sccacheBucket: pulumi.Input<string>;
+    sccacheRegion: pulumi.Input<string>;
+    sccacheEndpoint: pulumi.Input<string>;
+    sccacheAccessKeyId: pulumi.Input<string>;
+    sccacheSecretAccessKey: pulumi.Input<string>;
   }
 ): {
   hqImage: dockerBuild.Image;
@@ -90,6 +100,13 @@ export function createDockerRegistry(
         location: "../../hq/Dockerfile",
       },
       platforms: [dockerBuild.Platform.Linux_arm64],
+      buildArgs: {
+        SCCACHE_BUCKET: sccacheBucket,
+        SCCACHE_REGION: sccacheRegion,
+        SCCACHE_ENDPOINT: sccacheEndpoint,
+        AWS_ACCESS_KEY_ID: sccacheAccessKeyId,
+        AWS_SECRET_ACCESS_KEY: sccacheSecretAccessKey,
+      },
       push: true,
       registries: [
         {

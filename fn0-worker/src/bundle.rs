@@ -25,6 +25,7 @@ pub struct BundleFetcher {
     js_cache: BundleCache<String, FromUtf8Error>,
     fn0: Arc<Fn0<BundleCache<String, FromUtf8Error>>>,
     loaded: Mutex<HashMap<String, (u64, u64)>>,
+    env_key: [u8; 32],
 }
 
 impl BundleFetcher {
@@ -35,6 +36,7 @@ impl BundleFetcher {
         wasm_cache: BundleCache<WasmProxyPre, fn0::wasmtime::Error>,
         js_cache: BundleCache<String, FromUtf8Error>,
         fn0: Arc<Fn0<BundleCache<String, FromUtf8Error>>>,
+        env_key: [u8; 32],
     ) -> Self {
         Self {
             s3_client,
@@ -44,6 +46,7 @@ impl BundleFetcher {
             js_cache,
             fn0,
             loaded: Mutex::new(HashMap::new()),
+            env_key,
         }
     }
 
@@ -78,6 +81,7 @@ impl BundleFetcher {
         let mut backend_bytes: Option<Bytes> = None;
         let mut frontend_bytes: Option<Bytes> = None;
         let mut assets: HashMap<String, Vec<u8>> = HashMap::new();
+        let mut env_enc_bytes: Option<Vec<u8>> = None;
 
         let mut archive = tar::Archive::new(tar_bytes.as_slice());
         for entry in archive.entries()? {
@@ -98,6 +102,9 @@ impl BundleFetcher {
                 }
                 "frontend.js" => {
                     frontend_bytes = Some(Bytes::from(buf));
+                }
+                "env.enc" => {
+                    env_enc_bytes = Some(buf);
                 }
                 other if other.starts_with("public/") => {
                     let rel = &other["public/".len()..];
@@ -137,6 +144,19 @@ impl BundleFetcher {
 
         if is_forte {
             self.fn0.set_public_assets(subdomain, assets);
+        }
+
+        match env_enc_bytes {
+            Some(blob) => {
+                let plaintext = crate::env_crypto::decrypt(&self.env_key, &blob)?;
+                let content = String::from_utf8(plaintext)
+                    .map_err(|e| eyre!("env plaintext is not valid utf-8: {e}"))?;
+                let vars = crate::env_crypto::parse_env_file(&content);
+                self.fn0.set_env(subdomain, vars);
+            }
+            None => {
+                self.fn0.clear_env(subdomain);
+            }
         }
 
         self.loaded

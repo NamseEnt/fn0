@@ -3,6 +3,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as oci from "@pulumi/oci";
 import * as cloudflare from "@pulumi/cloudflare";
+import * as random from "@pulumi/random";
 
 const config = new pulumi.Config();
 
@@ -11,6 +12,10 @@ const zoneId = config.require("cloudflareZoneId");
 const domain = config.require("domain");
 
 const suffix = new fn0.Suffix("suffix").result;
+
+const envEncryptionKey = new random.RandomBytes("fn0-env-encryption-key", {
+  length: 32,
+});
 
 const dns = new fn0.CloudflareDns("cloudflare-dns", {
   suffix,
@@ -293,6 +298,12 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   },
   awsAccessKeyId: hqAwsAccessKey.id,
   awsSecretAccessKey: hqAwsAccessKey.secret,
+  envEncryptionKeyBase64: envEncryptionKey.base64,
+  sccacheBucket: sccacheBucket.name,
+  sccacheRegion: sccacheRegion,
+  sccacheEndpoint: sccacheEndpoint,
+  sccacheAccessKeyId: sccacheCustomerKey.id,
+  sccacheSecretAccessKey: sccacheCustomerKey.key,
   selfDnsHostname: `fn0-hq.${domain}`,
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
@@ -323,6 +334,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             AWS_SECRET_ACCESS_KEY: ociComputeWorker.cwasmBucket.secretAccessKey,
             ORIGIN_CERT_PEM: dns.certificate,
             ORIGIN_KEY_PEM: dns.privateKeyPem,
+            FN0_ENV_KEY_BASE64: envEncryptionKey.base64,
           },
           sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
           sshPrivateKeyBase64: ociComputeWorker.sshPrivateKey.apply(

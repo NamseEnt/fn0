@@ -24,7 +24,7 @@ use wasmtime_wasi_http::{
     },
 };
 
-pub type EnvVars = Arc<RwLock<Vec<(String, String)>>>;
+pub type EnvVars = Arc<RwLock<std::collections::HashMap<String, Vec<(String, String)>>>>;
 
 pub struct Job {
     pub req: Request,
@@ -89,9 +89,15 @@ impl WasmExecutor {
         Self { job_tx, env_vars }
     }
 
-    pub fn update_env(&self, new_vars: Vec<(String, String)>) {
+    pub fn set_env(&self, code_id: &str, new_vars: Vec<(String, String)>) {
         if let Ok(mut env) = self.env_vars.write() {
-            *env = new_vars;
+            env.insert(code_id.to_string(), new_vars);
+        }
+    }
+
+    pub fn clear_env(&self, code_id: &str) {
+        if let Ok(mut env) = self.env_vars.write() {
+            env.remove(code_id);
         }
     }
 
@@ -183,9 +189,12 @@ where
     let wasi = {
         let mut builder = WasiCtx::builder();
         builder.inherit_stdio();
-        if let Ok(vars) = env_vars.read() {
-            for (key, value) in vars.iter() {
-                builder.env(key, value);
+        let subdomain = code_id.split("::").next().unwrap_or(&code_id);
+        if let Ok(map) = env_vars.read() {
+            if let Some(vars) = map.get(subdomain) {
+                for (key, value) in vars.iter() {
+                    builder.env(key, value);
+                }
             }
         }
         builder.build()

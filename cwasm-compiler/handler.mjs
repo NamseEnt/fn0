@@ -17,6 +17,8 @@ export const handler = async (event) => {
   const inputKey = event?.input_key;
   const outputBucket = event?.output_bucket;
   const outputKey = event?.output_key;
+  const envBucket = event?.env_bucket;
+  const envKey = event?.env_key;
 
   for (const [name, value] of Object.entries({ inputBucket, inputKey, outputBucket, outputKey })) {
     if (typeof value !== "string" || value.length === 0) {
@@ -32,6 +34,15 @@ export const handler = async (event) => {
   const rawTarBytes = Buffer.from(await obj.Body.transformToByteArray());
 
   const entries = await unpackTar(rawTarBytes);
+
+  let envEncBytes = null;
+  if (typeof envBucket === "string" && envBucket.length > 0 &&
+      typeof envKey === "string" && envKey.length > 0) {
+    const envObj = await s3.send(
+      new GetObjectCommand({ Bucket: envBucket, Key: envKey }),
+    );
+    envEncBytes = Buffer.from(await envObj.Body.transformToByteArray());
+  }
 
   const backendWasm = entries.get("backend.wasm");
   if (!backendWasm) {
@@ -63,6 +74,9 @@ export const handler = async (event) => {
     }
     outputEntries.set("manifest.json", manifest);
     outputEntries.set("backend.cwasm.zst", cwasmZst);
+    if (envEncBytes) {
+      outputEntries.set("env.enc", envEncBytes);
+    }
 
     for (const [name, data] of entries) {
       if (name === "manifest.json" || name === "backend.wasm") continue;

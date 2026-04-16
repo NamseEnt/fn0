@@ -74,6 +74,7 @@ where
             .unwrap()
             .unregister_deployment(code_id);
         self.public_assets.write().unwrap().remove(code_id);
+        self.wasm_executor.clear_env(code_id);
     }
 
     pub fn set_public_assets(&self, code_id: &str, assets: HashMap<String, Vec<u8>>) {
@@ -96,8 +97,12 @@ where
             .insert(code_id.to_string(), Arc::new(converted));
     }
 
-    pub fn update_env(&self, new_vars: Vec<(String, String)>) {
-        self.wasm_executor.update_env(new_vars);
+    pub fn set_env(&self, code_id: &str, new_vars: Vec<(String, String)>) {
+        self.wasm_executor.set_env(code_id, new_vars);
+    }
+
+    pub fn clear_env(&self, code_id: &str) {
+        self.wasm_executor.clear_env(code_id);
     }
 
     pub async fn run(

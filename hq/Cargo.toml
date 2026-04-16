@@ -30,6 +30,8 @@ http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["full"] }
 oci-rust-sdk = { path = "../oci-rust-sdk", features = ["core"] }
 base64 = "0.22.1"
+aes-gcm = "0.10"
+rand = "0.8"
 opentelemetry = { version = "0.31.0", features = ["logs", "metrics"] }
 opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.31.0", features = [

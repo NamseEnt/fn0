@@ -123,7 +123,11 @@ pub async fn get_github_token() -> Result<String> {
     Ok(token)
 }
 
-pub async fn deploy(project_name: &str, bundle_tar_path: &Path) -> Result<()> {
+pub async fn deploy(
+    project_name: &str,
+    bundle_tar_path: &Path,
+    env_content: Option<String>,
+) -> Result<()> {
     let github_token = get_github_token().await?;
 
     let client = reqwest::Client::new();
@@ -165,6 +169,7 @@ pub async fn deploy(project_name: &str, bundle_tar_path: &Path) -> Result<()> {
             "deploy_job_id": start_resp.deploy_job_id,
             "subdomain": start_resp.subdomain,
             "code_id": start_resp.code_id,
+            "env": env_content,
         }))
         .send()
         .await?
@@ -174,6 +179,15 @@ pub async fn deploy(project_name: &str, bundle_tar_path: &Path) -> Result<()> {
     println!("Deploy complete!");
 
     Ok(())
+}
+
+pub fn read_env_content(project_dir: &Path) -> Result<Option<String>> {
+    let env_path = project_dir.join(".env");
+    match std::fs::read_to_string(&env_path) {
+        Ok(content) => Ok(Some(content)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(anyhow!("Failed to read {}: {}", env_path.display(), e)),
+    }
 }
 
 pub fn create_raw_bundle_wasm(wasm_path: &Path, output_path: &Path) -> Result<()> {

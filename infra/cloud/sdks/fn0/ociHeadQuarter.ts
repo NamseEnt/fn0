@@ -58,6 +58,9 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             if (args?.docDbUrl === undefined && !opts.urn) {
                 throw new Error("Missing required property 'docDbUrl'");
             }
+            if (args?.envEncryptionKeyBase64 === undefined && !opts.urn) {
+                throw new Error("Missing required property 'envEncryptionKeyBase64'");
+            }
             if (args?.grafanaRegion === undefined && !opts.urn) {
                 throw new Error("Missing required property 'grafanaRegion'");
             }
@@ -69,6 +72,21 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             }
             if (args?.ociRegion === undefined && !opts.urn) {
                 throw new Error("Missing required property 'ociRegion'");
+            }
+            if (args?.sccacheAccessKeyId === undefined && !opts.urn) {
+                throw new Error("Missing required property 'sccacheAccessKeyId'");
+            }
+            if (args?.sccacheBucket === undefined && !opts.urn) {
+                throw new Error("Missing required property 'sccacheBucket'");
+            }
+            if (args?.sccacheEndpoint === undefined && !opts.urn) {
+                throw new Error("Missing required property 'sccacheEndpoint'");
+            }
+            if (args?.sccacheRegion === undefined && !opts.urn) {
+                throw new Error("Missing required property 'sccacheRegion'");
+            }
+            if (args?.sccacheSecretAccessKey === undefined && !opts.urn) {
+                throw new Error("Missing required property 'sccacheSecretAccessKey'");
             }
             if (args?.selfDnsCloudflareApiToken === undefined && !opts.urn) {
                 throw new Error("Missing required property 'selfDnsCloudflareApiToken'");
@@ -99,10 +117,16 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             resourceInputs["dnsProvider"] = args?.dnsProvider;
             resourceInputs["docDbToken"] = args?.docDbToken;
             resourceInputs["docDbUrl"] = args?.docDbUrl;
+            resourceInputs["envEncryptionKeyBase64"] = args?.envEncryptionKeyBase64;
             resourceInputs["grafanaRegion"] = args?.grafanaRegion;
             resourceInputs["grafanaSlug"] = args?.grafanaSlug;
             resourceInputs["ipv6cidrBlocks"] = args?.ipv6cidrBlocks;
             resourceInputs["ociRegion"] = args?.ociRegion;
+            resourceInputs["sccacheAccessKeyId"] = args?.sccacheAccessKeyId;
+            resourceInputs["sccacheBucket"] = args?.sccacheBucket;
+            resourceInputs["sccacheEndpoint"] = args?.sccacheEndpoint;
+            resourceInputs["sccacheRegion"] = args?.sccacheRegion;
+            resourceInputs["sccacheSecretAccessKey"] = args?.sccacheSecretAccessKey;
             resourceInputs["selfDnsCloudflareApiToken"] = args?.selfDnsCloudflareApiToken;
             resourceInputs["selfDnsCloudflareZoneId"] = args?.selfDnsCloudflareZoneId;
             resourceInputs["selfDnsHostname"] = args?.selfDnsHostname;
@@ -131,10 +155,16 @@ export interface OciHeadQuarterArgs {
     dnsProvider: pulumi.Input<inputs.DnsProviderArgArgs>;
     docDbToken: pulumi.Input<string>;
     docDbUrl: pulumi.Input<string>;
+    envEncryptionKeyBase64: pulumi.Input<string>;
     grafanaRegion: pulumi.Input<string>;
     grafanaSlug: pulumi.Input<string>;
     ipv6cidrBlocks: pulumi.Input<string[]>;
     ociRegion: pulumi.Input<string>;
+    sccacheAccessKeyId: pulumi.Input<string>;
+    sccacheBucket: pulumi.Input<string>;
+    sccacheEndpoint: pulumi.Input<string>;
+    sccacheRegion: pulumi.Input<string>;
+    sccacheSecretAccessKey: pulumi.Input<string>;
     selfDnsCloudflareApiToken: pulumi.Input<string>;
     selfDnsCloudflareZoneId: pulumi.Input<string>;
     selfDnsHostname: pulumi.Input<string>;
