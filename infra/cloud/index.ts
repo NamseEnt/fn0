@@ -208,6 +208,8 @@ new aws.iam.UserPolicy("cwasm-compiler-builder-user-policy", {
               "lambda:CreateFunction",
               "lambda:GetFunction",
               "lambda:UpdateFunctionCode",
+              "lambda:UpdateFunctionConfiguration",
+              "lambda:DeleteFunction",
             ],
             Resource: `arn:aws:lambda:${cwasmCompilerRegion}:${accountId}:function:fn0-cwasm-compiler-*`,
           },

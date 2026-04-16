@@ -95,29 +95,43 @@ docker buildx build \
   --push \
   "$REPO_ROOT"
 
-echo ">> Creating Lambda function"
+ENV_VARS="Variables={BUCKET=${CWASM_BUCKET},XDG_CACHE_HOME=/tmp,HOME=/tmp}"
+
 CREATE_LOG="$(mktemp)"
 trap 'rm -f "$PUBLISH_LOG" "$CREATE_LOG"' EXIT
 
-if aws lambda create-function \
-  --region "$CWASM_REGION" \
-  --function-name "$FUNCTION_NAME" \
-  --package-type Image \
-  --code "ImageUri=${IMAGE_URI}" \
-  --role "$CWASM_ROLE_ARN" \
-  --architectures arm64 \
-  --timeout 60 \
-  --memory-size 10240 \
-  --environment "Variables={BUCKET=${CWASM_BUCKET}}" \
-  >"$CREATE_LOG" 2>&1; then
-  cat "$CREATE_LOG"
-  echo ">> Created Lambda: ${FUNCTION_NAME}"
+if aws lambda get-function --region "$CWASM_REGION" --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then
+  echo ">> Lambda exists; updating code + config"
+  aws lambda update-function-code \
+    --region "$CWASM_REGION" \
+    --function-name "$FUNCTION_NAME" \
+    --image-uri "$IMAGE_URI" \
+    >/dev/null
+  until aws lambda update-function-configuration \
+    --region "$CWASM_REGION" \
+    --function-name "$FUNCTION_NAME" \
+    --environment "$ENV_VARS" \
+    >/dev/null 2>"$CREATE_LOG"; do
+    if ! grep -q "ResourceConflictException" "$CREATE_LOG"; then
+      cat "$CREATE_LOG" >&2
+      exit 1
+    fi
+    echo "   update-function-configuration conflicting (code update still in progress); retry..."
+    sleep 5
+  done
+  echo ">> Updated Lambda: ${FUNCTION_NAME}"
 else
-  if grep -q "ResourceConflictException" "$CREATE_LOG"; then
-    echo "ERROR: Lambda '${FUNCTION_NAME}' already exists for fn0-wasmtime ${VERSION}." >&2
-    echo "       Bump fn0-wasmtime/Cargo.toml version and re-run this script." >&2
-    exit 1
-  fi
-  cat "$CREATE_LOG" >&2
-  exit 1
+  echo ">> Creating Lambda function"
+  aws lambda create-function \
+    --region "$CWASM_REGION" \
+    --function-name "$FUNCTION_NAME" \
+    --package-type Image \
+    --code "ImageUri=${IMAGE_URI}" \
+    --role "$CWASM_ROLE_ARN" \
+    --architectures arm64 \
+    --timeout 60 \
+    --memory-size 10240 \
+    --environment "$ENV_VARS" \
+    >"$CREATE_LOG" 2>&1 || { cat "$CREATE_LOG" >&2; exit 1; }
+  echo ">> Created Lambda: ${FUNCTION_NAME}"
 fi

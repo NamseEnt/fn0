@@ -45,7 +45,15 @@ export const handler = async (event) => {
   let outputBundleBytes;
   try {
     writeFileSync(inputWasmPath, backendWasm);
-    execFileSync(WASMTIME_BIN, ["--zstd", inputWasmPath, outputCwasmZstPath], { stdio: "inherit" });
+    try {
+      execFileSync(WASMTIME_BIN, ["--zstd", inputWasmPath, outputCwasmZstPath], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (err) {
+      const stderr = err.stderr ? err.stderr.toString() : "";
+      const stdout = err.stdout ? err.stdout.toString() : "";
+      throw new Error(`fn0-wasmtime failed (exit=${err.status}): stderr=${stderr} stdout=${stdout}`);
+    }
     const cwasmZst = readFileSync(outputCwasmZstPath);
 
     const outputEntries = new Map();
@@ -120,6 +128,13 @@ async function zstdCompress(bytes, workDir) {
   const inPath = join(workDir, "bundle.tar");
   const outPath = join(workDir, "bundle.tar.zst");
   writeFileSync(inPath, bytes);
-  execFileSync("zstd", ["-q", "-f", inPath, "-o", outPath], { stdio: "inherit" });
+  try {
+    execFileSync("zstd", ["-q", "-f", inPath, "-o", outPath], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString() : "";
+    throw new Error(`zstd failed (exit=${err.status}): ${stderr}`);
+  }
   return readFileSync(outPath);
 }
