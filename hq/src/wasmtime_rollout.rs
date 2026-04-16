@@ -64,6 +64,14 @@ async fn reconcile_site(ctx: &Arc<DeployContext>, site_name: &str) -> color_eyre
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         handles.push(tokio::spawn(async move {
             let _permit = permit;
+            let env_present = ctx
+                .aws_s3_client
+                .head_object()
+                .bucket(&ctx.wasm_bucket)
+                .key(crate::cwasm_compile::env_key(&subdomain))
+                .send()
+                .await
+                .is_ok();
             let result = crate::cwasm_compile::compile_and_publish(
                 &ctx.lambda_client,
                 &ctx.aws_s3_client,
@@ -72,6 +80,7 @@ async fn reconcile_site(ctx: &Arc<DeployContext>, site_name: &str) -> color_eyre
                 &ctx.cwasm_bucket,
                 &version,
                 &subdomain,
+                env_present,
             )
             .await;
             (subdomain, result)

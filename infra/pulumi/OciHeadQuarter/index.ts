@@ -24,6 +24,12 @@ export interface OciHeadQuarterArgs {
   cwasmBucket: pulumi.Input<CwasmBucketArgs>;
   awsAccessKeyId: pulumi.Input<string>;
   awsSecretAccessKey: pulumi.Input<string>;
+  envEncryptionKeyBase64: pulumi.Input<string>;
+  sccacheBucket: pulumi.Input<string>;
+  sccacheRegion: pulumi.Input<string>;
+  sccacheEndpoint: pulumi.Input<string>;
+  sccacheAccessKeyId: pulumi.Input<string>;
+  sccacheSecretAccessKey: pulumi.Input<string>;
   selfDnsHostname: pulumi.Input<string>;
   selfDnsCloudflareZoneId: pulumi.Input<string>;
   selfDnsCloudflareApiToken: pulumi.Input<string>;
@@ -86,6 +92,11 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       compartmentId,
       suffix,
       region: ociRegion,
+      sccacheBucket: args.sccacheBucket,
+      sccacheRegion: args.sccacheRegion,
+      sccacheEndpoint: args.sccacheEndpoint,
+      sccacheAccessKeyId: args.sccacheAccessKeyId,
+      sccacheSecretAccessKey: args.sccacheSecretAccessKey,
     });
 
     deployHqApplication(this, {
@@ -107,6 +118,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           accessKeyId: args.awsAccessKeyId,
           secretAccessKey: args.awsSecretAccessKey,
         },
+        envEncryptionKeyBase64: args.envEncryptionKeyBase64,
         cwasmBucket: args.cwasmBucket,
         selfDns: {
           hostname: args.selfDnsHostname,

@@ -27,6 +27,7 @@ struct DeployFinishRequest {
     github_token: String,
     subdomain: String,
     code_id: u64,
+    env: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -167,6 +168,45 @@ pub async fn handle_deploy_finish(
         Err(e) => return json_response(401, &ErrorResponse { error: e }),
     };
 
+    let env_key = crate::cwasm_compile::env_key(&request.subdomain);
+    let env_present = match &request.env {
+        Some(content) => {
+            let ciphertext = match crate::env_crypto::encrypt(
+                &ctx.env_encryption_key,
+                content.as_bytes(),
+            ) {
+                Ok(c) => c,
+                Err(e) => return json_response(500, &ErrorResponse {
+                    error: format!("env encryption failed: {}", e),
+                }),
+            };
+            if let Err(e) = ctx
+                .aws_s3_client
+                .put_object()
+                .bucket(&ctx.wasm_bucket)
+                .key(&env_key)
+                .body(aws_sdk_s3::primitives::ByteStream::from(ciphertext))
+                .send()
+                .await
+            {
+                return json_response(500, &ErrorResponse {
+                    error: format!("env upload failed: {}", e),
+                });
+            }
+            true
+        }
+        None => {
+            let _ = ctx
+                .aws_s3_client
+                .delete_object()
+                .bucket(&ctx.wasm_bucket)
+                .key(&env_key)
+                .send()
+                .await;
+            false
+        }
+    };
+
     let target_versions: std::collections::BTreeSet<String> = {
         let mut versions = std::collections::BTreeSet::new();
         for site in &ctx.sites {
@@ -209,6 +249,7 @@ pub async fn handle_deploy_finish(
             &ctx.cwasm_bucket,
             version,
             &request.subdomain,
+            env_present,
         )
         .await
         {

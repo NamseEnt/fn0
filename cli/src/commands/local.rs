@@ -29,7 +29,7 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     deployment_map.register_deployment("local", Deployment::Wasm);
 
     let cache = LocalCache::new(wasm_path);
-    let env_vars = std::sync::Arc::new(std::sync::RwLock::new(Vec::new()));
+    let env_vars = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
     let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map, env_vars));
 
     let port = port.unwrap_or(3000);

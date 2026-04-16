@@ -34,6 +34,8 @@ pub struct ServerHandle {
     pub fn0: Arc<Fn0<SimpleCache>>,
 }
 
+pub const DEV_CODE_ID: &str = "app";
+
 pub fn load_env_file(project_root: &Path) -> Vec<(String, String)> {
     let env_path = project_root.join(".env");
     let mut vars = Vec::new();
@@ -57,7 +59,9 @@ pub fn load_env_file(project_root: &Path) -> Vec<(String, String)> {
 }
 
 pub fn create_env_vars(project_root: &Path) -> EnvVars {
-    Arc::new(RwLock::new(load_env_file(project_root)))
+    let mut map = HashMap::new();
+    map.insert(DEV_CODE_ID.to_string(), load_env_file(project_root));
+    Arc::new(RwLock::new(map))
 }
 
 async fn load_public_assets(public_dir: &Path) -> HashMap<String, Vec<u8>> {

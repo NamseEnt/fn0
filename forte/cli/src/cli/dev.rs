@@ -288,7 +288,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
 
     let env_vars = server::create_env_vars(&project_dir);
     {
-        let mut vars = env_vars.write().unwrap();
+        let mut map = env_vars.write().unwrap();
+        let vars = map.entry(server::DEV_CODE_ID.to_string()).or_default();
         if !vars.iter().any(|(k, _)| k == "TURSO_URL") {
             vars.push((
                 "TURSO_URL".to_string(),
@@ -419,7 +420,7 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                 if env_changed {
                     known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
                     let new_vars = server::load_env_file(project_dir);
-                    handle.fn0.update_env(new_vars);
+                    handle.fn0.set_env(server::DEV_CODE_ID, new_vars);
                 }
 
                 if !rs_changes.is_empty() {

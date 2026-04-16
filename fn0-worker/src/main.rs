@@ -2,6 +2,7 @@ mod bundle;
 mod bundle_cache;
 mod bundle_store;
 mod deployments_watcher;
+mod env_crypto;
 mod telemetry;
 
 use bundle::BundleFetcher;
@@ -64,6 +65,10 @@ async fn run() -> Result<()> {
         .parse()
         .expect("HTTP_PORT must be a valid port");
 
+    let env_key_base64 =
+        std::env::var("FN0_ENV_KEY_BASE64").expect("FN0_ENV_KEY_BASE64 is required");
+    let env_key = env_crypto::decode_key_base64(&env_key_base64)?;
+
     let s3_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .region(aws_config::Region::new(s3_region))
         .endpoint_url(&s3_endpoint)
@@ -81,7 +86,7 @@ async fn run() -> Result<()> {
     let js_cache: BundleCache<String, FromUtf8Error> = BundleCache::new(store.clone());
 
     let deployment_map = DeploymentMap::new();
-    let env_vars = Arc::new(RwLock::new(Vec::new()));
+    let env_vars = Arc::new(RwLock::new(std::collections::HashMap::new()));
     let fn0 = Arc::new(Fn0::new(
         wasm_cache.clone(),
         js_cache.clone(),
@@ -96,6 +101,7 @@ async fn run() -> Result<()> {
         wasm_cache,
         js_cache,
         fn0.clone(),
+        env_key,
     ));
 
     let generation = Arc::new(AtomicU64::new(0));

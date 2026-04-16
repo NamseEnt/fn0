@@ -3,6 +3,7 @@ mod args_parse;
 mod cwasm_compile;
 mod deploy;
 mod deployment_cache;
+mod env_crypto;
 mod doc_db;
 mod dns;
 mod dns_sync;

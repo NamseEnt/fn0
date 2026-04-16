@@ -31,7 +31,9 @@ pub async fn run(project_dir: PathBuf, build_on_remote: Option<&str>) -> Result<
 
     fn0_deploy::create_raw_bundle_forte(&dist_dir, &bundle_path)?;
 
-    fn0_deploy::deploy(&project_name, &bundle_path).await?;
+    let env_content = fn0_deploy::read_env_content(&project_dir)?;
+
+    fn0_deploy::deploy(&project_name, &bundle_path, env_content).await?;
 
     Ok(())
 }

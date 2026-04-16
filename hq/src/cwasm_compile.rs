@@ -10,6 +10,8 @@ struct InvokePayload<'a> {
     input_key: &'a str,
     output_bucket: &'a str,
     output_key: &'a str,
+    env_bucket: Option<&'a str>,
+    env_key: Option<&'a str>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -33,6 +35,10 @@ pub fn raw_key(subdomain: &str) -> String {
     format!("bundles/{subdomain}.raw.tar")
 }
 
+pub fn env_key(subdomain: &str) -> String {
+    format!("bundles/{subdomain}.env.enc")
+}
+
 pub fn intermediate_key(fn0_wasmtime_version: &str, subdomain: &str) -> String {
     format!("compiled/{fn0_wasmtime_version}/{subdomain}.tar.zst")
 }
@@ -49,9 +55,13 @@ pub async fn compile_and_publish(
     cwasm_bucket: &str,
     fn0_wasmtime_version: &str,
     subdomain: &str,
+    env_present: bool,
 ) -> Result<()> {
     let input_key = raw_key(subdomain);
     let intermediate_key = intermediate_key(fn0_wasmtime_version, subdomain);
+    let env_key_str = env_key(subdomain);
+    let env_key_opt = if env_present { Some(env_key_str.as_str()) } else { None };
+    let env_bucket_opt = if env_present { Some(wasm_bucket) } else { None };
 
     invoke_compile(
         lambda_client,
@@ -60,6 +70,8 @@ pub async fn compile_and_publish(
         &input_key,
         wasm_bucket,
         &intermediate_key,
+        env_bucket_opt,
+        env_key_opt,
     )
     .await?;
 
@@ -98,6 +110,8 @@ async fn invoke_compile(
     input_key: &str,
     output_bucket: &str,
     output_key: &str,
+    env_bucket: Option<&str>,
+    env_key: Option<&str>,
 ) -> Result<InvokeResult> {
     let function = function_name(fn0_wasmtime_version);
     let payload = InvokePayload {
@@ -105,6 +119,8 @@ async fn invoke_compile(
         input_key,
         output_bucket,
         output_key,
+        env_bucket,
+        env_key,
     };
     let payload_json = serde_json::to_vec(&payload)?;
 

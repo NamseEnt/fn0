@@ -16,7 +16,7 @@ pub async fn execute() -> Result<()> {
     fn0_deploy::create_raw_bundle_wasm(&wasm_path, &bundle_path)
         .map_err(|e| eyre!(e))?;
 
-    fn0_deploy::deploy(&project_name, &bundle_path)
+    fn0_deploy::deploy(&project_name, &bundle_path, None)
         .await
         .map_err(|e| eyre!(e))?;
 

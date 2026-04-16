@@ -49,9 +49,7 @@ struct PipelineError {
 
 #[derive(Deserialize)]
 struct ExecuteResult {
-    #[serde(default)]
     rows: Vec<Vec<serde_json::Value>>,
-    #[serde(default)]
     affected_row_count: u64,
 }
 

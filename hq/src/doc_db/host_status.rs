@@ -41,21 +41,13 @@ pub struct HostStatus {
     pub site_name: String,
     pub addr: String,
     pub dns_addr: Option<String>,
-    #[serde(default)]
     pub generation: Option<u64>,
-    #[serde(default)]
     pub instances: Option<u64>,
-    #[serde(default)]
     pub healthy: bool,
-    #[serde(default)]
     pub consecutive_failures: u32,
-    #[serde(default)]
     pub last_verified_at: Option<String>,
-    #[serde(default)]
     pub graceful: bool,
-    #[serde(default)]
     pub graceful_purpose: Option<GracefulPurpose>,
-    #[serde(default)]
     pub graceful_since_at: Option<String>,
 }
 

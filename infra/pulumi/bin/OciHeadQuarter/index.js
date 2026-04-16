@@ -10,7 +10,7 @@ const hq_deployment_1 = require("./hq-deployment");
 class OciHeadQuarter extends pulumi.ComponentResource {
     constructor(name, args, opts) {
         super("pkg:index:oci-head-quarter", name, args, opts);
-        const { suffix, ociRegion, compartmentId, vcnId, docDbUrl, docDbToken, sites, certificate, } = args;
+        const { suffix, ociRegion, compartmentId, vcnId, docDbUrl, docDbToken, sites, } = args;
         const { regionalSubnet } = (0, networking_1.createNetworking)(this, {
             compartmentId,
             vcnId,
@@ -57,14 +57,14 @@ class OciHeadQuarter extends pulumi.ComponentResource {
                     url: docDbUrl,
                     token: docDbToken,
                 },
-                caCertPem: certificate,
                 aws: {
                     region: args.awsRegion,
                     wasmBucket: args.wasmBucket,
-                    cwasmBucket: args.cwasmBucket,
                     accessKeyId: args.awsAccessKeyId,
                     secretAccessKey: args.awsSecretAccessKey,
                 },
+                envEncryptionKeyBase64: args.envEncryptionKeyBase64,
+                cwasmBucket: args.cwasmBucket,
                 selfDns: {
                     hostname: args.selfDnsHostname,
                     cloudflareZoneId: args.selfDnsCloudflareZoneId,
