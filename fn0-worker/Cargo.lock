@@ -2379,6 +2379,8 @@ dependencies = [
 [[package]]
 name = "fn0"
 version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46c39c023a2dcba386e8decba995fee0cb087d2cfbb3e3a474b3e30686d72834"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2515,6 +2517,8 @@ dependencies = [
 [[package]]
 name = "fn0-wasmtime"
 version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ba569029b64aafd9a2f6989b106b1561876d65008acf0560f391616b96c75ba"
 dependencies = [
  "anyhow",
  "sysinfo",
