@@ -63,6 +63,7 @@ pub struct HostStatus {
 #[serde(rename_all = "snake_case")]
 pub enum GracefulPurpose {
     Terminate,
+    ImageSwap,
 }
 
 fn pk(host_id: &str) -> String {
@@ -186,6 +187,25 @@ impl DocDb {
             )
             .await?;
             Ok(failures)
+        })
+        .await
+    }
+
+    pub async fn clear_host_graceful(&self, host_id: &str) -> Result<()> {
+        with_busy_retry(|| async {
+            let Some(mut s) = self.get_host_status(host_id).await? else {
+                return Ok(());
+            };
+            s.graceful = false;
+            s.graceful_purpose = None;
+            s.graceful_since_at = None;
+            let conn = self.db.connect()?;
+            conn.execute(
+                "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
+                libsql::params![pk(host_id), serde_json::to_string(&s).unwrap()],
+            )
+            .await?;
+            Ok(())
         })
         .await
     }

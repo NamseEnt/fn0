@@ -2,6 +2,7 @@ use super::*;
 use crate::doc_db::{GracefulPurpose, HostStatus};
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
+use tracing::{info, warn};
 
 const DNS_GRACEFUL_REMOVAL_SECS: i64 = 20;
 const DRAIN_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -59,8 +60,58 @@ impl Site {
                 )
                 .await;
             }
+            Some(GracefulPurpose::ImageSwap) => {
+                self.swap_image_on(&s.host_id, &s.addr).await;
+            }
             None => {
                 warn!(host_id = %s.host_id, "Graceful without purpose");
+            }
+        }
+    }
+
+    async fn swap_image_on(&self, host_id: &str, addr: &str) {
+        let target = match self.doc_db.get_worker_target(&self.name).await {
+            Ok(Some(t)) => t,
+            Ok(None) => {
+                warn!(%host_id, "swap_image: no worker-target; clearing graceful");
+                let _ = self
+                    .doc_db
+                    .clear_host_graceful(host_id)
+                    .await
+                    .inspect_err(|err| warn!(%err, %host_id, "clear_graceful failed"));
+                return;
+            }
+            Err(err) => {
+                warn!(%err, %host_id, "swap_image: failed to read worker-target");
+                return;
+            }
+        };
+
+        let envs = self.host_provider.envs().clone();
+        let image = target.image_ref();
+        let script = super::worker_update::build_deploy_script(&image, &envs, &target);
+
+        match self
+            .ssh_pool
+            .exec_with_timeout(addr, &script, crate::ssh_pool::DEPLOY_TIMEOUT)
+            .await
+        {
+            Ok((0, _)) => {
+                info!(%host_id, new_image = %image, "image swap complete");
+                if let Err(err) = self.doc_db.clear_host_graceful(host_id).await {
+                    warn!(%err, %host_id, "clear_graceful failed after swap");
+                }
+            }
+            Ok((code, output)) => {
+                warn!(
+                    %host_id,
+                    exit = code,
+                    output = %output.trim(),
+                    "image swap script non-zero; will retry"
+                );
+            }
+            Err(err) => {
+                warn!(%err, %host_id, "image swap ssh exec failed; will retry");
             }
         }
     }
