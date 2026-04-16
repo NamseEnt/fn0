@@ -78,42 +78,26 @@ impl DocDb {
         dns_addr: Option<&str>,
     ) -> Result<()> {
         with_busy_retry(|| async {
+            let new = HostStatus {
+                host_id: host_id.to_string(),
+                site_name: site_name.to_string(),
+                addr: addr.to_string(),
+                dns_addr: dns_addr.map(|s| s.to_string()),
+                generation: None,
+                instances: None,
+                healthy: false,
+                consecutive_failures: 0,
+                last_verified_at: None,
+                graceful: false,
+                graceful_purpose: None,
+                graceful_since_at: None,
+            };
             let conn = self.db.connect()?;
-            let tx = conn.transaction().await?;
-
-            let existing: Option<String> = tx
-                .query(
-                    "SELECT value FROM docs WHERE pk = ? AND sk = 0",
-                    libsql::params![pk(host_id)],
-                )
-                .await?
-                .next()
-                .await?
-                .and_then(|row| row.get::<String>(0).ok());
-
-            if existing.is_none() {
-                let new = HostStatus {
-                    host_id: host_id.to_string(),
-                    site_name: site_name.to_string(),
-                    addr: addr.to_string(),
-                    dns_addr: dns_addr.map(|s| s.to_string()),
-                    generation: None,
-                    instances: None,
-                    healthy: false,
-                    consecutive_failures: 0,
-                    last_verified_at: None,
-                    graceful: false,
-                    graceful_purpose: None,
-                    graceful_since_at: None,
-                };
-                tx.execute(
-                    "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
-                    libsql::params![pk(host_id), serde_json::to_string(&new).unwrap()],
-                )
-                .await?;
-            }
-
-            tx.commit().await?;
+            conn.execute(
+                "INSERT OR IGNORE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
+                libsql::params![pk(host_id), serde_json::to_string(&new).unwrap()],
+            )
+            .await?;
             Ok(())
         })
         .await
@@ -189,31 +173,18 @@ impl DocDb {
 
     pub async fn mark_host_failed(&self, host_id: &str) -> Result<u32> {
         with_busy_retry(|| async {
-            let conn = self.db.connect()?;
-            let tx = conn.transaction().await?;
-            let existing: Option<String> = tx
-                .query(
-                    "SELECT value FROM docs WHERE pk = ? AND sk = 0",
-                    libsql::params![pk(host_id)],
-                )
-                .await?
-                .next()
-                .await?
-                .and_then(|row| row.get::<String>(0).ok());
-            let Some(json) = existing else {
-                tx.commit().await?;
+            let Some(mut s) = self.get_host_status(host_id).await? else {
                 return Ok(0);
             };
-            let mut s: HostStatus = serde_json::from_str(&json).unwrap();
             s.healthy = false;
             s.consecutive_failures = s.consecutive_failures.saturating_add(1);
             let failures = s.consecutive_failures;
-            tx.execute(
+            let conn = self.db.connect()?;
+            conn.execute(
                 "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
                 libsql::params![pk(host_id), serde_json::to_string(&s).unwrap()],
             )
             .await?;
-            tx.commit().await?;
             Ok(failures)
         })
         .await
@@ -226,35 +197,21 @@ impl DocDb {
         now_rfc3339: &str,
     ) -> Result<bool> {
         with_busy_retry(|| async {
-            let conn = self.db.connect()?;
-            let tx = conn.transaction().await?;
-            let existing: Option<String> = tx
-                .query(
-                    "SELECT value FROM docs WHERE pk = ? AND sk = 0",
-                    libsql::params![pk(host_id)],
-                )
-                .await?
-                .next()
-                .await?
-                .and_then(|row| row.get::<String>(0).ok());
-            let Some(json) = existing else {
-                tx.commit().await?;
+            let Some(mut s) = self.get_host_status(host_id).await? else {
                 return Ok(false);
             };
-            let mut s: HostStatus = serde_json::from_str(&json).unwrap();
             if s.graceful {
-                tx.commit().await?;
                 return Ok(false);
             }
             s.graceful = true;
             s.graceful_purpose = Some(purpose);
             s.graceful_since_at = Some(now_rfc3339.to_string());
-            tx.execute(
+            let conn = self.db.connect()?;
+            conn.execute(
                 "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
                 libsql::params![pk(host_id), serde_json::to_string(&s).unwrap()],
             )
             .await?;
-            tx.commit().await?;
             Ok(true)
         })
         .await

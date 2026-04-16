@@ -49,6 +49,15 @@ struct DeployStatusResponse {
     hosts_at_target: usize,
     hosts_pending: Vec<String>,
     hosts_quarantined: Vec<String>,
+    sites: Vec<SiteStatus>,
+}
+
+#[derive(Serialize)]
+struct SiteStatus {
+    name: String,
+    target_fn0_wasmtime_version: Option<String>,
+    ready_fn0_wasmtime_version: Option<String>,
+    wasmtime_synced: bool,
 }
 
 fn json_response<T: Serialize>(status: u16, body: &T) -> Response<Full<Bytes>> {
@@ -298,8 +307,45 @@ pub async fn handle_deploy_status(
     let mut hosts_at_target = 0usize;
     let mut hosts_pending: Vec<String> = Vec::new();
     let mut hosts_quarantined: Vec<String> = Vec::new();
+    let mut sites: Vec<SiteStatus> = Vec::new();
+    let mut all_sites_synced = true;
 
     for site in &ctx.sites {
+        let target = match ctx.doc_db.get_worker_target(site.name()).await {
+            Ok(t) => t,
+            Err(e) => {
+                return json_response(500, &ErrorResponse {
+                    error: format!("Failed to read worker-target: {}", e),
+                });
+            }
+        };
+        let ready = match ctx.doc_db.get_cwasm_ready(site.name()).await {
+            Ok(r) => r,
+            Err(e) => {
+                return json_response(500, &ErrorResponse {
+                    error: format!("Failed to read cwasm-ready: {}", e),
+                });
+            }
+        };
+
+        let target_ver = target.as_ref().map(|t| t.fn0_wasmtime_version.clone());
+        let ready_ver = ready.as_ref().map(|r| r.fn0_wasmtime_version.clone());
+        let wasmtime_synced = match (&target_ver, &ready_ver) {
+            (Some(t), Some(r)) => t == r,
+            (None, _) => true,
+            (Some(_), None) => false,
+        };
+        if !wasmtime_synced {
+            all_sites_synced = false;
+        }
+
+        sites.push(SiteStatus {
+            name: site.name().to_string(),
+            target_fn0_wasmtime_version: target_ver,
+            ready_fn0_wasmtime_version: ready_ver,
+            wasmtime_synced,
+        });
+
         match ctx.doc_db.list_host_statuses(site.name()).await {
             Ok(statuses) => {
                 for s in statuses {
@@ -322,8 +368,10 @@ pub async fn handle_deploy_status(
         }
     }
 
-    let delivered =
-        hosts_total > 0 && hosts_total == hosts_at_target && hosts_quarantined.is_empty();
+    let delivered = hosts_total > 0
+        && hosts_total == hosts_at_target
+        && hosts_quarantined.is_empty()
+        && all_sites_synced;
 
     json_response(200, &DeployStatusResponse {
         latest_generation,
@@ -333,6 +381,7 @@ pub async fn handle_deploy_status(
         hosts_at_target,
         hosts_pending,
         hosts_quarantined,
+        sites,
     })
 }
 

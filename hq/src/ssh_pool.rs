@@ -6,7 +6,8 @@ use tokio::time::timeout;
 
 use crate::ssh::SshClient;
 
-const EXEC_TIMEOUT: Duration = Duration::from_secs(90);
+pub const STATUS_TIMEOUT: Duration = Duration::from_secs(5);
+pub const DEPLOY_TIMEOUT: Duration = Duration::from_secs(90);
 
 #[derive(Clone)]
 pub struct SshPool {
@@ -31,9 +32,18 @@ impl SshPool {
     }
 
     pub async fn exec(&self, addr: &str, command: &str) -> Result<(i32, String)> {
+        self.exec_with_timeout(addr, command, STATUS_TIMEOUT).await
+    }
+
+    pub async fn exec_with_timeout(
+        &self,
+        addr: &str,
+        command: &str,
+        t: Duration,
+    ) -> Result<(i32, String)> {
         let client = self.get_or_connect(addr).await?;
         let exec_fut = client.exec(command);
-        match timeout(EXEC_TIMEOUT, exec_fut).await {
+        match timeout(t, exec_fut).await {
             Ok(Ok(result)) => Ok(result),
             Ok(Err(err)) => {
                 self.invalidate(addr);
@@ -41,7 +51,7 @@ impl SshPool {
             }
             Err(_) => {
                 self.invalidate(addr);
-                Err(eyre!("SSH exec timed out after {:?} on {}", EXEC_TIMEOUT, addr))
+                Err(eyre!("SSH exec timed out after {:?} on {}", t, addr))
             }
         }
     }
