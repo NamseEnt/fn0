@@ -18,7 +18,7 @@ bytes = "1"
 http-body-util = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 dirs = "6"
-fn0-deploy = { version = "0.1", path = "../fn0-deploy" }
+fn0-deploy = { version = "=0.1.2", path = "../fn0-deploy" }
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
 tower = { workspace = true, features = ["util"] }
