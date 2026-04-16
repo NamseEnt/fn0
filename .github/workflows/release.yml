@@ -131,6 +131,27 @@ jobs:
         uses: "Swatinem/rust-cache@v2"
         with:
           "workspaces": "forte/cli -> target"
+      - name: "Install Pulumi CLI"
+        uses: "pulumi/setup-pulumi@v2"
+      - name: "Fetch sccache config from Pulumi"
+        run: |
+          cd infra/cloud
+          OUT="$(pulumi stack output --show-secrets --json --stack prod)"
+          pick() { echo "$OUT" | jq -r ".${1}"; }
+          {
+            echo "RUSTC_WRAPPER=sccache"
+            echo "SCCACHE_S3_USE_SSL=true"
+            echo "SCCACHE_BUCKET=$(pick sccacheBucketName)"
+            echo "SCCACHE_REGION=$(pick sccacheBucketRegion)"
+            echo "SCCACHE_ENDPOINT=$(pick sccacheBucketEndpoint)"
+            echo "AWS_ACCESS_KEY_ID=$(pick sccacheAccessKeyId)"
+            echo "AWS_SECRET_ACCESS_KEY=$(pick sccacheSecretAccessKey)"
+          } >> "$GITHUB_ENV"
+        shell: "bash"
+        env:
+          "PULUMI_ACCESS_TOKEN": "${{ secrets.PULUMI_ACCESS_TOKEN }}"
+      - name: "Install sccache"
+        uses: "mozilla-actions/sccache-action@v0.0.6"
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest
