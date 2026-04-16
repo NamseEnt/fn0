@@ -115,7 +115,9 @@ async fn reconcile_one(
     );
 
     let script = build_deploy_script(desired_image_ref, desired_envs, target);
-    let (code, output) = ssh_pool.exec(addr, &script).await?;
+    let (code, output) = ssh_pool
+        .exec_with_timeout(addr, &script, crate::ssh_pool::DEPLOY_TIMEOUT)
+        .await?;
     if code != 0 {
         return Err(color_eyre::eyre::eyre!(
             "deploy_worker failed on {addr} (exit {code}): {}",
