@@ -32,6 +32,20 @@ struct DeployStartResponse {
     code_id: u64,
 }
 
+#[derive(Deserialize)]
+struct DeployFinishResponse {
+    generation: u64,
+}
+
+#[derive(Deserialize)]
+struct DeployStatusResponse {
+    delivered: bool,
+    hosts_total: usize,
+    hosts_at_target: usize,
+    hosts_pending: Vec<String>,
+    hosts_quarantined: Vec<String>,
+}
+
 fn credentials_path() -> Result<PathBuf> {
     let home = std::env::var("HOME").map_err(|_| anyhow!("Cannot find HOME directory"))?;
     Ok(PathBuf::from(home).join(".fn0").join("credentials"))
@@ -162,7 +176,7 @@ pub async fn deploy(
         .map_err(|e| anyhow!("Bundle upload failed: {}", e))?;
 
     println!("Requesting deploy finish...");
-    client
+    let finish_resp: DeployFinishResponse = client
         .post(format!("{}/deploy/finish", HQ_URL))
         .json(&serde_json::json!({
             "github_token": github_token,
@@ -174,7 +188,54 @@ pub async fn deploy(
         .send()
         .await?
         .error_for_status()
-        .map_err(|e| anyhow!("Deploy finish failed: {}", e))?;
+        .map_err(|e| anyhow!("Deploy finish failed: {}", e))?
+        .json()
+        .await?;
+
+    println!(
+        "Waiting for rollout to all workers (generation {})...",
+        finish_resp.generation
+    );
+
+    let poll_interval = std::time::Duration::from_secs(2);
+    let timeout = std::time::Duration::from_secs(300);
+    let start = std::time::Instant::now();
+    let mut last_progress: Option<(usize, usize)> = None;
+
+    loop {
+        let status: DeployStatusResponse = client
+            .get(format!(
+                "{}/deploy/status?generation={}",
+                HQ_URL, finish_resp.generation
+            ))
+            .send()
+            .await?
+            .error_for_status()
+            .map_err(|e| anyhow!("Deploy status failed: {}", e))?
+            .json()
+            .await?;
+
+        let progress = (status.hosts_at_target, status.hosts_total);
+        if last_progress != Some(progress) {
+            println!("  {}/{} hosts ready", progress.0, progress.1);
+            last_progress = Some(progress);
+        }
+
+        if status.delivered {
+            break;
+        }
+
+        if start.elapsed() > timeout {
+            return Err(anyhow!(
+                "Deploy rollout timed out after {}s. pending={:?} quarantined={:?}",
+                timeout.as_secs(),
+                status.hosts_pending,
+                status.hosts_quarantined
+            ));
+        }
+
+        tokio::time::sleep(poll_interval).await;
+    }
 
     println!("Deploy complete!");
 
