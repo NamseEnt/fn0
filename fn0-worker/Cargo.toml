@@ -1,6 +1,6 @@
 [package]
 name = "fn0-worker"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 description = "Worker binary for the fn0 FaaS platform"
 license = "AGPL-3.0-only"
@@ -10,7 +10,7 @@ repository = "https://github.com/NamseEnt/fn0"
 debug = true
 
 [dependencies]
-fn0 = "=0.2.9"
+fn0 = "=0.2.10"
 adapt-cache = { package = "fn0-adapt-cache", version = "0.1.2" }
 futures = "0.3"
 aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }

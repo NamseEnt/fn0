@@ -5,7 +5,7 @@ use std::{env, fs, path::Path};
 pub fn generate_routes() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let pages_dir = Path::new(&manifest_dir).join("src/pages");
-    let api_dir = Path::new(&manifest_dir).join("src/api");
+    let apis_dir = Path::new(&manifest_dir).join("src/apis");
     let hooks_dir = Path::new(&manifest_dir).join("src/hooks");
     let actions_dir = Path::new(&manifest_dir).join("src/actions");
     let queue_task_dir = Path::new(&manifest_dir).join("src/queue_task");
@@ -13,13 +13,13 @@ pub fn generate_routes() {
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
     println!("cargo:rerun-if-changed=src/pages");
-    println!("cargo:rerun-if-changed=src/api");
+    println!("cargo:rerun-if-changed=src/apis");
     println!("cargo:rerun-if-changed=src/hooks");
     println!("cargo:rerun-if-changed=src/actions");
     println!("cargo:rerun-if-changed=src/queue_task");
 
     let mut pages = discover_pages(&pages_dir);
-    pages.extend(discover_api(&api_dir));
+    pages.extend(discover_apis(&apis_dir));
     let hooks = discover_hooks(&hooks_dir);
     let actions = discover_actions(&actions_dir);
     let queue_tasks = discover_queue_tasks(&queue_task_dir);
@@ -455,16 +455,16 @@ fn discover_pages(pages_dir: &Path) -> Vec<PageInfo> {
     pages
 }
 
-fn discover_api(api_dir: &Path) -> Vec<PageInfo> {
+fn discover_apis(apis_dir: &Path) -> Vec<PageInfo> {
     let mut endpoints = Vec::new();
-    if !api_dir.exists() {
+    if !apis_dir.exists() {
         return endpoints;
     }
     discover_endpoints_recursive(
-        api_dir,
-        api_dir,
+        apis_dir,
+        apis_dir,
         &mut endpoints,
-        "api",
+        "apis",
         &["api".to_string()],
         true,
     );
