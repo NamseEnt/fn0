@@ -259,6 +259,12 @@ pub async fn handle_deploy_finish(
         }
     }
 
+    if let Err(e) = crate::turso_admin::ensure_database(&ctx.forte_db, &request.subdomain).await {
+        return json_response(500, &ErrorResponse {
+            error: format!("Failed to ensure forte-db database: {}", e),
+        });
+    }
+
     let code_version = match ctx.doc_db.next_code_version(request.code_id).await {
         Ok(v) => v,
         Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get next version: {}", e) }),

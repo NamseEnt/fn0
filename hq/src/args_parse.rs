@@ -24,6 +24,7 @@ pub struct DeployContext {
     pub deployment_cache: DeploymentCache,
     pub sites: Vec<Site>,
     pub env_encryption_key: [u8; 32],
+    pub forte_db: crate::args::ForteDbArgs,
 }
 
 pub struct HqArgsParsed {
@@ -117,6 +118,7 @@ impl HqArgs {
             deployment_cache: deployment_cache.clone(),
             sites: sites.clone(),
             env_encryption_key,
+            forte_db: args.forte_db,
         });
 
         let dns_provider = match args.dns_provider {

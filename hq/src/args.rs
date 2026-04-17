@@ -5,11 +5,22 @@ use std::{collections::BTreeMap, num::NonZeroUsize};
 pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
     pub doc_db: DocDbArgs,
+    pub forte_db: ForteDbArgs,
     pub aws: AwsArgs,
     pub cwasm_bucket: CwasmBucketArgs,
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,
     pub env_encryption_key_base64: String,
+}
+
+#[derive(Clone, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ForteDbArgs {
+    pub api_token: String,
+    pub organization_slug: String,
+    pub group_name: String,
+    pub location: String,
+    pub host_suffix: String,
 }
 
 #[derive(Clone, serde::Deserialize, schemars::JsonSchema)]

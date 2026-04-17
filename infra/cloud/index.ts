@@ -35,6 +35,17 @@ const docDb = new fn0.TursoDocDb("doc-db", {
   location: config.require("tursoLocation"),
 });
 
+const forteDb = new fn0.ForteDb(
+  "forte-db",
+  {
+    organizationSlug: config.require("tursoOrganizationSlug"),
+    location: config.require("tursoLocation"),
+  },
+  {}
+);
+
+const tursoApiToken = config.requireSecret("tursoApiToken");
+
 const sccacheRegion = config.require("ociHeadQuarterRegion");
 
 const sccacheCompartment = new oci.identity.Compartment("sccache-compartment", {
@@ -287,6 +298,13 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   grafanaRegion: config.require("grafanaRegion"),
   docDbUrl: docDb.url,
   docDbToken: docDb.token,
+  forteDb: {
+    apiToken: tursoApiToken,
+    organizationSlug: config.require("tursoOrganizationSlug"),
+    groupName: forteDb.groupName,
+    location: config.require("tursoLocation"),
+    hostSuffix: forteDb.hostSuffix,
+  },
   awsRegion: cwasmCompilerRegion,
   wasmBucket: cwasmCompilerBucketR.bucket,
   cwasmBucket: {
@@ -335,6 +353,8 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             ORIGIN_CERT_PEM: dns.certificate,
             ORIGIN_KEY_PEM: dns.privateKeyPem,
             FN0_ENV_KEY_BASE64: envEncryptionKey.base64,
+            TURSO_GROUP_TOKEN: forteDb.groupToken,
+            TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
           },
           sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
           sshPrivateKeyBase64: ociComputeWorker.sshPrivateKey.apply(

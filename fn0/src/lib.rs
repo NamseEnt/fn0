@@ -2,9 +2,14 @@ mod deployment;
 pub mod execute;
 mod forte_fetch;
 pub mod measure_cpu_time;
+pub mod outbound;
 pub mod queue_poller;
 pub mod telemetry;
+mod turso_stats;
+mod turso_tee;
 pub mod turso_queue;
+
+pub use outbound::{SharedHttpClient, TursoHijack};
 
 use adapt_cache::AdaptCache;
 use anyhow::*;
@@ -49,14 +54,27 @@ impl<J> Fn0<J>
 where
     J: AdaptCache<String, FromUtf8Error> + Send + Sync + 'static,
 {
-    pub fn new<W>(wasm_proxy_cache: W, js_cache: J, deployment_map: DeploymentMap, env_vars: EnvVars) -> Self
+    pub fn new<W>(
+        wasm_proxy_cache: W,
+        js_cache: J,
+        deployment_map: DeploymentMap,
+        env_vars: EnvVars,
+        shared_client: SharedHttpClient,
+        turso_hijack: Option<Arc<TursoHijack>>,
+    ) -> Self
     where
         W: AdaptCache<ProxyPre<ClientState<SystemClock>>, wasmtime::Error>,
     {
         Self {
             js_cache,
             deployment_map: RwLock::new(deployment_map),
-            wasm_executor: WasmExecutor::new(wasm_proxy_cache, SystemClock, env_vars),
+            wasm_executor: WasmExecutor::new(
+                wasm_proxy_cache,
+                SystemClock,
+                env_vars,
+                shared_client,
+                turso_hijack,
+            ),
             public_assets: RwLock::new(HashMap::new()),
         }
     }

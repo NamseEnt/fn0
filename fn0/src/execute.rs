@@ -92,7 +92,11 @@ use wasmtime_wasi_http::{
         ProxyPre,
         http::types::{ErrorCode, Scheme},
     },
+    body::HyperOutgoingBody,
+    types::{HostFutureIncomingResponse, OutgoingRequestConfig},
 };
+
+use crate::outbound::{OutboundContext, SharedHttpClient, TursoHijack};
 
 pub type EnvVars = Arc<RwLock<std::collections::HashMap<String, Vec<(String, String)>>>>;
 
@@ -108,7 +112,13 @@ pub struct WasmExecutor {
 }
 
 impl WasmExecutor {
-    pub fn new<A, C>(proxy_cache: A, clock: C, env_vars: EnvVars) -> Self
+    pub fn new<A, C>(
+        proxy_cache: A,
+        clock: C,
+        env_vars: EnvVars,
+        shared_client: SharedHttpClient,
+        turso_hijack: Option<Arc<TursoHijack>>,
+    ) -> Self
     where
         A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
         C: Clock,
@@ -143,9 +153,21 @@ impl WasmExecutor {
                                     let linker = linker.clone();
                                     let clock = clock.clone();
                                     let env_vars = env_vars.clone();
+                                    let shared_client = shared_client.clone();
+                                    let turso_hijack = turso_hijack.clone();
 
                                     tokio::spawn(async move {
-                                        run_job(job, proxy_cache, engine, linker, clock, env_vars).await;
+                                        run_job(
+                                            job,
+                                            proxy_cache,
+                                            engine,
+                                            linker,
+                                            clock,
+                                            env_vars,
+                                            shared_client,
+                                            turso_hijack,
+                                        )
+                                        .await;
                                     });
                                 },
                                 None => break,
@@ -197,6 +219,8 @@ async fn run_job<A, C>(
     linker: Linker<ClientState<C>>,
     clock: C,
     env_vars: EnvVars,
+    shared_client: SharedHttpClient,
+    turso_hijack: Option<Arc<TursoHijack>>,
 ) where
     A: AdaptCache<ProxyPre<ClientState<C>>, wasmtime::Error>,
     C: Clock,
@@ -209,7 +233,16 @@ async fn run_job<A, C>(
         }
     };
 
-    let result = handle_request(proxy_pre, job.req, job.code_id, clock, env_vars).await;
+    let result = handle_request(
+        proxy_pre,
+        job.req,
+        job.code_id,
+        clock,
+        env_vars,
+        shared_client,
+        turso_hijack,
+    )
+    .await;
 
     let _ = job.res_tx.send(result);
 }
@@ -249,6 +282,8 @@ async fn handle_request<C>(
     code_id: String,
     clock: C,
     env_vars: EnvVars,
+    shared_client: SharedHttpClient,
+    turso_hijack: Option<Arc<TursoHijack>>,
 ) -> Result<Response>
 where
     C: Clock + Send + 'static,
@@ -264,9 +299,18 @@ where
         if let Ok(map) = env_vars.read() {
             if let Some(vars) = map.get(subdomain) {
                 for (key, value) in vars.iter() {
+                    if turso_hijack.is_some()
+                        && (key == "TURSO_URL" || key == "TURSO_AUTH_TOKEN")
+                    {
+                        continue;
+                    }
                     builder.env(key, value);
                 }
             }
+        }
+        if let Some(hijack) = turso_hijack.as_ref() {
+            builder.env("TURSO_URL", format!("http://{}", hijack.placeholder_host));
+            builder.env("TURSO_AUTH_TOKEN", "");
         }
         builder.build()
     };
@@ -280,6 +324,8 @@ where
             time_tracker: time_tracker.clone(),
             code_id: code_id.clone(),
             is_timeout: is_timeout.clone(),
+            shared_client,
+            turso_hijack,
         },
     );
     store.epoch_deadline_trap();
@@ -405,6 +451,8 @@ pub struct ClientState<C: Clock> {
     time_tracker: TimeTracker<C>,
     code_id: String,
     is_timeout: Arc<AtomicBool>,
+    shared_client: SharedHttpClient,
+    turso_hijack: Option<Arc<TursoHijack>>,
 }
 
 impl<C: Clock> WasiView for ClientState<C> {
@@ -423,5 +471,18 @@ impl<C: Clock> WasiHttpView for ClientState<C> {
 
     fn table(&mut self) -> &mut ResourceTable {
         &mut self.table
+    }
+
+    fn send_request(
+        &mut self,
+        request: hyper::Request<HyperOutgoingBody>,
+        config: OutgoingRequestConfig,
+    ) -> wasmtime_wasi_http::HttpResult<HostFutureIncomingResponse> {
+        let ctx = OutboundContext {
+            shared_client: self.shared_client.clone(),
+            turso_hijack: self.turso_hijack.clone(),
+            code_id: self.code_id.clone(),
+        };
+        Ok(crate::outbound::send_request(ctx, request, config))
     }
 }
