@@ -106,7 +106,11 @@ export function hqGrafana(
         },
         collectors: {
           "alloy-receiver": {
-            alloy: {},
+            alloy: {
+              clustering: {
+                enabled: true,
+              },
+            },
           },
           "alloy-logs": {
             alloy: {

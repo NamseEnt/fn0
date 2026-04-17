@@ -44,7 +44,7 @@ const forteDb = new fn0.ForteDb(
   {}
 );
 
-const tursoApiToken = config.requireSecret("tursoApiToken");
+const tursoApiToken = new pulumi.Config("turso").requireSecret("apiToken");
 
 const sccacheRegion = config.require("ociHeadQuarterRegion");
 

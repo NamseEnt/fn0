@@ -61,6 +61,9 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             if (args?.envEncryptionKeyBase64 === undefined && !opts.urn) {
                 throw new Error("Missing required property 'envEncryptionKeyBase64'");
             }
+            if (args?.forteDb === undefined && !opts.urn) {
+                throw new Error("Missing required property 'forteDb'");
+            }
             if (args?.grafanaRegion === undefined && !opts.urn) {
                 throw new Error("Missing required property 'grafanaRegion'");
             }
@@ -118,6 +121,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
             resourceInputs["docDbToken"] = args?.docDbToken;
             resourceInputs["docDbUrl"] = args?.docDbUrl;
             resourceInputs["envEncryptionKeyBase64"] = args?.envEncryptionKeyBase64;
+            resourceInputs["forteDb"] = args?.forteDb;
             resourceInputs["grafanaRegion"] = args?.grafanaRegion;
             resourceInputs["grafanaSlug"] = args?.grafanaSlug;
             resourceInputs["ipv6cidrBlocks"] = args?.ipv6cidrBlocks;
@@ -156,6 +160,7 @@ export interface OciHeadQuarterArgs {
     docDbToken: pulumi.Input<string>;
     docDbUrl: pulumi.Input<string>;
     envEncryptionKeyBase64: pulumi.Input<string>;
+    forteDb: pulumi.Input<inputs.ForteDbArgsArgs>;
     grafanaRegion: pulumi.Input<string>;
     grafanaSlug: pulumi.Input<string>;
     ipv6cidrBlocks: pulumi.Input<string[]>;

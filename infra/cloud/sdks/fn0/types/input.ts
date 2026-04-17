@@ -23,6 +23,14 @@ export interface DnsProviderArgArgs {
     cloudflare?: pulumi.Input<inputs.CloudflareDnsProviderArgsArgs>;
 }
 
+export interface ForteDbArgsArgs {
+    apiToken: pulumi.Input<string>;
+    groupName: pulumi.Input<string>;
+    hostSuffix: pulumi.Input<string>;
+    location: pulumi.Input<string>;
+    organizationSlug: pulumi.Input<string>;
+}
+
 export interface HostProviderArgArgs {
     ociComputeVm?: pulumi.Input<inputs.OciComputeVmHostProviderArgsArgs>;
 }
