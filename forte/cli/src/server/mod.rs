@@ -91,12 +91,7 @@ async fn load_public_assets(public_dir: &Path) -> HashMap<String, Vec<u8>> {
 
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let mut deployment_map = DeploymentMap::new();
-    deployment_map.register_deployment(
-        "app",
-        Deployment::Forte {
-            frontend_script_path: config.frontend_path.clone(),
-        },
-    );
+    deployment_map.register_deployment("app", Deployment::Forte);
 
     let cache = SimpleCache::new(config.backend_path.clone(), config.frontend_path.clone());
 

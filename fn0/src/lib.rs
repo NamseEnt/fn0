@@ -125,8 +125,8 @@ where
 
         let result = match deployment {
             Deployment::Wasm => self.wasm_executor.run(&format!("{code_id}::backend"), request).await,
-            Deployment::Forte { frontend_script_path } => {
-                self.run_forte(code_id, &frontend_script_path, request, fetch_handler)
+            Deployment::Forte => {
+                self.run_forte(code_id, request, fetch_handler)
                     .await
             }
         };
@@ -161,7 +161,6 @@ where
     async fn run_forte(
         self: &Arc<Self>,
         code_id: &str,
-        frontend_script_path: &str,
         request: Request,
         _fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
@@ -217,7 +216,7 @@ where
 
         let mut ssr_response = ski::run(
             &js_code,
-            frontend_script_path,
+            "/frontend.js",
             frontend_request,
             Some(handler.clone()),
         )
