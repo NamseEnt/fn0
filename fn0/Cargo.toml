@@ -1,6 +1,6 @@
 [package]
 name = "fn0"
-version = "0.2.10"
+version = "0.2.11"
 edition = "2024"
 description = "FaaS platform powered by wasmtime"
 license = "AGPL-3.0-only"

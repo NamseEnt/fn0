@@ -10,12 +10,82 @@ use std::{
     },
     time::Duration,
 };
+use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::io::AsyncWrite;
 use tokio::sync::{mpsc::Sender, oneshot};
 use wasmtime::{
     Engine, Store,
     component::{Component, Linker},
 };
+use wasmtime_wasi::cli::AsyncStdoutStream;
 use wasmtime_wasi::*;
+
+struct TracingWriter {
+    code_id: String,
+    is_stderr: bool,
+    buf: Vec<u8>,
+}
+
+impl TracingWriter {
+    fn new(code_id: String, is_stderr: bool) -> Self {
+        Self {
+            code_id,
+            is_stderr,
+            buf: Vec::with_capacity(1024),
+        }
+    }
+
+    fn emit_line(&self, line: &str) {
+        if self.is_stderr {
+            tracing::error!(code_id = %self.code_id, stream = "stderr", "{}", line);
+        } else {
+            tracing::info!(code_id = %self.code_id, stream = "stdout", "{}", line);
+        }
+    }
+}
+
+impl AsyncWrite for TracingWriter {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = Pin::get_mut(self);
+        this.buf.extend_from_slice(buf);
+        while let Some(pos) = this.buf.iter().position(|&b| b == b'\n') {
+            let line: Vec<u8> = this.buf.drain(..=pos).collect();
+            let line_str = String::from_utf8_lossy(&line[..line.len() - 1]);
+            let trimmed = line_str.trim_end_matches('\r');
+            if !trimmed.is_empty() {
+                this.emit_line(trimmed);
+            }
+        }
+        Poll::Ready(Ok(buf.len()))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let this = Pin::get_mut(self);
+        if !this.buf.is_empty() {
+            let line_str = String::from_utf8_lossy(&this.buf);
+            let trimmed = line_str.trim_end_matches(|c| c == '\r' || c == '\n');
+            if !trimmed.is_empty() {
+                this.emit_line(trimmed);
+            }
+            this.buf.clear();
+        }
+        Poll::Ready(Ok(()))
+    }
+}
+
+fn make_tracing_stream(code_id: String, is_stderr: bool) -> AsyncStdoutStream {
+    AsyncStdoutStream::new(4096, TracingWriter::new(code_id, is_stderr))
+}
 use wasmtime_wasi_http::{
     WasiHttpCtx, WasiHttpView,
     bindings::{
@@ -188,7 +258,8 @@ where
 
     let wasi = {
         let mut builder = WasiCtx::builder();
-        builder.inherit_stdio();
+        builder.stdout(make_tracing_stream(code_id.clone(), false));
+        builder.stderr(make_tracing_stream(code_id.clone(), true));
         let subdomain = code_id.split("::").next().unwrap_or(&code_id);
         if let Ok(map) = env_vars.read() {
             if let Some(vars) = map.get(subdomain) {
