@@ -10,7 +10,7 @@ use bundle_cache::BundleCache;
 use bundle_store::BundleStore;
 use bytes::Bytes;
 use color_eyre::eyre::Result;
-use fn0::{DeploymentMap, Fn0, WasmProxyPre};
+use fn0::{DeploymentMap, Fn0, SharedHttpClient, TursoHijack, WasmProxyPre};
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::server::conn::http1;
@@ -87,11 +87,35 @@ async fn run() -> Result<()> {
 
     let deployment_map = DeploymentMap::new();
     let env_vars = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+    let shared_client = SharedHttpClient::new();
+    let turso_hijack = match (
+        std::env::var("TURSO_GROUP_TOKEN").ok(),
+        std::env::var("TURSO_DB_HOST_SUFFIX").ok(),
+    ) {
+        (Some(group_token), Some(target_host_suffix)) if !group_token.is_empty() => {
+            Some(Arc::new(TursoHijack {
+                placeholder_host: std::env::var("TURSO_PLACEHOLDER_HOST")
+                    .unwrap_or_else(|_| "forte-db.fn0.dev".to_string()),
+                target_host_suffix,
+                group_token,
+            }))
+        }
+        _ => {
+            tracing::warn!(
+                "TURSO_GROUP_TOKEN or TURSO_DB_HOST_SUFFIX not set; Turso hijack disabled"
+            );
+            None
+        }
+    };
+
     let fn0 = Arc::new(Fn0::new(
         wasm_cache.clone(),
         js_cache.clone(),
         deployment_map,
         env_vars,
+        shared_client,
+        turso_hijack,
     ));
 
     let bundle_fetcher = Arc::new(BundleFetcher::new(

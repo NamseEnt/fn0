@@ -2200,6 +2200,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "duplicate"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e92f10a49176cbffacaedabfaa11d51db1ea0f80a83c26e1873b43cd1742c24"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+]
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2378,19 +2389,19 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d35a69470a8336e088424e191dc670fa860f2b9883486e243bf18ad2f52d3664"
+version = "0.2.12"
 dependencies = [
  "anyhow",
  "bytes",
  "chrono",
+ "crossbeam-channel",
  "fn0-adapt-cache",
  "fn0-ski",
  "fn0-wasmtime",
  "futures",
  "http-body-util",
  "hyper 1.8.1",
+ "hyper-rustls 0.27.7",
  "hyper-util",
  "libsql-hrana",
  "memberlist",
@@ -2403,6 +2414,7 @@ dependencies = [
  "serde_json",
  "socket2 0.6.3",
  "sonic-rs",
+ "struson",
  "sysinfo",
  "tokio",
  "tokio-util",
@@ -2517,8 +2529,6 @@ dependencies = [
 [[package]]
 name = "fn0-wasmtime"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ba569029b64aafd9a2f6989b106b1561876d65008acf0560f391616b96c75ba"
 dependencies = [
  "anyhow",
  "sysinfo",
@@ -2528,7 +2538,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3254,6 +3264,7 @@ dependencies = [
  "http 1.4.0",
  "hyper 1.8.1",
  "hyper-util",
+ "log",
  "rustls 0.23.28",
  "rustls-pki-types",
  "tokio",
@@ -4627,6 +4638,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro2-diagnostics"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af066a9c399a26e020ada66a034357a868728e72cd426f3adcd35f80d88d88c8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "version_check",
+]
+
+[[package]]
 name = "prost"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5786,6 +5809,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "struson"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a8eaaf563e9de627dadbe66ff8b7ef8f065fc69844c90ed6acdc90bdc9f0571"
+dependencies = [
+ "duplicate",
+ "strum",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

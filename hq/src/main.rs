@@ -15,6 +15,7 @@ mod site;
 mod ssh;
 mod ssh_pool;
 mod telemetry;
+mod turso_admin;
 mod wasmtime_rollout;
 
 use args::HqArgs;

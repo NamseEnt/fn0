@@ -6,7 +6,12 @@ import { createOkeCluster } from "./oke-cluster";
 import { createDockerRegistry } from "./docker-registry";
 import { deployK8sDashboard } from "./k8s-dashboard";
 import { deployHqApplication } from "./hq-deployment";
-import { SiteArgs, DnsProviderArg, CwasmBucketArgs } from "../hqArgs.schema";
+import {
+  SiteArgs,
+  DnsProviderArg,
+  CwasmBucketArgs,
+  ForteDbArgs,
+} from "../hqArgs.schema";
 
 export interface OciHeadQuarterArgs {
   suffix: pulumi.Input<string>;
@@ -18,6 +23,7 @@ export interface OciHeadQuarterArgs {
   grafanaSlug: pulumi.Input<string>;
   docDbUrl: pulumi.Input<string>;
   docDbToken: pulumi.Input<string>;
+  forteDb: pulumi.Input<ForteDbArgs>;
   sites: pulumi.Input<SiteArgs[]>;
   awsRegion: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
@@ -112,6 +118,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           url: docDbUrl,
           token: docDbToken,
         },
+        forteDb: args.forteDb,
         aws: {
           region: args.awsRegion,
           wasmBucket: args.wasmBucket,
