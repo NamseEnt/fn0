@@ -1,8 +1,10 @@
 use bytes::Bytes;
 use opentelemetry::{global, trace::TracerProvider};
+use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_http::{HttpClient, HttpError};
 use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig};
 use opentelemetry_sdk::Resource;
+use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use std::collections::HashMap;
@@ -12,7 +14,7 @@ use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-pub type TelemetryProviders = (SdkTracerProvider, SdkMeterProvider);
+pub type TelemetryProviders = (SdkTracerProvider, SdkMeterProvider, SdkLoggerProvider);
 
 #[derive(Debug, Clone)]
 struct TokioHttpClient {
@@ -49,6 +51,7 @@ pub fn setup(
     let headers = build_headers(basic_auth);
     let traces_endpoint = format!("{}/v1/traces", endpoint.trim_end_matches('/'));
     let metrics_endpoint = format!("{}/v1/metrics", endpoint.trim_end_matches('/'));
+    let logs_endpoint = format!("{}/v1/logs", endpoint.trim_end_matches('/'));
 
     let http_client = TokioHttpClient {
         client: reqwest::Client::builder().build()?,
@@ -70,10 +73,26 @@ pub fn setup(
 
     global::set_tracer_provider(tracer_provider.clone());
 
+    let log_exporter = opentelemetry_otlp::LogExporter::builder()
+        .with_http()
+        .with_http_client(http_client.clone())
+        .with_endpoint(&logs_endpoint)
+        .with_protocol(Protocol::HttpBinary)
+        .with_headers(headers.clone())
+        .build()?;
+
+    let logger_provider = SdkLoggerProvider::builder()
+        .with_batch_exporter(log_exporter)
+        .with_resource(Resource::builder().with_service_name("fn0-worker").build())
+        .build();
+
+    let log_bridge = OpenTelemetryTracingBridge::new(&logger_provider);
+
     let tracer = tracer_provider.tracer("fn0-worker-tracer");
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .with(log_bridge)
         .init();
 
     let metric_exporter = opentelemetry_otlp::MetricExporter::builder()
@@ -96,14 +115,15 @@ pub fn setup(
     global::set_meter_provider(meter_provider.clone());
 
     info!("telemetry setup completed with OTLP endpoint: {}", endpoint);
-    Ok((tracer_provider, meter_provider))
+    Ok((tracer_provider, meter_provider, logger_provider))
 }
 
 pub fn shutdown(
-    (tracer_provider, meter_provider): TelemetryProviders,
+    (tracer_provider, meter_provider, logger_provider): TelemetryProviders,
 ) -> color_eyre::eyre::Result<()> {
     tracer_provider.shutdown()?;
     meter_provider.shutdown()?;
+    logger_provider.shutdown()?;
     Ok(())
 }
 
