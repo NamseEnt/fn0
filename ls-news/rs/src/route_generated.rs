@@ -1,12 +1,12 @@
+#[path = "pages/signout.rs"]
+mod pages_signout;
+#[path = "pages/index/mod.rs"]
+mod pages_index;
 #[allow(non_snake_case)]
 #[path = "pages/post/[id]/mod.rs"]
 mod pages_post__id_;
 #[path = "pages/write.rs"]
 mod pages_write;
-#[path = "pages/index/mod.rs"]
-mod pages_index;
-#[path = "pages/signout.rs"]
-mod pages_signout;
 #[path = "api/auth/callback/github.rs"]
 mod api_auth_callback_github;
 #[path = "hooks/me.rs"]
@@ -21,22 +21,22 @@ use forte_sdk::*;
 #[allow(non_camel_case_types)]
 pub enum Redirect {
     External { url: String },
+    Signout,
+    Index,
     Post_id_ { id: String },
     Write,
-    Index,
-    Signout,
     ApiAuthCallbackGithub,
 }
 impl Redirect {
     pub fn to_path(&self) -> String {
         match self {
             Redirect::External { url } => url.clone(),
+            Redirect::Signout => "/signout".to_string(),
+            Redirect::Index => "/".to_string(),
             Redirect::Post_id_ { id } => {
                 format!("/{}", ["post".to_string(), id.to_string()].join("/"))
             }
             Redirect::Write => "/write".to_string(),
-            Redirect::Index => "/".to_string(),
-            Redirect::Signout => "/signout".to_string(),
             Redirect::ApiAuthCallbackGithub => "/api/auth/callback/github".to_string(),
         }
     }
@@ -93,7 +93,92 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
         return handle_queue_task_execute(&body_bytes).await;
     }
     let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
-    if path_segments.len() == 2usize && path_segments.first() == Some(&"post") {
+    if path == "/signout" {
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+            db: &db,
+        };
+        match pages_signout::handler(req).await {
+            Ok(redirect) => {
+                Ok(
+                    build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ),
+                )
+            }
+            Err(e) => {
+                eprintln!("Error at {}: {:?}", path, e);
+                Ok(
+                    Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap(),
+                )
+            }
+        }
+    } else if path == "/" {
+        use std::collections::HashMap;
+        let query = parts.uri.query().unwrap_or("");
+        let query_params: HashMap<String, String> = forte_sdk::form_urlencoded::parse(
+                query.as_bytes(),
+            )
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect();
+        let after: Option<String> = query_params.get("after").cloned();
+        let search_params = pages_index::SearchParams { after };
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+            db: &db,
+        };
+        match pages_index::handler(req, search_params).await {
+            Ok(props) => {
+                let stream = forte_json::to_stream(&props);
+                Ok(
+                    build_response_with_cookies(
+                        Response::new(Body::from_stream(stream)),
+                        &cookie_jar,
+                    ),
+                )
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(
+                        build_response_with_cookies(
+                            Response::builder()
+                                .status(StatusCode::FOUND)
+                                .header(LOCATION, redirect.to_path())
+                                .body(Body::empty())
+                                .unwrap(),
+                            &cookie_jar,
+                        ),
+                    )
+                } else {
+                    eprintln!("Error at {}: {:?}", path, e);
+                    Ok(
+                        Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Body::from("Internal Server Error"))
+                            .unwrap(),
+                    )
+                }
+            }
+        }
+    } else if path_segments.len() == 2usize && path_segments.first() == Some(&"post") {
         let id: String = path_segments[1usize].to_string();
         let path_params = pages_post__id_::PathParams { id };
         let req = ForteRequest {
@@ -179,91 +264,6 @@ pub async fn main(request: Request<Body>) -> Result<Response<Body>, Error> {
                             .unwrap(),
                     )
                 }
-            }
-        }
-    } else if path == "/" {
-        use std::collections::HashMap;
-        let query = parts.uri.query().unwrap_or("");
-        let query_params: HashMap<String, String> = forte_sdk::form_urlencoded::parse(
-                query.as_bytes(),
-            )
-            .map(|(k, v)| (k.into_owned(), v.into_owned()))
-            .collect();
-        let after: Option<String> = query_params.get("after").cloned();
-        let search_params = pages_index::SearchParams { after };
-        let req = ForteRequest {
-            uri_authority,
-            method: &method,
-            headers: &headers,
-            jar: &mut cookie_jar,
-            raw_body: &body_bytes,
-            body: (),
-            db: &db,
-        };
-        match pages_index::handler(req, search_params).await {
-            Ok(props) => {
-                let stream = forte_json::to_stream(&props);
-                Ok(
-                    build_response_with_cookies(
-                        Response::new(Body::from_stream(stream)),
-                        &cookie_jar,
-                    ),
-                )
-            }
-            Err(e) => {
-                if let Some(redirect) = e.downcast_ref::<Redirect>() {
-                    Ok(
-                        build_response_with_cookies(
-                            Response::builder()
-                                .status(StatusCode::FOUND)
-                                .header(LOCATION, redirect.to_path())
-                                .body(Body::empty())
-                                .unwrap(),
-                            &cookie_jar,
-                        ),
-                    )
-                } else {
-                    eprintln!("Error at {}: {:?}", path, e);
-                    Ok(
-                        Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::from("Internal Server Error"))
-                            .unwrap(),
-                    )
-                }
-            }
-        }
-    } else if path == "/signout" {
-        let req = ForteRequest {
-            uri_authority,
-            method: &method,
-            headers: &headers,
-            jar: &mut cookie_jar,
-            raw_body: &body_bytes,
-            body: (),
-            db: &db,
-        };
-        match pages_signout::handler(req).await {
-            Ok(redirect) => {
-                Ok(
-                    build_response_with_cookies(
-                        Response::builder()
-                            .status(StatusCode::FOUND)
-                            .header(LOCATION, redirect.to_path())
-                            .body(Body::empty())
-                            .unwrap(),
-                        &cookie_jar,
-                    ),
-                )
-            }
-            Err(e) => {
-                eprintln!("Error at {}: {:?}", path, e);
-                Ok(
-                    Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Body::from("Internal Server Error"))
-                        .unwrap(),
-                )
             }
         }
     } else if path == "/api/auth/callback/github" {
@@ -379,7 +379,7 @@ async fn handle_hook(
                 body: input,
                 db,
             };
-            let output = hooks_me::handler(req);
+            let output = hooks_me::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(
                 build_response_with_cookies(

@@ -165,9 +165,10 @@ fn has_hook_handler(content: &str) -> bool {
             }
             syn::Item::Fn(func) => {
                 let is_pub = matches!(func.vis, syn::Visibility::Public(_));
+                let is_async = func.sig.asyncness.is_some();
                 let is_handler_fn = func.sig.ident == "handler";
 
-                if is_pub && is_handler_fn {
+                if is_pub && is_async && is_handler_fn {
                     has_handler = true;
                 }
             }
@@ -1195,7 +1196,7 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
                         body: input,
                         db,
                     };
-                    let output = #module_name::handler(req);
+                    let output = #module_name::handler(req).await;
                     let json = forte_json::to_vec(&output);
                     Ok(build_response_with_cookies(
                         Response::builder()
