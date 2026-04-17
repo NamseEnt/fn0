@@ -132,9 +132,6 @@ jobs:
         with:
           "workspaces": "forte/cli -> target"
       - name: "Fetch sccache config from Pulumi API"
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-        shell: bash
         run: |
           set -euo pipefail
           STACK_API="https://api.pulumi.com/api/stacks/namse/fn0Cloud/prod"
@@ -170,6 +167,9 @@ jobs:
             echo "AWS_ACCESS_KEY_ID=$(read_output sccacheAccessKeyId)"
             echo "AWS_SECRET_ACCESS_KEY=$(read_output sccacheSecretAccessKey)"
           } >> "$GITHUB_ENV"
+        shell: "bash"
+        env:
+          "PULUMI_ACCESS_TOKEN": "${{ secrets.PULUMI_ACCESS_TOKEN }}"
       - name: "Install sccache"
         uses: "mozilla-actions/sccache-action@v0.0.6"
       - name: Install dist
