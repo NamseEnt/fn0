@@ -272,7 +272,7 @@ pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()
         .map_err(|e| anyhow!("Failed to create {}: {}", output_path.display(), e))?;
     let mut builder = tar::Builder::new(file);
 
-    let manifest = br#"{"kind":"forte","frontend_script_path":"/frontend.js"}"#;
+    let manifest = br#"{"kind":"forte"}"#;
     append_bytes(&mut builder, "manifest.json", manifest)?;
 
     let backend_wasm = dist_dir.join("backend.wasm");

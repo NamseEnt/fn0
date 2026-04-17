@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub enum Deployment {
     Wasm,
-    Forte { frontend_script_path: String },
+    Forte,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,7 +29,7 @@ impl DeploymentMap {
                 self.artifacts
                     .insert(format!("{code_id}::backend"), CodeKind::Wasm);
             }
-            Deployment::Forte { .. } => {
+            Deployment::Forte => {
                 self.artifacts
                     .insert(format!("{code_id}::backend"), CodeKind::Wasm);
                 self.artifacts
@@ -45,7 +45,7 @@ impl DeploymentMap {
                 Deployment::Wasm => {
                     self.artifacts.remove(&format!("{code_id}::backend"));
                 }
-                Deployment::Forte { .. } => {
+                Deployment::Forte => {
                     self.artifacts.remove(&format!("{code_id}::backend"));
                     self.artifacts.remove(&format!("{code_id}::frontend"));
                 }
@@ -79,19 +79,9 @@ mod tests {
     #[test]
     fn register_and_query_forte() {
         let mut map = DeploymentMap::new();
-        map.register_deployment(
-            "app-1",
-            Deployment::Forte {
-                frontend_script_path: "/server.js".to_string(),
-            },
-        );
+        map.register_deployment("app-1", Deployment::Forte);
 
-        match map.deployment("app-1") {
-            Some(Deployment::Forte { frontend_script_path }) => {
-                assert_eq!(frontend_script_path, "/server.js");
-            }
-            other => panic!("expected Forte, got {other:?}"),
-        }
+        assert!(matches!(map.deployment("app-1"), Some(Deployment::Forte)));
         assert_eq!(map.artifact_kind("app-1::backend"), Some(CodeKind::Wasm));
         assert_eq!(map.artifact_kind("app-1::frontend"), Some(CodeKind::Js));
     }
@@ -99,12 +89,7 @@ mod tests {
     #[test]
     fn unregister_removes_all_artifacts() {
         let mut map = DeploymentMap::new();
-        map.register_deployment(
-            "app-1",
-            Deployment::Forte {
-                frontend_script_path: "/s.js".to_string(),
-            },
-        );
+        map.register_deployment("app-1", Deployment::Forte);
         map.unregister_deployment("app-1");
 
         assert!(map.deployment("app-1").is_none());
@@ -117,17 +102,9 @@ mod tests {
         let mut map = DeploymentMap::new();
         map.register_deployment("app-1", Deployment::Wasm);
         map.unregister_deployment("app-1");
-        map.register_deployment(
-            "app-1",
-            Deployment::Forte {
-                frontend_script_path: "/s.js".to_string(),
-            },
-        );
+        map.register_deployment("app-1", Deployment::Forte);
 
-        assert!(matches!(
-            map.deployment("app-1"),
-            Some(Deployment::Forte { .. })
-        ));
+        assert!(matches!(map.deployment("app-1"), Some(Deployment::Forte)));
         assert_eq!(map.artifact_kind("app-1::backend"), Some(CodeKind::Wasm));
         assert_eq!(map.artifact_kind("app-1::frontend"), Some(CodeKind::Js));
     }

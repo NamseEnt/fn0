@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 #[serde(tag = "kind", rename_all = "lowercase")]
 enum Manifest {
     Wasm,
-    Forte { frontend_script_path: String },
+    Forte,
 }
 
 pub struct BundleFetcher {
@@ -127,19 +127,15 @@ impl BundleFetcher {
 
         let deployment = match manifest {
             Manifest::Wasm => Deployment::Wasm,
-            Manifest::Forte {
-                frontend_script_path,
-            } => {
+            Manifest::Forte => {
                 let frontend =
                     frontend_bytes.ok_or_else(|| eyre!("forte bundle missing frontend.js"))?;
                 self.store.insert(&frontend_key, frontend);
-                Deployment::Forte {
-                    frontend_script_path,
-                }
+                Deployment::Forte
             }
         };
 
-        let is_forte = matches!(deployment, Deployment::Forte { .. });
+        let is_forte = matches!(deployment, Deployment::Forte);
         self.fn0.register_deployment(subdomain, deployment);
 
         if is_forte {
@@ -176,5 +172,31 @@ impl BundleFetcher {
         self.wasm_cache.invalidate(&backend_key).await;
         self.js_cache.invalidate(&frontend_key).await;
         self.fn0.unregister_deployment(subdomain);
+    }
+}
+
+#[cfg(test)]
+mod manifest_tests {
+    use super::*;
+
+    #[test]
+    fn parses_new_forte_manifest() {
+        let bytes = br#"{"kind":"forte"}"#;
+        let manifest: Manifest = serde_json::from_slice(bytes).expect("should parse");
+        assert!(matches!(manifest, Manifest::Forte));
+    }
+
+    #[test]
+    fn parses_legacy_forte_manifest_with_frontend_script_path() {
+        let bytes = br#"{"kind":"forte","frontend_script_path":"/frontend.js"}"#;
+        let manifest: Manifest = serde_json::from_slice(bytes).expect("should parse");
+        assert!(matches!(manifest, Manifest::Forte));
+    }
+
+    #[test]
+    fn parses_wasm_manifest() {
+        let bytes = br#"{"kind":"wasm"}"#;
+        let manifest: Manifest = serde_json::from_slice(bytes).expect("should parse");
+        assert!(matches!(manifest, Manifest::Wasm));
     }
 }
