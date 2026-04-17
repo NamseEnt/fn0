@@ -12,7 +12,7 @@ pub enum Output {
     NotLoggedIn { oauth_nonce: String },
 }
 
-pub fn handler(req: ForteRequest<Input>) -> Output {
+pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     if let Some(u) = get_me(req.jar) {
         Output::LoggedIn {
             user: User {
