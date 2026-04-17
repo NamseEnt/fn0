@@ -2400,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2635,7 +2635,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "chrono",

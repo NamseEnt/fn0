@@ -231,7 +231,10 @@ async fn handle_request(
             ));
         }
 
-        if path.starts_with("/__forte_hook/") || path.starts_with("/__forte_action/") {
+        if path.starts_with("/__forte_hook/")
+            || path.starts_with("/__forte_action/")
+            || path.starts_with("/api/")
+        {
             return Ok(backend_response);
         }
 
