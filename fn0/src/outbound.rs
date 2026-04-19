@@ -33,6 +33,10 @@ impl SharedHttpClient {
         }
     }
 
+    pub fn from_client(client: Arc<HyperClient>) -> Self {
+        Self { inner: client }
+    }
+
     pub fn client(&self) -> Arc<HyperClient> {
         self.inner.clone()
     }
@@ -69,6 +73,8 @@ pub fn send_request(
     mut request: hyper::Request<HyperOutgoingBody>,
     config: OutgoingRequestConfig,
 ) -> HostFutureIncomingResponse {
+    request.headers_mut().remove(HOST);
+
     let is_turso = ctx
         .turso_hijack
         .as_ref()
