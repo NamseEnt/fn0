@@ -3,7 +3,7 @@ pub mod vite_dev;
 
 use anyhow::Result;
 pub use cache::SimpleCache;
-use fn0::{Deployment, DeploymentMap, EnvVars, Fn0};
+use fn0::{Deployment, DeploymentMap, EnvVars, Fn0, SharedHttpClient};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -102,6 +102,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
         cache.clone(),
         deployment_map,
         config.env_vars,
+        SharedHttpClient::new(),
+        None,
     ));
 
     let public_dir = Arc::new(config.public_dir);
@@ -357,6 +359,7 @@ fn get_content_type(path: &std::path::Path) -> &'static str {
 
 fn should_proxy_to_vite(path: &str) -> bool {
     path.starts_with("/src/")
+        || path.starts_with("/.forte/")
         || path.starts_with("/@vite/")
         || path.starts_with("/@id/")
         || path.starts_with("/@fs/")

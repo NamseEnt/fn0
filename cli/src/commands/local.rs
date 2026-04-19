@@ -1,8 +1,8 @@
-use fn0_adapt_cache::AdaptCache;
 use bytes::Bytes;
 use color_eyre::Result;
-use fn0::{Deployment, DeploymentMap, Fn0};
-use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
+use fn0::{Deployment, DeploymentMap, Fn0, SharedHttpClient};
+use fn0_adapt_cache::AdaptCache;
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
@@ -30,7 +30,14 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
 
     let cache = LocalCache::new(wasm_path);
     let env_vars = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-    let fn0 = Arc::new(Fn0::new(cache.clone(), cache, deployment_map, env_vars));
+    let fn0 = Arc::new(Fn0::new(
+        cache.clone(),
+        cache,
+        deployment_map,
+        env_vars,
+        SharedHttpClient::new(),
+        None,
+    ));
 
     let port = port.unwrap_or(3000);
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -71,14 +78,11 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
                                             http_body_util::Full::new(Bytes::from(
                                                 "Internal Server Error",
                                             ))
-                                            .map_err(|e: std::convert::Infallible| {
-                                                anyhow::anyhow!(e)
-                                            }),
+                                            .map_err(
+                                                |e: std::convert::Infallible| anyhow::anyhow!(e),
+                                            ),
                                         );
-                                    Ok(hyper::Response::builder()
-                                        .status(500)
-                                        .body(body)
-                                        .unwrap())
+                                    Ok(hyper::Response::builder().status(500).body(body).unwrap())
                                 }
                             }
                         }
@@ -127,8 +131,7 @@ impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for L
                 .map_err(|e| fn0_adapt_cache::Error::StorageError(anyhow::anyhow!(e)))?;
 
             eprintln!("Compiling WASM ({} bytes)...", data.len());
-            let cwasm = fn0::compile(&data)
-                .map_err(|e| fn0_adapt_cache::Error::StorageError(e))?;
+            let cwasm = fn0::compile(&data).map_err(|e| fn0_adapt_cache::Error::StorageError(e))?;
             eprintln!("Compilation done ({} bytes)", cwasm.len());
 
             cache.insert(id.to_string(), cwasm.clone());

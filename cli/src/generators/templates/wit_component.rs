@@ -4,5 +4,6 @@ pub fn generate() -> String {
 world component {
     export wasi:http/incoming-handler@0.2.6;
 }
-"#.to_string()
+"#
+    .to_string()
 }

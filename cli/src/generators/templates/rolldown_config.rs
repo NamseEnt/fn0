@@ -9,5 +9,6 @@ export default defineConfig({
     format: 'esm',
   },
 })
-"#.to_string()
+"#
+    .to_string()
 }

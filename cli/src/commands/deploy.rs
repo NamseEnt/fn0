@@ -13,8 +13,7 @@ pub async fn execute() -> Result<()> {
     let dist_dir = Path::new("dist");
     let bundle_path = dist_dir.join("bundle.raw.tar");
 
-    fn0_deploy::create_raw_bundle_wasm(&wasm_path, &bundle_path)
-        .map_err(|e| eyre!(e))?;
+    fn0_deploy::create_raw_bundle_wasm(&wasm_path, &bundle_path).map_err(|e| eyre!(e))?;
 
     fn0_deploy::deploy(&project_name, &bundle_path, None)
         .await
