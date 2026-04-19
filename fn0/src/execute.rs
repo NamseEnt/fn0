@@ -193,7 +193,7 @@ impl WasmExecutor {
         }
     }
 
-    pub(crate) async fn run(&self, code_id: &str, request: Request) -> Result<Response> {
+    pub async fn run(&self, code_id: &str, request: Request) -> Result<Response> {
         let (res_tx, res_rx) = oneshot::channel();
         let job = Job {
             req: request,
