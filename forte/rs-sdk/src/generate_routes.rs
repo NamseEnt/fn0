@@ -704,7 +704,7 @@ fn generate_code(
                 return jar;
             };
 
-            for cookie in cookie::Cookie::split_parse(cookie_str) {
+            for cookie in cookie::Cookie::split_parse_encoded(cookie_str) {
                 let Ok(cookie) = cookie else { continue };
                 jar.add_original(cookie.into_owned());
             }
