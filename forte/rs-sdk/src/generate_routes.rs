@@ -17,6 +17,10 @@ pub fn generate_routes() {
     println!("cargo:rerun-if-changed=src/hooks");
     println!("cargo:rerun-if-changed=src/actions");
     println!("cargo:rerun-if-changed=src/queue_task");
+    // Also rerun when dependency versions change (e.g. forte-sdk bump),
+    // because once any rerun-if-changed is declared Cargo stops doing
+    // default change detection across the rest of the crate.
+    println!("cargo:rerun-if-changed=Cargo.lock");
 
     let mut pages = discover_pages(&pages_dir);
     pages.extend(discover_apis(&apis_dir));
