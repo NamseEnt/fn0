@@ -475,7 +475,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8efe528b12d36088ea252a277b6b63c17bead9a2cbd67900e3aeeac99a181ef9"
 dependencies = [
  "pin-project",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -1307,7 +1307,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1741,7 +1741,7 @@ dependencies = [
  "smallvec",
  "sourcemap",
  "static_assertions",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "url",
  "v8",
@@ -1817,7 +1817,7 @@ dependencies = [
  "strum_macros",
  "syn 2.0.112",
  "syn-match",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1829,7 +1829,7 @@ dependencies = [
  "deno_error",
  "percent-encoding",
  "sys_traits",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "url",
 ]
 
@@ -1847,7 +1847,7 @@ dependencies = [
  "rustls-tokio-stream",
  "rustls-webpki 0.102.8",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "webpki-roots 0.26.11",
 ]
@@ -2106,6 +2106,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "duplicate"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e92f10a49176cbffacaedabfaa11d51db1ea0f80a83c26e1873b43cd1742c24"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+]
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2283,17 +2294,19 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.9"
+version = "0.2.13"
 dependencies = [
  "anyhow",
  "bytes",
  "chrono",
+ "crossbeam-channel",
  "fn0-adapt-cache",
  "fn0-ski",
  "fn0-wasmtime",
  "futures",
  "http-body-util",
  "hyper",
+ "hyper-rustls",
  "hyper-util",
  "libsql-hrana",
  "memberlist",
@@ -2306,6 +2319,7 @@ dependencies = [
  "serde_json",
  "socket2 0.6.1",
  "sonic-rs",
+ "struson",
  "sysinfo",
  "tokio",
  "tokio-util",
@@ -2358,7 +2372,7 @@ dependencies = [
  "rustls-webpki 0.102.8",
  "serde",
  "serde_json",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-rustls 0.26.4",
  "tokio-socks",
@@ -2385,7 +2399,7 @@ dependencies = [
  "flate2",
  "futures",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "urlpattern",
  "uuid",
@@ -2425,7 +2439,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-util",
 ]
@@ -2463,7 +2477,7 @@ dependencies = [
 
 [[package]]
 name = "forte-cli"
-version = "0.3.18"
+version = "0.3.19"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2793,7 +2807,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36fca164ea873ea6d164c3b9e6bc59a70e172d28a57b8513528ed4f5ec127c9f"
 dependencies = [
  "paste",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2880,7 +2894,7 @@ dependencies = [
  "rand 0.9.2",
  "ring",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tinyvec",
  "tokio",
  "tracing",
@@ -2924,7 +2938,7 @@ dependencies = [
  "resolv-conf",
  "serde",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -2962,7 +2976,7 @@ dependencies = [
  "percent-encoding",
  "simdutf8",
  "smol_str 0.3.4",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tinyvec",
  "triomphe",
 ]
@@ -3093,6 +3107,7 @@ dependencies = [
  "http 1.4.0",
  "hyper",
  "hyper-util",
+ "log",
  "rustls 0.23.28",
  "rustls-pki-types",
  "tokio",
@@ -3750,7 +3765,7 @@ dependencies = [
  "smallvec-wrapper",
  "smol_str 0.3.4",
  "snap",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "triomphe",
  "varing",
@@ -3780,7 +3795,7 @@ dependencies = [
  "peekable",
  "pin-project",
  "rand 0.9.2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "viewit",
 ]
@@ -3816,7 +3831,7 @@ dependencies = [
  "smallvec-wrapper",
  "smol_str 0.3.4",
  "snap",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "triomphe",
  "varing",
@@ -3848,7 +3863,7 @@ dependencies = [
  "rustls 0.23.28",
  "scopeguard",
  "smol_str 0.3.4",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "viewit",
 ]
@@ -3972,7 +3987,7 @@ dependencies = [
  "rkyv",
  "serde",
  "smol_str 0.3.4",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -4214,7 +4229,7 @@ dependencies = [
  "futures-sink",
  "js-sys",
  "pin-project-lite",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -4244,7 +4259,7 @@ dependencies = [
  "opentelemetry_sdk",
  "prost 0.14.1",
  "reqwest",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tonic",
  "tracing",
@@ -4275,7 +4290,7 @@ dependencies = [
  "opentelemetry",
  "percent-encoding",
  "rand 0.9.2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
 ]
@@ -4563,6 +4578,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro2-diagnostics"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af066a9c399a26e020ada66a034357a868728e72cd426f3adcd35f80d88d88c8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.112",
+ "version_check",
+]
+
+[[package]]
 name = "prost"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4666,7 +4693,7 @@ dependencies = [
  "rustc-hash",
  "rustls 0.23.28",
  "socket2 0.6.1",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "web-time",
@@ -4687,7 +4714,7 @@ dependencies = [
  "rustls 0.23.28",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tinyvec",
  "tracing",
  "web-time",
@@ -5369,7 +5396,7 @@ dependencies = [
  "num-bigint",
  "serde",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "v8",
 ]
 
@@ -5450,7 +5477,7 @@ checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
 dependencies = [
  "num-bigint",
  "num-traits",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "time",
 ]
 
@@ -5571,7 +5598,7 @@ dependencies = [
  "simdutf8",
  "sonic-number",
  "sonic-simd",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5675,6 +5702,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.112",
+]
+
+[[package]]
+name = "struson"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a8eaaf563e9de627dadbe66ff8b7ef8f065fc69844c90ed6acdc90bdc9f0571"
+dependencies = [
+ "duplicate",
+ "strum",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5887,11 +5925,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.17",
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -5907,9 +5945,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6319,7 +6357,7 @@ dependencies = [
  "opentelemetry_sdk",
  "rustversion",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -6529,7 +6567,7 @@ checksum = "b4d38fb5a071bc7f9ad9c7b10cea5b39d977ff1ba40b4fa62ed1a51f3e5d4d15"
 dependencies = [
  "paste",
  "seq-macro",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -6686,7 +6724,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a10e6b67c951a84de7029487e0e0a496860dae49f6699edd279d5ff35b8fbf54"
 dependencies = [
  "deno_error",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -6854,7 +6892,7 @@ dependencies = [
  "pulley-interpreter",
  "smallvec",
  "target-lexicon",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "wasmparser",
  "wasmtime-environ",
  "wasmtime-internal-core",
@@ -6973,7 +7011,7 @@ dependencies = [
  "io-lifetimes",
  "rustix 1.1.3",
  "system-interface",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "url",
@@ -7091,7 +7129,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0bbdfe34fac0937e887fd0b3b9266b775c1fff8cd2e3f80ffa5d67b35bfa7cb"
 dependencies = [
  "bitflags 2.10.0",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "wasmtime",
  "wasmtime-environ",
@@ -7167,7 +7205,7 @@ dependencies = [
  "regalloc2",
  "smallvec",
  "target-lexicon",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "wasmparser",
  "wasmtime-environ",
  "wasmtime-internal-core",

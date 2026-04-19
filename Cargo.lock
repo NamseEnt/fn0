@@ -2411,7 +2411,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "anyhow",
  "bytes",

@@ -1,15 +1,11 @@
-use color_eyre::{Result, eyre::eyre};
+use color_eyre::{eyre::eyre, Result};
 use std::path::Path;
 use tokio::process::Command;
 
 pub struct CommandExecutor;
 
 impl CommandExecutor {
-    pub async fn run(
-        command: &str,
-        args: &[&str],
-        working_dir: &Path,
-    ) -> Result<()> {
+    pub async fn run(command: &str, args: &[&str], working_dir: &Path) -> Result<()> {
         let output = Command::new(command)
             .args(args)
             .current_dir(working_dir)
@@ -18,11 +14,7 @@ impl CommandExecutor {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(eyre!(
-                "Command '{}' failed:\n{}",
-                command,
-                stderr
-            ));
+            return Err(eyre!("Command '{}' failed:\n{}", command, stderr));
         }
 
         Ok(())
