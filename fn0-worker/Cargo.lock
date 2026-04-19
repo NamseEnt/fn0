@@ -2389,9 +2389,9 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.12"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a3099f94beb1f7165800d21acdff9a52d909e442be20376f660b5cc986a1608"
+checksum = "aabfa7de18aeeff559af5363988ed7f56411ad966a40203a34b55c501ad26209"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2542,7 +2542,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "aes-gcm",
  "anyhow",
