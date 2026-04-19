@@ -1,3 +1,4 @@
+use crate::cli::fe_runtime;
 use crate::server::{self, ServerConfig, ServerHandle, vite_dev};
 use anyhow::{Context, Result};
 use http_body_util::BodyExt;
@@ -50,6 +51,7 @@ async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
 async fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
     if !rs_dir.exists() {
+        fe_runtime::ensure(project_dir)?;
         return Ok(());
     }
     let binary = ensure_forte_rs_to_ts().await?;
@@ -64,6 +66,7 @@ async fn run_codegen(project_dir: &Path) -> Result<()> {
         anyhow::bail!("forte-rs-to-ts failed with status: {}", status);
     }
 
+    fe_runtime::ensure(project_dir)?;
     generate_frontend_routes(project_dir)?;
 
     Ok(())
@@ -77,14 +80,14 @@ struct RouteInfo {
 
 fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
     let pages_dir = project_dir.join("rs/src/pages");
-    let fe_src_dir = project_dir.join("fe/src");
 
     if !pages_dir.exists() {
         return Ok(());
     }
 
+    let prefix = fe_runtime::page_import_prefix(project_dir);
     let mut routes = Vec::new();
-    scan_pages_dir(&pages_dir, &pages_dir, &mut routes)?;
+    scan_pages_dir(&pages_dir, &pages_dir, prefix, &mut routes)?;
 
     routes.sort_by(|a, b| {
         let a_dynamic = a.path.contains(':');
@@ -113,21 +116,30 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
 
     output.push_str("];\n");
 
-    fs::write(fe_src_dir.join("routes.generated.ts"), output)?;
+    let output_path = fe_runtime::routes_generated(project_dir);
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(output_path, output)?;
 
     Ok(())
 }
 
-fn scan_pages_dir(base_dir: &Path, current_dir: &Path, routes: &mut Vec<RouteInfo>) -> Result<()> {
+fn scan_pages_dir(
+    base_dir: &Path,
+    current_dir: &Path,
+    page_import_prefix: &str,
+    routes: &mut Vec<RouteInfo>,
+) -> Result<()> {
     for entry in fs::read_dir(current_dir)? {
         let entry = entry?;
         let path = entry.path();
 
         if path.is_dir() {
-            scan_pages_dir(base_dir, &path, routes)?;
+            scan_pages_dir(base_dir, &path, page_import_prefix, routes)?;
         } else if path.extension().is_some_and(|ext| ext == "rs")
             && has_handler_function(&path)?
-            && let Some(route) = path_to_route(base_dir, &path)
+            && let Some(route) = path_to_route(base_dir, &path, page_import_prefix)
         {
             routes.push(route);
         }
@@ -143,7 +155,7 @@ fn has_handler_function(path: &Path) -> Result<bool> {
     Ok(content.contains("pub async fn handler"))
 }
 
-fn path_to_route(base_dir: &Path, file_path: &Path) -> Option<RouteInfo> {
+fn path_to_route(base_dir: &Path, file_path: &Path, page_import_prefix: &str) -> Option<RouteInfo> {
     let relative = file_path.strip_prefix(base_dir).ok()?;
     let relative_str = relative.to_string_lossy();
 
@@ -168,7 +180,7 @@ fn path_to_route(base_dir: &Path, file_path: &Path) -> Option<RouteInfo> {
         return None;
     }
 
-    let fe_page_path = build_fe_page_path(&route_path);
+    let fe_page_path = build_fe_page_path(&route_path, page_import_prefix);
 
     Some(RouteInfo {
         path: route_path,
@@ -176,9 +188,9 @@ fn path_to_route(base_dir: &Path, file_path: &Path) -> Option<RouteInfo> {
     })
 }
 
-fn build_fe_page_path(route_path: &str) -> String {
+fn build_fe_page_path(route_path: &str, prefix: &str) -> String {
     if route_path == "/" {
-        "./pages/index/page".to_string()
+        format!("{}/pages/index/page", prefix)
     } else {
         let path = route_path
             .replace(":", "[")
@@ -193,7 +205,7 @@ fn build_fe_page_path(route_path: &str) -> String {
             })
             .collect::<Vec<_>>()
             .join("/");
-        format!("./pages/{}/page", path)
+        format!("{}/pages/{}/page", prefix, path)
     }
 }
 
@@ -276,7 +288,9 @@ pub async fn run(options: DevOptions) -> Result<()> {
     build_backend(&project_dir)?;
 
     let fe_dir = project_dir.join("fe");
-    let vite = vite_dev::spawn_vite(&fe_dir, port)?;
+    let vite_config = fe_runtime::vite_config(&project_dir);
+    let ssr_module_path = fe_runtime::ssr_load_module_path(&project_dir);
+    let vite = vite_dev::spawn_vite(&fe_dir, port, vite_config.as_deref(), ssr_module_path)?;
     vite_dev::wait_for_vite_ready(&vite.socket_path).await?;
 
     let backend_path = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?

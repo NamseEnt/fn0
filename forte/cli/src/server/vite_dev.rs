@@ -3,14 +3,24 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use uuid::Uuid;
 
-pub fn generate_vite_server_script(socket_path: &Path) -> String {
+pub fn generate_vite_server_script(
+    socket_path: &Path,
+    config_file: Option<&Path>,
+    ssr_module_path: &str,
+) -> String {
     let socket_path_str = socket_path.display();
+    let config_file_js = match config_file {
+        Some(p) => format!("\"{}\"", p.display()),
+        None => "undefined".to_string(),
+    };
     format!(
         r#"import {{ createServer }} from "vite";
 import {{ createServer as createHttpServer }} from "http";
 import {{ unlinkSync, existsSync }} from "fs";
 
 const SOCKET_PATH = "{socket_path_str}";
+const CONFIG_FILE = {config_file_js};
+const SSR_MODULE_PATH = "{ssr_module_path}";
 
 function cleanup() {{
     try {{
@@ -57,12 +67,16 @@ async function streamToString(stream) {{
 async function main() {{
     cleanup();
 
-    const vite = await createServer({{
+    const viteOptions = {{
         server: {{
             middlewareMode: true,
         }},
         appType: "custom",
-    }});
+    }};
+    if (CONFIG_FILE) {{
+        viteOptions.configFile = CONFIG_FILE;
+    }}
+    const vite = await createServer(viteOptions);
 
 
     const server = createHttpServer(async (req, res) => {{
@@ -74,7 +88,7 @@ async function main() {{
             req.on("end", async () => {{
                 try {{
                     const {{ url, props, cookie }} = JSON.parse(body);
-                    const {{ renderStream }} = await vite.ssrLoadModule("/src/server.tsx");
+                    const {{ renderStream }} = await vite.ssrLoadModule(SSR_MODULE_PATH);
                     const {{ stream, cookies }} = await renderStream(url, props, cookie);
 
                     const htmlBuffer = Buffer.from(await streamToString(stream));
@@ -115,7 +129,12 @@ pub struct Vite {
     pub socket_path: PathBuf,
 }
 
-pub fn spawn_vite(fe_dir: &Path, forte_port: u16) -> Result<Vite> {
+pub fn spawn_vite(
+    fe_dir: &Path,
+    forte_port: u16,
+    config_file: Option<&Path>,
+    ssr_module_path: &str,
+) -> Result<Vite> {
     let dev_dir = fe_dir.join(".forte/dev");
     std::fs::create_dir_all(&dev_dir)?;
 
@@ -123,7 +142,7 @@ pub fn spawn_vite(fe_dir: &Path, forte_port: u16) -> Result<Vite> {
     let socket_path = dev_dir.join(format!("vite-{}.sock", session_id));
 
     let script_path = dev_dir.join(format!("vite-ssr-server-{}.mjs", session_id));
-    let script_content = generate_vite_server_script(&socket_path);
+    let script_content = generate_vite_server_script(&socket_path, config_file, ssr_module_path);
     std::fs::write(&script_path, &script_content)?;
 
     let child = Command::new("node")

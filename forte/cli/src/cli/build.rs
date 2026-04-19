@@ -1,3 +1,4 @@
+use crate::cli::fe_runtime;
 use anyhow::{Context, Result};
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -57,6 +58,7 @@ async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
 async fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
     if !rs_dir.exists() {
+        fe_runtime::ensure(project_dir)?;
         generate_frontend_routes(project_dir)?;
         return Ok(());
     }
@@ -74,6 +76,7 @@ async fn run_codegen(project_dir: &Path) -> Result<()> {
         anyhow::bail!("forte-rs-to-ts failed with status: {}", status);
     }
 
+    fe_runtime::ensure(project_dir)?;
     generate_frontend_routes(project_dir)?;
 
     Ok(())
@@ -81,7 +84,6 @@ async fn run_codegen(project_dir: &Path) -> Result<()> {
 
 fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
     let pages_dir = project_dir.join("rs/src/pages");
-    let fe_src_dir = project_dir.join("fe/src");
 
     if !pages_dir.exists() {
         return Ok(());
@@ -89,8 +91,9 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
 
     println!("[codegen] Generating frontend routes...");
 
+    let prefix = fe_runtime::page_import_prefix(project_dir);
     let mut routes = Vec::new();
-    scan_pages_dir(&pages_dir, &pages_dir, &mut routes)?;
+    scan_pages_dir(&pages_dir, &pages_dir, prefix, &mut routes)?;
 
     routes.sort_by(|a, b| {
         let a_dynamic = a.0.contains(':');
@@ -106,7 +109,6 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
     output.push_str("export const routes: Array<{ path: string; component: () => Promise<{ default: (props: any) => any }>; schema: () => Promise<{ PropsSchema: any }> }> = [\n");
 
     for (path, fe_page_path) in &routes {
-        // Replace only the trailing "/page" with "/.props"
         let fe_props_path = fe_page_path
             .strip_suffix("/page")
             .map(|s| format!("{}/.props", s))
@@ -119,7 +121,11 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
 
     output.push_str("];\n");
 
-    fs::write(fe_src_dir.join("routes.generated.ts"), output)?;
+    let output_path = fe_runtime::routes_generated(project_dir);
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(output_path, output)?;
 
     println!("[codegen] Generated {} route(s)", routes.len());
 
@@ -129,6 +135,7 @@ fn generate_frontend_routes(project_dir: &Path) -> Result<()> {
 fn scan_pages_dir(
     base_dir: &Path,
     current_dir: &Path,
+    page_import_prefix: &str,
     routes: &mut Vec<(String, String)>,
 ) -> Result<()> {
     for entry in fs::read_dir(current_dir)? {
@@ -136,10 +143,11 @@ fn scan_pages_dir(
         let path = entry.path();
 
         if path.is_dir() {
-            scan_pages_dir(base_dir, &path, routes)?;
+            scan_pages_dir(base_dir, &path, page_import_prefix, routes)?;
         } else if path.extension().is_some_and(|ext| ext == "rs")
             && has_handler_function(&path)?
-            && let Some((route_path, fe_page_path)) = path_to_route(base_dir, &path)
+            && let Some((route_path, fe_page_path)) =
+                path_to_route(base_dir, &path, page_import_prefix)
         {
             routes.push((route_path, fe_page_path));
         }
@@ -155,7 +163,11 @@ fn has_handler_function(path: &Path) -> Result<bool> {
     Ok(content.contains("pub async fn handler"))
 }
 
-fn path_to_route(base_dir: &Path, file_path: &Path) -> Option<(String, String)> {
+fn path_to_route(
+    base_dir: &Path,
+    file_path: &Path,
+    page_import_prefix: &str,
+) -> Option<(String, String)> {
     let relative = file_path.strip_prefix(base_dir).ok()?;
     let relative_str = relative.to_string_lossy();
 
@@ -180,14 +192,14 @@ fn path_to_route(base_dir: &Path, file_path: &Path) -> Option<(String, String)> 
         return None;
     }
 
-    let fe_page_path = build_fe_page_path(&route_path);
+    let fe_page_path = build_fe_page_path(&route_path, page_import_prefix);
 
     Some((route_path, fe_page_path))
 }
 
-fn build_fe_page_path(route_path: &str) -> String {
+fn build_fe_page_path(route_path: &str, prefix: &str) -> String {
     if route_path == "/" {
-        "./pages/index/page".to_string()
+        format!("{}/pages/index/page", prefix)
     } else {
         let path = route_path
             .replace(":", "[")
@@ -202,7 +214,7 @@ fn build_fe_page_path(route_path: &str) -> String {
             })
             .collect::<Vec<_>>()
             .join("/");
-        format!("./pages/{}/page", path)
+        format!("{}/pages/{}/page", prefix, path)
     }
 }
 
@@ -308,15 +320,41 @@ fn build_frontend(project_dir: &Path) -> Result<()> {
     let fe_dir = project_dir.join("fe");
 
     println!("[build] Building frontend...");
-    let status = Command::new("npm")
-        .arg("run")
-        .arg("build")
-        .current_dir(&fe_dir)
-        .status()
-        .context("Failed to run npm run build")?;
 
-    if !status.success() {
-        anyhow::bail!("npm run build failed with status: {}", status);
+    if let Some(config_path) = fe_runtime::vite_config(project_dir) {
+        let server_entry = fe_runtime::ssr_entry(project_dir);
+
+        let status = Command::new("npx")
+            .args(["vite", "build", "--config"])
+            .arg(&config_path)
+            .current_dir(&fe_dir)
+            .status()
+            .context("Failed to run vite build (client)")?;
+        if !status.success() {
+            anyhow::bail!("vite client build failed with status: {}", status);
+        }
+
+        let status = Command::new("npx")
+            .args(["vite", "build", "--ssr"])
+            .arg(&server_entry)
+            .args(["--config"])
+            .arg(&config_path)
+            .current_dir(&fe_dir)
+            .status()
+            .context("Failed to run vite build --ssr")?;
+        if !status.success() {
+            anyhow::bail!("vite ssr build failed with status: {}", status);
+        }
+    } else {
+        let status = Command::new("npm")
+            .arg("run")
+            .arg("build")
+            .current_dir(&fe_dir)
+            .status()
+            .context("Failed to run npm run build")?;
+        if !status.success() {
+            anyhow::bail!("npm run build failed with status: {}", status);
+        }
     }
 
     Ok(())
