@@ -47,14 +47,7 @@ pub fn run(name: &str) -> Result<()> {
 
     fs::write(project_dir.join("fe/tsconfig.json"), generate_tsconfig())?;
 
-    fs::write(
-        project_dir.join("fe/vite.config.ts"),
-        generate_vite_config(),
-    )?;
-
-    fs::write(project_dir.join("fe/src/server.tsx"), generate_server_tsx())?;
-
-    fs::write(project_dir.join("fe/src/client.tsx"), generate_client_tsx())?;
+    fs::write(project_dir.join("fe/src/app.tsx"), generate_app_tsx())?;
 
     fs::write(
         project_dir.join("fe/src/pages/index/page.tsx"),
@@ -82,7 +75,7 @@ fn install_npm_packages(project_dir: &Path) -> Result<()> {
 
     println!("Installing npm packages...");
 
-    let deps = ["react", "react-dom"];
+    let deps = ["react", "react-dom", "zod"];
     let status = Command::new("npm")
         .arg("install")
         .args(deps)
@@ -140,7 +133,7 @@ fn generate_rs_gitignore() -> &'static str {
 }
 
 fn generate_fe_gitignore() -> &'static str {
-    "/node_modules\n"
+    "/node_modules\n/dist\n/.forte\n"
 }
 
 fn generate_cargo_toml() -> String {
@@ -295,10 +288,7 @@ fn generate_package_json(name: &str) -> String {
         r#"{{
   "name": "{name}-frontend",
   "private": true,
-  "type": "module",
-  "scripts": {{
-    "build": "vite build && vite build --ssr src/server.tsx --outDir dist/ssr"
-  }}
+  "type": "module"
 }}
 "#
     )
@@ -321,151 +311,16 @@ fn generate_tsconfig() -> &'static str {
 "#
 }
 
-fn generate_vite_config() -> &'static str {
-    r#"import { defineConfig, Plugin } from "vite";
-import react from "@vitejs/plugin-react";
-
-function exitOnStdinClose(): Plugin {
-  return {
-    name: "exit-on-stdin-close",
-    configureServer() {
-      process.stdin.resume();
-      process.stdin.on("close", () => {
-        process.exit(0);
-      });
-    },
-  };
+fn generate_app_tsx() -> &'static str {
+    r#"export function Head() {
+    return (
+        <>
+            <meta charSet="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Forte App</title>
+        </>
+    );
 }
-
-export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react(), exitOnStdinClose()],
-  optimizeDeps: {
-    include: ["react", "react-dom"],
-  },
-  build: {
-    rollupOptions: {
-      input: isSsrBuild ? "src/server.tsx" : "src/client.tsx",
-      output: {
-        entryFileNames: isSsrBuild ? "server.js" : "client.js",
-      },
-    },
-  },
-  ssr: {
-    external: ["react", "react-dom"],
-  },
-}));
-"#
-}
-
-fn generate_server_tsx() -> &'static str {
-    r#"import { renderToString } from "react-dom/server";
-import { routes } from "./routes.generated";
-
-function matchRoute(pathname: string): { route: typeof routes[0]; params: Record<string, string> } | null {
-    for (const route of routes) {
-        const routeParts = route.path.split("/");
-        const pathParts = pathname.split("/");
-
-        if (routeParts.length !== pathParts.length) continue;
-
-        const params: Record<string, string> = {};
-        let match = true;
-
-        for (let i = 0; i < routeParts.length; i++) {
-            if (routeParts[i].startsWith(":")) {
-                params[routeParts[i].slice(1)] = pathParts[i];
-            } else if (routeParts[i] !== pathParts[i]) {
-                match = false;
-                break;
-            }
-        }
-
-        if (match) {
-            return { route, params };
-        }
-    }
-    return null;
-}
-
-function escapeJsonForScript(json: string): string {
-    return json.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
-}
-
-const isDev = import.meta.env?.DEV ?? false;
-
-export async function render(url: string, props: any): Promise<string> {
-    const urlObj = new URL(url, "http://localhost");
-    const matched = matchRoute(urlObj.pathname);
-
-    if (!matched) {
-        return "Not Found";
-    }
-
-    const allProps = { ...props, params: matched.params };
-    const pageModule = await matched.route.component();
-    const PageComponent = pageModule.default;
-    const html = renderToString(<PageComponent {...allProps} />);
-    const propsJson = escapeJsonForScript(JSON.stringify(allProps));
-
-    const viteScripts = `<script type="module" src="/@vite/client"></script>`;
-    const clientScript = `/src/client.tsx`;
-
-    return `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-    <title>Forte App</title>
-    ${viteScripts}
-</head>
-<body>
-    <div id="root">${html}</div>
-    <script>window.__FORTE_PROPS__ = ${propsJson};</script>
-    <script type="module" src="${clientScript}"></script>
-</body>
-</html>`;
-}
-
-(globalThis as any).handler = async function handler(request: Request): Promise<Response> {
-    const props = await request.json();
-    const url = new URL(request.url);
-
-    const matched = matchRoute(url.pathname);
-    if (matched) {
-        const allProps = { ...props, params: matched.params };
-        const pageModule = await matched.route.component();
-        const PageComponent = pageModule.default;
-        const html = renderToString(<PageComponent {...allProps} />);
-        const propsJson = escapeJsonForScript(JSON.stringify(allProps));
-
-        const viteScripts = isDev
-            ? `<script type="module" src="/@vite/client"></script>`
-            : "";
-        const clientScript = isDev
-            ? `/src/client.tsx`
-            : `/public/client.js`;
-
-        return new Response(
-            `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-    <title>Forte App</title>
-    ${viteScripts}
-</head>
-<body>
-    <div id="root">${html}</div>
-    <script>window.__FORTE_PROPS__ = ${propsJson};</script>
-    <script type="module" src="${clientScript}"></script>
-</body>
-</html>`,
-            {
-                headers: { "Content-Type": "text/html" },
-            }
-        );
-    }
-
-    return new Response("Not Found", { status: 404 });
-};
 "#
 }
 
@@ -490,51 +345,5 @@ export default function IndexPage(props: Props) {
 fn generate_robots_txt() -> &'static str {
     r#"User-agent: *
 Allow: /
-"#
-}
-
-fn generate_client_tsx() -> &'static str {
-    r#"import { hydrateRoot } from "react-dom/client";
-import { routes } from "./routes.generated";
-
-function matchRoute(pathname: string): { route: typeof routes[0]; params: Record<string, string> } | null {
-    for (const route of routes) {
-        const routeParts = route.path.split("/");
-        const pathParts = pathname.split("/");
-
-        if (routeParts.length !== pathParts.length) continue;
-
-        const params: Record<string, string> = {};
-        let match = true;
-
-        for (let i = 0; i < routeParts.length; i++) {
-            if (routeParts[i].startsWith(":")) {
-                params[routeParts[i].slice(1)] = pathParts[i];
-            } else if (routeParts[i] !== pathParts[i]) {
-                match = false;
-                break;
-            }
-        }
-
-        if (match) {
-            return { route, params };
-        }
-    }
-    return null;
-}
-
-async function hydrate() {
-    const props = (window as any).__FORTE_PROPS__;
-    const matched = matchRoute(window.location.pathname);
-
-    if (matched) {
-        const pageModule = await matched.route.component();
-        const PageComponent = pageModule.default;
-        const allProps = { ...props, params: matched.params };
-        hydrateRoot(document.getElementById("root")!, <PageComponent {...allProps} />);
-    }
-}
-
-hydrate();
 "#
 }
