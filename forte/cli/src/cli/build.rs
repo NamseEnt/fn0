@@ -9,7 +9,6 @@ use std::process::Stdio;
 #[derive(Debug)]
 pub struct BuildOptions {
     pub project_dir: PathBuf,
-    pub remote_host: Option<String>,
 }
 
 pub async fn run_build(options: BuildOptions) -> Result<()> {
@@ -23,13 +22,7 @@ pub async fn run_build(options: BuildOptions) -> Result<()> {
     println!("Project directory: {}", project_dir.display());
 
     run_codegen(&project_dir).await?;
-
-    if let Some(ref remote_host) = options.remote_host {
-        build_backend_remote(&project_dir, remote_host)?;
-    } else {
-        build_backend(&project_dir)?;
-    }
-
+    build_backend(&project_dir)?;
     build_frontend(&project_dir)?;
 
     let dist_dir = project_dir.join("dist");
@@ -233,76 +226,6 @@ fn build_backend(project_dir: &Path) -> Result<()> {
         anyhow::bail!("cargo build failed with status: {}", status);
     }
 
-    Ok(())
-}
-
-fn build_backend_remote(project_dir: &Path, ssh_target: &str) -> Result<()> {
-    let dir_name = project_dir
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "forte-project".to_string());
-    let remote_path = format!("/tmp/forte-remote-build-{}", dir_name);
-
-    println!("[build] Building backend on remote ({})...", ssh_target);
-
-    println!("[build] Syncing source to remote...");
-    let status = Command::new("rsync")
-        .args([
-            "-az",
-            "--delete",
-            "--exclude",
-            "target/",
-            "--include",
-            "Cargo.toml",
-            "--include",
-            "Cargo.lock",
-            "--include",
-            "rs/***",
-            "--exclude",
-            "*",
-        ])
-        .arg(format!("{}/", project_dir.display()))
-        .arg(format!("{}:{}/", ssh_target, remote_path))
-        .status()
-        .context("Failed to run rsync")?;
-
-    if !status.success() {
-        anyhow::bail!("rsync to remote failed with status: {}", status);
-    }
-
-    println!("[build] Running cargo build on remote...");
-    let status = Command::new("ssh")
-        .arg(ssh_target)
-        .arg(format!(
-            "cd {}/rs && ~/.cargo/bin/cargo build --release --target wasm32-wasip2",
-            remote_path
-        ))
-        .status()
-        .context("Failed to run ssh")?;
-
-    if !status.success() {
-        anyhow::bail!("Remote cargo build failed with status: {}", status);
-    }
-
-    let local_release_dir = project_dir.join("rs/target/wasm32-wasip2/release");
-    fs::create_dir_all(&local_release_dir)?;
-
-    println!("[build] Fetching build artifact from remote...");
-    let status = Command::new("rsync")
-        .args(["-az", "--include", "*.wasm", "--exclude", "*"])
-        .arg(format!(
-            "{}:{}/rs/target/wasm32-wasip2/release/",
-            ssh_target, remote_path
-        ))
-        .arg(format!("{}/", local_release_dir.display()))
-        .status()
-        .context("Failed to run rsync")?;
-
-    if !status.success() {
-        anyhow::bail!("rsync from remote failed with status: {}", status);
-    }
-
-    println!("[build] Remote build complete.");
     Ok(())
 }
 

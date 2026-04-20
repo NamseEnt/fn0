@@ -42,15 +42,18 @@ pub enum Commands {
         command: AddCommands,
     },
 
+    /// Build the project locally without deploying
+    Build {
+        /// Project directory (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+
     /// Build and deploy the project to fn0 cloud
     Deploy {
         /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
-
-        /// Build backend on a remote server via SSH (e.g. user@host)
-        #[arg(long)]
-        build_on_remote: Option<String>,
     },
 
     /// Queue management commands

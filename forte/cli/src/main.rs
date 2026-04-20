@@ -34,12 +34,14 @@ async fn main() -> Result<()> {
             }
         },
 
-        Commands::Deploy {
-            project,
-            build_on_remote,
-        } => {
+        Commands::Build { project } => {
             let project_dir = project.unwrap_or_else(|| ".".into());
-            cli::deploy::run(project_dir, build_on_remote.as_deref()).await?;
+            cli::build::run_build(cli::build::BuildOptions { project_dir }).await?;
+        }
+
+        Commands::Deploy { project } => {
+            let project_dir = project.unwrap_or_else(|| ".".into());
+            cli::deploy::run(project_dir).await?;
         }
 
         Commands::Queue { command } => match command {
