@@ -48,7 +48,11 @@ fn convert_rust_path_to_ts_path(rust_path: &str, ts_output_dir: &str) -> PathBuf
             if after_pages.len() == 1 {
                 file_stem.to_string()
             } else {
-                format!("{}/{}", after_pages[..after_pages.len() - 1].join("/"), file_stem)
+                format!(
+                    "{}/{}",
+                    after_pages[..after_pages.len() - 1].join("/"),
+                    file_stem
+                )
             }
         } else {
             after_pages.join("/")
@@ -138,9 +142,8 @@ impl Callbacks for Analyzer {
                     let path_str = local_path.to_string_lossy();
                     if path_str.contains("src/pages") {
                         let is_mod_rs = path_str.ends_with("mod.rs");
-                        let is_single_page_rs = !is_mod_rs
-                            && path_str.ends_with(".rs")
-                            && !path_str.contains("/api/");
+                        let is_single_page_rs =
+                            !is_mod_rs && path_str.ends_with(".rs") && !path_str.contains("/api/");
 
                         if is_mod_rs || is_single_page_rs {
                             let path_parts: Vec<&str> = path_str.split('/').collect();
@@ -430,7 +433,10 @@ impl Callbacks for Analyzer {
                                 }
                                 "handler" => {
                                     if tcx.def_kind(child_def_id) == DefKind::Fn
-                                        && matches!(tcx.visibility(child_def_id), Visibility::Public)
+                                        && matches!(
+                                            tcx.visibility(child_def_id),
+                                            Visibility::Public
+                                        )
                                     {
                                         handler_found = true;
                                     }
@@ -625,7 +631,10 @@ impl Callbacks for Analyzer {
                                 }
                                 "handler" => {
                                     if tcx.def_kind(child_def_id) == DefKind::Fn
-                                        && matches!(tcx.visibility(child_def_id), Visibility::Public)
+                                        && matches!(
+                                            tcx.visibility(child_def_id),
+                                            Visibility::Public
+                                        )
                                     {
                                         handler_found = true;
                                     }
@@ -780,12 +789,15 @@ fn generate_hook_file_content(
     let mut file_content = String::new();
     file_content.push_str(&format!("// Auto-generated from {}\n\n", rust_source_path));
     file_content.push_str("import { z } from \"zod\";\n");
-    file_content.push_str("import { useForteHook } from \"@/lib/forte-react\";\n\n");
+    file_content.push_str("import { useForteHook } from \"@forte/react\";\n\n");
 
     for def in definitions {
         if def.namespace.is_empty() {
             let zod_schema = to_zod(&def.ty);
-            file_content.push_str(&format!("const {}Schema = {};\n\n", def.type_name, zod_schema));
+            file_content.push_str(&format!(
+                "const {}Schema = {};\n\n",
+                def.type_name, zod_schema
+            ));
         }
     }
 
@@ -819,12 +831,15 @@ fn generate_action_file_content(
     let mut file_content = String::new();
     file_content.push_str(&format!("// Auto-generated from {}\n\n", rust_source_path));
     file_content.push_str("import { z } from \"zod\";\n");
-    file_content.push_str("import { callAction } from \"@/lib/forte-react\";\n\n");
+    file_content.push_str("import { callAction } from \"@forte/react\";\n\n");
 
     for def in definitions {
         if def.namespace.is_empty() {
             let zod_schema = to_zod(&def.ty);
-            file_content.push_str(&format!("const {}Schema = {};\n\n", def.type_name, zod_schema));
+            file_content.push_str(&format!(
+                "const {}Schema = {};\n\n",
+                def.type_name, zod_schema
+            ));
         }
     }
 
@@ -851,7 +866,10 @@ fn generate_actions_index(action_names: &[String]) -> String {
 
     for name in action_names {
         let camel_case_name = to_camel_case(name);
-        content.push_str(&format!("export {{ {} }} from \"./{}\";\n", camel_case_name, name));
+        content.push_str(&format!(
+            "export {{ {} }} from \"./{}\";\n",
+            camel_case_name, name
+        ));
     }
 
     content
