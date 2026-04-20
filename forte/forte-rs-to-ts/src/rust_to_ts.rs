@@ -308,4 +308,3 @@ impl<'tcx> TypeConverter<'tcx> {
         TsType::DiscriminatedUnion("t".to_string(), variants)
     }
 }
-
