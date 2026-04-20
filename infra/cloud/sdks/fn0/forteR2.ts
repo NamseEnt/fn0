@@ -29,6 +29,9 @@ export class ForteR2 extends pulumi.ComponentResource {
             if (args?.zoneId === undefined && !opts.urn) {
                 throw new Error("Missing required property 'zoneId'");
             }
+            if (args?.domain === undefined && !opts.urn) {
+                throw new Error("Missing required property 'domain'");
+            }
             if (args?.staticHostname === undefined && !opts.urn) {
                 throw new Error("Missing required property 'staticHostname'");
             }
@@ -37,6 +40,7 @@ export class ForteR2 extends pulumi.ComponentResource {
             }
             resourceInputs["accountId"] = args?.accountId;
             resourceInputs["zoneId"] = args?.zoneId;
+            resourceInputs["domain"] = args?.domain;
             resourceInputs["staticHostname"] = args?.staticHostname;
             resourceInputs["bucketName"] = args?.bucketName;
             resourceInputs["location"] = args?.location;
@@ -62,6 +66,7 @@ export class ForteR2 extends pulumi.ComponentResource {
 export interface ForteR2Args {
     accountId: pulumi.Input<string>;
     zoneId: pulumi.Input<string>;
+    domain: pulumi.Input<string>;
     staticHostname: pulumi.Input<string>;
     bucketName: pulumi.Input<string>;
     location?: pulumi.Input<string>;

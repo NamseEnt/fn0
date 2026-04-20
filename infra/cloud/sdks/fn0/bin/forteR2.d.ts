@@ -12,6 +12,7 @@ export declare class ForteR2 extends pulumi.ComponentResource {
 export interface ForteR2Args {
     accountId: pulumi.Input<string>;
     zoneId: pulumi.Input<string>;
+    domain: pulumi.Input<string>;
     staticHostname: pulumi.Input<string>;
     bucketName: pulumi.Input<string>;
     location?: pulumi.Input<string>;

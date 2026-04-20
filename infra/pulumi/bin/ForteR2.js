@@ -7,7 +7,7 @@ const crypto = require("crypto");
 class ForteR2 extends pulumi.ComponentResource {
     constructor(name, args, opts) {
         super("pkg:index:forte-r2", name, args, opts);
-        const { accountId, zoneId, staticHostname, bucketName, location } = args;
+        const { accountId, zoneId, domain, staticHostname, bucketName, location } = args;
         const bucket = new cloudflare.R2Bucket("bucket", {
             accountId,
             name: bucketName,
@@ -20,6 +20,21 @@ class ForteR2 extends pulumi.ComponentResource {
             zoneId,
             enabled: true,
             minTls: "1.2",
+        }, { parent: this, dependsOn: [bucket] });
+        new cloudflare.R2BucketCors("bucket-cors", {
+            accountId,
+            bucketName: bucket.name,
+            rules: [
+                {
+                    id: "forte-cross-origin-scripts",
+                    allowed: {
+                        methods: ["GET", "HEAD"],
+                        origins: [pulumi.interpolate `https://*.${domain}`],
+                        headers: ["*"],
+                    },
+                    maxAgeSeconds: 86400,
+                },
+            ],
         }, { parent: this, dependsOn: [bucket] });
         const permissionGroups = cloudflare.getAccountApiTokenPermissionGroupsListOutput({
             accountId,

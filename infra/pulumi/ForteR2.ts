@@ -5,6 +5,7 @@ import * as crypto from "crypto";
 export interface ForteR2Args {
   accountId: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
+  domain: pulumi.Input<string>;
   staticHostname: pulumi.Input<string>;
   bucketName: pulumi.Input<string>;
   location?: pulumi.Input<string>;
@@ -25,7 +26,7 @@ export class ForteR2 extends pulumi.ComponentResource {
   ) {
     super("pkg:index:forte-r2", name, args, opts);
 
-    const { accountId, zoneId, staticHostname, bucketName, location } = args;
+    const { accountId, zoneId, domain, staticHostname, bucketName, location } = args;
 
     const bucket = new cloudflare.R2Bucket(
       "bucket",
@@ -46,6 +47,26 @@ export class ForteR2 extends pulumi.ComponentResource {
         zoneId,
         enabled: true,
         minTls: "1.2",
+      },
+      { parent: this, dependsOn: [bucket] }
+    );
+
+    new cloudflare.R2BucketCors(
+      "bucket-cors",
+      {
+        accountId,
+        bucketName: bucket.name,
+        rules: [
+          {
+            id: "forte-cross-origin-scripts",
+            allowed: {
+              methods: ["GET", "HEAD"],
+              origins: [pulumi.interpolate`https://*.${domain}`],
+              headers: ["*"],
+            },
+            maxAgeSeconds: 86400,
+          },
+        ],
       },
       { parent: this, dependsOn: [bucket] }
     );

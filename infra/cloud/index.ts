@@ -51,6 +51,7 @@ const forteR2 = new fn0.ForteR2(
   {
     accountId,
     zoneId,
+    domain,
     staticHostname: `forte-static.${domain}`,
     bucketName: pulumi.interpolate`fn0-forte-static-${suffix}`,
   },
