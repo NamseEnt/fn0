@@ -42,7 +42,7 @@ pub async fn run_build(options: BuildOptions) -> Result<()> {
     Ok(())
 }
 
-const FORTE_RS_TO_TS_VERSION: &str = "0.1.4";
+const FORTE_RS_TO_TS_VERSION: &str = "0.1.7";
 
 async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
     let url = crate::tools::fn0_release_url("forte-rs-to-ts", FORTE_RS_TO_TS_VERSION)?;
