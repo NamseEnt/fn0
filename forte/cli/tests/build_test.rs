@@ -33,7 +33,8 @@ fn test_build_creates_dist() {
 
     assert!(project_dir.join("dist/backend.wasm").exists());
     assert!(project_dir.join("dist/server.js").exists());
-    assert!(project_dir.join("dist/public/robots.txt").exists());
+    assert!(project_dir.join("fe/dist/robots.txt").exists());
+    assert!(project_dir.join("fe/dist/client.js").exists());
 }
 
 #[test]

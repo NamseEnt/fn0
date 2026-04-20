@@ -1,12 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Suffix = exports.dns = exports.OciHeadQuarterVcn = exports.OciHeadQuarter = exports.docDb = exports.B2CloudflareStaticCdn = exports.OciRegion = exports.OciComputeWorker = void 0;
+exports.Suffix = exports.dns = exports.OciHeadQuarterVcn = exports.OciHeadQuarter = exports.ForteR2 = exports.docDb = exports.B2CloudflareStaticCdn = exports.OciRegion = exports.OciComputeWorker = void 0;
 var OciComputeWorker_1 = require("./OciComputeWorker");
 Object.defineProperty(exports, "OciComputeWorker", { enumerable: true, get: function () { return OciComputeWorker_1.OciComputeWorker; } });
 Object.defineProperty(exports, "OciRegion", { enumerable: true, get: function () { return OciComputeWorker_1.OciRegion; } });
 var B2CloudflareStaticCdn_1 = require("./B2CloudflareStaticCdn");
 Object.defineProperty(exports, "B2CloudflareStaticCdn", { enumerable: true, get: function () { return B2CloudflareStaticCdn_1.B2CloudflareStaticCdn; } });
 exports.docDb = require("./docDb");
+var ForteR2_1 = require("./ForteR2");
+Object.defineProperty(exports, "ForteR2", { enumerable: true, get: function () { return ForteR2_1.ForteR2; } });
 var OciHeadQuarter_1 = require("./OciHeadQuarter");
 Object.defineProperty(exports, "OciHeadQuarter", { enumerable: true, get: function () { return OciHeadQuarter_1.OciHeadQuarter; } });
 var OciHeadQuarterVcn_1 = require("./OciHeadQuarterVcn");

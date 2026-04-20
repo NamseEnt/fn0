@@ -13,4 +13,3 @@ serde_json = "1"
 anyhow = "1"
 tokio = { version = "1", features = ["time"] }
 tar = "0.4"
-walkdir = "2"

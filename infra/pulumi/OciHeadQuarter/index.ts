@@ -11,6 +11,7 @@ import {
   DnsProviderArg,
   CwasmBucketArgs,
   ForteDbArgs,
+  ForteR2Args,
 } from "../hqArgs.schema";
 
 export interface OciHeadQuarterArgs {
@@ -24,6 +25,7 @@ export interface OciHeadQuarterArgs {
   docDbUrl: pulumi.Input<string>;
   docDbToken: pulumi.Input<string>;
   forteDb: pulumi.Input<ForteDbArgs>;
+  forteR2: pulumi.Input<ForteR2Args>;
   sites: pulumi.Input<SiteArgs[]>;
   awsRegion: pulumi.Input<string>;
   wasmBucket: pulumi.Input<string>;
@@ -119,6 +121,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           token: docDbToken,
         },
         forteDb: args.forteDb,
+        forteR2: args.forteR2,
         aws: {
           region: args.awsRegion,
           wasmBucket: args.wasmBucket,

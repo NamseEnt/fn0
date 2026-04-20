@@ -14,10 +14,19 @@ if (fs.existsSync(userConfigPath)) {
   userConfig = mod.default ?? {};
 }
 
+const FORTE_BASE_PLACEHOLDER = "/__FORTE_BASE__/";
+
 export default defineConfig(async (env) => {
+  const isProdBuild = env.command === "build";
   const base: UserConfig = {
     root: feDir,
     plugins: [react()],
+    base: isProdBuild ? FORTE_BASE_PLACEHOLDER : "/",
+    define: {
+      __FORTE_BASE_URL__: JSON.stringify(
+        isProdBuild ? FORTE_BASE_PLACEHOLDER : "/"
+      ),
+    },
     resolve: {
       alias: {
         "@forte/react": path.resolve(dirname, "./forte-react.ts"),

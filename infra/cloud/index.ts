@@ -46,6 +46,17 @@ const forteDb = new fn0.ForteDb(
 
 const tursoApiToken = new pulumi.Config("turso").requireSecret("apiToken");
 
+const forteR2 = new fn0.ForteR2(
+  "forte-r2",
+  {
+    accountId,
+    zoneId,
+    staticHostname: `forte-static.${domain}`,
+    bucketName: pulumi.interpolate`fn0-forte-static-${suffix}`,
+  },
+  {}
+);
+
 const sccacheRegion = config.require("ociHeadQuarterRegion");
 
 const sccacheCompartment = new oci.identity.Compartment("sccache-compartment", {
@@ -304,6 +315,14 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
     groupName: forteDb.groupName,
     location: config.require("tursoLocation"),
     hostSuffix: forteDb.hostSuffix,
+  },
+  forteR2: {
+    accountId: forteR2.accountId,
+    bucket: forteR2.bucketName,
+    endpoint: forteR2.endpoint,
+    accessKeyId: forteR2.accessKeyId,
+    secretAccessKey: forteR2.secretAccessKey,
+    publicBaseUrl: forteR2.publicBaseUrl,
   },
   awsRegion: cwasmCompilerRegion,
   wasmBucket: cwasmCompilerBucketR.bucket,

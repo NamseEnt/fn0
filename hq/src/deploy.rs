@@ -20,6 +20,8 @@ struct DeployStartResponse {
     deploy_job_id: String,
     subdomain: String,
     code_id: u64,
+    build_id: String,
+    static_base_url: String,
 }
 
 #[derive(Deserialize)]
@@ -27,7 +29,33 @@ struct DeployFinishRequest {
     github_token: String,
     subdomain: String,
     code_id: u64,
+    build_id: Option<String>,
     env: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct DeployR2SignRequest {
+    github_token: String,
+    subdomain: String,
+    build_id: String,
+    files: Vec<DeployR2SignFile>,
+}
+
+#[derive(Deserialize)]
+struct DeployR2SignFile {
+    path: String,
+    content_type: Option<String>,
+}
+
+#[derive(Serialize)]
+struct DeployR2SignResponse {
+    uploads: Vec<DeployR2SignUpload>,
+}
+
+#[derive(Serialize)]
+struct DeployR2SignUpload {
+    path: String,
+    presigned_url: String,
 }
 
 #[derive(Serialize)]
@@ -141,12 +169,79 @@ pub async fn handle_deploy_start(
         Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to generate presigned URL: {}", e) }),
     };
 
+    let build_id = uuid::Uuid::new_v4().to_string();
+    let static_base_url = ctx.forte_r2.static_base_url(&project.subdomain, &build_id);
+
     json_response(200, &DeployStartResponse {
         presigned_url: presigned.uri().to_string(),
         deploy_job_id,
         subdomain: project.subdomain,
         code_id: project.code_id,
+        build_id,
+        static_base_url,
     })
+}
+
+pub async fn handle_deploy_r2_sign(
+    req: Request<hyper::body::Incoming>,
+    ctx: Arc<DeployContext>,
+) -> Response<Full<Bytes>> {
+    let body = match req.collect().await {
+        Ok(b) => b.to_bytes(),
+        Err(_) => return json_response(400, &ErrorResponse { error: "Failed to read body".to_string() }),
+    };
+
+    let request: DeployR2SignRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(_) => return json_response(400, &ErrorResponse { error: "Invalid request body".to_string() }),
+    };
+
+    let username = match verify_github_user(&request.github_token).await {
+        Ok(u) => u,
+        Err(e) => return json_response(401, &ErrorResponse { error: e }),
+    };
+
+    let project_name = match request.subdomain.strip_prefix(&format!("{username}-")) {
+        Some(name) => name,
+        None => return json_response(403, &ErrorResponse { error: "subdomain does not match authenticated user".to_string() }),
+    };
+
+    let project = match ctx.doc_db.get_project(&username, project_name).await {
+        Ok(Some(p)) => p,
+        Ok(None) => return json_response(404, &ErrorResponse { error: "Project not found".to_string() }),
+        Err(e) => return json_response(500, &ErrorResponse { error: format!("Failed to get project: {e}") }),
+    };
+    if project.subdomain != request.subdomain {
+        return json_response(403, &ErrorResponse { error: "subdomain mismatch".to_string() });
+    }
+
+    let expires = std::time::Duration::from_secs(600);
+    let mut uploads = Vec::with_capacity(request.files.len());
+    for file in &request.files {
+        match ctx
+            .forte_r2
+            .presign_put(
+                &request.subdomain,
+                &request.build_id,
+                &file.path,
+                file.content_type.as_deref(),
+                expires,
+            )
+            .await
+        {
+            Ok(url) => uploads.push(DeployR2SignUpload {
+                path: file.path.clone(),
+                presigned_url: url,
+            }),
+            Err(e) => {
+                return json_response(500, &ErrorResponse {
+                    error: format!("presign failed: {e}"),
+                });
+            }
+        }
+    }
+
+    json_response(200, &DeployR2SignResponse { uploads })
 }
 
 pub async fn handle_deploy_finish(
@@ -274,6 +369,24 @@ pub async fn handle_deploy_finish(
         return json_response(500, &ErrorResponse { error: format!("Failed to insert deployment: {}", e) });
     }
 
+    if let Some(build_id) = &request.build_id {
+        let old_build_ids = match ctx
+            .doc_db
+            .register_build(&request.subdomain, build_id)
+            .await
+        {
+            Ok(ids) => ids,
+            Err(e) => return json_response(500, &ErrorResponse {
+                error: format!("Failed to register build: {}", e),
+            }),
+        };
+        for old in old_build_ids {
+            if let Err(e) = ctx.doc_db.enqueue_r2_prefix_delete(&request.subdomain, &old).await {
+                tracing::warn!(%e, %old, "Failed to enqueue r2 prefix delete");
+            }
+        }
+    }
+
     ctx.deployment_cache.refresh().await;
     let generation = ctx.deployment_cache.last_deployment_id();
 
@@ -327,6 +440,17 @@ pub async fn handle_deploy_destroy(
         return json_response(500, &ErrorResponse {
             error: format!("Failed to destroy deployment: {}", e),
         });
+    }
+
+    if let Err(e) = ctx.doc_db.clear_build(&project.subdomain).await {
+        tracing::warn!(%e, subdomain = %project.subdomain, "Failed to clear build registry");
+    }
+    if let Err(e) = ctx
+        .doc_db
+        .enqueue_r2_subdomain_delete(&project.subdomain)
+        .await
+    {
+        tracing::warn!(%e, subdomain = %project.subdomain, "Failed to enqueue r2 subdomain delete");
     }
 
     spawn_immediate_push(&ctx).await;

@@ -12,7 +12,9 @@ import { Head } from "../src/app";
 
 const isDev = (import.meta as any).env?.DEV ?? false;
 
-const clientScriptSrc = isDev ? "/.forte/client.tsx" : "/public/client.js";
+declare const __FORTE_BASE_URL__: string;
+const forteBase = typeof __FORTE_BASE_URL__ !== "undefined" ? __FORTE_BASE_URL__ : "/";
+const clientScriptSrc = isDev ? "/.forte/client.tsx" : `${forteBase}client.js`;
 
 const viteDevBlock = isDev
   ? `<script type="module" src="/@vite/client"></script>

@@ -85,7 +85,11 @@ function hqGrafana(parent, { slug, k8sProvider, suffix, }) {
             },
             collectors: {
                 "alloy-receiver": {
-                    alloy: {},
+                    alloy: {
+                        clustering: {
+                            enabled: true,
+                        },
+                    },
                 },
                 "alloy-logs": {
                     alloy: {

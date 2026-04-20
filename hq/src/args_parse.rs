@@ -9,6 +9,7 @@ use crate::{
     args::*,
     deployment_cache::DeploymentCache,
     dns::{DnsProvider, cloudflare::CloudflareDnsProvider},
+    forte_r2::ForteR2,
     host_provider,
     site::Site,
 };
@@ -25,6 +26,7 @@ pub struct DeployContext {
     pub sites: Vec<Site>,
     pub env_encryption_key: [u8; 32],
     pub forte_db: crate::args::ForteDbArgs,
+    pub forte_r2: ForteR2,
 }
 
 pub struct HqArgsParsed {
@@ -107,6 +109,8 @@ impl HqArgs {
         let env_encryption_key =
             crate::env_crypto::decode_key_base64(&args.env_encryption_key_base64)?;
 
+        let forte_r2 = ForteR2::new(&args.forte_r2).await;
+
         let deploy_context = Arc::new(DeployContext {
             aws_s3_client,
             cwasm_s3_client,
@@ -119,6 +123,7 @@ impl HqArgs {
             sites: sites.clone(),
             env_encryption_key,
             forte_db: args.forte_db,
+            forte_r2,
         });
 
         let dns_provider = match args.dns_provider {

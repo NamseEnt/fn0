@@ -43,6 +43,11 @@ class OciHeadQuarter extends pulumi.ComponentResource {
             compartmentId,
             suffix,
             region: ociRegion,
+            sccacheBucket: args.sccacheBucket,
+            sccacheRegion: args.sccacheRegion,
+            sccacheEndpoint: args.sccacheEndpoint,
+            sccacheAccessKeyId: args.sccacheAccessKeyId,
+            sccacheSecretAccessKey: args.sccacheSecretAccessKey,
         });
         (0, hq_deployment_1.deployHqApplication)(this, {
             k8sProvider,
@@ -57,6 +62,8 @@ class OciHeadQuarter extends pulumi.ComponentResource {
                     url: docDbUrl,
                     token: docDbToken,
                 },
+                forteDb: args.forteDb,
+                forteR2: args.forteR2,
                 aws: {
                     region: args.awsRegion,
                     wasmBucket: args.wasmBucket,

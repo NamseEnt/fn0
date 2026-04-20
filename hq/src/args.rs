@@ -6,11 +6,23 @@ pub struct HqArgs {
     pub sites: Vec<SiteArgs>,
     pub doc_db: DocDbArgs,
     pub forte_db: ForteDbArgs,
+    pub forte_r2: ForteR2Args,
     pub aws: AwsArgs,
     pub cwasm_bucket: CwasmBucketArgs,
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,
     pub env_encryption_key_base64: String,
+}
+
+#[derive(Clone, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ForteR2Args {
+    pub account_id: String,
+    pub bucket: String,
+    pub endpoint: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub public_base_url: String,
 }
 
 #[derive(Clone, serde::Deserialize, schemars::JsonSchema)]

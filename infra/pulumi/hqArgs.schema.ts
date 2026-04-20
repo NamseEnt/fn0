@@ -6,6 +6,7 @@ export interface HqArgs {
   docDb: pulumi.Input<DocDbArgs>;
   envEncryptionKeyBase64: pulumi.Input<string>;
   forteDb: pulumi.Input<ForteDbArgs>;
+  forteR2: pulumi.Input<ForteR2Args>;
   selfDns: pulumi.Input<SelfDnsArgs>;
   sites: pulumi.Input<Array<SiteArgs>>;
 }
@@ -40,6 +41,14 @@ export interface ForteDbArgs {
   hostSuffix: pulumi.Input<string>;
   location: pulumi.Input<string>;
   organizationSlug: pulumi.Input<string>;
+}
+export interface ForteR2Args {
+  accessKeyId: pulumi.Input<string>;
+  accountId: pulumi.Input<string>;
+  bucket: pulumi.Input<string>;
+  endpoint: pulumi.Input<string>;
+  publicBaseUrl: pulumi.Input<string>;
+  secretAccessKey: pulumi.Input<string>;
 }
 export interface HostProviderArg {
   ociComputeVm?: pulumi.Input<OciComputeVmHostProviderArgs>;

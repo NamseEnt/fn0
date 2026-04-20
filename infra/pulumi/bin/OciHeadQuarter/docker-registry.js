@@ -4,7 +4,7 @@ exports.createDockerRegistry = createDockerRegistry;
 const pulumi = require("@pulumi/pulumi");
 const oci = require("@pulumi/oci");
 const dockerBuild = require("@pulumi/docker-build");
-function createDockerRegistry(parent, { compartmentId, suffix, region, }) {
+function createDockerRegistry(parent, { compartmentId, suffix, region, sccacheBucket, sccacheRegion, sccacheEndpoint, sccacheAccessKeyId, sccacheSecretAccessKey, }) {
     const repo = new oci.artifacts.ContainerRepository("hq-repo", {
         compartmentId,
         displayName: pulumi.interpolate `hq-repo-${suffix}`,
@@ -46,6 +46,13 @@ function createDockerRegistry(parent, { compartmentId, suffix, region, }) {
             location: "../../hq/Dockerfile",
         },
         platforms: [dockerBuild.Platform.Linux_arm64],
+        buildArgs: {
+            SCCACHE_BUCKET: sccacheBucket,
+            SCCACHE_REGION: sccacheRegion,
+            SCCACHE_ENDPOINT: sccacheEndpoint,
+            AWS_ACCESS_KEY_ID: sccacheAccessKeyId,
+            AWS_SECRET_ACCESS_KEY: sccacheSecretAccessKey,
+        },
         push: true,
         registries: [
             {
