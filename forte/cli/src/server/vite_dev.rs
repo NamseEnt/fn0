@@ -88,7 +88,8 @@ async function main() {{
             req.on("end", async () => {{
                 try {{
                     const {{ url, props, cookie }} = JSON.parse(body);
-                    const {{ renderStream }} = await vite.ssrLoadModule(SSR_MODULE_PATH);
+                    await vite.ssrLoadModule(SSR_MODULE_PATH);
+                    const renderStream = globalThis.renderStream;
                     const {{ stream, cookies }} = await renderStream(url, props, cookie);
 
                     const htmlBuffer = Buffer.from(await streamToString(stream));

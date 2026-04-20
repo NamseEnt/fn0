@@ -147,4 +147,4 @@ ${viteDevBlock}
   return new Response(stream, { headers });
 };
 
-export { renderStream };
+(globalThis as any).renderStream = renderStream;
