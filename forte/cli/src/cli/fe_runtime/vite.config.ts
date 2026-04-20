@@ -32,9 +32,15 @@ export default defineConfig(async (env) => {
         input: env.isSsrBuild
           ? path.resolve(dirname, "./server.tsx")
           : path.resolve(dirname, "./client.tsx"),
-        output: {
-          entryFileNames: env.isSsrBuild ? "server.js" : "client.js",
-        },
+        output: env.isSsrBuild
+          ? {
+              entryFileNames: "server.js",
+              format: "iife",
+              inlineDynamicImports: true,
+            }
+          : {
+              entryFileNames: "client.js",
+            },
       },
     },
     ssr: env.isSsrBuild
