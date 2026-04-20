@@ -11,6 +11,7 @@ use color_eyre::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     color_eyre::install()?;
 
     let cli = Cli::parse();
