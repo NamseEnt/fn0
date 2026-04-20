@@ -1,9 +1,10 @@
 use aws_sdk_s3::Client as S3Client;
 use crate::doc_db::DocDb;
+use crate::forte_r2::ForteR2;
 use std::time::Duration;
 use tracing::*;
 
-pub async fn run(doc_db: DocDb, s3_client: S3Client) {
+pub async fn run(doc_db: DocDb, s3_client: S3Client, forte_r2: ForteR2) {
     let mut interval = tokio::time::interval(Duration::from_secs(2));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -23,6 +24,7 @@ pub async fn run(doc_db: DocDb, s3_client: S3Client) {
 
         let result = match job.task_name.as_str() {
             "delete_wasm" => process_delete_wasm(&s3_client, &job.payload).await,
+            "delete_r2_prefix" => process_delete_r2_prefix(&forte_r2, &job.payload).await,
             other => {
                 warn!(task = other, "Unknown job task");
                 Ok(())
@@ -69,5 +71,23 @@ async fn process_delete_wasm(s3_client: &S3Client, payload: &str) -> Result<(), 
 
     info!(key = %payload.s3_key, "Deleted WASM from S3");
 
+    Ok(())
+}
+
+async fn process_delete_r2_prefix(forte_r2: &ForteR2, payload: &str) -> Result<(), String> {
+    #[derive(serde::Deserialize)]
+    struct DeleteR2PrefixPayload {
+        prefix: String,
+    }
+
+    let payload: DeleteR2PrefixPayload =
+        serde_json::from_str(payload).map_err(|e| format!("Invalid payload: {}", e))?;
+
+    forte_r2
+        .delete_prefix(&payload.prefix)
+        .await
+        .map_err(|e| format!("R2 delete prefix failed: {}", e))?;
+
+    info!(prefix = %payload.prefix, "Deleted R2 prefix");
     Ok(())
 }

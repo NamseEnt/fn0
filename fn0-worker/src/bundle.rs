@@ -80,7 +80,6 @@ impl BundleFetcher {
         let mut manifest: Option<Manifest> = None;
         let mut backend_bytes: Option<Bytes> = None;
         let mut frontend_bytes: Option<Bytes> = None;
-        let mut assets: HashMap<String, Vec<u8>> = HashMap::new();
         let mut env_enc_bytes: Option<Vec<u8>> = None;
 
         let mut archive = tar::Archive::new(tar_bytes.as_slice());
@@ -105,10 +104,6 @@ impl BundleFetcher {
                 }
                 "env.enc" => {
                     env_enc_bytes = Some(buf);
-                }
-                other if other.starts_with("public/") => {
-                    let rel = &other["public/".len()..];
-                    assets.insert(format!("/{rel}"), buf);
                 }
                 _ => {}
             }
@@ -135,12 +130,7 @@ impl BundleFetcher {
             }
         };
 
-        let is_forte = matches!(deployment, Deployment::Forte);
         self.fn0.register_deployment(subdomain, deployment);
-
-        if is_forte {
-            self.fn0.set_public_assets(subdomain, assets);
-        }
 
         match env_enc_bytes {
             Some(blob) => {

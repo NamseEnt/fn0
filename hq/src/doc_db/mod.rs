@@ -1,3 +1,4 @@
+mod build_registry;
 mod deployment;
 mod host_status;
 mod job_queue;

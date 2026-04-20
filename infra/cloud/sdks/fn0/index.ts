@@ -20,6 +20,11 @@ export type ForteDb = import("./forteDb").ForteDb;
 export const ForteDb: typeof import("./forteDb").ForteDb = null as any;
 utilities.lazyLoad(exports, ["ForteDb"], () => require("./forteDb"));
 
+export { ForteR2Args } from "./forteR2";
+export type ForteR2 = import("./forteR2").ForteR2;
+export const ForteR2: typeof import("./forteR2").ForteR2 = null as any;
+utilities.lazyLoad(exports, ["ForteR2"], () => require("./forteR2"));
+
 export { OciComputeWorkerArgs } from "./ociComputeWorker";
 export type OciComputeWorker = import("./ociComputeWorker").OciComputeWorker;
 export const OciComputeWorker: typeof import("./ociComputeWorker").OciComputeWorker = null as any;
@@ -68,6 +73,8 @@ const _module = {
                 return new CloudflareDns(name, <any>undefined, { urn })
             case "fn0:index:ForteDb":
                 return new ForteDb(name, <any>undefined, { urn })
+            case "fn0:index:ForteR2":
+                return new ForteR2(name, <any>undefined, { urn })
             case "fn0:index:OciComputeWorker":
                 return new OciComputeWorker(name, <any>undefined, { urn })
             case "fn0:index:OciHeadQuarter":

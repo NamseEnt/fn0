@@ -64,31 +64,6 @@ pub fn create_env_vars(project_root: &Path) -> EnvVars {
     Arc::new(RwLock::new(map))
 }
 
-async fn load_public_assets(public_dir: &Path) -> HashMap<String, Vec<u8>> {
-    let mut assets = HashMap::new();
-    if !public_dir.exists() {
-        return assets;
-    }
-    let mut stack = vec![public_dir.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        let Ok(mut rd) = tokio::fs::read_dir(&dir).await else {
-            continue;
-        };
-        while let Ok(Some(entry)) = rd.next_entry().await {
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else if let Ok(bytes) = tokio::fs::read(&path).await {
-                if let Ok(rel) = path.strip_prefix(public_dir) {
-                    let key = format!("/{}", rel.to_string_lossy().replace('\\', "/"));
-                    assets.insert(key, bytes);
-                }
-            }
-        }
-    }
-    assets
-}
-
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let mut deployment_map = DeploymentMap::new();
     deployment_map.register_deployment("app", Deployment::Forte);
@@ -107,11 +82,6 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     ));
 
     let public_dir = Arc::new(config.public_dir);
-
-    if vite_socket_path.is_none() {
-        let assets = load_public_assets(&public_dir).await;
-        fn0.set_public_assets("app", assets);
-    }
 
     let handle = ServerHandle {
         cache: cache.clone(),

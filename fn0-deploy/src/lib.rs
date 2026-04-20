@@ -285,23 +285,6 @@ pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()
         .map_err(|e| anyhow!("Failed to read {}: {}", server_js.display(), e))?;
     append_bytes(&mut builder, "frontend.js", &server_bytes)?;
 
-    let public_dir = dist_dir.join("public");
-    if public_dir.exists() {
-        for entry in walkdir::WalkDir::new(&public_dir).into_iter().filter_map(|e| e.ok()) {
-            if !entry.file_type().is_file() {
-                continue;
-            }
-            let rel = entry
-                .path()
-                .strip_prefix(&public_dir)
-                .map_err(|e| anyhow!("strip_prefix failed: {}", e))?;
-            let tar_path = format!("public/{}", rel.to_string_lossy().replace('\\', "/"));
-            let bytes = std::fs::read(entry.path())
-                .map_err(|e| anyhow!("Failed to read {}: {}", entry.path().display(), e))?;
-            append_bytes(&mut builder, &tar_path, &bytes)?;
-        }
-    }
-
     builder.finish()?;
     Ok(())
 }

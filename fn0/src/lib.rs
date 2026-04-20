@@ -19,9 +19,7 @@ use execute::*;
 pub use execute::EnvVars;
 use forte_fetch::ForteFetchHandler;
 use http_body_util::combinators::UnsyncBoxBody;
-use http_body_util::{BodyExt, Full};
 use crate::measure_cpu_time::SystemClock;
-use std::collections::HashMap;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, RwLock};
 use wasmtime_wasi_http::bindings::ProxyPre;
@@ -34,12 +32,6 @@ pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
 
-#[derive(Clone)]
-pub struct StaticAsset {
-    pub bytes: Bytes,
-    pub content_type: &'static str,
-}
-
 pub struct Fn0<J>
 where
     J: AdaptCache<String, FromUtf8Error>,
@@ -47,7 +39,6 @@ where
     js_cache: J,
     deployment_map: RwLock<DeploymentMap>,
     wasm_executor: WasmExecutor,
-    public_assets: RwLock<HashMap<String, Arc<HashMap<String, StaticAsset>>>>,
 }
 
 impl<J> Fn0<J>
@@ -75,7 +66,6 @@ where
                 shared_client,
                 turso_hijack,
             ),
-            public_assets: RwLock::new(HashMap::new()),
         }
     }
 
@@ -91,28 +81,7 @@ where
             .write()
             .unwrap()
             .unregister_deployment(code_id);
-        self.public_assets.write().unwrap().remove(code_id);
         self.wasm_executor.clear_env(code_id);
-    }
-
-    pub fn set_public_assets(&self, code_id: &str, assets: HashMap<String, Vec<u8>>) {
-        let converted: HashMap<String, StaticAsset> = assets
-            .into_iter()
-            .map(|(path, bytes)| {
-                let content_type = get_content_type(&path);
-                (
-                    path,
-                    StaticAsset {
-                        bytes: Bytes::from(bytes),
-                        content_type,
-                    },
-                )
-            })
-            .collect();
-        self.public_assets
-            .write()
-            .unwrap()
-            .insert(code_id.to_string(), Arc::new(converted));
     }
 
     pub fn set_env(&self, code_id: &str, new_vars: Vec<(String, String)>) {
@@ -185,10 +154,6 @@ where
         let uri = request.uri().clone();
         let path = uri.path().to_string();
 
-        if let Some(asset_response) = self.try_serve_public_asset(code_id, &path) {
-            return Ok(asset_response);
-        }
-
         let original_headers = request.headers().clone();
 
         let backend_response = self
@@ -249,61 +214,6 @@ where
         }
 
         Ok(ssr_response)
-    }
-
-    fn try_serve_public_asset(&self, code_id: &str, path: &str) -> Option<Response> {
-        let assets = {
-            let guard = self.public_assets.read().unwrap();
-            guard.get(code_id).cloned()
-        }?;
-
-        let stripped = path.strip_prefix("/public/").map(|s| format!("/{s}"));
-
-        let asset = assets
-            .get(path)
-            .or_else(|| stripped.as_deref().and_then(|p| assets.get(p)))?;
-
-        let body: Body = Full::new(asset.bytes.clone())
-            .map_err(|e| anyhow!("{e}"))
-            .boxed_unsync();
-
-        Some(
-            hyper::Response::builder()
-                .status(200)
-                .header("content-type", asset.content_type)
-                .header("cache-control", "public, max-age=3600")
-                .body(body)
-                .unwrap(),
-        )
-    }
-}
-
-fn get_content_type(path: &str) -> &'static str {
-    let ext = path.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
-    match ext.as_deref() {
-        Some("html") => "text/html; charset=utf-8",
-        Some("css") => "text/css; charset=utf-8",
-        Some("js") => "application/javascript; charset=utf-8",
-        Some("json") => "application/json; charset=utf-8",
-        Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("gif") => "image/gif",
-        Some("svg") => "image/svg+xml",
-        Some("ico") => "image/x-icon",
-        Some("webp") => "image/webp",
-        Some("woff") => "font/woff",
-        Some("woff2") => "font/woff2",
-        Some("ttf") => "font/ttf",
-        Some("otf") => "font/otf",
-        Some("eot") => "application/vnd.ms-fontobject",
-        Some("txt") => "text/plain; charset=utf-8",
-        Some("xml") => "application/xml; charset=utf-8",
-        Some("pdf") => "application/pdf",
-        Some("mp4") => "video/mp4",
-        Some("webm") => "video/webm",
-        Some("mp3") => "audio/mpeg",
-        Some("wav") => "audio/wav",
-        _ => "application/octet-stream",
     }
 }
 

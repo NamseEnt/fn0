@@ -1,7 +1,6 @@
 use crate::cli::fe_runtime;
 use anyhow::{Context, Result};
 use std::fs;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
@@ -293,61 +292,13 @@ fn create_dist(project_dir: &Path, dist_dir: &Path) -> Result<()> {
 
     let backend_wasm = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?;
     let frontend_js = project_dir.join("fe/dist/ssr/server.js");
-    let client_js = project_dir.join("fe/dist/client.js");
-    let public_dir = project_dir.join("fe/public");
 
     fs::copy(&backend_wasm, dist_dir.join("backend.wasm"))?;
     println!("[dist] Copied backend.wasm");
 
-    let dist_public = dist_dir.join("public");
-    fs::create_dir_all(&dist_public)?;
-
-    if public_dir.exists() {
-        copy_dir_recursive(&public_dir, &dist_public)?;
-        println!("[dist] Copied public/");
-    }
-
-    let client_content = fs::read(&client_js)?;
-    let hash = compute_hash(&client_content);
-    let hashed_filename = format!("client.{}.js", hash);
-
-    fs::write(dist_public.join(&hashed_filename), &client_content)?;
-    println!("[dist] Copied {} (hashed)", hashed_filename);
-
-    let server_content = fs::read_to_string(&frontend_js)?;
-    let updated_content =
-        server_content.replace("/public/client.js", &format!("/public/{}", hashed_filename));
-    fs::write(dist_dir.join("server.js"), updated_content)?;
-    println!("[dist] Copied server.js (updated client path)");
-
-    let manifest = format!(r#"{{"client.js":"{}"}}"#, hashed_filename);
-    fs::write(dist_public.join("manifest.json"), manifest)?;
-    println!("[dist] Generated manifest.json");
-
-    Ok(())
-}
-
-fn compute_hash(content: &[u8]) -> String {
-    let mut hasher = DefaultHasher::new();
-    content.hash(&mut hasher);
-    let hash = hasher.finish();
-    format!("{:08x}", hash as u32)
-}
-
-fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir_all(dst)?;
-
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-
-        if src_path.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
-        } else {
-            fs::copy(&src_path, &dst_path)?;
-        }
-    }
+    let server_content = fs::read(&frontend_js)?;
+    fs::write(dist_dir.join("server.js"), server_content)?;
+    println!("[dist] Copied server.js");
 
     Ok(())
 }

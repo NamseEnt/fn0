@@ -7,6 +7,7 @@ mod env_crypto;
 mod doc_db;
 mod dns;
 mod dns_sync;
+mod forte_r2;
 mod host_id;
 mod host_provider;
 mod job_processor;
@@ -61,8 +62,9 @@ fn main() -> Result<()> {
         {
             let doc_db = deploy_context.doc_db.clone();
             let s3_client = deploy_context.cwasm_s3_client.clone();
+            let forte_r2 = deploy_context.forte_r2.clone();
             set.spawn(async move {
-                job_processor::run(doc_db, s3_client).await;
+                job_processor::run(doc_db, s3_client, forte_r2).await;
                 Ok(())
             });
         }
@@ -143,6 +145,9 @@ async fn route(
         }
         (&Method::POST, "/deploy/start") => {
             Ok(deploy::handle_deploy_start(req, ctx).await)
+        }
+        (&Method::POST, "/deploy/r2/sign") => {
+            Ok(deploy::handle_deploy_r2_sign(req, ctx).await)
         }
         (&Method::POST, "/deploy/finish") => {
             Ok(deploy::handle_deploy_finish(req, ctx).await)
