@@ -6,6 +6,9 @@ description = "Build-time code generators for the Forte web framework (routes, e
 license = "AGPL-3.0-only"
 repository = "https://github.com/NamseEnt/fn0"
 
+[package.metadata.release]
+release = false
+
 [dependencies]
 anyhow = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

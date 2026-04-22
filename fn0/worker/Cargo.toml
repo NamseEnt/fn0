@@ -6,6 +6,9 @@ description = "Worker binary for the fn0 FaaS platform"
 license = "AGPL-3.0-only"
 repository = "https://github.com/NamseEnt/fn0"
 
+[package.metadata.release]
+release = false
+
 [dependencies]
 fn0 = { workspace = true }
 async_singleflight = { workspace = true }

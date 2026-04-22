@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["fn0/*", "forte/*"]
-exclude = ["vendor/wasmtime", "vendor/deno", "vendor/oci-rust-sdk", "fn0/adapt-cache", "forte/rs-to-ts"]
+exclude = ["vendor/*", "forte/rs-to-ts"]
 
 [workspace.dependencies]
 anyhow = "1"
