@@ -11,13 +11,13 @@ bytes = "1"
 chrono = "0.4"
 clap = "4.5.53"
 color-eyre = "0.6"
-fn0 = { path = "fn0/fn0" }
-fn0-deploy = { path = "fn0/deploy" }
-fn0-wasmtime = { path = "fn0/wasmtime" }
-ski = { package = "fn0-ski", path = "fn0/ski" }
-forte-json = { path = "forte/json" }
-forte-macros = { path = "forte/macros" }
-forte-sdk = { path = "forte/sdk" }
+fn0 = { path = "fn0/fn0", version = "0.2.14" }
+fn0-deploy = { path = "fn0/deploy", version = "0.1.3" }
+fn0-wasmtime = { path = "fn0/wasmtime", version = "0.1.3" }
+ski = { package = "fn0-ski", path = "fn0/ski", version = "0.1.2" }
+forte-json = { path = "forte/json", version = "0.1.1" }
+forte-macros = { path = "forte/macros", version = "0.5.0" }
+forte-sdk = { path = "forte/sdk", version = "0.3.0" }
 futures = "0.3"
 http = "1"
 http-body-util = "0.1"
