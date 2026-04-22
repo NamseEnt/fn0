@@ -104,8 +104,10 @@ export function createDockerRegistry(
         SCCACHE_BUCKET: sccacheBucket,
         SCCACHE_REGION: sccacheRegion,
         SCCACHE_ENDPOINT: sccacheEndpoint,
-        AWS_ACCESS_KEY_ID: sccacheAccessKeyId,
-        AWS_SECRET_ACCESS_KEY: sccacheSecretAccessKey,
+      },
+      secrets: {
+        aws_access_key_id: sccacheAccessKeyId,
+        aws_secret_access_key: sccacheSecretAccessKey,
       },
       push: true,
       registries: [

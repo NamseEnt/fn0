@@ -18,13 +18,10 @@ export interface DnsProviderArgArgs {
 export interface ForteDbArgsArgs {
     apiToken: pulumi.Input<string>;
     groupName: pulumi.Input<string>;
-    hostSuffix: pulumi.Input<string>;
-    location: pulumi.Input<string>;
     organizationSlug: pulumi.Input<string>;
 }
 export interface ForteR2ArgsArgs {
     accessKeyId: pulumi.Input<string>;
-    accountId: pulumi.Input<string>;
     bucket: pulumi.Input<string>;
     endpoint: pulumi.Input<string>;
     publicBaseUrl: pulumi.Input<string>;
