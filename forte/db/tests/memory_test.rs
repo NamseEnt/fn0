@@ -1,4 +1,4 @@
-use forte_db::{BatchOp, DbOp, DbResult, DbRequest, Prepared};
+use forte_db::{BatchOp, DbOp, DbRequest, DbResult, Prepared};
 
 fn create_test_db() -> forte_db::Database {
     forte_db::memory()
@@ -8,7 +8,7 @@ fn create_test_db() -> forte_db::Database {
 // In-memory backend tests
 // ============================================================
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_put_and_get() {
     let db = create_test_db();
     db.put("pk", "sk", b"hello").await.unwrap();
@@ -18,14 +18,14 @@ async fn memory_put_and_get() {
     assert_eq!(result.unwrap().as_ref(), b"hello");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_get_nonexistent() {
     let db = create_test_db();
     let result = db.get("missing", "missing").await.unwrap();
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_update_existing() {
     let db = create_test_db();
     db.put("pk", "sk", b"v1").await.unwrap();
@@ -35,7 +35,7 @@ async fn memory_update_existing() {
     assert_eq!(result.as_ref(), b"v2");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_delete() {
     let db = create_test_db();
     db.put("pk", "sk", b"data").await.unwrap();
@@ -45,7 +45,7 @@ async fn memory_delete() {
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_query_with_pagination() {
     let db = create_test_db();
     for i in 0..5 {
@@ -68,7 +68,7 @@ async fn memory_query_with_pagination() {
     assert_eq!(page3[0].0, "sk_04");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_scan() {
     let db = create_test_db();
     db.put("a", "1", b"a1").await.unwrap();
@@ -85,21 +85,35 @@ async fn memory_scan() {
     assert_eq!(page2[0].0, "b");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_batch() {
     let db = create_test_db();
     db.batch(&[
-        BatchOp::Put { pk: "pk", sk: "a", data: b"1" },
-        BatchOp::Put { pk: "pk", sk: "b", data: b"2" },
-        BatchOp::Put { pk: "pk", sk: "c", data: b"3" },
-    ]).await.unwrap();
+        BatchOp::Put {
+            pk: "pk",
+            sk: "a",
+            data: b"1",
+        },
+        BatchOp::Put {
+            pk: "pk",
+            sk: "b",
+            data: b"2",
+        },
+        BatchOp::Put {
+            pk: "pk",
+            sk: "c",
+            data: b"3",
+        },
+    ])
+    .await
+    .unwrap();
 
     let items = db.query("pk", None::<&str>, 10).await.unwrap();
     assert_eq!(items.len(), 3);
 
-    db.batch(&[
-        BatchOp::Delete { pk: "pk", sk: "b" },
-    ]).await.unwrap();
+    db.batch(&[BatchOp::Delete { pk: "pk", sk: "b" }])
+        .await
+        .unwrap();
 
     let items = db.query("pk", None::<&str>, 10).await.unwrap();
     assert_eq!(items.len(), 2);
@@ -107,7 +121,7 @@ async fn memory_batch() {
     assert_eq!(items[1].0, "c");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_transaction_commit() {
     let db = create_test_db();
 
@@ -125,7 +139,7 @@ async fn memory_transaction_commit() {
     assert_eq!(result.as_ref(), b"in_tx");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_transaction_rollback() {
     let db = create_test_db();
     db.put("pk", "sk", b"original").await.unwrap();
@@ -138,16 +152,29 @@ async fn memory_transaction_rollback() {
     assert_eq!(result.as_ref(), b"original");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_execute_ops() {
     let db = create_test_db();
     db.put("pk", "a", b"aa").await.unwrap();
 
-    let results = db.execute_ops(vec![
-        DbOp::Get { pk: "pk".into(), sk: "a".into() },
-        DbOp::Get { pk: "pk".into(), sk: "missing".into() },
-        DbOp::Put { pk: "pk".into(), sk: "b".into(), data: b"bb".to_vec() },
-    ]).await.unwrap();
+    let results = db
+        .execute_ops(vec![
+            DbOp::Get {
+                pk: "pk".into(),
+                sk: "a".into(),
+            },
+            DbOp::Get {
+                pk: "pk".into(),
+                sk: "missing".into(),
+            },
+            DbOp::Put {
+                pk: "pk".into(),
+                sk: "b".into(),
+                data: b"bb".to_vec(),
+            },
+        ])
+        .await
+        .unwrap();
 
     assert_eq!(results.len(), 3);
     match &results[0] {
@@ -155,7 +182,7 @@ async fn memory_execute_ops() {
         _ => panic!("expected Single(Some)"),
     }
     match &results[1] {
-        DbResult::Single(None) => {},
+        DbResult::Single(None) => {}
         _ => panic!("expected Single(None)"),
     }
     assert!(matches!(&results[2], DbResult::Done));
@@ -165,7 +192,7 @@ async fn memory_execute_ops() {
     assert_eq!(result.as_ref(), b"bb");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_send_with() {
     let db = create_test_db();
     db.put("TestDoc", "id=hello", b"{}").await.unwrap();
@@ -176,12 +203,13 @@ async fn memory_send_with() {
         type Output = Option<Vec<u8>>;
         fn prepare(self) -> Prepared<Self::Output> {
             Prepared {
-                ops: vec![DbOp::Get { pk: "TestDoc".into(), sk: "id=hello".into() }],
-                parse: Box::new(|iter| {
-                    match iter.next().unwrap() {
-                        DbResult::Single(opt) => Ok(opt.map(|b| b.to_vec())),
-                        _ => panic!("unexpected"),
-                    }
+                ops: vec![DbOp::Get {
+                    pk: "TestDoc".into(),
+                    sk: "id=hello".into(),
+                }],
+                parse: Box::new(|iter| match iter.next().unwrap() {
+                    DbResult::Single(opt) => Ok(opt.map(|b| b.to_vec())),
+                    _ => panic!("unexpected"),
                 }),
             }
         }
@@ -195,7 +223,7 @@ async fn memory_send_with() {
 // Per-instance isolation test
 // ============================================================
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_instances_are_isolated() {
     let db1 = create_test_db();
     let db2 = create_test_db();
@@ -210,7 +238,7 @@ async fn memory_instances_are_isolated() {
 // Mocking tests
 // ============================================================
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_get_returns_data() {
     let db = create_test_db();
 
@@ -220,7 +248,7 @@ async fn mock_get_returns_data() {
     assert_eq!(result.as_ref(), b"mocked_data");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_get_returns_none() {
     let db = create_test_db();
 
@@ -238,7 +266,7 @@ async fn mock_get_returns_none() {
     assert_eq!(result.as_ref(), b"real");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_get_returns_error() {
     let db = create_test_db();
 
@@ -248,7 +276,7 @@ async fn mock_get_returns_error() {
     assert!(err.to_string().contains("network timeout"));
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_put_returns_error() {
     let db = create_test_db();
 
@@ -262,7 +290,7 @@ async fn mock_put_returns_error() {
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_delete_returns_error() {
     let db = create_test_db();
     db.put("pk", "sk", b"data").await.unwrap();
@@ -277,7 +305,7 @@ async fn mock_delete_returns_error() {
     assert!(result.is_some());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_is_one_shot() {
     let db = create_test_db();
     db.put("pk", "sk", b"real").await.unwrap();
@@ -292,7 +320,7 @@ async fn mock_is_one_shot() {
     assert_eq!(result.as_ref(), b"real");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_clear() {
     let db = create_test_db();
 
@@ -304,7 +332,7 @@ async fn mock_clear() {
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_multiple_rules() {
     let db = create_test_db();
 

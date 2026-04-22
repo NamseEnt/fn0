@@ -194,10 +194,7 @@ const MAX_ATTEMPTS: u32 = 5;
 const BACKOFF_BASE_MS: u64 = 50;
 const BACKOFF_CAP_MS: u64 = 1000;
 
-pub(crate) async fn run<F, Fut, Out, Cancel, E>(
-    db: Database,
-    mut f: F,
-) -> TrxResult<Out, Cancel, E>
+pub(crate) async fn run<F, Fut, Out, Cancel, E>(db: Database, mut f: F) -> TrxResult<Out, Cancel, E>
 where
     F: FnMut(Trx) -> Fut,
     Fut: std::future::Future<Output = Result<TrxControl<Out, Cancel>, E>>,
@@ -228,8 +225,8 @@ where
                         if attempt + 1 >= MAX_ATTEMPTS {
                             return TrxResult::Conflict(details);
                         }
-                        let backoff = conflict_backoff(attempt);
-                        wstd::time::Timer::after(backoff).wait().await;
+                        let backoff = conflict_backoff(attempt).await;
+                        forte_sdk::time_wasi::sleep(backoff).await;
                         attempt += 1;
                     }
                     Err(CommitFailure::Err(err)) => return TrxResult::Err(E::from(err)),
@@ -240,16 +237,16 @@ where
     }
 }
 
-fn conflict_backoff(attempt: u32) -> wstd::time::Duration {
+async fn conflict_backoff(attempt: u32) -> forte_sdk::time_wasi::Duration {
     let ceiling = BACKOFF_BASE_MS
         .checked_shl(attempt)
         .unwrap_or(BACKOFF_CAP_MS)
         .min(BACKOFF_CAP_MS);
     let mut buf = [0u8; 8];
-    wstd::rand::get_insecure_random_bytes(&mut buf);
+    forte_sdk::rand::get_insecure_random_bytes(&mut buf).await;
     let raw = u64::from_le_bytes(buf);
     let delay_ms = raw % (ceiling + 1);
-    wstd::time::Duration::from_millis(delay_ms)
+    forte_sdk::time_wasi::Duration::from_millis(delay_ms)
 }
 
 struct TrxState {

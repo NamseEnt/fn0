@@ -1,11 +1,11 @@
 use crate::turso::StoredDoc;
 use crate::{BatchOp, DbOp, DbResult};
 use anyhow::{Result, bail};
+use bytes::Bytes;
 use libsql_hrana::proto::*;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use wstd::http::body::Bytes;
 
 #[derive(Clone)]
 struct MemDoc {
@@ -127,12 +127,8 @@ impl MemoryDatabase {
                     limit,
                 } => {
                     let store = self.store.borrow();
-                    let items = query_store(
-                        &store,
-                        pk,
-                        after_sk.as_deref(),
-                        limit.unwrap_or(usize::MAX),
-                    );
+                    let items =
+                        query_store(&store, pk, after_sk.as_deref(), limit.unwrap_or(usize::MAX));
                     results.push(DbResult::Multiple(items));
                 }
                 DbOp::Put { pk, sk, data } => {
@@ -140,9 +136,7 @@ impl MemoryDatabase {
                     results.push(DbResult::Done);
                 }
                 DbOp::Delete { pk, sk } => {
-                    self.store
-                        .borrow_mut()
-                        .remove(&(pk.clone(), sk.clone()));
+                    self.store.borrow_mut().remove(&(pk.clone(), sk.clone()));
                     results.push(DbResult::Done);
                 }
             }
@@ -191,8 +185,7 @@ impl<'a> MemoryTransaction<'a> {
     }
 
     pub(crate) async fn delete(&mut self, pk: &str, sk: &str) -> Result<()> {
-        self.working
-            .remove(&(pk.to_string(), sk.to_string()));
+        self.working.remove(&(pk.to_string(), sk.to_string()));
         Ok(())
     }
 
@@ -240,10 +233,10 @@ fn query_store(
         if k_pk != pk {
             continue;
         }
-        if let Some(after) = after_sk {
-            if k_sk.as_str() <= after {
-                continue;
-            }
+        if let Some(after) = after_sk
+            && k_sk.as_str() <= after
+        {
+            continue;
         }
         items.push((k_sk.clone(), Bytes::from(doc.data.clone())));
         if items.len() >= limit {
@@ -260,16 +253,12 @@ fn scan_store(
 ) -> Vec<(String, String, Bytes)> {
     let mut items = Vec::new();
     for ((k_pk, k_sk), doc) in store.iter() {
-        if let Some((after_pk, after_sk)) = after {
-            if (k_pk.as_str(), k_sk.as_str()) <= (after_pk, after_sk) {
-                continue;
-            }
+        if let Some((after_pk, after_sk)) = after
+            && (k_pk.as_str(), k_sk.as_str()) <= (after_pk, after_sk)
+        {
+            continue;
         }
-        items.push((
-            k_pk.clone(),
-            k_sk.clone(),
-            Bytes::from(doc.data.clone()),
-        ));
+        items.push((k_pk.clone(), k_sk.clone(), Bytes::from(doc.data.clone())));
         if items.len() >= limit {
             break;
         }
@@ -328,11 +317,7 @@ fn execute_sql_on_store(store: &mut Store, sql: &str, args: Vec<Value>) -> Resul
     }
 
     // Transaction control → no-op (handled at MemoryTransaction level)
-    if sql == "BEGIN"
-        || sql == "BEGIN TRANSACTION"
-        || sql == "COMMIT"
-        || sql == "ROLLBACK"
-    {
+    if sql == "BEGIN" || sql == "BEGIN TRANSACTION" || sql == "COMMIT" || sql == "ROLLBACK" {
         return Ok(empty_result());
     }
 
@@ -364,9 +349,7 @@ fn execute_sql_on_store(store: &mut Store, sql: &str, args: Vec<Value>) -> Resul
                         Value::Blob {
                             value: doc.data.clone().into(),
                         },
-                        Value::Integer {
-                            value: doc.version,
-                        },
+                        Value::Integer { value: doc.version },
                     ],
                 }],
                 ..empty_result()
@@ -525,9 +508,7 @@ fn execute_sql_on_store(store: &mut Store, sql: &str, args: Vec<Value>) -> Resul
         };
 
         let limit = extract_integer(&args[arg_idx])? as usize;
-        let after_ref = after
-            .as_ref()
-            .map(|(pk, sk)| (pk.as_str(), sk.as_str()));
+        let after_ref = after.as_ref().map(|(pk, sk)| (pk.as_str(), sk.as_str()));
         let items = scan_store(store, after_ref, limit);
         let rows = items
             .into_iter()

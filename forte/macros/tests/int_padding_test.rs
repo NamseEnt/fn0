@@ -74,11 +74,11 @@ fn test_usize_padding() {
 
 #[test]
 fn test_i8_offset_boundary() {
-    assert_eq!(format_i8(i8::MIN), "000");   // -128 + 128 = 0
-    assert_eq!(format_i8(-1), "127");         // -1 + 128 = 127
-    assert_eq!(format_i8(0), "128");          // 0 + 128 = 128
-    assert_eq!(format_i8(1), "129");          // 1 + 128 = 129
-    assert_eq!(format_i8(i8::MAX), "255");    // 127 + 128 = 255
+    assert_eq!(format_i8(i8::MIN), "000"); // -128 + 128 = 0
+    assert_eq!(format_i8(-1), "127"); // -1 + 128 = 127
+    assert_eq!(format_i8(0), "128"); // 0 + 128 = 128
+    assert_eq!(format_i8(1), "129"); // 1 + 128 = 129
+    assert_eq!(format_i8(i8::MAX), "255"); // 127 + 128 = 255
 }
 
 #[test]
@@ -97,11 +97,11 @@ fn test_i8_sort_order() {
 
 #[test]
 fn test_i16_offset_boundary() {
-    assert_eq!(format_i16(i16::MIN), "00000");  // -32768 + 32768 = 0
-    assert_eq!(format_i16(-1), "32767");          // -1 + 32768 = 32767
-    assert_eq!(format_i16(0), "32768");           // 0 + 32768 = 32768
-    assert_eq!(format_i16(1), "32769");           // 1 + 32768 = 32769
-    assert_eq!(format_i16(i16::MAX), "65535");    // 32767 + 32768 = 65535
+    assert_eq!(format_i16(i16::MIN), "00000"); // -32768 + 32768 = 0
+    assert_eq!(format_i16(-1), "32767"); // -1 + 32768 = 32767
+    assert_eq!(format_i16(0), "32768"); // 0 + 32768 = 32768
+    assert_eq!(format_i16(1), "32769"); // 1 + 32768 = 32769
+    assert_eq!(format_i16(i16::MAX), "65535"); // 32767 + 32768 = 65535
 }
 
 #[test]
@@ -118,11 +118,11 @@ fn test_i16_sort_order() {
 
 #[test]
 fn test_i32_offset_boundary() {
-    assert_eq!(format_i32(i32::MIN), "0000000000");   // -2147483648 + 2147483648 = 0
+    assert_eq!(format_i32(i32::MIN), "0000000000"); // -2147483648 + 2147483648 = 0
     assert_eq!(format_i32(-1), "2147483647");
     assert_eq!(format_i32(0), "2147483648");
     assert_eq!(format_i32(1), "2147483649");
-    assert_eq!(format_i32(i32::MAX), "4294967295");    // 2147483647 + 2147483648 = 4294967295
+    assert_eq!(format_i32(i32::MAX), "4294967295"); // 2147483647 + 2147483648 = 4294967295
 }
 
 #[test]
@@ -182,9 +182,7 @@ fn test_i32_consecutive_values() {
 
 #[test]
 fn test_i8_all_values_sorted() {
-    let formatted: Vec<_> = (i8::MIN..=i8::MAX)
-        .map(|v| (v, format_i8(v)))
-        .collect();
+    let formatted: Vec<_> = (i8::MIN..=i8::MAX).map(|v| (v, format_i8(v))).collect();
 
     for window in formatted.windows(2) {
         let (v1, s1) = &window[0];
@@ -192,7 +190,10 @@ fn test_i8_all_values_sorted() {
         assert!(
             s1 < s2,
             "i8 sort broken: format_i8({}) = {} should be < format_i8({}) = {}",
-            v1, s1, v2, s2
+            v1,
+            s1,
+            v2,
+            s2
         );
     }
 }

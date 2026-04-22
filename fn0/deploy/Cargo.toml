@@ -1,0 +1,15 @@
+[package]
+name = "fn0-deploy"
+version = "0.1.3"
+edition = "2021"
+description = "Deploy client for fn0 cloud"
+license = "AGPL-3.0-only"
+repository = "https://github.com/NamseEnt/fn0"
+
+[dependencies]
+reqwest = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+tar = "0.4"
