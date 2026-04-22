@@ -1,0 +1,54 @@
+[package]
+name = "hq"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = "0.1"
+chrono = { workspace = true }
+libsql = { workspace = true }
+opendal = { workspace = true }
+reqsign = { workspace = true }
+http = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+color-eyre = { workspace = true }
+dashmap = "6.1.0"
+futures = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+hyper = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
+tokio-util = { workspace = true }
+http-body-util = { workspace = true }
+hyper-util = { workspace = true, features = ["full"] }
+oci-rust-sdk = { path = "../../vendor/oci-rust-sdk", features = ["core"] }
+base64 = { workspace = true }
+aes-gcm = "0.10"
+rand = "0.8"
+opentelemetry = { version = "0.31.0", features = ["logs", "metrics"] }
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.31.0", features = [
+    "grpc-tonic",
+    "reqwest-client",
+    "metrics",
+    "logs",
+] }
+tracing-opentelemetry = "0.32.0"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing = { workspace = true }
+schemars = "0.8"
+rustls = { workspace = true }
+bytes = { workspace = true }
+singleflight = "0.3.0"
+boxcar = "0.2.14"
+russh = "0.60.0"
+
+[dev-dependencies]
+wiremock = "0.6"
+mockall = "0.13"
+
+[build-dependencies]
+schemars = "0.8"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }

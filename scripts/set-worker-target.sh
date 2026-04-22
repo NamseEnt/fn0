@@ -84,7 +84,7 @@ REPOSITORY="$(jq -r .repository <<<"$FIRST_REG")"
 if [[ -n "$TAG_OVERRIDE" ]]; then
   TAG="$TAG_OVERRIDE"
 else
-  TAG="$(cd "${REPO_ROOT}/fn0-worker" && cargo pkgid | sed -E 's/.*[#@]([^:]+)$/\1/')"
+  TAG="$(cd "${REPO_ROOT}" && cargo pkgid -p fn0-worker | sed -E 's/.*[#@]([^:]+)$/\1/')"
 fi
 
 if [[ -z "$TAG" ]]; then
@@ -92,9 +92,9 @@ if [[ -z "$TAG" ]]; then
   exit 1
 fi
 
-WASMTIME_VERSION="$(awk '/^name = "fn0-wasmtime"/{getline; gsub(/"/, "", $3); print $3; exit}' "${REPO_ROOT}/fn0-worker/Cargo.lock")"
+WASMTIME_VERSION="$(cd "${REPO_ROOT}" && cargo pkgid -p fn0-wasmtime | sed -E 's/.*[#@]([^:]+)$/\1/')"
 if [[ -z "$WASMTIME_VERSION" ]]; then
-  echo "failed to read fn0-wasmtime version from fn0-worker/Cargo.lock" >&2
+  echo "failed to determine fn0-wasmtime version" >&2
   exit 1
 fi
 

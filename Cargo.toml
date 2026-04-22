@@ -1,41 +1,50 @@
 [workspace]
 resolver = "3"
-members = ["forte/db", "forte/rs-sdk", "forte/macros", "cli"]
-exclude = [
-    "ls-news/rs",
-    "forte/forte",
-    "wasmtime",
-    "ski",
-    "forte/forte-rs-to-ts",
-    "fn0",
-    "fn0-worker",
-    "fn0-compiler",
-    "hq",
-    "measure-cpu-time",
-    "adapt-cache",
-    "oci-rust-sdk",
-    "fn0-wasmtime",
-]
+members = ["fn0/*", "forte/*"]
+exclude = ["vendor/wasmtime", "vendor/deno", "vendor/oci-rust-sdk", "fn0/adapt-cache", "forte/rs-to-ts"]
 
 [workspace.dependencies]
 anyhow = "1"
 async_singleflight = "0.6"
-aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.115"
-aws-smithy-mocks = "0.2"
-aws-smithy-runtime-api = "1.7"
-aws-smithy-types = "1.3"
+base64 = "0.22"
 bytes = "1"
+chrono = "0.4"
 clap = "4.5.53"
 color-eyre = "0.6"
+fn0 = { path = "fn0/fn0" }
+fn0-deploy = { path = "fn0/deploy" }
+fn0-wasmtime = { path = "fn0/wasmtime" }
+ski = { package = "fn0-ski", path = "fn0/ski" }
+forte-json = { path = "forte/json" }
+forte-macros = { path = "forte/macros" }
+forte-sdk = { path = "forte/sdk" }
+futures = "0.3"
+http = "1"
+http-body-util = "0.1"
 hyper = "1"
 hyper-util = "0.1"
 inquire = "0.9"
 libsql = "0.9"
+opendal = { version = "0.55", default-features = false, features = ["services-s3", "executors-tokio"] }
+reqsign = { version = "0.16", default-features = false, features = ["services-aws", "reqwest_request"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots-no-provider", "json"] }
+rustls = { version = "0.23", default-features = false, features = ["logging", "std", "tls12", "aws_lc_rs"] }
 serde = "1.0"
 serde_json = "1.0"
 socket2 = "0.5"
 tempfile = "3"
+thiserror = "2"
 tokio = "1.48"
+tokio-util = "0.7"
 toml = "0.8"
 tower = "0.5"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = "1"
+
+[profile.release]
+debug = true
+
+[profile.dist]
+inherits = "release"
+lto = "thin"

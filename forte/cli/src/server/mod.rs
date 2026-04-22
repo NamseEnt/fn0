@@ -3,16 +3,15 @@ pub mod vite_dev;
 
 use anyhow::Result;
 pub use cache::SimpleCache;
-use fn0::{Deployment, DeploymentMap, EnvVars, Fn0, SharedHttpClient};
+use fn0::{CodeExecutor, ExecutionContext};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 #[cfg(unix)]
@@ -20,18 +19,16 @@ use tokio::net::UnixStream;
 
 pub struct ServerConfig {
     pub port: u16,
-    pub backend_path: String,
-    pub frontend_path: String,
+    pub wasm_path: String,
+    pub js_path: String,
     pub public_dir: PathBuf,
-    pub project_root: PathBuf,
-    pub dev_mode: bool,
     pub vite_socket_path: Option<PathBuf>,
-    pub env_vars: EnvVars,
+    pub env_vars: Vec<(String, String)>,
 }
 
 pub struct ServerHandle {
-    pub cache: SimpleCache,
-    pub fn0: Arc<Fn0<SimpleCache>>,
+    pub ctx: Arc<ExecutionContext<SimpleCache>>,
+    pub executor: std::rc::Rc<CodeExecutor<SimpleCache>>,
 }
 
 pub const DEV_CODE_ID: &str = "app";
@@ -58,41 +55,36 @@ pub fn load_env_file(project_root: &Path) -> Vec<(String, String)> {
     vars
 }
 
-pub fn create_env_vars(project_root: &Path) -> EnvVars {
-    let mut map = HashMap::new();
-    map.insert(DEV_CODE_ID.to_string(), load_env_file(project_root));
-    Arc::new(RwLock::new(map))
-}
-
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
-    let mut deployment_map = DeploymentMap::new();
-    deployment_map.register_deployment("app", Deployment::Forte);
+    let engine = fn0::build_engine()?;
+    fn0::spawn_epoch_ticker(engine.clone());
+    let linker = fn0::build_linker(&engine);
 
-    let cache = SimpleCache::new(config.backend_path.clone(), config.frontend_path.clone());
+    let cache = SimpleCache::new(
+        config.wasm_path.clone(),
+        config.js_path.clone(),
+        engine.clone(),
+        linker.clone(),
+        config.env_vars,
+    );
 
     let vite_socket_path = config.vite_socket_path.map(Arc::new);
 
-    let fn0 = Arc::new(Fn0::new(
-        cache.clone(),
-        cache.clone(),
-        deployment_map,
-        config.env_vars,
-        SharedHttpClient::new(),
-        None,
-    ));
+    let ctx = Arc::new(ExecutionContext::new(engine, linker, cache));
+    let executor = std::rc::Rc::new(CodeExecutor::new(ctx.clone()));
 
     let public_dir = Arc::new(config.public_dir);
 
     let handle = ServerHandle {
-        cache: cache.clone(),
-        fn0: fn0.clone(),
+        ctx: ctx.clone(),
+        executor: executor.clone(),
     };
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://localhost:{}", config.port);
 
-    tokio::spawn(async move {
+    tokio::task::spawn_local(async move {
         loop {
             let (socket, _) = match listener.accept().await {
                 Ok(s) => s,
@@ -101,19 +93,19 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                     continue;
                 }
             };
-            let fn0_clone = fn0.clone();
+            let executor_clone = executor.clone();
             let public_dir_clone = public_dir.clone();
             let vite_socket_path_clone = vite_socket_path.clone();
 
-            tokio::spawn(async move {
+            tokio::task::spawn_local(async move {
                 let io = TokioIo::new(socket);
                 let conn = http1::Builder::new().serve_connection(
                     io,
                     service_fn(move |req| {
-                        let fn0 = fn0_clone.clone();
+                        let executor = executor_clone.clone();
                         let public_dir = public_dir_clone.clone();
                         let vite_socket = vite_socket_path_clone.clone();
-                        handle_request(req, fn0, public_dir, vite_socket)
+                        handle_request(req, executor, public_dir, vite_socket)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -128,7 +120,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
 
 async fn handle_request(
     req: Request<hyper::body::Incoming>,
-    fn0: Arc<Fn0<SimpleCache>>,
+    executor: std::rc::Rc<CodeExecutor<SimpleCache>>,
     public_dir: Arc<PathBuf>,
     vite_socket_path: Option<Arc<PathBuf>>,
 ) -> Result<fn0::Response> {
@@ -147,16 +139,27 @@ async fn handle_request(
             .unwrap());
     }
 
-    if should_proxy_to_vite(path) {
-        if let Some(socket_path) = &vite_socket_path {
-            return proxy_to_vite_uds(socket_path, path_with_query).await;
-        }
+    if let Some(hook_name) = path.strip_prefix("/__self_invoke/")
+        && req.headers().contains_key("x-forte-prefetch-miss")
+    {
+        eprintln!(
+            "[forte] hook '{hook_name}' fell back to client fetch \
+             (not pre-fetched during SSR — extra round-trip, slower TTI). \
+             Likely cause: caller component is gated by useEffect-only state, \
+             or rendered conditionally outside the SSR tree."
+        );
     }
 
-    if vite_socket_path.is_some() {
-        if let Some(static_response) = try_serve_static(&public_dir, path).await {
-            return Ok(static_response);
-        }
+    if should_proxy_to_vite(path)
+        && let Some(socket_path) = &vite_socket_path
+    {
+        return proxy_to_vite_uds(socket_path, path_with_query).await;
+    }
+
+    if vite_socket_path.is_some()
+        && let Some(static_response) = try_serve_static(&public_dir, path).await
+    {
+        return Ok(static_response);
     }
 
     let mapped_req = req.map(|body| {
@@ -168,7 +171,7 @@ async fn handle_request(
     if let Some(socket_path) = &vite_socket_path {
         let original_headers = mapped_req.headers().clone();
 
-        let backend_response = match fn0.run_backend_only("app", mapped_req).await {
+        let backend_response = match executor.run_backend_only("app", mapped_req).await {
             Ok(resp) => resp,
             Err(e) => {
                 eprintln!("Backend error: {:?}", e);
@@ -198,7 +201,7 @@ async fn handle_request(
             ));
         }
 
-        if path.starts_with("/__forte_hook/")
+        if path.starts_with("/__self_invoke/")
             || path.starts_with("/__forte_action/")
             || path.starts_with("/api/")
         {
@@ -238,7 +241,7 @@ async fn handle_request(
         return Ok(ssr_response);
     }
 
-    match fn0.run("app", "", mapped_req, None).await {
+    match executor.run("app", "", mapped_req, None).await {
         Ok(resp) => Ok(resp),
         Err(e) => {
             eprintln!("Request error: {:?}", e);
@@ -439,12 +442,13 @@ fn parse_http_response(response_bytes: &[u8]) -> Result<fn0::Response> {
 
 fn looks_like_chunked(data: &[u8]) -> bool {
     let crlf_pos = data.windows(2).position(|w| w == b"\r\n");
-    if let Some(pos) = crlf_pos {
-        if pos > 0 && pos <= 8 {
-            let potential_size = &data[..pos];
-            if let Ok(s) = std::str::from_utf8(potential_size) {
-                return usize::from_str_radix(s.trim(), 16).is_ok();
-            }
+    if let Some(pos) = crlf_pos
+        && pos > 0
+        && pos <= 8
+    {
+        let potential_size = &data[..pos];
+        if let Ok(s) = std::str::from_utf8(potential_size) {
+            return usize::from_str_radix(s.trim(), 16).is_ok();
         }
     }
     false

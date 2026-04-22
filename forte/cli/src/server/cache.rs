@@ -1,84 +1,102 @@
-use adapt_cache::AdaptCache;
-use anyhow::Result;
-use bytes::Bytes;
-use std::collections::HashMap;
+use fn0::Deployment;
+use fn0::cache::{Bundle, BundleCache, Error as CacheError};
+use fn0::execute::ClientState;
+use fn0::measure_cpu_time::SystemClock;
+use fn0::wasmtime::Engine;
+use fn0::wasmtime::component::Linker;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-#[derive(Clone)]
 pub struct SimpleCache {
-    memory: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-    backend_path: String,
-    frontend_path: String,
+    wasm_path: String,
+    js_path: String,
+    engine: Engine,
+    linker: Linker<ClientState<SystemClock>>,
+    state: Mutex<State>,
+}
+
+struct State {
+    bundle: Option<Arc<Bundle>>,
+    env_vars: Vec<(String, String)>,
 }
 
 impl SimpleCache {
-    pub fn new(backend_path: String, frontend_path: String) -> Self {
+    pub fn new(
+        wasm_path: String,
+        js_path: String,
+        engine: Engine,
+        linker: Linker<ClientState<SystemClock>>,
+        env_vars: Vec<(String, String)>,
+    ) -> Self {
         Self {
-            memory: Arc::new(Mutex::new(HashMap::new())),
-            backend_path,
-            frontend_path,
+            wasm_path,
+            js_path,
+            engine,
+            linker,
+            state: Mutex::new(State {
+                bundle: None,
+                env_vars,
+            }),
         }
     }
 
-    pub async fn invalidate(&self, id: &str) {
-        let mut cache = self.memory.lock().await;
-        cache.remove(id);
+    pub async fn set_env(&self, new_vars: Vec<(String, String)>) {
+        let mut state = self.state.lock().await;
+        state.env_vars = new_vars;
+        state.bundle = None;
     }
 
-    #[allow(dead_code)]
-    pub async fn invalidate_all(&self) {
-        let mut cache = self.memory.lock().await;
-        cache.clear();
-    }
+    async fn build_bundle(
+        &self,
+        env_vars: Vec<(String, String)>,
+    ) -> Result<Arc<Bundle>, CacheError> {
+        let wasm_data = tokio::fs::read(&self.wasm_path)
+            .await
+            .map_err(|e| CacheError::Storage(anyhow::anyhow!("read {}: {e}", self.wasm_path)))?;
+        let cwasm = fn0::compile(&wasm_data).map_err(CacheError::Compile)?;
+        let service_pre = fn0::build_service_pre(&self.engine, &self.linker, &cwasm)
+            .map_err(CacheError::Compile)?;
 
-    async fn load_file(&self, path: &str) -> Result<Vec<u8>> {
-        tokio::fs::read(path).await.map_err(|e| anyhow::anyhow!(e))
+        let (js, deployment) = if self.js_path.is_empty() {
+            (None, Deployment::Wasm)
+        } else {
+            let js_bytes = tokio::fs::read(&self.js_path)
+                .await
+                .map_err(|e| CacheError::Storage(anyhow::anyhow!("read {}: {e}", self.js_path)))?;
+            let js_str =
+                String::from_utf8(js_bytes).map_err(|e| CacheError::Decode(anyhow::anyhow!(e)))?;
+            (Some(js_str), Deployment::WasmJs)
+        };
+
+        Ok(Arc::new(Bundle {
+            service_pre,
+            js,
+            deployment,
+            env_vars,
+        }))
     }
 }
 
-impl<T: Clone + Send + Sync + 'static, E: Send + 'static> AdaptCache<T, E> for SimpleCache {
-    async fn get(
-        &self,
-        id: &str,
-        convert: impl FnOnce(Bytes) -> std::result::Result<(T, usize), E> + Send,
-    ) -> std::result::Result<T, adapt_cache::Error<E>> {
-        let mut cache = self.memory.lock().await;
-
-        let bytes = if let Some(data) = cache.get(id) {
-            Bytes::copy_from_slice(data)
-        } else {
-            let (path, is_backend) = match id {
-                "app::backend" => (&self.backend_path, true),
-                "app::frontend" => (&self.frontend_path, false),
-                _ => return Err(adapt_cache::Error::NotFound),
-            };
-
-            let mut data = match self.load_file(path).await {
-                Ok(data) => data,
-                Err(e) => {
-                    eprintln!("Failed to read '{path}': {e}");
-                    return Err(adapt_cache::Error::StorageError(anyhow::anyhow!(e)));
-                }
-            };
-
-            if is_backend {
-                match fn0::compile(&data) {
-                    Ok(cwasm) => {
-                        data = cwasm;
-                    }
-                    Err(e) => {
-                        eprintln!("[wasm] Compilation failed: {:?}", e);
-                        return Err(adapt_cache::Error::StorageError(e));
-                    }
-                }
+impl BundleCache for SimpleCache {
+    async fn get(&self, subdomain: &str) -> Result<Arc<Bundle>, CacheError> {
+        if subdomain != super::DEV_CODE_ID {
+            return Err(CacheError::NotFound);
+        }
+        let env_vars = {
+            let state = self.state.lock().await;
+            if let Some(b) = &state.bundle {
+                return Ok(b.clone());
             }
-
-            cache.insert(id.to_string(), data.clone());
-            Bytes::from(data)
+            state.env_vars.clone()
         };
+        let bundle = self.build_bundle(env_vars).await?;
+        let mut state = self.state.lock().await;
+        state.bundle = Some(bundle.clone());
+        Ok(bundle)
+    }
 
-        let (converted, _) = convert(bytes).map_err(adapt_cache::Error::ConvertError)?;
-        Ok(converted)
+    async fn invalidate(&self, _subdomain: &str) {
+        let mut state = self.state.lock().await;
+        state.bundle = None;
     }
 }

@@ -4,4 +4,5 @@
 target/
 infra/cloud/sdks/
 package-lock.json
-vendor/
+fn0/*/Cargo.lock
+forte/*/Cargo.lock

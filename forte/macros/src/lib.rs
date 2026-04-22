@@ -30,8 +30,43 @@
 //! `usize` is always treated as `u64`, and `isize` as `i64`.
 
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{Fields, ItemStruct, parse_macro_input};
+use quote::{format_ident, quote, quote_spanned};
+use syn::{Fields, ItemFn, ItemStruct, parse_macro_input, spanned::Spanned};
+
+#[proc_macro_attribute]
+pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+
+    if input.sig.asyncness.is_none() {
+        return quote_spanned! { input.sig.fn_token.span()=>
+            compile_error!("fn must be `async fn`");
+        }
+        .into();
+    }
+
+    if !input.sig.inputs.is_empty() {
+        return quote_spanned! { input.sig.inputs.span()=>
+            compile_error!("arguments to test functions are not supported");
+        }
+        .into();
+    }
+
+    let name = input.sig.ident;
+    let attrs = input.attrs;
+    let output = input.sig.output;
+    let block = input.block;
+    quote! {
+        #[::core::prelude::v1::test]
+        pub fn #name() #output {
+            #(#attrs)*
+            async fn __run() #output {
+                #block
+            }
+            ::forte_sdk::runtime::block_on(async { __run().await })
+        }
+    }
+    .into()
+}
 
 fn format_placeholder(ty: &syn::Type) -> String {
     if let syn::Type::Path(type_path) = ty

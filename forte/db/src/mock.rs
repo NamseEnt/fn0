@@ -49,9 +49,9 @@ impl MockState {
     /// Try to match and consume a rule for the given operation.
     pub(crate) fn try_match(&self, op: MockOp, pk: &str, sk: &str) -> Option<MockResult> {
         let mut rules = self.rules.borrow_mut();
-        let pos = rules.iter().position(|r| {
-            r.key.op == op && r.key.pk == pk && r.key.sk == sk
-        })?;
+        let pos = rules
+            .iter()
+            .position(|r| r.key.op == op && r.key.pk == pk && r.key.sk == sk)?;
         Some(rules.remove(pos).unwrap().result)
     }
 

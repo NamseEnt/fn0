@@ -64,10 +64,10 @@ pub fn ensure(project_dir: &Path) -> Result<()> {
 }
 
 fn write_if_changed(path: &Path, content: &str) -> Result<()> {
-    if let Ok(existing) = fs::read_to_string(path) {
-        if existing == content {
-            return Ok(());
-        }
+    if let Ok(existing) = fs::read_to_string(path)
+        && existing == content
+    {
+        return Ok(());
     }
     fs::write(path, content)?;
     Ok(())

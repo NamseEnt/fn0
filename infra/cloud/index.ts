@@ -314,11 +314,8 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
     apiToken: tursoApiToken,
     organizationSlug: config.require("tursoOrganizationSlug"),
     groupName: forteDb.groupName,
-    location: config.require("tursoLocation"),
-    hostSuffix: forteDb.hostSuffix,
   },
   forteR2: {
-    accountId: forteR2.accountId,
     bucket: forteR2.bucketName,
     endpoint: forteR2.endpoint,
     accessKeyId: forteR2.accessKeyId,

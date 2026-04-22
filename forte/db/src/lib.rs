@@ -4,6 +4,7 @@ mod trx;
 mod turso;
 
 use anyhow::Result;
+use bytes::Bytes;
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
 use std::future::Future;
@@ -12,7 +13,6 @@ pub use trx::{
     TrxResult,
 };
 use turso::{StoredDoc, TursoDatabase, TursoTransaction};
-use wstd::http::body::Bytes;
 
 pub fn text_value(s: impl Into<String>) -> Value {
     Value::Text {

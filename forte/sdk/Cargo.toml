@@ -1,0 +1,28 @@
+[package]
+name = "forte-sdk"
+version = "0.3.0"
+edition = "2024"
+description = "Runtime library for Forte wasm components (wasi:http p3)"
+license = "AGPL-3.0-only"
+repository = "https://github.com/NamseEnt/fn0"
+
+[dependencies]
+anyhow = { workspace = true, features = ["backtrace"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+http = { workspace = true }
+http-body = "1"
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+wit-bindgen = { version = "0.50", features = ["default", "async-spawn", "inter-task-wakeup"] }
+forte-json = { workspace = true }
+cookie = { version = "0.18", features = ["percent-encode"] }
+sha2 = "0.10.9"
+hmac = "0.12.1"
+hex = "0.4.3"
+chrono = { workspace = true, features = ["serde"] }
+futures = { workspace = true }
+time = "0.3.44"
+uuid = { workspace = true, features = ["v7"] }
+form_urlencoded = "1.2.2"
+forte-macros = { workspace = true }
