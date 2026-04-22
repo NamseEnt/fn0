@@ -1,6 +1,6 @@
 [package]
 name = "forte-sdk"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 description = "Runtime library for Forte wasm components (wasi:http p3)"
 license = "AGPL-3.0-only"
