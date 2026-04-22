@@ -5,7 +5,7 @@ use libsql_hrana::proto::*;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use wstd::http::body::Bytes;
+use bytes::Bytes;
 
 #[derive(Clone)]
 struct MemDoc {

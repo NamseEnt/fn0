@@ -97,7 +97,7 @@ export function createDockerRegistry(
         location: "../..",
       },
       dockerfile: {
-        location: "../../hq/Dockerfile",
+        location: "../../fn0/hq/Dockerfile",
       },
       platforms: [dockerBuild.Platform.Linux_arm64],
       buildArgs: {

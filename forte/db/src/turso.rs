@@ -2,7 +2,8 @@ use crate::BatchOp;
 use anyhow::{Result, bail};
 use libsql_hrana::proto::*;
 use std::{str::FromStr, sync::Arc};
-use wstd::http::{Client, HeaderValue, Request, Uri, body::Bytes};
+use bytes::Bytes;
+use forte_sdk::http::{Client, HeaderValue, Request, Uri};
 
 const CREATE_DOCS_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS docs (pk TEXT, sk TEXT, data BLOB, version INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (pk, sk))";
 const ADD_VERSION_COLUMN_SQL: &str =
@@ -74,7 +75,7 @@ impl TursoDatabase {
             bail!("Turso request failed with status: {}", response.status());
         }
 
-        response.into_body().json().await
+        Ok(response.into_body().json().await?)
     }
 
     async fn create_table(&self) -> Result<()> {

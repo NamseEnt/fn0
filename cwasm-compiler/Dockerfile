@@ -22,10 +22,12 @@ RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_
  && rm -rf "/tmp/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl"
 
 WORKDIR /build
-COPY fn0-wasmtime/ fn0-wasmtime/
-RUN cargo build --release --manifest-path fn0-wasmtime/Cargo.toml \
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=id=cwasm-target,type=cache,target=/build/target \
+    cargo build --release -p fn0-wasmtime \
  && sccache --show-stats \
- && cp fn0-wasmtime/target/release/fn0-wasmtime /build/fn0-wasmtime-bin
+ && cp target/release/fn0-wasmtime /build/fn0-wasmtime-bin
 
 FROM --platform=linux/arm64 node:20-bookworm AS handler-deps
 WORKDIR /handler

@@ -1,7 +1,0 @@
-[package]
-name = "fn0-compiler"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-fn0 = { path = "../fn0" }

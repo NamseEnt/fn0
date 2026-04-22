@@ -1,0 +1,17 @@
+[package]
+name = "forte-codegen"
+version = "0.1.0"
+edition = "2024"
+description = "Build-time code generators for the Forte web framework (routes, env, wit assets)"
+license = "AGPL-3.0-only"
+repository = "https://github.com/NamseEnt/fn0"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+syn = { version = "2.0", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"
+prettyplease = "0.2"
+include_dir = "0.7"

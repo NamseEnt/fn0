@@ -6,7 +6,7 @@ fn create_test_db() -> forte_db::Database {
     turso_with_config(format!("http://127.0.0.1:{}", TEST_PORT), String::new())
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_put_and_get() {
     let db = create_test_db();
 
@@ -31,7 +31,7 @@ async fn test_put_and_get() {
         .expect("Failed to delete data");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_get_nonexistent() {
     let db = create_test_db();
 
@@ -44,7 +44,7 @@ async fn test_get_nonexistent() {
     assert!(result.is_none(), "Should return None for nonexistent key");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_update_existing() {
     let db = create_test_db();
 
@@ -75,7 +75,7 @@ async fn test_update_existing() {
         .expect("Failed to delete data");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_delete() {
     let db = create_test_db();
 
@@ -102,7 +102,7 @@ async fn test_delete() {
     assert!(result.is_none(), "Data should be gone after delete");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_query() {
     let db = create_test_db();
 
@@ -147,7 +147,7 @@ async fn test_query() {
     }
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_scan() {
     let db = create_test_db();
 
@@ -201,7 +201,7 @@ async fn test_scan() {
     }
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_batch_put() {
     let db = create_test_db();
 
@@ -248,7 +248,7 @@ async fn test_batch_put() {
     assert_eq!(result.len(), 0);
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_batch_mixed_operations() {
     let db = create_test_db();
 
@@ -312,7 +312,7 @@ async fn test_batch_mixed_operations() {
     .expect("Cleanup failed");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_transaction_commit() {
     let db = create_test_db();
 
@@ -351,7 +351,7 @@ async fn test_transaction_commit() {
     db.delete(pk, "sk_2").await.expect("Delete failed");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_transaction_rollback() {
     let db = create_test_db();
 
@@ -395,7 +395,7 @@ async fn test_transaction_rollback() {
     db.delete(pk, "sk_existing").await.expect("Delete failed");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_transaction_delete() {
     let db = create_test_db();
 
@@ -420,7 +420,7 @@ async fn test_transaction_delete() {
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_execute_ops_single_get() {
     let db = create_test_db();
     let pk = "exec_ops_get_pk";
@@ -445,7 +445,7 @@ async fn test_execute_ops_single_get() {
     db.delete(pk, sk).await.expect("Delete failed");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_execute_ops_multiple() {
     let db = create_test_db();
     let pk = "exec_ops_multi_pk";
@@ -489,7 +489,7 @@ async fn test_execute_ops_multiple() {
     db.delete(pk, "sk_b").await.expect("Delete failed");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_execute_ops_query() {
     let db = create_test_db();
     let pk = "exec_ops_query_pk";
@@ -527,7 +527,7 @@ async fn test_execute_ops_query() {
     }
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_execute_ops_put_and_delete() {
     let db = create_test_db();
     let pk = "exec_ops_put_del_pk";
@@ -574,7 +574,7 @@ async fn test_execute_ops_put_and_delete() {
     db.delete(pk, "sk_2").await.expect("Cleanup failed");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn test_execute_ops_mixed() {
     let db = create_test_db();
     let pk = "exec_ops_mixed_pk";

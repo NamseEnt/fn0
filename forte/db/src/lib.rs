@@ -12,7 +12,7 @@ pub use trx::{
     TrxResult,
 };
 use turso::{StoredDoc, TursoDatabase, TursoTransaction};
-use wstd::http::body::Bytes;
+use bytes::Bytes;
 
 pub fn text_value(s: impl Into<String>) -> Value {
     Value::Text {

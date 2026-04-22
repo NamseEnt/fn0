@@ -1,6 +1,7 @@
 use crate::cli::fe_runtime;
 use crate::server::{self, ServerConfig, ServerHandle, vite_dev};
 use anyhow::{Context, Result};
+use fn0::cache::BundleCache;
 use http_body_util::BodyExt;
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
 use std::collections::HashMap;
@@ -8,7 +9,7 @@ use std::fs;
 use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::mpsc::channel;
+use tokio::sync::mpsc::unbounded_channel;
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug)]
@@ -293,29 +294,25 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let vite = vite_dev::spawn_vite(&fe_dir, port, vite_config.as_deref(), ssr_module_path)?;
     vite_dev::wait_for_vite_ready(&vite.socket_path).await?;
 
-    let backend_path = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?
+    let wasm_path = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?
         .to_string_lossy()
         .to_string();
 
-    let frontend_path = String::new();
+    let js_path = String::new();
     let public_dir = project_dir.join("fe/public");
 
-    let env_vars = server::create_env_vars(&project_dir);
-    {
-        let mut map = env_vars.write().unwrap();
-        let vars = map.entry(server::DEV_CODE_ID.to_string()).or_default();
-        if !vars.iter().any(|(k, _)| k == "TURSO_URL") {
-            vars.push((
-                "TURSO_URL".to_string(),
-                format!("http://127.0.0.1:{}", sqld_port),
-            ));
-        }
+    let mut env_vars = server::load_env_file(&project_dir);
+    if !env_vars.iter().any(|(k, _)| k == "TURSO_URL") {
+        env_vars.push((
+            "TURSO_URL".to_string(),
+            format!("http://127.0.0.1:{}", sqld_port),
+        ));
     }
 
     let config = ServerConfig {
         port,
-        backend_path,
-        frontend_path,
+        wasm_path,
+        js_path,
         public_dir,
         project_root: project_dir.clone(),
         dev_mode: true,
@@ -327,15 +324,15 @@ pub async fn run(options: DevOptions) -> Result<()> {
 
     let shutdown_token = tokio_util::sync::CancellationToken::new();
     let _poller_handle = {
-        let fn0 = handle.fn0.clone();
+        let executor = handle.executor.clone();
         let turso_url = format!("http://127.0.0.1:{}", sqld_port);
         let shutdown = shutdown_token.clone();
-        tokio::spawn(async move {
+        tokio::task::spawn_local(async move {
             let poller = fn0::queue_poller::QueuePoller::new(&turso_url, "");
             poller
                 .run(
                     |task_name, payload| {
-                        let fn0 = fn0.clone();
+                        let executor = executor.clone();
                         Box::pin(async move {
                             let body =
                                 serde_json::json!({"task_name": task_name, "payload": payload});
@@ -351,7 +348,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
                                         .boxed_unsync(),
                                 )?;
 
-                            let response = fn0.run("backend", "", request, None).await?;
+                            let response = executor.run("backend", "", request, None).await?;
                             if response.status().is_success() {
                                 Ok(())
                             } else {
@@ -381,9 +378,11 @@ pub async fn run(options: DevOptions) -> Result<()> {
 }
 
 async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> {
-    let (tx, rx) = channel();
+    let (tx, mut rx) = unbounded_channel();
 
-    let mut debouncer = new_debouncer(Duration::from_millis(100), tx)?;
+    let mut debouncer = new_debouncer(Duration::from_millis(100), move |evt| {
+        let _ = tx.send(evt);
+    })?;
 
     let rs_dir = project_dir.join("rs/src");
     let env_file = project_dir.join(".env");
@@ -400,9 +399,9 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     let mut known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
     let mut known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
 
-    loop {
-        match rx.recv() {
-            Ok(Ok(events)) => {
+    while let Some(evt_result) = rx.recv().await {
+        match evt_result {
+            Ok(events) => {
                 let rs_changes: Vec<_> = events
                     .iter()
                     .filter(|e| {
@@ -434,7 +433,7 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                 if env_changed {
                     known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
                     let new_vars = server::load_env_file(project_dir);
-                    handle.fn0.set_env(server::DEV_CODE_ID, new_vars);
+                    handle.ctx.bundle_cache().set_env(new_vars).await;
                 }
 
                 if !rs_changes.is_empty() {
@@ -448,12 +447,8 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                     }
                 }
             }
-            Ok(Err(error)) => {
+            Err(error) => {
                 eprintln!("[watch] Error: {:?}", error);
-            }
-            Err(e) => {
-                eprintln!("[watch] Channel error: {:?}", e);
-                break;
             }
         }
     }
@@ -464,6 +459,6 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
 async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()> {
     run_codegen(project_dir).await?;
     build_backend(project_dir)?;
-    handle.cache.invalidate("app::backend").await;
+    handle.ctx.bundle_cache().invalidate(server::DEV_CODE_ID).await;
     Ok(())
 }

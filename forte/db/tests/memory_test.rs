@@ -8,7 +8,7 @@ fn create_test_db() -> forte_db::Database {
 // In-memory backend tests
 // ============================================================
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_put_and_get() {
     let db = create_test_db();
     db.put("pk", "sk", b"hello").await.unwrap();
@@ -18,14 +18,14 @@ async fn memory_put_and_get() {
     assert_eq!(result.unwrap().as_ref(), b"hello");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_get_nonexistent() {
     let db = create_test_db();
     let result = db.get("missing", "missing").await.unwrap();
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_update_existing() {
     let db = create_test_db();
     db.put("pk", "sk", b"v1").await.unwrap();
@@ -35,7 +35,7 @@ async fn memory_update_existing() {
     assert_eq!(result.as_ref(), b"v2");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_delete() {
     let db = create_test_db();
     db.put("pk", "sk", b"data").await.unwrap();
@@ -45,7 +45,7 @@ async fn memory_delete() {
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_query_with_pagination() {
     let db = create_test_db();
     for i in 0..5 {
@@ -68,7 +68,7 @@ async fn memory_query_with_pagination() {
     assert_eq!(page3[0].0, "sk_04");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_scan() {
     let db = create_test_db();
     db.put("a", "1", b"a1").await.unwrap();
@@ -85,7 +85,7 @@ async fn memory_scan() {
     assert_eq!(page2[0].0, "b");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_batch() {
     let db = create_test_db();
     db.batch(&[
@@ -107,7 +107,7 @@ async fn memory_batch() {
     assert_eq!(items[1].0, "c");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_transaction_commit() {
     let db = create_test_db();
 
@@ -125,7 +125,7 @@ async fn memory_transaction_commit() {
     assert_eq!(result.as_ref(), b"in_tx");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_transaction_rollback() {
     let db = create_test_db();
     db.put("pk", "sk", b"original").await.unwrap();
@@ -138,7 +138,7 @@ async fn memory_transaction_rollback() {
     assert_eq!(result.as_ref(), b"original");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_execute_ops() {
     let db = create_test_db();
     db.put("pk", "a", b"aa").await.unwrap();
@@ -165,7 +165,7 @@ async fn memory_execute_ops() {
     assert_eq!(result.as_ref(), b"bb");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_send_with() {
     let db = create_test_db();
     db.put("TestDoc", "id=hello", b"{}").await.unwrap();
@@ -195,7 +195,7 @@ async fn memory_send_with() {
 // Per-instance isolation test
 // ============================================================
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn memory_instances_are_isolated() {
     let db1 = create_test_db();
     let db2 = create_test_db();
@@ -210,7 +210,7 @@ async fn memory_instances_are_isolated() {
 // Mocking tests
 // ============================================================
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_get_returns_data() {
     let db = create_test_db();
 
@@ -220,7 +220,7 @@ async fn mock_get_returns_data() {
     assert_eq!(result.as_ref(), b"mocked_data");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_get_returns_none() {
     let db = create_test_db();
 
@@ -238,7 +238,7 @@ async fn mock_get_returns_none() {
     assert_eq!(result.as_ref(), b"real");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_get_returns_error() {
     let db = create_test_db();
 
@@ -248,7 +248,7 @@ async fn mock_get_returns_error() {
     assert!(err.to_string().contains("network timeout"));
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_put_returns_error() {
     let db = create_test_db();
 
@@ -262,7 +262,7 @@ async fn mock_put_returns_error() {
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_delete_returns_error() {
     let db = create_test_db();
     db.put("pk", "sk", b"data").await.unwrap();
@@ -277,7 +277,7 @@ async fn mock_delete_returns_error() {
     assert!(result.is_some());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_is_one_shot() {
     let db = create_test_db();
     db.put("pk", "sk", b"real").await.unwrap();
@@ -292,7 +292,7 @@ async fn mock_is_one_shot() {
     assert_eq!(result.as_ref(), b"real");
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_clear() {
     let db = create_test_db();
 
@@ -304,7 +304,7 @@ async fn mock_clear() {
     assert!(result.is_none());
 }
 
-#[wstd::test]
+#[forte_sdk::test]
 async fn mock_multiple_rules() {
     let db = create_test_db();
 

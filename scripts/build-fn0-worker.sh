@@ -42,7 +42,7 @@ INSPECT_LOG="$(mktemp)"
 cleanup() { rm -f "$PUBLISH_LOG" "$IID_FILE" "$INSPECT_LOG"; }
 trap cleanup EXIT
 
-if (cd "${REPO_ROOT}/fn0-worker" && cargo publish) 2>&1 | tee "$PUBLISH_LOG"; then
+if (cd "${REPO_ROOT}" && cargo publish -p fn0-worker) 2>&1 | tee "$PUBLISH_LOG"; then
   echo "   published."
 else
   if grep -qE "already (uploaded|exists)" "$PUBLISH_LOG"; then
@@ -53,7 +53,7 @@ else
   fi
 fi
 
-VERSION="$(cd "${REPO_ROOT}/fn0-worker" && cargo pkgid | sed -E 's/.*[#@]([^:]+)$/\1/')"
+VERSION="$(cd "${REPO_ROOT}" && cargo pkgid -p fn0-worker | sed -E 's/.*[#@]([^:]+)$/\1/')"
 if [[ -z "$VERSION" ]]; then
   echo "failed to determine fn0-worker version" >&2
   exit 1
@@ -64,7 +64,7 @@ echo ">> fn0-worker version: ${VERSION}"
 echo ">> Building local image (host-native)"
 
 docker build \
-  --file "${REPO_ROOT}/fn0-worker/Dockerfile" \
+  --file "${REPO_ROOT}/fn0/worker/Dockerfile" \
   --iidfile "$IID_FILE" \
   --build-arg SCCACHE_BUCKET="$SCCACHE_BUCKET" \
   --build-arg SCCACHE_REGION="$SCCACHE_REGION" \

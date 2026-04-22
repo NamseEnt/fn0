@@ -43,29 +43,33 @@ export function useForteHook<T>(
     return cached.result;
   }
 
-  if (!isSSR) {
-    throw new Error(`Hook '${hookName}' was not pre-fetched during SSR`);
-  }
-
   if (cached?.promise) {
     throw cached.promise;
   }
 
-  const fortePort = process.env["FORTE_PORT"];
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (requestCookie) {
-    headers["Cookie"] = requestCookie;
-  }
-  const promise = fetch(
-    `http://localhost:${fortePort}/__forte_hook/${hookName}`,
-    {
+  let url: string;
+  let init: RequestInit;
+  if (isSSR) {
+    const fortePort = process.env["FORTE_PORT"];
+    if (requestCookie) {
+      headers["Cookie"] = requestCookie;
+    }
+    url = `http://localhost:${fortePort}/__self_invoke/${hookName}`;
+    init = { method: "POST", headers, body: JSON.stringify(input) };
+  } else {
+    headers["X-Forte-Prefetch-Miss"] = "1";
+    url = `/__self_invoke/${hookName}`;
+    init = {
       method: "POST",
       headers,
       body: JSON.stringify(input),
-    }
-  )
+      credentials: "include",
+    };
+  }
+  const promise = fetch(url, init)
     .then((res) => {
       if (!res.ok) {
         throw new Error(`Hook '${hookName}' failed: ${res.status}`);

@@ -8,9 +8,16 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{AddCommands, Cli, Commands, QueueCommands};
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
+fn main() -> Result<()> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let local = tokio::task::LocalSet::new();
+    rt.block_on(local.run_until(async_main()))
+}
+
+async fn async_main() -> Result<()> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let cli = Cli::parse();
 
     match cli.command {

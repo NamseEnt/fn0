@@ -60,6 +60,16 @@ This limits are for fn0 Cloud. If you run fn0 on your own, you can remove these 
   - Please use async/await instead of multi-threading.
   - It would be supported in the future with WASI [Shared Everything Threads](https://github.com/WebAssembly/shared-everything-threads).
 
+## Handler Contract
+
+fn0 reuses a single wasm instance (and, for `WasmJs` deployments, a single V8 isolate) to serve many concurrent requests on the same worker thread — the same model as Cloudflare Workers. Your handler code must respect this:
+
+- **Handlers must be effectively stateless across requests.** Do not rely on module-level mutable state to carry information between requests; another request may be interleaved on the same instance at any `await` point.
+- **If you do keep shared state, it must be safe for concurrent read/write from interleaved requests on a single thread** (e.g. short-lived caches guarded by `RefCell` and never held across an `await`).
+- **Do not assume a fresh environment per request.** Module-level initialization runs once; per-request setup belongs inside the handler.
+
+fn0 does not enforce this contract at runtime. Violating it will produce request-level data leakage or inconsistent behavior.
+
 ## Internal Implementation
 
 - Monolith architecture
