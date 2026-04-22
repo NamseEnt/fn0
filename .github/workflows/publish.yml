@@ -16,46 +16,19 @@ jobs:
       - name: Install Rust
         run: rustup update stable
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-release
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Publish changed crates
+      - name: Publish unpublished workspace crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          publish_if_needed() {
-            local dir="$1"
-            local name="$2"
-
-            local local_ver=$(grep '^version' "$dir/Cargo.toml" | head -1 | sed 's/version = "\(.*\)"/\1/')
-            local remote_ver=$(cargo search "$name" --limit 1 2>/dev/null | grep "^${name} " | sed 's/.* = "\(.*\)".*/\1/' || echo "")
-
-            if [ "$local_ver" = "$remote_ver" ]; then
-              return
-            fi
-
-            echo "Publishing $name@$local_ver (crates.io: ${remote_ver:-none})"
-            cargo publish --manifest-path "$dir/Cargo.toml" --allow-dirty
-            echo "Waiting for crates.io to index..."
-            sleep 30
-          }
-
-          publish_if_needed "adapt-cache" "fn0-adapt-cache"
-          publish_if_needed "ski/deno/ext/web" "fn0-deno-web"
-          publish_if_needed "ski/deno/ext/fetch" "fn0-deno-fetch"
-          publish_if_needed "ski/ski" "fn0-ski"
-          publish_if_needed "fn0" "fn0"
-          publish_if_needed "forte/forte-json" "forte-json"
-          publish_if_needed "forte/db" "forte-db"
-          publish_if_needed "forte/macros" "forte-macros"
-          publish_if_needed "forte/rs-sdk" "forte-sdk"
-          publish_if_needed "fn0-deploy" "fn0-deploy"
-          publish_if_needed "forte/cli" "forte-cli"
+        run: cargo release publish --workspace --unpublished --execute --no-confirm
 
       - name: Create release tags
         shell: bash
@@ -79,4 +52,4 @@ jobs:
           }
 
           tag_if_needed "forte/cli" "forte-cli"
-          tag_if_needed "forte/forte-rs-to-ts" "forte-rs-to-ts"
+          tag_if_needed "forte/rs-to-ts" "forte-rs-to-ts"

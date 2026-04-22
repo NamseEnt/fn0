@@ -5,6 +5,9 @@ edition = "2024"
 description = "Runs wasi:http@0.3 wasm test binaries (cargo test runner for forte-db)"
 license = "AGPL-3.0-only"
 
+[package.metadata.release]
+release = false
+
 [[bin]]
 name = "forte-test-runner"
 path = "src/main.rs"
