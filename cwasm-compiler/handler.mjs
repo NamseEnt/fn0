@@ -51,7 +51,7 @@ export const handler = async (event) => {
 
   const workDir = mkdtempSync(join(tmpdir(), "cwasm-"));
   const inputWasmPath = join(workDir, "backend.wasm");
-  const outputCwasmZstPath = join(workDir, "backend.cwasm.zst");
+  const outputCwasmZstPath = join(workDir, "wasm.cwasm.zst");
 
   let outputBundleBytes;
   try {
@@ -73,7 +73,7 @@ export const handler = async (event) => {
       throw new Error("raw bundle missing manifest.json");
     }
     outputEntries.set("manifest.json", manifest);
-    outputEntries.set("backend.cwasm.zst", cwasmZst);
+    outputEntries.set("wasm.cwasm.zst", cwasmZst);
     if (envEncBytes) {
       outputEntries.set("env.enc", envEncBytes);
     }
