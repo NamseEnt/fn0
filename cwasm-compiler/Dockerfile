@@ -15,11 +15,13 @@ ENV SCCACHE_BUCKET=${SCCACHE_BUCKET} \
     RUSTC_WRAPPER=sccache
 
 ARG SCCACHE_VERSION=0.14.0
-RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl.tar.gz" \
-    | tar -xz -C /tmp \
+RUN curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 15 --max-time 120 \
+        -o /tmp/sccache.tar.gz \
+        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl.tar.gz" \
+ && tar -xzf /tmp/sccache.tar.gz -C /tmp \
  && mv "/tmp/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl/sccache" /usr/local/bin/sccache \
  && chmod +x /usr/local/bin/sccache \
- && rm -rf "/tmp/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl"
+ && rm -rf /tmp/sccache.tar.gz "/tmp/sccache-v${SCCACHE_VERSION}-aarch64-unknown-linux-musl"
 
 WORKDIR /build
 COPY . .

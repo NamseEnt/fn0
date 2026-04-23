@@ -117,7 +117,7 @@ const cwasmCompilerBucketR = new aws.s3.Bucket("cwasm-compiler-bucket", {
 
 const cwasmCompilerEcrR = new aws.ecr.Repository("cwasm-compiler-ecr", {
   region: cwasmCompilerRegion,
-  imageTagMutability: "IMMUTABLE",
+  imageTagMutability: "MUTABLE",
   forceDelete: true,
 });
 
