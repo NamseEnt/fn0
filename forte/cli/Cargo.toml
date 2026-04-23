@@ -1,10 +1,10 @@
 [package]
 name = "forte-cli"
 version = "0.3.26"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "CLI for the Forte fullstack web framework"
-license = "AGPL-3.0-only"
-repository = "https://github.com/NamseEnt/fn0"
 
 [[bin]]
 name = "forte"
@@ -16,8 +16,14 @@ bin-dir = "{ name }-{ target }/{ bin }{ binary-ext }"
 pkg-fmt = "txz"
 
 [dependencies]
+anyhow = { workspace = true }
+bytes = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 fn0 = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
+fn0-deploy = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["server", "http1", "client"] }
 hyper-util = { workspace = true, features = [
     "service",
@@ -25,29 +31,22 @@ hyper-util = { workspace = true, features = [
     "http1",
     "tokio",
 ] }
-bytes = { workspace = true }
-anyhow = { workspace = true }
+notify = { workspace = true }
+notify-debouncer-mini = { workspace = true }
+reqwest = { workspace = true }
+rustls = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-util = { workspace = true }
+toml = { workspace = true }
+tower = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-http-body-util = { workspace = true }
-tower = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
-notify = "8"
-notify-debouncer-mini = "0.6"
-http = { workspace = true }
-reqwest = { workspace = true }
-serde_json = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-toml = { workspace = true }
-fn0-deploy = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
-tokio-util = { workspace = true }
-rustls = { workspace = true }
-futures = { workspace = true }
-
 
 [dev-dependencies]
-assert_cmd = "2"
-predicates = "3"
-tempfile = { workspace = true }
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }
+tempfile = { workspace = true }

@@ -1,9 +1,10 @@
 [package]
 name = "forte-test-runner"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Runs wasi:http@0.3 wasm test binaries (cargo test runner for forte-db)"
-license = "AGPL-3.0-only"
 
 [package.metadata.release]
 release = false
@@ -15,6 +16,6 @@ path = "src/main.rs"
 [dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "time"] }
-wasmtime = { version = "43", features = ["component-model-async"] }
-wasmtime-wasi = { version = "43", features = ["p3"] }
-wasmtime-wasi-http = { version = "43", features = ["p3"] }
+wasmtime = { workspace = true, default-features = true, features = ["component-model-async"] }
+wasmtime-wasi = { workspace = true, features = ["p3"] }
+wasmtime-wasi-http = { workspace = true, features = ["p3"] }

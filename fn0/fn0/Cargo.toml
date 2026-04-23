@@ -1,15 +1,49 @@
 [package]
 name = "fn0"
 version = "0.2.14"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "FaaS platform powered by wasmtime"
-license = "AGPL-3.0-only"
-repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
-ski = { workspace = true }
+anyhow = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+crossbeam-channel = { workspace = true }
 fn0-wasmtime = { workspace = true }
-wasmtime = { version = "43", default-features = false, features = [
+futures = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true, features = ["server", "client", "http1", "http2"] }
+hyper-rustls = { workspace = true }
+hyper-util = { workspace = true, features = ["service", "client", "client-legacy", "http1", "http2", "tokio"] }
+libsql-hrana = { workspace = true }
+memberlist = { workspace = true }
+oci-rust-sdk = { workspace = true }
+opentelemetry = { workspace = true, features = ["logs", "metrics"] }
+opentelemetry-otlp = { workspace = true, features = [
+    "grpc-tonic",
+    "reqwest-client",
+    "metrics",
+    "logs",
+] }
+opentelemetry_sdk = { workspace = true, features = ["rt-tokio"] }
+reqwest = { workspace = true, features = ["http2"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+ski = { workspace = true }
+socket2 = { workspace = true }
+sonic-rs = { workspace = true }
+struson = { workspace = true }
+sysinfo = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tower = { workspace = true, features = ["timeout", "util"] }
+tower-http = { workspace = true, features = ["timeout"] }
+tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+tracing-subscriber = { workspace = true }
+wasmtime = { workspace = true, features = [
     "runtime",
     "cranelift",
     "component-model",
@@ -18,47 +52,13 @@ wasmtime = { version = "43", default-features = false, features = [
     "parallel-compilation",
     "cache",
 ] }
-wasmtime-wasi = { version = "43", features = ["p3"] }
-wasmtime-wasi-http = { version = "43", features = ["component-model-async", "p3", "default-send-request"] }
-tokio = { workspace = true }
-memberlist = { version = "0.7", features = ["snappy", "tokio", "quinn"] }
-hyper = { workspace = true, features = ["server", "client", "http1", "http2"] }
-hyper-util = { workspace = true, features = ["service", "client", "client-legacy", "http1", "http2", "tokio"] }
-hyper-rustls = { version = "0.27", default-features = false, features = ["webpki-roots", "http1", "http2", "ring", "tls12", "logging"] }
-tower = { workspace = true, features = ["timeout", "util"] }
-tower-http = { version = "0.6.7", features = ["timeout"] }
-bytes = { workspace = true }
-http-body-util = { workspace = true }
-sysinfo = "0.37.2"
-oci-rust-sdk = { version = "0.4" }
-reqwest = { workspace = true, features = ["http2"] }
-sonic-rs = "0.5.6"
-futures = { workspace = true }
-socket2 = "0.6.1"
-opentelemetry = { version = "0.31.0", features = ["logs", "metrics"] }
-opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.31.0", features = [
-    "grpc-tonic",
-    "reqwest-client",
-    "metrics",
-    "logs",
-] }
-tracing-opentelemetry = "0.32.0"
-tracing-subscriber = { workspace = true }
-tracing = { workspace = true }
-anyhow = { workspace = true }
-libsql-hrana = "0.9.29"
-serde_json = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-chrono = { workspace = true }
-tokio-util = { workspace = true }
-struson = "0.7"
-crossbeam-channel = "0.5"
+wasmtime-wasi = { workspace = true, features = ["p3"] }
+wasmtime-wasi-http = { workspace = true, features = ["component-model-async", "p3", "default-send-request"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync", "test-util"] }
-tokio-rustls = "0.26"
+h2 = { workspace = true }
+rcgen = { workspace = true }
 rustls = { workspace = true }
-rcgen = "0.14"
-rustls-pki-types = "1"
-h2 = "0.4"
+rustls-pki-types = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync", "test-util"] }
+tokio-rustls = { workspace = true }

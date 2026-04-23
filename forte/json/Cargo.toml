@@ -1,16 +1,16 @@
 [package]
 name = "forte-json"
 version = "0.1.1"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Streaming JSON serializer for the Forte web framework"
-license = "AGPL-3.0-only"
-repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 serde = { workspace = true, features = ["derive"] }

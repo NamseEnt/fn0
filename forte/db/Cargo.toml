@@ -1,18 +1,18 @@
 [package]
 name = "forte-db"
 version = "0.3.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Database layer for the Forte web framework (Turso/libSQL)"
-license = "AGPL-3.0-only"
-repository = "https://github.com/NamseEnt/fn0"
 
 [features]
 dev-test = []
 
 [dependencies]
 anyhow = { workspace = true }
+bytes = { workspace = true }
+forte-sdk = { workspace = true }
+libsql-hrana = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-bytes = { workspace = true }
-libsql-hrana = "0.9.29"
-forte-sdk = { workspace = true }
