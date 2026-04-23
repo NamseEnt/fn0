@@ -46,6 +46,8 @@ bytes = { workspace = true }
 singleflight = "0.3.0"
 boxcar = "0.2.14"
 russh = "0.60.0"
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 wiremock = "0.6"
