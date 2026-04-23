@@ -269,7 +269,7 @@ pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()
         .map_err(|e| anyhow!("Failed to create {}: {}", output_path.display(), e))?;
     let mut builder = tar::Builder::new(file);
 
-    let manifest = br#"{"kind":"forte"}"#;
+    let manifest = br#"{"kind":"wasmjs"}"#;
     append_bytes(&mut builder, "manifest.json", manifest)?;
 
     let backend_wasm = dist_dir.join("backend.wasm");
@@ -280,7 +280,7 @@ pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()
     let server_js = dist_dir.join("server.js");
     let server_bytes = std::fs::read(&server_js)
         .map_err(|e| anyhow!("Failed to read {}: {}", server_js.display(), e))?;
-    append_bytes(&mut builder, "frontend.js", &server_bytes)?;
+    append_bytes(&mut builder, "entry.js", &server_bytes)?;
 
     builder.finish()?;
     Ok(())
