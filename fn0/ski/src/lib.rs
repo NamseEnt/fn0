@@ -175,6 +175,7 @@ pub struct SkiInstance {
     driver_waker: Rc<Cell<Option<Waker>>>,
     deadlines: std::sync::Arc<DeadlineMap>,
     metrics: std::sync::Arc<CpuMetrics>,
+    terminated: std::sync::Arc<tokio::sync::Notify>,
 }
 
 static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
@@ -227,6 +228,7 @@ struct WatchdogEntry {
     isolate: v8::IsolateHandle,
     deadlines: std::sync::Arc<DeadlineMap>,
     metrics: std::sync::Arc<CpuMetrics>,
+    terminated: std::sync::Arc<tokio::sync::Notify>,
 }
 
 static WATCHDOG: std::sync::OnceLock<std::sync::Mutex<Vec<std::sync::Arc<WatchdogEntry>>>> =
@@ -256,6 +258,7 @@ fn watchdog_loop() {
             };
             if exceeded {
                 entry.isolate.terminate_execution();
+                entry.terminated.notify_waiters();
             }
         }
     }
@@ -305,6 +308,7 @@ impl SkiInstance {
         let deadlines: std::sync::Arc<DeadlineMap> =
             std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
         let metrics = std::sync::Arc::new(CpuMetrics::new());
+        let terminated = std::sync::Arc::new(tokio::sync::Notify::new());
 
         let registry = watchdog_registry();
         registry
@@ -314,6 +318,7 @@ impl SkiInstance {
                 isolate: isolate_handle.clone(),
                 deadlines: deadlines.clone(),
                 metrics: metrics.clone(),
+                terminated: terminated.clone(),
             }));
 
         Ok(Self {
@@ -323,6 +328,7 @@ impl SkiInstance {
             driver_waker: Rc::new(Cell::new(None)),
             deadlines,
             metrics,
+            terminated,
         })
     }
 
@@ -334,6 +340,7 @@ impl SkiInstance {
         let run_handler = self.run_handler.clone();
         let deadlines = self.deadlines.clone();
         let metrics = self.metrics.clone();
+        let terminated = self.terminated.clone();
 
         let call_fut = {
             let mut rt = runtime.borrow_mut();
@@ -361,10 +368,20 @@ impl SkiInstance {
         }
 
         Box::pin(async move {
-            let result = call_fut.await;
+            let outcome = tokio::select! {
+                r = call_fut => Some(r),
+                _ = terminated.notified() => None,
+            };
             deadlines.lock().unwrap().remove(&id);
-            result.map_err(|e| anyhow!("js handler failed: {e:?}"))?;
-            take_response(&runtime, id)
+            match outcome {
+                Some(r) => {
+                    r.map_err(|e| anyhow!("js handler failed: {e:?}"))?;
+                    take_response(&runtime, id)
+                }
+                None => Err(anyhow!(
+                    "ski runtime terminated (cpu budget exceeded or driver crashed)"
+                )),
+            }
         })
     }
 
@@ -383,6 +400,7 @@ impl SkiInstance {
                 Poll::Ready(Ok(())) => Poll::Pending,
                 Poll::Ready(Err(e)) => {
                     eprintln!("[ski] event loop error: {e:?}");
+                    self.terminated.notify_waiters();
                     Poll::Ready(())
                 }
                 Poll::Pending => Poll::Pending,
