@@ -11,7 +11,7 @@ class OciHeadQuarter extends pulumi.ComponentResource {
     constructor(name, args, opts) {
         super("pkg:index:oci-head-quarter", name, args, opts);
         const { suffix, ociRegion, compartmentId, vcnId, docDbUrl, docDbToken, sites, } = args;
-        const { regionalSubnet } = (0, networking_1.createNetworking)(this, {
+        const { regionalSubnet, podSubnet } = (0, networking_1.createNetworking)(this, {
             compartmentId,
             vcnId,
             ipv6cidrBlocks: args.ipv6cidrBlocks,
@@ -25,6 +25,7 @@ class OciHeadQuarter extends pulumi.ComponentResource {
             compartmentId,
             vcnId,
             regionalSubnetId: regionalSubnet.id,
+            podSubnetId: podSubnet.id,
             suffix,
             region: ociRegion,
             tenancyOcid,

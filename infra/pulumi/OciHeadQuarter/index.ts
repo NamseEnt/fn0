@@ -63,7 +63,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       sites,
     } = args;
 
-    const { regionalSubnet } = createNetworking(this, {
+    const { regionalSubnet, podSubnet } = createNetworking(this, {
       compartmentId,
       vcnId,
       ipv6cidrBlocks: args.ipv6cidrBlocks,
@@ -79,6 +79,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       compartmentId,
       vcnId,
       regionalSubnetId: regionalSubnet.id,
+      podSubnetId: podSubnet.id,
       suffix,
       region: ociRegion,
       tenancyOcid,

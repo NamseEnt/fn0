@@ -9,6 +9,7 @@ export function createOkeCluster(
     compartmentId,
     vcnId,
     regionalSubnetId,
+    podSubnetId,
     suffix,
     region,
     tenancyOcid,
@@ -19,6 +20,7 @@ export function createOkeCluster(
     compartmentId: pulumi.Input<string>;
     vcnId: pulumi.Input<string>;
     regionalSubnetId: pulumi.Input<string>;
+    podSubnetId: pulumi.Input<string>;
     suffix: pulumi.Input<string>;
     region: pulumi.Input<string>;
     tenancyOcid: string;
@@ -118,7 +120,7 @@ export function createOkeCluster(
         ],
         nodePoolPodNetworkOptionDetails: {
           cniType: "OCI_VCN_IP_NATIVE",
-          podSubnetIds: [regionalSubnetId],
+          podSubnetIds: [podSubnetId],
         },
       },
       nodeSourceDetails: {

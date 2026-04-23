@@ -35,6 +35,27 @@ impl DocDb {
         Ok(deployments)
     }
 
+    pub async fn deployment_exists(
+        &self,
+        subdomain: &str,
+        code_id: u64,
+        code_version: u64,
+    ) -> Result<bool> {
+        let conn = self.db.connect()?;
+        let mut rows = conn
+            .query(
+                "SELECT 1 FROM docs \
+                 WHERE pk = 'deployments' \
+                   AND json_extract(value, '$.subdomain') = ? \
+                   AND json_extract(value, '$.code_id') = ? \
+                   AND json_extract(value, '$.code_version') = ? \
+                 LIMIT 1",
+                libsql::params!(subdomain, code_id, code_version),
+            )
+            .await?;
+        Ok(rows.next().await?.is_some())
+    }
+
     pub async fn insert_deployment(
         &self,
         subdomain: &str,

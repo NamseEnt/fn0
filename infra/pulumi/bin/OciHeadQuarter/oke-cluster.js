@@ -5,7 +5,7 @@ const pulumi = require("@pulumi/pulumi");
 const oci = require("@pulumi/oci");
 const k8s = require("@pulumi/kubernetes");
 const yaml = require("js-yaml");
-function createOkeCluster(parent, { compartmentId, vcnId, regionalSubnetId, suffix, region, tenancyOcid, userOcid, fingerprint, privateKey, }) {
+function createOkeCluster(parent, { compartmentId, vcnId, regionalSubnetId, podSubnetId, suffix, region, tenancyOcid, userOcid, fingerprint, privateKey, }) {
     const ad1 = pulumi.all([compartmentId]).apply(([compartmentId]) => oci.identity
         .getAvailabilityDomain({
         adNumber: 1,
@@ -74,7 +74,7 @@ function createOkeCluster(parent, { compartmentId, vcnId, regionalSubnetId, suff
             ],
             nodePoolPodNetworkOptionDetails: {
                 cniType: "OCI_VCN_IP_NATIVE",
-                podSubnetIds: [regionalSubnetId],
+                podSubnetIds: [podSubnetId],
             },
         },
         nodeSourceDetails: {
