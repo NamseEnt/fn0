@@ -39,7 +39,8 @@ echo ">> Attempting cargo publish for fn0-worker"
 PUBLISH_LOG="$(mktemp)"
 IID_FILE="$(mktemp)"
 INSPECT_LOG="$(mktemp)"
-cleanup() { rm -f "$PUBLISH_LOG" "$IID_FILE" "$INSPECT_LOG"; }
+BUILD_LOG="$(mktemp)"
+cleanup() { rm -f "$PUBLISH_LOG" "$IID_FILE" "$INSPECT_LOG" "$BUILD_LOG"; }
 trap cleanup EXIT
 
 if (cd "${REPO_ROOT}" && cargo publish -p fn0-worker) 2>&1 | tee "$PUBLISH_LOG"; then
@@ -63,18 +64,32 @@ TAG="$VERSION"
 echo ">> fn0-worker version: ${VERSION}"
 echo ">> Building local image (host-native)"
 
+DOCKER_BUILD_PIPESTATUS=0
+set +e
 docker build \
   --file "${REPO_ROOT}/fn0/worker/Dockerfile" \
   --iidfile "$IID_FILE" \
+  --progress=plain \
   --build-arg SCCACHE_BUCKET="$SCCACHE_BUCKET" \
   --build-arg SCCACHE_REGION="$SCCACHE_REGION" \
   --build-arg SCCACHE_ENDPOINT="$SCCACHE_ENDPOINT" \
   --build-arg AWS_ACCESS_KEY_ID="$SCCACHE_ACCESS_KEY_ID" \
   --build-arg AWS_SECRET_ACCESS_KEY="$SCCACHE_SECRET_ACCESS_KEY" \
-  "$REPO_ROOT"
+  "$REPO_ROOT" 2>&1 | tee "$BUILD_LOG"
+DOCKER_BUILD_PIPESTATUS=("${PIPESTATUS[@]}")
+set -e
+if [[ "${DOCKER_BUILD_PIPESTATUS[0]}" -ne 0 ]]; then
+  echo "docker build failed (exit ${DOCKER_BUILD_PIPESTATUS[0]})" >&2
+  exit "${DOCKER_BUILD_PIPESTATUS[0]}"
+fi
 
-LOCAL_DIGEST="$(cat "$IID_FILE")"
-echo ">> Local image config digest: ${LOCAL_DIGEST}"
+LOCAL_IID="$(cat "$IID_FILE")"
+LOCAL_CONFIG_DIGEST="$(grep -oE 'exporting config sha256:[a-f0-9]+' "$BUILD_LOG" | head -1 | awk '{print $3}')"
+if [[ -z "$LOCAL_CONFIG_DIGEST" ]]; then
+  echo "failed to extract local image config digest from build log" >&2
+  exit 1
+fi
+echo ">> Local image config digest: ${LOCAL_CONFIG_DIGEST}"
 
 COUNT="$(jq length <<<"$REGISTRIES_JSON")"
 if (( COUNT == 0 )); then
@@ -106,19 +121,19 @@ for i in $(seq 0 $((COUNT - 1))); do
         exit 1
       fi
     fi
-    REMOTE_DIGEST="$(jq -r .config.digest <"$INSPECT_LOG")"
-    if [[ "$LOCAL_DIGEST" == "$REMOTE_DIGEST" ]]; then
+    REMOTE_CONFIG_DIGEST="$(jq -r .config.digest <"$INSPECT_LOG")"
+    if [[ "$LOCAL_CONFIG_DIGEST" == "$REMOTE_CONFIG_DIGEST" ]]; then
       echo "   ${FULL_REF}: match (skip push)"
     else
-      echo "ERROR: ${FULL_REF} exists but config digest differs:" >&2
-      echo "       local  = ${LOCAL_DIGEST}" >&2
-      echo "       remote = ${REMOTE_DIGEST}" >&2
+      echo "ERROR: ${FULL_REF} exists but image config digest differs:" >&2
+      echo "       local  = ${LOCAL_CONFIG_DIGEST}" >&2
+      echo "       remote = ${REMOTE_CONFIG_DIGEST}" >&2
       exit 1
     fi
   else
     if grep -qiE "no such manifest|not found|manifest unknown" "$INSPECT_LOG"; then
       echo ">> Pushing ${FULL_REF}"
-      docker tag "$LOCAL_DIGEST" "$FULL_REF"
+      docker tag "$LOCAL_IID" "$FULL_REF"
       docker push "$FULL_REF"
     else
       cat "$INSPECT_LOG" >&2
