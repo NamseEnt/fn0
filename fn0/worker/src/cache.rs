@@ -1,6 +1,5 @@
 use crate::env_crypto;
 use async_singleflight::Group;
-use fn0::Deployment;
 use fn0::cache::{Bundle, BundleCache, Error};
 use fn0::execute::ClientState;
 use fn0::measure_cpu_time::SystemClock;
@@ -201,15 +200,15 @@ impl S3BundleCache {
             fn0::build_service_pre(&self.engine, &self.linker, &cwasm).map_err(Error::Compile)?;
         let cwasm_size = cwasm.len();
 
-        let (js, deployment) = match manifest {
-            Manifest::Wasm => (None, Deployment::Wasm),
+        let js = match manifest {
+            Manifest::Wasm => None,
             Manifest::WasmJs => {
                 let js = js_bytes.ok_or_else(|| {
                     Error::Decode(anyhow::anyhow!("wasmjs bundle missing entry.js"))
                 })?;
                 let js_str =
                     String::from_utf8(js).map_err(|e| Error::Decode(anyhow::anyhow!(e)))?;
-                (Some(js_str), Deployment::WasmJs)
+                Some(js_str)
             }
         };
         let js_size = js.as_ref().map(|s| s.len()).unwrap_or(0);
@@ -230,7 +229,6 @@ impl S3BundleCache {
             Arc::new(Bundle {
                 service_pre,
                 js,
-                deployment,
                 env_vars,
             }),
             size,

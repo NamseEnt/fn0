@@ -1,4 +1,3 @@
-use fn0::Deployment;
 use fn0::cache::{Bundle, BundleCache, Error as CacheError};
 use fn0::execute::ClientState;
 use fn0::measure_cpu_time::SystemClock;
@@ -57,21 +56,20 @@ impl SimpleCache {
         let service_pre = fn0::build_service_pre(&self.engine, &self.linker, &cwasm)
             .map_err(CacheError::Compile)?;
 
-        let (js, deployment) = if self.js_path.is_empty() {
-            (None, Deployment::Wasm)
+        let js = if self.js_path.is_empty() {
+            None
         } else {
             let js_bytes = tokio::fs::read(&self.js_path)
                 .await
                 .map_err(|e| CacheError::Storage(anyhow::anyhow!("read {}: {e}", self.js_path)))?;
             let js_str =
                 String::from_utf8(js_bytes).map_err(|e| CacheError::Decode(anyhow::anyhow!(e)))?;
-            (Some(js_str), Deployment::WasmJs)
+            Some(js_str)
         };
 
         Ok(Arc::new(Bundle {
             service_pre,
             js,
-            deployment,
             env_vars,
         }))
     }

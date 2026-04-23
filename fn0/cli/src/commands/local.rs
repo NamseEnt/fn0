@@ -3,10 +3,10 @@ use color_eyre::Result;
 use fn0::cache::{Bundle, BundleCache, Error as CacheError};
 use fn0::execute::ClientState;
 use fn0::measure_cpu_time::SystemClock;
-use fn0::wasmtime::component::Linker;
 use fn0::wasmtime::Engine;
-use fn0::{CodeExecutor, Deployment, ExecutionContext};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
+use fn0::wasmtime::component::Linker;
+use fn0::{CodeExecutor, ExecutionContext};
+use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
@@ -123,7 +123,6 @@ impl LocalCache {
         Ok(Arc::new(Bundle {
             service_pre,
             js: None,
-            deployment: Deployment::Wasm,
             env_vars: Vec::new(),
         }))
     }

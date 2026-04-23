@@ -1,4 +1,3 @@
-use crate::Deployment;
 use crate::execute::ClientState;
 use crate::measure_cpu_time::SystemClock;
 use std::sync::Arc;
@@ -9,7 +8,6 @@ use wasmtime_wasi_http::p3::bindings::ServicePre;
 pub struct Bundle {
     pub service_pre: ServicePre<ClientState<SystemClock>>,
     pub js: Option<String>,
-    pub deployment: Deployment,
     pub env_vars: Vec<(String, String)>,
 }
 
