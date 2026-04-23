@@ -16,9 +16,19 @@ export function createNetworking(
   }
 ): {
   regionalSubnet: oci.core.Subnet;
+  podSubnet: oci.core.Subnet;
 } {
   const internetGateway = new oci.core.InternetGateway(
     "igw",
+    {
+      compartmentId,
+      vcnId,
+    },
+    { parent }
+  );
+
+  const natGateway = new oci.core.NatGateway(
+    "nat-gw",
     {
       compartmentId,
       vcnId,
@@ -41,6 +51,22 @@ export function createNetworking(
           destination: "0.0.0.0/0",
           destinationType: "CIDR_BLOCK",
           networkEntityId: internetGateway.id,
+        },
+      ],
+    },
+    { parent }
+  );
+
+  const podRouteTable = new oci.core.RouteTable(
+    "pod-route-table",
+    {
+      compartmentId,
+      vcnId,
+      routeRules: [
+        {
+          destination: "0.0.0.0/0",
+          destinationType: "CIDR_BLOCK",
+          networkEntityId: natGateway.id,
         },
       ],
     },
@@ -99,6 +125,30 @@ export function createNetworking(
     { parent }
   );
 
+  const podSecurityList = new oci.core.SecurityList(
+    "pod-security-list",
+    {
+      compartmentId,
+      vcnId,
+      egressSecurityRules: [
+        {
+          destination: "0.0.0.0/0",
+          destinationType: "CIDR_BLOCK",
+          protocol: "all",
+          stateless: false,
+        },
+      ],
+      ingressSecurityRules: [
+        {
+          source: "10.0.0.0/16",
+          protocol: "all",
+          stateless: false,
+        },
+      ],
+    },
+    { parent }
+  );
+
   const regionalSubnet = new oci.core.Subnet(
     "regional-subnet",
     {
@@ -114,5 +164,19 @@ export function createNetworking(
     { parent, deleteBeforeReplace: true }
   );
 
-  return { regionalSubnet };
+  const podSubnet = new oci.core.Subnet(
+    "pod-subnet",
+    {
+      displayName: "fn0-hq-pod-subnet",
+      compartmentId,
+      vcnId,
+      ipv4cidrBlocks: ["10.0.3.0/24"],
+      prohibitPublicIpOnVnic: true,
+      routeTableId: podRouteTable.id,
+      securityListIds: [podSecurityList.id],
+    },
+    { parent, deleteBeforeReplace: true }
+  );
+
+  return { regionalSubnet, podSubnet };
 }

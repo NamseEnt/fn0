@@ -34,7 +34,7 @@ struct DeployStartResponse {
 
 #[derive(Deserialize)]
 struct DeployFinishResponse {
-    generation: u64,
+    job_id: String,
 }
 
 #[derive(Deserialize)]
@@ -44,6 +44,18 @@ struct DeployStatusResponse {
     hosts_at_target: usize,
     hosts_pending: Vec<String>,
     hosts_quarantined: Vec<String>,
+    #[serde(default)]
+    job: Option<DeployJobStatus>,
+}
+
+#[derive(Deserialize)]
+struct DeployJobStatus {
+    phase: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    generation: Option<u64>,
+    #[serde(default)]
+    last_error: Option<String>,
 }
 
 fn credentials_path() -> Result<PathBuf> {
@@ -189,21 +201,19 @@ pub async fn deploy(
         .json()
         .await?;
 
-    println!(
-        "Waiting for rollout to all workers (generation {})...",
-        finish_resp.generation
-    );
+    println!("Deploy job queued: {}", finish_resp.job_id);
 
     let poll_interval = std::time::Duration::from_secs(2);
-    let timeout = std::time::Duration::from_secs(300);
+    let timeout = std::time::Duration::from_secs(600);
     let start = std::time::Instant::now();
+    let mut last_phase: Option<String> = None;
     let mut last_progress: Option<(usize, usize)> = None;
 
     loop {
         let status: DeployStatusResponse = client
             .get(format!(
-                "{}/deploy/status?generation={}",
-                HQ_URL, finish_resp.generation
+                "{}/deploy/status?job_id={}",
+                HQ_URL, finish_resp.job_id
             ))
             .send()
             .await?
@@ -212,20 +222,40 @@ pub async fn deploy(
             .json()
             .await?;
 
+        if let Some(job) = status.job.as_ref() {
+            if last_phase.as_deref() != Some(job.phase.as_str()) {
+                println!("  phase: {}", job.phase);
+                last_phase = Some(job.phase.clone());
+            }
+            if job.phase == "failed" {
+                let msg = job
+                    .last_error
+                    .clone()
+                    .unwrap_or_else(|| "unknown error".to_string());
+                return Err(anyhow!("Deploy job failed: {}", msg));
+            }
+        }
+
         let progress = (status.hosts_at_target, status.hosts_total);
         if last_progress != Some(progress) {
             println!("  {}/{} hosts ready", progress.0, progress.1);
             last_progress = Some(progress);
         }
 
-        if status.delivered {
+        let phase_done = status
+            .job
+            .as_ref()
+            .map(|j| j.phase == "done")
+            .unwrap_or(false);
+        if phase_done && status.delivered {
             break;
         }
 
         if start.elapsed() > timeout {
             return Err(anyhow!(
-                "Deploy rollout timed out after {}s. pending={:?} quarantined={:?}",
+                "Deploy timed out after {}s. phase={:?} pending={:?} quarantined={:?}",
                 timeout.as_secs(),
+                status.job.as_ref().map(|j| j.phase.clone()),
                 status.hosts_pending,
                 status.hosts_quarantined
             ));

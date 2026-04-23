@@ -78,6 +78,19 @@ struct DeployStatusResponse {
     hosts_pending: Vec<String>,
     hosts_quarantined: Vec<String>,
     sites: Vec<SiteStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    job: Option<DeployJobStatus>,
+}
+
+#[derive(Serialize)]
+struct DeployJobStatus {
+    job_id: String,
+    phase: crate::doc_db::DeployJobPhase,
+    code_version: Option<u64>,
+    generation: Option<u64>,
+    attempts: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -346,8 +359,7 @@ pub async fn handle_deploy_finish(
         Err(e) => return json_response(401, &ErrorResponse { error: e }),
     };
 
-    let env_key = crate::cwasm_compile::env_key(&request.subdomain);
-    let env_present = match &request.env {
+    let env_ciphertext_b64 = match &request.env {
         Some(content) => {
             let ciphertext =
                 match crate::env_crypto::encrypt(&ctx.env_encryption_key, content.as_bytes()) {
@@ -361,162 +373,45 @@ pub async fn handle_deploy_finish(
                         );
                     }
                 };
-            if let Err(e) = ctx.aws_s3.write(&env_key, ciphertext).await {
-                return json_response(
-                    500,
-                    &ErrorResponse {
-                        error: format!("env upload failed: {}", e),
-                    },
-                );
-            }
-            true
+            use base64::{Engine, engine::general_purpose::STANDARD};
+            Some(STANDARD.encode(ciphertext))
         }
-        None => {
-            let _ = ctx.aws_s3.delete(&env_key).await;
-            false
-        }
+        None => None,
     };
 
-    let target_versions: std::collections::BTreeSet<String> = {
-        let mut versions = std::collections::BTreeSet::new();
-        for site in &ctx.sites {
-            match ctx.doc_db.get_worker_target(site.name()).await {
-                Ok(Some(t)) => {
-                    versions.insert(t.fn0_wasmtime_version);
-                }
-                Ok(None) => {
-                    return json_response(
-                        409,
-                        &ErrorResponse {
-                            error: format!("worker-target not set for site '{}'", site.name()),
-                        },
-                    );
-                }
-                Err(e) => {
-                    return json_response(
-                        500,
-                        &ErrorResponse {
-                            error: format!("Failed to read worker-target: {}", e),
-                        },
-                    );
-                }
-            }
-            match ctx.doc_db.get_worker_last_stable(site.name()).await {
-                Ok(Some(l)) => {
-                    versions.insert(l.fn0_wasmtime_version);
-                }
-                Ok(None) => {}
-                Err(e) => {
-                    return json_response(
-                        500,
-                        &ErrorResponse {
-                            error: format!("Failed to read worker-last-stable: {}", e),
-                        },
-                    );
-                }
-            }
-        }
-        versions
+    let now = chrono::Utc::now().to_rfc3339();
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let job = crate::doc_db::DeployJob {
+        job_id: job_id.clone(),
+        subdomain: request.subdomain.clone(),
+        code_id: request.code_id,
+        build_id: request.build_id.clone(),
+        env_ciphertext: env_ciphertext_b64,
+        phase: crate::doc_db::DeployJobPhase::Queued,
+        code_version: None,
+        old_build_ids: None,
+        generation: None,
+        attempts: 0,
+        last_error: None,
+        created_at: now.clone(),
+        updated_at: now,
+        heartbeat_at: None,
     };
 
-    for version in &target_versions {
-        let compile_ctx = crate::cwasm_compile::CompileContext {
-            lambda_client: &ctx.lambda_client,
-            wasm_bucket: crate::cwasm_compile::BucketRef {
-                op: &ctx.aws_s3,
-                name: &ctx.wasm_bucket,
-            },
-            cwasm_bucket: crate::cwasm_compile::BucketRef {
-                op: &ctx.cwasm_s3,
-                name: &ctx.cwasm_bucket,
-            },
-            fn0_wasmtime_version: version,
-        };
-        if let Err(e) =
-            crate::cwasm_compile::compile_and_publish(&compile_ctx, &request.subdomain, env_present)
-                .await
-        {
-            return json_response(
-                500,
-                &ErrorResponse {
-                    error: format!("Compile failed for fn0-wasmtime {}: {}", version, e),
-                },
-            );
-        }
-    }
-
-    if let Err(e) = crate::turso_admin::ensure_database(&ctx.forte_db, &request.subdomain).await {
+    if let Err(e) = ctx.doc_db.insert_deploy_job(&job).await {
         return json_response(
             500,
             &ErrorResponse {
-                error: format!("Failed to ensure forte-db database: {}", e),
+                error: format!("Failed to enqueue deploy job: {}", e),
             },
         );
     }
-
-    let code_version = match ctx.doc_db.next_code_version(request.code_id).await {
-        Ok(v) => v,
-        Err(e) => {
-            return json_response(
-                500,
-                &ErrorResponse {
-                    error: format!("Failed to get next version: {}", e),
-                },
-            );
-        }
-    };
-
-    if let Err(e) = ctx
-        .doc_db
-        .insert_deployment(&request.subdomain, request.code_id, code_version)
-        .await
-    {
-        return json_response(
-            500,
-            &ErrorResponse {
-                error: format!("Failed to insert deployment: {}", e),
-            },
-        );
-    }
-
-    if let Some(build_id) = &request.build_id {
-        let old_build_ids = match ctx
-            .doc_db
-            .register_build(&request.subdomain, build_id)
-            .await
-        {
-            Ok(ids) => ids,
-            Err(e) => {
-                return json_response(
-                    500,
-                    &ErrorResponse {
-                        error: format!("Failed to register build: {}", e),
-                    },
-                );
-            }
-        };
-        for old in old_build_ids {
-            if let Err(e) = ctx
-                .doc_db
-                .enqueue_r2_prefix_delete(&request.subdomain, &old)
-                .await
-            {
-                tracing::warn!(%e, %old, "Failed to enqueue r2 prefix delete");
-            }
-        }
-    }
-
-    ctx.deployment_cache.refresh().await;
-    let generation = ctx.deployment_cache.last_deployment_id();
-
-    spawn_immediate_push(&ctx).await;
 
     json_response(
         200,
         &serde_json::json!({
             "ok": true,
-            "code_version": code_version,
-            "generation": generation,
+            "job_id": job_id,
         }),
     )
 }
@@ -625,28 +520,55 @@ pub async fn handle_deploy_status(
     ctx.deployment_cache.refresh().await;
     let latest_generation = ctx.deployment_cache.last_deployment_id();
 
-    let target_generation = match req.uri().query() {
-        Some(q) => {
-            let mut parsed: Option<u64> = None;
-            for pair in q.split('&') {
-                if let Some(v) = pair.strip_prefix("generation=") {
-                    match v.parse() {
-                        Ok(n) => parsed = Some(n),
-                        Err(_) => {
-                            return json_response(
-                                400,
-                                &ErrorResponse {
-                                    error: format!("invalid generation '{}'", v),
-                                },
-                            );
-                        }
+    let mut parsed_generation: Option<u64> = None;
+    let mut job_id: Option<String> = None;
+    if let Some(q) = req.uri().query() {
+        for pair in q.split('&') {
+            if let Some(v) = pair.strip_prefix("generation=") {
+                match v.parse() {
+                    Ok(n) => parsed_generation = Some(n),
+                    Err(_) => {
+                        return json_response(
+                            400,
+                            &ErrorResponse {
+                                error: format!("invalid generation '{}'", v),
+                            },
+                        );
                     }
                 }
+            } else if let Some(v) = pair.strip_prefix("job_id=") {
+                job_id = Some(v.to_string());
             }
-            parsed.unwrap_or(latest_generation)
         }
-        None => latest_generation,
+    }
+
+    let job_info = if let Some(id) = job_id.as_deref() {
+        match ctx.doc_db.get_deploy_job(id).await {
+            Ok(Some(job)) => Some(job),
+            Ok(None) => {
+                return json_response(
+                    404,
+                    &ErrorResponse {
+                        error: format!("deploy job '{}' not found", id),
+                    },
+                );
+            }
+            Err(e) => {
+                return json_response(
+                    500,
+                    &ErrorResponse {
+                        error: format!("Failed to read deploy job: {}", e),
+                    },
+                );
+            }
+        }
+    } else {
+        None
     };
+
+    let target_generation = parsed_generation
+        .or_else(|| job_info.as_ref().and_then(|j| j.generation))
+        .unwrap_or(latest_generation);
 
     let mut hosts_total = 0usize;
     let mut hosts_at_target = 0usize;
@@ -727,6 +649,15 @@ pub async fn handle_deploy_status(
         && hosts_quarantined.is_empty()
         && all_sites_synced;
 
+    let job = job_info.map(|j| DeployJobStatus {
+        job_id: j.job_id,
+        phase: j.phase,
+        code_version: j.code_version,
+        generation: j.generation,
+        attempts: j.attempts,
+        last_error: j.last_error,
+    });
+
     json_response(
         200,
         &DeployStatusResponse {
@@ -738,11 +669,12 @@ pub async fn handle_deploy_status(
             hosts_pending,
             hosts_quarantined,
             sites,
+            job,
         },
     )
 }
 
-async fn spawn_immediate_push(ctx: &Arc<DeployContext>) {
+pub(crate) async fn spawn_immediate_push(ctx: &Arc<DeployContext>) {
     ctx.deployment_cache.refresh().await;
     for site in &ctx.sites {
         let pool = site.ssh_pool().clone();

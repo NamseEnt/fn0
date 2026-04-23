@@ -1,4 +1,5 @@
 mod build_registry;
+mod deploy_job;
 mod deployment;
 mod host_status;
 mod job_queue;
@@ -6,6 +7,7 @@ mod project;
 mod scale_config;
 mod worker_target;
 
+pub use deploy_job::*;
 pub use deployment::*;
 pub use host_status::*;
 use libsql::{Builder, Database, Result};
