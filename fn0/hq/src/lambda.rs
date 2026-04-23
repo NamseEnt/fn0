@@ -1,5 +1,6 @@
 use color_eyre::eyre::{Result, eyre};
 use reqsign::{AwsCredential, AwsV4Signer};
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -36,10 +37,12 @@ impl LambdaClient {
             "{}/2015-03-31/functions/{function_name}/invocations",
             self.endpoint
         );
+        let payload_hash = hex::encode(Sha256::digest(&payload));
         let mut req = http::Request::builder()
             .method(http::Method::POST)
             .uri(&url)
             .header(http::header::CONTENT_TYPE, "application/json")
+            .header("x-amz-content-sha256", &payload_hash)
             .body(payload)
             .map_err(|e| eyre!("Failed to build Lambda request: {e}"))?;
 
