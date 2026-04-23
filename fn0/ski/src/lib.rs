@@ -19,7 +19,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::task::{Context, Poll, Waker};
+use std::time::Instant;
 
 struct SourceMapLoader {
     source_maps: RefCell<HashMap<String, Vec<u8>>>,
@@ -162,9 +164,9 @@ deno_core::extension!(fetch_intercept_extension, ops = [op_fetch_intercept],);
 
 static RUNTIME_SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/RUNJS_SNAPSHOT.bin"));
 
-pub const JS_CALL_TIMEOUT_MS: u64 = 10;
+pub const JS_CALL_CPU_BUDGET_NANOS: u64 = 100_000_000;
 
-type DeadlineMap = std::sync::Mutex<std::collections::HashMap<u32, std::time::Instant>>;
+type DeadlineMap = std::sync::Mutex<std::collections::HashMap<u32, u64>>;
 
 pub struct SkiInstance {
     runtime: Rc<RefCell<JsRuntime>>,
@@ -172,11 +174,59 @@ pub struct SkiInstance {
     next_id: Cell<u32>,
     driver_waker: Rc<Cell<Option<Waker>>>,
     deadlines: std::sync::Arc<DeadlineMap>,
+    metrics: std::sync::Arc<CpuMetrics>,
+}
+
+static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+fn now_nanos() -> u64 {
+    let epoch = *EPOCH.get_or_init(Instant::now);
+    Instant::now().saturating_duration_since(epoch).as_nanos() as u64
+}
+
+struct CpuMetrics {
+    cpu_nanos_used: AtomicU64,
+    in_v8: AtomicBool,
+    last_enter_nanos: AtomicU64,
+}
+
+impl CpuMetrics {
+    fn new() -> Self {
+        Self {
+            cpu_nanos_used: AtomicU64::new(0),
+            in_v8: AtomicBool::new(false),
+            last_enter_nanos: AtomicU64::new(0),
+        }
+    }
+
+    fn before_v8_enter(&self) {
+        self.last_enter_nanos.store(now_nanos(), Ordering::Release);
+        self.in_v8.store(true, Ordering::Release);
+    }
+
+    fn after_v8_exit(&self) {
+        let now = now_nanos();
+        let last = self.last_enter_nanos.load(Ordering::Acquire);
+        self.cpu_nanos_used
+            .fetch_add(now.saturating_sub(last), Ordering::AcqRel);
+        self.in_v8.store(false, Ordering::Release);
+    }
+
+    fn current_total_nanos(&self) -> u64 {
+        let used = self.cpu_nanos_used.load(Ordering::Acquire);
+        if self.in_v8.load(Ordering::Acquire) {
+            let last = self.last_enter_nanos.load(Ordering::Acquire);
+            used + now_nanos().saturating_sub(last)
+        } else {
+            used
+        }
+    }
 }
 
 struct WatchdogEntry {
     isolate: v8::IsolateHandle,
     deadlines: std::sync::Arc<DeadlineMap>,
+    metrics: std::sync::Arc<CpuMetrics>,
 }
 
 static WATCHDOG: std::sync::OnceLock<std::sync::Mutex<Vec<std::sync::Arc<WatchdogEntry>>>> =
@@ -198,13 +248,13 @@ fn watchdog_loop() {
         std::thread::sleep(std::time::Duration::from_millis(1));
         let registry = WATCHDOG.get().expect("registry initialized");
         let entries: Vec<_> = registry.lock().unwrap().clone();
-        let now = std::time::Instant::now();
         for entry in entries {
-            let expired = {
+            let total = entry.metrics.current_total_nanos();
+            let exceeded = {
                 let deadlines = entry.deadlines.lock().unwrap();
-                deadlines.values().any(|d| now >= *d)
+                deadlines.values().any(|&d| total >= d)
             };
-            if expired {
+            if exceeded {
                 entry.isolate.terminate_execution();
             }
         }
@@ -254,6 +304,7 @@ impl SkiInstance {
 
         let deadlines: std::sync::Arc<DeadlineMap> =
             std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+        let metrics = std::sync::Arc::new(CpuMetrics::new());
 
         let registry = watchdog_registry();
         registry
@@ -262,6 +313,7 @@ impl SkiInstance {
             .push(std::sync::Arc::new(WatchdogEntry {
                 isolate: isolate_handle.clone(),
                 deadlines: deadlines.clone(),
+                metrics: metrics.clone(),
             }));
 
         Ok(Self {
@@ -270,6 +322,7 @@ impl SkiInstance {
             next_id: Cell::new(0),
             driver_waker: Rc::new(Cell::new(None)),
             deadlines,
+            metrics,
         })
     }
 
@@ -280,22 +333,28 @@ impl SkiInstance {
         let runtime = self.runtime.clone();
         let run_handler = self.run_handler.clone();
         let deadlines = self.deadlines.clone();
+        let metrics = self.metrics.clone();
 
         let call_fut = {
             let mut rt = runtime.borrow_mut();
             register_request(&mut rt, id, request);
+            metrics.before_v8_enter();
             let id_global: v8::Global<v8::Value> = {
                 deno_core::scope!(scope, &mut *rt);
                 let v = v8::Integer::new_from_unsigned(scope, id);
                 let v: v8::Local<v8::Value> = v.into();
                 v8::Global::new(scope, v)
             };
-            rt.call_with_args(&run_handler, &[id_global])
+            let f = rt.call_with_args(&run_handler, &[id_global]);
+            metrics.after_v8_exit();
+            f
         };
 
-        let deadline =
-            std::time::Instant::now() + std::time::Duration::from_millis(JS_CALL_TIMEOUT_MS);
-        deadlines.lock().unwrap().insert(id, deadline);
+        let baseline = metrics.cpu_nanos_used.load(Ordering::Acquire);
+        deadlines
+            .lock()
+            .unwrap()
+            .insert(id, baseline + JS_CALL_CPU_BUDGET_NANOS);
 
         if let Some(waker) = self.driver_waker.replace(None) {
             waker.wake();
@@ -311,7 +370,10 @@ impl SkiInstance {
 
     pub fn drive(&self, cx: &mut Context<'_>) -> Poll<Result<(), deno_core::error::CoreError>> {
         let mut rt = self.runtime.borrow_mut();
-        rt.poll_event_loop(cx, Default::default())
+        self.metrics.before_v8_enter();
+        let result = rt.poll_event_loop(cx, Default::default());
+        self.metrics.after_v8_exit();
+        result
     }
 
     pub fn drive_forever(self: Rc<Self>) -> Pin<Box<dyn Future<Output = ()>>> {
