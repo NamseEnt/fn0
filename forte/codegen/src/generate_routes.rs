@@ -941,7 +941,11 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                     }
                 } else {
                     quote! {
-                        Response::new(Body::from(body_bytes))
+                        Response::builder()
+                            .status(StatusCode::OK)
+                            .header("x-fn0-next", "js")
+                            .body(Body::from(body_bytes))
+                            .unwrap()
                     }
                 };
                 quote! {

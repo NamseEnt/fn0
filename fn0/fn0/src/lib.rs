@@ -1,5 +1,4 @@
 pub mod cache;
-mod deployment;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
@@ -12,9 +11,9 @@ use crate::measure_cpu_time::SystemClock;
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
 pub use cache::{Bundle, BundleCache, build_service_pre};
-pub use deployment::Deployment;
 use execute::ClientState;
 pub use execute::{build_linker, spawn_epoch_ticker};
+use http_body_util::BodyExt;
 use http_body_util::combinators::UnsyncBoxBody;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -31,6 +30,9 @@ pub type WasmProxyPre = ServicePre<ClientState<SystemClock>>;
 pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
+
+const NEXT_HEADER: &str = "x-fn0-next";
+const FN0_HEADER_PREFIX: &str = "x-fn0-";
 
 #[derive(Debug)]
 pub struct BuildEngineError(wasmtime::Error);
@@ -121,23 +123,10 @@ impl<C: BundleCache> CodeExecutor<C> {
         telemetry::function_invocation(subdomain);
         let start = std::time::Instant::now();
 
-        let result = match bundle.deployment {
-            Deployment::Wasm => {
-                let tx = self.wasm_instance_sender(subdomain, &bundle);
-                let (resp_tx, resp_rx) = oneshot::channel();
-                if tx.send((request, resp_tx)).is_err() {
-                    Err(anyhow!("wasm instance channel closed"))
-                } else {
-                    resp_rx
-                        .await
-                        .unwrap_or_else(|_| Err(anyhow!("wasm instance dropped response")))
-                }
-            }
-            Deployment::WasmJs => self.run_wasm_js(subdomain, bundle, request).await,
-        };
+        let result = self.run_with_next(subdomain, bundle, request).await;
 
         telemetry::execution_time(subdomain, start.elapsed());
-        result
+        result.map(strip_fn0_headers)
     }
 
     pub async fn run_backend_only(&self, subdomain: &str, request: Request) -> Result<Response> {
@@ -147,7 +136,50 @@ impl<C: BundleCache> CodeExecutor<C> {
             .get(subdomain)
             .await
             .map_err(|e| anyhow!("bundle get failed for {subdomain}: {e}"))?;
-        let tx = self.wasm_instance_sender(subdomain, &bundle);
+        self.run_wasm(subdomain, &bundle, request).await
+    }
+
+    async fn run_with_next(
+        &self,
+        subdomain: &str,
+        bundle: Arc<Bundle>,
+        request: Request,
+    ) -> Result<Response> {
+        let external_headers = request.headers().clone();
+        let uri = request.uri().clone();
+
+        let wasm_resp = self.run_wasm(subdomain, &bundle, request).await?;
+
+        if wasm_resp.status() != hyper::StatusCode::OK {
+            return Ok(wasm_resp);
+        }
+
+        let next = wasm_resp
+            .headers()
+            .get(NEXT_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        match next.as_deref() {
+            None | Some("") => Ok(wasm_resp),
+            Some("js") => {
+                self.delegate_to_js(subdomain, &bundle, &external_headers, uri, wasm_resp)
+                    .await
+            }
+            Some(other) => {
+                tracing::error!(runtime = other, subdomain, "unknown x-fn0-next runtime");
+                Ok(internal_error())
+            }
+        }
+    }
+
+    async fn run_wasm(
+        &self,
+        subdomain: &str,
+        bundle: &Arc<Bundle>,
+        request: Request,
+    ) -> Result<Response> {
+        let tx = self.wasm_instance_sender(subdomain, bundle);
         let (resp_tx, resp_rx) = oneshot::channel();
         if tx.send((request, resp_tx)).is_err() {
             return Err(anyhow!("wasm instance channel closed"));
@@ -157,31 +189,25 @@ impl<C: BundleCache> CodeExecutor<C> {
             .unwrap_or_else(|_| Err(anyhow!("wasm instance dropped response")))
     }
 
-    async fn run_wasm_js(
+    async fn delegate_to_js(
         &self,
         subdomain: &str,
-        bundle: Arc<Bundle>,
-        external_req: Request,
+        bundle: &Arc<Bundle>,
+        external_headers: &hyper::HeaderMap,
+        uri: hyper::Uri,
+        wasm_resp: Response,
     ) -> Result<Response> {
-        let wasm_tx = self.wasm_instance_sender(subdomain, &bundle);
-        let ski = self.get_or_spawn_js_instance(subdomain, &bundle).await?;
-
-        let (wasm_resp_tx, wasm_resp_rx) = oneshot::channel();
-        let external_parts = external_req.headers().clone();
-        let uri = external_req.uri().clone();
-
-        if wasm_tx.send((external_req, wasm_resp_tx)).is_err() {
-            return Err(anyhow!("wasm instance channel closed"));
+        if bundle.js.is_none() {
+            tracing::error!(subdomain, "x-fn0-next=js requested but bundle has no js");
+            return Ok(internal_error());
         }
-        let wasm_resp = wasm_resp_rx
-            .await
-            .unwrap_or_else(|_| Err(anyhow!("wasm instance dropped response")))?;
+        let ski = self.get_or_spawn_js_instance(subdomain, bundle).await?;
 
         let js_entry_req = hyper::Request::builder()
             .method("POST")
             .uri(uri)
             .header(hyper::header::CONTENT_TYPE, "application/json");
-        let js_entry_req = external_parts.iter().fold(js_entry_req, |b, (k, v)| {
+        let js_entry_req = external_headers.iter().fold(js_entry_req, |b, (k, v)| {
             if k == hyper::header::CONTENT_TYPE {
                 b
             } else {
@@ -256,6 +282,26 @@ impl<C: BundleCache> CodeExecutor<C> {
 
         tx
     }
+}
+
+fn strip_fn0_headers(mut resp: Response) -> Response {
+    let headers = resp.headers_mut();
+    let to_remove: Vec<_> = headers
+        .keys()
+        .filter(|k| k.as_str().starts_with(FN0_HEADER_PREFIX))
+        .cloned()
+        .collect();
+    for name in to_remove {
+        headers.remove(&name);
+    }
+    resp
+}
+
+fn internal_error() -> Response {
+    let body: Body = UnsyncBoxBody::new(
+        http_body_util::Empty::<Bytes>::new().map_err(|e: std::convert::Infallible| anyhow!(e)),
+    );
+    hyper::Response::builder().status(500).body(body).unwrap()
 }
 
 pub use fn0_wasmtime::{VERSION as FN0_WASMTIME_VERSION, compile};
