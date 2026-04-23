@@ -1,43 +1,43 @@
 [package]
 name = "fn0-worker"
 version = "0.3.8"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Worker binary for the fn0 FaaS platform"
-license = "AGPL-3.0-only"
-repository = "https://github.com/NamseEnt/fn0"
 
 [package.metadata.release]
 release = false
 
 [dependencies]
-fn0 = { workspace = true }
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
 async_singleflight = { workspace = true }
-futures = { workspace = true }
-opendal = { workspace = true }
-bytes = { workspace = true }
 base64 = { workspace = true }
+bytes = { workspace = true }
 color-eyre = { workspace = true }
+fn0 = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
+opendal = { workspace = true }
+opentelemetry = { workspace = true, features = ["logs", "metrics"] }
+opentelemetry-appender-tracing = { workspace = true }
+opentelemetry-http = { workspace = true, features = ["reqwest"] }
+opentelemetry-otlp = { workspace = true, features = ["http-proto", "reqwest-client", "metrics", "logs"] }
+opentelemetry_sdk = { workspace = true, features = ["logs", "rt-tokio"] }
+reqwest = { workspace = true }
 rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+tar = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-tokio-rustls = "0.26"
-rustls-pemfile = "2"
+tokio-rustls = { workspace = true }
 tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }
-tracing-opentelemetry = "0.32"
-opentelemetry = { version = "0.31", features = ["logs", "metrics"] }
-opentelemetry_sdk = { version = "0.31", features = ["logs", "rt-tokio"] }
-opentelemetry-otlp = { version = "0.31", features = ["http-proto", "reqwest-client", "metrics", "logs"] }
-opentelemetry-http = { version = "0.31", features = ["reqwest"] }
-reqwest = { workspace = true }
-http = { workspace = true }
-async-trait = "0.1"
-anyhow = { workspace = true }
-zstd = "0.13"
-tar = "0.4"
-aes-gcm = "0.10"
-opentelemetry-appender-tracing = "0.31"
+zstd = { workspace = true }

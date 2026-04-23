@@ -1,13 +1,14 @@
 [package]
 name = "fn0-wasmtime"
 version = "0.1.3"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Wasmtime wrapper for fn0"
-license = "AGPL-3.0-only"
-repository = "https://github.com/NamseEnt/fn0"
 
 [dependencies]
-wasmtime = { version = "=43.0.1", default-features = false, features = [
+sysinfo = { workspace = true }
+wasmtime = { workspace = true, features = [
     "runtime",
     "cranelift",
     "component-model",
@@ -16,5 +17,4 @@ wasmtime = { version = "=43.0.1", default-features = false, features = [
     "parallel-compilation",
     "cache",
 ] }
-sysinfo = "0.37.2"
-zstd = "0.13"
+zstd = { workspace = true }

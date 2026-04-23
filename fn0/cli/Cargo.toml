@@ -1,27 +1,29 @@
 [package]
 name = "fn0-cli"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [package.metadata.release]
 release = false
 
 [dependencies]
-clap = { workspace = true, features = ["derive"] }
-color-eyre = { workspace = true }
-inquire = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-toml = { workspace = true }
-fn0 = { workspace = true }
 anyhow = { workspace = true }
 bytes = { workspace = true }
-http-body-util = { workspace = true }
-reqwest = { workspace = true }
-dirs = "6"
+clap = { workspace = true, features = ["derive"] }
+color-eyre = { workspace = true }
+dirs = { workspace = true }
+fn0 = { workspace = true }
 fn0-deploy = { workspace = true }
+http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
-tower = { workspace = true, features = ["util"] }
+inquire = { workspace = true }
+reqwest = { workspace = true }
 rustls = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+toml = { workspace = true }
+tower = { workspace = true, features = ["util"] }

@@ -1,7 +1,9 @@
 [package]
 name = "fn0-compiler"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [package.metadata.release]
 release = false

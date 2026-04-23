@@ -1,59 +1,61 @@
 [package]
 name = "hq"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [package.metadata.release]
 release = false
 
 [dependencies]
-async-trait = "0.1"
-chrono = { workspace = true }
-libsql = { workspace = true }
-opendal = { workspace = true }
-reqsign = { workspace = true }
-http = { workspace = true }
-uuid = { workspace = true, features = ["v4"] }
-color-eyre = { workspace = true }
-dashmap = "6.1.0"
-futures = { workspace = true }
-reqwest = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-hyper = { workspace = true, features = ["full"] }
-tokio = { workspace = true, features = ["full"] }
-tokio-util = { workspace = true }
-http-body-util = { workspace = true }
-hyper-util = { workspace = true, features = ["full"] }
-oci-rust-sdk = { path = "../../vendor/oci-rust-sdk", features = ["core"] }
+aes-gcm = { workspace = true }
+async-trait = { workspace = true }
 base64 = { workspace = true }
-aes-gcm = "0.10"
-rand = "0.8"
-opentelemetry = { version = "0.31.0", features = ["logs", "metrics"] }
-opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.31.0", features = [
+boxcar = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+color-eyre = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true, features = ["full"] }
+hyper-util = { workspace = true, features = ["full"] }
+libsql = { workspace = true }
+oci-rust-sdk = { workspace = true, features = ["core"] }
+opendal = { workspace = true }
+opentelemetry = { workspace = true, features = ["logs", "metrics"] }
+opentelemetry-otlp = { workspace = true, features = [
     "grpc-tonic",
     "reqwest-client",
     "metrics",
     "logs",
 ] }
-tracing-opentelemetry = "0.32.0"
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
-tracing = { workspace = true }
-schemars = "0.8"
+opentelemetry_sdk = { workspace = true, features = ["rt-tokio"] }
+rand = { workspace = true }
+reqsign = { workspace = true }
+reqwest = { workspace = true }
+russh = { workspace = true }
 rustls = { workspace = true }
-bytes = { workspace = true }
-singleflight = "0.3.0"
-boxcar = "0.2.14"
-russh = "0.60.0"
-sha2 = "0.10"
-hex = "0.4"
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+singleflight = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
-wiremock = "0.6"
-mockall = "0.13"
+mockall = { workspace = true }
+wiremock = { workspace = true }
 
 [build-dependencies]
-schemars = "0.8"
+schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
