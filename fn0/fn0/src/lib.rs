@@ -5,6 +5,7 @@ pub mod measure_cpu_time;
 pub mod queue_poller;
 mod self_invoke;
 pub mod telemetry;
+pub mod turso_hijack;
 pub mod turso_queue;
 
 use crate::measure_cpu_time::SystemClock;
@@ -24,6 +25,7 @@ use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
 
 pub use ski::{FetchHandler, FetchHandlerFuture};
+pub use turso_hijack::TursoHijack;
 pub use wasmtime;
 
 pub type WasmProxyPre = ServicePre<ClientState<SystemClock>>;
@@ -59,6 +61,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) engine: Engine,
     pub(crate) linker: Linker<ClientState<SystemClock>>,
     pub(crate) bundle_cache: C,
+    pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -67,7 +70,13 @@ impl<C: BundleCache> ExecutionContext<C> {
             engine,
             linker,
             bundle_cache,
+            turso_hijack: None,
         }
+    }
+
+    pub fn with_turso_hijack(mut self, turso_hijack: Arc<TursoHijack>) -> Self {
+        self.turso_hijack = Some(turso_hijack);
+        self
     }
 
     pub fn bundle_cache(&self) -> &C {
@@ -80,6 +89,10 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn linker(&self) -> &Linker<ClientState<SystemClock>> {
         &self.linker
+    }
+
+    pub fn turso_hijack(&self) -> Option<&Arc<TursoHijack>> {
+        self.turso_hijack.as_ref()
     }
 }
 
@@ -272,9 +285,16 @@ impl<C: BundleCache> CodeExecutor<C> {
         let ctx = self.ctx.clone();
         let bundle = bundle.clone();
         let subdomain_owned = subdomain.to_string();
+        let turso_hijack = ctx.turso_hijack.clone();
         tokio::task::spawn_local(async move {
-            let result =
-                execute::run_wasm_instance_loop(&ctx.engine, bundle, subdomain_owned, rx).await;
+            let result = execute::run_wasm_instance_loop(
+                &ctx.engine,
+                bundle,
+                subdomain_owned,
+                rx,
+                turso_hijack,
+            )
+            .await;
             if let Err(e) = result {
                 tracing::error!(?e, "wasm instance loop failed");
             }

@@ -1,5 +1,6 @@
 use crate::execute::ClientState;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker, measure_cpu_time};
+use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
@@ -103,11 +104,13 @@ type HookResponse = (
 );
 type HookResult = std::result::Result<HookResponse, TrappableError<ErrorCode>>;
 
-pub(crate) struct SelfInvokeHooks;
+pub(crate) struct SelfInvokeHooks {
+    turso_hijack: Option<Arc<TursoHijack>>,
+}
 
 impl SelfInvokeHooks {
-    pub(crate) fn new() -> Self {
-        Self
+    pub(crate) fn new(turso_hijack: Option<Arc<TursoHijack>>) -> Self {
+        Self { turso_hijack }
     }
 }
 
@@ -124,41 +127,78 @@ impl WasiHttpHooks for SelfInvokeHooks {
             .map(|h| matches_self(request.uri(), h))
             .unwrap_or(false);
 
-        if !is_self {
-            return default_send(request, options);
+        if is_self {
+            return self_invoke_send(request);
         }
 
-        Box::new(async move {
-            let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
-            let svc_ptr = SERVICE_PTR.with(|c| c.get());
-            let (Some(acc_ptr), Some(svc_ptr)) = (acc_ptr, svc_ptr) else {
-                return Err(ErrorCode::InternalError(Some(
-                    "self-invoke accessor slot empty".into(),
-                ))
-                .into());
-            };
-            let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
-            let service: &Service = unsafe { &*svc_ptr };
+        if let Some(hijack) = self.turso_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return turso_send(hijack, request, options);
+        }
 
-            let (p3_req, req_io) = P3Request::from_http(request);
-            let handle_result = service.handle(accessor, p3_req).await;
-
-            match handle_result {
-                Ok(Ok(resp)) => {
-                    let http_resp = accessor
-                        .with(|mut access| resp.into_http(access.as_context_mut(), req_io))
-                        .map_err(|e| {
-                            TrappableError::from(ErrorCode::InternalError(Some(format!("{e:?}"))))
-                        })?;
-                    let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
-                        Box::new(async { Ok(()) });
-                    Ok((http_resp, io))
-                }
-                Ok(Err(ec)) => Err(ec.into()),
-                Err(e) => Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
-            }
-        })
+        default_send(request, options)
     }
+}
+
+fn self_invoke_send(
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
+        let svc_ptr = SERVICE_PTR.with(|c| c.get());
+        let (Some(acc_ptr), Some(svc_ptr)) = (acc_ptr, svc_ptr) else {
+            return Err(
+                ErrorCode::InternalError(Some("self-invoke accessor slot empty".into())).into(),
+            );
+        };
+        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
+        let service: &Service = unsafe { &*svc_ptr };
+
+        let (p3_req, req_io) = P3Request::from_http(request);
+        let handle_result = service.handle(accessor, p3_req).await;
+
+        match handle_result {
+            Ok(Ok(resp)) => {
+                let http_resp = accessor
+                    .with(|mut access| resp.into_http(access.as_context_mut(), req_io))
+                    .map_err(|e| {
+                        TrappableError::from(ErrorCode::InternalError(Some(format!("{e:?}"))))
+                    })?;
+                let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+                    Box::new(async { Ok(()) });
+                Ok((http_resp, io))
+            }
+            Ok(Err(ec)) => Err(ec.into()),
+            Err(e) => Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        }
+    })
+}
+
+fn turso_send(
+    hijack: Arc<TursoHijack>,
+    mut request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    options: Option<RequestOptions>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
+        let Some(acc_ptr) = acc_ptr else {
+            return Err(
+                ErrorCode::InternalError(Some("turso hijack accessor slot empty".into())).into(),
+            );
+        };
+        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
+        let subdomain = accessor.with(|mut access| access.data_mut().code_id.clone());
+
+        if let Err(e) = hijack.rewrite(&mut request, &subdomain) {
+            return Err(e.into());
+        }
+
+        let (res, io) = default_send_request(request, options).await?;
+        let res = res.map(BodyExt::boxed_unsync);
+        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
+        Ok((res, io))
+    })
 }
 
 fn default_send(
