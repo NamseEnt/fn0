@@ -1,6 +1,7 @@
 use crate::cache::Bundle;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
 use crate::self_invoke::{self, AccessorGuard, SELF_HOST, SelfInvokeHooks, call_service};
+use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -118,6 +119,7 @@ pub(crate) fn build_store<C>(
     time_tracker: TimeTracker<C>,
     is_timeout: Arc<AtomicBool>,
     hooks: SelfInvokeHooks,
+    turso_hijack: Option<&TursoHijack>,
 ) -> Store<ClientState<C>>
 where
     C: Clock,
@@ -127,7 +129,14 @@ where
         builder.stdout(make_tracing_stream(code_id.to_string(), false));
         builder.stderr(make_tracing_stream(code_id.to_string(), true));
         for (key, value) in env_vars {
+            if turso_hijack.is_some() && (key == "TURSO_URL" || key == "TURSO_AUTH_TOKEN") {
+                continue;
+            }
             builder.env(key, value);
+        }
+        if let Some(hijack) = turso_hijack {
+            builder.env("TURSO_URL", format!("http://{}", hijack.placeholder_host));
+            builder.env("TURSO_AUTH_TOKEN", "");
         }
         builder.build()
     };
@@ -168,6 +177,7 @@ pub async fn run_wasm_instance_loop(
     bundle: Arc<Bundle>,
     subdomain: String,
     mut rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
+    turso_hijack: Option<Arc<TursoHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -178,7 +188,8 @@ pub async fn run_wasm_instance_loop(
         &bundle.env_vars,
         time_tracker.clone(),
         is_timeout.clone(),
-        SelfInvokeHooks::new(),
+        SelfInvokeHooks::new(turso_hijack.clone()),
+        turso_hijack.as_deref(),
     );
 
     let service = bundle

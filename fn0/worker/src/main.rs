@@ -8,7 +8,7 @@ use base64::Engine;
 use bytes::Bytes;
 use cache::S3BundleCache;
 use color_eyre::eyre::Result;
-use fn0::ExecutionContext;
+use fn0::{ExecutionContext, TursoHijack};
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::server::conn::http1;
@@ -38,6 +38,32 @@ pub fn read_pem_env(name: &str) -> Option<String> {
         .decode(&b64)
         .ok()?;
     String::from_utf8(bytes).ok()
+}
+
+fn build_turso_hijack() -> Option<Arc<TursoHijack>> {
+    let group_token = std::env::var("TURSO_GROUP_TOKEN")
+        .ok()
+        .filter(|s| !s.is_empty());
+    let target_host_suffix = std::env::var("TURSO_DB_HOST_SUFFIX")
+        .ok()
+        .filter(|s| !s.is_empty());
+    match (group_token, target_host_suffix) {
+        (Some(group_token), Some(target_host_suffix)) => {
+            let placeholder_host = std::env::var("TURSO_PLACEHOLDER_HOST")
+                .unwrap_or_else(|_| "forte-db.fn0.dev".to_string());
+            Some(Arc::new(TursoHijack {
+                placeholder_host,
+                target_host_suffix,
+                group_token,
+            }))
+        }
+        _ => {
+            tracing::warn!(
+                "TURSO_GROUP_TOKEN or TURSO_DB_HOST_SUFFIX not set; Turso hijack disabled"
+            );
+            None
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -103,7 +129,13 @@ async fn run() -> Result<()> {
         cache_size_bytes,
     );
 
-    let execution_context = Arc::new(ExecutionContext::new(engine, linker, cache.clone()));
+    let execution_context = {
+        let mut ctx = ExecutionContext::new(engine, linker, cache.clone());
+        if let Some(hijack) = build_turso_hijack() {
+            ctx = ctx.with_turso_hijack(hijack);
+        }
+        Arc::new(ctx)
+    };
 
     let generation = Arc::new(AtomicU64::new(0));
     let instance_count = Arc::new(AtomicU64::new(0));
