@@ -144,20 +144,43 @@ impl MemoryDatabase {
         Ok(results)
     }
 
-    pub(crate) async fn transaction(&self) -> Result<MemoryTransaction<'_>> {
+    pub(crate) async fn transaction(&self) -> Result<MemoryTransaction> {
         Ok(MemoryTransaction {
-            db: self,
+            db: self.clone(),
             working: self.store.borrow().clone(),
         })
     }
+
+    pub(crate) async fn begin_immediate_with_reads(
+        &self,
+        keys: &[(String, String)],
+    ) -> Result<(MemoryTransaction, Vec<Option<StoredDoc>>)> {
+        let working = self.store.borrow().clone();
+        let docs = keys
+            .iter()
+            .map(|(pk, sk)| {
+                working.get(&(pk.clone(), sk.clone())).map(|doc| StoredDoc {
+                    data: doc.data.clone().into(),
+                    version: doc.version,
+                })
+            })
+            .collect();
+        Ok((
+            MemoryTransaction {
+                db: self.clone(),
+                working,
+            },
+            docs,
+        ))
+    }
 }
 
-pub(crate) struct MemoryTransaction<'a> {
-    db: &'a MemoryDatabase,
+pub(crate) struct MemoryTransaction {
+    db: MemoryDatabase,
     working: Store,
 }
 
-impl<'a> MemoryTransaction<'a> {
+impl MemoryTransaction {
     pub(crate) async fn get(&mut self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
         Ok(self
             .working
@@ -205,6 +228,83 @@ impl<'a> MemoryTransaction<'a> {
 
     pub(crate) async fn rollback(self) -> Result<()> {
         Ok(())
+    }
+
+    pub(crate) async fn batch_get_with_version(
+        &mut self,
+        keys: &[(String, String)],
+    ) -> Result<Vec<Option<StoredDoc>>> {
+        let docs = keys
+            .iter()
+            .map(|(pk, sk)| {
+                self.working
+                    .get(&(pk.clone(), sk.clone()))
+                    .map(|doc| StoredDoc {
+                        data: doc.data.clone().into(),
+                        version: doc.version,
+                    })
+            })
+            .collect();
+        Ok(docs)
+    }
+
+    pub(crate) async fn apply_writes_and_commit(
+        &mut self,
+        writes: &[crate::WriteOp],
+    ) -> Result<crate::CommitOutcome> {
+        use crate::WriteOp;
+        let mut affected_counts = Vec::with_capacity(writes.len());
+        for op in writes {
+            match op {
+                WriteOp::Insert { pk, sk, data } => {
+                    let key = (pk.clone(), sk.clone());
+                    if self.working.contains_key(&key) {
+                        affected_counts.push(0);
+                    } else {
+                        self.working.insert(
+                            key,
+                            MemDoc {
+                                data: data.clone(),
+                                version: 0,
+                            },
+                        );
+                        affected_counts.push(1);
+                    }
+                }
+                WriteOp::Update {
+                    pk,
+                    sk,
+                    expected_version,
+                    data,
+                } => {
+                    let key = (pk.clone(), sk.clone());
+                    match self.working.get_mut(&key) {
+                        Some(doc) if doc.version == *expected_version => {
+                            doc.data = data.clone();
+                            doc.version += 1;
+                            affected_counts.push(1);
+                        }
+                        _ => affected_counts.push(0),
+                    }
+                }
+                WriteOp::Delete {
+                    pk,
+                    sk,
+                    expected_version,
+                } => {
+                    let key = (pk.clone(), sk.clone());
+                    match self.working.get(&key) {
+                        Some(doc) if doc.version == *expected_version => {
+                            self.working.remove(&key);
+                            affected_counts.push(1);
+                        }
+                        _ => affected_counts.push(0),
+                    }
+                }
+            }
+        }
+        *self.db.store.borrow_mut() = std::mem::take(&mut self.working);
+        Ok(crate::CommitOutcome { affected_counts })
     }
 }
 

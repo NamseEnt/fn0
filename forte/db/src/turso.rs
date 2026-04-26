@@ -861,7 +861,7 @@ impl TursoDatabase {
         Ok(vec![])
     }
 
-    pub(crate) async fn transaction(&self) -> Result<TursoTransaction<'_>> {
+    pub(crate) async fn transaction(&self) -> Result<TursoTransaction> {
         // Ensure table exists before starting transaction
         self.ensure_table().await?;
 
@@ -891,9 +891,108 @@ impl TursoDatabase {
             .ok_or_else(|| anyhow::anyhow!("No baton returned from BEGIN"))?;
 
         Ok(TursoTransaction {
-            db: self,
+            db: self.clone(),
             baton: Some(baton),
         })
+    }
+
+    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
+    pub(crate) async fn begin_immediate_with_reads(
+        &self,
+        keys: &[(String, String)],
+    ) -> Result<(TursoTransaction, Vec<Option<StoredDoc>>)> {
+        for retry in 0..2 {
+            let mut requests: Vec<StreamRequest> = Vec::with_capacity(keys.len() + 1);
+            requests.push(StreamRequest::Execute(ExecuteStreamReq {
+                stmt: Stmt {
+                    sql: Some("BEGIN IMMEDIATE".to_string()),
+                    sql_id: None,
+                    args: vec![],
+                    named_args: vec![],
+                    want_rows: Some(false),
+                    replication_index: None,
+                },
+            }));
+            for (pk, sk) in keys {
+                requests.push(StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: Stmt {
+                        sql: Some(
+                            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?".to_string(),
+                        ),
+                        sql_id: None,
+                        args: vec![
+                            Value::Text {
+                                value: pk.clone().into(),
+                            },
+                            Value::Text {
+                                value: sk.clone().into(),
+                            },
+                        ],
+                        named_args: vec![],
+                        want_rows: Some(true),
+                        replication_index: None,
+                    },
+                }));
+            }
+
+            let response = self.execute_pipeline(requests).await?;
+
+            let mut should_retry = false;
+            let mut docs: Vec<Option<StoredDoc>> = Vec::with_capacity(keys.len());
+            let mut idx = 0usize;
+
+            for stream_result in response.results {
+                match stream_result {
+                    StreamResult::Ok {
+                        response: StreamResponse::Execute(exec_resp),
+                    } => {
+                        if idx == 0 {
+                            // BEGIN IMMEDIATE result, ignore
+                        } else {
+                            let stored = if let Some(row) = exec_resp.result.rows.first()
+                                && let (
+                                    Some(Value::Blob { value: data }),
+                                    Some(Value::Integer { value: version }),
+                                ) = (row.values.first(), row.values.get(1))
+                            {
+                                Some(StoredDoc {
+                                    data: data.clone(),
+                                    version: *version,
+                                })
+                            } else {
+                                None
+                            };
+                            docs.push(stored);
+                        }
+                        idx += 1;
+                    }
+                    StreamResult::Ok { response: _ } => {}
+                    StreamResult::Error { error } => {
+                        if retry == 0 && Self::is_schema_error(&error.message) {
+                            self.create_table().await?;
+                            should_retry = true;
+                            break;
+                        }
+                        bail!("begin_immediate_with_reads error: {}", error.message);
+                    }
+                    StreamResult::None => {}
+                }
+            }
+
+            if should_retry {
+                continue;
+            }
+
+            let baton = response
+                .baton
+                .ok_or_else(|| anyhow::anyhow!("No baton returned from BEGIN IMMEDIATE"))?;
+            let tx = TursoTransaction {
+                db: self.clone(),
+                baton: Some(baton),
+            };
+            return Ok((tx, docs));
+        }
+        bail!("begin_immediate_with_reads: schema retries exhausted");
     }
 
     async fn ensure_table(&self) -> Result<()> {
@@ -901,12 +1000,12 @@ impl TursoDatabase {
     }
 }
 
-pub(crate) struct TursoTransaction<'a> {
-    db: &'a TursoDatabase,
+pub(crate) struct TursoTransaction {
+    db: TursoDatabase,
     baton: Option<String>,
 }
 
-impl<'a> TursoTransaction<'a> {
+impl TursoTransaction {
     async fn execute_in_tx(&mut self, requests: Vec<StreamRequest>) -> Result<PipelineRespBody> {
         let baton = self
             .baton
@@ -1120,5 +1219,215 @@ impl<'a> TursoTransaction<'a> {
 
         self.baton = None; // Mark as finished
         Ok(())
+    }
+
+    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
+    pub(crate) async fn batch_get_with_version(
+        &mut self,
+        keys: &[(String, String)],
+    ) -> Result<Vec<Option<StoredDoc>>> {
+        if keys.is_empty() {
+            return Ok(vec![]);
+        }
+        let requests: Vec<StreamRequest> = keys
+            .iter()
+            .map(|(pk, sk)| {
+                StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: Stmt {
+                        sql: Some(
+                            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?".to_string(),
+                        ),
+                        sql_id: None,
+                        args: vec![
+                            Value::Text {
+                                value: pk.clone().into(),
+                            },
+                            Value::Text {
+                                value: sk.clone().into(),
+                            },
+                        ],
+                        named_args: vec![],
+                        want_rows: Some(true),
+                        replication_index: None,
+                    },
+                })
+            })
+            .collect();
+
+        let response = self.execute_in_tx(requests).await?;
+
+        let mut docs: Vec<Option<StoredDoc>> = Vec::with_capacity(keys.len());
+        for stream_result in response.results {
+            match stream_result {
+                StreamResult::Ok {
+                    response: StreamResponse::Execute(exec_resp),
+                } => {
+                    let stored = if let Some(row) = exec_resp.result.rows.first()
+                        && let (
+                            Some(Value::Blob { value: data }),
+                            Some(Value::Integer { value: version }),
+                        ) = (row.values.first(), row.values.get(1))
+                    {
+                        Some(StoredDoc {
+                            data: data.clone(),
+                            version: *version,
+                        })
+                    } else {
+                        None
+                    };
+                    docs.push(stored);
+                }
+                StreamResult::Ok { response: _ } => {}
+                StreamResult::Error { error } => {
+                    bail!("batch_get_with_version error: {}", error.message);
+                }
+                StreamResult::None => {}
+            }
+        }
+        Ok(docs)
+    }
+
+    #[tracing::instrument(skip_all, fields(writes = writes.len()))]
+    pub(crate) async fn apply_writes_and_commit(
+        &mut self,
+        writes: &[crate::WriteOp],
+    ) -> Result<crate::CommitOutcome> {
+        use crate::WriteOp;
+
+        let mut requests: Vec<StreamRequest> = Vec::with_capacity(writes.len() + 2);
+
+        for op in writes {
+            let stmt = match op {
+                WriteOp::Insert { pk, sk, data } => Stmt {
+                    sql: Some(
+                        "INSERT INTO docs (pk, sk, data, version) SELECT ?, ?, ?, 0 \
+                         WHERE NOT EXISTS (SELECT 1 FROM docs WHERE pk = ? AND sk = ?)"
+                            .to_string(),
+                    ),
+                    sql_id: None,
+                    args: vec![
+                        Value::Text {
+                            value: pk.clone().into(),
+                        },
+                        Value::Text {
+                            value: sk.clone().into(),
+                        },
+                        Value::Blob {
+                            value: data.clone().into(),
+                        },
+                        Value::Text {
+                            value: pk.clone().into(),
+                        },
+                        Value::Text {
+                            value: sk.clone().into(),
+                        },
+                    ],
+                    named_args: vec![],
+                    want_rows: Some(false),
+                    replication_index: None,
+                },
+                WriteOp::Update {
+                    pk,
+                    sk,
+                    expected_version,
+                    data,
+                } => Stmt {
+                    sql: Some(
+                        "UPDATE docs SET data = ?, version = version + 1 \
+                         WHERE pk = ? AND sk = ? AND version = ?"
+                            .to_string(),
+                    ),
+                    sql_id: None,
+                    args: vec![
+                        Value::Blob {
+                            value: data.clone().into(),
+                        },
+                        Value::Text {
+                            value: pk.clone().into(),
+                        },
+                        Value::Text {
+                            value: sk.clone().into(),
+                        },
+                        Value::Integer {
+                            value: *expected_version,
+                        },
+                    ],
+                    named_args: vec![],
+                    want_rows: Some(false),
+                    replication_index: None,
+                },
+                WriteOp::Delete {
+                    pk,
+                    sk,
+                    expected_version,
+                } => Stmt {
+                    sql: Some(
+                        "DELETE FROM docs WHERE pk = ? AND sk = ? AND version = ?".to_string(),
+                    ),
+                    sql_id: None,
+                    args: vec![
+                        Value::Text {
+                            value: pk.clone().into(),
+                        },
+                        Value::Text {
+                            value: sk.clone().into(),
+                        },
+                        Value::Integer {
+                            value: *expected_version,
+                        },
+                    ],
+                    named_args: vec![],
+                    want_rows: Some(false),
+                    replication_index: None,
+                },
+            };
+            requests.push(StreamRequest::Execute(ExecuteStreamReq { stmt }));
+        }
+
+        requests.push(StreamRequest::Execute(ExecuteStreamReq {
+            stmt: Stmt {
+                sql: Some("COMMIT".to_string()),
+                sql_id: None,
+                args: vec![],
+                named_args: vec![],
+                want_rows: Some(false),
+                replication_index: None,
+            },
+        }));
+        requests.push(StreamRequest::Close(CloseStreamReq {}));
+
+        let response = self.execute_in_tx(requests).await?;
+
+        let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
+        let mut idx_in_writes = 0usize;
+        let mut commit_seen = false;
+
+        for stream_result in response.results {
+            match stream_result {
+                StreamResult::Ok {
+                    response: StreamResponse::Execute(exec_resp),
+                } => {
+                    if idx_in_writes < writes.len() {
+                        affected_counts.push(exec_resp.result.affected_row_count);
+                        idx_in_writes += 1;
+                    } else {
+                        commit_seen = true;
+                    }
+                }
+                StreamResult::Ok { response: _ } => {}
+                StreamResult::Error { error } => {
+                    bail!("apply_writes_and_commit error: {}", error.message);
+                }
+                StreamResult::None => {}
+            }
+        }
+
+        self.baton = None;
+
+        if !commit_seen {
+            bail!("apply_writes_and_commit: COMMIT response missing");
+        }
+
+        Ok(crate::CommitOutcome { affected_counts })
     }
 }
