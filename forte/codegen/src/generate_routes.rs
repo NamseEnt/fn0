@@ -80,6 +80,74 @@ pub fn generate_routes() {
             fs::write(&actions_mod_path, actions_mod_content).unwrap();
         }
     }
+
+    let lib_rs_path = Path::new(&manifest_dir).join("src/lib.rs");
+    update_lib_rs_managed_block(
+        &lib_rs_path,
+        !actions.is_empty(),
+        !admin_tasks.is_empty(),
+        !queue_tasks.is_empty(),
+    );
+}
+
+const LIB_RS_MARKER_START: &str = "// === FORTE-MANAGED START ===";
+const LIB_RS_MARKER_END: &str = "// === FORTE-MANAGED END ===";
+
+fn render_managed_block(has_actions: bool, has_admin: bool, has_queue_tasks: bool) -> String {
+    let mut lines = Vec::new();
+    lines.push(LIB_RS_MARKER_START.to_string());
+    lines.push(
+        "// Auto-managed by `forte build`. Do not edit between the START/END markers.".to_string(),
+    );
+    if has_actions {
+        lines.push("pub mod actions;".to_string());
+    }
+    if has_admin {
+        lines.push("pub mod admin;".to_string());
+    }
+    if has_queue_tasks {
+        lines.push("pub mod queue_task;".to_string());
+    }
+    lines.push("mod route_generated;".to_string());
+    if has_queue_tasks {
+        lines.push("pub use route_generated::enqueue;".to_string());
+    }
+    lines.push(LIB_RS_MARKER_END.to_string());
+    lines.join("\n")
+}
+
+fn update_lib_rs_managed_block(
+    lib_rs_path: &Path,
+    has_actions: bool,
+    has_admin: bool,
+    has_queue_tasks: bool,
+) {
+    let new_block = render_managed_block(has_actions, has_admin, has_queue_tasks);
+    let existing = fs::read_to_string(lib_rs_path).unwrap_or_default();
+
+    let updated = match (
+        existing.find(LIB_RS_MARKER_START),
+        existing.find(LIB_RS_MARKER_END),
+    ) {
+        (Some(start), Some(end_marker)) if start < end_marker => {
+            let block_end = end_marker + LIB_RS_MARKER_END.len();
+            let mut out = String::with_capacity(existing.len() + new_block.len());
+            out.push_str(&existing[..start]);
+            out.push_str(&new_block);
+            out.push_str(&existing[block_end..]);
+            out
+        }
+        _ => {
+            panic!(
+                "src/lib.rs is missing the forte-managed marker block.\n\
+                 Add the following lines to src/lib.rs (typically at the top), then re-run `forte build`:\n\n{new_block}\n",
+            );
+        }
+    };
+
+    if updated != existing {
+        fs::write(lib_rs_path, updated).unwrap();
+    }
 }
 
 fn run_rustfmt(input: &str) -> Option<String> {
