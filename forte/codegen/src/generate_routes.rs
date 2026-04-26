@@ -16,6 +16,7 @@ pub fn generate_routes() {
     let hooks_dir = Path::new(&manifest_dir).join("src/hooks");
     let actions_dir = Path::new(&manifest_dir).join("src/actions");
     let queue_task_dir = Path::new(&manifest_dir).join("src/queue_task");
+    let admin_dir = Path::new(&manifest_dir).join("src/admin");
     let output_path = Path::new(&manifest_dir).join("src/route_generated.rs");
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
@@ -24,6 +25,7 @@ pub fn generate_routes() {
     println!("cargo:rerun-if-changed=src/hooks");
     println!("cargo:rerun-if-changed=src/actions");
     println!("cargo:rerun-if-changed=src/queue_task");
+    println!("cargo:rerun-if-changed=src/admin");
     // Also rerun when dependency versions change (e.g. forte-sdk bump),
     // because once any rerun-if-changed is declared Cargo stops doing
     // default change detection across the rest of the crate.
@@ -34,7 +36,8 @@ pub fn generate_routes() {
     let hooks = discover_hooks(&hooks_dir);
     let actions = discover_actions(&actions_dir);
     let queue_tasks = discover_queue_tasks(&queue_task_dir);
-    let tokens = generate_code(&pages, &hooks, &actions, &queue_tasks, &wit_dir_str);
+    let admin_tasks = discover_admin_tasks(&admin_dir);
+    let tokens = generate_code(&pages, &hooks, &actions, &queue_tasks, &admin_tasks, &wit_dir_str);
 
     let syntax_tree = syn::parse2::<syn::File>(tokens).expect("Failed to parse generated code");
     let pp_output = prettyplease::unparse(&syntax_tree);
@@ -57,6 +60,24 @@ pub fn generate_routes() {
         let current_qt_mod = fs::read_to_string(&queue_task_mod_path).unwrap_or_default();
         if current_qt_mod != queue_task_mod_content {
             fs::write(&queue_task_mod_path, queue_task_mod_content).unwrap();
+        }
+    }
+
+    if !admin_tasks.is_empty() {
+        let admin_mod_path = Path::new(&manifest_dir).join("src/admin/mod.rs");
+        let admin_mod_content = generate_admin_mod(&admin_tasks);
+        let current_admin_mod = fs::read_to_string(&admin_mod_path).unwrap_or_default();
+        if current_admin_mod != admin_mod_content {
+            fs::write(&admin_mod_path, admin_mod_content).unwrap();
+        }
+    }
+
+    if !actions.is_empty() {
+        let actions_mod_path = Path::new(&manifest_dir).join("src/actions/mod.rs");
+        let actions_mod_content = generate_actions_mod(&actions);
+        let current_actions_mod = fs::read_to_string(&actions_mod_path).unwrap_or_default();
+        if current_actions_mod != actions_mod_content {
+            fs::write(&actions_mod_path, actions_mod_content).unwrap();
         }
     }
 }
@@ -126,6 +147,11 @@ struct ActionInfo {
 
 #[derive(Debug)]
 struct QueueTaskInfo {
+    name: String,
+}
+
+#[derive(Debug)]
+struct AdminTaskInfo {
     name: String,
 }
 
@@ -319,6 +345,40 @@ fn discover_queue_tasks(queue_task_dir: &Path) -> Vec<QueueTaskInfo> {
     }
 
     queue_tasks
+}
+
+fn discover_admin_tasks(admin_dir: &Path) -> Vec<AdminTaskInfo> {
+    let mut admin_tasks = Vec::new();
+
+    if !admin_dir.exists() {
+        return admin_tasks;
+    }
+
+    let Ok(entries) = fs::read_dir(admin_dir) else {
+        return admin_tasks;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_file() && path.extension().map(|e| e == "rs").unwrap_or(false) {
+            let file_name = path.file_stem().unwrap().to_string_lossy().to_string();
+
+            if file_name == "mod" {
+                continue;
+            }
+
+            let Some(content) = fs::read_to_string(&path).ok() else {
+                continue;
+            };
+
+            if has_queue_task_handler(&content) {
+                admin_tasks.push(AdminTaskInfo { name: file_name });
+            }
+        }
+    }
+
+    admin_tasks
 }
 
 fn has_queue_task_handler(content: &str) -> bool {
@@ -625,6 +685,7 @@ fn generate_code(
     hooks: &[HookInfo],
     actions: &[ActionInfo],
     queue_tasks: &[QueueTaskInfo],
+    admin_tasks: &[AdminTaskInfo],
     wit_dir: &str,
 ) -> TokenStream {
     let mut all_module_decls: Vec<(String, TokenStream)> = Vec::new();
@@ -648,6 +709,8 @@ fn generate_code(
     let action_handler = generate_action_handler(actions);
     let enqueue_module = generate_enqueue_module(queue_tasks);
     let queue_task_execute_handler = generate_queue_task_execute_handler(queue_tasks);
+    let admin_task_handler = generate_admin_task_handler(admin_tasks);
+    let classify_route_fn = generate_classify_route(pages);
 
     let route_chain = if route_matches.is_empty() {
         quote! {
@@ -737,6 +800,20 @@ fn generate_code(
         proxy::export!(Server);
 
         async fn dispatch(request: Request<Vec<u8>>) -> Result<Response<Body>> {
+            let path_for_route = request.uri().path().to_string();
+            let key = classify_route(&path_for_route);
+            let result = dispatch_inner(request).await;
+            result.map(|mut resp| {
+                if let Ok(v) = forte_sdk::http::HeaderValue::from_str(&key) {
+                    resp.headers_mut().insert("x-fn0-execution-time-metric-key", v);
+                }
+                resp
+            })
+        }
+
+        #classify_route_fn
+
+        async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
             let (parts, body_bytes) = request.into_parts();
             let headers = parts.headers;
             let path = parts.uri.path().to_string();
@@ -764,6 +841,10 @@ fn generate_code(
                 return handle_queue_task_execute(&body_bytes).await;
             }
 
+            if let Some(task_name) = path.strip_prefix("/__forte_admin/") {
+                return handle_admin_task(task_name, &headers, &body_bytes).await;
+            }
+
             #route_chain
         }
 
@@ -772,6 +853,8 @@ fn generate_code(
         #action_handler
 
         #queue_task_execute_handler
+
+        #admin_task_handler
 
         fn make_cookie_jar(headers: &HeaderMap) -> cookie::CookieJar {
             let mut jar = cookie::CookieJar::new();
@@ -1296,6 +1379,11 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
         .collect();
 
     quote! {
+        #[forte_sdk::tracing::instrument(
+            name = "handle_hook",
+            skip_all,
+            fields(hook = hook_name),
+        )]
         async fn handle_hook(
             hook_name: &str,
             uri_authority: &str,
@@ -1315,22 +1403,8 @@ fn generate_hook_handler(hooks: &[HookInfo]) -> TokenStream {
     }
 }
 
-fn generate_action_module_declarations(actions: &[ActionInfo]) -> Vec<(String, TokenStream)> {
-    actions
-        .iter()
-        .map(|action| {
-            let module_ident = format_ident!("{}", action.module_name);
-            let module_path = &action.module_path;
-
-            (
-                action.module_name.clone(),
-                quote! {
-                    #[path = #module_path]
-                    mod #module_ident;
-                },
-            )
-        })
-        .collect()
+fn generate_action_module_declarations(_actions: &[ActionInfo]) -> Vec<(String, TokenStream)> {
+    Vec::new()
 }
 
 fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
@@ -1356,11 +1430,11 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
         .iter()
         .map(|action| {
             let name = &action.name;
-            let module_name = format_ident!("{}", action.module_name);
+            let module_ident = format_ident!("{}", action.name);
 
             quote! {
                 #name => {
-                    let input: #module_name::Input = forte_json::from_slice(body_bytes)?;
+                    let input: crate::actions::#module_ident::Input = forte_json::from_slice(body_bytes)?;
                     let req = ForteRequest {
                         uri_authority,
                         method,
@@ -1369,7 +1443,7 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
                         raw_body: body_bytes,
                         body: input,
                     };
-                    let output = #module_name::handler(req).await;
+                    let output = crate::actions::#module_ident::handler(req).await;
                     let json = forte_json::to_vec(&output);
                     Ok(build_response_with_cookies(
                         Response::builder()
@@ -1385,6 +1459,11 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
         .collect();
 
     quote! {
+        #[forte_sdk::tracing::instrument(
+            name = "handle_action",
+            skip_all,
+            fields(action = action_name),
+        )]
         async fn handle_action(
             action_name: &str,
             uri_authority: &str,
@@ -1513,6 +1592,167 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
             }
         }
     }
+}
+
+fn generate_admin_task_handler(admin_tasks: &[AdminTaskInfo]) -> TokenStream {
+    if admin_tasks.is_empty() {
+        return quote! {
+            async fn handle_admin_task(
+                _task_name: &str,
+                _headers: &HeaderMap,
+                _body_bytes: &[u8],
+            ) -> Result<Response<Body>> {
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from("No admin tasks defined"))
+                    .unwrap())
+            }
+        };
+    }
+
+    let task_matches: Vec<TokenStream> = admin_tasks
+        .iter()
+        .map(|at| {
+            let name = &at.name;
+            let module_path: Vec<_> =
+                vec![format_ident!("admin"), format_ident!("{}", at.name)];
+
+            quote! {
+                #name => {
+                    let input: crate::#(#module_path)::*::Input =
+                        forte_sdk::serde_json::from_slice(body_bytes)?;
+                    let output = crate::#(#module_path)::*::handle(input).await;
+                    match output {
+                        Ok(value) => {
+                            let json = forte_sdk::serde_json::to_vec(&value)?;
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header("content-type", "application/json")
+                                .body(Body::from(json))
+                                .unwrap())
+                        }
+                        Err(e) => Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Body::from(format!("{:?}", e)))
+                            .unwrap()),
+                    }
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        #[forte_sdk::tracing::instrument(
+            name = "handle_admin_task",
+            skip_all,
+            fields(task = task_name),
+        )]
+        async fn handle_admin_task(
+            task_name: &str,
+            headers: &HeaderMap,
+            body_bytes: &[u8],
+        ) -> Result<Response<Body>> {
+            let is_admin = headers
+                .get("x-fn0-admin")
+                .and_then(|v| v.to_str().ok())
+                .map(|v| v == "true")
+                .unwrap_or(false);
+            if !is_admin {
+                return Ok(Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .body(Body::from("Unauthorized"))
+                    .unwrap());
+            }
+
+            match task_name {
+                #(#task_matches)*
+                _ => Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::from(format!("Admin task '{}' not found", task_name)))
+                    .unwrap()),
+            }
+        }
+    }
+}
+
+fn generate_classify_route(pages: &[PageInfo]) -> TokenStream {
+    let arms: Vec<TokenStream> = pages
+        .iter()
+        .map(|p| {
+            let route_path = &p.route_path;
+            if has_dynamic_segments(&p.route_segments) {
+                let len = p.route_segments.len();
+                let static_checks: Vec<TokenStream> = p
+                    .route_segments
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, seg)| match seg {
+                        RouteSegment::Static(s) => Some(quote! { path_segments[#i] == #s }),
+                        RouteSegment::Dynamic(_) => None,
+                    })
+                    .collect();
+                if static_checks.is_empty() {
+                    quote! {
+                        if path_segments.len() == #len {
+                            return #route_path.to_string();
+                        }
+                    }
+                } else {
+                    quote! {
+                        if path_segments.len() == #len && #(#static_checks)&&* {
+                            return #route_path.to_string();
+                        }
+                    }
+                }
+            } else {
+                quote! {
+                    if path == #route_path {
+                        return #route_path.to_string();
+                    }
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        fn classify_route(path: &str) -> String {
+            if path.strip_prefix("/__forte_action/").is_some() {
+                return "/__forte_action/[name]".to_string();
+            }
+            if path.strip_prefix("/__forte_admin/").is_some() {
+                return "/__forte_admin/[name]".to_string();
+            }
+            if path == "/__forte_queue_task/execute" {
+                return "/__forte_queue_task/execute".to_string();
+            }
+            if path.strip_prefix("/__self_invoke/").is_some() {
+                return "/__self_invoke/[name]".to_string();
+            }
+            let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            #(#arms)*
+            "unknown".to_string()
+        }
+    }
+}
+
+fn generate_admin_mod(admin_tasks: &[AdminTaskInfo]) -> String {
+    let mut content = String::new();
+    content.push_str("// Auto-generated by forte build\n\n");
+    for at in admin_tasks {
+        content.push_str(&format!("pub mod {};\n", at.name));
+    }
+    content
+}
+
+fn generate_actions_mod(actions: &[ActionInfo]) -> String {
+    let mut content = String::new();
+    content.push_str("// Auto-generated by forte build\n\n");
+    let mut names: Vec<&str> = actions.iter().map(|a| a.name.as_str()).collect();
+    names.sort();
+    for name in names {
+        content.push_str(&format!("pub mod {};\n", name));
+    }
+    content
 }
 
 fn generate_queue_task_mod(queue_tasks: &[QueueTaskInfo]) -> String {

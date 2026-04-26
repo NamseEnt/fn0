@@ -1,6 +1,7 @@
 use std::fmt;
 use std::future::Future;
 
+use tracing::Instrument;
 use wit_bindgen::rt::async_support::StreamReader;
 
 use crate::bindings::wasi::http::types as p3;
@@ -45,15 +46,29 @@ where
     Fut: Future<Output = core::result::Result<::http::Response<Body>, E>>,
     E: fmt::Debug,
 {
+    crate::otel::init_once();
+
     let http_req = match p3_to_http_request(req).await {
         Ok(r) => r,
         Err(e) => return Err(p3::ErrorCode::InternalError(Some(format!("{e}")))),
     };
 
-    let http_resp = match dispatch(http_req).await {
+    let method_str = http_req.method().as_str().to_string();
+    let path_str = http_req.uri().path().to_string();
+    let span = tracing::info_span!(
+        "http.request",
+        otel.name = %format!("{} {}", method_str, path_str),
+        http.request.method = %method_str,
+        url.path = %path_str,
+        http.response.status_code = tracing::field::Empty,
+    );
+
+    let http_resp = match dispatch(http_req).instrument(span.clone()).await {
         Ok(r) => r,
         Err(e) => return Err(p3::ErrorCode::InternalError(Some(format!("{e:?}")))),
     };
+
+    span.record("http.response.status_code", http_resp.status().as_u16());
 
     http_response_to_p3(http_resp)
         .await
