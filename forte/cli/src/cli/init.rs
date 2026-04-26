@@ -181,7 +181,10 @@ target = "wasm32-wasip2"
 }
 
 fn generate_lib_rs() -> &'static str {
-    r#"mod route_generated;
+    r#"// === FORTE-MANAGED START ===
+// Auto-managed by `forte build`. Do not edit between the START/END markers.
+mod route_generated;
+// === FORTE-MANAGED END ===
 "#
 }
 
