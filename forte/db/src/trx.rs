@@ -304,9 +304,15 @@ where
 
     match control.inner {
         TrxControlInner::Commit(out) => {
-            let (commit_db, tx, entries) = match take_entries_and_tx(state) {
-                Ok(value) => value,
-                Err(err) => return AttemptOutcome::Done(TrxResult::Err(E::from(err))),
+            let (commit_db, tx, entries_result) = take_entries_and_tx(state);
+            let entries = match entries_result {
+                Ok(e) => e,
+                Err(err) => {
+                    if let Some(mut tx) = tx {
+                        let _ = tx.rollback().await;
+                    }
+                    return AttemptOutcome::Done(TrxResult::Err(E::from(err)));
+                }
             };
 
             match commit_entries(commit_db, tx, entries).await {
@@ -316,8 +322,8 @@ where
             }
         }
         TrxControlInner::Cancel(reason) => {
-            // best-effort rollback to release lock
-            if let Some(mut tx) = state.borrow_mut().tx.take() {
+            let tx_to_rollback = state.borrow_mut().tx.take();
+            if let Some(mut tx) = tx_to_rollback {
                 let _ = tx.rollback().await;
             }
             AttemptOutcome::Done(TrxResult::Cancelled(reason))
@@ -440,24 +446,25 @@ impl TrxState {
         }
     }
 
-    fn take_entries_and_tx(&mut self) -> Result<(Database, Option<Transaction>, Vec<TrackedEntry>)> {
+    fn take_entries_and_tx(
+        &mut self,
+    ) -> (Database, Option<Transaction>, Result<Vec<TrackedEntry>>) {
+        let tx = self.tx.take();
+        let db = self.db.clone();
         for entry in &self.entries {
             if let TrackedState::Managed { shared, .. } = &entry.state
                 && shared.handle_alive.upgrade().is_some()
             {
-                bail!(
+                let err = anyhow!(
                     "live doc handle escaped trx for key {}/{}; commit outputs must not contain DocHandle values",
                     entry.key.pk,
                     entry.key.sk
                 );
+                self.entries.clear();
+                return (db, tx, Err(err));
             }
         }
-
-        Ok((
-            self.db.clone(),
-            self.tx.take(),
-            std::mem::take(&mut self.entries),
-        ))
+        (db, tx, Ok(std::mem::take(&mut self.entries)))
     }
 }
 
@@ -547,7 +554,7 @@ where
 
 fn take_entries_and_tx(
     state: Rc<RefCell<TrxState>>,
-) -> Result<(Database, Option<Transaction>, Vec<TrackedEntry>)> {
+) -> (Database, Option<Transaction>, Result<Vec<TrackedEntry>>) {
     state.borrow_mut().take_entries_and_tx()
 }
 
@@ -618,24 +625,11 @@ async fn commit_entries(
         .map_err(CommitFailure::Err)?;
 
     let mut conflicts = Vec::new();
-    for (i, count) in outcome.affected_counts.iter().enumerate() {
-        if *count == 1 {
-            continue;
-        }
-        let (pk, sk, expected) = match &writes[i] {
-            crate::WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
-            crate::WriteOp::Update {
-                pk,
-                sk,
-                expected_version,
-                ..
-            }
-            | crate::WriteOp::Delete {
-                pk,
-                sk,
-                expected_version,
-            } => (pk.clone(), sk.clone(), Some(*expected_version)),
-        };
+
+    if let Some(info) = outcome.conflict
+        && let Some(op) = writes.get(info.step_index)
+    {
+        let (pk, sk, expected) = write_key_and_expected(op);
         conflicts.push(ConflictKey {
             key: DocKey { pk, sk },
             expected_version: expected,
@@ -643,11 +637,54 @@ async fn commit_entries(
         });
     }
 
+    for (i, count) in outcome.affected_counts.iter().enumerate() {
+        if *count == 1 {
+            continue;
+        }
+        let Some(op) = writes.get(i) else { continue };
+        let (pk, sk, expected) = write_key_and_expected(op);
+        let key = DocKey { pk, sk };
+        if conflicts.iter().any(|c| c.key == key) {
+            continue;
+        }
+        conflicts.push(ConflictKey {
+            key,
+            expected_version: expected,
+            actual_version: None,
+        });
+    }
+
     if !conflicts.is_empty() {
+        let key_pairs: Vec<(String, String)> = conflicts
+            .iter()
+            .map(|c| (c.key.pk.clone(), c.key.sk.clone()))
+            .collect();
+        if let Ok(stored) = db.batch_get_with_version(&key_pairs).await {
+            for (c, slot) in conflicts.iter_mut().zip(stored.into_iter()) {
+                c.actual_version = slot.map(|d| d.version);
+            }
+        }
         return Err(CommitFailure::Conflict(ConflictDetails { keys: conflicts }));
     }
 
     Ok(())
+}
+
+fn write_key_and_expected(op: &crate::WriteOp) -> (String, String, Option<i64>) {
+    match op {
+        crate::WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
+        crate::WriteOp::Update {
+            pk,
+            sk,
+            expected_version,
+            ..
+        }
+        | crate::WriteOp::Delete {
+            pk,
+            sk,
+            expected_version,
+        } => (pk.clone(), sk.clone(), Some(*expected_version)),
+    }
 }
 
 #[cfg(test)]
@@ -811,7 +848,8 @@ mod tests {
             })
             .expect("create should succeed");
 
-        match state.take_entries_and_tx() {
+        let (_, _, result) = state.take_entries_and_tx();
+        match result {
             Ok(_) => panic!("live handle should fail"),
             Err(err) => assert!(err.to_string().contains("live doc handle escaped trx")),
         }

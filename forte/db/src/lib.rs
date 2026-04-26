@@ -58,6 +58,12 @@ pub enum WriteOp {
 
 pub struct CommitOutcome {
     pub affected_counts: Vec<u64>,
+    pub conflict: Option<ConflictInfo>,
+}
+
+pub struct ConflictInfo {
+    pub step_index: usize,
+    pub message: String,
 }
 
 pub fn turso() -> Database {
@@ -243,6 +249,21 @@ impl Database {
             DatabaseInner::Turso(db) => db.get_with_version(pk, sk).await,
             DatabaseInner::Memory(db) => db.get_with_version(pk, sk).await,
         }
+    }
+
+    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
+    pub(crate) async fn batch_get_with_version(
+        &self,
+        keys: &[(String, String)],
+    ) -> Result<Vec<Option<StoredDoc>>> {
+        if keys.is_empty() {
+            return Ok(vec![]);
+        }
+        let mut out = Vec::with_capacity(keys.len());
+        for (pk, sk) in keys {
+            out.push(self.get_with_version(pk, sk).await?);
+        }
+        Ok(out)
     }
 
     #[tracing::instrument(skip_all, fields(reads = keys.len()))]

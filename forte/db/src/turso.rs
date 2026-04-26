@@ -5,6 +5,11 @@ use forte_sdk::http::{Client, HeaderValue, Request, Uri};
 use libsql_hrana::proto::*;
 use std::{str::FromStr, sync::Arc};
 
+enum RetryKind {
+    Schema,
+    Busy,
+}
+
 const CREATE_DOCS_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS docs (pk TEXT, sk TEXT, data BLOB, version INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (pk, sk))";
 const ADD_VERSION_COLUMN_SQL: &str =
     "ALTER TABLE docs ADD COLUMN version INTEGER NOT NULL DEFAULT 0";
@@ -133,6 +138,24 @@ impl TursoDatabase {
     fn is_schema_error(error_message: &str) -> bool {
         Self::is_table_not_found_error(error_message)
             || Self::is_missing_version_column_error(error_message)
+    }
+
+    fn is_busy_error(error_message: &str) -> bool {
+        let msg = error_message.to_ascii_lowercase();
+        msg.contains("database is locked")
+            || msg.contains("sqlite_busy")
+            || msg.contains("busy")
+    }
+
+    async fn busy_backoff(attempt: u32) -> () {
+        const BASE_MS: u64 = 5;
+        const CAP_MS: u64 = 200;
+        let ceiling = BASE_MS.checked_shl(attempt).unwrap_or(CAP_MS).min(CAP_MS);
+        let mut buf = [0u8; 8];
+        forte_sdk::rand::get_insecure_random_bytes(&mut buf).await;
+        let raw = u64::from_le_bytes(buf);
+        let delay_ms = raw % (ceiling + 1);
+        forte_sdk::time_wasi::sleep(forte_sdk::time_wasi::Duration::from_millis(delay_ms)).await;
     }
 
     pub(crate) async fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
@@ -901,7 +924,10 @@ impl TursoDatabase {
         &self,
         keys: &[(String, String)],
     ) -> Result<(TursoTransaction, Vec<Option<StoredDoc>>)> {
-        for retry in 0..2 {
+        const MAX_BUSY_ATTEMPTS: u32 = 8;
+        let mut busy_attempt: u32 = 0;
+        let mut schema_retried = false;
+        loop {
             let mut requests: Vec<StreamRequest> = Vec::with_capacity(keys.len() + 1);
             requests.push(StreamRequest::Execute(ExecuteStreamReq {
                 stmt: Stmt {
@@ -937,9 +963,10 @@ impl TursoDatabase {
 
             let response = self.execute_pipeline(requests).await?;
 
-            let mut should_retry = false;
             let mut docs: Vec<Option<StoredDoc>> = Vec::with_capacity(keys.len());
             let mut idx = 0usize;
+            let mut retry_kind: Option<RetryKind> = None;
+            let mut fatal_error: Option<String> = None;
 
             for stream_result in response.results {
                 match stream_result {
@@ -968,19 +995,41 @@ impl TursoDatabase {
                     }
                     StreamResult::Ok { response: _ } => {}
                     StreamResult::Error { error } => {
-                        if retry == 0 && Self::is_schema_error(&error.message) {
-                            self.create_table().await?;
-                            should_retry = true;
-                            break;
+                        if !schema_retried && Self::is_schema_error(&error.message) {
+                            retry_kind = Some(RetryKind::Schema);
+                        } else if Self::is_busy_error(&error.message) {
+                            retry_kind = Some(RetryKind::Busy);
+                        } else {
+                            fatal_error = Some(error.message);
                         }
-                        bail!("begin_immediate_with_reads error: {}", error.message);
+                        break;
                     }
                     StreamResult::None => {}
                 }
             }
 
-            if should_retry {
-                continue;
+            if let Some(msg) = fatal_error {
+                bail!("begin_immediate_with_reads error: {}", msg);
+            }
+
+            match retry_kind {
+                Some(RetryKind::Schema) => {
+                    self.create_table().await?;
+                    schema_retried = true;
+                    continue;
+                }
+                Some(RetryKind::Busy) => {
+                    if busy_attempt + 1 >= MAX_BUSY_ATTEMPTS {
+                        bail!(
+                            "begin_immediate_with_reads: BUSY after {} attempts",
+                            MAX_BUSY_ATTEMPTS
+                        );
+                    }
+                    Self::busy_backoff(busy_attempt).await;
+                    busy_attempt += 1;
+                    continue;
+                }
+                None => {}
             }
 
             let baton = response
@@ -992,7 +1041,6 @@ impl TursoDatabase {
             };
             return Ok((tx, docs));
         }
-        bail!("begin_immediate_with_reads: schema retries exhausted");
     }
 
     async fn ensure_table(&self) -> Result<()> {
@@ -1294,14 +1342,13 @@ impl TursoTransaction {
     ) -> Result<crate::CommitOutcome> {
         use crate::WriteOp;
 
-        let mut requests: Vec<StreamRequest> = Vec::with_capacity(writes.len() + 2);
+        let mut steps: Vec<BatchStep> = Vec::with_capacity(writes.len() + 2);
 
         for op in writes {
             let stmt = match op {
                 WriteOp::Insert { pk, sk, data } => Stmt {
                     sql: Some(
-                        "INSERT INTO docs (pk, sk, data, version) SELECT ?, ?, ?, 0 \
-                         WHERE NOT EXISTS (SELECT 1 FROM docs WHERE pk = ? AND sk = ?)"
+                        "INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0)"
                             .to_string(),
                     ),
                     sql_id: None,
@@ -1314,12 +1361,6 @@ impl TursoTransaction {
                         },
                         Value::Blob {
                             value: data.clone().into(),
-                        },
-                        Value::Text {
-                            value: pk.clone().into(),
-                        },
-                        Value::Text {
-                            value: sk.clone().into(),
                         },
                     ],
                     named_args: vec![],
@@ -1381,10 +1422,24 @@ impl TursoTransaction {
                     replication_index: None,
                 },
             };
-            requests.push(StreamRequest::Execute(ExecuteStreamReq { stmt }));
+            let condition = if steps.is_empty() {
+                None
+            } else {
+                Some(BatchCond::Ok {
+                    step: (steps.len() - 1) as u32,
+                })
+            };
+            steps.push(BatchStep { condition, stmt });
         }
 
-        requests.push(StreamRequest::Execute(ExecuteStreamReq {
+        let last_write_step = if writes.is_empty() {
+            None
+        } else {
+            Some((steps.len() - 1) as u32)
+        };
+        let commit_cond = last_write_step.map(|s| BatchCond::Ok { step: s });
+        steps.push(BatchStep {
+            condition: commit_cond,
             stmt: Stmt {
                 sql: Some("COMMIT".to_string()),
                 sql_id: None,
@@ -1393,41 +1448,90 @@ impl TursoTransaction {
                 want_rows: Some(false),
                 replication_index: None,
             },
-        }));
-        requests.push(StreamRequest::Close(CloseStreamReq {}));
+        });
+        let commit_step_idx = (steps.len() - 1) as u32;
+        steps.push(BatchStep {
+            condition: Some(BatchCond::Not {
+                cond: Box::new(BatchCond::Ok {
+                    step: commit_step_idx,
+                }),
+            }),
+            stmt: Stmt {
+                sql: Some("ROLLBACK".to_string()),
+                sql_id: None,
+                args: vec![],
+                named_args: vec![],
+                want_rows: Some(false),
+                replication_index: None,
+            },
+        });
 
-        let response = self.execute_in_tx(requests).await?;
+        let batch = Batch {
+            steps,
+            replication_index: None,
+        };
 
-        let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
-        let mut idx_in_writes = 0usize;
-        let mut commit_seen = false;
+        let response = self
+            .execute_in_tx(vec![
+                StreamRequest::Batch(BatchStreamReq { batch }),
+                StreamRequest::Close(CloseStreamReq {}),
+            ])
+            .await?;
 
+        self.baton = None;
+
+        let mut batch_result: Option<BatchResult> = None;
         for stream_result in response.results {
             match stream_result {
                 StreamResult::Ok {
-                    response: StreamResponse::Execute(exec_resp),
+                    response: StreamResponse::Batch(batch_resp),
                 } => {
-                    if idx_in_writes < writes.len() {
-                        affected_counts.push(exec_resp.result.affected_row_count);
-                        idx_in_writes += 1;
-                    } else {
-                        commit_seen = true;
-                    }
+                    batch_result = Some(batch_resp.result);
+                    break;
                 }
                 StreamResult::Ok { response: _ } => {}
                 StreamResult::Error { error } => {
-                    bail!("apply_writes_and_commit error: {}", error.message);
+                    bail!("apply_writes_and_commit stream error: {}", error.message);
                 }
                 StreamResult::None => {}
             }
         }
 
-        self.baton = None;
+        let batch_result = batch_result
+            .ok_or_else(|| anyhow::anyhow!("apply_writes_and_commit: batch response missing"))?;
 
-        if !commit_seen {
-            bail!("apply_writes_and_commit: COMMIT response missing");
+        let mut conflict: Option<crate::ConflictInfo> = None;
+        for (i, error_opt) in batch_result.step_errors.iter().enumerate() {
+            if let Some(error) = error_opt
+                && i < writes.len()
+            {
+                conflict = Some(crate::ConflictInfo {
+                    step_index: i,
+                    message: error.message.clone(),
+                });
+                break;
+            }
         }
 
-        Ok(crate::CommitOutcome { affected_counts })
+        let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
+        for (i, stmt_result_opt) in batch_result.step_results.iter().enumerate() {
+            if i >= writes.len() {
+                break;
+            }
+            affected_counts.push(
+                stmt_result_opt
+                    .as_ref()
+                    .map(|r| r.affected_row_count)
+                    .unwrap_or(0),
+            );
+        }
+        while affected_counts.len() < writes.len() {
+            affected_counts.push(0);
+        }
+
+        Ok(crate::CommitOutcome {
+            affected_counts,
+            conflict,
+        })
     }
 }
