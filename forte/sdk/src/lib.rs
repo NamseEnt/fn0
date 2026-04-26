@@ -1,6 +1,7 @@
 pub mod bindings;
 pub mod cookie_sign;
 pub mod http;
+pub(crate) mod otel;
 pub mod rand;
 pub mod runtime;
 pub mod serve;
@@ -17,6 +18,7 @@ pub use serde;
 pub use serde_json;
 pub use sha2;
 pub use time;
+pub use tracing;
 pub use uuid::Uuid;
 pub use wit_bindgen;
 
