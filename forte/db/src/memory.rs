@@ -253,23 +253,31 @@ impl MemoryTransaction {
         writes: &[crate::WriteOp],
     ) -> Result<crate::CommitOutcome> {
         use crate::WriteOp;
-        let mut affected_counts = Vec::with_capacity(writes.len());
-        for op in writes {
+
+        let mut staged = self.working.clone();
+        let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
+        let mut conflict: Option<crate::ConflictInfo> = None;
+
+        for (i, op) in writes.iter().enumerate() {
             match op {
                 WriteOp::Insert { pk, sk, data } => {
                     let key = (pk.clone(), sk.clone());
-                    if self.working.contains_key(&key) {
+                    if staged.contains_key(&key) {
+                        conflict = Some(crate::ConflictInfo {
+                            step_index: i,
+                            message: format!("UNIQUE constraint failed: docs.pk, docs.sk ({pk}/{sk})"),
+                        });
                         affected_counts.push(0);
-                    } else {
-                        self.working.insert(
-                            key,
-                            MemDoc {
-                                data: data.clone(),
-                                version: 0,
-                            },
-                        );
-                        affected_counts.push(1);
+                        break;
                     }
+                    staged.insert(
+                        key,
+                        MemDoc {
+                            data: data.clone(),
+                            version: 0,
+                        },
+                    );
+                    affected_counts.push(1);
                 }
                 WriteOp::Update {
                     pk,
@@ -278,7 +286,7 @@ impl MemoryTransaction {
                     data,
                 } => {
                     let key = (pk.clone(), sk.clone());
-                    match self.working.get_mut(&key) {
+                    match staged.get_mut(&key) {
                         Some(doc) if doc.version == *expected_version => {
                             doc.data = data.clone();
                             doc.version += 1;
@@ -293,9 +301,9 @@ impl MemoryTransaction {
                     expected_version,
                 } => {
                     let key = (pk.clone(), sk.clone());
-                    match self.working.get(&key) {
+                    match staged.get(&key) {
                         Some(doc) if doc.version == *expected_version => {
-                            self.working.remove(&key);
+                            staged.remove(&key);
                             affected_counts.push(1);
                         }
                         _ => affected_counts.push(0),
@@ -303,8 +311,20 @@ impl MemoryTransaction {
                 }
             }
         }
-        *self.db.store.borrow_mut() = std::mem::take(&mut self.working);
-        Ok(crate::CommitOutcome { affected_counts })
+
+        while affected_counts.len() < writes.len() {
+            affected_counts.push(0);
+        }
+
+        if conflict.is_none() {
+            *self.db.store.borrow_mut() = staged;
+            self.working.clear();
+        }
+
+        Ok(crate::CommitOutcome {
+            affected_counts,
+            conflict,
+        })
     }
 }
 
