@@ -16,3 +16,4 @@ forte-sdk = { workspace = true }
 libsql-hrana = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+tracing = { workspace = true }

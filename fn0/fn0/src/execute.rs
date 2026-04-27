@@ -178,6 +178,7 @@ pub async fn run_wasm_instance_loop(
     subdomain: String,
     mut rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
     turso_hijack: Option<Arc<TursoHijack>>,
+    otlp_hijack: Option<Arc<crate::OtlpHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -188,7 +189,7 @@ pub async fn run_wasm_instance_loop(
         &bundle.env_vars,
         time_tracker.clone(),
         is_timeout.clone(),
-        SelfInvokeHooks::new(turso_hijack.clone()),
+        SelfInvokeHooks::new(turso_hijack.clone(), otlp_hijack.clone()),
         turso_hijack.as_deref(),
     );
 

@@ -1,3 +1,4 @@
+mod admin;
 mod args;
 mod args_parse;
 mod cwasm_compile;
@@ -156,6 +157,7 @@ async fn route(
             info!("health check");
             Ok(Response::new(Full::new(Bytes::from("ok"))))
         }
+        (&Method::POST, "/admin/grant") => Ok(admin::handle_admin_grant(req, ctx).await),
         (&Method::POST, "/deploy/start") => Ok(deploy::handle_deploy_start(req, ctx).await),
         (&Method::POST, "/deploy/r2/sign") => Ok(deploy::handle_deploy_r2_sign(req, ctx).await),
         (&Method::POST, "/deploy/finish") => Ok(deploy::handle_deploy_finish(req, ctx).await),

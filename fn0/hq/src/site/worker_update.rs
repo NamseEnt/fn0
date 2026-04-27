@@ -217,12 +217,14 @@ pub(super) fn build_deploy_script(
         "bash -c 'set -e; \
 podman stop fn0-worker 2>/dev/null || true; \
 podman rm -f fn0-worker 2>/dev/null || true; \
+podman image prune -af 2>/dev/null || true; \
 podman pull {image}; \
 podman create --replace --name fn0-worker \
   --network=host \
   --restart=always \
   -v /etc/fn0-worker:/etc/fn0-worker:ro {env_flags} {image}; \
-podman start fn0-worker'"
+podman start fn0-worker; \
+podman image prune -af 2>/dev/null || true'"
     )
 }
 

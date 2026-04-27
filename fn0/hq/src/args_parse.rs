@@ -26,6 +26,7 @@ pub struct DeployContext {
     pub deployment_cache: DeploymentCache,
     pub sites: Vec<Site>,
     pub env_encryption_key: [u8; 32],
+    pub admin_signing_key: [u8; 32],
     pub forte_db: crate::args::ForteDbArgs,
     pub forte_r2: ForteR2,
 }
@@ -106,6 +107,8 @@ impl HqArgs {
 
         let env_encryption_key =
             crate::env_crypto::decode_key_base64(&args.env_encryption_key_base64)?;
+        let admin_signing_key =
+            crate::env_crypto::decode_key_base64(&args.admin_signing_key_base64)?;
 
         let forte_r2 = ForteR2::new(&args.forte_r2).await?;
 
@@ -119,6 +122,7 @@ impl HqArgs {
             deployment_cache: deployment_cache.clone(),
             sites: sites.clone(),
             env_encryption_key,
+            admin_signing_key,
             forte_db: args.forte_db,
             forte_r2,
         });

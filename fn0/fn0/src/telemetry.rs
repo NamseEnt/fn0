@@ -126,12 +126,15 @@ pub fn function_invocation(code_id: &str) {
     counter.add(1, &[KeyValue::new("code_id", code_id.to_string())]);
 }
 
-pub fn execution_time(code_id: &str, duration: Duration) {
+pub fn execution_time(code_id: &str, route: &str, duration: Duration) {
     let histogram = global::meter("fn0")
         .f64_histogram("execution_time_seconds")
         .build();
     histogram.record(
         duration.as_secs_f64(),
-        &[KeyValue::new("code_id", code_id.to_string())],
+        &[
+            KeyValue::new("code_id", code_id.to_string()),
+            KeyValue::new("route", route.to_string()),
+        ],
     );
 }

@@ -17,6 +17,10 @@ const envEncryptionKey = new random.RandomBytes("fn0-env-encryption-key", {
   length: 32,
 });
 
+const adminSigningKey = new random.RandomBytes("fn0-admin-signing-key", {
+  length: 32,
+});
+
 const dns = new fn0.CloudflareDns("cloudflare-dns", {
   suffix,
   accountId,
@@ -334,6 +338,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   awsAccessKeyId: hqAwsAccessKey.id,
   awsSecretAccessKey: hqAwsAccessKey.secret,
   envEncryptionKeyBase64: envEncryptionKey.base64,
+  adminSigningKeyBase64: adminSigningKey.base64,
   sccacheBucket: sccacheBucket.name,
   sccacheRegion: sccacheRegion,
   sccacheEndpoint: sccacheEndpoint,
@@ -370,6 +375,7 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             ORIGIN_CERT_PEM: dns.certificate,
             ORIGIN_KEY_PEM: dns.privateKeyPem,
             FN0_ENV_KEY_BASE64: envEncryptionKey.base64,
+            FN0_ADMIN_SIGNING_KEY_BASE64: adminSigningKey.base64,
             TURSO_GROUP_TOKEN: forteDb.groupToken,
             TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
           },

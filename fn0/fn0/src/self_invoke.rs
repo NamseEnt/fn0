@@ -1,5 +1,6 @@
 use crate::execute::ClientState;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker, measure_cpu_time};
+use crate::otlp_hijack::OtlpHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
@@ -106,11 +107,18 @@ type HookResult = std::result::Result<HookResponse, TrappableError<ErrorCode>>;
 
 pub(crate) struct SelfInvokeHooks {
     turso_hijack: Option<Arc<TursoHijack>>,
+    otlp_hijack: Option<Arc<OtlpHijack>>,
 }
 
 impl SelfInvokeHooks {
-    pub(crate) fn new(turso_hijack: Option<Arc<TursoHijack>>) -> Self {
-        Self { turso_hijack }
+    pub(crate) fn new(
+        turso_hijack: Option<Arc<TursoHijack>>,
+        otlp_hijack: Option<Arc<OtlpHijack>>,
+    ) -> Self {
+        Self {
+            turso_hijack,
+            otlp_hijack,
+        }
     }
 }
 
@@ -135,6 +143,12 @@ impl WasiHttpHooks for SelfInvokeHooks {
             && hijack.matches(request.uri())
         {
             return turso_send(hijack, request, options);
+        }
+
+        if let Some(hijack) = self.otlp_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return otlp_send(hijack, request, options);
         }
 
         default_send(request, options)
@@ -198,6 +212,51 @@ fn turso_send(
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))
+    })
+}
+
+fn otlp_send(
+    hijack: Arc<OtlpHijack>,
+    mut request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    options: Option<RequestOptions>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        if let Err(e) = hijack.rewrite(&mut request) {
+            return Err(e.into());
+        }
+
+        let (parts, body) = request.into_parts();
+        let body_bytes = match body.collect().await {
+            Ok(c) => c.to_bytes(),
+            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        };
+        let forward_body = http_body_util::Full::new(body_bytes)
+            .map_err(|never: std::convert::Infallible| match never {})
+            .boxed_unsync();
+        let forward_request = http::Request::from_parts(parts, forward_body);
+
+        tokio::task::spawn_local(async move {
+            match default_send_request(forward_request, options).await {
+                Ok((_resp, io)) => {
+                    let _ = io.await;
+                }
+                Err(err) => {
+                    tracing::warn!(?err, "otlp forward failed");
+                }
+            }
+        });
+
+        let response = http::Response::builder()
+            .status(202)
+            .body(
+                http_body_util::Empty::<Bytes>::new()
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
+        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+            Box::new(async { Ok(()) });
+        Ok((response, io))
     })
 }
 

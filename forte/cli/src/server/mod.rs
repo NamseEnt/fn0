@@ -86,13 +86,14 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
 
     tokio::task::spawn_local(async move {
         loop {
-            let (socket, _) = match listener.accept().await {
+            let (socket, peer_addr) = match listener.accept().await {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("Failed to accept connection: {}", e);
                     continue;
                 }
             };
+            let is_loopback = peer_addr.ip().is_loopback();
             let executor_clone = executor.clone();
             let public_dir_clone = public_dir.clone();
             let vite_socket_path_clone = vite_socket_path.clone();
@@ -105,7 +106,7 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
                         let executor = executor_clone.clone();
                         let public_dir = public_dir_clone.clone();
                         let vite_socket = vite_socket_path_clone.clone();
-                        handle_request(req, executor, public_dir, vite_socket)
+                        handle_request(req, executor, public_dir, vite_socket, is_loopback)
                     }),
                 );
                 if let Err(err) = conn.with_upgrades().await {
@@ -119,10 +120,11 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
 }
 
 async fn handle_request(
-    req: Request<hyper::body::Incoming>,
+    mut req: Request<hyper::body::Incoming>,
     executor: std::rc::Rc<CodeExecutor<SimpleCache>>,
     public_dir: Arc<PathBuf>,
     vite_socket_path: Option<Arc<PathBuf>>,
+    is_loopback: bool,
 ) -> Result<fn0::Response> {
     let uri = req.uri().clone();
     let path = uri.path();
@@ -137,6 +139,35 @@ async fn handle_request(
                     .boxed_unsync(),
             )
             .unwrap());
+    }
+
+    {
+        let headers = req.headers_mut();
+        headers.remove("x-fn0-admin");
+        headers.remove("x-fn0-admin-github-login");
+        headers.remove("x-fn0-admin-task");
+    }
+
+    if path.starts_with("/__forte_admin/") {
+        if !is_loopback {
+            return Ok(Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(
+                    Full::new(bytes::Bytes::from("Forbidden (admin only on loopback)"))
+                        .map_err(|e| anyhow::anyhow!("{e}"))
+                        .boxed_unsync(),
+                )
+                .unwrap());
+        }
+        req.headers_mut()
+            .insert("x-fn0-admin", "true".parse().unwrap());
+        req.headers_mut()
+            .insert("x-fn0-admin-github-login", "local-dev".parse().unwrap());
+        if let Some(task_name) = path.strip_prefix("/__forte_admin/")
+            && let Ok(v) = hyper::header::HeaderValue::from_str(task_name)
+        {
+            req.headers_mut().insert("x-fn0-admin-task", v);
+        }
     }
 
     if let Some(hook_name) = path.strip_prefix("/__self_invoke/")

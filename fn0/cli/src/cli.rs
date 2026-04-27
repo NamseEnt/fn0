@@ -21,4 +21,23 @@ pub enum Commands {
         #[arg(short, long)]
         port: Option<u16>,
     },
+    Admin {
+        #[command(subcommand)]
+        command: AdminCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum AdminCommands {
+    Run {
+        task: String,
+        #[arg(short, long)]
+        project: Option<String>,
+        #[arg(long)]
+        input_file: Option<std::path::PathBuf>,
+        #[arg(long)]
+        input: Option<String>,
+        #[arg(long, default_value_t = 300)]
+        timeout_seconds: u64,
+    },
 }

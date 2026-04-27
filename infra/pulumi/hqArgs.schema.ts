@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
+  adminSigningKeyBase64: pulumi.Input<string>;
   aws: pulumi.Input<AwsArgs>;
   cwasmBucket: pulumi.Input<CwasmBucketArgs>;
   dnsProvider: pulumi.Input<DnsProviderArg>;

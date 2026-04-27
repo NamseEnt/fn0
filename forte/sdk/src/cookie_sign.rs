@@ -13,7 +13,12 @@ fn get_secret() -> &'static [u8] {
         .as_bytes()
 }
 
-pub fn sign_cookie<T: Serialize>(jar: &mut CookieJar, name: &str, value: &T) {
+pub fn sign_cookie<T: Serialize>(
+    jar: &mut CookieJar,
+    name: &str,
+    value: &T,
+    max_age: Option<time::Duration>,
+) {
     let value = serde_json::to_string(value).expect("Fail to serialize value");
 
     let mut mac = HmacSha256::new_from_slice(get_secret()).expect("HMAC can take key of any size");
@@ -21,13 +26,15 @@ pub fn sign_cookie<T: Serialize>(jar: &mut CookieJar, name: &str, value: &T) {
 
     let cookie_value = format!("{value}.{}", hex::encode(mac.finalize().into_bytes()));
 
-    let cookie = Cookie::build((name.to_string(), cookie_value))
+    let mut builder = Cookie::build((name.to_string(), cookie_value))
         .http_only(true)
         .secure(true)
-        .path("/")
-        .build();
+        .path("/");
+    if let Some(max_age) = max_age {
+        builder = builder.max_age(max_age);
+    }
 
-    jar.add(cookie);
+    jar.add(builder.build());
 }
 
 pub fn unsign_cookie<T: DeserializeOwned>(jar: &CookieJar, name: &str) -> Option<T> {

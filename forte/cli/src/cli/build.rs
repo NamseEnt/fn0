@@ -228,14 +228,34 @@ fn build_backend(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn find_wasm_binary(release_dir: &Path) -> Result<PathBuf> {
-    for entry in fs::read_dir(release_dir)? {
-        let path = entry?.path();
-        if path.extension().is_some_and(|ext| ext == "wasm") {
-            return Ok(path);
-        }
+fn find_wasm_binary(release_dir: &Path, project_dir: &Path) -> Result<PathBuf> {
+    let cargo_toml = project_dir.join("rs/Cargo.toml");
+    let content = fs::read_to_string(&cargo_toml)
+        .with_context(|| format!("read {}", cargo_toml.display()))?;
+
+    #[derive(serde::Deserialize)]
+    struct CargoToml {
+        package: CargoPackage,
     }
-    anyhow::bail!("No .wasm file found in {}", release_dir.display())
+    #[derive(serde::Deserialize)]
+    struct CargoPackage {
+        name: String,
+    }
+
+    let parsed: CargoToml = toml::from_str(&content)
+        .with_context(|| format!("parse {}", cargo_toml.display()))?;
+
+    let wasm_name = format!("{}.wasm", parsed.package.name.replace('-', "_"));
+    let wasm_path = release_dir.join(&wasm_name);
+
+    if !wasm_path.exists() {
+        anyhow::bail!(
+            "expected wasm '{}' not found in {}",
+            wasm_name,
+            release_dir.display()
+        );
+    }
+    Ok(wasm_path)
 }
 
 fn build_frontend(project_dir: &Path) -> Result<()> {
@@ -290,7 +310,10 @@ fn create_dist(project_dir: &Path, dist_dir: &Path) -> Result<()> {
     }
     fs::create_dir_all(dist_dir)?;
 
-    let backend_wasm = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?;
+    let backend_wasm = find_wasm_binary(
+        &project_dir.join("rs/target/wasm32-wasip2/release"),
+        project_dir,
+    )?;
     let frontend_js = project_dir.join("fe/dist/ssr/server.js");
 
     fs::copy(&backend_wasm, dist_dir.join("backend.wasm"))?;

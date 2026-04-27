@@ -33,6 +33,7 @@ export interface OciHeadQuarterArgs {
   awsAccessKeyId: pulumi.Input<string>;
   awsSecretAccessKey: pulumi.Input<string>;
   envEncryptionKeyBase64: pulumi.Input<string>;
+  adminSigningKeyBase64: pulumi.Input<string>;
   sccacheBucket: pulumi.Input<string>;
   sccacheRegion: pulumi.Input<string>;
   sccacheEndpoint: pulumi.Input<string>;
@@ -108,6 +109,33 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       sccacheSecretAccessKey: args.sccacheSecretAccessKey,
     });
 
+    const augmentedSites = pulumi
+      .all([sites, workerOtlpEndpoint, workerOtlpBasicAuth])
+      .apply(([siteList, endpoint, basicAuth]) => {
+        const u = new URL(endpoint);
+        const target_host = u.host;
+        const target_path_prefix = u.pathname.replace(/\/$/, "");
+        const auth = basicAuth;
+        return siteList.map((site) => {
+          const hp = site.hostProvider as any;
+          if (!hp.ociComputeVm) return site;
+          return {
+            ...site,
+            hostProvider: {
+              ociComputeVm: {
+                ...hp.ociComputeVm,
+                envs: {
+                  ...hp.ociComputeVm.envs,
+                  FN0_OTLP_TARGET_HOST: target_host,
+                  FN0_OTLP_TARGET_PATH_PREFIX: target_path_prefix,
+                  FN0_OTLP_AUTH: auth,
+                },
+              },
+            },
+          };
+        });
+      });
+
     deployHqApplication(this, {
       k8sProvider,
       hqImage,
@@ -115,7 +143,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       workerOtlpEndpoint,
       workerOtlpBasicAuth,
       hqArgs: {
-        sites,
+        sites: augmentedSites,
         dnsProvider: args.dnsProvider,
         docDb: {
           url: docDbUrl,
@@ -130,6 +158,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           secretAccessKey: args.awsSecretAccessKey,
         },
         envEncryptionKeyBase64: args.envEncryptionKeyBase64,
+        adminSigningKeyBase64: args.adminSigningKeyBase64,
         cwasmBucket: args.cwasmBucket,
         selfDns: {
           hostname: args.selfDnsHostname,

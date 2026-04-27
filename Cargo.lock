@@ -2786,7 +2786,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.18"
+version = "0.2.24"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2962,7 +2962,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.13"
+version = "0.3.20"
 dependencies = [
  "aes-gcm 0.10.3",
  "anyhow",
@@ -2973,6 +2973,7 @@ dependencies = [
  "color-eyre",
  "fn0",
  "futures",
+ "hmac 0.12.1",
  "http 1.4.0",
  "http-body-util",
  "hyper 1.8.1",
@@ -2988,6 +2989,7 @@ dependencies = [
  "rustls-pemfile",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tar",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -3080,6 +3082,7 @@ dependencies = [
  "libsql-hrana",
  "serde",
  "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -3119,10 +3122,17 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
+ "opentelemetry",
+ "opentelemetry-proto",
+ "opentelemetry_sdk",
+ "prost 0.14.3",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "time",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
  "uuid",
  "wit-bindgen 0.50.0",
 ]
@@ -3787,6 +3797,7 @@ dependencies = [
  "dashmap",
  "futures",
  "hex",
+ "hmac 0.12.1",
  "http 1.4.0",
  "http-body-util",
  "hyper 1.8.1",
@@ -5347,15 +5358,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3b335231dfd352ffb0f8017f3b6027a4917f7df785ea2143d8af2adc66980ae"
 dependencies = [
  "winapi",
-]
-
-[[package]]
-name = "nu-ansi-term"
-version = "0.50.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
-dependencies = [
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8606,17 +8608,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-log"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
-dependencies = [
- "log",
- "once_cell",
- "tracing-core",
-]
-
-[[package]]
 name = "tracing-opentelemetry"
 version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8624,10 +8615,8 @@ checksum = "1ac28f2d093c6c477eaa76b23525478f38de514fa9aeb1285738d4b97a9552fc"
 dependencies = [
  "js-sys",
  "opentelemetry",
- "smallvec",
  "tracing",
  "tracing-core",
- "tracing-log",
  "tracing-subscriber",
  "web-time",
 ]
@@ -8639,15 +8628,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb7f578e5945fb242538965c2d0b04418d38ec25c79d160cd279bf0731c8d319"
 dependencies = [
  "matchers",
- "nu-ansi-term",
  "once_cell",
  "regex-automata",
  "sharded-slab",
- "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",
- "tracing-log",
 ]
 
 [[package]]

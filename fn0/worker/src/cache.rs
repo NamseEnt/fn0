@@ -66,6 +66,7 @@ impl S3BundleCache {
         }
     }
 
+    #[tracing::instrument(skip_all, fields(subdomain = %subdomain, code_id, code_version))]
     pub async fn register(&self, subdomain: &str, code_id: u64, code_version: u64) {
         let mut inner = self.inner.lock().await;
         let prev = inner
@@ -88,6 +89,7 @@ impl S3BundleCache {
         }
     }
 
+    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
     async fn get_impl(&self, subdomain: &str) -> Result<Arc<Bundle>, Error> {
         let version = {
             let mut inner = self.inner.lock().await;
@@ -133,6 +135,7 @@ impl S3BundleCache {
         Ok(bundle)
     }
 
+    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
     async fn fetch_and_build(&self, subdomain: &str) -> Result<(Arc<Bundle>, usize), Error> {
         let key = format!(
             "bundles/{version}/{subdomain}.tar.zst",
