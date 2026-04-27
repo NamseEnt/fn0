@@ -20,6 +20,7 @@ export declare class OciHeadQuarter extends pulumi.ComponentResource {
  * The set of arguments for constructing a OciHeadQuarter resource.
  */
 export interface OciHeadQuarterArgs {
+    adminSigningKeyBase64: pulumi.Input<string>;
     awsAccessKeyId: pulumi.Input<string>;
     awsRegion: pulumi.Input<string>;
     awsSecretAccessKey: pulumi.Input<string>;

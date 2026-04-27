@@ -27,6 +27,9 @@ class OciHeadQuarter extends pulumi.ComponentResource {
         let resourceInputs = {};
         opts = opts || {};
         if (!opts.id) {
+            if (args?.adminSigningKeyBase64 === undefined && !opts.urn) {
+                throw new Error("Missing required property 'adminSigningKeyBase64'");
+            }
             if (args?.awsAccessKeyId === undefined && !opts.urn) {
                 throw new Error("Missing required property 'awsAccessKeyId'");
             }
@@ -108,6 +111,7 @@ class OciHeadQuarter extends pulumi.ComponentResource {
             if (args?.wasmBucket === undefined && !opts.urn) {
                 throw new Error("Missing required property 'wasmBucket'");
             }
+            resourceInputs["adminSigningKeyBase64"] = args?.adminSigningKeyBase64;
             resourceInputs["awsAccessKeyId"] = args?.awsAccessKeyId;
             resourceInputs["awsRegion"] = args?.awsRegion;
             resourceInputs["awsSecretAccessKey"] = args?.awsSecretAccessKey;

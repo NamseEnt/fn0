@@ -5,6 +5,7 @@ pub mod measure_cpu_time;
 pub mod queue_poller;
 mod self_invoke;
 pub mod telemetry;
+pub mod otlp_hijack;
 pub mod turso_hijack;
 pub mod turso_queue;
 
@@ -25,6 +26,7 @@ use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
 
 pub use ski::{FetchHandler, FetchHandlerFuture};
+pub use otlp_hijack::OtlpHijack;
 pub use turso_hijack::TursoHijack;
 pub use wasmtime;
 
@@ -34,6 +36,7 @@ pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
 
 const NEXT_HEADER: &str = "x-fn0-next";
+const EXECUTION_TIME_METRIC_KEY_HEADER: &str = "x-fn0-execution-time-metric-key";
 const FN0_HEADER_PREFIX: &str = "x-fn0-";
 
 #[derive(Debug)]
@@ -62,6 +65,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) linker: Linker<ClientState<SystemClock>>,
     pub(crate) bundle_cache: C,
     pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
+    pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -71,11 +75,17 @@ impl<C: BundleCache> ExecutionContext<C> {
             linker,
             bundle_cache,
             turso_hijack: None,
+            otlp_hijack: None,
         }
     }
 
     pub fn with_turso_hijack(mut self, turso_hijack: Arc<TursoHijack>) -> Self {
         self.turso_hijack = Some(turso_hijack);
+        self
+    }
+
+    pub fn with_otlp_hijack(mut self, otlp_hijack: Arc<OtlpHijack>) -> Self {
+        self.otlp_hijack = Some(otlp_hijack);
         self
     }
 
@@ -94,15 +104,25 @@ impl<C: BundleCache> ExecutionContext<C> {
     pub fn turso_hijack(&self) -> Option<&Arc<TursoHijack>> {
         self.turso_hijack.as_ref()
     }
+
+    pub fn otlp_hijack(&self) -> Option<&Arc<OtlpHijack>> {
+        self.otlp_hijack.as_ref()
+    }
 }
 
 struct JsSlot {
     instance: std::rc::Rc<ski::SkiInstance>,
+    bundle: Arc<Bundle>,
+}
+
+struct WasmSlot {
+    sender: mpsc::UnboundedSender<execute::WasmInjectEnvelope>,
+    bundle: Arc<Bundle>,
 }
 
 pub struct CodeExecutor<C: BundleCache> {
     ctx: Arc<ExecutionContext<C>>,
-    instances: RefCell<HashMap<String, mpsc::UnboundedSender<execute::WasmInjectEnvelope>>>,
+    instances: RefCell<HashMap<String, WasmSlot>>,
     js_instances: RefCell<HashMap<String, JsSlot>>,
 }
 
@@ -119,6 +139,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         &self.ctx
     }
 
+    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
     pub async fn run(
         &self,
         subdomain: &str,
@@ -138,10 +159,18 @@ impl<C: BundleCache> CodeExecutor<C> {
 
         let result = self.run_with_next(subdomain, bundle, request).await;
 
-        telemetry::execution_time(subdomain, start.elapsed());
+        let key = result
+            .as_ref()
+            .ok()
+            .and_then(|r| r.headers().get(EXECUTION_TIME_METRIC_KEY_HEADER))
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("unknown")
+            .to_string();
+        telemetry::execution_time(subdomain, &key, start.elapsed());
         result.map(strip_fn0_headers)
     }
 
+    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
     pub async fn run_backend_only(&self, subdomain: &str, request: Request) -> Result<Response> {
         let bundle = self
             .ctx
@@ -152,6 +181,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         self.run_wasm(subdomain, &bundle, request).await
     }
 
+    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
     async fn run_with_next(
         &self,
         subdomain: &str,
@@ -186,6 +216,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         }
     }
 
+    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
     async fn run_wasm(
         &self,
         subdomain: &str,
@@ -237,8 +268,14 @@ impl<C: BundleCache> CodeExecutor<C> {
         subdomain: &str,
         bundle: &Arc<Bundle>,
     ) -> Result<std::rc::Rc<ski::SkiInstance>> {
-        if let Some(slot) = self.js_instances.borrow().get(subdomain) {
-            return Ok(slot.instance.clone());
+        {
+            let mut js_instances = self.js_instances.borrow_mut();
+            if let Some(slot) = js_instances.get(subdomain) {
+                if Arc::ptr_eq(&slot.bundle, bundle) {
+                    return Ok(slot.instance.clone());
+                }
+                js_instances.remove(subdomain);
+            }
         }
 
         let js_code = bundle
@@ -258,6 +295,7 @@ impl<C: BundleCache> CodeExecutor<C> {
             subdomain.to_string(),
             JsSlot {
                 instance: instance.clone(),
+                bundle: bundle.clone(),
             },
         );
 
@@ -274,18 +312,30 @@ impl<C: BundleCache> CodeExecutor<C> {
         subdomain: &str,
         bundle: &Arc<Bundle>,
     ) -> mpsc::UnboundedSender<execute::WasmInjectEnvelope> {
-        if let Some(tx) = self.instances.borrow().get(subdomain) {
-            return tx.clone();
+        {
+            let mut instances = self.instances.borrow_mut();
+            if let Some(slot) = instances.get(subdomain) {
+                if Arc::ptr_eq(&slot.bundle, bundle) {
+                    return slot.sender.clone();
+                }
+                instances.remove(subdomain);
+            }
         }
+
         let (tx, rx) = mpsc::unbounded_channel();
-        self.instances
-            .borrow_mut()
-            .insert(subdomain.to_string(), tx.clone());
+        self.instances.borrow_mut().insert(
+            subdomain.to_string(),
+            WasmSlot {
+                sender: tx.clone(),
+                bundle: bundle.clone(),
+            },
+        );
 
         let ctx = self.ctx.clone();
         let bundle = bundle.clone();
         let subdomain_owned = subdomain.to_string();
         let turso_hijack = ctx.turso_hijack.clone();
+        let otlp_hijack = ctx.otlp_hijack.clone();
         tokio::task::spawn_local(async move {
             let result = execute::run_wasm_instance_loop(
                 &ctx.engine,
@@ -293,6 +343,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 subdomain_owned,
                 rx,
                 turso_hijack,
+                otlp_hijack,
             )
             .await;
             if let Err(e) = result {

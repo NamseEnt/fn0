@@ -1,4 +1,5 @@
 pub mod add;
+pub mod admin;
 pub mod build;
 pub mod deploy;
 pub mod dev;
@@ -60,6 +61,42 @@ pub enum Commands {
     Queue {
         #[command(subcommand)]
         command: QueueCommands,
+    },
+
+    /// Admin task commands
+    Admin {
+        #[command(subcommand)]
+        command: AdminCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum AdminCommands {
+    /// Run an admin task against the deployed app
+    Run {
+        /// Task name (matches src/admin/<name>.rs)
+        task: String,
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+        #[arg(long)]
+        input_file: Option<PathBuf>,
+        #[arg(long)]
+        input: Option<String>,
+        #[arg(long, default_value_t = 300)]
+        timeout_seconds: u64,
+    },
+    /// Run an admin task against a locally-running `forte dev`
+    RunLocal {
+        /// Task name
+        task: String,
+        #[arg(short = 'P', long, default_value_t = 3000)]
+        port: u16,
+        #[arg(long)]
+        input_file: Option<PathBuf>,
+        #[arg(long)]
+        input: Option<String>,
+        #[arg(long, default_value_t = 300)]
+        timeout_seconds: u64,
     },
 }
 

@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod build;
 pub mod deploy;
 pub mod destroy;

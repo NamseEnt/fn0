@@ -6,7 +6,7 @@ mod prompts;
 mod utils;
 
 use clap::Parser;
-use cli::{Cli, Commands};
+use cli::{AdminCommands, Cli, Commands};
 use color_eyre::Result;
 
 fn main() -> Result<()> {
@@ -39,6 +39,17 @@ async fn async_main() -> Result<()> {
         Commands::Local { port } => {
             commands::local::execute(port).await?;
         }
+        Commands::Admin { command } => match command {
+            AdminCommands::Run {
+                task,
+                project,
+                input_file,
+                input,
+                timeout_seconds,
+            } => {
+                commands::admin::run(task, project, input_file, input, timeout_seconds).await?;
+            }
+        },
     }
 
     Ok(())

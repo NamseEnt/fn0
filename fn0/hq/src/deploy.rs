@@ -58,8 +58,8 @@ struct DeployR2SignUpload {
 }
 
 #[derive(Serialize)]
-struct ErrorResponse {
-    error: String,
+pub(crate) struct ErrorResponse {
+    pub error: String,
 }
 
 #[derive(Deserialize)]
@@ -101,7 +101,7 @@ struct SiteStatus {
     wasmtime_synced: bool,
 }
 
-fn json_response<T: Serialize>(status: u16, body: &T) -> Response<Full<Bytes>> {
+pub(crate) fn json_response<T: Serialize>(status: u16, body: &T) -> Response<Full<Bytes>> {
     let json = serde_json::to_string(body).unwrap();
     Response::builder()
         .status(status)
@@ -110,7 +110,7 @@ fn json_response<T: Serialize>(status: u16, body: &T) -> Response<Full<Bytes>> {
         .unwrap()
 }
 
-async fn verify_github_user(token: &str) -> Result<String, String> {
+pub(crate) async fn verify_github_user(token: &str) -> Result<String, String> {
     let client = reqwest::Client::new();
     let resp = client
         .get("https://api.github.com/user")

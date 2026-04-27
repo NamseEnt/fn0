@@ -5,7 +5,7 @@ mod tools;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AddCommands, Cli, Commands, QueueCommands};
+use cli::{AddCommands, AdminCommands, Cli, Commands, QueueCommands};
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -55,6 +55,28 @@ async fn async_main() -> Result<()> {
             QueueCommands::Flush { project, task_name } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
                 cli::queue::flush(&project_dir, task_name.as_deref()).await?;
+            }
+        },
+
+        Commands::Admin { command } => match command {
+            AdminCommands::Run {
+                task,
+                project,
+                input_file,
+                input,
+                timeout_seconds,
+            } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::admin::run(task, project_dir, input_file, input, timeout_seconds).await?;
+            }
+            AdminCommands::RunLocal {
+                task,
+                port,
+                input_file,
+                input,
+                timeout_seconds,
+            } => {
+                cli::admin::run_local(task, port, input_file, input, timeout_seconds).await?;
             }
         },
     }

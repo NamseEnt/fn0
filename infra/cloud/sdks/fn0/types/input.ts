@@ -64,3 +64,4 @@ export interface SiteArgsArgs {
     hostProvider: pulumi.Input<inputs.HostProviderArgArgs>;
     name: pulumi.Input<string>;
 }
+

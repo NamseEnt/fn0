@@ -39,6 +39,11 @@ function createNetworking(parent, { compartmentId, vcnId, ipv6cidrBlocks, }) {
                 destinationType: "CIDR_BLOCK",
                 networkEntityId: natGateway.id,
             },
+            {
+                destination: "::/0",
+                destinationType: "CIDR_BLOCK",
+                networkEntityId: internetGateway.id,
+            },
         ],
     }, { parent });
     const myIp = command.local.runOutput({
@@ -50,6 +55,25 @@ function createNetworking(parent, { compartmentId, vcnId, ipv6cidrBlocks, }) {
         const startAddress = address.startAddress();
         return `${startAddress.correctForm()}/64`;
     });
+    const podIpv6cidrBlock = pulumi.output(ipv6cidrBlocks).apply((blocks) => {
+        const cidr = blocks[0];
+        const address = new ip_address_1.Address6(cidr);
+        const parts = address
+            .startAddress()
+            .canonicalForm()
+            .split(":")
+            .map((p) => parseInt(p, 16));
+        parts[3] = (parts[3] + 1) & 0xffff;
+        parts[4] = 0;
+        parts[5] = 0;
+        parts[6] = 0;
+        parts[7] = 0;
+        const hex = parts.map((n) => n.toString(16)).join(":");
+        return `${hex}/64`;
+    });
+    const vcnIpv6cidrBlock = pulumi
+        .output(ipv6cidrBlocks)
+        .apply((blocks) => blocks[0]);
     const securityList = new oci.core.SecurityList("security-list", {
         compartmentId,
         vcnId,
@@ -95,10 +119,21 @@ function createNetworking(parent, { compartmentId, vcnId, ipv6cidrBlocks, }) {
                 protocol: "all",
                 stateless: false,
             },
+            {
+                destination: "::/0",
+                destinationType: "CIDR_BLOCK",
+                protocol: "all",
+                stateless: false,
+            },
         ],
         ingressSecurityRules: [
             {
                 source: "10.0.0.0/16",
+                protocol: "all",
+                stateless: false,
+            },
+            {
+                source: vcnIpv6cidrBlock,
                 protocol: "all",
                 stateless: false,
             },
@@ -119,7 +154,8 @@ function createNetworking(parent, { compartmentId, vcnId, ipv6cidrBlocks, }) {
         compartmentId,
         vcnId,
         ipv4cidrBlocks: ["10.0.3.0/24"],
-        prohibitPublicIpOnVnic: true,
+        ipv6cidrBlock: podIpv6cidrBlock,
+        prohibitPublicIpOnVnic: false,
         routeTableId: podRouteTable.id,
         securityListIds: [podSecurityList.id],
     }, { parent, deleteBeforeReplace: true });

@@ -50,6 +50,33 @@ class OciHeadQuarter extends pulumi.ComponentResource {
             sccacheAccessKeyId: args.sccacheAccessKeyId,
             sccacheSecretAccessKey: args.sccacheSecretAccessKey,
         });
+        const augmentedSites = pulumi
+            .all([sites, workerOtlpEndpoint, workerOtlpBasicAuth])
+            .apply(([siteList, endpoint, basicAuth]) => {
+            const u = new URL(endpoint);
+            const target_host = u.host;
+            const target_path_prefix = u.pathname.replace(/\/$/, "");
+            const auth = basicAuth;
+            return siteList.map((site) => {
+                const hp = site.hostProvider;
+                if (!hp.ociComputeVm)
+                    return site;
+                return {
+                    ...site,
+                    hostProvider: {
+                        ociComputeVm: {
+                            ...hp.ociComputeVm,
+                            envs: {
+                                ...hp.ociComputeVm.envs,
+                                FN0_OTLP_TARGET_HOST: target_host,
+                                FN0_OTLP_TARGET_PATH_PREFIX: target_path_prefix,
+                                FN0_OTLP_AUTH: auth,
+                            },
+                        },
+                    },
+                };
+            });
+        });
         (0, hq_deployment_1.deployHqApplication)(this, {
             k8sProvider,
             hqImage,
@@ -57,7 +84,7 @@ class OciHeadQuarter extends pulumi.ComponentResource {
             workerOtlpEndpoint,
             workerOtlpBasicAuth,
             hqArgs: {
-                sites,
+                sites: augmentedSites,
                 dnsProvider: args.dnsProvider,
                 docDb: {
                     url: docDbUrl,
@@ -72,6 +99,7 @@ class OciHeadQuarter extends pulumi.ComponentResource {
                     secretAccessKey: args.awsSecretAccessKey,
                 },
                 envEncryptionKeyBase64: args.envEncryptionKeyBase64,
+                adminSigningKeyBase64: args.adminSigningKeyBase64,
                 cwasmBucket: args.cwasmBucket,
                 selfDns: {
                     hostname: args.selfDnsHostname,

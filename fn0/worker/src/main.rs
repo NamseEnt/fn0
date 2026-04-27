@@ -1,3 +1,4 @@
+mod admin_verify;
 mod cache;
 mod deployments_watcher;
 mod env_crypto;
@@ -8,7 +9,7 @@ use base64::Engine;
 use bytes::Bytes;
 use cache::S3BundleCache;
 use color_eyre::eyre::Result;
-use fn0::{ExecutionContext, TursoHijack};
+use fn0::{ExecutionContext, OtlpHijack, TursoHijack};
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::server::conn::http1;
@@ -40,6 +41,25 @@ pub fn read_pem_env(name: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+fn build_otlp_hijack() -> Option<Arc<OtlpHijack>> {
+    let target_host = std::env::var("FN0_OTLP_TARGET_HOST")
+        .ok()
+        .filter(|s| !s.is_empty())?;
+    let auth = std::env::var("FN0_OTLP_AUTH")
+        .ok()
+        .filter(|s| !s.is_empty())?;
+    let target_path_prefix =
+        std::env::var("FN0_OTLP_TARGET_PATH_PREFIX").unwrap_or_else(|_| "".to_string());
+    let placeholder_host = std::env::var("FN0_OTLP_PLACEHOLDER_HOST")
+        .unwrap_or_else(|_| "fn0-otel.fn0.dev".to_string());
+    Some(Arc::new(OtlpHijack {
+        placeholder_host,
+        target_host,
+        target_path_prefix,
+        auth,
+    }))
+}
+
 fn build_turso_hijack() -> Option<Arc<TursoHijack>> {
     let group_token = std::env::var("TURSO_GROUP_TOKEN")
         .ok()
@@ -50,7 +70,7 @@ fn build_turso_hijack() -> Option<Arc<TursoHijack>> {
     match (group_token, target_host_suffix) {
         (Some(group_token), Some(target_host_suffix)) => {
             let placeholder_host = std::env::var("TURSO_PLACEHOLDER_HOST")
-                .unwrap_or_else(|_| "forte-db.fn0.dev".to_string());
+                .unwrap_or_else(|_| "fn0-db.fn0.dev".to_string());
             Some(Arc::new(TursoHijack {
                 placeholder_host,
                 target_host_suffix,
@@ -100,6 +120,18 @@ async fn run() -> Result<()> {
         std::env::var("FN0_ENV_KEY_BASE64").expect("FN0_ENV_KEY_BASE64 is required");
     let env_key = env_crypto::decode_key_base64(&env_key_base64)?;
 
+    let admin_signing_key: Option<Arc<[u8; 32]>> =
+        match std::env::var("FN0_ADMIN_SIGNING_KEY_BASE64") {
+            Ok(s) if !s.is_empty() => Some(Arc::new(
+                admin_verify::decode_key_base64(&s)
+                    .map_err(|e| color_eyre::eyre::eyre!("FN0_ADMIN_SIGNING_KEY_BASE64: {e}"))?,
+            )),
+            _ => {
+                tracing::warn!("FN0_ADMIN_SIGNING_KEY_BASE64 not set; admin auth disabled");
+                None
+            }
+        };
+
     let cache_size_bytes = std::env::var("FN0_BUNDLE_CACHE_SIZE_BYTES")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -134,6 +166,11 @@ async fn run() -> Result<()> {
         if let Some(hijack) = build_turso_hijack() {
             ctx = ctx.with_turso_hijack(hijack);
         }
+        if let Some(hijack) = build_otlp_hijack() {
+            ctx = ctx.with_otlp_hijack(hijack);
+        } else {
+            tracing::warn!("FN0_OTLP_TARGET_HOST or FN0_OTLP_AUTH not set; OTLP hijack disabled");
+        }
         Arc::new(ctx)
     };
 
@@ -160,9 +197,16 @@ async fn run() -> Result<()> {
         let worker_senders = worker_senders.clone();
         let generation = generation.clone();
         let instance_count = instance_count.clone();
+        let admin_signing_key = admin_signing_key.clone();
         async move {
-            if let Err(err) =
-                run_http_server(http_port, worker_senders, generation, instance_count).await
+            if let Err(err) = run_http_server(
+                http_port,
+                worker_senders,
+                generation,
+                instance_count,
+                admin_signing_key,
+            )
+            .await
             {
                 tracing::error!(%err, "HTTP server error");
             }
@@ -185,6 +229,7 @@ async fn run_http_server(
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     generation: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
+    admin_signing_key: Option<Arc<[u8; 32]>>,
 ) -> Result<()> {
     let tls_acceptor = match (
         read_pem_env("ORIGIN_CERT_PEM"),
@@ -218,15 +263,24 @@ async fn run_http_server(
         let generation = generation.clone();
         let instance_count = instance_count.clone();
         let tls_acceptor = tls_acceptor.clone();
+        let admin_signing_key = admin_signing_key.clone();
 
         tokio::spawn(async move {
             let service = service_fn(move |req| {
                 let worker_senders = worker_senders.clone();
                 let generation = generation.clone();
                 let instance_count = instance_count.clone();
+                let admin_signing_key = admin_signing_key.clone();
                 async move {
-                    handle_request(req, worker_senders, generation, instance_count, is_loopback)
-                        .await
+                    handle_request(
+                        req,
+                        worker_senders,
+                        generation,
+                        instance_count,
+                        is_loopback,
+                        admin_signing_key,
+                    )
+                    .await
                 }
             });
 
@@ -273,11 +327,12 @@ impl Drop for InFlightGuard {
 type HyperResponse = hyper::Response<Full<Bytes>>;
 
 async fn handle_request(
-    req: hyper::Request<hyper::body::Incoming>,
+    mut req: hyper::Request<hyper::body::Incoming>,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     generation: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
     is_loopback: bool,
+    admin_signing_key: Option<Arc<[u8; 32]>>,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     match req.uri().path() {
         "/status" if is_loopback => {
@@ -313,6 +368,53 @@ async fn handle_request(
                 .to_string();
 
             let code_id = host.split('.').next().unwrap_or("unknown").to_string();
+
+            {
+                let headers = req.headers_mut();
+                headers.remove("x-fn0-admin");
+                headers.remove("x-fn0-admin-github-login");
+                headers.remove("x-fn0-admin-task");
+            }
+
+            let admin_token = req
+                .headers()
+                .get("authorization")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.strip_prefix("FortoAdmin "))
+                .map(|s| s.to_string());
+
+            if let Some(token) = admin_token {
+                let Some(key) = admin_signing_key.as_ref() else {
+                    return Ok(hyper::Response::builder()
+                        .status(503)
+                        .body(Full::new(Bytes::from("Admin verification not configured")))
+                        .unwrap());
+                };
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                match admin_verify::verify_token(&token, key, &code_id, now) {
+                    Ok(claims) => {
+                        let headers = req.headers_mut();
+                        headers.remove("authorization");
+                        headers.insert("x-fn0-admin", "true".parse().unwrap());
+                        if let Ok(v) = hyper::header::HeaderValue::from_str(&claims.github_login) {
+                            headers.insert("x-fn0-admin-github-login", v);
+                        }
+                        if let Ok(v) = hyper::header::HeaderValue::from_str(&claims.task) {
+                            headers.insert("x-fn0-admin-task", v);
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!(?err, %code_id, "admin token rejected");
+                        return Ok(hyper::Response::builder()
+                            .status(401)
+                            .body(Full::new(Bytes::from("Unauthorized")))
+                            .unwrap());
+                    }
+                }
+            }
 
             let mapped_req = req.map(|body| {
                 UnsyncBoxBody::new(body)

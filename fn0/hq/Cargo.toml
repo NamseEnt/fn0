@@ -19,6 +19,7 @@ color-eyre = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+hmac = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["full"] }

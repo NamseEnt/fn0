@@ -228,14 +228,34 @@ fn build_backend(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn find_wasm_binary(release_dir: &Path) -> Result<PathBuf> {
-    for entry in fs::read_dir(release_dir)? {
-        let path = entry?.path();
-        if path.extension().is_some_and(|ext| ext == "wasm") {
-            return Ok(path);
-        }
+fn find_wasm_binary(release_dir: &Path, project_dir: &Path) -> Result<PathBuf> {
+    let cargo_toml = project_dir.join("rs/Cargo.toml");
+    let content = fs::read_to_string(&cargo_toml)
+        .with_context(|| format!("read {}", cargo_toml.display()))?;
+
+    #[derive(serde::Deserialize)]
+    struct CargoToml {
+        package: CargoPackage,
     }
-    anyhow::bail!("No .wasm file found in {}", release_dir.display())
+    #[derive(serde::Deserialize)]
+    struct CargoPackage {
+        name: String,
+    }
+
+    let parsed: CargoToml = toml::from_str(&content)
+        .with_context(|| format!("parse {}", cargo_toml.display()))?;
+
+    let wasm_name = format!("{}.wasm", parsed.package.name.replace('-', "_"));
+    let wasm_path = release_dir.join(&wasm_name);
+
+    if !wasm_path.exists() {
+        anyhow::bail!(
+            "expected wasm '{}' not found in {}",
+            wasm_name,
+            release_dir.display()
+        );
+    }
+    Ok(wasm_path)
 }
 
 fn collect_file_mtimes(dir: &Path, extensions: &[&str]) -> HashMap<PathBuf, SystemTime> {
@@ -292,9 +312,12 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let vite = vite_dev::spawn_vite(&fe_dir, port, vite_config.as_deref(), ssr_module_path)?;
     vite_dev::wait_for_vite_ready(&vite.socket_path).await?;
 
-    let wasm_path = find_wasm_binary(&project_dir.join("rs/target/wasm32-wasip2/release"))?
-        .to_string_lossy()
-        .to_string();
+    let wasm_path = find_wasm_binary(
+        &project_dir.join("rs/target/wasm32-wasip2/release"),
+        &project_dir,
+    )?
+    .to_string_lossy()
+    .to_string();
 
     let js_path = String::new();
     let public_dir = project_dir.join("fe/public");

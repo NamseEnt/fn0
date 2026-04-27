@@ -269,6 +269,70 @@ pub async fn deploy(
     Ok(())
 }
 
+#[derive(Deserialize)]
+struct AdminGrantResponse {
+    token: String,
+    subdomain: String,
+    #[allow(dead_code)]
+    expires_at: i64,
+}
+
+pub struct AdminRunOutput {
+    pub status: u16,
+    pub content_type: Option<String>,
+    pub body: Vec<u8>,
+}
+
+pub async fn admin_run(
+    project_name: &str,
+    task: &str,
+    input_body: Vec<u8>,
+    timeout_secs: u64,
+) -> Result<AdminRunOutput> {
+    let github_token = get_github_token().await?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .build()?;
+
+    let grant: AdminGrantResponse = client
+        .post(format!("{}/admin/grant", HQ_URL))
+        .json(&serde_json::json!({
+            "github_token": github_token,
+            "project_name": project_name,
+            "task": task,
+        }))
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(|e| anyhow!("Admin grant request failed: {}", e))?
+        .json()
+        .await?;
+
+    let url = format!("https://{}.fn0.dev/__forte_admin/{}", grant.subdomain, task);
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("FortoAdmin {}", grant.token))
+        .header("Content-Type", "application/json")
+        .body(input_body)
+        .send()
+        .await?;
+
+    let status = resp.status().as_u16();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let body = resp.bytes().await?.to_vec();
+
+    Ok(AdminRunOutput {
+        status,
+        content_type,
+        body,
+    })
+}
+
 pub fn read_env_content(project_dir: &Path) -> Result<Option<String>> {
     let env_path = project_dir.join(".env");
     match std::fs::read_to_string(&env_path) {

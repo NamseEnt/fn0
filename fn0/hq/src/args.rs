@@ -12,6 +12,7 @@ pub struct HqArgs {
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,
     pub env_encryption_key_base64: String,
+    pub admin_signing_key_base64: String,
 }
 
 #[derive(Clone, serde::Deserialize, schemars::JsonSchema)]
