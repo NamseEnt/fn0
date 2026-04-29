@@ -76,10 +76,11 @@ impl Site {
             let provider = self.host_provider.clone();
             let db = self.doc_db.clone();
             let pool = self.ssh_pool.clone();
+            let site = s.site_name.clone();
             let id = s.host_id.clone();
             let addr = s.addr.clone();
             tokio::spawn(async move {
-                super::terminate::terminate_host(&provider, &db, &pool, &id, &addr).await;
+                super::terminate::terminate_host(&provider, &db, &pool, &site, &id, &addr).await;
             });
         }
 
@@ -94,7 +95,7 @@ impl Site {
             let now = chrono::Utc::now().to_rfc3339();
             if let Err(err) = self
                 .doc_db
-                .set_host_graceful(&victim.host_id, GracefulPurpose::ImageSwap, &now)
+                .set_host_graceful(&victim.site_name, &victim.host_id, GracefulPurpose::ImageSwap, &now)
                 .await
             {
                 warn!(%err, host_id = %victim.host_id, "set_host_graceful(ImageSwap) failed");
@@ -107,12 +108,13 @@ impl Site {
             && last_stable_differs(&last_stable, &target)
         {
             let ls = WorkerLastStable {
+                site_name: self.name.clone(),
                 image_registry: target.image_registry.clone(),
                 image_repository: target.image_repository.clone(),
                 image_tag: target.image_tag.clone(),
                 fn0_wasmtime_version: target.fn0_wasmtime_version.clone(),
             };
-            if let Err(err) = self.doc_db.set_worker_last_stable(&self.name, &ls).await {
+            if let Err(err) = self.doc_db.set_worker_last_stable(ls).await {
                 warn!(%err, "Failed to write worker-last-stable");
             } else {
                 info!(

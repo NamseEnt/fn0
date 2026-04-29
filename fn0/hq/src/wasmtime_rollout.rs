@@ -48,12 +48,10 @@ async fn reconcile_site(ctx: &Arc<DeployContext>, site_name: &str) -> color_eyre
 
     if active_subdomains.is_empty() {
         ctx.doc_db
-            .set_cwasm_ready(
-                site_name,
-                &CwasmReady {
-                    fn0_wasmtime_version: target.fn0_wasmtime_version.clone(),
-                },
-            )
+            .set_cwasm_ready(CwasmReady {
+                site_name: site_name.to_string(),
+                fn0_wasmtime_version: target.fn0_wasmtime_version.clone(),
+            })
             .await?;
         info!(site = %site_name, "Fan-out trivially complete (no active subdomains)");
         return Ok(());
@@ -110,12 +108,10 @@ async fn reconcile_site(ctx: &Arc<DeployContext>, site_name: &str) -> color_eyre
 
     if all_ok {
         ctx.doc_db
-            .set_cwasm_ready(
-                site_name,
-                &CwasmReady {
-                    fn0_wasmtime_version: target.fn0_wasmtime_version.clone(),
-                },
-            )
+            .set_cwasm_ready(CwasmReady {
+                site_name: site_name.to_string(),
+                fn0_wasmtime_version: target.fn0_wasmtime_version.clone(),
+            })
             .await?;
         info!(
             site = %site_name,

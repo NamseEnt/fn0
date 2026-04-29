@@ -58,7 +58,7 @@ impl Site {
                 let now = chrono::Utc::now().to_rfc3339();
                 if let Err(err) = self
                     .doc_db
-                    .mark_host_verified(&host_id, ws.generation, ws.instances, &now)
+                    .mark_host_verified(&self.name, &host_id, ws.generation, ws.instances, &now)
                     .await
                 {
                     warn!(%err, %host_id, "Failed to mark host verified");
@@ -78,16 +78,17 @@ impl Site {
             }
             Err(err) => {
                 warn!(%err, %host_id, "SSH status check failed");
-                match self.doc_db.mark_host_failed(&host_id).await {
+                match self.doc_db.mark_host_failed(&self.name, &host_id).await {
                     Ok(failures) => {
                         if failures >= SSH_FAILURE_TERMINATE_THRESHOLD {
                             let provider = self.host_provider.clone();
                             let db = self.doc_db.clone();
                             let pool = self.ssh_pool.clone();
+                            let site = self.name.clone();
                             let id = host_id.clone();
                             let a = addr.clone();
                             tokio::spawn(async move {
-                                super::terminate::terminate_host(&provider, &db, &pool, &id, &a)
+                                super::terminate::terminate_host(&provider, &db, &pool, &site, &id, &a)
                                     .await;
                             });
                         }

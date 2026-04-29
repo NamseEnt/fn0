@@ -3,9 +3,9 @@ use crate::{BatchOp, DbOp, DbResult};
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
-use std::cell::RefCell;
+
 use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 struct MemDoc {
@@ -17,25 +17,25 @@ type Store = BTreeMap<(String, String), MemDoc>;
 
 #[derive(Clone)]
 pub(crate) struct MemoryDatabase {
-    store: Rc<RefCell<Store>>,
+    store: Arc<Mutex<Store>>,
 }
 
 impl MemoryDatabase {
     pub(crate) fn new() -> Self {
         Self {
-            store: Rc::new(RefCell::new(BTreeMap::new())),
+            store: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
     pub(crate) async fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
-        let store = self.store.borrow();
+        let store = self.store.lock().unwrap();
         Ok(store
             .get(&(pk.to_string(), sk.to_string()))
             .map(|doc| doc.data.clone().into()))
     }
 
     pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
-        let store = self.store.borrow();
+        let store = self.store.lock().unwrap();
         Ok(store
             .get(&(pk.to_string(), sk.to_string()))
             .map(|doc| StoredDoc {
@@ -45,13 +45,13 @@ impl MemoryDatabase {
     }
 
     pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
-        upsert(&mut self.store.borrow_mut(), pk, sk, data);
+        upsert(&mut self.store.lock().unwrap(), pk, sk, data);
         Ok(())
     }
 
     pub(crate) async fn delete(&self, pk: &str, sk: &str) -> Result<()> {
         self.store
-            .borrow_mut()
+            .lock().unwrap()
             .remove(&(pk.to_string(), sk.to_string()));
         Ok(())
     }
@@ -62,7 +62,7 @@ impl MemoryDatabase {
         after_sk: Option<S2>,
         limit: usize,
     ) -> Result<Vec<(String, Bytes)>> {
-        let store = self.store.borrow();
+        let store = self.store.lock().unwrap();
         Ok(query_store(
             &store,
             pk.as_ref(),
@@ -76,12 +76,12 @@ impl MemoryDatabase {
         after: Option<(&str, &str)>,
         limit: usize,
     ) -> Result<Vec<(String, String, Bytes)>> {
-        let store = self.store.borrow();
+        let store = self.store.lock().unwrap();
         Ok(scan_store(&store, after, limit))
     }
 
     pub(crate) async fn batch(&self, ops: &[BatchOp<'_>]) -> Result<()> {
-        let mut store = self.store.borrow_mut();
+        let mut store = self.store.lock().unwrap();
         for op in ops {
             match op {
                 BatchOp::Put { pk, sk, data } => {
@@ -101,7 +101,7 @@ impl MemoryDatabase {
         args: Vec<Value>,
         want_rows: bool,
     ) -> Result<Vec<Vec<Value>>> {
-        let result = execute_sql_on_store(&mut self.store.borrow_mut(), sql, args)?;
+        let result = execute_sql_on_store(&mut self.store.lock().unwrap(), sql, args)?;
         if want_rows {
             Ok(result.rows.into_iter().map(|row| row.values).collect())
         } else {
@@ -116,7 +116,7 @@ impl MemoryDatabase {
                 DbOp::Get { pk, sk } => {
                     let data = self
                         .store
-                        .borrow()
+                        .lock().unwrap()
                         .get(&(pk.clone(), sk.clone()))
                         .map(|doc| Bytes::from(doc.data.clone()));
                     results.push(DbResult::Single(data));
@@ -126,17 +126,17 @@ impl MemoryDatabase {
                     after_sk,
                     limit,
                 } => {
-                    let store = self.store.borrow();
+                    let store = self.store.lock().unwrap();
                     let items =
                         query_store(&store, pk, after_sk.as_deref(), limit.unwrap_or(usize::MAX));
                     results.push(DbResult::Multiple(items));
                 }
                 DbOp::Put { pk, sk, data } => {
-                    upsert(&mut self.store.borrow_mut(), pk, sk, data);
+                    upsert(&mut self.store.lock().unwrap(), pk, sk, data);
                     results.push(DbResult::Done);
                 }
                 DbOp::Delete { pk, sk } => {
-                    self.store.borrow_mut().remove(&(pk.clone(), sk.clone()));
+                    self.store.lock().unwrap().remove(&(pk.clone(), sk.clone()));
                     results.push(DbResult::Done);
                 }
             }
@@ -147,7 +147,7 @@ impl MemoryDatabase {
     pub(crate) async fn transaction(&self) -> Result<MemoryTransaction> {
         Ok(MemoryTransaction {
             db: self.clone(),
-            working: self.store.borrow().clone(),
+            working: self.store.lock().unwrap().clone(),
         })
     }
 
@@ -155,7 +155,7 @@ impl MemoryDatabase {
         &self,
         keys: &[(String, String)],
     ) -> Result<(MemoryTransaction, Vec<Option<StoredDoc>>)> {
-        let working = self.store.borrow().clone();
+        let working = self.store.lock().unwrap().clone();
         let docs = keys
             .iter()
             .map(|(pk, sk)| {
@@ -222,7 +222,7 @@ impl MemoryTransaction {
     }
 
     pub(crate) async fn commit(self) -> Result<()> {
-        *self.db.store.borrow_mut() = self.working;
+        *self.db.store.lock().unwrap() = self.working;
         Ok(())
     }
 
@@ -317,7 +317,7 @@ impl MemoryTransaction {
         }
 
         if conflict.is_none() {
-            *self.db.store.borrow_mut() = staged;
+            *self.db.store.lock().unwrap() = staged;
             self.working.clear();
         }
 

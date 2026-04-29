@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Key for matching mock rules against operations.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -38,17 +37,17 @@ pub(crate) struct MockRule {
 /// Shared mock state stored inside a Database.
 #[derive(Clone, Default)]
 pub(crate) struct MockState {
-    rules: Rc<RefCell<VecDeque<MockRule>>>,
+    rules: Arc<Mutex<VecDeque<MockRule>>>,
 }
 
 impl MockState {
     pub(crate) fn push(&self, rule: MockRule) {
-        self.rules.borrow_mut().push_back(rule);
+        self.rules.lock().unwrap().push_back(rule);
     }
 
     /// Try to match and consume a rule for the given operation.
     pub(crate) fn try_match(&self, op: MockOp, pk: &str, sk: &str) -> Option<MockResult> {
-        let mut rules = self.rules.borrow_mut();
+        let mut rules = self.rules.lock().unwrap();
         let pos = rules
             .iter()
             .position(|r| r.key.op == op && r.key.pk == pk && r.key.sk == sk)?;
@@ -56,7 +55,7 @@ impl MockState {
     }
 
     pub(crate) fn clear(&self) {
-        self.rules.borrow_mut().clear();
+        self.rules.lock().unwrap().clear();
     }
 }
 
