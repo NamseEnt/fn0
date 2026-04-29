@@ -286,7 +286,7 @@ where
                 let backoff_span = tracing::info_span!("trx_backoff", attempt = attempt);
                 async {
                     let backoff = conflict_backoff(attempt).await;
-                    forte_sdk::time_wasi::sleep(backoff).await;
+                    crate::runtime::sleep(backoff).await;
                 }
                 .instrument(backoff_span)
                 .await;
@@ -350,16 +350,16 @@ where
     }
 }
 
-async fn conflict_backoff(attempt: u32) -> forte_sdk::time_wasi::Duration {
+async fn conflict_backoff(attempt: u32) -> std::time::Duration {
     let ceiling = BACKOFF_BASE_MS
         .checked_shl(attempt)
         .unwrap_or(BACKOFF_CAP_MS)
         .min(BACKOFF_CAP_MS);
     let mut buf = [0u8; 8];
-    forte_sdk::rand::get_insecure_random_bytes(&mut buf).await;
+    crate::runtime::random_bytes(&mut buf).await;
     let raw = u64::from_le_bytes(buf);
     let delay_ms = raw % (ceiling + 1);
-    forte_sdk::time_wasi::Duration::from_millis(delay_ms)
+    std::time::Duration::from_millis(delay_ms)
 }
 
 struct TrxState {

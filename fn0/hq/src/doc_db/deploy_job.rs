@@ -1,7 +1,7 @@
 use crate::doc_db::DocDb;
 use crate::docs::{DbRequest, DeployJobDoc, DeployJobDocGet, DeployJobDocPut, DeployJobDocQuery};
 use color_eyre::eyre::{Result, eyre};
-use forte_db::TrxResult;
+use doc_db::TrxResult;
 
 pub use crate::docs::{DeployJobDoc as DeployJob, DeployJobPhase};
 

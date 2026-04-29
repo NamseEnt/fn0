@@ -4,7 +4,7 @@ use crate::docs::{
     NextCodeIdDocPut, ProjectDoc, ProjectDocGet, ProjectDocPut,
 };
 use color_eyre::eyre::{Result, eyre};
-use forte_db::TrxResult;
+use doc_db::TrxResult;
 
 pub struct ProjectInfo {
     pub code_id: u64,

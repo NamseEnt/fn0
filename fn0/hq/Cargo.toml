@@ -18,8 +18,8 @@ bytes = { workspace = true }
 chrono = { workspace = true }
 color-eyre = { workspace = true }
 dashmap = { workspace = true }
-forte-db = { workspace = true }
-forte-sdk = { workspace = true }
+doc-db = { workspace = true }
+forte-macros = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }

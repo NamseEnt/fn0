@@ -1,5 +1,6 @@
 mod memory;
 pub mod mock;
+mod runtime;
 mod trx;
 mod turso;
 
@@ -67,7 +68,7 @@ pub struct ConflictInfo {
 }
 
 pub fn turso() -> Database {
-    let url = std::env::var("TURSO_URL").unwrap_or("http://127.0.0.1:8080".to_string());
+    let url = std::env::var("TURSO_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
     let auth_token = std::env::var("TURSO_AUTH_TOKEN").unwrap_or_default();
     turso_with_config(url, auth_token)
 }
@@ -79,16 +80,6 @@ pub fn turso_with_config(url: String, auth_token: String) -> Database {
     }
 }
 
-/// Creates an in-memory database for unit testing.
-///
-/// This backend uses a `BTreeMap` to store data entirely in memory,
-/// requiring no external server (sqld, Turso, etc.). It supports all
-/// standard forte-db operations including optimistic transactions (`trx`).
-///
-/// ```ignore
-/// let db = forte_db::memory();
-/// db.put("pk", "sk", b"data").await?;
-/// ```
 pub fn memory() -> Database {
     Database {
         inner: DatabaseInner::Memory(MemoryDatabase::new()),
@@ -398,26 +389,6 @@ impl Transaction {
     }
 }
 
-pub fn default_db() -> Database {
-    #[cfg(feature = "dev-test")]
-    {
-        memory()
-    }
-    #[cfg(not(feature = "dev-test"))]
-    {
-        turso()
-    }
-}
-
-pub async fn trx<F, Fut, Out, Cancel, E>(f: F) -> TrxResult<Out, Cancel, E>
-where
-    F: FnMut(Trx) -> Fut,
-    Fut: Future<Output = Result<TrxControl<Out, Cancel>, E>>,
-    E: From<anyhow::Error>,
-{
-    default_db().trx(f).await
-}
-
 pub enum DbOp {
     Get {
         pk: String,
@@ -462,10 +433,6 @@ pub trait DbRequest: Sized {
         let results = db.execute_ops(prepared.ops).await?;
         let mut iter = results.into_iter();
         (prepared.parse)(&mut iter)
-    }
-
-    async fn send(self) -> Result<Self::Output> {
-        self.send_with(&default_db()).await
     }
 }
 

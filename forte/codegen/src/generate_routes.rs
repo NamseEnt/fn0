@@ -1568,15 +1568,15 @@ fn generate_enqueue_module(queue_tasks: &[QueueTaskInfo]) -> TokenStream {
                     let payload = forte_sdk::serde_json::to_string(&input)?;
                     let id = forte_sdk::Uuid::now_v7().to_string();
                     let now = forte_sdk::now().to_rfc3339();
-                    forte_db::turso()
+                    doc_db::turso()
                         .execute_raw(
                             "INSERT INTO __forte_queue (id, task_name, payload, status, retry_count, max_retries, created_at, updated_at) VALUES (?, ?, ?, 'pending', 0, 3, ?, ?)",
                             vec![
-                                forte_db::text_value(&id),
-                                forte_db::text_value(#task_name_str),
-                                forte_db::text_value(&payload),
-                                forte_db::text_value(&now),
-                                forte_db::text_value(&now),
+                                doc_db::text_value(&id),
+                                doc_db::text_value(#task_name_str),
+                                doc_db::text_value(&payload),
+                                doc_db::text_value(&now),
+                                doc_db::text_value(&now),
                             ],
                             false,
                         )

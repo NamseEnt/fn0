@@ -1,7 +1,7 @@
-use forte_db::{BatchOp, DbOp, DbRequest, DbResult, Prepared};
+use doc_db::{BatchOp, DbOp, DbRequest, DbResult, Prepared};
 
-fn create_test_db() -> forte_db::Database {
-    forte_db::memory()
+fn create_test_db() -> doc_db::Database {
+    doc_db::memory()
 }
 
 // ============================================================

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["fn0/*", "forte/*"]
+members = ["fn0/*", "forte/*", "doc-db"]
 exclude = ["vendor/*", "forte/rs-to-ts"]
 
 [workspace.package]
@@ -13,7 +13,7 @@ fn0 = { path = "fn0/fn0", version = "=0.2.24" }
 fn0-deploy = { path = "fn0/deploy", version = "=0.1.4" }
 fn0-wasmtime = { path = "fn0/wasmtime", version = "=0.1.3" }
 ski = { package = "fn0-ski", path = "fn0/ski", version = "=0.1.4" }
-forte-db = { path = "forte/db", version = "=0.3.0" }
+doc-db = { path = "doc-db", version = "=0.4.0" }
 forte-json = { path = "forte/json", version = "=0.1.1" }
 forte-macros = { path = "forte/macros", version = "=0.5.1" }
 forte-sdk = { path = "forte/sdk", version = "=0.3.2" }

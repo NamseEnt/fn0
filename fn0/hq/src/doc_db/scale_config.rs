@@ -1,7 +1,7 @@
 use crate::doc_db::DocDb;
 use crate::docs::{ScaleConfigDoc, ScaleConfigDocGet};
 use color_eyre::eyre::{Result, eyre};
-use forte_db::TrxResult;
+use doc_db::TrxResult;
 
 impl DocDb {
     pub async fn get_scale_config(&self, site_name: &str) -> Result<Option<ScaleConfigDoc>> {

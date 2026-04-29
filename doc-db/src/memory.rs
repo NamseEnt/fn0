@@ -421,7 +421,7 @@ fn empty_result() -> StmtResult {
 }
 
 /// Executes a SQL statement against the in-memory store by matching known
-/// query patterns used internally by forte-db.
+/// query patterns used internally by doc-db.
 ///
 /// Supported patterns:
 /// - Schema DDL (CREATE TABLE, ALTER TABLE) → no-op
@@ -649,7 +649,7 @@ fn execute_sql_on_store(store: &mut Store, sql: &str, args: Vec<Value>) -> Resul
 
     bail!(
         "Unsupported SQL in memory backend: {}. \
-         The in-memory backend supports the standard forte-db operations. \
+         The in-memory backend supports the standard doc-db operations. \
          Use a real database for arbitrary SQL.",
         sql
     )
