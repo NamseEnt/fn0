@@ -108,7 +108,7 @@ impl Site {
                 for s in running.into_iter().take(count) {
                     match self
                         .doc_db
-                        .set_host_graceful(&s.host_id, GracefulPurpose::Terminate, &now)
+                        .set_host_graceful(&s.site_name, &s.host_id, GracefulPurpose::Terminate, &now)
                         .await
                     {
                         Ok(true) => {

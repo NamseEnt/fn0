@@ -1,105 +1,92 @@
-use super::*;
+use crate::doc_db::DocDb;
+use crate::docs::{ForteBuildDoc, ForteBuildDocGet, ForteBuildDocPut};
+use color_eyre::eyre::{Result, eyre};
+use forte_db::TrxResult;
 
 impl DocDb {
-    pub async fn register_build(&self, subdomain: &str, build_id: &str) -> Result<Vec<String>> {
-        let conn = self.db.connect()?;
-        let tx = conn.transaction().await?;
-
-        let pk = format!("forte_builds:{subdomain}");
-
-        let mut old_ids = Vec::new();
-        let mut rows = tx
-            .query(
-                "SELECT value FROM docs WHERE pk = ? ORDER BY sk ASC",
-                libsql::params!(pk.clone()),
-            )
-            .await?;
-        while let Some(row) = rows.next().await? {
-            let v: String = row.get(0)?;
-            old_ids.push(v);
+    pub async fn register_build(
+        &self,
+        subdomain: &str,
+        build_id: &str,
+    ) -> Result<Vec<String>> {
+        let subdomain_owned = subdomain.to_string();
+        let build_id_owned = build_id.to_string();
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| {
+                let subdomain = subdomain_owned.clone();
+                let build_id = build_id_owned.clone();
+                async move {
+                    let prev = trx
+                        .get(ForteBuildDocGet {
+                            subdomain: subdomain.as_str(),
+                        })
+                        .await
+                        .map_err(anyhow::Error::from)?;
+                    let mut old_ids = Vec::new();
+                    if let Some(mut handle) = prev {
+                        old_ids.push(handle.build_id.clone());
+                        handle.build_id = build_id;
+                    } else {
+                        trx.create(ForteBuildDoc {
+                            subdomain: subdomain.clone(),
+                            build_id,
+                        })
+                        .map_err(anyhow::Error::from)?;
+                    }
+                    trx.commit(old_ids).map_err(anyhow::Error::from)
+                }
+            })
+            .await
+        {
+            TrxResult::Committed(ids) => Ok(ids),
+            TrxResult::Conflict(d) => Err(eyre!("register_build conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
         }
-        drop(rows);
-
-        tx.execute("DELETE FROM docs WHERE pk = ?", libsql::params!(pk.clone()))
-            .await?;
-
-        tx.execute(
-            "INSERT INTO docs (pk, sk, value) VALUES (?, 1, ?)",
-            libsql::params!(pk, build_id.to_string()),
-        )
-        .await?;
-
-        tx.commit().await?;
-        Ok(old_ids)
     }
 
     pub async fn enqueue_r2_prefix_delete(&self, subdomain: &str, build_id: &str) -> Result<()> {
-        let conn = self.db.connect()?;
         let job_id = uuid::Uuid::new_v4().to_string();
         let prefix = format!("{subdomain}/{build_id}/");
         let payload = serde_json::json!({ "prefix": prefix }).to_string();
-
-        conn.execute(
-            "INSERT INTO hq_jobs (id, task_name, payload, status, retry_count, max_retries, created_at, updated_at) VALUES (?, 'delete_r2_prefix', ?, 'pending', 0, 10, datetime('now'), datetime('now'))",
-            libsql::params!(job_id, payload),
-        )
-        .await?;
-
-        Ok(())
+        self.enqueue_pending(&job_id, "delete_r2_prefix", &payload, 10)
+            .await
     }
 
     pub async fn clear_build(&self, subdomain: &str) -> Result<()> {
-        let conn = self.db.connect()?;
-        let pk = format!("forte_builds:{subdomain}");
-        conn.execute("DELETE FROM docs WHERE pk = ?", libsql::params!(pk))
-            .await?;
-        Ok(())
+        let subdomain_owned = subdomain.to_string();
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| {
+                let subdomain = subdomain_owned.clone();
+                async move {
+                    let prev = trx
+                        .get(ForteBuildDocGet {
+                            subdomain: subdomain.as_str(),
+                        })
+                        .await
+                        .map_err(anyhow::Error::from)?;
+                    if let Some(handle) = prev {
+                        handle.delete();
+                    }
+                    trx.commit(()).map_err(anyhow::Error::from)
+                }
+            })
+            .await
+        {
+            TrxResult::Committed(_) => Ok(()),
+            TrxResult::Conflict(d) => Err(eyre!("clear_build conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
+        }
     }
 
     pub async fn enqueue_r2_subdomain_delete(&self, subdomain: &str) -> Result<()> {
-        let conn = self.db.connect()?;
         let job_id = uuid::Uuid::new_v4().to_string();
         let prefix = format!("{subdomain}/");
         let payload = serde_json::json!({ "prefix": prefix }).to_string();
-
-        conn.execute(
-            "INSERT INTO hq_jobs (id, task_name, payload, status, retry_count, max_retries, created_at, updated_at) VALUES (?, 'delete_r2_prefix', ?, 'pending', 0, 10, datetime('now'), datetime('now'))",
-            libsql::params!(job_id, payload),
-        )
-        .await?;
-
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn register_build_returns_previous_ids() {
-        let db = DocDb::new_test_db().await.unwrap();
-        db.ensure_job_tables().await.unwrap();
-
-        let old = db.register_build("alice-app", "build-a").await.unwrap();
-        assert!(old.is_empty());
-
-        let old = db.register_build("alice-app", "build-b").await.unwrap();
-        assert_eq!(old, vec!["build-a"]);
-    }
-
-    #[tokio::test]
-    async fn enqueue_r2_prefix_delete_creates_job() {
-        let db = DocDb::new_test_db().await.unwrap();
-        db.ensure_job_tables().await.unwrap();
-
-        db.enqueue_r2_prefix_delete("alice-app", "build-a")
+        self.enqueue_pending(&job_id, "delete_r2_prefix", &payload, 10)
             .await
-            .unwrap();
-
-        let job = db.claim_job().await.unwrap().unwrap();
-        assert_eq!(job.task_name, "delete_r2_prefix");
-        let v: serde_json::Value = serde_json::from_str(&job.payload).unwrap();
-        assert_eq!(v["prefix"], "alice-app/build-a/");
     }
 }

@@ -1,17 +1,17 @@
-use libsql::Row;
-use serde::{Deserialize, Serialize};
+use crate::doc_db::DocDb;
+use crate::docs::{
+    CwasmReadyDoc, CwasmReadyDocGet, CwasmReadyDocPut, DbRequest, WorkerLastStableDoc,
+    WorkerLastStableDocGet, WorkerLastStableDocPut, WorkerTargetDoc, WorkerTargetDocGet,
+};
+use color_eyre::eyre::{Result, eyre};
+use forte_db::TrxResult;
 
-use super::*;
+pub use crate::docs::{
+    CwasmReadyDoc as CwasmReady, WorkerLastStableDoc as WorkerLastStable,
+    WorkerTargetDoc as WorkerTarget,
+};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WorkerTarget {
-    pub image_registry: String,
-    pub image_repository: String,
-    pub image_tag: String,
-    pub fn0_wasmtime_version: String,
-}
-
-impl WorkerTarget {
+impl WorkerTargetDoc {
     pub fn image_ref(&self) -> String {
         format!(
             "{}/{}:{}",
@@ -20,32 +20,7 @@ impl WorkerTarget {
     }
 }
 
-fn pk(site_name: &str) -> String {
-    format!("worker-target:{site_name}")
-}
-
-fn ready_pk(site_name: &str) -> String {
-    format!("cwasm-ready:{site_name}")
-}
-
-fn last_stable_pk(site_name: &str) -> String {
-    format!("worker-last-stable:{site_name}")
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CwasmReady {
-    pub fn0_wasmtime_version: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WorkerLastStable {
-    pub image_registry: String,
-    pub image_repository: String,
-    pub image_tag: String,
-    pub fn0_wasmtime_version: String,
-}
-
-impl WorkerLastStable {
+impl WorkerLastStableDoc {
     pub fn image_ref(&self) -> String {
         format!(
             "{}/{}:{}",
@@ -55,79 +30,84 @@ impl WorkerLastStable {
 }
 
 impl DocDb {
-    pub async fn get_worker_target(&self, site_name: &str) -> Result<Option<WorkerTarget>> {
-        let conn = self.db.connect()?;
-        let mut rows = conn
-            .query(
-                "SELECT value FROM docs WHERE pk = ? AND sk = 0",
-                libsql::params![pk(site_name)],
-            )
-            .await?;
-        Ok(rows.next().await?.map(|row| row.into()))
+    pub async fn get_worker_target(&self, site_name: &str) -> Result<Option<WorkerTargetDoc>> {
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| async move {
+                let doc = trx
+                    .get(WorkerTargetDocGet { site_name })
+                    .await
+                    .map_err(anyhow::Error::from)?
+                    .map(|h| (*h).clone());
+                trx.commit(doc).map_err(anyhow::Error::from)
+            })
+            .await
+        {
+            TrxResult::Committed(doc) => Ok(doc),
+            TrxResult::Conflict(d) => return Err(eyre!("get_worker_target conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
+        }
     }
 
-    pub async fn get_cwasm_ready(&self, site_name: &str) -> Result<Option<CwasmReady>> {
-        let conn = self.db.connect()?;
-        let mut rows = conn
-            .query(
-                "SELECT value FROM docs WHERE pk = ? AND sk = 0",
-                libsql::params![ready_pk(site_name)],
-            )
-            .await?;
-        Ok(rows.next().await?.map(|row| {
-            let json: String = row.get(0).unwrap();
-            serde_json::from_str(&json).unwrap()
-        }))
+    pub async fn get_cwasm_ready(&self, site_name: &str) -> Result<Option<CwasmReadyDoc>> {
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| async move {
+                let doc = trx
+                    .get(CwasmReadyDocGet { site_name })
+                    .await
+                    .map_err(anyhow::Error::from)?
+                    .map(|h| (*h).clone());
+                trx.commit(doc).map_err(anyhow::Error::from)
+            })
+            .await
+        {
+            TrxResult::Committed(doc) => Ok(doc),
+            TrxResult::Conflict(d) => return Err(eyre!("get_cwasm_ready conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
+        }
     }
 
-    pub async fn set_cwasm_ready(&self, site_name: &str, ready: &CwasmReady) -> Result<()> {
-        let conn = self.db.connect()?;
-        conn.execute(
-            "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
-            libsql::params![ready_pk(site_name), serde_json::to_string(ready).unwrap()],
-        )
-        .await?;
+    pub async fn set_cwasm_ready(&self, ready: CwasmReadyDoc) -> Result<()> {
+        let prepared = CwasmReadyDocPut(ready).prepare();
+        self.forte
+            .execute_ops(prepared.ops)
+            .await
+            .map_err(|e| eyre!("{}", e))?;
         Ok(())
     }
 
     pub async fn get_worker_last_stable(
         &self,
         site_name: &str,
-    ) -> Result<Option<WorkerLastStable>> {
-        let conn = self.db.connect()?;
-        let mut rows = conn
-            .query(
-                "SELECT value FROM docs WHERE pk = ? AND sk = 0",
-                libsql::params![last_stable_pk(site_name)],
-            )
-            .await?;
-        Ok(rows.next().await?.map(|row| {
-            let json: String = row.get(0).unwrap();
-            serde_json::from_str(&json).unwrap()
-        }))
+    ) -> Result<Option<WorkerLastStableDoc>> {
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| async move {
+                let doc = trx
+                    .get(WorkerLastStableDocGet { site_name })
+                    .await
+                    .map_err(anyhow::Error::from)?
+                    .map(|h| (*h).clone());
+                trx.commit(doc).map_err(anyhow::Error::from)
+            })
+            .await
+        {
+            TrxResult::Committed(doc) => Ok(doc),
+            TrxResult::Conflict(d) => return Err(eyre!("get_worker_last_stable conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
+        }
     }
 
-    pub async fn set_worker_last_stable(
-        &self,
-        site_name: &str,
-        last_stable: &WorkerLastStable,
-    ) -> Result<()> {
-        let conn = self.db.connect()?;
-        conn.execute(
-            "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)",
-            libsql::params![
-                last_stable_pk(site_name),
-                serde_json::to_string(last_stable).unwrap()
-            ],
-        )
-        .await?;
+    pub async fn set_worker_last_stable(&self, last_stable: WorkerLastStableDoc) -> Result<()> {
+        let prepared = WorkerLastStableDocPut(last_stable).prepare();
+        self.forte
+            .execute_ops(prepared.ops)
+            .await
+            .map_err(|e| eyre!("{}", e))?;
         Ok(())
-    }
-}
-
-impl From<Row> for WorkerTarget {
-    fn from(row: Row) -> Self {
-        let json: String = row.get(0).unwrap();
-        serde_json::from_str(&json).unwrap()
     }
 }

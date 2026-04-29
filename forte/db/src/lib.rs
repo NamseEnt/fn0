@@ -445,7 +445,7 @@ pub enum DbResult {
     Done,
 }
 
-pub type DbResultParser<O> = Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<O>>;
+pub type DbResultParser<O> = Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<O> + Send>;
 
 pub struct Prepared<O> {
     pub ops: Vec<DbOp>,

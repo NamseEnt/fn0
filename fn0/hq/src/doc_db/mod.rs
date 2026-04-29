@@ -10,36 +10,24 @@ mod worker_target;
 pub use deploy_job::*;
 pub use deployment::*;
 pub use host_status::*;
-use libsql::{Builder, Database, Result};
-use std::sync::Arc;
+use color_eyre::eyre::Result;
 pub use worker_target::*;
 
 #[derive(Clone)]
 pub struct DocDb {
-    db: Arc<Database>,
+    pub forte: forte_db::Database,
 }
 
 impl DocDb {
     pub async fn new(url: String, token: String) -> Result<Self> {
-        let db = Builder::new_remote(url, token).build().await?;
-        Ok(Self { db: Arc::new(db) })
+        let forte = forte_db::turso_with_config(url, token);
+        Ok(Self { forte })
     }
 
     #[cfg(test)]
     pub async fn new_test_db() -> Result<Self> {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        static COUNTER: AtomicU64 = AtomicU64::new(0);
-        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("docdb_test_{}_{}.db", std::process::id(), id));
-        let _ = std::fs::remove_file(&path);
-        let db = Builder::new_local(path.to_str().unwrap()).build().await?;
-        let conn = db.connect()?;
-        conn.execute(
-            "CREATE TABLE docs (pk TEXT NOT NULL, sk INTEGER NOT NULL, value BLOB NOT NULL, PRIMARY KEY (pk, sk))",
-            libsql::params!(),
-        )
-        .await?;
-        Ok(Self { db: Arc::new(db) })
+        Ok(Self {
+            forte: forte_db::memory(),
+        })
     }
 }

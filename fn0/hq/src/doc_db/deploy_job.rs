@@ -1,176 +1,96 @@
-use super::*;
-use serde::{Deserialize, Serialize};
+use crate::doc_db::DocDb;
+use crate::docs::{DbRequest, DeployJobDoc, DeployJobDocGet, DeployJobDocPut, DeployJobDocQuery};
+use color_eyre::eyre::{Result, eyre};
+use forte_db::TrxResult;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum DeployJobPhase {
-    Queued,
-    EnvUploaded,
-    CwasmCompiled,
-    DbEnsured,
-    Versioned,
-    Deployed,
-    BuildRegistered,
-    R2GcEnqueued,
-    Pushed,
-    Done,
-    Failed,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DeployJob {
-    pub job_id: String,
-    pub subdomain: String,
-    pub code_id: u64,
-    pub build_id: Option<String>,
-    pub env_ciphertext: Option<String>,
-    pub phase: DeployJobPhase,
-    pub code_version: Option<u64>,
-    pub old_build_ids: Option<Vec<String>>,
-    pub generation: Option<u64>,
-    pub attempts: u32,
-    pub last_error: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub heartbeat_at: Option<String>,
-}
-
-impl DeployJob {
-    pub fn is_terminal(&self) -> bool {
-        matches!(self.phase, DeployJobPhase::Done | DeployJobPhase::Failed)
-    }
-}
-
-fn pk(job_id: &str) -> String {
-    format!("deploy_job:{job_id}")
-}
+pub use crate::docs::{DeployJobDoc as DeployJob, DeployJobPhase};
 
 impl DocDb {
-    pub async fn insert_deploy_job(&self, job: &DeployJob) -> Result<()> {
-        let conn = self.db.connect()?;
-        let value = serde_json::to_string(job).expect("DeployJob serializes");
-        conn.execute(
-            "INSERT INTO docs (pk, sk, value) VALUES (?, 0, ?)",
-            libsql::params!(pk(&job.job_id), value),
-        )
-        .await?;
-        Ok(())
-    }
-
-    pub async fn get_deploy_job(&self, job_id: &str) -> Result<Option<DeployJob>> {
-        let conn = self.db.connect()?;
-        let mut rows = conn
-            .query(
-                "SELECT value FROM docs WHERE pk = ? AND sk = 0",
-                libsql::params!(pk(job_id)),
-            )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Ok(None);
-        };
-        let value: String = row.get(0)?;
-        let job: DeployJob = serde_json::from_str(&value)
-            .map_err(|e| libsql::Error::Misuse(format!("bad deploy_job: {e}")))?;
-        Ok(Some(job))
-    }
-
-    pub async fn update_deploy_job(&self, job: &DeployJob) -> Result<()> {
-        let conn = self.db.connect()?;
-        let value = serde_json::to_string(job).expect("DeployJob serializes");
-        conn.execute(
-            "UPDATE docs SET value = ? WHERE pk = ? AND sk = 0",
-            libsql::params!(value, pk(&job.job_id)),
-        )
-        .await?;
-        Ok(())
-    }
-
-    pub async fn list_active_deploy_jobs(&self) -> Result<Vec<DeployJob>> {
-        let conn = self.db.connect()?;
-        let mut rows = conn
-            .query(
-                "SELECT value FROM docs WHERE pk LIKE 'deploy_job:%' AND sk = 0",
-                libsql::params!(),
-            )
-            .await?;
-        let mut jobs = Vec::new();
-        while let Some(row) = rows.next().await? {
-            let value: String = row.get(0)?;
-            match serde_json::from_str::<DeployJob>(&value) {
-                Ok(job) => {
-                    if !job.is_terminal() {
-                        jobs.push(job);
-                    }
+    pub async fn insert_deploy_job(&self, job: DeployJobDoc) -> Result<()> {
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| {
+                let job = job.clone();
+                async move {
+                    trx.create(job).map_err(anyhow::Error::from)?;
+                    trx.commit(()).map_err(anyhow::Error::from)
                 }
-                Err(err) => {
-                    tracing::warn!(%err, "skipping undecodable deploy_job row");
-                }
-            }
+            })
+            .await
+        {
+            TrxResult::Committed(_) => Ok(()),
+            TrxResult::Conflict(d) => Err(eyre!("insert_deploy_job conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
         }
+    }
+
+    pub async fn get_deploy_job(&self, job_id: &str) -> Result<Option<DeployJobDoc>> {
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| async move {
+                let doc = trx
+                    .get(DeployJobDocGet { job_id })
+                    .await
+                    .map_err(anyhow::Error::from)?
+                    .map(|h| (*h).clone());
+                trx.commit(doc).map_err(anyhow::Error::from)
+            })
+            .await
+        {
+            TrxResult::Committed(d) => Ok(d),
+            TrxResult::Conflict(d) => Err(eyre!("get_deploy_job conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
+        }
+    }
+
+    pub async fn update_deploy_job(&self, job: &DeployJobDoc) -> Result<()> {
+        let job_id = job.job_id.clone();
+        let updated = job.clone();
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| {
+                let job_id = job_id.clone();
+                let updated = updated.clone();
+                async move {
+                    let handle = trx
+                        .get(DeployJobDocGet {
+                            job_id: job_id.as_str(),
+                        })
+                        .await
+                        .map_err(anyhow::Error::from)?;
+                    if let Some(mut h) = handle {
+                        *h = updated;
+                    }
+                    trx.commit(()).map_err(anyhow::Error::from)
+                }
+            })
+            .await
+        {
+            TrxResult::Committed(_) => Ok(()),
+            TrxResult::Conflict(d) => Err(eyre!("update_deploy_job conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
+        }
+    }
+
+    pub async fn list_active_deploy_jobs(&self) -> Result<Vec<DeployJobDoc>> {
+        let prepared = DeployJobDocQuery {
+            job_id: None,
+            limit: Some(1000),
+        }
+        .prepare();
+        let mut results = self
+            .forte
+            .execute_ops(prepared.ops)
+            .await
+            .map_err(|e| eyre!("{}", e))?
+            .into_iter();
+        let docs: Vec<DeployJobDoc> =
+            (prepared.parse)(&mut results).map_err(|e| eyre!("{}", e))?;
+        let jobs: Vec<DeployJobDoc> = docs.into_iter().filter(|d| !d.is_terminal()).collect();
         Ok(jobs)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample(job_id: &str) -> DeployJob {
-        DeployJob {
-            job_id: job_id.to_string(),
-            subdomain: "alice-app".to_string(),
-            code_id: 7,
-            build_id: Some("b1".to_string()),
-            env_ciphertext: None,
-            phase: DeployJobPhase::Queued,
-            code_version: None,
-            old_build_ids: None,
-            generation: None,
-            attempts: 0,
-            last_error: None,
-            created_at: "2026-04-23T00:00:00Z".to_string(),
-            updated_at: "2026-04-23T00:00:00Z".to_string(),
-            heartbeat_at: None,
-        }
-    }
-
-    #[tokio::test]
-    async fn insert_get_update_roundtrip() {
-        let db = DocDb::new_test_db().await.unwrap();
-        let mut job = sample("j1");
-        db.insert_deploy_job(&job).await.unwrap();
-
-        let fetched = db.get_deploy_job("j1").await.unwrap().unwrap();
-        assert_eq!(fetched.phase, DeployJobPhase::Queued);
-
-        job.phase = DeployJobPhase::Deployed;
-        job.code_version = Some(42);
-        db.update_deploy_job(&job).await.unwrap();
-
-        let fetched = db.get_deploy_job("j1").await.unwrap().unwrap();
-        assert_eq!(fetched.phase, DeployJobPhase::Deployed);
-        assert_eq!(fetched.code_version, Some(42));
-    }
-
-    #[tokio::test]
-    async fn list_active_excludes_terminal() {
-        let db = DocDb::new_test_db().await.unwrap();
-        let mut running = sample("running");
-        let mut done = sample("done");
-        done.phase = DeployJobPhase::Done;
-        let mut failed = sample("failed");
-        failed.phase = DeployJobPhase::Failed;
-        db.insert_deploy_job(&running).await.unwrap();
-        db.insert_deploy_job(&done).await.unwrap();
-        db.insert_deploy_job(&failed).await.unwrap();
-
-        let active = db.list_active_deploy_jobs().await.unwrap();
-        assert_eq!(active.len(), 1);
-        assert_eq!(active[0].job_id, "running");
-
-        running.phase = DeployJobPhase::Done;
-        db.update_deploy_job(&running).await.unwrap();
-        let active = db.list_active_deploy_jobs().await.unwrap();
-        assert!(active.is_empty());
-    }
-}

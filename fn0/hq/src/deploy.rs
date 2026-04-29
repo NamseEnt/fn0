@@ -398,7 +398,7 @@ pub async fn handle_deploy_finish(
         heartbeat_at: None,
     };
 
-    if let Err(e) = ctx.doc_db.insert_deploy_job(&job).await {
+    if let Err(e) = ctx.doc_db.insert_deploy_job(job.clone()).await {
         return json_response(
             500,
             &ErrorResponse {

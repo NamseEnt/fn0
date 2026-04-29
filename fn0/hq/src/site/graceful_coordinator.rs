@@ -53,6 +53,7 @@ impl Site {
                     &self.host_provider,
                     &self.doc_db,
                     &self.ssh_pool,
+                    &s.site_name,
                     &s.host_id,
                     &s.addr,
                 )
@@ -74,7 +75,7 @@ impl Site {
                 warn!(%host_id, "swap_image: no worker-target; clearing graceful");
                 let _ = self
                     .doc_db
-                    .clear_host_graceful(host_id)
+                    .clear_host_graceful(&self.name, host_id)
                     .await
                     .inspect_err(|err| warn!(%err, %host_id, "clear_graceful failed"));
                 return;
@@ -96,7 +97,7 @@ impl Site {
         {
             Ok((0, _)) => {
                 info!(%host_id, new_image = %image, "image swap complete");
-                if let Err(err) = self.doc_db.clear_host_graceful(host_id).await {
+                if let Err(err) = self.doc_db.clear_host_graceful(&self.name, host_id).await {
                     warn!(%err, %host_id, "clear_graceful failed after swap");
                 }
             }

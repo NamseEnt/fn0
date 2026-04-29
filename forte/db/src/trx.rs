@@ -4,12 +4,33 @@ use serde::{Serialize, de::DeserializeOwned};
 use tracing::Instrument;
 use std::{
     any::type_name,
-    cell::{Cell, RefCell, UnsafeCell},
+    cell::UnsafeCell,
     collections::HashMap,
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    rc::{Rc, Weak},
+    sync::{
+        Arc, Mutex, Weak,
+        atomic::{AtomicBool, Ordering},
+    },
 };
+
+/// Wrapper around UnsafeCell that asserts Send/Sync when T: Send.
+/// DocHandle holds the only outstanding reference within a trx, so concurrent
+/// access cannot occur in practice; the trx future itself is the unit of work.
+#[repr(transparent)]
+pub(crate) struct SyncUnsafeCell<T>(UnsafeCell<T>);
+
+unsafe impl<T: Send> Send for SyncUnsafeCell<T> {}
+unsafe impl<T: Send> Sync for SyncUnsafeCell<T> {}
+
+impl<T> SyncUnsafeCell<T> {
+    fn new(value: T) -> Self {
+        Self(UnsafeCell::new(value))
+    }
+    fn get(&self) -> *mut T {
+        self.0.get()
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DocKey {
@@ -26,7 +47,7 @@ impl DocKey {
     }
 }
 
-pub trait Document: Serialize + DeserializeOwned + 'static {
+pub trait Document: Serialize + DeserializeOwned + Send + Sync + 'static {
     fn key(&self) -> DocKey;
 }
 
@@ -66,7 +87,7 @@ where
             .ok_or_else(|| anyhow!("trx batch result missing for read"))?;
         let key = self.key();
         tx.inner
-            .borrow_mut()
+            .lock().unwrap()
             .register_loaded::<R::Doc>(key, stored)
     }
 }
@@ -108,16 +129,16 @@ impl_trx_read_tuple!(A, B, C, D, E, F, G, H, I, J, K);
 impl_trx_read_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
 
 pub struct DocHandle<T> {
-    data: Rc<UnsafeCell<T>>,
-    dirty: Rc<Cell<bool>>,
-    deleted: Rc<Cell<bool>>,
-    _alive: Rc<()>,
-    _marker: PhantomData<Rc<T>>,
+    data: Arc<SyncUnsafeCell<T>>,
+    dirty: Arc<AtomicBool>,
+    deleted: Arc<AtomicBool>,
+    _alive: Arc<()>,
+    _marker: PhantomData<Arc<T>>,
 }
 
 impl<T> DocHandle<T> {
     pub fn delete(&self) {
-        self.deleted.set(true);
+        self.deleted.store(true, Ordering::Release);
     }
 }
 
@@ -125,21 +146,19 @@ impl<T> Deref for DocHandle<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        // A handle is unique per key within a trx and is not cloneable.
         unsafe { &*self.data.get() }
     }
 }
 
 impl<T> DerefMut for DocHandle<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.dirty.set(true);
-        // Dirty tracking happens at first mutable access; the doc lives until trx end.
+        self.dirty.store(true, Ordering::Release);
         unsafe { &mut *self.data.get() }
     }
 }
 
 pub struct Trx {
-    inner: Rc<RefCell<TrxState>>,
+    inner: Arc<Mutex<TrxState>>,
 }
 
 impl Trx {
@@ -152,7 +171,7 @@ impl Trx {
         request.collect_keys(&mut keys);
 
         {
-            let state = self.inner.borrow();
+            let state = self.inner.lock().unwrap();
             for key in &keys {
                 if state.index.contains_key(key) {
                     bail!("duplicate trx key access: {}/{}", key.pk, key.sk);
@@ -174,7 +193,7 @@ impl Trx {
     where
         T: Document,
     {
-        self.inner.borrow_mut().create(doc)
+        self.inner.lock().unwrap().create(doc)
     }
 
     pub fn commit<Out, Cancel>(self, out: Out) -> Result<TrxControl<Out, Cancel>> {
@@ -196,11 +215,11 @@ impl Trx {
         if keys.is_empty() {
             return Ok(vec![]);
         }
-        let mut tx_opt = self.inner.borrow_mut().tx.take();
+        let mut tx_opt = self.inner.lock().unwrap().tx.take();
         let result = match &mut tx_opt {
             Some(tx) => tx.batch_get_with_version(keys).await,
             None => {
-                let db = self.inner.borrow().db.clone();
+                let db = self.inner.lock().unwrap().db.clone();
                 match db.begin_immediate_with_reads(keys).await {
                     Ok((tx, docs)) => {
                         tx_opt = Some(tx);
@@ -210,7 +229,7 @@ impl Trx {
                 }
             }
         };
-        self.inner.borrow_mut().tx = tx_opt;
+        self.inner.lock().unwrap().tx = tx_opt;
         result
     }
 }
@@ -291,7 +310,7 @@ where
     Fut: std::future::Future<Output = Result<TrxControl<Out, Cancel>, E>>,
     E: From<anyhow::Error>,
 {
-    let state = Rc::new(RefCell::new(TrxState::new(db.clone())));
+    let state = Arc::new(Mutex::new(TrxState::new(db.clone())));
     let tx = Trx {
         inner: state.clone(),
     };
@@ -322,7 +341,7 @@ where
             }
         }
         TrxControlInner::Cancel(reason) => {
-            let tx_to_rollback = state.borrow_mut().tx.take();
+            let tx_to_rollback = state.lock().unwrap().tx.take();
             if let Some(mut tx) = tx_to_rollback {
                 let _ = tx.rollback().await;
             }
@@ -479,7 +498,7 @@ impl TrackedEntry {
         match &self.state {
             TrackedState::Missing => Ok(PendingWrite::None),
             TrackedState::Managed { shared, created } => {
-                if shared.deleted.get() {
+                if shared.deleted.load(Ordering::Acquire) {
                     if *created {
                         return Ok(PendingWrite::None);
                     }
@@ -493,7 +512,7 @@ impl TrackedEntry {
                     return Ok(PendingWrite::Insert((shared.serialize)()?));
                 }
 
-                if shared.dirty.get() {
+                if shared.dirty.load(Ordering::Acquire) {
                     let expected_version = self.expected_version.ok_or_else(|| {
                         anyhow!("existing tracked doc missing expected version for update")
                     })?;
@@ -515,26 +534,26 @@ enum TrackedState {
 }
 
 struct SharedDoc {
-    dirty: Rc<Cell<bool>>,
-    deleted: Rc<Cell<bool>>,
+    dirty: Arc<AtomicBool>,
+    deleted: Arc<AtomicBool>,
     handle_alive: Weak<()>,
-    serialize: Box<dyn Fn() -> Result<Vec<u8>>>,
+    serialize: Box<dyn Fn() -> Result<Vec<u8>> + Send + Sync>,
 }
 
 fn new_shared_doc<T>(doc: T) -> (SharedDoc, DocHandle<T>)
 where
-    T: Document,
+    T: Document + Send + Sync,
 {
-    let data = Rc::new(UnsafeCell::new(doc));
-    let dirty = Rc::new(Cell::new(false));
-    let deleted = Rc::new(Cell::new(false));
-    let alive = Rc::new(());
+    let data = Arc::new(SyncUnsafeCell::new(doc));
+    let dirty = Arc::new(AtomicBool::new(false));
+    let deleted = Arc::new(AtomicBool::new(false));
+    let alive = Arc::new(());
 
     let serialize_data = data.clone();
     let shared = SharedDoc {
         dirty: dirty.clone(),
         deleted: deleted.clone(),
-        handle_alive: Rc::downgrade(&alive),
+        handle_alive: Arc::downgrade(&alive),
         serialize: Box::new(move || {
             let doc_ref = unsafe { &*serialize_data.get() };
             serde_json::to_vec(doc_ref).map_err(Into::into)
@@ -553,9 +572,9 @@ where
 }
 
 fn take_entries_and_tx(
-    state: Rc<RefCell<TrxState>>,
+    state: Arc<Mutex<TrxState>>,
 ) -> (Database, Option<Transaction>, Result<Vec<TrackedEntry>>) {
-    state.borrow_mut().take_entries_and_tx()
+    state.lock().unwrap().take_entries_and_tx()
 }
 
 enum PendingWrite {

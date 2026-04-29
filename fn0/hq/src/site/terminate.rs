@@ -8,6 +8,7 @@ pub async fn terminate_host(
     host_provider: &OciComputeVmHostProvider,
     doc_db: &DocDb,
     ssh_pool: &SshPool,
+    site_name: &str,
     host_id: &str,
     addr: &str,
 ) {
@@ -22,7 +23,7 @@ pub async fn terminate_host(
         }
     }
     ssh_pool.invalidate(addr);
-    if let Err(err) = doc_db.delete_host_status(host_id).await {
+    if let Err(err) = doc_db.delete_host_status(site_name, host_id).await {
         warn!(%err, %host_id, "Failed to delete host-status after terminate");
     }
 }

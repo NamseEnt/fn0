@@ -8,6 +8,7 @@ mod deployment_cache;
 mod dns;
 mod dns_sync;
 mod doc_db;
+mod docs;
 mod env_crypto;
 mod forte_r2;
 mod host_id;
