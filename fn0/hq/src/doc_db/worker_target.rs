@@ -4,7 +4,7 @@ use crate::docs::{
     WorkerLastStableDocGet, WorkerLastStableDocPut, WorkerTargetDoc, WorkerTargetDocGet,
 };
 use color_eyre::eyre::{Result, eyre};
-use forte_db::TrxResult;
+use doc_db::TrxResult;
 
 pub use crate::docs::{
     CwasmReadyDoc as CwasmReady, WorkerLastStableDoc as WorkerLastStable,

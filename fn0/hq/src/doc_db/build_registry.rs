@@ -1,7 +1,7 @@
 use crate::doc_db::DocDb;
 use crate::docs::{ForteBuildDoc, ForteBuildDocGet, ForteBuildDocPut};
 use color_eyre::eyre::{Result, eyre};
-use forte_db::TrxResult;
+use doc_db::TrxResult;
 
 impl DocDb {
     pub async fn register_build(

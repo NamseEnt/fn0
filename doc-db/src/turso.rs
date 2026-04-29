@@ -1,9 +1,9 @@
 use crate::BatchOp;
+use crate::runtime;
 use anyhow::{Result, bail};
 use bytes::Bytes;
-use forte_sdk::http::{Client, HeaderValue, Request, Uri};
 use libsql_hrana::proto::*;
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 enum RetryKind {
     Schema,
@@ -17,8 +17,7 @@ const UPSERT_DOC_SQL: &str = "INSERT INTO docs (pk, sk, data, version) VALUES (?
 
 #[derive(Clone)]
 pub(crate) struct TursoDatabase {
-    http_url: Uri,
-    client: Client,
+    http_url: String,
     auth_token: String,
 }
 
@@ -30,21 +29,9 @@ pub(crate) struct StoredDoc {
 
 impl TursoDatabase {
     pub(crate) fn new(url: String, auth_token: String) -> Self {
-        let url = Uri::from_str(&url).expect("Failed to parse URI");
-        let mut parts = url.into_parts();
-        // Convert libsql: scheme to https, preserve http for local development
-        match parts.scheme.as_ref().map(|s| s.as_str()) {
-            Some("libsql") | None => {
-                parts.scheme = Some("https".parse().unwrap());
-            }
-            _ => {} // Keep http or other schemes as-is
-        }
-        parts.path_and_query = Some("/v2/pipeline".parse().unwrap());
-        let http_url = Uri::from_parts(parts).expect("Failed to assemble URI");
-
+        let http_url = normalize_pipeline_url(&url);
         Self {
             http_url,
-            client: Client::new(),
             auth_token,
         }
     }
@@ -58,29 +45,19 @@ impl TursoDatabase {
         requests: Vec<StreamRequest>,
     ) -> Result<PipelineRespBody> {
         let body = PipelineReqBody { baton, requests };
+        let body_bytes = serde_json::to_vec(&body)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize body: {}", e))?;
 
-        let mut request_builder = Request::post(&self.http_url);
+        let auth = if self.auth_token.is_empty() {
+            None
+        } else {
+            Some(self.auth_token.as_str())
+        };
+        let response_bytes = runtime::http_post_json(&self.http_url, body_bytes, auth).await?;
 
-        if !self.auth_token.is_empty() {
-            request_builder = request_builder.header(
-                "Authorization",
-                HeaderValue::from_str(&format!("Bearer {}", self.auth_token))?,
-            );
-        }
-
-        let request = request_builder
-            .header("Content-Type", HeaderValue::from_str("application/json")?)
-            .body(
-                serde_json::to_vec(&body)
-                    .map_err(|e| anyhow::anyhow!("Failed to serialize body: {}", e))?,
-            )?;
-
-        let response = self.client.send(request).await?;
-        if !response.status().is_success() {
-            bail!("Turso request failed with status: {}", response.status());
-        }
-
-        Ok(response.into_body().json().await?)
+        let resp: PipelineRespBody = serde_json::from_slice(&response_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to parse Turso response: {}", e))?;
+        Ok(resp)
     }
 
     async fn create_table(&self) -> Result<()> {
@@ -147,15 +124,15 @@ impl TursoDatabase {
             || msg.contains("busy")
     }
 
-    async fn busy_backoff(attempt: u32) -> () {
+    async fn busy_backoff(attempt: u32) {
         const BASE_MS: u64 = 5;
         const CAP_MS: u64 = 200;
         let ceiling = BASE_MS.checked_shl(attempt).unwrap_or(CAP_MS).min(CAP_MS);
         let mut buf = [0u8; 8];
-        forte_sdk::rand::get_insecure_random_bytes(&mut buf).await;
+        runtime::random_bytes(&mut buf).await;
         let raw = u64::from_le_bytes(buf);
         let delay_ms = raw % (ceiling + 1);
-        forte_sdk::time_wasi::sleep(forte_sdk::time_wasi::Duration::from_millis(delay_ms)).await;
+        runtime::sleep(std::time::Duration::from_millis(delay_ms)).await;
     }
 
     pub(crate) async fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
@@ -1534,4 +1511,17 @@ impl TursoTransaction {
             conflict,
         })
     }
+}
+
+fn normalize_pipeline_url(url: &str) -> String {
+    let (scheme, rest) = match url.split_once("://") {
+        Some((s, r)) => (s, r),
+        None => ("https", url),
+    };
+    let scheme = match scheme {
+        "libsql" | "" => "https",
+        other => other,
+    };
+    let host = rest.split('/').next().unwrap_or(rest);
+    format!("{scheme}://{host}/v2/pipeline")
 }

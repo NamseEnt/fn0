@@ -3,7 +3,7 @@ use reqwest::StatusCode;
 
 use crate::args::ForteDbArgs;
 
-/// Ensure a Turso database exists in the forte-db group. Idempotent: a 409
+/// Ensure a Turso database exists in the doc-db group. Idempotent: a 409
 /// response from the Turso API (database already exists) is treated as success.
 pub async fn ensure_database(args: &ForteDbArgs, name: &str) -> Result<()> {
     let url = format!(

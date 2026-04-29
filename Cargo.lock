@@ -2368,6 +2368,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "doc-db"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "forte-sdk",
+ "libsql-hrana",
+ "rand 0.8.5",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "document-features"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2959,19 +2975,6 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.113",
-]
-
-[[package]]
-name = "forte-db"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "bytes",
- "forte-sdk",
- "libsql-hrana",
- "serde",
- "serde_json",
- "tracing",
 ]
 
 [[package]]
@@ -3651,8 +3654,8 @@ dependencies = [
  "chrono",
  "color-eyre",
  "dashmap",
- "forte-db",
- "forte-sdk",
+ "doc-db",
+ "forte-macros",
  "futures",
  "hex",
  "hmac 0.12.1",

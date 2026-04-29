@@ -140,9 +140,12 @@ fn generate_cargo_toml() -> String {
     let forte_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("Failed to get parent of CARGO_MANIFEST_DIR");
+    let workspace_root = forte_dir
+        .parent()
+        .expect("Failed to get workspace root from forte dir");
     let forte_json_path = forte_dir.join("json");
     let forte_sdk_path = forte_dir.join("sdk");
-    let forte_db_path = forte_dir.join("db");
+    let doc_db_path = workspace_root.join("doc-db");
     let forte_codegen_path = forte_dir.join("codegen");
 
     format!(
@@ -162,14 +165,14 @@ serde_json = "1"
 http = "1"
 forte-json = {{ path = "{forte_json}" }}
 forte-sdk = {{ path = "{forte_sdk}" }}
-forte-db = {{ path = "{forte_db}" }}
+doc-db = {{ path = "{doc_db}" }}
 
 [build-dependencies]
 forte-codegen = {{ path = "{forte_codegen}" }}
 "#,
         forte_json = forte_json_path.display(),
         forte_sdk = forte_sdk_path.display(),
-        forte_db = forte_db_path.display(),
+        doc_db = doc_db_path.display(),
         forte_codegen = forte_codegen_path.display(),
     )
 }

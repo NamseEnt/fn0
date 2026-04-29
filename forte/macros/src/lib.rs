@@ -454,27 +454,27 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #(#clean_fields,)*
         }
 
-        impl forte_db::Document for #name {
-            fn key(&self) -> forte_db::DocKey {
+        impl doc_db::Document for #name {
+            fn key(&self) -> doc_db::DocKey {
                 let pk = #doc_pk_str;
                 let sk = format!(#sk_format_string, #(#doc_sk_format_args),*);
-                forte_db::DocKey::new(pk, sk)
+                doc_db::DocKey::new(pk, sk)
             }
         }
 
         #vis struct #put_name(pub #name);
 
-        impl forte_db::DbRequest for #put_name {
+        impl doc_db::DbRequest for #put_name {
             type Output = ();
-            fn prepare(self) -> forte_db::Prepared<Self::Output> {
+            fn prepare(self) -> doc_db::Prepared<Self::Output> {
                 let pk = #put_pk_str;
                 let sk = format!(#sk_format_string, #(#put_sk_format_args),*);
                 let data = serde_json::to_vec(&self.0).expect("failed to serialize");
-                forte_db::Prepared {
-                    ops: vec![forte_db::DbOp::Put { pk, sk, data }],
+                doc_db::Prepared {
+                    ops: vec![doc_db::DbOp::Put { pk, sk, data }],
                     parse: Box::new(|iter| {
                         match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
-                            forte_db::DbResult::Done => Ok(()),
+                            doc_db::DbResult::Done => Ok(()),
                             _ => anyhow::bail!("unexpected result type"),
                         }
                     }),
@@ -487,26 +487,26 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #(#get_sk_fields,)*
         }
 
-        impl #generic_def forte_db::DocGet for #get_name #generic_use {
+        impl #generic_def doc_db::DocGet for #get_name #generic_use {
             type Doc = #name;
 
-            fn key(&self) -> forte_db::DocKey {
+            fn key(&self) -> doc_db::DocKey {
                 let pk = #pk_str;
                 let sk = format!(#sk_format_string, #(#sk_format_args),*);
-                forte_db::DocKey::new(pk, sk)
+                doc_db::DocKey::new(pk, sk)
             }
         }
 
-        impl #generic_def forte_db::DbRequest for #get_name #generic_use {
+        impl #generic_def doc_db::DbRequest for #get_name #generic_use {
             type Output = Option<#name>;
-            fn prepare(self) -> forte_db::Prepared<Self::Output> {
+            fn prepare(self) -> doc_db::Prepared<Self::Output> {
                 let pk = #pk_str;
                 let sk = format!(#sk_format_string, #(#sk_format_args),*);
-                forte_db::Prepared {
-                    ops: vec![forte_db::DbOp::Get { pk, sk }],
+                doc_db::Prepared {
+                    ops: vec![doc_db::DbOp::Get { pk, sk }],
                     parse: Box::new(|iter| {
                         match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
-                            forte_db::DbResult::Single(opt) => {
+                            doc_db::DbResult::Single(opt) => {
                                 opt.map(|data| serde_json::from_slice(&data))
                                     .transpose()
                                     .map_err(Into::into)
@@ -524,9 +524,9 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             pub limit: Option<usize>,
         }
 
-        impl #query_generic_def forte_db::DbRequest for #query_name #query_generic_use {
+        impl #query_generic_def doc_db::DbRequest for #query_name #query_generic_use {
             type Output = Vec<#name>;
-            fn prepare(self) -> forte_db::Prepared<Self::Output> {
+            fn prepare(self) -> doc_db::Prepared<Self::Output> {
                 let pk = #query_pk_str;
                 let after_sk: Option<String> = {
                     let mut parts: Vec<String> = Vec::new();
@@ -536,11 +536,11 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     if parts.is_empty() { None } else { Some(parts.join("&")) }
                 };
                 let limit = self.limit;
-                forte_db::Prepared {
-                    ops: vec![forte_db::DbOp::Query { pk, after_sk, limit }],
+                doc_db::Prepared {
+                    ops: vec![doc_db::DbOp::Query { pk, after_sk, limit }],
                     parse: Box::new(|iter| {
                         match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
-                            forte_db::DbResult::Multiple(items) => {
+                            doc_db::DbResult::Multiple(items) => {
                                 items.into_iter()
                                     .map(|(_sk, data)| serde_json::from_slice(&data))
                                     .collect::<Result<Vec<_>, _>>()
@@ -558,16 +558,16 @@ pub fn forte_doc(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #(#get_sk_fields,)*
         }
 
-        impl #generic_def forte_db::DbRequest for #delete_name #generic_use {
+        impl #generic_def doc_db::DbRequest for #delete_name #generic_use {
             type Output = ();
-            fn prepare(self) -> forte_db::Prepared<Self::Output> {
+            fn prepare(self) -> doc_db::Prepared<Self::Output> {
                 let pk = #pk_str;
                 let sk = format!(#sk_format_string, #(#sk_format_args),*);
-                forte_db::Prepared {
-                    ops: vec![forte_db::DbOp::Delete { pk, sk }],
+                doc_db::Prepared {
+                    ops: vec![doc_db::DbOp::Delete { pk, sk }],
                     parse: Box::new(|iter| {
                         match iter.next().ok_or_else(|| anyhow::anyhow!("missing result"))? {
-                            forte_db::DbResult::Done => Ok(()),
+                            doc_db::DbResult::Done => Ok(()),
                             _ => anyhow::bail!("unexpected result type"),
                         }
                     }),

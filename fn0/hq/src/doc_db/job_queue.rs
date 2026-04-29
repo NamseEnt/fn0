@@ -4,7 +4,7 @@ use crate::docs::{
     HqJobProcessingDocGet, HqJobProcessingDocQuery,
 };
 use color_eyre::eyre::{Result, eyre};
-use forte_db::TrxResult;
+use doc_db::TrxResult;
 
 #[derive(Clone)]
 pub struct HqJob {

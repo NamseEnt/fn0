@@ -1,8 +1,8 @@
-use forte_sdk::forte_doc;
+use forte_macros::forte_doc;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroUsize;
 
-pub use forte_db::DbRequest;
+pub use doc_db::DbRequest;
 
 // === Host Status ===
 

@@ -4,7 +4,7 @@ use crate::docs::{
     NextDeploymentSeqDocGet,
 };
 use color_eyre::eyre::{Result, eyre};
-use forte_db::TrxResult;
+use doc_db::TrxResult;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]

@@ -15,19 +15,19 @@ pub use worker_target::*;
 
 #[derive(Clone)]
 pub struct DocDb {
-    pub forte: forte_db::Database,
+    pub forte: doc_db::Database,
 }
 
 impl DocDb {
     pub async fn new(url: String, token: String) -> Result<Self> {
-        let forte = forte_db::turso_with_config(url, token);
+        let forte = doc_db::turso_with_config(url, token);
         Ok(Self { forte })
     }
 
     #[cfg(test)]
     pub async fn new_test_db() -> Result<Self> {
         Ok(Self {
-            forte: forte_db::memory(),
+            forte: doc_db::memory(),
         })
     }
 }

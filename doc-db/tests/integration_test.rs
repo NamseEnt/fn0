@@ -1,8 +1,8 @@
-use forte_db::{BatchOp, DbOp, DbResult, turso_with_config};
+use doc_db::{BatchOp, DbOp, DbResult, turso_with_config};
 
 const TEST_PORT: u16 = 18123;
 
-fn create_test_db() -> forte_db::Database {
+fn create_test_db() -> doc_db::Database {
     turso_with_config(format!("http://127.0.0.1:{}", TEST_PORT), String::new())
 }
 
