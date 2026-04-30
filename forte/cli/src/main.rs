@@ -51,6 +51,11 @@ async fn async_main() -> Result<()> {
             cli::deploy::run(project_dir).await?;
         }
 
+        Commands::Rename { new_name, project } => {
+            let project_dir = project.unwrap_or_else(|| ".".into());
+            cli::rename::run(project_dir, new_name).await?;
+        }
+
         Commands::Queue { command } => match command {
             QueueCommands::Flush { project, task_name } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());

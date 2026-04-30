@@ -6,6 +6,7 @@ pub mod dev;
 pub mod fe_runtime;
 pub mod init;
 pub mod queue;
+pub mod rename;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -52,6 +53,16 @@ pub enum Commands {
 
     /// Build and deploy the project to fn0 cloud
     Deploy {
+        /// Project directory (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+
+    /// Rename the deployed project (migrates Turso DB and switches subdomain)
+    Rename {
+        /// New project name
+        new_name: String,
+
         /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
