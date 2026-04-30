@@ -235,7 +235,7 @@ async fn advance_one_phase(ctx: &Arc<DeployContext>, job: &mut RenameJob) -> Res
                 .generation
                 .ok_or_else(|| eyre!("verify phase without generation"))?;
             if all_sites_have_verified_host(ctx, target_generation).await? {
-                job.phase = RenameJobPhase::OldUndeployed;
+                job.phase = RenameJobPhase::ProjectRenamed;
                 return Ok(true);
             }
             let started_ts = chrono::DateTime::parse_from_rfc3339(&job.updated_at)
@@ -247,10 +247,21 @@ async fn advance_one_phase(ctx: &Arc<DeployContext>, job: &mut RenameJob) -> Res
                     job_id = %job.job_id,
                     "rename verify timeout reached; advancing without all-sites verification"
                 );
-                job.phase = RenameJobPhase::OldUndeployed;
+                job.phase = RenameJobPhase::ProjectRenamed;
                 return Ok(true);
             }
             Ok(false)
+        }
+        RenameJobPhase::ProjectRenamed => {
+            ctx.doc_db
+                .rename_project(
+                    &job.github_username,
+                    &job.old_project_name,
+                    &job.new_project_name,
+                )
+                .await?;
+            job.phase = RenameJobPhase::OldUndeployed;
+            Ok(true)
         }
         RenameJobPhase::OldUndeployed => {
             let job_id = format!("rename-undeploy-{}", job.job_id);
