@@ -126,6 +126,9 @@ impl DeployJobDoc {
 pub struct RenameJobDoc {
     #[sk]
     pub job_id: String,
+    pub github_username: String,
+    pub old_project_name: String,
+    pub new_project_name: String,
     pub old_subdomain: String,
     pub new_subdomain: String,
     pub code_id: u64,
@@ -155,6 +158,7 @@ pub enum RenameJobPhase {
     NewBuildRegistered,
     NewDeploymentPushed,
     NewDeploymentVerified,
+    ProjectRenamed,
     OldUndeployed,
     OldEnvDeleted,
     OldDbDestroyed,
