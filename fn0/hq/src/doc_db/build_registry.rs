@@ -82,6 +82,32 @@ impl DocDb {
         }
     }
 
+    pub async fn get_forte_build(&self, subdomain: &str) -> Result<Option<String>> {
+        let subdomain_owned = subdomain.to_string();
+        match self
+            .forte
+            .trx::<_, _, _, (), anyhow::Error>(|trx| {
+                let subdomain = subdomain_owned.clone();
+                async move {
+                    let prev = trx
+                        .get(ForteBuildDocGet {
+                            subdomain: subdomain.as_str(),
+                        })
+                        .await
+                        .map_err(anyhow::Error::from)?;
+                    let build = prev.map(|h| h.build_id.clone());
+                    trx.commit(build).map_err(anyhow::Error::from)
+                }
+            })
+            .await
+        {
+            TrxResult::Committed(b) => Ok(b),
+            TrxResult::Conflict(d) => Err(eyre!("get_forte_build conflict: {:?}", d)),
+            TrxResult::Err(e) => Err(eyre!("{}", e)),
+            TrxResult::Cancelled(_) => unreachable!(),
+        }
+    }
+
     pub async fn enqueue_r2_subdomain_delete(&self, subdomain: &str) -> Result<()> {
         let job_id = uuid::Uuid::new_v4().to_string();
         let prefix = format!("{subdomain}/");

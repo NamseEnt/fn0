@@ -4,12 +4,14 @@ mod deployment;
 mod host_status;
 mod job_queue;
 mod project;
+mod rename_job;
 mod scale_config;
 mod worker_target;
 
 pub use deploy_job::*;
 pub use deployment::*;
 pub use host_status::*;
+pub use rename_job::*;
 use color_eyre::eyre::Result;
 pub use worker_target::*;
 

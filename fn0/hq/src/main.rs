@@ -4,6 +4,7 @@ mod args_parse;
 mod cwasm_compile;
 mod deploy;
 mod deploy_job_worker;
+mod rename_job_worker;
 mod deployment_cache;
 mod dns;
 mod dns_sync;
@@ -105,6 +106,14 @@ fn main() -> Result<()> {
             let ctx = deploy_context.clone();
             set.spawn(async move {
                 deploy_job_worker::run(ctx).await;
+                Ok(())
+            });
+        }
+
+        {
+            let ctx = deploy_context.clone();
+            set.spawn(async move {
+                rename_job_worker::run(ctx).await;
                 Ok(())
             });
         }
