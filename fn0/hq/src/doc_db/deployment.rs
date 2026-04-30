@@ -167,6 +167,41 @@ impl DocDb {
         }
     }
 
+    pub async fn latest_active_deployment_for(
+        &self,
+        subdomain: &str,
+    ) -> Result<Option<(u64, u64)>> {
+        let prepared = DeploymentDocQuery {
+            seq: None,
+            limit: Some(100_000),
+        }
+        .prepare();
+        let mut results = self
+            .forte
+            .execute_ops(prepared.ops)
+            .await
+            .map_err(|e| eyre!("{}", e))?
+            .into_iter();
+        let docs: Vec<DeploymentDoc> =
+            (prepared.parse)(&mut results).map_err(|e| eyre!("{}", e))?;
+        let mut filtered: Vec<DeploymentDoc> = docs
+            .into_iter()
+            .filter(|d| d.subdomain == subdomain)
+            .collect();
+        filtered.sort_by_key(|d| std::cmp::Reverse(d.seq));
+        for doc in filtered {
+            match doc.kind {
+                DeploymentKind::Deploy => {
+                    if let (Some(c), Some(v)) = (doc.code_id, doc.code_version) {
+                        return Ok(Some((c, v)));
+                    }
+                }
+                DeploymentKind::Undeploy => return Ok(None),
+            }
+        }
+        Ok(None)
+    }
+
     pub async fn deployments_after(&self, sk: u64) -> Result<Vec<Deployment>> {
         let prepared = DeploymentDocQuery {
             seq: Some(sk),

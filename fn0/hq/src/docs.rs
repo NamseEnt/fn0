@@ -120,6 +120,54 @@ impl DeployJobDoc {
     }
 }
 
+// === Rename Job ===
+
+#[forte_doc]
+pub struct RenameJobDoc {
+    #[sk]
+    pub job_id: String,
+    pub old_subdomain: String,
+    pub new_subdomain: String,
+    pub code_id: u64,
+    pub code_version: Option<u64>,
+    pub build_id: Option<String>,
+    pub env_ciphertext: Option<String>,
+    pub old_build_ids: Option<Vec<String>>,
+    pub generation: Option<u64>,
+    pub phase: RenameJobPhase,
+    pub attempts: u32,
+    pub last_error: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub heartbeat_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RenameJobPhase {
+    Queued,
+    OldWritesBlocked,
+    NewDbSeeded,
+    NewEnvUploaded,
+    NewCwasmCompiled,
+    NewVersioned,
+    NewDeploymentInserted,
+    NewBuildRegistered,
+    NewDeploymentPushed,
+    NewDeploymentVerified,
+    OldUndeployed,
+    OldEnvDeleted,
+    OldDbDestroyed,
+    Done,
+    Failed,
+}
+
+impl RenameJobDoc {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self.phase, RenameJobPhase::Done | RenameJobPhase::Failed)
+    }
+}
+
 // === Project / Code Version / Next Code ID ===
 
 #[forte_doc]
