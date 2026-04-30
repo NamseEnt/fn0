@@ -4,6 +4,7 @@ mod args_parse;
 mod cwasm_compile;
 mod deploy;
 mod deploy_job_worker;
+mod rename;
 mod rename_job_worker;
 mod deployment_cache;
 mod dns;
@@ -173,6 +174,8 @@ async fn route(
         (&Method::POST, "/deploy/finish") => Ok(deploy::handle_deploy_finish(req, ctx).await),
         (&Method::POST, "/deploy/destroy") => Ok(deploy::handle_deploy_destroy(req, ctx).await),
         (&Method::GET, "/deploy/status") => Ok(deploy::handle_deploy_status(req, ctx).await),
+        (&Method::POST, "/rename/start") => Ok(rename::handle_rename_start(req, ctx).await),
+        (&Method::GET, "/rename/status") => Ok(rename::handle_rename_status(req, ctx).await),
         _ => Ok(Response::builder()
             .status(404)
             .body(Full::new(Bytes::from("not found")))
