@@ -2933,7 +2933,7 @@ dependencies = [
 
 [[package]]
 name = "forte-cli"
-version = "0.3.28"
+version = "0.3.29"
 dependencies = [
  "anyhow",
  "assert_cmd",
