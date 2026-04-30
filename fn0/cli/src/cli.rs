@@ -17,6 +17,9 @@ pub enum Commands {
     Build,
     Deploy,
     Destroy,
+    Rename {
+        new_name: String,
+    },
     Local {
         #[arg(short, long)]
         port: Option<u16>,

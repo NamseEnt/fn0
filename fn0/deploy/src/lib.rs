@@ -283,6 +283,98 @@ pub struct AdminRunOutput {
     pub body: Vec<u8>,
 }
 
+#[derive(Deserialize)]
+struct RenameStartResponse {
+    job_id: String,
+    #[serde(default)]
+    already_running: bool,
+}
+
+#[derive(Deserialize)]
+struct RenameStatusResponse {
+    job_id: String,
+    phase: String,
+    attempts: u32,
+    last_error: Option<String>,
+    is_terminal: bool,
+}
+
+pub async fn rename(project_name: &str, new_project_name: &str) -> Result<()> {
+    let github_token = get_github_token().await?;
+
+    let client = reqwest::Client::new();
+
+    println!("Requesting rename start...");
+    let start_resp: RenameStartResponse = client
+        .post(format!("{}/rename/start", HQ_URL))
+        .json(&serde_json::json!({
+            "github_token": github_token,
+            "project_name": project_name,
+            "new_project_name": new_project_name,
+        }))
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(|e| anyhow!("Rename start failed: {}", e))?
+        .json()
+        .await?;
+
+    if start_resp.already_running {
+        println!("Following existing rename job: {}", start_resp.job_id);
+    } else {
+        println!("Rename job queued: {}", start_resp.job_id);
+    }
+
+    let poll_interval = std::time::Duration::from_secs(2);
+    let timeout = std::time::Duration::from_secs(900);
+    let start = std::time::Instant::now();
+    let mut last_phase: Option<String> = None;
+
+    loop {
+        let status: RenameStatusResponse = client
+            .get(format!(
+                "{}/rename/status?job_id={}",
+                HQ_URL, start_resp.job_id
+            ))
+            .send()
+            .await?
+            .error_for_status()
+            .map_err(|e| anyhow!("Rename status failed: {}", e))?
+            .json()
+            .await?;
+
+        if last_phase.as_deref() != Some(status.phase.as_str()) {
+            println!("  phase: {} (attempts={})", status.phase, status.attempts);
+            last_phase = Some(status.phase.clone());
+        }
+
+        if status.phase == "failed" {
+            let msg = status
+                .last_error
+                .unwrap_or_else(|| "unknown error".to_string());
+            return Err(anyhow!("Rename job failed: {}", msg));
+        }
+
+        if status.is_terminal && status.phase == "done" {
+            break;
+        }
+
+        if start.elapsed() > timeout {
+            return Err(anyhow!(
+                "Rename timed out after {}s. phase={:?}",
+                timeout.as_secs(),
+                status.phase
+            ));
+        }
+
+        let _ = status.job_id;
+        tokio::time::sleep(poll_interval).await;
+    }
+
+    println!("Rename complete!");
+    Ok(())
+}
+
 pub async fn admin_run(
     project_name: &str,
     task: &str,
