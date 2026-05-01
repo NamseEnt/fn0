@@ -473,6 +473,18 @@ async fn handle_request(
                     Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)))
                 }
                 Err(err) => {
+                    if matches!(
+                        err.downcast_ref::<fn0::cache::Error>(),
+                        Some(fn0::cache::Error::NotFound)
+                    ) {
+                        return Ok(hyper::Response::builder()
+                            .status(404)
+                            .header("content-type", "text/plain; charset=utf-8")
+                            .body(Full::new(Bytes::from(
+                                "No application is deployed at this subdomain.",
+                            )))
+                            .unwrap());
+                    }
                     tracing::error!(%err, %code_id, "Failed to run fn0");
                     Ok(hyper::Response::builder()
                         .status(502)

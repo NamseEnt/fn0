@@ -147,12 +147,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         request: Request,
         _fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
-        let bundle = self
-            .ctx
-            .bundle_cache
-            .get(subdomain)
-            .await
-            .map_err(|e| anyhow!("bundle get failed for {subdomain}: {e}"))?;
+        let bundle = self.ctx.bundle_cache.get(subdomain).await?;
 
         telemetry::function_invocation(subdomain);
         let start = std::time::Instant::now();
@@ -172,12 +167,7 @@ impl<C: BundleCache> CodeExecutor<C> {
 
     #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
     pub async fn run_backend_only(&self, subdomain: &str, request: Request) -> Result<Response> {
-        let bundle = self
-            .ctx
-            .bundle_cache
-            .get(subdomain)
-            .await
-            .map_err(|e| anyhow!("bundle get failed for {subdomain}: {e}"))?;
+        let bundle = self.ctx.bundle_cache.get(subdomain).await?;
         self.run_wasm(subdomain, &bundle, request).await
     }
 
