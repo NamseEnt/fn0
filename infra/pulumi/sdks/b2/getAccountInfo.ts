@@ -47,5 +47,5 @@ export function getAccountInfoOutput(args?: GetAccountInfoOutputArgs, opts?: pul
  * A collection of arguments for invoking getAccountInfo.
  */
 export interface GetAccountInfoOutputArgs {
-    id?: pulumi.Input<string>;
+    id?: pulumi.Input<string | undefined>;
 }

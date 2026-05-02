@@ -1,6 +1,10 @@
 mod admin;
 mod args;
 mod args_parse;
+mod cloudflare_saas;
+mod custom_domain;
+mod custom_domain_cache;
+mod custom_domain_job_worker;
 mod cwasm_compile;
 mod deploy;
 mod deploy_job_worker;
@@ -46,6 +50,7 @@ fn main() -> Result<()> {
         let HqArgsParsed {
             sites,
             deployment_cache,
+            custom_domain_cache,
             deploy_context,
             self_dns_args,
             dns_provider,
@@ -61,6 +66,14 @@ fn main() -> Result<()> {
             let deployment_cache = deployment_cache.clone();
             set.spawn(async move {
                 deployment_cache.run_sync().await;
+                Ok(())
+            });
+        }
+
+        {
+            let custom_domain_cache = custom_domain_cache.clone();
+            set.spawn(async move {
+                custom_domain_cache.run_sync().await;
                 Ok(())
             });
         }
@@ -115,6 +128,14 @@ fn main() -> Result<()> {
             let ctx = deploy_context.clone();
             set.spawn(async move {
                 rename_job_worker::run(ctx).await;
+                Ok(())
+            });
+        }
+
+        {
+            let ctx = deploy_context.clone();
+            set.spawn(async move {
+                custom_domain_job_worker::run(ctx).await;
                 Ok(())
             });
         }
@@ -176,6 +197,13 @@ async fn route(
         (&Method::GET, "/deploy/status") => Ok(deploy::handle_deploy_status(req, ctx).await),
         (&Method::POST, "/rename/start") => Ok(rename::handle_rename_start(req, ctx).await),
         (&Method::GET, "/rename/status") => Ok(rename::handle_rename_status(req, ctx).await),
+        (&Method::POST, "/domain/add") => Ok(custom_domain::handle_domain_add(req, ctx).await),
+        (&Method::POST, "/domain/remove") => {
+            Ok(custom_domain::handle_domain_remove(req, ctx).await)
+        }
+        (&Method::GET, "/domain/status") => {
+            Ok(custom_domain::handle_domain_status(req, ctx).await)
+        }
         _ => Ok(Response::builder()
             .status(404)
             .body(Full::new(Bytes::from("not found")))

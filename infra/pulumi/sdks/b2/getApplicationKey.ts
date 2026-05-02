@@ -51,7 +51,7 @@ export function getApplicationKeyOutput(args: GetApplicationKeyOutputArgs, opts?
  * A collection of arguments for invoking getApplicationKey.
  */
 export interface GetApplicationKeyOutputArgs {
-    id?: pulumi.Input<string>;
+    id?: pulumi.Input<string | undefined>;
     keyName: pulumi.Input<string>;
-    namePrefix?: pulumi.Input<string>;
+    namePrefix?: pulumi.Input<string | undefined>;
 }

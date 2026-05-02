@@ -28,6 +28,17 @@ pub enum Commands {
         #[command(subcommand)]
         command: AdminCommands,
     },
+    Domain {
+        #[command(subcommand)]
+        command: DomainCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DomainCommands {
+    Add { domain: String },
+    Remove,
+    Status,
 }
 
 #[derive(Subcommand)]

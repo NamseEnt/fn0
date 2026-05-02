@@ -66,10 +66,12 @@ impl Site {
                 if ws.generation < latest_generation {
                     let pool = self.ssh_pool.clone();
                     let cache = self.deployment_cache.clone();
+                    let dom_cache = self.custom_domain_cache.clone();
                     let addr = addr.clone();
                     tokio::spawn(async move {
                         if let Err(err) =
-                            super::deployment_pusher::push_to_addr(&pool, &cache, &addr).await
+                            super::deployment_pusher::push_to_addr(&pool, &cache, &dom_cache, &addr)
+                                .await
                         {
                             warn!(%err, %addr, "Deferred push failed");
                         }

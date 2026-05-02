@@ -52,6 +52,6 @@ export function getBucketFileOutput(args: GetBucketFileOutputArgs, opts?: pulumi
 export interface GetBucketFileOutputArgs {
     bucketId: pulumi.Input<string>;
     fileName: pulumi.Input<string>;
-    id?: pulumi.Input<string>;
-    showVersions?: pulumi.Input<boolean>;
+    id?: pulumi.Input<string | undefined>;
+    showVersions?: pulumi.Input<boolean | undefined>;
 }

@@ -9,6 +9,8 @@ use crate::lambda::LambdaClient;
 
 use crate::{
     args::*,
+    cloudflare_saas::CloudflareSaas,
+    custom_domain_cache::CustomDomainCache,
     deployment_cache::DeploymentCache,
     dns::{DnsProvider, cloudflare::CloudflareDnsProvider},
     forte_r2::ForteR2,
@@ -24,16 +26,19 @@ pub struct DeployContext {
     pub cwasm_bucket: String,
     pub doc_db: DocDb,
     pub deployment_cache: DeploymentCache,
+    pub custom_domain_cache: CustomDomainCache,
     pub sites: Vec<Site>,
     pub env_encryption_key: [u8; 32],
     pub admin_signing_key: [u8; 32],
     pub forte_db: crate::args::ForteDbArgs,
     pub forte_r2: ForteR2,
+    pub cloudflare_saas: Arc<CloudflareSaas>,
 }
 
 pub struct HqArgsParsed {
     pub sites: Vec<Site>,
     pub deployment_cache: DeploymentCache,
+    pub custom_domain_cache: CustomDomainCache,
     pub deploy_context: Arc<DeployContext>,
     pub self_dns_args: crate::args::SelfDnsArgs,
     pub dns_provider: DnsProvider,
@@ -51,6 +56,7 @@ impl HqArgs {
 
         let doc_db = DocDb::new(args.doc_db.url, args.doc_db.token).await?;
         let deployment_cache = DeploymentCache::new(doc_db.clone()).await?;
+        let custom_domain_cache = CustomDomainCache::new(doc_db.clone()).await?;
 
         let aws_s3 = Operator::new(
             S3::default()
@@ -98,6 +104,7 @@ impl HqArgs {
                     site_args.name,
                     host_provider,
                     deployment_cache.clone(),
+                    custom_domain_cache.clone(),
                     host_cpu_cores,
                     host_memory_in_gb,
                     doc_db.clone(),
@@ -112,6 +119,12 @@ impl HqArgs {
 
         let forte_r2 = ForteR2::new(&args.forte_r2).await?;
 
+        let cloudflare_saas = Arc::new(CloudflareSaas::new(
+            args.cloudflare_saas.zone_id,
+            args.cloudflare_saas.api_token,
+            None,
+        ));
+
         let deploy_context = Arc::new(DeployContext {
             aws_s3,
             cwasm_s3,
@@ -120,11 +133,13 @@ impl HqArgs {
             cwasm_bucket: args.cwasm_bucket.name,
             doc_db: doc_db.clone(),
             deployment_cache: deployment_cache.clone(),
+            custom_domain_cache: custom_domain_cache.clone(),
             sites: sites.clone(),
             env_encryption_key,
             admin_signing_key,
             forte_db: args.forte_db,
             forte_r2,
+            cloudflare_saas,
         });
 
         let dns_provider = match args.dns_provider {
@@ -136,6 +151,7 @@ impl HqArgs {
         Ok(HqArgsParsed {
             sites,
             deployment_cache,
+            custom_domain_cache,
             deploy_context,
             self_dns_args: args.self_dns.clone(),
             dns_provider,

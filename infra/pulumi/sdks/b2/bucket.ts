@@ -138,59 +138,59 @@ export interface BucketState {
     /**
      * Account ID that the bucket belongs to.
      */
-    accountId?: pulumi.Input<string>;
-    b2BucketId?: pulumi.Input<string>;
+    accountId?: pulumi.Input<string | undefined>;
+    b2BucketId?: pulumi.Input<string | undefined>;
     /**
      * The ID of the bucket.
      */
-    bucketId?: pulumi.Input<string>;
+    bucketId?: pulumi.Input<string | undefined>;
     /**
      * User-defined information to be stored with the bucket.
      */
-    bucketInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>}>;
+    bucketInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>} | undefined>;
     /**
      * The name of the bucket. **Modifying this attribute will force creation of a new resource.**
      */
-    bucketName?: pulumi.Input<string>;
+    bucketName?: pulumi.Input<string | undefined>;
     /**
      * The bucket type. Either 'allPublic', meaning that files in this bucket can be downloaded by anybody, or 'allPrivate'.
      */
-    bucketType?: pulumi.Input<string>;
+    bucketType?: pulumi.Input<string | undefined>;
     /**
      * The initial list of CORS rules for this bucket.
      */
-    corsRules?: pulumi.Input<pulumi.Input<inputs.BucketCorsRule>[]>;
+    corsRules?: pulumi.Input<pulumi.Input<inputs.BucketCorsRule>[] | undefined>;
     /**
      * The default server-side encryption settings for this bucket.
      */
-    defaultServerSideEncryption?: pulumi.Input<inputs.BucketDefaultServerSideEncryption>;
+    defaultServerSideEncryption?: pulumi.Input<inputs.BucketDefaultServerSideEncryption | undefined>;
     /**
      * File lock enabled flag, and default retention settings.
      */
-    fileLockConfigurations?: pulumi.Input<pulumi.Input<inputs.BucketFileLockConfiguration>[]>;
+    fileLockConfigurations?: pulumi.Input<pulumi.Input<inputs.BucketFileLockConfiguration>[] | undefined>;
     /**
      * The initial list of lifecycle rules for this bucket.
      */
-    lifecycleRules?: pulumi.Input<pulumi.Input<inputs.BucketLifecycleRule>[]>;
+    lifecycleRules?: pulumi.Input<pulumi.Input<inputs.BucketLifecycleRule>[] | undefined>;
     /**
      * List of bucket options.
      */
-    options?: pulumi.Input<pulumi.Input<string>[]>;
+    options?: pulumi.Input<pulumi.Input<string>[] | undefined>;
     /**
      * Bucket revision.
      */
-    revision?: pulumi.Input<number>;
+    revision?: pulumi.Input<number | undefined>;
 }
 
 /**
  * The set of arguments for constructing a Bucket resource.
  */
 export interface BucketArgs {
-    b2BucketId?: pulumi.Input<string>;
+    b2BucketId?: pulumi.Input<string | undefined>;
     /**
      * User-defined information to be stored with the bucket.
      */
-    bucketInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>}>;
+    bucketInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>} | undefined>;
     /**
      * The name of the bucket. **Modifying this attribute will force creation of a new resource.**
      */
@@ -202,17 +202,17 @@ export interface BucketArgs {
     /**
      * The initial list of CORS rules for this bucket.
      */
-    corsRules?: pulumi.Input<pulumi.Input<inputs.BucketCorsRule>[]>;
+    corsRules?: pulumi.Input<pulumi.Input<inputs.BucketCorsRule>[] | undefined>;
     /**
      * The default server-side encryption settings for this bucket.
      */
-    defaultServerSideEncryption?: pulumi.Input<inputs.BucketDefaultServerSideEncryption>;
+    defaultServerSideEncryption?: pulumi.Input<inputs.BucketDefaultServerSideEncryption | undefined>;
     /**
      * File lock enabled flag, and default retention settings.
      */
-    fileLockConfigurations?: pulumi.Input<pulumi.Input<inputs.BucketFileLockConfiguration>[]>;
+    fileLockConfigurations?: pulumi.Input<pulumi.Input<inputs.BucketFileLockConfiguration>[] | undefined>;
     /**
      * The initial list of lifecycle rules for this bucket.
      */
-    lifecycleRules?: pulumi.Input<pulumi.Input<inputs.BucketLifecycleRule>[]>;
+    lifecycleRules?: pulumi.Input<pulumi.Input<inputs.BucketLifecycleRule>[] | undefined>;
 }

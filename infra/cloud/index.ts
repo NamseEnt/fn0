@@ -348,6 +348,10 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
   dnsProvider,
+  cloudflareSaas: {
+    zoneId,
+    apiToken: dns.saasApiToken,
+  },
   sites: [
     {
       name: "oci-compute-vm",

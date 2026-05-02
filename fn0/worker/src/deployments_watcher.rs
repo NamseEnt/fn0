@@ -1,6 +1,6 @@
 use crate::cache::S3BundleCache;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -12,6 +12,8 @@ const POLL_INTERVAL: Duration = Duration::from_millis(500);
 struct DeploymentsFile {
     generation: u64,
     deployments: Vec<DeploymentEntry>,
+    #[serde(default)]
+    custom_domains: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -24,6 +26,7 @@ struct DeploymentEntry {
 pub async fn run(path: &Path, generation: Arc<AtomicU64>, cache: S3BundleCache) {
     let mut last_mtime: Option<SystemTime> = None;
     let mut known: HashMap<String, (u64, u64)> = HashMap::new();
+    let mut known_domains: BTreeMap<String, String> = BTreeMap::new();
 
     loop {
         tokio::time::sleep(POLL_INTERVAL).await;
@@ -72,7 +75,20 @@ pub async fn run(path: &Path, generation: Arc<AtomicU64>, cache: S3BundleCache) 
             cache.unregister(&sub).await;
         }
 
+        for (domain, subdomain) in &parsed.custom_domains {
+            cache.register_domain(domain, subdomain).await;
+        }
+        let stale_domains: Vec<String> = known_domains
+            .keys()
+            .filter(|d| !parsed.custom_domains.contains_key(*d))
+            .cloned()
+            .collect();
+        for d in stale_domains {
+            cache.unregister_domain(&d).await;
+        }
+
         known = target;
+        known_domains = parsed.custom_domains;
         generation.store(parsed.generation, Ordering::Relaxed);
     }
 }

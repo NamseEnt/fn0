@@ -77,15 +77,15 @@ export interface ProviderArgs {
     /**
      * B2 Application Key (B2_APPLICATION_KEY env).
      */
-    applicationKey?: pulumi.Input<string>;
+    applicationKey?: pulumi.Input<string | undefined>;
     /**
      * B2 Application Key ID (B2_APPLICATION_KEY_ID env).
      */
-    applicationKeyId?: pulumi.Input<string>;
+    applicationKeyId?: pulumi.Input<string | undefined>;
     /**
      * B2 endpoint - the string 'production' or a custom B2 API URL (B2_ENDPOINT env). You should not need to set this unless you work at Backblaze. Defaults to <span pulumi-lang-nodejs="`production`" pulumi-lang-dotnet="`Production`" pulumi-lang-go="`production`" pulumi-lang-python="`production`" pulumi-lang-yaml="`production`" pulumi-lang-java="`production`">`production`</span>.
      */
-    endpoint?: pulumi.Input<string>;
+    endpoint?: pulumi.Input<string | undefined>;
 }
 
 export namespace Provider {

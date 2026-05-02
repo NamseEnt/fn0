@@ -55,8 +55,8 @@ export function getBucketFilesOutput(args: GetBucketFilesOutputArgs, opts?: pulu
  */
 export interface GetBucketFilesOutputArgs {
     bucketId: pulumi.Input<string>;
-    folderName?: pulumi.Input<string>;
-    id?: pulumi.Input<string>;
-    recursive?: pulumi.Input<boolean>;
-    showVersions?: pulumi.Input<boolean>;
+    folderName?: pulumi.Input<string | undefined>;
+    id?: pulumi.Input<string | undefined>;
+    recursive?: pulumi.Input<boolean | undefined>;
+    showVersions?: pulumi.Input<boolean | undefined>;
 }

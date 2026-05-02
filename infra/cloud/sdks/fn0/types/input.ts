@@ -11,6 +11,11 @@ export interface CloudflareDnsProviderArgsArgs {
     zoneId: pulumi.Input<string>;
 }
 
+export interface CloudflareSaasArgsArgs {
+    apiToken: pulumi.Input<string>;
+    zoneId: pulumi.Input<string>;
+}
+
 export interface CwasmBucketArgsArgs {
     accessKeyId: pulumi.Input<string>;
     endpoint: pulumi.Input<string>;
@@ -20,7 +25,7 @@ export interface CwasmBucketArgsArgs {
 }
 
 export interface DnsProviderArgArgs {
-    cloudflare?: pulumi.Input<inputs.CloudflareDnsProviderArgsArgs>;
+    cloudflare?: pulumi.Input<inputs.CloudflareDnsProviderArgsArgs | undefined>;
 }
 
 export interface ForteDbArgsArgs {
@@ -38,7 +43,7 @@ export interface ForteR2ArgsArgs {
 }
 
 export interface HostProviderArgArgs {
-    ociComputeVm?: pulumi.Input<inputs.OciComputeVmHostProviderArgsArgs>;
+    ociComputeVm?: pulumi.Input<inputs.OciComputeVmHostProviderArgsArgs | undefined>;
 }
 
 export interface OciComputeVmHostProviderArgsArgs {

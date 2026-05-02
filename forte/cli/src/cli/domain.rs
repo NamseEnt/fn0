@@ -1,0 +1,34 @@
+use anyhow::{Result, anyhow};
+use serde::Deserialize;
+use std::path::PathBuf;
+
+#[derive(Deserialize)]
+struct ForteConfig {
+    name: Option<String>,
+}
+
+fn project_name(project_dir: &PathBuf) -> Result<String> {
+    let config_path = project_dir.join("Forte.toml");
+    let content = std::fs::read_to_string(&config_path)
+        .map_err(|_| anyhow!("Forte.toml not found. Are you in a Forte project directory?"))?;
+    let config: ForteConfig =
+        toml::from_str(&content).map_err(|e| anyhow!("Failed to parse Forte.toml: {}", e))?;
+    config
+        .name
+        .ok_or_else(|| anyhow!("'name' field missing in Forte.toml"))
+}
+
+pub async fn add(project_dir: PathBuf, domain: String) -> Result<()> {
+    let name = project_name(&project_dir)?;
+    fn0_deploy::domain_add(&name, &domain).await
+}
+
+pub async fn remove(project_dir: PathBuf) -> Result<()> {
+    let name = project_name(&project_dir)?;
+    fn0_deploy::domain_remove(&name).await
+}
+
+pub async fn status(project_dir: PathBuf) -> Result<()> {
+    let name = project_name(&project_dir)?;
+    fn0_deploy::domain_status(&name).await
+}

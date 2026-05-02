@@ -147,59 +147,59 @@ export interface BucketFileVersionState {
     /**
      * One of 'start', 'upload', 'hide', 'folder', or other values added in the future.
      */
-    action?: pulumi.Input<string>;
-    bucketFileVersionId?: pulumi.Input<string>;
+    action?: pulumi.Input<string | undefined>;
+    bucketFileVersionId?: pulumi.Input<string | undefined>;
     /**
      * The ID of the bucket. **Modifying this attribute will force creation of a new resource.**
      */
-    bucketId?: pulumi.Input<string>;
+    bucketId?: pulumi.Input<string | undefined>;
     /**
      * MD5 sum of the content.
      */
-    contentMd5?: pulumi.Input<string>;
+    contentMd5?: pulumi.Input<string | undefined>;
     /**
      * SHA1 hash of the content.
      */
-    contentSha1?: pulumi.Input<string>;
+    contentSha1?: pulumi.Input<string | undefined>;
     /**
      * Content type. If not set, it will be set based on the file extension. **Modifying this attribute will force creation of a new resource.**
      */
-    contentType?: pulumi.Input<string>;
+    contentType?: pulumi.Input<string | undefined>;
     /**
      * The unique identifier for this version of this file.
      */
-    fileId?: pulumi.Input<string>;
+    fileId?: pulumi.Input<string | undefined>;
     /**
      * The custom information that is uploaded with the file. **Modifying this attribute will force creation of a new resource.**
      */
-    fileInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>}>;
+    fileInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>} | undefined>;
     /**
      * The name of the B2 file. **Modifying this attribute will force creation of a new resource.**
      */
-    fileName?: pulumi.Input<string>;
+    fileName?: pulumi.Input<string | undefined>;
     /**
      * Server-side encryption settings. **Modifying this attribute will force creation of a new resource.**
      */
-    serverSideEncryption?: pulumi.Input<inputs.BucketFileVersionServerSideEncryption>;
+    serverSideEncryption?: pulumi.Input<inputs.BucketFileVersionServerSideEncryption | undefined>;
     /**
      * The file size.
      */
-    size?: pulumi.Input<number>;
+    size?: pulumi.Input<number | undefined>;
     /**
      * Path to the local file. **Modifying this attribute will force creation of a new resource.**
      */
-    source?: pulumi.Input<string>;
+    source?: pulumi.Input<string | undefined>;
     /**
      * This is a UTC time when this file was uploaded.
      */
-    uploadTimestamp?: pulumi.Input<number>;
+    uploadTimestamp?: pulumi.Input<number | undefined>;
 }
 
 /**
  * The set of arguments for constructing a BucketFileVersion resource.
  */
 export interface BucketFileVersionArgs {
-    bucketFileVersionId?: pulumi.Input<string>;
+    bucketFileVersionId?: pulumi.Input<string | undefined>;
     /**
      * The ID of the bucket. **Modifying this attribute will force creation of a new resource.**
      */
@@ -207,11 +207,11 @@ export interface BucketFileVersionArgs {
     /**
      * Content type. If not set, it will be set based on the file extension. **Modifying this attribute will force creation of a new resource.**
      */
-    contentType?: pulumi.Input<string>;
+    contentType?: pulumi.Input<string | undefined>;
     /**
      * The custom information that is uploaded with the file. **Modifying this attribute will force creation of a new resource.**
      */
-    fileInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>}>;
+    fileInfo?: pulumi.Input<{[key: string]: pulumi.Input<string>} | undefined>;
     /**
      * The name of the B2 file. **Modifying this attribute will force creation of a new resource.**
      */
@@ -219,7 +219,7 @@ export interface BucketFileVersionArgs {
     /**
      * Server-side encryption settings. **Modifying this attribute will force creation of a new resource.**
      */
-    serverSideEncryption?: pulumi.Input<inputs.BucketFileVersionServerSideEncryption>;
+    serverSideEncryption?: pulumi.Input<inputs.BucketFileVersionServerSideEncryption | undefined>;
     /**
      * Path to the local file. **Modifying this attribute will force creation of a new resource.**
      */

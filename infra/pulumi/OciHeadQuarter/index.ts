@@ -12,6 +12,7 @@ import {
   CwasmBucketArgs,
   ForteDbArgs,
   ForteR2Args,
+  CloudflareSaasArgs,
 } from "../hqArgs.schema";
 
 export interface OciHeadQuarterArgs {
@@ -43,6 +44,7 @@ export interface OciHeadQuarterArgs {
   selfDnsCloudflareZoneId: pulumi.Input<string>;
   selfDnsCloudflareApiToken: pulumi.Input<string>;
   dnsProvider: pulumi.Input<DnsProviderArg>;
+  cloudflareSaas: pulumi.Input<CloudflareSaasArgs>;
 }
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
@@ -165,6 +167,7 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
           cloudflareZoneId: args.selfDnsCloudflareZoneId,
           cloudflareApiToken: args.selfDnsCloudflareApiToken,
         },
+        cloudflareSaas: args.cloudflareSaas,
       },
     });
   }

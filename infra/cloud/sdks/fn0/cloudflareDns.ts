@@ -22,6 +22,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
     declare public /*out*/ readonly certificate: pulumi.Output<string>;
     declare public /*out*/ readonly dnsApiToken: pulumi.Output<string>;
     declare public /*out*/ readonly privateKeyPem: pulumi.Output<string>;
+    declare public /*out*/ readonly saasApiToken: pulumi.Output<string>;
 
     /**
      * Create a CloudflareDns resource with the given unique name, arguments, and options.
@@ -53,10 +54,12 @@ export class CloudflareDns extends pulumi.ComponentResource {
             resourceInputs["certificate"] = undefined /*out*/;
             resourceInputs["dnsApiToken"] = undefined /*out*/;
             resourceInputs["privateKeyPem"] = undefined /*out*/;
+            resourceInputs["saasApiToken"] = undefined /*out*/;
         } else {
             resourceInputs["certificate"] = undefined /*out*/;
             resourceInputs["dnsApiToken"] = undefined /*out*/;
             resourceInputs["privateKeyPem"] = undefined /*out*/;
+            resourceInputs["saasApiToken"] = undefined /*out*/;
         }
         opts = pulumi.mergeOptions(utilities.resourceOptsDefaults(), opts);
         super(CloudflareDns.__pulumiType, name, resourceInputs, opts, true /*remote*/);

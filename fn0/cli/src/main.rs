@@ -6,7 +6,7 @@ mod prompts;
 mod utils;
 
 use clap::Parser;
-use cli::{AdminCommands, Cli, Commands};
+use cli::{AdminCommands, Cli, Commands, DomainCommands};
 use color_eyre::Result;
 
 fn main() -> Result<()> {
@@ -51,6 +51,17 @@ async fn async_main() -> Result<()> {
                 timeout_seconds,
             } => {
                 commands::admin::run(task, project, input_file, input, timeout_seconds).await?;
+            }
+        },
+        Commands::Domain { command } => match command {
+            DomainCommands::Add { domain } => {
+                commands::domain::add(&domain).await?;
+            }
+            DomainCommands::Remove => {
+                commands::domain::remove().await?;
+            }
+            DomainCommands::Status => {
+                commands::domain::status().await?;
             }
         },
     }

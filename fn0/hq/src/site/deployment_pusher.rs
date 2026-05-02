@@ -1,15 +1,18 @@
+use crate::custom_domain_cache::CustomDomainCache;
 use crate::deployment_cache::DeploymentCache;
 use crate::doc_db::Deployment;
 use crate::ssh_pool::SshPool;
 use base64::Engine;
 use color_eyre::eyre::{Result, eyre};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use tracing::*;
 
 #[derive(Serialize)]
 struct DeploymentsFile {
     generation: u64,
     deployments: Vec<DeploymentEntry>,
+    custom_domains: BTreeMap<String, String>,
 }
 
 #[derive(Serialize)]
@@ -22,9 +25,10 @@ struct DeploymentEntry {
 pub async fn push_to_addr(
     ssh_pool: &SshPool,
     deployment_cache: &DeploymentCache,
+    custom_domain_cache: &CustomDomainCache,
     addr: &str,
 ) -> Result<()> {
-    let payload = build_payload(deployment_cache);
+    let payload = build_payload(deployment_cache, custom_domain_cache).await;
     let json = serde_json::to_string(&payload)?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(json.as_bytes());
 
@@ -46,14 +50,16 @@ pub async fn push_to_addr(
 pub async fn push_to_all(
     ssh_pool: &SshPool,
     deployment_cache: &DeploymentCache,
+    custom_domain_cache: &CustomDomainCache,
     addrs: Vec<String>,
 ) {
     let mut tasks = Vec::with_capacity(addrs.len());
     for addr in addrs {
         let pool = ssh_pool.clone();
         let cache = deployment_cache.clone();
+        let dom_cache = custom_domain_cache.clone();
         tasks.push(tokio::spawn(async move {
-            if let Err(err) = push_to_addr(&pool, &cache, &addr).await {
+            if let Err(err) = push_to_addr(&pool, &cache, &dom_cache, &addr).await {
                 warn!(%err, %addr, "deployments.json push failed");
             }
         }));
@@ -63,7 +69,10 @@ pub async fn push_to_all(
     }
 }
 
-fn build_payload(deployment_cache: &DeploymentCache) -> DeploymentsFile {
+async fn build_payload(
+    deployment_cache: &DeploymentCache,
+    custom_domain_cache: &CustomDomainCache,
+) -> DeploymentsFile {
     use crate::deployment_cache::DeploymentId;
     let generation = deployment_cache.last_deployment_id();
     let latest_per_subdomain = deployment_cache.slice_updates(DeploymentId(0));
@@ -82,8 +91,10 @@ fn build_payload(deployment_cache: &DeploymentCache) -> DeploymentsFile {
             Deployment::Undeploy { .. } => None,
         })
         .collect();
+    let custom_domains = custom_domain_cache.snapshot().await.domain_to_subdomain;
     DeploymentsFile {
         generation,
         deployments,
+        custom_domains,
     }
 }

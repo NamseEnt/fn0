@@ -676,9 +676,11 @@ pub async fn handle_deploy_status(
 
 pub(crate) async fn spawn_immediate_push(ctx: &Arc<DeployContext>) {
     ctx.deployment_cache.refresh().await;
+    ctx.custom_domain_cache.refresh().await;
     for site in &ctx.sites {
         let pool = site.ssh_pool().clone();
         let cache = ctx.deployment_cache.clone();
+        let dom_cache = ctx.custom_domain_cache.clone();
         let db = ctx.doc_db.clone();
         let site_name = site.name().to_string();
         tokio::spawn(async move {
@@ -690,7 +692,7 @@ pub(crate) async fn spawn_immediate_push(ctx: &Arc<DeployContext>) {
                 }
             };
             let addrs: Vec<String> = statuses.into_iter().map(|s| s.addr).collect();
-            crate::site::push_to_all(&pool, &cache, addrs).await;
+            crate::site::push_to_all(&pool, &cache, &dom_cache, addrs).await;
         });
     }
 }

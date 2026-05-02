@@ -9,7 +9,7 @@ export interface BucketCorsRule {
     /**
      * If present, this is a list of headers that are allowed in a pre-flight OPTIONS's request's Access-Control-Request-Headers header value.
      */
-    allowedHeaders?: pulumi.Input<pulumi.Input<string>[]>;
+    allowedHeaders?: pulumi.Input<pulumi.Input<string>[] | undefined>;
     /**
      * A list specifying which operations the rule allows.
      */
@@ -25,7 +25,7 @@ export interface BucketCorsRule {
     /**
      * If present, this is a list of headers that may be exposed to an application inside the client.
      */
-    exposeHeaders?: pulumi.Input<pulumi.Input<string>[]>;
+    exposeHeaders?: pulumi.Input<pulumi.Input<string>[] | undefined>;
     /**
      * This specifies the maximum number of seconds that a browser may cache the response to a preflight request.
      */
@@ -36,22 +36,22 @@ export interface BucketDefaultServerSideEncryption {
     /**
      * Server-side encryption algorithm. AES256 is the only one supported.
      */
-    algorithm?: pulumi.Input<string>;
+    algorithm?: pulumi.Input<string | undefined>;
     /**
      * Server-side encryption mode.
      */
-    mode?: pulumi.Input<string>;
+    mode?: pulumi.Input<string | undefined>;
 }
 
 export interface BucketFileLockConfiguration {
     /**
      * Default retention settings for files uploaded to this bucket.
      */
-    defaultRetention?: pulumi.Input<inputs.BucketFileLockConfigurationDefaultRetention>;
+    defaultRetention?: pulumi.Input<inputs.BucketFileLockConfigurationDefaultRetention | undefined>;
     /**
      * If present, the boolean value specifies whether bucket is File Lock-enabled. Defaults to <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`">`false`</span>. **Modifying this attribute will force creation of a new resource.**
      */
-    isFileLockEnabled?: pulumi.Input<boolean>;
+    isFileLockEnabled?: pulumi.Input<boolean | undefined>;
 }
 
 export interface BucketFileLockConfigurationDefaultRetention {
@@ -62,7 +62,7 @@ export interface BucketFileLockConfigurationDefaultRetention {
     /**
      * How long for to make files immutable.
      */
-    period?: pulumi.Input<inputs.BucketFileLockConfigurationDefaultRetentionPeriod>;
+    period?: pulumi.Input<inputs.BucketFileLockConfigurationDefaultRetentionPeriod | undefined>;
 }
 
 export interface BucketFileLockConfigurationDefaultRetentionPeriod {
@@ -80,41 +80,41 @@ export interface BucketFileVersionServerSideEncryption {
     /**
      * Server-side encryption algorithm. AES256 is the only one supported.
      */
-    algorithm?: pulumi.Input<string>;
+    algorithm?: pulumi.Input<string | undefined>;
     /**
      * Key used in SSE-C mode.
      */
-    key?: pulumi.Input<inputs.BucketFileVersionServerSideEncryptionKey>;
+    key?: pulumi.Input<inputs.BucketFileVersionServerSideEncryptionKey | undefined>;
     /**
      * Server-side encryption mode.
      */
-    mode?: pulumi.Input<string>;
+    mode?: pulumi.Input<string | undefined>;
 }
 
 export interface BucketFileVersionServerSideEncryptionKey {
     /**
      * Key identifier stored in file info metadata.
      */
-    keyId?: pulumi.Input<string>;
+    keyId?: pulumi.Input<string | undefined>;
     /**
      * Secret key value, in standard Base 64 encoding (RFC 4648).
      */
-    secretB64?: pulumi.Input<string>;
+    secretB64?: pulumi.Input<string | undefined>;
 }
 
 export interface BucketLifecycleRule {
     /**
      * It says how long to keep file versions that are not the current version.
      */
-    daysFromHidingToDeleting?: pulumi.Input<number>;
+    daysFromHidingToDeleting?: pulumi.Input<number | undefined>;
     /**
      * It cancels any unfinished large file versions after a given number of days.
      */
-    daysFromStartingToCancelingUnfinishedLargeFiles?: pulumi.Input<number>;
+    daysFromStartingToCancelingUnfinishedLargeFiles?: pulumi.Input<number | undefined>;
     /**
      * It causes files to be hidden automatically after the given number of days.
      */
-    daysFromUploadingToHiding?: pulumi.Input<number>;
+    daysFromUploadingToHiding?: pulumi.Input<number | undefined>;
     /**
      * It specifies which files in the bucket it applies to.
      */
@@ -129,11 +129,11 @@ export interface BucketNotificationRulesNotificationRule {
     /**
      * Whether the event notification rule is enabled. Defaults to <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`">`true`</span>.
      */
-    isEnabled?: pulumi.Input<boolean>;
+    isEnabled?: pulumi.Input<boolean | undefined>;
     /**
      * Whether the event notification rule is suspended.
      */
-    isSuspended?: pulumi.Input<boolean>;
+    isSuspended?: pulumi.Input<boolean | undefined>;
     /**
      * A name for the event notification rule. The name must be unique among the bucket's notification rules.
      */
@@ -141,11 +141,11 @@ export interface BucketNotificationRulesNotificationRule {
     /**
      * Specifies which object(s) in the bucket the event notification rule applies to.
      */
-    objectNamePrefix?: pulumi.Input<string>;
+    objectNamePrefix?: pulumi.Input<string | undefined>;
     /**
      * A brief description of why the event notification rule was suspended.
      */
-    suspensionReason?: pulumi.Input<string>;
+    suspensionReason?: pulumi.Input<string | undefined>;
     /**
      * The target configuration for the event notification rule.
      */
@@ -156,11 +156,11 @@ export interface BucketNotificationRulesNotificationRuleTargetConfiguration {
     /**
      * When present, additional header name/value pairs to be sent on the webhook invocation.
      */
-    customHeaders?: pulumi.Input<pulumi.Input<inputs.BucketNotificationRulesNotificationRuleTargetConfigurationCustomHeader>[]>;
+    customHeaders?: pulumi.Input<pulumi.Input<inputs.BucketNotificationRulesNotificationRuleTargetConfigurationCustomHeader>[] | undefined>;
     /**
      * The signing secret for use in verifying the X-Bz-Event-Notification-Signature.
      */
-    hmacSha256SigningSecret?: pulumi.Input<string>;
+    hmacSha256SigningSecret?: pulumi.Input<string | undefined>;
     /**
      * The type of the target configuration, currently "webhook" only.
      */

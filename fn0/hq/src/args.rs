@@ -11,8 +11,16 @@ pub struct HqArgs {
     pub cwasm_bucket: CwasmBucketArgs,
     pub self_dns: SelfDnsArgs,
     pub dns_provider: DnsProviderArg,
+    pub cloudflare_saas: CloudflareSaasArgs,
     pub env_encryption_key_base64: String,
     pub admin_signing_key_base64: String,
+}
+
+#[derive(Clone, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CloudflareSaasArgs {
+    pub zone_id: String,
+    pub api_token: String,
 }
 
 #[derive(Clone, serde::Deserialize, schemars::JsonSchema)]

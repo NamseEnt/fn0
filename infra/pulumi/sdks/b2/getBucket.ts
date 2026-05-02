@@ -52,5 +52,5 @@ export function getBucketOutput(args: GetBucketOutputArgs, opts?: pulumi.InvokeO
  */
 export interface GetBucketOutputArgs {
     bucketName: pulumi.Input<string>;
-    id?: pulumi.Input<string>;
+    id?: pulumi.Input<string | undefined>;
 }

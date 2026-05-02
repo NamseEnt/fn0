@@ -8,6 +8,7 @@ mod worker_update;
 
 pub use deployment_pusher::push_to_all;
 
+use crate::custom_domain_cache::CustomDomainCache;
 use crate::doc_db::DocDb;
 use crate::{
     deployment_cache::DeploymentCache, host_provider::oci_compute_vm::OciComputeVmHostProvider,
@@ -23,6 +24,7 @@ pub struct Site {
     host_provider: OciComputeVmHostProvider,
     ssh_pool: SshPool,
     pub deployment_cache: DeploymentCache,
+    pub custom_domain_cache: CustomDomainCache,
     host_cpu_cores: NonZeroUsize,
     host_memory_in_gb: NonZeroUsize,
     doc_db: DocDb,
@@ -33,6 +35,7 @@ impl Site {
         name: String,
         host_provider: OciComputeVmHostProvider,
         deployment_cache: DeploymentCache,
+        custom_domain_cache: CustomDomainCache,
         host_cpu_cores: NonZeroUsize,
         host_memory_in_gb: NonZeroUsize,
         doc_db: DocDb,
@@ -46,6 +49,7 @@ impl Site {
             host_provider,
             ssh_pool,
             deployment_cache,
+            custom_domain_cache,
             host_cpu_cores,
             host_memory_in_gb,
             doc_db,

@@ -375,6 +375,221 @@ pub async fn rename(project_name: &str, new_project_name: &str) -> Result<()> {
     Ok(())
 }
 
+#[derive(Deserialize)]
+struct DomainAddResponse {
+    job_id: String,
+    already_running: bool,
+    subdomain: String,
+    domain: String,
+}
+
+#[derive(Deserialize)]
+struct DomainRemoveResponse {
+    job_id: String,
+    already_running: bool,
+}
+
+#[derive(Deserialize)]
+struct DomainStatusResponse {
+    subdomain: String,
+    current_domain: Option<String>,
+    add_job: Option<DomainJobStatus>,
+    remove_job: Option<DomainJobStatus>,
+}
+
+#[derive(Deserialize, Clone)]
+struct DomainJobStatus {
+    job_id: String,
+    phase: String,
+    domain: String,
+    attempts: u32,
+    last_error: Option<String>,
+    is_terminal: bool,
+}
+
+pub async fn domain_add(project_name: &str, domain: &str) -> Result<()> {
+    let github_token = get_github_token().await?;
+    let client = reqwest::Client::new();
+
+    println!("Requesting domain add...");
+    let resp: DomainAddResponse = client
+        .post(format!("{HQ_URL}/domain/add"))
+        .json(&serde_json::json!({
+            "github_token": github_token,
+            "project_name": project_name,
+            "domain": domain,
+        }))
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(|e| anyhow!("domain add failed: {e}"))?
+        .json()
+        .await?;
+
+    if resp.already_running {
+        println!("Following existing add job: {}", resp.job_id);
+    } else {
+        println!("Add job queued: {}", resp.job_id);
+    }
+    println!(
+        "\nPoint a CNAME for {} to: {}.fn0.dev",
+        resp.domain, resp.subdomain
+    );
+    println!("(Cloudflare for SaaS will validate and issue a TLS cert.)\n");
+
+    poll_domain_until(project_name, &github_token, |s| {
+        s.add_job.as_ref().map(|j| j.is_terminal).unwrap_or(false)
+            && s.current_domain.as_deref() == Some(resp.domain.as_str())
+    })
+    .await
+}
+
+pub async fn domain_remove(project_name: &str) -> Result<()> {
+    let github_token = get_github_token().await?;
+    let client = reqwest::Client::new();
+
+    println!("Requesting domain remove...");
+    let resp: DomainRemoveResponse = client
+        .post(format!("{HQ_URL}/domain/remove"))
+        .json(&serde_json::json!({
+            "github_token": github_token,
+            "project_name": project_name,
+        }))
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(|e| anyhow!("domain remove failed: {e}"))?
+        .json()
+        .await?;
+
+    if resp.already_running {
+        println!("Following existing remove job: {}", resp.job_id);
+    } else {
+        println!("Remove job queued: {}", resp.job_id);
+    }
+
+    poll_domain_until(project_name, &github_token, |s| {
+        s.remove_job.as_ref().map(|j| j.is_terminal).unwrap_or(false)
+            && s.current_domain.is_none()
+    })
+    .await
+}
+
+pub async fn domain_status(project_name: &str) -> Result<()> {
+    let github_token = get_github_token().await?;
+    let client = reqwest::Client::new();
+
+    let url = format!(
+        "{HQ_URL}/domain/status?github_token={}&project_name={}",
+        urlencoding::encode(&github_token),
+        urlencoding::encode(project_name)
+    );
+    let status: DomainStatusResponse = client
+        .get(&url)
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(|e| anyhow!("domain status failed: {e}"))?
+        .json()
+        .await?;
+
+    println!("Subdomain: {}.fn0.dev", status.subdomain);
+    match &status.current_domain {
+        Some(d) => println!("Current domain: {d}"),
+        None => println!("Current domain: (none)"),
+    }
+    if let Some(j) = &status.add_job {
+        println!(
+            "Add job: id={} phase={} domain={} attempts={} terminal={}",
+            j.job_id, j.phase, j.domain, j.attempts, j.is_terminal
+        );
+        if let Some(e) = &j.last_error {
+            println!("  last_error: {e}");
+        }
+    }
+    if let Some(j) = &status.remove_job {
+        println!(
+            "Remove job: id={} phase={} domain={} attempts={} terminal={}",
+            j.job_id, j.phase, j.domain, j.attempts, j.is_terminal
+        );
+        if let Some(e) = &j.last_error {
+            println!("  last_error: {e}");
+        }
+    }
+    Ok(())
+}
+
+async fn poll_domain_until<F>(project_name: &str, github_token: &str, done: F) -> Result<()>
+where
+    F: Fn(&DomainStatusResponse) -> bool,
+{
+    let client = reqwest::Client::new();
+    let poll_interval = std::time::Duration::from_secs(3);
+    let timeout = std::time::Duration::from_secs(900);
+    let start = std::time::Instant::now();
+    let mut last_phase: Option<String> = None;
+
+    loop {
+        let url = format!(
+            "{HQ_URL}/domain/status?github_token={}&project_name={}",
+            urlencoding::encode(github_token),
+            urlencoding::encode(project_name)
+        );
+        let status: DomainStatusResponse = client
+            .get(&url)
+            .send()
+            .await?
+            .error_for_status()
+            .map_err(|e| anyhow!("domain status failed: {e}"))?
+            .json()
+            .await?;
+
+        let active_phase = status
+            .add_job
+            .as_ref()
+            .map(|j| j.phase.clone())
+            .or_else(|| status.remove_job.as_ref().map(|j| j.phase.clone()));
+        if last_phase != active_phase
+            && let Some(p) = active_phase.clone()
+        {
+            println!("  phase: {p}");
+            last_phase = active_phase;
+        }
+
+        if let Some(j) = status.add_job.as_ref()
+            && j.phase == "failed"
+        {
+            let msg = j
+                .last_error
+                .clone()
+                .unwrap_or_else(|| "unknown error".to_string());
+            return Err(anyhow!("Add job failed: {msg}"));
+        }
+        if let Some(j) = status.remove_job.as_ref()
+            && j.phase == "failed"
+        {
+            let msg = j
+                .last_error
+                .clone()
+                .unwrap_or_else(|| "unknown error".to_string());
+            return Err(anyhow!("Remove job failed: {msg}"));
+        }
+
+        if done(&status) {
+            println!("Done!");
+            return Ok(());
+        }
+
+        if start.elapsed() > timeout {
+            return Err(anyhow!(
+                "Domain operation timed out after {}s",
+                timeout.as_secs()
+            ));
+        }
+        tokio::time::sleep(poll_interval).await;
+    }
+}
+
 pub async fn admin_run(
     project_name: &str,
     task: &str,

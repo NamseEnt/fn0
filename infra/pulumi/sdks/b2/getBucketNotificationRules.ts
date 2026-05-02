@@ -43,5 +43,5 @@ export function getBucketNotificationRulesOutput(args: GetBucketNotificationRule
  */
 export interface GetBucketNotificationRulesOutputArgs {
     bucketId: pulumi.Input<string>;
-    id?: pulumi.Input<string>;
+    id?: pulumi.Input<string | undefined>;
 }

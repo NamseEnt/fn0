@@ -198,6 +198,7 @@ async fn run() -> Result<()> {
         let generation = generation.clone();
         let instance_count = instance_count.clone();
         let admin_signing_key = admin_signing_key.clone();
+        let cache = cache.clone();
         async move {
             if let Err(err) = run_http_server(
                 http_port,
@@ -205,6 +206,7 @@ async fn run() -> Result<()> {
                 generation,
                 instance_count,
                 admin_signing_key,
+                cache,
             )
             .await
             {
@@ -230,6 +232,7 @@ async fn run_http_server(
     generation: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
     admin_signing_key: Option<Arc<[u8; 32]>>,
+    cache: S3BundleCache,
 ) -> Result<()> {
     let tls_acceptor = match (
         read_pem_env("ORIGIN_CERT_PEM"),
@@ -264,6 +267,7 @@ async fn run_http_server(
         let instance_count = instance_count.clone();
         let tls_acceptor = tls_acceptor.clone();
         let admin_signing_key = admin_signing_key.clone();
+        let cache = cache.clone();
 
         tokio::spawn(async move {
             let service = service_fn(move |req| {
@@ -271,6 +275,7 @@ async fn run_http_server(
                 let generation = generation.clone();
                 let instance_count = instance_count.clone();
                 let admin_signing_key = admin_signing_key.clone();
+                let cache = cache.clone();
                 async move {
                     handle_request(
                         req,
@@ -279,6 +284,7 @@ async fn run_http_server(
                         instance_count,
                         is_loopback,
                         admin_signing_key,
+                        cache,
                     )
                     .await
                 }
@@ -333,6 +339,7 @@ async fn handle_request(
     instance_count: Arc<AtomicU64>,
     is_loopback: bool,
     admin_signing_key: Option<Arc<[u8; 32]>>,
+    cache: S3BundleCache,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     match req.uri().path() {
         "/status" if is_loopback => {
@@ -366,8 +373,16 @@ async fn handle_request(
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("")
                 .to_string();
+            let host_no_port = host.split(':').next().unwrap_or("").to_string();
 
-            let code_id = host.split('.').next().unwrap_or("unknown").to_string();
+            let code_id = match cache.resolve_domain(&host_no_port).await {
+                Some(sub) => sub,
+                None => host_no_port
+                    .split('.')
+                    .next()
+                    .unwrap_or("unknown")
+                    .to_string(),
+            };
 
             {
                 let headers = req.headers_mut();

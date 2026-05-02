@@ -3,6 +3,7 @@ pub mod admin;
 pub mod build;
 pub mod deploy;
 pub mod dev;
+pub mod domain;
 pub mod fe_runtime;
 pub mod init;
 pub mod queue;
@@ -78,6 +79,36 @@ pub enum Commands {
     Admin {
         #[command(subcommand)]
         command: AdminCommands,
+    },
+
+    /// Custom domain management
+    Domain {
+        #[command(subcommand)]
+        command: DomainCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DomainCommands {
+    /// Attach a custom domain to this project (CNAME-based)
+    Add {
+        /// Domain to attach (e.g. www.example.com)
+        domain: String,
+        /// Project directory (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+    /// Detach the custom domain from this project
+    Remove {
+        /// Project directory (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+    /// Show custom domain status for this project
+    Status {
+        /// Project directory (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
     },
 }
 

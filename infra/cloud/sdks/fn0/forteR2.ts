@@ -82,7 +82,7 @@ export interface ForteR2Args {
     accountId: pulumi.Input<string>;
     bucketName: pulumi.Input<string>;
     domain: pulumi.Input<string>;
-    location?: pulumi.Input<string>;
+    location?: pulumi.Input<string | undefined>;
     staticHostname: pulumi.Input<string>;
     zoneId: pulumi.Input<string>;
 }
