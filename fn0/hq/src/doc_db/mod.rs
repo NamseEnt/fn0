@@ -1,4 +1,6 @@
 mod build_registry;
+mod custom_domain;
+mod custom_domain_job;
 mod deploy_job;
 mod deployment;
 mod host_status;
@@ -8,6 +10,8 @@ mod rename_job;
 mod scale_config;
 mod worker_target;
 
+pub use custom_domain::*;
+pub use custom_domain_job::*;
 pub use deploy_job::*;
 pub use deployment::*;
 pub use host_status::*;

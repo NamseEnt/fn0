@@ -11,7 +11,6 @@ use crate::doc_db::{RenameJob, RenameJobPhase};
 const TICK_INTERVAL: Duration = Duration::from_secs(5);
 const HEARTBEAT_STALE_SECS: i64 = 30;
 const MAX_ATTEMPTS: u32 = 20;
-const VERIFY_TIMEOUT_SECS: i64 = 120;
 
 pub async fn run(ctx: Arc<DeployContext>) {
     let mut interval = tokio::time::interval(TICK_INTERVAL);
@@ -235,18 +234,6 @@ async fn advance_one_phase(ctx: &Arc<DeployContext>, job: &mut RenameJob) -> Res
                 .generation
                 .ok_or_else(|| eyre!("verify phase without generation"))?;
             if all_sites_have_verified_host(ctx, target_generation).await? {
-                job.phase = RenameJobPhase::ProjectRenamed;
-                return Ok(true);
-            }
-            let started_ts = chrono::DateTime::parse_from_rfc3339(&job.updated_at)
-                .map(|t| t.timestamp())
-                .unwrap_or_else(|_| chrono::Utc::now().timestamp());
-            let now_ts = chrono::Utc::now().timestamp();
-            if now_ts - started_ts >= VERIFY_TIMEOUT_SECS {
-                warn!(
-                    job_id = %job.job_id,
-                    "rename verify timeout reached; advancing without all-sites verification"
-                );
                 job.phase = RenameJobPhase::ProjectRenamed;
                 return Ok(true);
             }

@@ -2,6 +2,7 @@ import * as pulumi from '@pulumi/pulumi';
 export interface HqArgs {
   adminSigningKeyBase64: pulumi.Input<string>;
   aws: pulumi.Input<AwsArgs>;
+  cloudflareSaas: pulumi.Input<CloudflareSaasArgs>;
   cwasmBucket: pulumi.Input<CwasmBucketArgs>;
   dnsProvider: pulumi.Input<DnsProviderArg>;
   docDb: pulumi.Input<DocDbArgs>;
@@ -20,6 +21,10 @@ export interface AwsArgs {
 export interface CloudflareDnsProviderArgs {
   apiToken: pulumi.Input<string>;
   asteriskDomain: pulumi.Input<string>;
+  zoneId: pulumi.Input<string>;
+}
+export interface CloudflareSaasArgs {
+  apiToken: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
 }
 export interface CwasmBucketArgs {

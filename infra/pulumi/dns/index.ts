@@ -13,6 +13,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
   privateKeyPem: pulumi.Output<string>;
   certificate: pulumi.Output<string>;
   dnsApiToken: pulumi.Output<string>;
+  saasApiToken: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -29,6 +30,8 @@ export class CloudflareDns extends pulumi.ComponentResource {
       WORKERS_ROUTES_WRITE: "28f4b596e7d643029c524985477ae49a",
       ZONE_WAF_WRITE: "fb6778dc191143babbfaa57993f1d275",
       ZONE_SETTINGS_WRITE: "3030687196b94b638145a3953da2b699",
+      SSL_AND_CERTIFICATES_WRITE: "c03055bc037c4ea9afb9a9f104b7b721",
+      ZONE_READ: "c8fed203ed3043cba015a93ad1616f1f",
     };
 
     const cloudflareApiToken = new cloudflare.AccountToken(
@@ -99,5 +102,28 @@ export class CloudflareDns extends pulumi.ComponentResource {
 
     this.certificate = originCaCert.certificate;
     this.dnsApiToken = cloudflareApiToken.value;
+
+    const cloudflareSaasApiToken = new cloudflare.AccountToken(
+      "cloudflare-saas-api-token",
+      {
+        accountId,
+        name: pulumi.interpolate`fn0-saas-${suffix}`,
+        policies: [
+          {
+            effect: "allow",
+            resources: {
+              [`com.cloudflare.api.account.zone.${zoneId}`]: "*",
+            },
+            permissionGroups: [
+              { id: PERMISSION_IDS.SSL_AND_CERTIFICATES_WRITE },
+              { id: PERMISSION_IDS.ZONE_READ },
+            ],
+          },
+        ],
+      },
+      { parent: this }
+    );
+
+    this.saasApiToken = cloudflareSaasApiToken.value;
   }
 }

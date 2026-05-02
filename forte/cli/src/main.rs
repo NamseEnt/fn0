@@ -5,7 +5,7 @@ mod tools;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AddCommands, AdminCommands, Cli, Commands, QueueCommands};
+use cli::{AddCommands, AdminCommands, Cli, Commands, DomainCommands, QueueCommands};
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -82,6 +82,21 @@ async fn async_main() -> Result<()> {
                 timeout_seconds,
             } => {
                 cli::admin::run_local(task, port, input_file, input, timeout_seconds).await?;
+            }
+        },
+
+        Commands::Domain { command } => match command {
+            DomainCommands::Add { domain, project } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::domain::add(project_dir, domain).await?;
+            }
+            DomainCommands::Remove { project } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::domain::remove(project_dir).await?;
+            }
+            DomainCommands::Status { project } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::domain::status(project_dir).await?;
             }
         },
     }

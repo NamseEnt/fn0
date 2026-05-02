@@ -228,6 +228,98 @@ pub struct NextDeploymentSeqDoc {
     pub count: u64,
 }
 
+// === Custom Domain ===
+
+#[forte_doc]
+pub struct CustomDomainBySubdomainDoc {
+    #[sk]
+    pub subdomain: String,
+    pub domain: String,
+}
+
+#[forte_doc]
+pub struct CustomDomainByDomainDoc {
+    #[sk]
+    pub domain: String,
+    pub subdomain: String,
+    pub cloudflare_hostname_id: String,
+}
+
+#[forte_doc]
+pub struct CustomDomainAddJobDoc {
+    #[sk]
+    pub job_id: String,
+    pub github_username: String,
+    pub project_name: String,
+    pub subdomain: String,
+    pub domain: String,
+    pub cloudflare_hostname_id: Option<String>,
+    pub phase: CustomDomainAddPhase,
+    pub attempts: u32,
+    pub last_error: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub heartbeat_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomDomainAddPhase {
+    Queued,
+    CloudflareHostnameCreated,
+    DocPersisted,
+    Pushed,
+    Verified,
+    Done,
+    Failed,
+}
+
+impl CustomDomainAddJobDoc {
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self.phase,
+            CustomDomainAddPhase::Done | CustomDomainAddPhase::Failed
+        )
+    }
+}
+
+#[forte_doc]
+pub struct CustomDomainRemoveJobDoc {
+    #[sk]
+    pub job_id: String,
+    pub github_username: String,
+    pub project_name: String,
+    pub subdomain: String,
+    pub domain: String,
+    pub cloudflare_hostname_id: Option<String>,
+    pub phase: CustomDomainRemovePhase,
+    pub attempts: u32,
+    pub last_error: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub heartbeat_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomDomainRemovePhase {
+    Queued,
+    DocDeleted,
+    Pushed,
+    CloudflareHostnameDeleted,
+    Done,
+    Failed,
+}
+
+impl CustomDomainRemoveJobDoc {
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self.phase,
+            CustomDomainRemovePhase::Done | CustomDomainRemovePhase::Failed
+        )
+    }
+}
+
 // === Hq Jobs (queue) ===
 
 #[forte_doc]

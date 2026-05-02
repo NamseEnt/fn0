@@ -28,6 +28,7 @@ struct LruEntry {
 
 struct Inner {
     registry: HashMap<String, (u64, u64)>,
+    domain_to_subdomain: HashMap<String, String>,
     lru: VecDeque<LruEntry>,
     current_bytes: usize,
 }
@@ -58,6 +59,7 @@ impl S3BundleCache {
             env_key,
             inner: Arc::new(Mutex::new(Inner {
                 registry: HashMap::new(),
+                domain_to_subdomain: HashMap::new(),
                 lru: VecDeque::new(),
                 current_bytes: 0,
             })),
@@ -87,6 +89,23 @@ impl S3BundleCache {
             let removed = inner.lru.remove(pos).unwrap();
             inner.current_bytes = inner.current_bytes.saturating_sub(removed.size_bytes);
         }
+    }
+
+    pub async fn register_domain(&self, domain: &str, subdomain: &str) {
+        let mut inner = self.inner.lock().await;
+        inner
+            .domain_to_subdomain
+            .insert(domain.to_string(), subdomain.to_string());
+    }
+
+    pub async fn unregister_domain(&self, domain: &str) {
+        let mut inner = self.inner.lock().await;
+        inner.domain_to_subdomain.remove(domain);
+    }
+
+    pub async fn resolve_domain(&self, domain: &str) -> Option<String> {
+        let inner = self.inner.lock().await;
+        inner.domain_to_subdomain.get(domain).cloned()
     }
 
     #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
