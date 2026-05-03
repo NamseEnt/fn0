@@ -32,11 +32,7 @@ pub(crate) async fn http_post_json(
     if !response.status().is_success() {
         bail!("HTTP request failed with status: {}", response.status());
     }
-    let bytes = response
-        .into_body()
-        .bytes()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to read response body: {e}"))?;
+    let bytes = response.into_body().bytes().await;
     Ok(bytes.to_vec())
 }
 
