@@ -300,6 +300,7 @@ const dnsProvider = {
   cloudflare: {
     zoneId,
     asteriskDomain: `*.${domain}`,
+    saasFallbackDomain: dns.saasFallbackDomain,
     apiToken: dns.dnsApiToken,
   },
 };
