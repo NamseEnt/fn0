@@ -9,6 +9,7 @@ use std::fs;
 use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc::unbounded_channel;
 
@@ -330,6 +331,17 @@ pub async fn run(options: DevOptions) -> Result<()> {
         ));
     }
 
+    let (queue_tx, queue_rx) = tokio::sync::mpsc::unbounded_channel::<fn0::queue_hijack::LoopbackMessage>();
+    let queue_placeholder = "fn0-queue.fn0.dev".to_string();
+    let queue_hijack = Arc::new(fn0::QueueHijack::new_loopback(
+        queue_placeholder.clone(),
+        queue_tx,
+    ));
+
+    if !env_vars.iter().any(|(k, _)| k == "FN0_QUEUE_URL") {
+        env_vars.push(("FN0_QUEUE_URL".to_string(), format!("http://{queue_placeholder}")));
+    }
+
     let config = ServerConfig {
         port,
         wasm_path,
@@ -337,58 +349,51 @@ pub async fn run(options: DevOptions) -> Result<()> {
         public_dir,
         vite_socket_path: Some(vite.socket_path.clone()),
         env_vars,
+        queue_hijack: Some(queue_hijack),
     };
 
     let handle = server::run(config).await?;
 
-    let shutdown_token = tokio_util::sync::CancellationToken::new();
-    let _poller_handle = {
+    let _consumer_handle = tokio::task::spawn_local({
         let executor = handle.executor.clone();
-        let turso_url = format!("http://127.0.0.1:{}", sqld_port);
-        let shutdown = shutdown_token.clone();
-        tokio::task::spawn_local(async move {
-            let poller = fn0::queue_poller::QueuePoller::new(&turso_url, "");
-            poller
-                .run(
-                    |task_name, payload| {
-                        let executor = executor.clone();
-                        Box::pin(async move {
-                            let body =
-                                serde_json::json!({"task_name": task_name, "payload": payload});
-                            let body_bytes = serde_json::to_vec(&body)?;
-
-                            let request = hyper::Request::builder()
-                                .method("POST")
-                                .uri("http://localhost/__forte_queue_task/execute")
-                                .header("content-type", "application/json")
-                                .body(
-                                    http_body_util::Full::new(bytes::Bytes::from(body_bytes))
-                                        .map_err(|e| anyhow::anyhow!("{e}"))
-                                        .boxed_unsync(),
-                                )?;
-
-                            let response = executor.run("backend", "", request, None).await?;
-                            if response.status().is_success() {
-                                Ok(())
-                            } else {
-                                let (_, body) = response.into_parts();
-                                let body_bytes =
-                                    http_body_util::BodyExt::collect(body).await?.to_bytes();
-                                let error_msg = String::from_utf8_lossy(&body_bytes);
-                                Err(anyhow::anyhow!("Task failed: {}", error_msg))
-                            }
-                        })
-                    },
-                    shutdown,
-                )
-                .await;
-        })
-    };
+        let mut queue_rx = queue_rx;
+        async move {
+            while let Some(msg) = queue_rx.recv().await {
+                let body = serde_json::json!({
+                    "task_name": msg.task_name,
+                    "payload": msg.payload,
+                });
+                let body_bytes = match serde_json::to_vec(&body) {
+                    Ok(b) => b,
+                    Err(err) => {
+                        tracing::warn!(?err, "loopback queue: serialize body failed");
+                        continue;
+                    }
+                };
+                let req = match hyper::Request::builder()
+                    .method("POST")
+                    .uri("http://localhost/__forte_queue_task/execute")
+                    .header("content-type", "application/json")
+                    .body(
+                        http_body_util::Full::new(bytes::Bytes::from(body_bytes))
+                            .map_err(|never: std::convert::Infallible| match never {})
+                            .boxed_unsync(),
+                    ) {
+                    Ok(r) => r,
+                    Err(err) => {
+                        tracing::warn!(?err, "loopback queue: build request failed");
+                        continue;
+                    }
+                };
+                if let Err(err) = executor.run(&msg.subdomain, "", req, None).await {
+                    tracing::warn!(?err, task = %msg.task_name, "loopback queue task failed");
+                }
+            }
+        }
+    });
 
     let mut vite = vite;
     let result = run_watch_loop(&project_dir, handle).await;
-
-    shutdown_token.cancel();
 
     let _ = vite.child.kill();
     _sqld.kill();

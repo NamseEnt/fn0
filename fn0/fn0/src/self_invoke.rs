@@ -1,7 +1,9 @@
 use crate::execute::ClientState;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker, measure_cpu_time};
 use crate::otlp_hijack::OtlpHijack;
+use crate::queue_hijack::QueueHijack;
 use crate::turso_hijack::TursoHijack;
+use crate::vault_hijack::VaultHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
@@ -108,16 +110,22 @@ type HookResult = std::result::Result<HookResponse, TrappableError<ErrorCode>>;
 pub(crate) struct SelfInvokeHooks {
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<OtlpHijack>>,
+    queue_hijack: Option<Arc<QueueHijack>>,
+    vault_hijack: Option<Arc<VaultHijack>>,
 }
 
 impl SelfInvokeHooks {
     pub(crate) fn new(
         turso_hijack: Option<Arc<TursoHijack>>,
         otlp_hijack: Option<Arc<OtlpHijack>>,
+        queue_hijack: Option<Arc<QueueHijack>>,
+        vault_hijack: Option<Arc<VaultHijack>>,
     ) -> Self {
         Self {
             turso_hijack,
             otlp_hijack,
+            queue_hijack,
+            vault_hijack,
         }
     }
 }
@@ -143,6 +151,18 @@ impl WasiHttpHooks for SelfInvokeHooks {
             && hijack.matches(request.uri())
         {
             return turso_send(hijack, request, options);
+        }
+
+        if let Some(hijack) = self.queue_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return queue_send(hijack, request, options);
+        }
+
+        if let Some(hijack) = self.vault_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return vault_send(hijack, request, options);
         }
 
         if let Some(hijack) = self.otlp_hijack.clone()
@@ -209,6 +229,91 @@ fn turso_send(
         }
 
         let (res, io) = default_send_request(request, options).await?;
+        let res = res.map(BodyExt::boxed_unsync);
+        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
+        Ok((res, io))
+    })
+}
+
+fn queue_send(
+    hijack: Arc<QueueHijack>,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    options: Option<RequestOptions>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
+        let Some(acc_ptr) = acc_ptr else {
+            return Err(
+                ErrorCode::InternalError(Some("queue hijack accessor slot empty".into())).into(),
+            );
+        };
+        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
+        let subdomain = accessor.with(|mut access| access.data_mut().code_id.clone());
+
+        let (_parts, body) = request.into_parts();
+        let body_bytes = match body.collect().await {
+            Ok(c) => c.to_bytes(),
+            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        };
+
+        let action = match hijack.handle_enqueue(&subdomain, &body_bytes) {
+            Ok(a) => a,
+            Err(ec) => return Err(ec.into()),
+        };
+
+        hijack.record_usage(&subdomain);
+
+        match action {
+            crate::queue_hijack::HijackAction::Forward(signed) => {
+                let (res, io) = default_send_request(signed, options).await?;
+                let res = res.map(BodyExt::boxed_unsync);
+                let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+                    Box::new(io);
+                Ok((res, io))
+            }
+            crate::queue_hijack::HijackAction::Synthesized(resp) => {
+                let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+                    Box::new(async { Ok(()) });
+                Ok((resp, io))
+            }
+        }
+    })
+}
+
+fn vault_send(
+    hijack: Arc<VaultHijack>,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    options: Option<RequestOptions>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
+        let Some(acc_ptr) = acc_ptr else {
+            return Err(
+                ErrorCode::InternalError(Some("vault hijack accessor slot empty".into())).into(),
+            );
+        };
+        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
+        let subdomain = accessor.with(|mut access| access.data_mut().code_id.clone());
+
+        let (parts, body) = request.into_parts();
+        let body_bytes = match body.collect().await {
+            Ok(c) => c.to_bytes(),
+            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        };
+
+        let method = parts.method.as_str();
+        let path = parts
+            .uri
+            .path_and_query()
+            .map(|pq| pq.path())
+            .unwrap_or("/");
+
+        let signed = match hijack.build_signed_request(&subdomain, method, path, &body_bytes) {
+            Ok(req) => req,
+            Err(ec) => return Err(ec.into()),
+        };
+
+        let (res, io) = default_send_request(signed, options).await?;
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))

@@ -8,16 +8,17 @@ description = "FaaS platform powered by wasmtime"
 
 [dependencies]
 anyhow = { workspace = true }
+base64 = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 crossbeam-channel = { workspace = true }
+dashmap = { workspace = true }
 fn0-wasmtime = { workspace = true }
 futures = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["server", "client", "http1", "http2"] }
 hyper-rustls = { workspace = true }
 hyper-util = { workspace = true, features = ["service", "client", "client-legacy", "http1", "http2", "tokio"] }
-libsql-hrana = { workspace = true }
 memberlist = { workspace = true }
 oci-rust-sdk = { workspace = true }
 opentelemetry = { workspace = true, features = ["logs", "metrics"] }
@@ -43,6 +44,7 @@ tower-http = { workspace = true, features = ["timeout"] }
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }
+url = { workspace = true }
 wasmtime = { workspace = true, features = [
     "runtime",
     "cranelift",

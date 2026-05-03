@@ -18,6 +18,16 @@ export interface OciCwasmBucketInfo {
   namespace: pulumi.Output<string>;
 }
 
+export interface OciQueueInfo {
+  ocid: pulumi.Output<string>;
+  messagesEndpoint: pulumi.Output<string>;
+  region: pulumi.Output<string>;
+  ociUserId: pulumi.Output<string>;
+  ociTenancyId: pulumi.Output<string>;
+  ociFingerprint: pulumi.Output<string>;
+  ociPrivateKeyBase64: pulumi.Output<string>;
+}
+
 export interface WorkerImageRegistry {
   url: string;
   username: string;
@@ -44,6 +54,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
   public readonly workerImageRegistries: pulumi.Output<WorkerImageRegistry[]>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
+  public readonly queue: OciQueueInfo;
   public readonly ipv6CidrBlocks: pulumi.Output<string[]>;
   public readonly sshPublicKey: pulumi.Output<string>;
   public readonly sshPrivateKey: pulumi.Output<string>;
@@ -542,6 +553,85 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       accessKeyId: customerSecretKey.id,
       secretAccessKey: customerSecretKey.key,
       namespace: workerRepo.namespace,
+    };
+
+    const queue = new oci.queue.Queue(
+      "queue",
+      {
+        compartmentId: compartment.id,
+        displayName: pulumi.interpolate`fn0-queue-${compartmentSuffix}`,
+      },
+      { parent: this }
+    );
+
+    const queueUser = new oci.identity.User(
+      "queue-user",
+      {
+        name: pulumi.interpolate`fn0-queue-${compartmentSuffix}`,
+        description: "User for fn0 queue produce/consume",
+      },
+      { parent: this }
+    );
+
+    const queueGroup = new oci.identity.Group(
+      "queue-group",
+      {
+        name: pulumi.interpolate`fn0-queue-group-${compartmentSuffix}`,
+        description: "Group for fn0 queue access",
+      },
+      { parent: this }
+    );
+
+    new oci.identity.UserGroupMembership(
+      "queue-membership",
+      {
+        userId: queueUser.id,
+        groupId: queueGroup.id,
+      },
+      { parent: this }
+    );
+
+    new oci.identity.Policy(
+      "queue-policy",
+      {
+        compartmentId: compartment.id,
+        name: pulumi.interpolate`allow-queue-${compartmentSuffix}`,
+        description: "Policy for fn0 queue produce/consume",
+        statements: [
+          pulumi.interpolate`Allow group ${queueGroup.name} to use queues in compartment id ${compartment.id}`,
+        ],
+      },
+      { dependsOn: [queueGroup], parent: this }
+    );
+
+    const queueApiPrivateKey = new tls.PrivateKey(
+      "queue-api-key-pair",
+      {
+        algorithm: "RSA",
+        rsaBits: 2048,
+      },
+      { parent: this }
+    );
+
+    const queueApiKey = new oci.identity.ApiKey(
+      "queue-api-key",
+      {
+        userId: queueUser.id,
+        keyValue: queueApiPrivateKey.publicKeyPem,
+      },
+      { parent: this }
+    );
+
+    this.queue = {
+      ocid: queue.id,
+      messagesEndpoint: queue.messagesEndpoint,
+      region: pulumi.output(args.region),
+      ociUserId: queueUser.id,
+      ociTenancyId: queueUser.compartmentId,
+      ociFingerprint: queueApiKey.fingerprint,
+      ociPrivateKeyBase64: queueApiPrivateKey.privateKeyPemPkcs8.apply((pem) =>
+        Buffer.from(pem).toString("base64")
+      ),
     };
   }
 }

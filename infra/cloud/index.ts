@@ -4,6 +4,7 @@ import * as aws from "@pulumi/aws";
 import * as oci from "@pulumi/oci";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as random from "@pulumi/random";
+import * as crypto from "node:crypto";
 
 const config = new pulumi.Config();
 
@@ -296,6 +297,83 @@ const ociComputeWorker = new fn0.OciComputeWorker("oci-compute-worker", {
   hqIpv6CidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
 });
 
+const ociGlobalVault = new fn0.OciGlobalVault("oci-global-vault", {
+  region: config.require("ociHeadQuarterRegion"),
+  allowedSubdomain: "fn0-control",
+});
+
+const controlDek = new oci.kms.GeneratedKey(
+  "control-dek",
+  {
+    cryptoEndpoint: ociGlobalVault.cryptoEndpoint,
+    keyId: ociGlobalVault.keyOcid,
+    keyShape: { algorithm: "AES", length: 32 },
+    includePlaintextKey: true,
+  },
+  { dependsOn: [ociGlobalVault] }
+);
+
+const fn0TokenHmacKey = new random.RandomBytes("fn0-token-hmac-key", {
+  length: 32,
+});
+
+const controlCookieSecret = new random.RandomBytes("fn0-control-cookie-secret", {
+  length: 32,
+});
+
+const githubClientId = config.require("githubClientId");
+const githubClientSecret = config.requireSecret("githubClientSecret");
+
+function aesGcmEncryptToBase64(dekBase64: string, plaintext: string): string {
+  const key = Buffer.from(dekBase64, "base64");
+  if (key.length !== 32) {
+    throw new Error(`DEK must be 32 bytes, got ${key.length}`);
+  }
+  const nonce = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce);
+  const ct = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([nonce, ct, tag]).toString("base64");
+}
+
+const controlGithubSecretCt = pulumi
+  .all([controlDek.plaintext, githubClientSecret])
+  .apply(([dek, secret]) => aesGcmEncryptToBase64(dek, secret));
+
+const controlTokenHmacCt = pulumi
+  .all([controlDek.plaintext, fn0TokenHmacKey.base64])
+  .apply(([dek, hmac]) => aesGcmEncryptToBase64(dek, hmac));
+
+const controlCookieSecretCt = pulumi
+  .all([controlDek.plaintext, controlCookieSecret.base64])
+  .apply(([dek, secret]) => aesGcmEncryptToBase64(dek, secret));
+
+const controlEnvYamlBootstrap = pulumi
+  .all([
+    controlDek.ciphertext,
+    githubClientId,
+    controlGithubSecretCt,
+    controlTokenHmacCt,
+    controlCookieSecretCt,
+  ])
+  .apply(([dekCt, clientId, ghCt, hmacCt, cookieCt]) =>
+    [
+      "__dek:",
+      `  encrypted: ${dekCt}`,
+      `GITHUB_CLIENT_ID: ${clientId}`,
+      "GITHUB_CLIENT_SECRET:",
+      `  secret: ${ghCt}`,
+      "FN0_TOKEN_HMAC_KEY:",
+      `  secret: ${hmacCt}`,
+      "COOKIE_SECRET:",
+      `  secret: ${cookieCt}`,
+      "",
+    ].join("\n")
+  );
+
 const dnsProvider = {
   cloudflare: {
     zoneId,
@@ -383,6 +461,30 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             FN0_ADMIN_SIGNING_KEY_BASE64: adminSigningKey.base64,
             TURSO_GROUP_TOKEN: forteDb.groupToken,
             TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
+            FN0_QUEUE_OCID: ociComputeWorker.queue.ocid,
+            FN0_QUEUE_MESSAGES_ENDPOINT: ociComputeWorker.queue.messagesEndpoint,
+            FN0_QUEUE_REGION: ociComputeWorker.queue.region,
+            FN0_QUEUE_OCI_USER_ID: ociComputeWorker.queue.ociUserId,
+            FN0_QUEUE_OCI_TENANCY_ID: ociComputeWorker.queue.ociTenancyId,
+            FN0_QUEUE_OCI_FINGERPRINT: ociComputeWorker.queue.ociFingerprint,
+            FN0_QUEUE_OCI_PRIVATE_KEY_BASE64:
+              ociComputeWorker.queue.ociPrivateKeyBase64,
+            FN0_VAULT_CRYPTO_ENDPOINT: ociGlobalVault.cryptoEndpoint,
+            FN0_VAULT_KEY_OCID: ociGlobalVault.keyOcid,
+            FN0_VAULT_REGION: ociGlobalVault.region,
+            FN0_VAULT_ALLOWED_SUBDOMAIN: ociGlobalVault.allowedSubdomain,
+            FN0_VAULT_OCI_USER_ID: ociGlobalVault.workerCredentials.apply(
+              (c) => c.ociUserId
+            ),
+            FN0_VAULT_OCI_TENANCY_ID: ociGlobalVault.workerCredentials.apply(
+              (c) => c.ociTenancyId
+            ),
+            FN0_VAULT_OCI_FINGERPRINT: ociGlobalVault.workerCredentials.apply(
+              (c) => c.ociFingerprint
+            ),
+            FN0_VAULT_OCI_PRIVATE_KEY_BASE64: ociGlobalVault.workerCredentials.apply(
+              (c) => c.ociPrivateKeyBase64
+            ),
           },
           sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
           sshPrivateKeyBase64: ociComputeWorker.sshPrivateKey.apply(
@@ -417,3 +519,6 @@ export const hqAwsAccessKeyId = pulumi.secret(hqAwsAccessKey.id);
 export const hqAwsSecretAccessKey = pulumi.secret(hqAwsAccessKey.secret);
 export const docDbUrl = docDb.url;
 export const docDbToken = pulumi.secret(docDb.token);
+export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
+export const vaultKeyOcid = ociGlobalVault.keyOcid;
+export const controlBootstrapEnvYaml = pulumi.secret(controlEnvYamlBootstrap);

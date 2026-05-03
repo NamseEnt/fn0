@@ -1565,22 +1565,23 @@ fn generate_enqueue_module(queue_tasks: &[QueueTaskInfo]) -> TokenStream {
 
             quote! {
                 pub async fn #fn_name(input: crate::#(#module_path)::*::Input) -> forte_sdk::anyhow::Result<()> {
-                    let payload = forte_sdk::serde_json::to_string(&input)?;
-                    let id = forte_sdk::Uuid::now_v7().to_string();
-                    let now = forte_sdk::now().to_rfc3339();
-                    doc_db::turso()
-                        .execute_raw(
-                            "INSERT INTO __forte_queue (id, task_name, payload, status, retry_count, max_retries, created_at, updated_at) VALUES (?, ?, ?, 'pending', 0, 3, ?, ?)",
-                            vec![
-                                doc_db::text_value(&id),
-                                doc_db::text_value(#task_name_str),
-                                doc_db::text_value(&payload),
-                                doc_db::text_value(&now),
-                                doc_db::text_value(&now),
-                            ],
-                            false,
-                        )
-                        .await?;
+                    let payload = forte_sdk::serde_json::to_value(&input)?;
+                    let body = forte_sdk::serde_json::to_vec(&forte_sdk::serde_json::json!({
+                        "task_name": #task_name_str,
+                        "payload": payload,
+                    }))?;
+                    let url = std::env::var("FN0_QUEUE_URL")
+                        .map_err(|_| forte_sdk::anyhow::anyhow!("FN0_QUEUE_URL is not set"))?;
+                    let request = forte_sdk::http::Request::post(&url)
+                        .header("Content-Type", "application/json")
+                        .body(body)?;
+                    let response = forte_sdk::http::Client::new().send(request).await?;
+                    if !response.status().is_success() {
+                        return Err(forte_sdk::anyhow::anyhow!(
+                            "enqueue failed with status {}",
+                            response.status()
+                        ));
+                    }
                     Ok(())
                 }
             }

@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["fn0/*", "forte/*", "doc-db"]
-exclude = ["vendor/*", "forte/rs-to-ts"]
+exclude = ["vendor/*", "forte/rs-to-ts", "fn0/control"]
 
 [workspace.package]
 edition = "2024"
@@ -80,6 +80,7 @@ rustls-pki-types = "=1.13.2"
 schemars = "=0.8.22"
 serde = "=1.0.228"
 serde_json = "=1.0.148"
+serde_yaml = "=0.9.34"
 sha2 = "=0.10.9"
 singleflight = "=0.3.0"
 socket2 = "=0.6.1"
@@ -100,6 +101,7 @@ tower-http = "=0.6.8"
 tracing = "=0.1.44"
 tracing-opentelemetry = { version = "=0.32.1", default-features = false }
 tracing-subscriber = { version = "=0.3.23", default-features = false }
+url = "=2.5.8"
 uuid = "=1.19.0"
 wasmtime = { version = "=43.0.1", default-features = false }
 wasmtime-wasi = "=43.0.1"

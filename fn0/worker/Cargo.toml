@@ -22,6 +22,7 @@ futures = { workspace = true }
 hmac = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
+oci-rust-sdk = { workspace = true }
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
 opendal = { workspace = true }
@@ -35,6 +36,7 @@ rustls = { workspace = true }
 rustls-pemfile = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 sha2 = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
@@ -42,4 +44,5 @@ tokio-rustls = { workspace = true }
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }
+url = { workspace = true }
 zstd = { workspace = true }
