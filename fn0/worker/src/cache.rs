@@ -1,4 +1,5 @@
-use crate::env_crypto;
+use crate::env_yaml;
+use crate::vault_client::VaultClient;
 use async_singleflight::Group;
 use fn0::cache::{Bundle, BundleCache, Error};
 use fn0::execute::ClientState;
@@ -38,7 +39,7 @@ pub struct S3BundleCache {
     engine: Engine,
     linker: Linker<ClientState<SystemClock>>,
     operator: Operator,
-    env_key: [u8; 32],
+    vault: Option<Arc<VaultClient>>,
     inner: Arc<Mutex<Inner>>,
     cache_size_bytes: usize,
     singleflight: Arc<Group<String, Arc<Bundle>, Error>>,
@@ -49,14 +50,14 @@ impl S3BundleCache {
         engine: Engine,
         linker: Linker<ClientState<SystemClock>>,
         operator: Operator,
-        env_key: [u8; 32],
+        vault: Option<Arc<VaultClient>>,
         cache_size_bytes: usize,
     ) -> Self {
         Self {
             engine,
             linker,
             operator,
-            env_key,
+            vault,
             inner: Arc::new(Mutex::new(Inner {
                 registry: HashMap::new(),
                 domain_to_subdomain: HashMap::new(),
@@ -172,7 +173,7 @@ impl S3BundleCache {
         let mut manifest: Option<Manifest> = None;
         let mut wasm_bytes: Option<Vec<u8>> = None;
         let mut js_bytes: Option<Vec<u8>> = None;
-        let mut env_enc_bytes: Option<Vec<u8>> = None;
+        let mut env_yaml_bytes: Option<Vec<u8>> = None;
 
         let mut archive = tar::Archive::new(tar_bytes.as_slice());
         let entries = archive
@@ -206,8 +207,8 @@ impl S3BundleCache {
                 "entry.js" => {
                     js_bytes = Some(buf);
                 }
-                "env.enc" => {
-                    env_enc_bytes = Some(buf);
+                "env.yaml" => {
+                    env_yaml_bytes = Some(buf);
                 }
                 _ => {}
             }
@@ -235,13 +236,16 @@ impl S3BundleCache {
         };
         let js_size = js.as_ref().map(|s| s.len()).unwrap_or(0);
 
-        let env_vars = match env_enc_bytes {
-            Some(blob) => {
-                let plaintext = env_crypto::decrypt(&self.env_key, &blob)
-                    .map_err(|e| Error::Decode(anyhow::anyhow!("env decrypt: {e}")))?;
-                let content =
-                    String::from_utf8(plaintext).map_err(|e| Error::Decode(anyhow::anyhow!(e)))?;
-                env_crypto::parse_env_file(&content)
+        let env_vars = match env_yaml_bytes {
+            Some(bytes) => {
+                let vault = self.vault.as_ref().ok_or_else(|| {
+                    Error::Decode(anyhow::anyhow!(
+                        "bundle has env.yaml but vault client is not configured"
+                    ))
+                })?;
+                env_yaml::load(&bytes, vault)
+                    .await
+                    .map_err(|e| Error::Decode(anyhow::anyhow!("env.yaml load: {e}")))?
             }
             None => Vec::new(),
         };

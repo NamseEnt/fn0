@@ -2,14 +2,18 @@ mod admin_verify;
 mod cache;
 mod deployments_watcher;
 mod env_crypto;
+mod env_yaml;
+mod queue_consumer;
 mod telemetry;
+mod vault_client;
 mod worker_pool;
 
 use base64::Engine;
 use bytes::Bytes;
 use cache::S3BundleCache;
 use color_eyre::eyre::Result;
-use fn0::{ExecutionContext, OtlpHijack, TursoHijack};
+use fn0::{ExecutionContext, OtlpHijack, QueueHijack, TursoHijack, VaultHijack};
+use vault_client::VaultClient;
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::server::conn::http1;
@@ -58,6 +62,34 @@ fn build_otlp_hijack() -> Option<Arc<OtlpHijack>> {
         target_path_prefix,
         auth,
     }))
+}
+
+fn build_queue_hijack() -> Option<Arc<QueueHijack>> {
+    match QueueHijack::from_env() {
+        Ok(Some(hijack)) => Some(Arc::new(hijack)),
+        Ok(None) => {
+            tracing::warn!("FN0_QUEUE_MESSAGES_ENDPOINT not set; queue hijack disabled");
+            None
+        }
+        Err(err) => {
+            tracing::error!(?err, "queue hijack build failed");
+            None
+        }
+    }
+}
+
+fn build_vault_hijack() -> Option<Arc<VaultHijack>> {
+    match VaultHijack::from_env() {
+        Ok(Some(hijack)) => Some(Arc::new(hijack)),
+        Ok(None) => {
+            tracing::warn!("FN0_VAULT_CRYPTO_ENDPOINT not set; vault hijack disabled");
+            None
+        }
+        Err(err) => {
+            tracing::error!(?err, "vault hijack build failed");
+            None
+        }
+    }
 }
 
 fn build_turso_hijack() -> Option<Arc<TursoHijack>> {
@@ -116,9 +148,14 @@ async fn run() -> Result<()> {
         .parse()
         .expect("HTTP_PORT must be a valid port");
 
-    let env_key_base64 =
-        std::env::var("FN0_ENV_KEY_BASE64").expect("FN0_ENV_KEY_BASE64 is required");
-    let env_key = env_crypto::decode_key_base64(&env_key_base64)?;
+    let vault_client = match VaultClient::from_env() {
+        Ok(Some(c)) => Some(Arc::new(c)),
+        Ok(None) => {
+            tracing::warn!("FN0_VAULT_CRYPTO_ENDPOINT not set; vault client disabled");
+            None
+        }
+        Err(err) => return Err(color_eyre::eyre::eyre!("vault client init: {err}")),
+    };
 
     let admin_signing_key: Option<Arc<[u8; 32]>> =
         match std::env::var("FN0_ADMIN_SIGNING_KEY_BASE64") {
@@ -157,7 +194,7 @@ async fn run() -> Result<()> {
         engine.clone(),
         linker.clone(),
         operator,
-        env_key,
+        vault_client.clone(),
         cache_size_bytes,
     );
 
@@ -165,6 +202,12 @@ async fn run() -> Result<()> {
         let mut ctx = ExecutionContext::new(engine, linker, cache.clone());
         if let Some(hijack) = build_turso_hijack() {
             ctx = ctx.with_turso_hijack(hijack);
+        }
+        if let Some(hijack) = build_queue_hijack() {
+            ctx = ctx.with_queue_hijack(hijack);
+        }
+        if let Some(hijack) = build_vault_hijack() {
+            ctx = ctx.with_vault_hijack(hijack);
         }
         if let Some(hijack) = build_otlp_hijack() {
             ctx = ctx.with_otlp_hijack(hijack);
@@ -193,6 +236,23 @@ async fn run() -> Result<()> {
         }
     });
 
+    let queue_consumer_handle = match queue_consumer::QueueConsumerConfig::from_env() {
+        Ok(Some(config)) => {
+            let worker_senders = worker_senders.clone();
+            Some(tokio::spawn(async move {
+                queue_consumer::run(config, worker_senders).await;
+            }))
+        }
+        Ok(None) => {
+            tracing::warn!("FN0_QUEUE_MESSAGES_ENDPOINT not set; queue consumer disabled");
+            None
+        }
+        Err(err) => {
+            tracing::error!(?err, "queue consumer config invalid; consumer disabled");
+            None
+        }
+    };
+
     let http_handle = tokio::spawn({
         let worker_senders = worker_senders.clone();
         let generation = generation.clone();
@@ -218,6 +278,13 @@ async fn run() -> Result<()> {
     tokio::select! {
         _ = watcher_handle => {},
         _ = http_handle => {},
+        _ = async {
+            if let Some(h) = queue_consumer_handle {
+                let _ = h.await;
+            } else {
+                std::future::pending::<()>().await;
+            }
+        } => {},
         _ = tokio::signal::ctrl_c() => {
             tracing::info!("Received ctrl-c, shutting down");
         },

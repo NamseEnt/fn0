@@ -2,12 +2,12 @@ pub mod cache;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
-pub mod queue_poller;
+pub mod queue_hijack;
 mod self_invoke;
 pub mod telemetry;
 pub mod otlp_hijack;
 pub mod turso_hijack;
-pub mod turso_queue;
+pub mod vault_hijack;
 
 use crate::measure_cpu_time::SystemClock;
 use anyhow::{Result, anyhow};
@@ -27,7 +27,9 @@ use wasmtime_wasi_http::p3::bindings::ServicePre;
 
 pub use ski::{FetchHandler, FetchHandlerFuture};
 pub use otlp_hijack::OtlpHijack;
+pub use queue_hijack::QueueHijack;
 pub use turso_hijack::TursoHijack;
+pub use vault_hijack::VaultHijack;
 pub use wasmtime;
 
 pub type WasmProxyPre = ServicePre<ClientState<SystemClock>>;
@@ -66,6 +68,8 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) bundle_cache: C,
     pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
     pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
+    pub(crate) queue_hijack: Option<Arc<QueueHijack>>,
+    pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -76,6 +80,8 @@ impl<C: BundleCache> ExecutionContext<C> {
             bundle_cache,
             turso_hijack: None,
             otlp_hijack: None,
+            queue_hijack: None,
+            vault_hijack: None,
         }
     }
 
@@ -86,6 +92,16 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn with_otlp_hijack(mut self, otlp_hijack: Arc<OtlpHijack>) -> Self {
         self.otlp_hijack = Some(otlp_hijack);
+        self
+    }
+
+    pub fn with_queue_hijack(mut self, queue_hijack: Arc<QueueHijack>) -> Self {
+        self.queue_hijack = Some(queue_hijack);
+        self
+    }
+
+    pub fn with_vault_hijack(mut self, vault_hijack: Arc<VaultHijack>) -> Self {
+        self.vault_hijack = Some(vault_hijack);
         self
     }
 
@@ -107,6 +123,14 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn otlp_hijack(&self) -> Option<&Arc<OtlpHijack>> {
         self.otlp_hijack.as_ref()
+    }
+
+    pub fn queue_hijack(&self) -> Option<&Arc<QueueHijack>> {
+        self.queue_hijack.as_ref()
+    }
+
+    pub fn vault_hijack(&self) -> Option<&Arc<VaultHijack>> {
+        self.vault_hijack.as_ref()
     }
 }
 
@@ -326,6 +350,8 @@ impl<C: BundleCache> CodeExecutor<C> {
         let subdomain_owned = subdomain.to_string();
         let turso_hijack = ctx.turso_hijack.clone();
         let otlp_hijack = ctx.otlp_hijack.clone();
+        let queue_hijack = ctx.queue_hijack.clone();
+        let vault_hijack = ctx.vault_hijack.clone();
         tokio::task::spawn_local(async move {
             let result = execute::run_wasm_instance_loop(
                 &ctx.engine,
@@ -334,6 +360,8 @@ impl<C: BundleCache> CodeExecutor<C> {
                 rx,
                 turso_hijack,
                 otlp_hijack,
+                queue_hijack,
+                vault_hijack,
             )
             .await;
             if let Err(e) = result {

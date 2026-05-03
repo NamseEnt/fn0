@@ -17,6 +17,9 @@ pub enum Commands {
     Build,
     Deploy,
     Destroy,
+    Login {
+        token: Option<String>,
+    },
     Rename {
         new_name: String,
     },
@@ -32,6 +35,17 @@ pub enum Commands {
         #[command(subcommand)]
         command: DomainCommands,
     },
+    Secrets {
+        #[command(subcommand)]
+        command: SecretsCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SecretsCommands {
+    Set { key: String, value: String },
+    List,
+    Unset { key: String },
 }
 
 #[derive(Subcommand)]

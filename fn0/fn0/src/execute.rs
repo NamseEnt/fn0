@@ -120,6 +120,8 @@ pub(crate) fn build_store<C>(
     is_timeout: Arc<AtomicBool>,
     hooks: SelfInvokeHooks,
     turso_hijack: Option<&TursoHijack>,
+    queue_hijack: Option<&crate::QueueHijack>,
+    vault_hijack: Option<&crate::VaultHijack>,
 ) -> Store<ClientState<C>>
 where
     C: Clock,
@@ -132,11 +134,23 @@ where
             if turso_hijack.is_some() && (key == "TURSO_URL" || key == "TURSO_AUTH_TOKEN") {
                 continue;
             }
+            if queue_hijack.is_some() && key == "FN0_QUEUE_URL" {
+                continue;
+            }
+            if vault_hijack.is_some() && key == "FN0_VAULT_URL" {
+                continue;
+            }
             builder.env(key, value);
         }
         if let Some(hijack) = turso_hijack {
             builder.env("TURSO_URL", format!("http://{}", hijack.placeholder_host));
             builder.env("TURSO_AUTH_TOKEN", "");
+        }
+        if let Some(hijack) = queue_hijack {
+            builder.env("FN0_QUEUE_URL", hijack.placeholder_url());
+        }
+        if let Some(hijack) = vault_hijack {
+            builder.env("FN0_VAULT_URL", hijack.placeholder_url());
         }
         builder.build()
     };
@@ -179,6 +193,8 @@ pub async fn run_wasm_instance_loop(
     mut rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<crate::OtlpHijack>>,
+    queue_hijack: Option<Arc<crate::QueueHijack>>,
+    vault_hijack: Option<Arc<crate::VaultHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -189,8 +205,15 @@ pub async fn run_wasm_instance_loop(
         &bundle.env_vars,
         time_tracker.clone(),
         is_timeout.clone(),
-        SelfInvokeHooks::new(turso_hijack.clone(), otlp_hijack.clone()),
+        SelfInvokeHooks::new(
+            turso_hijack.clone(),
+            otlp_hijack.clone(),
+            queue_hijack.clone(),
+            vault_hijack.clone(),
+        ),
         turso_hijack.as_deref(),
+        queue_hijack.as_deref(),
+        vault_hijack.as_deref(),
     );
 
     let service = bundle

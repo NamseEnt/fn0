@@ -6,7 +6,7 @@ mod prompts;
 mod utils;
 
 use clap::Parser;
-use cli::{AdminCommands, Cli, Commands, DomainCommands};
+use cli::{AdminCommands, Cli, Commands, DomainCommands, SecretsCommands};
 use color_eyre::Result;
 
 fn main() -> Result<()> {
@@ -36,6 +36,9 @@ async fn async_main() -> Result<()> {
         Commands::Destroy => {
             commands::destroy::execute().await?;
         }
+        Commands::Login { token } => {
+            commands::login::execute(token).await?;
+        }
         Commands::Rename { new_name } => {
             commands::rename::execute(&new_name).await?;
         }
@@ -62,6 +65,17 @@ async fn async_main() -> Result<()> {
             }
             DomainCommands::Status => {
                 commands::domain::status().await?;
+            }
+        },
+        Commands::Secrets { command } => match command {
+            SecretsCommands::Set { key, value } => {
+                commands::secrets::set(key, value).await?;
+            }
+            SecretsCommands::List => {
+                commands::secrets::list().await?;
+            }
+            SecretsCommands::Unset { key } => {
+                commands::secrets::unset(key).await?;
             }
         },
     }

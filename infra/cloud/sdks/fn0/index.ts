@@ -30,6 +30,11 @@ export type OciComputeWorker = import("./ociComputeWorker").OciComputeWorker;
 export const OciComputeWorker: typeof import("./ociComputeWorker").OciComputeWorker = null as any;
 utilities.lazyLoad(exports, ["OciComputeWorker"], () => require("./ociComputeWorker"));
 
+export { OciGlobalVaultArgs } from "./ociGlobalVault";
+export type OciGlobalVault = import("./ociGlobalVault").OciGlobalVault;
+export const OciGlobalVault: typeof import("./ociGlobalVault").OciGlobalVault = null as any;
+utilities.lazyLoad(exports, ["OciGlobalVault"], () => require("./ociGlobalVault"));
+
 export { OciHeadQuarterArgs } from "./ociHeadQuarter";
 export type OciHeadQuarter = import("./ociHeadQuarter").OciHeadQuarter;
 export const OciHeadQuarter: typeof import("./ociHeadQuarter").OciHeadQuarter = null as any;
@@ -77,6 +82,8 @@ const _module = {
                 return new ForteR2(name, <any>undefined, { urn })
             case "fn0:index:OciComputeWorker":
                 return new OciComputeWorker(name, <any>undefined, { urn })
+            case "fn0:index:OciGlobalVault":
+                return new OciGlobalVault(name, <any>undefined, { urn })
             case "fn0:index:OciHeadQuarter":
                 return new OciHeadQuarter(name, <any>undefined, { urn })
             case "fn0:index:OciHeadQuarterVcn":

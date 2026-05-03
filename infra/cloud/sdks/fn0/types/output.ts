@@ -14,6 +14,23 @@ export interface OciCwasmBucketInfo {
     secretAccessKey: string;
 }
 
+export interface OciGlobalVaultWorkerCredentials {
+    ociFingerprint: string;
+    ociPrivateKeyBase64: string;
+    ociTenancyId: string;
+    ociUserId: string;
+}
+
+export interface OciQueueInfo {
+    ocid: string;
+    messagesEndpoint: string;
+    region: string;
+    ociUserId: string;
+    ociTenancyId: string;
+    ociFingerprint: string;
+    ociPrivateKeyBase64: string;
+}
+
 export interface OciWorkerInfraEnvs {
     OCI_AVAILABILITY_DOMAIN: string;
     OCI_COMPARTMENT_ID: string;

@@ -36,3 +36,5 @@ config:
     secure: AAABAKXxaIBVJJwdv1HixF2blTO4Dqs/dbcvbitrZy3EYyHmjys82zCiWIfGun7lyHxSMMx8DUno/7DDB8W9zzqJ9rJ0vGunxLuWge2UBqUI3cOMqLviYF9+eockvL+tUssd56N+wt9qmTqcbd898H9HLlWvxGg0eIOwTsStWmNbXXr/15NJy8E4HgDObcuFklYFnYaEKHR6GKEDhDrRG4wShdYQsWT+NQ99lzynirmDDjCgF6oY/cpmFcMxz8Au9dFJbeae5Ei41iPTlvcLL3ha8mYnGpMYfxWHboPt1yfPZjX8c7dVy2ef4we8vw2PQVrjF1CtWcattld9mvPiDKrTtdqQvR5EvkNlxV2HpLh/uNW3nIzwbd4iNJsMjtXT6RpXmwWTKW/zcSuNPcgI3/B1TdYcWJI=
   fn0Cloud:tursoDbUrl: libsql://fn0-namse.aws-ap-northeast-1.turso.io
   fn0Cloud:githubClientId: Ov23liRuIJf1NSe9ccP8
+  fn0Cloud:githubClientSecret:
+    secure: AAABAPjb842PxNqtIqH+dLnkomhrmgUHIZrEpIi9eJaiCL4xPuh0i+H8UxCQJD7pYBWnxurckIy1ocZGa1DU01b7TC2jbOti

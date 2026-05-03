@@ -6,7 +6,6 @@ pub mod dev;
 pub mod domain;
 pub mod fe_runtime;
 pub mod init;
-pub mod queue;
 pub mod rename;
 
 use clap::{Parser, Subcommand};
@@ -67,12 +66,6 @@ pub enum Commands {
         /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
-    },
-
-    /// Queue management commands
-    Queue {
-        #[command(subcommand)]
-        command: QueueCommands,
     },
 
     /// Admin task commands
@@ -139,20 +132,6 @@ pub enum AdminCommands {
         input: Option<String>,
         #[arg(long, default_value_t = 300)]
         timeout_seconds: u64,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum QueueCommands {
-    /// Flush dead queue tasks back to pending
-    Flush {
-        /// Project directory (defaults to current directory)
-        #[arg(short, long)]
-        project: Option<PathBuf>,
-
-        /// Only flush tasks with this name
-        #[arg(short, long)]
-        task_name: Option<String>,
     },
 }
 
