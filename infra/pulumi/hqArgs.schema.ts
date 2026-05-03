@@ -21,6 +21,7 @@ export interface AwsArgs {
 export interface CloudflareDnsProviderArgs {
   apiToken: pulumi.Input<string>;
   asteriskDomain: pulumi.Input<string>;
+  saasFallbackDomain: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
 }
 export interface CloudflareSaasArgs {

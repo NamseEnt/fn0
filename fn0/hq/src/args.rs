@@ -113,6 +113,7 @@ pub struct OciComputeVmHostProviderArgs {
 pub struct CloudflareDnsProviderArgs {
     pub zone_id: String,
     pub asterisk_domain: String,
+    pub saas_fallback_domain: String,
     pub api_token: String,
 }
 

@@ -8,6 +8,7 @@ pub struct CloudflareDnsProvider {
     client: reqwest::Client,
     zone_id: String,
     asterisk_domain: String,
+    saas_fallback_domain: String,
     api_token: String,
     api_url: String,
 }
@@ -21,16 +22,19 @@ impl CloudflareDnsProvider {
                 .unwrap(),
             zone_id: args.zone_id,
             asterisk_domain: args.asterisk_domain,
+            saas_fallback_domain: args.saas_fallback_domain,
             api_token: args.api_token,
             api_url: api_url.unwrap_or_else(|| "https://api.cloudflare.com/client/v4".to_string()),
         }
     }
-    async fn list_records(&self) -> color_eyre::Result<Vec<Record>> {
+
+    fn target_names(&self) -> [&str; 2] {
+        [&self.asterisk_domain, &self.saas_fallback_domain]
+    }
+
+    async fn list_records_for(&self, name: &str) -> color_eyre::Result<Vec<Record>> {
         let url = format!("{}/zones/{}/dns_records", self.api_url, self.zone_id);
-        let params = [
-            ("per_page", "5000000"),
-            ("name.exact", self.asterisk_domain.as_str()),
-        ];
+        let params = [("per_page", "5000000"), ("name.exact", name)];
 
         #[derive(Debug, serde::Deserialize)]
         struct CloudflareDnsRecordsResponse {
@@ -61,8 +65,8 @@ impl CloudflareDnsProvider {
         let response: CloudflareDnsRecordsResponse = serde_json::from_str(&text)?;
 
         if !response.success {
-            eprintln!("Failed to list records: {response:?}");
-            return Err(color_eyre::eyre::eyre!("Failed to list records"));
+            eprintln!("Failed to list records for {name}: {response:?}");
+            return Err(color_eyre::eyre::eyre!("Failed to list records for {name}"));
         }
 
         Ok(response
@@ -73,6 +77,7 @@ impl CloudflareDnsProvider {
                 record.r#type == "A" || record.r#type == "AAAA" || record.r#type == "CNAME"
             })
             .map(|record| Record {
+                name: name.to_string(),
                 content: record.content,
                 record_type: record.r#type,
                 id: record.id,
@@ -91,30 +96,11 @@ fn addr_to_record_type(addr: &str) -> &'static str {
 
 impl DnsProvide for CloudflareDnsProvider {
     async fn sync_addrs(&self, addrs: BTreeSet<String>) -> color_eyre::Result<()> {
-        let old_records = self.list_records().await?;
+        let names = self.target_names();
 
-        let new_addrs: Vec<_> = addrs
-            .iter()
-            .filter(|addr| {
-                let record_type = addr_to_record_type(addr);
-                old_records
-                    .iter()
-                    .all(|r| !(r.content == **addr && r.record_type == record_type))
-            })
-            .collect();
-
-        let deleted_records: Vec<_> = old_records
-            .iter()
-            .filter(|record| {
-                addrs.iter().all(|addr| {
-                    let record_type = addr_to_record_type(addr);
-                    !(record.content == *addr && record.record_type == record_type)
-                })
-            })
-            .collect();
-
-        if new_addrs.is_empty() && deleted_records.is_empty() {
-            return Ok(());
+        let mut old_records: Vec<Record> = Vec::new();
+        for name in &names {
+            old_records.extend(self.list_records_for(name).await?);
         }
 
         #[derive(serde::Serialize)]
@@ -137,6 +123,42 @@ impl DnsProvide for CloudflareDnsProvider {
             proxied: bool,
         }
 
+        let mut posts: Vec<Post> = Vec::new();
+        for name in &names {
+            for addr in &addrs {
+                let record_type = addr_to_record_type(addr);
+                let already = old_records.iter().any(|r| {
+                    r.name == *name && r.content == *addr && r.record_type == record_type
+                });
+                if !already {
+                    posts.push(Post {
+                        name,
+                        ttl: 60,
+                        r#type: record_type,
+                        content: addr,
+                        proxied: true,
+                    });
+                }
+            }
+        }
+
+        let deletes: Vec<Delete> = old_records
+            .iter()
+            .filter(|record| {
+                addrs.iter().all(|addr| {
+                    let record_type = addr_to_record_type(addr);
+                    !(record.content == *addr && record.record_type == record_type)
+                })
+            })
+            .map(|record| Delete {
+                id: record.id.as_str(),
+            })
+            .collect();
+
+        if posts.is_empty() && deletes.is_empty() {
+            return Ok(());
+        }
+
         let response = self
             .client
             .post(format!(
@@ -145,24 +167,7 @@ impl DnsProvide for CloudflareDnsProvider {
             ))
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", self.api_token))
-            .body(serde_json::to_string(&Body {
-                deletes: deleted_records
-                    .into_iter()
-                    .map(|record| Delete {
-                        id: record.id.as_str(),
-                    })
-                    .collect(),
-                posts: new_addrs
-                    .into_iter()
-                    .map(|addr| Post {
-                        name: &self.asterisk_domain,
-                        ttl: 60,
-                        r#type: addr_to_record_type(addr),
-                        content: addr,
-                        proxied: true,
-                    })
-                    .collect(),
-            })?)
+            .body(serde_json::to_string(&Body { deletes, posts })?)
             .timeout(DEFAULT_TIMEOUT)
             .send()
             .await?
@@ -177,6 +182,7 @@ impl DnsProvide for CloudflareDnsProvider {
 
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
 struct Record {
+    name: String,
     content: String,
     record_type: String,
     id: String,

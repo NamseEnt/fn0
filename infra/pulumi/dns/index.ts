@@ -14,6 +14,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
   certificate: pulumi.Output<string>;
   dnsApiToken: pulumi.Output<string>;
   saasApiToken: pulumi.Output<string>;
+  saasFallbackDomain: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -125,5 +126,17 @@ export class CloudflareDns extends pulumi.ComponentResource {
     );
 
     this.saasApiToken = cloudflareSaasApiToken.value;
+
+    const fallbackDomain = pulumi.interpolate`fallback.${domain}`;
+    this.saasFallbackDomain = fallbackDomain;
+
+    new cloudflare.CustomHostnameFallbackOrigin(
+      "saas-fallback-origin",
+      {
+        zoneId,
+        origin: fallbackDomain,
+      },
+      { parent: this }
+    );
   }
 }
