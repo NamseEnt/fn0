@@ -188,20 +188,6 @@ impl MemoryTransaction {
             .map(|doc| doc.data.clone().into()))
     }
 
-    pub(crate) async fn get_with_version(
-        &mut self,
-        pk: &str,
-        sk: &str,
-    ) -> Result<Option<StoredDoc>> {
-        Ok(self
-            .working
-            .get(&(pk.to_string(), sk.to_string()))
-            .map(|doc| StoredDoc {
-                data: doc.data.clone().into(),
-                version: doc.version,
-            }))
-    }
-
     pub(crate) async fn put(&mut self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
         upsert(&mut self.working, pk, sk, data);
         Ok(())
@@ -210,15 +196,6 @@ impl MemoryTransaction {
     pub(crate) async fn delete(&mut self, pk: &str, sk: &str) -> Result<()> {
         self.working.remove(&(pk.to_string(), sk.to_string()));
         Ok(())
-    }
-
-    pub(crate) async fn execute_stmt(
-        &mut self,
-        sql: &str,
-        args: Vec<Value>,
-        _want_rows: bool,
-    ) -> Result<StmtResult> {
-        execute_sql_on_store(&mut self.working, sql, args)
     }
 
     pub(crate) async fn commit(self) -> Result<()> {

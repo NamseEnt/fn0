@@ -341,31 +341,6 @@ impl Transaction {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(pk = %pk, sk = %sk))]
-    pub(crate) async fn get_with_version(
-        &mut self,
-        pk: &str,
-        sk: &str,
-    ) -> Result<Option<StoredDoc>> {
-        match &mut self.inner {
-            TransactionInner::Turso(tx) => tx.get_with_version(pk, sk).await,
-            TransactionInner::Memory(tx) => tx.get_with_version(pk, sk).await,
-        }
-    }
-
-    #[tracing::instrument(skip_all, fields(sql = %sql))]
-    pub(crate) async fn execute_stmt(
-        &mut self,
-        sql: &str,
-        args: Vec<Value>,
-        want_rows: bool,
-    ) -> Result<libsql_hrana::proto::StmtResult> {
-        match &mut self.inner {
-            TransactionInner::Turso(tx) => tx.execute_stmt(sql, args, want_rows).await,
-            TransactionInner::Memory(tx) => tx.execute_stmt(sql, args, want_rows).await,
-        }
-    }
-
     #[tracing::instrument(skip_all, fields(writes = writes.len()))]
     pub(crate) async fn apply_writes_and_commit(
         &mut self,

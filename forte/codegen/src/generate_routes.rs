@@ -209,8 +209,6 @@ struct HookInfo {
 #[derive(Debug)]
 struct ActionInfo {
     name: String,
-    module_name: String,
-    module_path: String,
 }
 
 #[derive(Debug)]
@@ -328,13 +326,7 @@ fn discover_actions(actions_dir: &Path) -> Vec<ActionInfo> {
             };
 
             if has_action_handler(&content) {
-                let module_name = format!("actions_{}", file_name);
-                let module_path = format!("actions/{}.rs", file_name);
-                actions.push(ActionInfo {
-                    name: file_name,
-                    module_name,
-                    module_path,
-                });
+                actions.push(ActionInfo { name: file_name });
             }
         }
     }

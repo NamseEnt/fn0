@@ -327,7 +327,7 @@ where
             let entries = match entries_result {
                 Ok(e) => e,
                 Err(err) => {
-                    if let Some(mut tx) = tx {
+                    if let Some(tx) = tx {
                         let _ = tx.rollback().await;
                     }
                     return AttemptOutcome::Done(TrxResult::Err(E::from(err)));
@@ -342,7 +342,7 @@ where
         }
         TrxControlInner::Cancel(reason) => {
             let tx_to_rollback = state.lock().unwrap().tx.take();
-            if let Some(mut tx) = tx_to_rollback {
+            if let Some(tx) = tx_to_rollback {
                 let _ = tx.rollback().await;
             }
             AttemptOutcome::Done(TrxResult::Cancelled(reason))
