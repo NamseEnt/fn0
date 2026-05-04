@@ -1,0 +1,2 @@
+pub const MAX_FILES_PER_BUILD: usize = 10_000;
+pub const MAX_TOTAL_SIZE_PER_BUILD: u64 = 1_000_000_000;

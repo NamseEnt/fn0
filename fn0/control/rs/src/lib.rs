@@ -6,3 +6,4 @@ mod route_generated;
 
 pub mod common;
 pub mod docs;
+pub mod quota;
