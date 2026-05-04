@@ -61,6 +61,7 @@ pub async fn handler(
                 created_at: forte_sdk::now(),
                 cli_tokens: Vec::new(),
                 web_sessions: Vec::new(),
+                projects: Vec::new(),
             };
             UserDocPut(fresh.clone()).send_with(&db).await?;
             fresh

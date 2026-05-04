@@ -42,7 +42,7 @@ mod proxy {
         { inline :
         "package forte:user; world service-export { import wasi:http/types@0.3.0-rc-2026-03-15; export wasi:http/handler@0.3.0-rc-2026-03-15; }",
         path :
-        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/release/build/fn0-control-11c11791c5a96c02/out/forte-wit",
+        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/debug/build/fn0-control-8d7b5d5a33ab1b06/out/forte-wit",
         world : "service-export", default_bindings_module :
         "crate::route_generated::proxy", pub_export_macro : true, async : true, features
         : ["clocks-timezone"], with : { "wasi:http/handler@0.3.0-rc-2026-03-15" :
@@ -89,7 +89,6 @@ fn classify_route(path: &str) -> String {
     if path.strip_prefix("/__self_invoke/").is_some() {
         return "/__self_invoke/[name]".to_string();
     }
-    let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
     if path == "/oauth/github/callback" {
         return "/oauth/github/callback".to_string();
     }
@@ -358,6 +357,27 @@ async fn handle_action(
                 cookie_jar,
             ))
         }
+        "deploy" => {
+            let input: crate::actions::deploy::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::deploy::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
         "secrets_init" => {
             let input: crate::actions::secrets_init::Input = forte_json::from_slice(body_bytes)?;
             let req = ForteRequest {
@@ -369,6 +389,48 @@ async fn handle_action(
                 body: input,
             };
             let output = crate::actions::secrets_init::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "new_project" => {
+            let input: crate::actions::new_project::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::new_project::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "bundle_compiled" => {
+            let input: crate::actions::bundle_compiled::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::bundle_compiled::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(build_response_with_cookies(
                 Response::builder()
@@ -432,6 +494,48 @@ async fn handle_action(
                 body: input,
             };
             let output = crate::actions::issue_token::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "bundle_uploaded" => {
+            let input: crate::actions::bundle_uploaded::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::bundle_uploaded::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "deploy_status" => {
+            let input: crate::actions::deploy_status::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::deploy_status::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(build_response_with_cookies(
                 Response::builder()
