@@ -379,6 +379,28 @@ async fn handle_action(
                 cookie_jar,
             ))
         }
+        "promote_pending_fn0_wasmtime" => {
+            let input: crate::actions::promote_pending_fn0_wasmtime::Input =
+                forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::promote_pending_fn0_wasmtime::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
         "deploy" => {
             let input: crate::actions::deploy::Input = forte_json::from_slice(body_bytes)?;
             let req = ForteRequest {
@@ -474,28 +496,6 @@ async fn handle_action(
                 body: input,
             };
             let output = crate::actions::secrets_encrypt::handler(req).await;
-            let json = forte_json::to_vec(&output);
-            Ok(build_response_with_cookies(
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header("content-type", "application/json")
-                    .body(Body::from(json))
-                    .unwrap(),
-                cookie_jar,
-            ))
-        }
-        "activate_fn0_wasmtime" => {
-            let input: crate::actions::activate_fn0_wasmtime::Input =
-                forte_json::from_slice(body_bytes)?;
-            let req = ForteRequest {
-                uri_authority,
-                method,
-                headers,
-                jar: cookie_jar,
-                raw_body: body_bytes,
-                body: input,
-            };
-            let output = crate::actions::activate_fn0_wasmtime::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(build_response_with_cookies(
                 Response::builder()
