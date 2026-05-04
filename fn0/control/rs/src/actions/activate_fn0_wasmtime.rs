@@ -10,7 +10,7 @@ pub struct Input {
 
 #[derive(Serialize)]
 pub enum Output {
-    Ok,
+    Ok { old_active: Option<String> },
     Unauthorized,
     Error { message: String },
 }
@@ -26,28 +26,32 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         .trx(|trx| {
             let version = version.clone();
             async move {
-                match trx.get(Fn0WasmtimeVersionDocGet {}).await? {
+                let old_active = match trx.get(Fn0WasmtimeVersionDocGet {}).await? {
                     Some(mut handle) => {
-                        if handle.active != version {
-                            handle.pending = Some(version);
-                        } else if handle.pending.is_some() {
-                            handle.pending = None;
-                        }
+                        let prev = if handle.active != version {
+                            Some(handle.active.clone())
+                        } else {
+                            None
+                        };
+                        handle.active = version;
+                        handle.pending = None;
+                        prev
                     }
                     None => {
                         trx.create(Fn0WasmtimeVersionDoc {
                             active: version,
                             pending: None,
                         })?;
+                        None
                     }
-                }
-                trx.commit::<_, ()>(())
+                };
+                trx.commit::<_, ()>(old_active)
             }
         })
         .await;
 
     match result {
-        doc_db::TrxResult::Committed(()) => Output::Ok,
+        doc_db::TrxResult::Committed(old_active) => Output::Ok { old_active },
         doc_db::TrxResult::Cancelled(()) => unreachable!(),
         doc_db::TrxResult::Conflict(_) => Output::Error {
             message: "conflict".to_string(),
