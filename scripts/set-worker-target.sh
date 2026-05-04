@@ -102,23 +102,26 @@ HTTPS_URL="${DOC_DB_URL/libsql:\/\//https://}"
 HTTPS_URL="${HTTPS_URL%/}"
 
 TARGET_JSON="$(jq -nc \
+  --arg site "$SITE_NAME" \
   --arg reg "$REGISTRY" \
   --arg repo "$REPOSITORY" \
   --arg tag "$TAG" \
   --arg wasmtime "$WASMTIME_VERSION" \
-  '{image_registry: $reg, image_repository: $repo, image_tag: $tag, fn0_wasmtime_version: $wasmtime}')"
+  '{site_name: $site, image_registry: $reg, image_repository: $repo, image_tag: $tag, fn0_wasmtime_version: $wasmtime}')"
 
-PK="worker-target:${SITE_NAME}"
+PK="WorkerTargetDoc/site_name=${SITE_NAME}"
+TARGET_B64="$(printf '%s' "$TARGET_JSON" | base64 | tr -d '\n')"
 
 REQ_BODY="$(jq -nc \
-  --arg sql "REPLACE INTO docs (pk, sk, value) VALUES (?, 0, ?)" \
+  --arg sql "INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0) ON CONFLICT(pk, sk) DO UPDATE SET data = excluded.data, version = docs.version + 1" \
   --arg pk "$PK" \
-  --arg val "$TARGET_JSON" \
+  --arg b64 "$TARGET_B64" \
   '{
     requests: [
       {type: "execute", stmt: {sql: $sql, args: [
         {type: "text", value: $pk},
-        {type: "text", value: $val}
+        {type: "text", value: ""},
+        {type: "blob", base64: $b64}
       ]}},
       {type: "close"}
     ]
@@ -152,9 +155,9 @@ if (( WAIT == 0 )); then
 fi
 
 TARGET_NORM="$(jq -Sc . <<<"$TARGET_JSON")"
-LAST_STABLE_PK="worker-last-stable:${SITE_NAME}"
+LAST_STABLE_PK="WorkerLastStableDoc/site_name=${SITE_NAME}"
 LAST_STABLE_REQ="$(jq -nc \
-  --arg sql "SELECT value FROM docs WHERE pk = ? AND sk = 0" \
+  --arg sql "SELECT data FROM docs WHERE pk = ? AND sk = ''" \
   --arg pk "$LAST_STABLE_PK" \
   '{
     requests: [
@@ -176,7 +179,21 @@ while :; do
     --data-raw "$LAST_STABLE_REQ" || echo 000)"
 
   if [[ "$HTTP_CODE" == "200" ]] && jq -e '.results[0].type == "ok"' <"$RESP_BODY" >/dev/null 2>&1; then
-    LS_RAW="$(jq -r '.results[0].response.result.rows[0][0].value // empty' <"$RESP_BODY")"
+    CELL="$(jq -c '.results[0].response.result.rows[0][0] // empty' <"$RESP_BODY")"
+    LS_RAW=""
+    if [[ -n "$CELL" ]]; then
+      CELL_TYPE="$(jq -r '.type // empty' <<<"$CELL")"
+      if [[ "$CELL_TYPE" == "blob" ]]; then
+        B64="$(jq -r '.base64 // empty' <<<"$CELL")"
+        if [[ -n "$B64" ]]; then
+          PAD=$(( (4 - ${#B64} % 4) % 4 ))
+          for _ in $(seq 1 "$PAD"); do B64="${B64}="; done
+          LS_RAW="$(printf '%s' "$B64" | base64 -d 2>/dev/null || true)"
+        fi
+      else
+        LS_RAW="$(jq -r '.value // empty' <<<"$CELL")"
+      fi
+    fi
     if [[ -n "$LS_RAW" ]]; then
       LS_NORM="$(jq -Sc . <<<"$LS_RAW")"
       if [[ "$LS_NORM" == "$TARGET_NORM" ]]; then
