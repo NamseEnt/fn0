@@ -39,7 +39,7 @@ async function handleMessage(msg, env) {
       msg.ack();
       return;
     }
-    const lastModified = head.uploaded.toISOString();
+    const lastModified = head.uploaded.toISOString().replace(/\.\d{3}Z$/, "Z");
     const ok = await postAction(env, "bundle_uploaded", {
       project_id: projectId,
       last_modified: lastModified,
