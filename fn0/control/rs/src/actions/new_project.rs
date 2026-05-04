@@ -1,4 +1,5 @@
 use crate::common::auth;
+use crate::common::cloudflare::CloudflareClient;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -37,6 +38,54 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let now = forte_sdk::now();
     let github_id = user.github_id;
 
+    let cf = match CloudflareClient::from_env() {
+        Ok(c) => c,
+        Err(e) => {
+            return Output::Error {
+                message: e.to_string(),
+            };
+        }
+    };
+    let public_base_domain = match std::env::var("FN0_STATIC_ASSET_STORAGE_PUBLIC_BASE_DOMAIN") {
+        Ok(d) => d,
+        Err(_) => {
+            return Output::Error {
+                message: "FN0_STATIC_ASSET_STORAGE_PUBLIC_BASE_DOMAIN not set".to_string(),
+            };
+        }
+    };
+    let zone_id = match std::env::var("FN0_CLOUDFLARE_ZONE_ID") {
+        Ok(z) => z,
+        Err(_) => {
+            return Output::Error {
+                message: "FN0_CLOUDFLARE_ZONE_ID not set".to_string(),
+            };
+        }
+    };
+
+    let bucket_name = format!("fn0-static-asset-{project_id}");
+    let custom_domain = format!("{project_id}.{public_base_domain}");
+    let cors_origin = format!("https://*.{}", root_domain(&public_base_domain));
+
+    if let Err(e) = cf.create_r2_bucket(&bucket_name, "apac").await {
+        return Output::Error {
+            message: format!("cloudflare create_r2_bucket: {e}"),
+        };
+    }
+    if let Err(e) = cf.put_r2_bucket_cors(&bucket_name, &cors_origin).await {
+        return Output::Error {
+            message: format!("cloudflare put_r2_bucket_cors: {e}"),
+        };
+    }
+    if let Err(e) = cf
+        .register_r2_custom_domain(&bucket_name, &custom_domain, &zone_id)
+        .await
+    {
+        return Output::Error {
+            message: format!("cloudflare register_r2_custom_domain: {e}"),
+        };
+    }
+
     let project_id_for_trx = project_id.clone();
     let name_for_trx = name.clone();
 
@@ -73,5 +122,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         doc_db::TrxResult::Err(e) => Output::Error {
             message: e.to_string(),
         },
+    }
+}
+
+fn root_domain(s: &str) -> &str {
+    match s.split_once('.') {
+        Some((_, rest)) => rest,
+        None => s,
     }
 }
