@@ -12,14 +12,18 @@ pub struct Input {
 #[derive(Serialize)]
 pub enum Output {
     Done {
+        active_version: String,
+        pending_version: Option<String>,
+        pending_compiled: bool,
         compiled_versions: Vec<String>,
-        target_versions: Vec<String>,
     },
     Pending {
+        active_version: String,
+        pending_version: Option<String>,
+        pending_compiled: bool,
         compiled_versions: Vec<String>,
-        target_versions: Vec<String>,
-        missing: Vec<String>,
     },
+    NoActiveVersion,
     NotLoggedIn,
     NotFound,
     Forbidden,
@@ -57,7 +61,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     let started = time_wasi::Instant::now().await;
     loop {
-        let (compiled, target) = match load_state(&db, &req.body.project_id, &req.body.last_modified).await {
+        let snapshot = match load_state(&db, &req.body.project_id, &req.body.last_modified).await {
             Ok(v) => v,
             Err(e) => {
                 return Output::Error {
@@ -66,24 +70,32 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             }
         };
 
-        let missing: Vec<String> = target
-            .iter()
-            .filter(|v| !compiled.contains(v))
-            .cloned()
-            .collect();
+        let Some(active_version) = snapshot.active.clone() else {
+            return Output::NoActiveVersion;
+        };
 
-        if missing.is_empty() && !target.is_empty() {
+        let active_compiled = snapshot.compiled_versions.contains(&active_version);
+        let pending_compiled = snapshot
+            .pending
+            .as_ref()
+            .map(|p| snapshot.compiled_versions.contains(p))
+            .unwrap_or(false);
+
+        if active_compiled {
             return Output::Done {
-                compiled_versions: compiled,
-                target_versions: target,
+                active_version,
+                pending_version: snapshot.pending,
+                pending_compiled,
+                compiled_versions: snapshot.compiled_versions,
             };
         }
 
         if started.elapsed().await >= POLL_TIMEOUT {
             return Output::Pending {
-                compiled_versions: compiled,
-                target_versions: target,
-                missing,
+                active_version,
+                pending_version: snapshot.pending,
+                pending_compiled,
+                compiled_versions: snapshot.compiled_versions,
             };
         }
 
@@ -91,11 +103,17 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 }
 
+struct Snapshot {
+    active: Option<String>,
+    pending: Option<String>,
+    compiled_versions: Vec<String>,
+}
+
 async fn load_state(
     db: &doc_db::Database,
     project_id: &str,
     last_modified: &str,
-) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+) -> anyhow::Result<Snapshot> {
     let (compiled_doc, version_doc) = (
         CompiledBundleDocGet {
             project_id,
@@ -106,16 +124,18 @@ async fn load_state(
         .send_with(db)
         .await?;
 
-    let compiled = compiled_doc
+    let compiled_versions = compiled_doc
         .map(|d| d.fn0_wasmtime_versions)
         .unwrap_or_default();
 
-    let mut target = Vec::new();
-    if let Some(v) = version_doc {
-        target.push(v.active);
-        if let Some(p) = v.pending {
-            target.push(p);
-        }
-    }
-    Ok((compiled, target))
+    let (active, pending) = match version_doc {
+        Some(v) => (Some(v.active), v.pending),
+        None => (None, None),
+    };
+
+    Ok(Snapshot {
+        active,
+        pending,
+        compiled_versions,
+    })
 }
