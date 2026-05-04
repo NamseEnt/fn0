@@ -1783,6 +1783,17 @@ fn generate_classify_route(pages: &[PageInfo]) -> TokenStream {
         })
         .collect();
 
+    let needs_path_segments = pages
+        .iter()
+        .any(|p| has_dynamic_segments(&p.route_segments));
+    let path_segments_decl = if needs_path_segments {
+        quote! {
+            let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         fn classify_route(path: &str) -> String {
             if path.strip_prefix("/__forte_action/").is_some() {
@@ -1797,7 +1808,7 @@ fn generate_classify_route(pages: &[PageInfo]) -> TokenStream {
             if path.strip_prefix("/__self_invoke/").is_some() {
                 return "/__self_invoke/[name]".to_string();
             }
-            let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            #path_segments_decl
             #(#arms)*
             "unknown".to_string()
         }
