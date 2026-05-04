@@ -3,7 +3,7 @@ import * as cloudflare from "@pulumi/cloudflare";
 import * as fs from "fs";
 import * as path from "path";
 
-export interface ControlR2WorkerArgs {
+export interface BundleStoreR2WorkerArgs {
   accountId: pulumi.Input<string>;
   scriptName: pulumi.Input<string>;
   bucketName: pulumi.Input<string>;
@@ -18,15 +18,15 @@ const WORKER_SOURCE_PATH = path.resolve(
   "../r2-worker/src/index.mjs"
 );
 
-export class ControlR2Worker extends pulumi.ComponentResource {
+export class BundleStoreR2Worker extends pulumi.ComponentResource {
   public readonly scriptName: pulumi.Output<string>;
 
   constructor(
     name: string,
-    args: ControlR2WorkerArgs,
+    args: BundleStoreR2WorkerArgs,
     opts: pulumi.ComponentResourceOptions
   ) {
-    super("pkg:index:control-r2-worker", name, args, opts);
+    super("pkg:index:bundle-store-r2-worker", name, args, opts);
 
     const workerSource = fs.readFileSync(WORKER_SOURCE_PATH, "utf-8");
 

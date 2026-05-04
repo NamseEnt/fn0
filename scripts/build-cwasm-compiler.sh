@@ -31,9 +31,9 @@ SCCACHE_ENDPOINT="$(pick sccacheBucketEndpoint)"
 SCCACHE_ACCESS_KEY_ID="$(pick sccacheAccessKeyId)"
 SCCACHE_SECRET_ACCESS_KEY="$(pick sccacheSecretAccessKey)"
 
-R2_ENDPOINT="$(pick controlR2Endpoint)"
-R2_ACCESS_KEY_ID="$(pick controlR2AccessKeyId)"
-R2_SECRET_ACCESS_KEY="$(pick controlR2SecretAccessKey)"
+R2_ENDPOINT="$(pick bundleStoreR2Endpoint)"
+R2_ACCESS_KEY_ID="$(pick bundleStoreR2AccessKeyId)"
+R2_SECRET_ACCESS_KEY="$(pick bundleStoreR2SecretAccessKey)"
 
 for v in CWASM_REGION CWASM_BUCKET CWASM_ECR CWASM_ROLE_ARN \
          BUILDER_AWS_ACCESS_KEY_ID BUILDER_AWS_SECRET_ACCESS_KEY \

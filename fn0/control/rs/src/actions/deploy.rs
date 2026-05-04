@@ -65,14 +65,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 }
 
 fn build_presign(key: &str) -> anyhow::Result<String> {
-    let account_id = std::env::var("FN0_R2_ACCOUNT_ID")
-        .map_err(|_| anyhow::anyhow!("FN0_R2_ACCOUNT_ID not set"))?;
-    let bucket = std::env::var("FN0_R2_BUCKET")
-        .map_err(|_| anyhow::anyhow!("FN0_R2_BUCKET not set"))?;
-    let access_key_id = std::env::var("FN0_R2_ACCESS_KEY_ID")
-        .map_err(|_| anyhow::anyhow!("FN0_R2_ACCESS_KEY_ID not set"))?;
-    let secret_access_key = std::env::var("FN0_R2_SECRET_ACCESS_KEY")
-        .map_err(|_| anyhow::anyhow!("FN0_R2_SECRET_ACCESS_KEY not set"))?;
+    let account_id = std::env::var("FN0_BUNDLE_STORE_ACCOUNT_ID")
+        .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_ACCOUNT_ID not set"))?;
+    let bucket = std::env::var("FN0_BUNDLE_STORE_BUCKET")
+        .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_BUCKET not set"))?;
+    let access_key_id = std::env::var("FN0_BUNDLE_STORE_ACCESS_KEY_ID")
+        .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_ACCESS_KEY_ID not set"))?;
+    let secret_access_key = std::env::var("FN0_BUNDLE_STORE_SECRET_ACCESS_KEY")
+        .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_SECRET_ACCESS_KEY not set"))?;
     Ok(aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
         account_id: &account_id,
         bucket: &bucket,

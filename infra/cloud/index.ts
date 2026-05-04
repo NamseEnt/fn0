@@ -325,22 +325,22 @@ const controlAdminToken = new random.RandomBytes("fn0-control-admin-token", {
   length: 32,
 });
 
-const controlR2 = new fn0.ControlR2(
-  "control-r2",
+const bundleStoreR2 = new fn0.BundleStoreR2(
+  "bundle-store-r2",
   {
     accountId,
-    bucketName: pulumi.interpolate`fn0-control-bundles-${suffix}`,
+    bucketName: pulumi.interpolate`fn0-bundle-store-${suffix}`,
   },
   {}
 );
 
-const controlR2Worker = new fn0.ControlR2Worker(
-  "control-r2-worker",
+const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
+  "bundle-store-r2-worker",
   {
     accountId,
-    scriptName: pulumi.interpolate`fn0-control-r2-worker-${suffix}`,
-    bucketName: controlR2.bucketName,
-    queueId: controlR2.queueId,
+    scriptName: pulumi.interpolate`fn0-bundle-store-r2-worker-${suffix}`,
+    bucketName: bundleStoreR2.bucketName,
+    queueId: bundleStoreR2.queueId,
     controlUrl: pulumi.interpolate`https://fn0-control.${domain}`,
     adminToken: controlAdminToken.base64,
   },
@@ -381,12 +381,12 @@ const controlAdminTokenCt = pulumi
   .all([controlDek.plaintext, controlAdminToken.base64])
   .apply(([dek, token]) => aesGcmEncryptToBase64(dek, token));
 
-const controlR2AccessKeyIdCt = pulumi
-  .all([controlDek.plaintext, controlR2.accessKeyId])
+const bundleStoreR2AccessKeyIdCt = pulumi
+  .all([controlDek.plaintext, bundleStoreR2.accessKeyId])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
-const controlR2SecretAccessKeyCt = pulumi
-  .all([controlDek.plaintext, controlR2.secretAccessKey])
+const bundleStoreR2SecretAccessKeyCt = pulumi
+  .all([controlDek.plaintext, bundleStoreR2.secretAccessKey])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
 const controlLambdaAccessKeyIdCt = pulumi
@@ -405,10 +405,10 @@ const controlEnvYamlBootstrap = pulumi
     controlTokenHmacCt,
     controlCookieSecretCt,
     controlAdminTokenCt,
-    controlR2.accountId,
-    controlR2.bucketName,
-    controlR2AccessKeyIdCt,
-    controlR2SecretAccessKeyCt,
+    bundleStoreR2.accountId,
+    bundleStoreR2.bucketName,
+    bundleStoreR2AccessKeyIdCt,
+    bundleStoreR2SecretAccessKeyCt,
     pulumi.output(cwasmCompilerRegion),
     controlLambdaAccessKeyIdCt,
     controlLambdaSecretAccessKeyCt,
@@ -441,11 +441,11 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${cookieCt}`,
         "FN0_CONTROL_ADMIN_TOKEN:",
         `  secret: ${adminCt}`,
-        `FN0_R2_ACCOUNT_ID: ${r2AccountId}`,
-        `FN0_R2_BUCKET: ${r2Bucket}`,
-        "FN0_R2_ACCESS_KEY_ID:",
+        `FN0_BUNDLE_STORE_ACCOUNT_ID: ${r2AccountId}`,
+        `FN0_BUNDLE_STORE_BUCKET: ${r2Bucket}`,
+        "FN0_BUNDLE_STORE_ACCESS_KEY_ID:",
         `  secret: ${r2KeyCt}`,
-        "FN0_R2_SECRET_ACCESS_KEY:",
+        "FN0_BUNDLE_STORE_SECRET_ACCESS_KEY:",
         `  secret: ${r2SecretCt}`,
         `FN0_LAMBDA_REGION: ${lambdaRegion}`,
         "FN0_LAMBDA_ACCESS_KEY_ID:",
@@ -606,10 +606,10 @@ export const vaultKeyOcid = ociGlobalVault.keyOcid;
 export const controlBootstrapEnvYaml = pulumi.secret(controlEnvYamlBootstrap);
 export const controlUrl = pulumi.interpolate`https://fn0-control.${domain}`;
 export const controlAdminTokenBase64 = pulumi.secret(controlAdminToken.base64);
-export const controlR2AccountId = controlR2.accountId;
-export const controlR2BucketName = controlR2.bucketName;
-export const controlR2Endpoint = controlR2.endpoint;
-export const controlR2AccessKeyId = pulumi.secret(controlR2.accessKeyId);
-export const controlR2SecretAccessKey = pulumi.secret(controlR2.secretAccessKey);
-export const controlR2QueueId = controlR2.queueId;
-export const controlR2WorkerScriptName = controlR2Worker.scriptName;
+export const bundleStoreR2AccountId = bundleStoreR2.accountId;
+export const bundleStoreR2BucketName = bundleStoreR2.bucketName;
+export const bundleStoreR2Endpoint = bundleStoreR2.endpoint;
+export const bundleStoreR2AccessKeyId = pulumi.secret(bundleStoreR2.accessKeyId);
+export const bundleStoreR2SecretAccessKey = pulumi.secret(bundleStoreR2.secretAccessKey);
+export const bundleStoreR2QueueId = bundleStoreR2.queueId;
+export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
