@@ -22,7 +22,7 @@ pub(crate) struct TursoDatabase {
 }
 
 #[derive(Clone)]
-pub(crate) struct StoredDoc {
+pub struct StoredDoc {
     pub(crate) data: Bytes,
     pub(crate) version: i64,
 }
@@ -1103,39 +1103,6 @@ impl TursoTransaction {
         if let Some(Value::Blob { value }) = result.rows.first().and_then(|row| row.values.first())
         {
             return Ok(Some(value.clone()));
-        }
-
-        Ok(None)
-    }
-
-    pub(crate) async fn get_with_version(
-        &mut self,
-        pk: &str,
-        sk: &str,
-    ) -> Result<Option<StoredDoc>> {
-        let result = self
-            .execute_stmt(
-                "SELECT data, version FROM docs WHERE pk = ? AND sk = ?",
-                vec![
-                    Value::Text {
-                        value: pk.to_string().into(),
-                    },
-                    Value::Text {
-                        value: sk.to_string().into(),
-                    },
-                ],
-                true,
-            )
-            .await?;
-
-        if let Some(row) = result.rows.first()
-            && let (Some(Value::Blob { value: data }), Some(Value::Integer { value: version })) =
-                (row.values.first(), row.values.get(1))
-        {
-            return Ok(Some(StoredDoc {
-                data: data.clone(),
-                version: *version,
-            }));
         }
 
         Ok(None)
