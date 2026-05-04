@@ -6,25 +6,26 @@ PULUMI_DIR="${PULUMI_DIR:-${REPO_ROOT}/infra/cloud}"
 
 usage() {
   cat <<EOF
-usage: $0 <fn0_wasmtime_version>
+usage: $0
 
-Idempotent. Promotes <ver> to control's active fn0-wasmtime version
-via activate_fn0_wasmtime. If a previous active version is reported
-back, its lambda function (fn0-cwasm-compiler-<old-dashed>) and ECR
-image tag are deleted.
+Idempotent. Calls control's promote_pending_fn0_wasmtime admin action,
+which flips the current pending fn0-wasmtime version to active and
+clears pending in a single trx. If the previous active version is
+different from the new one, the old lambda
+(fn0-cwasm-compiler-<old-dashed>) and its ECR image tag are deleted.
 
-Run this only after every worker is already on <ver>; otherwise live
-deploys won't compile for whatever fn0-wasmtime the worker is still
-on.
+If pending is empty (NoPending), this is a noop and exits 0.
+
+Run only after every worker is on whatever pending currently is;
+otherwise live deploys won't compile for the worker's still-on
+fn0-wasmtime.
 EOF
 }
 
-if [[ $# -lt 1 ]]; then
+if [[ $# -gt 0 ]]; then
   usage >&2
   exit 2
 fi
-
-VERSION="$1"
 
 need() {
   command -v "$1" >/dev/null 2>&1 || { echo "required command not found: $1" >&2; exit 1; }
@@ -58,16 +59,16 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 ECR_REPO_NAME="${CWASM_ECR##*/}"
 
-echo ">> activate_fn0_wasmtime ${VERSION}"
-RESP="${WORK_DIR}/activate_resp.json"
+echo ">> promote_pending_fn0_wasmtime"
+RESP="${WORK_DIR}/promote_resp.json"
 HTTP="$(curl -sS -o "$RESP" -w '%{http_code}' \
-  -X POST "${CONTROL_URL%/}/__forte_action/activate_fn0_wasmtime" \
+  -X POST "${CONTROL_URL%/}/__forte_action/promote_pending_fn0_wasmtime" \
   -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   -H "Content-Type: application/json" \
-  --data "$(jq -nc --arg v "$VERSION" '{version: $v}')")"
+  --data '{}')"
 
 if [[ "$HTTP" != "200" ]]; then
-  echo "control activate HTTP ${HTTP}" >&2
+  echo "control promote HTTP ${HTTP}" >&2
   cat "$RESP" >&2
   exit 1
 fi
@@ -79,22 +80,31 @@ OUTCOME="$(jq -r '
 
 case "$OUTCOME" in
   Ok)
-    OLD_ACTIVE="$(jq -r '.Ok.old_active // empty' < "$RESP")"
+    OLD_ACTIVE="$(jq -r '.Ok.old_active' < "$RESP")"
+    NEW_ACTIVE="$(jq -r '.Ok.new_active' < "$RESP")"
+    ;;
+  NoPending)
+    echo ">> no pending version; nothing to promote."
+    exit 0
+    ;;
+  NoActiveVersion)
+    echo "control reports no active version yet" >&2
+    exit 1
     ;;
   Unauthorized)
     echo "admin token rejected" >&2
     exit 1
     ;;
   *)
-    echo "unexpected activate response:" >&2
+    echo "unexpected response:" >&2
     cat "$RESP" >&2
     exit 1
     ;;
 esac
 
-echo ">> active=${VERSION}, old_active=${OLD_ACTIVE:-<none>}"
+echo ">> active=${NEW_ACTIVE} (was ${OLD_ACTIVE})"
 
-if [[ -z "$OLD_ACTIVE" || "$OLD_ACTIVE" == "$VERSION" ]]; then
+if [[ "$OLD_ACTIVE" == "$NEW_ACTIVE" ]]; then
   echo ">> nothing to clean up."
   exit 0
 fi
