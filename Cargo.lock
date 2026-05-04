@@ -2743,6 +2743,7 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "tower",
+ "uuid",
 ]
 
 [[package]]
@@ -2813,11 +2814,14 @@ version = "0.1.5"
 dependencies = [
  "anyhow",
  "chrono",
+ "dirs 6.0.0",
+ "futures",
  "reqwest",
  "serde",
  "serde_json",
  "tar",
  "tokio",
+ "toml 0.8.23",
  "urlencoding",
 ]
 

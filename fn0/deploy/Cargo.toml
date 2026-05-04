@@ -9,9 +9,12 @@ description = "Deploy client for fn0 cloud"
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true }
+dirs = { workspace = true }
+futures = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
+toml = { workspace = true }
 urlencoding = "2.1"
