@@ -2,13 +2,13 @@ import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as crypto from "crypto";
 
-export interface ControlR2Args {
+export interface BundleStoreR2Args {
   accountId: pulumi.Input<string>;
   bucketName: pulumi.Input<string>;
   location?: pulumi.Input<string>;
 }
 
-export class ControlR2 extends pulumi.ComponentResource {
+export class BundleStoreR2 extends pulumi.ComponentResource {
   public readonly accountId: pulumi.Output<string>;
   public readonly bucketName: pulumi.Output<string>;
   public readonly endpoint: pulumi.Output<string>;
@@ -19,10 +19,10 @@ export class ControlR2 extends pulumi.ComponentResource {
 
   constructor(
     name: string,
-    args: ControlR2Args,
+    args: BundleStoreR2Args,
     opts: pulumi.ComponentResourceOptions
   ) {
-    super("pkg:index:control-r2", name, args, opts);
+    super("pkg:index:bundle-store-r2", name, args, opts);
 
     const { accountId, bucketName, location } = args;
 
@@ -53,7 +53,7 @@ export class ControlR2 extends pulumi.ComponentResource {
         queueId: queue.queueId,
         rules: [
           {
-            description: "control bundle and compiled object events",
+            description: "raw and compiled bundle object events",
             actions: ["PutObject", "CompleteMultipartUpload", "CopyObject"],
           },
         ],
@@ -91,7 +91,7 @@ export class ControlR2 extends pulumi.ComponentResource {
       "r2-token",
       {
         accountId,
-        name: pulumi.interpolate`fn0-control-r2-${bucket.name}`,
+        name: pulumi.interpolate`fn0-bundle-store-r2-${bucket.name}`,
         policies: [
           {
             effect: "allow",

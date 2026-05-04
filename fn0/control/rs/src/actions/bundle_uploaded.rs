@@ -106,8 +106,8 @@ struct Env {
 
 fn read_env() -> anyhow::Result<Env> {
     Ok(Env {
-        bucket: std::env::var("FN0_R2_BUCKET")
-            .map_err(|_| anyhow::anyhow!("FN0_R2_BUCKET not set"))?,
+        bucket: std::env::var("FN0_BUNDLE_STORE_BUCKET")
+            .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_BUCKET not set"))?,
         region: std::env::var("FN0_LAMBDA_REGION")
             .map_err(|_| anyhow::anyhow!("FN0_LAMBDA_REGION not set"))?,
         access_key_id: std::env::var("FN0_LAMBDA_ACCESS_KEY_ID")
