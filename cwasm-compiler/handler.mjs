@@ -26,7 +26,14 @@ export const handler = async (event) => {
     }
   }
 
-  const s3 = new S3Client({});
+  const s3 = new S3Client({
+    endpoint: process.env.R2_ENDPOINT,
+    region: "auto",
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+  });
 
   const obj = await s3.send(
     new GetObjectCommand({ Bucket: inputBucket, Key: inputKey }),

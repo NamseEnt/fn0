@@ -31,10 +31,15 @@ SCCACHE_ENDPOINT="$(pick sccacheBucketEndpoint)"
 SCCACHE_ACCESS_KEY_ID="$(pick sccacheAccessKeyId)"
 SCCACHE_SECRET_ACCESS_KEY="$(pick sccacheSecretAccessKey)"
 
+R2_ENDPOINT="$(pick controlR2Endpoint)"
+R2_ACCESS_KEY_ID="$(pick controlR2AccessKeyId)"
+R2_SECRET_ACCESS_KEY="$(pick controlR2SecretAccessKey)"
+
 for v in CWASM_REGION CWASM_BUCKET CWASM_ECR CWASM_ROLE_ARN \
          BUILDER_AWS_ACCESS_KEY_ID BUILDER_AWS_SECRET_ACCESS_KEY \
          SCCACHE_BUCKET SCCACHE_REGION SCCACHE_ENDPOINT \
-         SCCACHE_ACCESS_KEY_ID SCCACHE_SECRET_ACCESS_KEY; do
+         SCCACHE_ACCESS_KEY_ID SCCACHE_SECRET_ACCESS_KEY \
+         R2_ENDPOINT R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
   if [[ -z "${!v}" ]]; then
     echo "missing Pulumi output for: ${v}" >&2
     exit 1
@@ -95,7 +100,7 @@ docker buildx build \
   --push \
   "$REPO_ROOT"
 
-ENV_VARS="Variables={BUCKET=${CWASM_BUCKET},XDG_CACHE_HOME=/tmp,HOME=/tmp}"
+ENV_VARS="Variables={BUCKET=${CWASM_BUCKET},XDG_CACHE_HOME=/tmp,HOME=/tmp,R2_ENDPOINT=${R2_ENDPOINT},R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID},R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}}"
 
 CREATE_LOG="$(mktemp)"
 trap 'rm -f "$PUBLISH_LOG" "$CREATE_LOG"' EXIT
