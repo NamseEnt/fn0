@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::utils::credentials;
 use color_eyre::{Result, eyre::eyre};
 use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 pub async fn execute() -> Result<()> {
     let config_path = PathBuf::from("fn0.toml");
@@ -24,11 +25,13 @@ pub async fn execute() -> Result<()> {
         .map_err(|e| eyre!(e))?;
 
     let mut project_id = config.project_id.clone();
-    fn0_deploy::deploy(
+    let build_id = Uuid::new_v4().to_string();
+    fn0_deploy::deploy_wasm(
         &creds.control_url,
         &creds.token,
         &project_name,
         &mut project_id,
+        &build_id,
         &bundle_path,
     )
     .await

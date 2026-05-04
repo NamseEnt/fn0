@@ -28,3 +28,4 @@ serde_yaml = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 toml = { workspace = true }
 tower = { workspace = true, features = ["util"] }
+uuid = { workspace = true, features = ["v4"] }
