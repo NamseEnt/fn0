@@ -8,6 +8,7 @@ import * as outputs from "../types/output";
 export interface CloudflareDnsProviderArgsArgs {
     apiToken: pulumi.Input<string>;
     asteriskDomain: pulumi.Input<string>;
+    saasFallbackDomain: pulumi.Input<string>;
     zoneId: pulumi.Input<string>;
 }
 
