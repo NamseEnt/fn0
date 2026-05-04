@@ -10,16 +10,29 @@ usage() {
   cat <<EOF
 usage: $0 <new_fn0_wasmtime_version>
 
-Builds the cwasm-compiler Lambda image for the given fn0-wasmtime version,
-publishes it as fn0-cwasm-compiler-<ver-dashed>, fans out synchronous
-Lambda invokes for every R2 /original/* bundle that is not yet present
-under /compiled/<ver>/, dumps each failure (CloudWatch tail), and only
-when there are zero failures and at least min(total, THRESHOLD) successes
-does it call control's set_pending_fn0_wasmtime admin action.
+Idempotent promote pipeline for a new fn0-wasmtime version. Each step is
+safe to re-run; the script can be invoked repeatedly until the new
+version is fully active.
+
+  1. Build & push the cwasm-compiler image, create or update
+     fn0-cwasm-compiler-<ver-dashed>, wait for the function to be active.
+  2. Tell control to set pending = <new_ver> early so any incoming
+     deploy is fanned out to both active and pending lambdas. If no
+     active version exists on control yet, set active = <new_ver>
+     directly.
+  3. List R2 /original/* minus /compiled/<ver>/ and sync-invoke the new
+     lambda for every missing entry in parallel. Failures dump the
+     CloudWatch tail to stderr.
+  4. If failures > 0 or successes < min(total, THRESHOLD): exit 1 with
+     pending left as-is.
+  5. If every original is now compiled under /compiled/<ver>/: activate
+     <new_ver>. Otherwise stop with pending only.
+  6. After activate, delete the previous active version's lambda
+     function and its ECR image tag.
 
 env:
-  PARALLEL   number of parallel sync invokes (default: 20)
-  THRESHOLD  min successful compiles required to promote (default: total)
+  PARALLEL   parallel sync invokes (default: 20)
+  THRESHOLD  min successful compiles required to set pending (default: total)
 EOF
 }
 
@@ -85,8 +98,130 @@ echo ">> FUNCTION_NAME=${FUNCTION_NAME}"
 
 IMAGE_TAG="${NEW_VERSION_DASH}"
 IMAGE_URI="${CWASM_ECR}:${IMAGE_TAG}"
+ECR_REPO_NAME="${CWASM_ECR##*/}"
 
-# --- Build image + create/update Lambda (builder credentials) ---
+# --- helper: control admin actions ---
+call_set_pending() {
+  local resp http outcome
+  resp="${WORK_DIR}/set_pending_resp.json"
+  http="$(curl -sS -o "$resp" -w '%{http_code}' \
+    -X POST "${CONTROL_URL%/}/__forte_action/set_pending_fn0_wasmtime" \
+    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data "$(jq -nc --arg v "$NEW_VERSION" '{version: $v}')")"
+  if [[ "$http" != "200" ]]; then
+    echo "control set_pending HTTP ${http}" >&2
+    cat "$resp" >&2
+    return 1
+  fi
+  outcome="$(jq -r 'if type=="string" then . else (keys[0]) end' < "$resp")"
+  case "$outcome" in
+    Ok) ;;
+    Unauthorized) echo "admin token rejected" >&2; return 1 ;;
+    *) echo "unexpected set_pending response:" >&2; cat "$resp" >&2; return 1 ;;
+  esac
+}
+
+OLD_ACTIVE=""
+call_activate() {
+  local resp http outcome
+  resp="${WORK_DIR}/activate_resp.json"
+  http="$(curl -sS -o "$resp" -w '%{http_code}' \
+    -X POST "${CONTROL_URL%/}/__forte_action/activate_fn0_wasmtime" \
+    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data "$(jq -nc --arg v "$NEW_VERSION" '{version: $v}')")"
+  if [[ "$http" != "200" ]]; then
+    echo "control activate HTTP ${http}" >&2
+    cat "$resp" >&2
+    return 1
+  fi
+  outcome="$(jq -r '
+    if type=="string" then .
+    elif has("Ok") then "Ok"
+    else (keys[0]) end' < "$resp")"
+  case "$outcome" in
+    Ok)
+      OLD_ACTIVE="$(jq -r '.Ok.old_active // empty' < "$resp")"
+      ;;
+    Unauthorized) echo "admin token rejected" >&2; return 1 ;;
+    *) echo "unexpected activate response:" >&2; cat "$resp" >&2; return 1 ;;
+  esac
+}
+
+delete_old_lambda() {
+  local old="$1"
+  local fn_name="fn0-cwasm-compiler-${old//./-}"
+  local rc=0
+  local err="${WORK_DIR}/delete_lambda.err"
+  AWS_ACCESS_KEY_ID="$BUILDER_AWS_ACCESS_KEY_ID" \
+  AWS_SECRET_ACCESS_KEY="$BUILDER_AWS_SECRET_ACCESS_KEY" \
+  AWS_DEFAULT_REGION="$CWASM_REGION" \
+  aws lambda delete-function --function-name "$fn_name" 2>"$err" || rc=$?
+  if [[ $rc -ne 0 ]] && ! grep -q "ResourceNotFoundException" "$err"; then
+    cat "$err" >&2
+    return 1
+  fi
+  echo ">> deleted lambda ${fn_name} (or already absent)"
+}
+
+delete_old_ecr_image() {
+  local old="$1"
+  local tag="${old//./-}"
+  local rc=0
+  local err="${WORK_DIR}/delete_image.err"
+  AWS_ACCESS_KEY_ID="$BUILDER_AWS_ACCESS_KEY_ID" \
+  AWS_SECRET_ACCESS_KEY="$BUILDER_AWS_SECRET_ACCESS_KEY" \
+  AWS_DEFAULT_REGION="$CWASM_REGION" \
+  aws ecr batch-delete-image \
+    --repository-name "$ECR_REPO_NAME" \
+    --image-ids "imageTag=${tag}" \
+    >/dev/null 2>"$err" || rc=$?
+  if [[ $rc -ne 0 ]] && ! grep -q "RepositoryNotFoundException\|ImageNotFoundException" "$err"; then
+    cat "$err" >&2
+    return 1
+  fi
+  echo ">> deleted ECR image tag ${tag} (or already absent)"
+}
+
+list_r2() {
+  local prefix="$1"
+  local token=""
+  local out=""
+  while :; do
+    if [[ -n "$token" ]]; then
+      out="$(AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
+             AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
+             AWS_DEFAULT_REGION=auto \
+             aws s3api list-objects-v2 \
+               --endpoint-url "$R2_ENDPOINT" \
+               --bucket "$R2_BUCKET" \
+               --prefix "$prefix" \
+               --starting-token "$token" \
+               --output json)"
+    else
+      out="$(AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
+             AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
+             AWS_DEFAULT_REGION=auto \
+             aws s3api list-objects-v2 \
+               --endpoint-url "$R2_ENDPOINT" \
+               --bucket "$R2_BUCKET" \
+               --prefix "$prefix" \
+               --output json)"
+    fi
+    jq -c '.Contents[]? | {Key, LastModified}' <<<"$out"
+    token="$(jq -r '.NextContinuationToken // empty' <<<"$out")"
+    [[ -z "$token" ]] && break
+  done
+}
+
+normalize_lm() {
+  # 2026-05-04T10:16:03.773000+00:00 -> 2026-05-04T10:16:03.773Z
+  # 2026-05-04T10:16:03+00:00        -> 2026-05-04T10:16:03.000Z
+  echo "$1" | sed -E 's/\.([0-9]{3})[0-9]*\+00:00$/.\1Z/; s/\+00:00$/.000Z/'
+}
+
+# --- step 1: build image + create/update lambda + wait ---
 (
   export AWS_ACCESS_KEY_ID="$BUILDER_AWS_ACCESS_KEY_ID"
   export AWS_SECRET_ACCESS_KEY="$BUILDER_AWS_SECRET_ACCESS_KEY"
@@ -155,44 +290,11 @@ IMAGE_URI="${CWASM_ECR}:${IMAGE_TAG}"
   aws lambda wait function-updated --region "$CWASM_REGION" --function-name "$FUNCTION_NAME"
 )
 
-# --- Build originals/compiled sets from R2 ---
-list_r2() {
-  local prefix="$1"
-  local token=""
-  local out=""
-  while :; do
-    if [[ -n "$token" ]]; then
-      out="$(AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
-             AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
-             AWS_DEFAULT_REGION=auto \
-             aws s3api list-objects-v2 \
-               --endpoint-url "$R2_ENDPOINT" \
-               --bucket "$R2_BUCKET" \
-               --prefix "$prefix" \
-               --starting-token "$token" \
-               --output json)"
-    else
-      out="$(AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
-             AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
-             AWS_DEFAULT_REGION=auto \
-             aws s3api list-objects-v2 \
-               --endpoint-url "$R2_ENDPOINT" \
-               --bucket "$R2_BUCKET" \
-               --prefix "$prefix" \
-               --output json)"
-    fi
-    jq -c '.Contents[]? | {Key, LastModified}' <<<"$out"
-    token="$(jq -r '.NextContinuationToken // empty' <<<"$out")"
-    [[ -z "$token" ]] && break
-  done
-}
+# --- step 2: set pending early so live deploys fan out to the new ver too ---
+echo ">> set_pending_fn0_wasmtime ${NEW_VERSION}"
+call_set_pending
 
-normalize_lm() {
-  # 2026-05-04T10:16:03.773000+00:00 -> 2026-05-04T10:16:03.773Z
-  # 2026-05-04T10:16:03+00:00        -> 2026-05-04T10:16:03.000Z
-  echo "$1" | sed -E 's/\.([0-9]{3})[0-9]*\+00:00$/.\1Z/; s/\+00:00$/.000Z/'
-}
-
+# --- step 3: list originals/compiled diff and sync-invoke ---
 ORIGINALS_FILE="${WORK_DIR}/originals.jsonl"
 COMPILED_FILE="${WORK_DIR}/compiled.txt"
 TODO_FILE="${WORK_DIR}/todo.jsonl"
@@ -238,7 +340,6 @@ else
   TARGET_SUCCESS="$TOTAL"
 fi
 
-# --- Sync invoke Lambda for each todo (parallel) ---
 invoke_one() {
   local entry="$1"
   local pid lm input_key output_key payload_file out_file meta_file rc fn_err log_b64
@@ -318,50 +419,35 @@ FAIL_COUNT="$(grep -c '^\[FAIL\]' "$FAIL_FILE" || true)"
 TOTAL_SUCCESS=$((ALREADY + SUCCESS_COUNT))
 
 echo ""
-echo ">> success(this run)=${SUCCESS_COUNT} fail=${FAIL_COUNT} total_success=${TOTAL_SUCCESS} target=${TARGET_SUCCESS}"
+echo ">> success(this run)=${SUCCESS_COUNT} fail=${FAIL_COUNT} total_success=${TOTAL_SUCCESS}/${TOTAL} target=${TARGET_SUCCESS}"
 
+# --- step 4: failure / threshold check ---
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo ""
   echo "=== failures ===" >&2
   cat "$FAIL_FILE" >&2
-  echo ">> aborting promote due to failures" >&2
+  echo ">> aborting (pending stays as-is); rerun the script after addressing failures" >&2
   exit 1
 fi
 if [[ "$TOTAL_SUCCESS" -lt "$TARGET_SUCCESS" ]]; then
-  echo ">> not enough successes (${TOTAL_SUCCESS} < ${TARGET_SUCCESS}); aborting promote" >&2
+  echo ">> not enough successes (${TOTAL_SUCCESS} < ${TARGET_SUCCESS}); pending stays as-is" >&2
   exit 1
 fi
 
-# --- Promote: call control admin endpoint ---
-echo ">> promoting Fn0WasmtimeVersionDoc.pending = ${NEW_VERSION}"
-RESP_BODY="${WORK_DIR}/promote_resp.json"
-HTTP_CODE="$(curl -sS -o "$RESP_BODY" -w '%{http_code}' \
-  -X POST "${CONTROL_URL%/}/__forte_action/set_pending_fn0_wasmtime" \
-  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-  -H "Content-Type: application/json" \
-  --data "$(jq -nc --arg v "$NEW_VERSION" '{version: $v}')")"
-
-if [[ "$HTTP_CODE" != "200" ]]; then
-  echo "control set_pending failed (HTTP ${HTTP_CODE})" >&2
-  cat "$RESP_BODY" >&2
-  exit 1
+# --- step 5: full coverage gate before activate ---
+if [[ "$TOTAL_SUCCESS" -lt "$TOTAL" ]]; then
+  echo ">> partial coverage (${TOTAL_SUCCESS}/${TOTAL}); pending set, activate skipped"
+  exit 0
 fi
 
-OUTCOME="$(jq -r 'if type=="string" then . else (keys[0]) end' < "$RESP_BODY" 2>/dev/null || true)"
-case "$OUTCOME" in
-  Ok) echo "promoted." ;;
-  AlreadyActive) echo "already active; nothing to promote." ;;
-  NoActiveVersion)
-    echo "no active version on control; promote skipped" >&2
-    exit 1
-    ;;
-  Unauthorized)
-    echo "admin token rejected" >&2
-    exit 1
-    ;;
-  *)
-    echo "unexpected response:" >&2
-    cat "$RESP_BODY" >&2
-    exit 1
-    ;;
-esac
+# --- step 6: activate + drop old lambda + ECR image ---
+echo ">> activate_fn0_wasmtime ${NEW_VERSION}"
+call_activate
+echo ">> activated. old_active=${OLD_ACTIVE:-<none>}"
+
+if [[ -n "$OLD_ACTIVE" && "$OLD_ACTIVE" != "$NEW_VERSION" ]]; then
+  delete_old_lambda "$OLD_ACTIVE"
+  delete_old_ecr_image "$OLD_ACTIVE"
+fi
+
+echo ">> done."
