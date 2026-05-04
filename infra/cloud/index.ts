@@ -334,6 +334,16 @@ const bundleStoreR2 = new fn0.BundleStoreR2(
   {}
 );
 
+const staticAssetStorage = new fn0.StaticAssetStorage(
+  "static-asset-storage",
+  {
+    accountId,
+    zoneId,
+    publicBaseDomain: `static.${domain}`,
+  },
+  {}
+);
+
 const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
   "bundle-store-r2-worker",
   {
@@ -397,6 +407,18 @@ const controlLambdaSecretAccessKeyCt = pulumi
   .all([controlDek.plaintext, hqAwsAccessKey.secret])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
+const staticAssetPresignAccessKeyIdCt = pulumi
+  .all([controlDek.plaintext, staticAssetStorage.presignAccessKeyId])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const staticAssetPresignSecretAccessKeyCt = pulumi
+  .all([controlDek.plaintext, staticAssetStorage.presignSecretAccessKey])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const cloudflareApiTokenCt = pulumi
+  .all([controlDek.plaintext, staticAssetStorage.cloudflareApiToken])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const controlEnvYamlBootstrap = pulumi
   .all([
     controlDek.ciphertext,
@@ -412,6 +434,12 @@ const controlEnvYamlBootstrap = pulumi
     pulumi.output(cwasmCompilerRegion),
     controlLambdaAccessKeyIdCt,
     controlLambdaSecretAccessKeyCt,
+    staticAssetStorage.accountId,
+    staticAssetPresignAccessKeyIdCt,
+    staticAssetPresignSecretAccessKeyCt,
+    staticAssetStorage.publicBaseDomain,
+    cloudflareApiTokenCt,
+    staticAssetStorage.zoneId,
   ])
   .apply(
     ([
@@ -428,6 +456,12 @@ const controlEnvYamlBootstrap = pulumi
       lambdaRegion,
       lambdaKeyCt,
       lambdaSecretCt,
+      sasAccountId,
+      sasKeyCt,
+      sasSecretCt,
+      sasPublicBaseDomain,
+      cfApiTokenCt,
+      cfZoneId,
     ]) =>
       [
         "__dek:",
@@ -452,6 +486,15 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${lambdaKeyCt}`,
         "FN0_LAMBDA_SECRET_ACCESS_KEY:",
         `  secret: ${lambdaSecretCt}`,
+        `FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID: ${sasAccountId}`,
+        "FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID:",
+        `  secret: ${sasKeyCt}`,
+        "FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY:",
+        `  secret: ${sasSecretCt}`,
+        `FN0_STATIC_ASSET_STORAGE_PUBLIC_BASE_DOMAIN: ${sasPublicBaseDomain}`,
+        "FN0_CLOUDFLARE_API_TOKEN:",
+        `  secret: ${cfApiTokenCt}`,
+        `FN0_CLOUDFLARE_ZONE_ID: ${cfZoneId}`,
         "",
       ].join("\n")
   );
