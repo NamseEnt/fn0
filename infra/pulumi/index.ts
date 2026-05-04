@@ -3,6 +3,8 @@ export { OciGlobalVault } from "./OciGlobalVault";
 export { B2CloudflareStaticCdn } from "./B2CloudflareStaticCdn";
 export * as docDb from "./docDb";
 export { ForteR2 } from "./ForteR2";
+export { ControlR2 } from "./ControlR2";
+export { ControlR2Worker } from "./ControlR2Worker";
 export { OciHeadQuarter } from "./OciHeadQuarter";
 export { OciHeadQuarterVcn } from "./OciHeadQuarterVcn";
 export * as dns from "./dns";
