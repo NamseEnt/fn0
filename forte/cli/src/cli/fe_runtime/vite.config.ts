@@ -14,18 +14,16 @@ if (fs.existsSync(userConfigPath)) {
   userConfig = mod.default ?? {};
 }
 
-const FORTE_BASE_PLACEHOLDER = "/__FORTE_BASE__/";
-
 export default defineConfig(async (env) => {
   const isProdBuild = env.command === "build";
+  const publicUrl = process.env.VITE_PUBLIC_URL ?? "/";
+  const baseUrl = isProdBuild ? publicUrl : "/";
   const base: UserConfig = {
     root: feDir,
     plugins: [react()],
-    base: isProdBuild ? FORTE_BASE_PLACEHOLDER : "/",
+    base: baseUrl,
     define: {
-      __FORTE_BASE_URL__: JSON.stringify(
-        isProdBuild ? FORTE_BASE_PLACEHOLDER : "/"
-      ),
+      __FORTE_BASE_URL__: JSON.stringify(baseUrl),
     },
     resolve: {
       alias: {

@@ -43,7 +43,11 @@ async fn async_main() -> Result<()> {
 
         Commands::Build { project } => {
             let project_dir = project.unwrap_or_else(|| ".".into());
-            cli::build::run_build(cli::build::BuildOptions { project_dir }).await?;
+            cli::build::run_build(cli::build::BuildOptions {
+                project_dir,
+                static_base_url: None,
+            })
+            .await?;
         }
 
         Commands::Deploy { project } => {

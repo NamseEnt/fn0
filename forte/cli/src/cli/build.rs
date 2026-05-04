@@ -8,6 +8,7 @@ use std::process::Stdio;
 #[derive(Debug)]
 pub struct BuildOptions {
     pub project_dir: PathBuf,
+    pub static_base_url: Option<String>,
 }
 
 pub async fn run_build(options: BuildOptions) -> Result<()> {
@@ -22,7 +23,7 @@ pub async fn run_build(options: BuildOptions) -> Result<()> {
 
     run_codegen(&project_dir).await?;
     build_backend(&project_dir)?;
-    build_frontend(&project_dir)?;
+    build_frontend(&project_dir, options.static_base_url.as_deref())?;
 
     let dist_dir = project_dir.join("dist");
     create_dist(&project_dir, &dist_dir)?;
@@ -258,7 +259,7 @@ fn find_wasm_binary(release_dir: &Path, project_dir: &Path) -> Result<PathBuf> {
     Ok(wasm_path)
 }
 
-fn build_frontend(project_dir: &Path) -> Result<()> {
+fn build_frontend(project_dir: &Path, static_base_url: Option<&str>) -> Result<()> {
     let fe_dir = project_dir.join("fe");
 
     println!("[build] Building frontend...");
@@ -266,22 +267,32 @@ fn build_frontend(project_dir: &Path) -> Result<()> {
     if let Some(config_path) = fe_runtime::vite_config(project_dir) {
         let server_entry = fe_runtime::ssr_entry(project_dir);
 
-        let status = Command::new("npx")
+        let mut client_cmd = Command::new("npx");
+        client_cmd
             .args(["vite", "build", "--config"])
             .arg(&config_path)
-            .current_dir(&fe_dir)
+            .current_dir(&fe_dir);
+        if let Some(base) = static_base_url {
+            client_cmd.env("VITE_PUBLIC_URL", base);
+        }
+        let status = client_cmd
             .status()
             .context("Failed to run vite build (client)")?;
         if !status.success() {
             anyhow::bail!("vite client build failed with status: {}", status);
         }
 
-        let status = Command::new("npx")
+        let mut ssr_cmd = Command::new("npx");
+        ssr_cmd
             .args(["vite", "build", "--ssr"])
             .arg(&server_entry)
             .args(["--config"])
             .arg(&config_path)
-            .current_dir(&fe_dir)
+            .current_dir(&fe_dir);
+        if let Some(base) = static_base_url {
+            ssr_cmd.env("VITE_PUBLIC_URL", base);
+        }
+        let status = ssr_cmd
             .status()
             .context("Failed to run vite build --ssr")?;
         if !status.success() {
