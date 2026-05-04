@@ -8,6 +8,7 @@ description = "Deploy client for fn0 cloud"
 
 [dependencies]
 anyhow = { workspace = true }
+chrono = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

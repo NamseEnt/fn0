@@ -3,7 +3,7 @@ use color_eyre::eyre::eyre;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-const DEFAULT_CONTROL_URL: &str = "https://fn0.dev";
+const DEFAULT_CONTROL_URL: &str = "https://fn0-control.fn0.dev";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Credentials {

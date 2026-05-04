@@ -23,6 +23,8 @@ pub struct ProjectConfig {
 pub struct Config {
     pub name: Option<String>,
     pub language_env: LanguageEnvironment,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +47,7 @@ impl Config {
         Self {
             name: Some(project_config.name.clone()),
             language_env: LanguageEnvironment::from(project_config),
+            project_id: None,
         }
     }
 

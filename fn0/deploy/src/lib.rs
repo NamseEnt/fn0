@@ -1,677 +1,326 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-pub const HQ_URL: &str = "http://fn0-hq.fn0.dev:8080";
-const GITHUB_CLIENT_ID: &str = "Ov23liRuIJf1NSe9ccP8";
-
-#[derive(Serialize, Deserialize)]
-struct Credentials {
-    github_token: String,
+#[derive(Serialize)]
+struct NewProjectInput<'a> {
+    name: &'a str,
 }
 
 #[derive(Deserialize)]
-struct DeviceCodeResponse {
-    device_code: String,
-    user_code: String,
-    verification_uri: String,
-    interval: u64,
+struct NewProjectRaw {
+    #[serde(rename = "Ok")]
+    ok: Option<NewProjectOk>,
+    #[serde(rename = "NotLoggedIn")]
+    not_logged_in: Option<()>,
+    #[serde(rename = "Error")]
+    error: Option<MessageErr>,
 }
 
 #[derive(Deserialize)]
-struct TokenResponse {
-    access_token: Option<String>,
-    error: Option<String>,
+struct NewProjectOk {
+    project_id: String,
 }
 
 #[derive(Deserialize)]
-struct DeployStartResponse {
-    presigned_url: String,
-    deploy_job_id: String,
-    subdomain: String,
-    code_id: u64,
+struct MessageErr {
+    message: String,
 }
 
-#[derive(Deserialize)]
-struct DeployFinishResponse {
-    job_id: String,
-}
-
-#[derive(Deserialize)]
-struct DeployStatusResponse {
-    delivered: bool,
-    hosts_total: usize,
-    hosts_at_target: usize,
-    hosts_pending: Vec<String>,
-    hosts_quarantined: Vec<String>,
-    #[serde(default)]
-    job: Option<DeployJobStatus>,
-}
-
-#[derive(Deserialize)]
-struct DeployJobStatus {
-    phase: String,
-    #[serde(default)]
-    #[allow(dead_code)]
-    generation: Option<u64>,
-    #[serde(default)]
-    last_error: Option<String>,
-}
-
-fn credentials_path() -> Result<PathBuf> {
-    let home = std::env::var("HOME").map_err(|_| anyhow!("Cannot find HOME directory"))?;
-    Ok(PathBuf::from(home).join(".fn0").join("credentials"))
-}
-
-fn load_credentials() -> Result<Option<Credentials>> {
-    let path = credentials_path()?;
-    if !path.exists() {
-        return Ok(None);
-    }
-    let content = std::fs::read_to_string(&path)?;
-    let creds: Credentials = serde_json::from_str(&content)?;
-    Ok(Some(creds))
-}
-
-fn save_credentials(creds: &Credentials) -> Result<()> {
-    let path = credentials_path()?;
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(&path, serde_json::to_string_pretty(creds)?)?;
-    Ok(())
-}
-
-async fn github_device_flow() -> Result<String> {
-    let client = reqwest::Client::new();
-
-    let resp: DeviceCodeResponse = client
-        .post("https://github.com/login/device/code")
-        .header("Accept", "application/json")
-        .form(&[("client_id", GITHUB_CLIENT_ID), ("scope", "read:user")])
-        .send()
-        .await?
-        .json()
-        .await?;
-
-    println!("\nGitHub authentication required.");
-    println!("Open {} in your browser", resp.verification_uri);
-    println!("and enter the code: {}\n", resp.user_code);
-
-    let interval = std::time::Duration::from_secs(resp.interval.max(5));
-
-    loop {
-        tokio::time::sleep(interval).await;
-
-        let token_resp: TokenResponse = client
-            .post("https://github.com/login/oauth/access_token")
-            .header("Accept", "application/json")
-            .form(&[
-                ("client_id", GITHUB_CLIENT_ID),
-                ("device_code", resp.device_code.as_str()),
-                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            ])
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        if let Some(token) = token_resp.access_token {
-            return Ok(token);
-        }
-
-        match token_resp.error.as_deref() {
-            Some("authorization_pending") => continue,
-            Some("slow_down") => {
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                continue;
-            }
-            Some(e) => return Err(anyhow!("GitHub OAuth error: {}", e)),
-            None => continue,
-        }
-    }
-}
-
-pub async fn get_github_token() -> Result<String> {
-    if let Some(creds) = load_credentials()? {
-        return Ok(creds.github_token);
-    }
-
-    let token = github_device_flow().await?;
-    save_credentials(&Credentials {
-        github_token: token.clone(),
-    })?;
-    println!("Authentication complete! Token saved.\n");
-
-    Ok(token)
-}
-
-pub async fn deploy(
+async fn ensure_project_id(
+    client: &reqwest::Client,
+    control_url: &str,
+    token: &str,
     project_name: &str,
-    bundle_tar_path: &Path,
-    env_content: Option<String>,
-) -> Result<()> {
-    let github_token = get_github_token().await?;
-
-    let client = reqwest::Client::new();
-
-    println!("Requesting deploy start...");
-    let start_resp: DeployStartResponse = client
-        .post(format!("{}/deploy/start", HQ_URL))
-        .json(&serde_json::json!({
-            "github_token": github_token,
-            "project_name": project_name,
-        }))
+    project_id: &mut Option<String>,
+) -> Result<String> {
+    if let Some(id) = project_id.as_ref() {
+        return Ok(id.clone());
+    }
+    let url = format!(
+        "{}/__forte_action/new_project",
+        control_url.trim_end_matches('/')
+    );
+    let resp = client
+        .post(&url)
+        .bearer_auth(token)
+        .json(&NewProjectInput { name: project_name })
         .send()
         .await?
         .error_for_status()
-        .map_err(|e| anyhow!("Deploy start failed: {}", e))?
+        .map_err(|e| anyhow!("new_project failed: {e}"))?;
+    let raw: NewProjectRaw = resp.json().await?;
+    let id = match raw {
+        NewProjectRaw {
+            ok: Some(ok), ..
+        } => ok.project_id,
+        NewProjectRaw {
+            not_logged_in: Some(_),
+            ..
+        } => return Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        NewProjectRaw {
+            error: Some(err), ..
+        } => return Err(anyhow!("new_project: {}", err.message)),
+        _ => return Err(anyhow!("unexpected new_project response")),
+    };
+    *project_id = Some(id.clone());
+    Ok(id)
+}
+
+#[derive(Serialize)]
+struct DeployInput<'a> {
+    project_id: &'a str,
+}
+
+#[derive(Deserialize)]
+struct DeployRaw {
+    #[serde(rename = "Ok")]
+    ok: Option<DeployOk>,
+    #[serde(rename = "NotLoggedIn")]
+    not_logged_in: Option<()>,
+    #[serde(rename = "NotFound")]
+    not_found: Option<()>,
+    #[serde(rename = "Forbidden")]
+    forbidden: Option<()>,
+    #[serde(rename = "Error")]
+    error: Option<MessageErr>,
+}
+
+#[derive(Deserialize)]
+struct DeployOk {
+    presigned_put_url: String,
+    object_key: String,
+}
+
+#[derive(Serialize)]
+struct DeployStatusInput<'a> {
+    project_id: &'a str,
+    last_modified: &'a str,
+}
+
+#[derive(Deserialize)]
+struct DeployStatusRaw {
+    #[serde(rename = "Done")]
+    done: Option<DeployStatusBody>,
+    #[serde(rename = "Pending")]
+    pending: Option<DeployStatusBody>,
+    #[serde(rename = "NoActiveVersion")]
+    no_active_version: Option<()>,
+    #[serde(rename = "NotLoggedIn")]
+    not_logged_in: Option<()>,
+    #[serde(rename = "NotFound")]
+    not_found: Option<()>,
+    #[serde(rename = "Forbidden")]
+    forbidden: Option<()>,
+    #[serde(rename = "Error")]
+    error: Option<MessageErr>,
+}
+
+#[derive(Deserialize)]
+struct DeployStatusBody {
+    active_version: String,
+    pending_version: Option<String>,
+    pending_compiled: bool,
+    compiled_versions: Vec<String>,
+}
+
+pub async fn deploy(
+    control_url: &str,
+    token: &str,
+    project_name: &str,
+    project_id: &mut Option<String>,
+    bundle_tar_path: &Path,
+) -> Result<()> {
+    let client = reqwest::Client::new();
+
+    let project_id_resolved =
+        ensure_project_id(&client, control_url, token, project_name, project_id).await?;
+    println!("project_id: {project_id_resolved}");
+
+    println!("Requesting deploy...");
+    let deploy_url = format!(
+        "{}/__forte_action/deploy",
+        control_url.trim_end_matches('/')
+    );
+    let raw: DeployRaw = client
+        .post(&deploy_url)
+        .bearer_auth(token)
+        .json(&DeployInput {
+            project_id: &project_id_resolved,
+        })
+        .send()
+        .await?
+        .error_for_status()
+        .map_err(|e| anyhow!("deploy failed: {e}"))?
         .json()
         .await?;
+    let DeployOk {
+        presigned_put_url,
+        object_key,
+    } = match raw {
+        DeployRaw { ok: Some(ok), .. } => ok,
+        DeployRaw {
+            not_logged_in: Some(_),
+            ..
+        } => return Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        DeployRaw {
+            not_found: Some(_), ..
+        } => return Err(anyhow!("project not found")),
+        DeployRaw {
+            forbidden: Some(_), ..
+        } => return Err(anyhow!("not the owner of this project")),
+        DeployRaw {
+            error: Some(err), ..
+        } => return Err(anyhow!("deploy: {}", err.message)),
+        _ => return Err(anyhow!("unexpected deploy response")),
+    };
+    println!("uploading bundle to {object_key}...");
 
-    println!("Subdomain: {}.fn0.dev", start_resp.subdomain);
-
-    println!("Uploading bundle...");
     let bundle_bytes = std::fs::read(bundle_tar_path)
         .map_err(|e| anyhow!("Failed to read {}: {}", bundle_tar_path.display(), e))?;
 
-    client
-        .put(&start_resp.presigned_url)
-        .header("content-type", "application/x-tar")
+    let put_resp = client
+        .put(&presigned_put_url)
         .body(bundle_bytes)
         .send()
         .await?
         .error_for_status()
-        .map_err(|e| anyhow!("Bundle upload failed: {}", e))?;
+        .map_err(|e| anyhow!("bundle upload failed: {e}"))?;
+    let last_modified = extract_last_modified(&put_resp)?;
+    println!("uploaded. last_modified={last_modified}");
 
-    println!("Requesting deploy finish...");
-    let finish_resp: DeployFinishResponse = client
-        .post(format!("{}/deploy/finish", HQ_URL))
-        .json(&serde_json::json!({
-            "github_token": github_token,
-            "deploy_job_id": start_resp.deploy_job_id,
-            "subdomain": start_resp.subdomain,
-            "code_id": start_resp.code_id,
-            "env": env_content,
-        }))
-        .send()
-        .await?
-        .error_for_status()
-        .map_err(|e| anyhow!("Deploy finish failed: {}", e))?
-        .json()
-        .await?;
-
-    println!("Deploy job queued: {}", finish_resp.job_id);
-
-    let poll_interval = std::time::Duration::from_secs(2);
-    let timeout = std::time::Duration::from_secs(600);
-    let start = std::time::Instant::now();
-    let mut last_phase: Option<String> = None;
-    let mut last_progress: Option<(usize, usize)> = None;
-
-    loop {
-        let status: DeployStatusResponse = client
-            .get(format!(
-                "{}/deploy/status?job_id={}",
-                HQ_URL, finish_resp.job_id
-            ))
-            .send()
-            .await?
-            .error_for_status()
-            .map_err(|e| anyhow!("Deploy status failed: {}", e))?
-            .json()
-            .await?;
-
-        if let Some(job) = status.job.as_ref() {
-            if last_phase.as_deref() != Some(job.phase.as_str()) {
-                println!("  phase: {}", job.phase);
-                last_phase = Some(job.phase.clone());
-            }
-            if job.phase == "failed" {
-                let msg = job
-                    .last_error
-                    .clone()
-                    .unwrap_or_else(|| "unknown error".to_string());
-                return Err(anyhow!("Deploy job failed: {}", msg));
-            }
-        }
-
-        let progress = (status.hosts_at_target, status.hosts_total);
-        if last_progress != Some(progress) {
-            println!("  {}/{} hosts ready", progress.0, progress.1);
-            last_progress = Some(progress);
-        }
-
-        let phase_done = status
-            .job
-            .as_ref()
-            .map(|j| j.phase == "done")
-            .unwrap_or(false);
-        if phase_done && status.delivered {
-            break;
-        }
-
-        if start.elapsed() > timeout {
-            return Err(anyhow!(
-                "Deploy timed out after {}s. phase={:?} pending={:?} quarantined={:?}",
-                timeout.as_secs(),
-                status.job.as_ref().map(|j| j.phase.clone()),
-                status.hosts_pending,
-                status.hosts_quarantined
-            ));
-        }
-
-        tokio::time::sleep(poll_interval).await;
-    }
+    poll_deploy_status(&client, control_url, token, &project_id_resolved, &last_modified).await?;
 
     println!("Deploy complete!");
-
     Ok(())
 }
 
-#[derive(Deserialize)]
-struct AdminGrantResponse {
-    token: String,
-    subdomain: String,
-    #[allow(dead_code)]
-    expires_at: i64,
+fn extract_last_modified(resp: &reqwest::Response) -> Result<String> {
+    let hv = resp
+        .headers()
+        .get(reqwest::header::LAST_MODIFIED)
+        .ok_or_else(|| anyhow!("R2 PUT response missing Last-Modified header"))?
+        .to_str()
+        .map_err(|e| anyhow!("Last-Modified not utf-8: {e}"))?;
+    let dt = chrono::DateTime::parse_from_rfc2822(hv)
+        .map_err(|e| anyhow!("Last-Modified parse: {e}; raw={hv}"))?;
+    Ok(dt
+        .with_timezone(&chrono::Utc)
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string())
 }
 
-pub struct AdminRunOutput {
-    pub status: u16,
-    pub content_type: Option<String>,
-    pub body: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-struct RenameStartResponse {
-    job_id: String,
-    #[serde(default)]
-    already_running: bool,
-}
-
-#[derive(Deserialize)]
-struct RenameStatusResponse {
-    job_id: String,
-    phase: String,
-    attempts: u32,
-    last_error: Option<String>,
-    is_terminal: bool,
-}
-
-pub async fn rename(project_name: &str, new_project_name: &str) -> Result<()> {
-    let github_token = get_github_token().await?;
-
-    let client = reqwest::Client::new();
-
-    println!("Requesting rename start...");
-    let start_resp: RenameStartResponse = client
-        .post(format!("{}/rename/start", HQ_URL))
-        .json(&serde_json::json!({
-            "github_token": github_token,
-            "project_name": project_name,
-            "new_project_name": new_project_name,
-        }))
-        .send()
-        .await?
-        .error_for_status()
-        .map_err(|e| anyhow!("Rename start failed: {}", e))?
-        .json()
-        .await?;
-
-    if start_resp.already_running {
-        println!("Following existing rename job: {}", start_resp.job_id);
-    } else {
-        println!("Rename job queued: {}", start_resp.job_id);
-    }
-
-    let poll_interval = std::time::Duration::from_secs(2);
-    let timeout = std::time::Duration::from_secs(900);
-    let start = std::time::Instant::now();
-    let mut last_phase: Option<String> = None;
-
-    loop {
-        let status: RenameStatusResponse = client
-            .get(format!(
-                "{}/rename/status?job_id={}",
-                HQ_URL, start_resp.job_id
-            ))
-            .send()
-            .await?
-            .error_for_status()
-            .map_err(|e| anyhow!("Rename status failed: {}", e))?
-            .json()
-            .await?;
-
-        if last_phase.as_deref() != Some(status.phase.as_str()) {
-            println!("  phase: {} (attempts={})", status.phase, status.attempts);
-            last_phase = Some(status.phase.clone());
-        }
-
-        if status.phase == "failed" {
-            let msg = status
-                .last_error
-                .unwrap_or_else(|| "unknown error".to_string());
-            return Err(anyhow!("Rename job failed: {}", msg));
-        }
-
-        if status.is_terminal && status.phase == "done" {
-            break;
-        }
-
-        if start.elapsed() > timeout {
-            return Err(anyhow!(
-                "Rename timed out after {}s. phase={:?}",
-                timeout.as_secs(),
-                status.phase
-            ));
-        }
-
-        let _ = status.job_id;
-        tokio::time::sleep(poll_interval).await;
-    }
-
-    println!("Rename complete!");
-    Ok(())
-}
-
-#[derive(Deserialize)]
-struct DomainAddResponse {
-    job_id: String,
-    already_running: bool,
-    subdomain: String,
-    domain: String,
-}
-
-#[derive(Deserialize)]
-struct DomainRemoveResponse {
-    job_id: String,
-    already_running: bool,
-}
-
-#[derive(Deserialize)]
-struct DomainStatusResponse {
-    subdomain: String,
-    current_domain: Option<String>,
-    add_job: Option<DomainJobStatus>,
-    remove_job: Option<DomainJobStatus>,
-}
-
-#[derive(Deserialize, Clone)]
-struct DomainJobStatus {
-    job_id: String,
-    phase: String,
-    domain: String,
-    attempts: u32,
-    last_error: Option<String>,
-    is_terminal: bool,
-}
-
-pub async fn domain_add(project_name: &str, domain: &str) -> Result<()> {
-    let github_token = get_github_token().await?;
-    let client = reqwest::Client::new();
-
-    println!("Requesting domain add...");
-    let resp: DomainAddResponse = client
-        .post(format!("{HQ_URL}/domain/add"))
-        .json(&serde_json::json!({
-            "github_token": github_token,
-            "project_name": project_name,
-            "domain": domain,
-        }))
-        .send()
-        .await?
-        .error_for_status()
-        .map_err(|e| anyhow!("domain add failed: {e}"))?
-        .json()
-        .await?;
-
-    if resp.already_running {
-        println!("Following existing add job: {}", resp.job_id);
-    } else {
-        println!("Add job queued: {}", resp.job_id);
-    }
-    println!(
-        "\nPoint a CNAME for {} to: {}.fn0.dev",
-        resp.domain, resp.subdomain
-    );
-    println!("(Cloudflare for SaaS will validate and issue a TLS cert.)\n");
-
-    poll_domain_until(project_name, &github_token, |s| {
-        s.add_job.as_ref().map(|j| j.is_terminal).unwrap_or(false)
-            && s.current_domain.as_deref() == Some(resp.domain.as_str())
-    })
-    .await
-}
-
-pub async fn domain_remove(project_name: &str) -> Result<()> {
-    let github_token = get_github_token().await?;
-    let client = reqwest::Client::new();
-
-    println!("Requesting domain remove...");
-    let resp: DomainRemoveResponse = client
-        .post(format!("{HQ_URL}/domain/remove"))
-        .json(&serde_json::json!({
-            "github_token": github_token,
-            "project_name": project_name,
-        }))
-        .send()
-        .await?
-        .error_for_status()
-        .map_err(|e| anyhow!("domain remove failed: {e}"))?
-        .json()
-        .await?;
-
-    if resp.already_running {
-        println!("Following existing remove job: {}", resp.job_id);
-    } else {
-        println!("Remove job queued: {}", resp.job_id);
-    }
-
-    poll_domain_until(project_name, &github_token, |s| {
-        s.remove_job.as_ref().map(|j| j.is_terminal).unwrap_or(false)
-            && s.current_domain.is_none()
-    })
-    .await
-}
-
-pub async fn domain_status(project_name: &str) -> Result<()> {
-    let github_token = get_github_token().await?;
-    let client = reqwest::Client::new();
-
+async fn poll_deploy_status(
+    client: &reqwest::Client,
+    control_url: &str,
+    token: &str,
+    project_id: &str,
+    last_modified: &str,
+) -> Result<()> {
     let url = format!(
-        "{HQ_URL}/domain/status?github_token={}&project_name={}",
-        urlencoding::encode(&github_token),
-        urlencoding::encode(project_name)
+        "{}/__forte_action/deploy_status",
+        control_url.trim_end_matches('/')
     );
-    let status: DomainStatusResponse = client
-        .get(&url)
-        .send()
-        .await?
-        .error_for_status()
-        .map_err(|e| anyhow!("domain status failed: {e}"))?
-        .json()
-        .await?;
-
-    println!("Subdomain: {}.fn0.dev", status.subdomain);
-    match &status.current_domain {
-        Some(d) => println!("Current domain: {d}"),
-        None => println!("Current domain: (none)"),
-    }
-    if let Some(j) = &status.add_job {
-        println!(
-            "Add job: id={} phase={} domain={} attempts={} terminal={}",
-            j.job_id, j.phase, j.domain, j.attempts, j.is_terminal
-        );
-        if let Some(e) = &j.last_error {
-            println!("  last_error: {e}");
-        }
-    }
-    if let Some(j) = &status.remove_job {
-        println!(
-            "Remove job: id={} phase={} domain={} attempts={} terminal={}",
-            j.job_id, j.phase, j.domain, j.attempts, j.is_terminal
-        );
-        if let Some(e) = &j.last_error {
-            println!("  last_error: {e}");
-        }
-    }
-    Ok(())
-}
-
-async fn poll_domain_until<F>(project_name: &str, github_token: &str, done: F) -> Result<()>
-where
-    F: Fn(&DomainStatusResponse) -> bool,
-{
-    let client = reqwest::Client::new();
-    let poll_interval = std::time::Duration::from_secs(3);
-    let timeout = std::time::Duration::from_secs(900);
+    let timeout = std::time::Duration::from_secs(600);
     let start = std::time::Instant::now();
-    let mut last_phase: Option<String> = None;
+    let mut last_state: Option<String> = None;
 
     loop {
-        let url = format!(
-            "{HQ_URL}/domain/status?github_token={}&project_name={}",
-            urlencoding::encode(github_token),
-            urlencoding::encode(project_name)
-        );
-        let status: DomainStatusResponse = client
-            .get(&url)
+        let raw: DeployStatusRaw = client
+            .post(&url)
+            .bearer_auth(token)
+            .json(&DeployStatusInput {
+                project_id,
+                last_modified,
+            })
             .send()
             .await?
             .error_for_status()
-            .map_err(|e| anyhow!("domain status failed: {e}"))?
+            .map_err(|e| anyhow!("deploy_status failed: {e}"))?
             .json()
             .await?;
 
-        let active_phase = status
-            .add_job
-            .as_ref()
-            .map(|j| j.phase.clone())
-            .or_else(|| status.remove_job.as_ref().map(|j| j.phase.clone()));
-        if last_phase != active_phase
-            && let Some(p) = active_phase.clone()
-        {
-            println!("  phase: {p}");
-            last_phase = active_phase;
-        }
-
-        if let Some(j) = status.add_job.as_ref()
-            && j.phase == "failed"
-        {
-            let msg = j
-                .last_error
-                .clone()
-                .unwrap_or_else(|| "unknown error".to_string());
-            return Err(anyhow!("Add job failed: {msg}"));
-        }
-        if let Some(j) = status.remove_job.as_ref()
-            && j.phase == "failed"
-        {
-            let msg = j
-                .last_error
-                .clone()
-                .unwrap_or_else(|| "unknown error".to_string());
-            return Err(anyhow!("Remove job failed: {msg}"));
-        }
-
-        if done(&status) {
-            println!("Done!");
+        if let Some(body) = raw.done {
+            log_status_line(&body, &mut last_state);
             return Ok(());
         }
-
-        if start.elapsed() > timeout {
-            return Err(anyhow!(
-                "Domain operation timed out after {}s",
-                timeout.as_secs()
-            ));
+        if raw.no_active_version.is_some() {
+            return Err(anyhow!("control has no active fn0-wasmtime version yet"));
         }
-        tokio::time::sleep(poll_interval).await;
+        if raw.not_logged_in.is_some() {
+            return Err(anyhow!("control rejected token; run `fn0 login` again."));
+        }
+        if raw.not_found.is_some() {
+            return Err(anyhow!("project not found"));
+        }
+        if raw.forbidden.is_some() {
+            return Err(anyhow!("not the owner of this project"));
+        }
+        if let Some(err) = raw.error {
+            return Err(anyhow!("deploy_status: {}", err.message));
+        }
+        if let Some(body) = raw.pending {
+            log_status_line(&body, &mut last_state);
+            if start.elapsed() > timeout {
+                return Err(anyhow!(
+                    "deploy_status timed out after {}s",
+                    timeout.as_secs()
+                ));
+            }
+            continue;
+        }
+        return Err(anyhow!("unexpected deploy_status response"));
     }
 }
 
-pub async fn admin_run(
-    project_name: &str,
-    task: &str,
-    input_body: Vec<u8>,
-    timeout_secs: u64,
-) -> Result<AdminRunOutput> {
-    let github_token = get_github_token().await?;
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(timeout_secs))
-        .build()?;
-
-    let grant: AdminGrantResponse = client
-        .post(format!("{}/admin/grant", HQ_URL))
-        .json(&serde_json::json!({
-            "github_token": github_token,
-            "project_name": project_name,
-            "task": task,
-        }))
-        .send()
-        .await?
-        .error_for_status()
-        .map_err(|e| anyhow!("Admin grant request failed: {}", e))?
-        .json()
-        .await?;
-
-    let url = format!("https://{}.fn0.dev/__forte_admin/{}", grant.subdomain, task);
-    let resp = client
-        .post(&url)
-        .header("Authorization", format!("FortoAdmin {}", grant.token))
-        .header("Content-Type", "application/json")
-        .body(input_body)
-        .send()
-        .await?;
-
-    let status = resp.status().as_u16();
-    let content_type = resp
-        .headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-    let body = resp.bytes().await?.to_vec();
-
-    Ok(AdminRunOutput {
-        status,
-        content_type,
-        body,
-    })
+fn log_status_line(body: &DeployStatusBody, last_state: &mut Option<String>) {
+    let state = format!(
+        "active={} compiled={:?} pending={:?} pending_compiled={}",
+        body.active_version, body.compiled_versions, body.pending_version, body.pending_compiled,
+    );
+    if last_state.as_deref() != Some(&state) {
+        println!("  {state}");
+        *last_state = Some(state);
+    }
 }
 
-pub fn read_env_content(project_dir: &Path) -> Result<Option<String>> {
-    let env_path = project_dir.join(".env");
-    match std::fs::read_to_string(&env_path) {
+pub fn read_env_yaml(project_dir: &Path) -> Result<Option<Vec<u8>>> {
+    let p = project_dir.join("env.yaml");
+    match std::fs::read(&p) {
         Ok(content) => Ok(Some(content)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(anyhow!("Failed to read {}: {}", env_path.display(), e)),
+        Err(e) => Err(anyhow!("Failed to read {}: {}", p.display(), e)),
     }
 }
 
-pub fn create_raw_bundle_wasm(wasm_path: &Path, output_path: &Path) -> Result<()> {
+pub fn create_raw_bundle_wasm(
+    wasm_path: &Path,
+    env_yaml: Option<&[u8]>,
+    output_path: &Path,
+) -> Result<()> {
     let file = std::fs::File::create(output_path)
         .map_err(|e| anyhow!("Failed to create {}: {}", output_path.display(), e))?;
     let mut builder = tar::Builder::new(file);
-
-    let manifest = br#"{"kind":"wasm"}"#;
-    append_bytes(&mut builder, "manifest.json", manifest)?;
-
+    append_bytes(&mut builder, "manifest.json", br#"{"kind":"wasm"}"#)?;
     let wasm_bytes = std::fs::read(wasm_path)
         .map_err(|e| anyhow!("Failed to read {}: {}", wasm_path.display(), e))?;
     append_bytes(&mut builder, "backend.wasm", &wasm_bytes)?;
-
+    if let Some(env) = env_yaml {
+        append_bytes(&mut builder, "env.yaml", env)?;
+    }
     builder.finish()?;
     Ok(())
 }
 
-pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()> {
+pub fn create_raw_bundle_forte(
+    dist_dir: &Path,
+    env_yaml: Option<&[u8]>,
+    output_path: &Path,
+) -> Result<()> {
     let file = std::fs::File::create(output_path)
         .map_err(|e| anyhow!("Failed to create {}: {}", output_path.display(), e))?;
     let mut builder = tar::Builder::new(file);
-
-    let manifest = br#"{"kind":"wasmjs"}"#;
-    append_bytes(&mut builder, "manifest.json", manifest)?;
+    append_bytes(&mut builder, "manifest.json", br#"{"kind":"wasmjs"}"#)?;
 
     let backend_wasm = dist_dir.join("backend.wasm");
     let wasm_bytes = std::fs::read(&backend_wasm)
@@ -682,6 +331,10 @@ pub fn create_raw_bundle_forte(dist_dir: &Path, output_path: &Path) -> Result<()
     let server_bytes = std::fs::read(&server_js)
         .map_err(|e| anyhow!("Failed to read {}: {}", server_js.display(), e))?;
     append_bytes(&mut builder, "entry.js", &server_bytes)?;
+
+    if let Some(env) = env_yaml {
+        append_bytes(&mut builder, "env.yaml", env)?;
+    }
 
     builder.finish()?;
     Ok(())
@@ -700,4 +353,51 @@ fn append_bytes<W: std::io::Write>(
         .append_data(&mut header, path, data)
         .map_err(|e| anyhow!("tar append failed for {}: {}", path, e))?;
     Ok(())
+}
+
+pub struct AdminRunOutput {
+    pub status: u16,
+    pub content_type: Option<String>,
+    pub body: Vec<u8>,
+}
+
+pub async fn admin_run(
+    _project_name: &str,
+    _task: &str,
+    _input_body: Vec<u8>,
+    _timeout_secs: u64,
+) -> Result<AdminRunOutput> {
+    Err(anyhow!(
+        "admin run is not yet migrated to control. See GitHub issue #4."
+    ))
+}
+
+pub async fn rename(_project_name: &str, _new_project_name: &str) -> Result<()> {
+    Err(anyhow!(
+        "rename is not yet migrated to control. See GitHub issue #5."
+    ))
+}
+
+pub async fn domain_add(_project_name: &str, _domain: &str) -> Result<()> {
+    Err(anyhow!(
+        "domain commands are not yet migrated to control."
+    ))
+}
+
+pub async fn domain_remove(_project_name: &str) -> Result<()> {
+    Err(anyhow!(
+        "domain commands are not yet migrated to control."
+    ))
+}
+
+pub async fn domain_status(_project_name: &str) -> Result<()> {
+    Err(anyhow!(
+        "domain commands are not yet migrated to control."
+    ))
+}
+
+pub fn read_env_content(_project_dir: &Path) -> Result<Option<String>> {
+    Err(anyhow!(
+        "read_env_content has been replaced by read_env_yaml; env.yaml is now bundled directly."
+    ))
 }
