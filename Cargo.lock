@@ -2812,6 +2812,7 @@ name = "fn0-deploy"
 version = "0.1.5"
 dependencies = [
  "anyhow",
+ "chrono",
  "reqwest",
  "serde",
  "serde_json",
