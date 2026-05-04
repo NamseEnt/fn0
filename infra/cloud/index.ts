@@ -321,6 +321,32 @@ const controlCookieSecret = new random.RandomBytes("fn0-control-cookie-secret", 
   length: 32,
 });
 
+const controlAdminToken = new random.RandomBytes("fn0-control-admin-token", {
+  length: 32,
+});
+
+const controlR2 = new fn0.ControlR2(
+  "control-r2",
+  {
+    accountId,
+    bucketName: pulumi.interpolate`fn0-control-bundles-${suffix}`,
+  },
+  {}
+);
+
+const controlR2Worker = new fn0.ControlR2Worker(
+  "control-r2-worker",
+  {
+    accountId,
+    scriptName: pulumi.interpolate`fn0-control-r2-worker-${suffix}`,
+    bucketName: controlR2.bucketName,
+    queueId: controlR2.queueId,
+    controlUrl: pulumi.interpolate`https://fn0-control.${domain}`,
+    adminToken: controlAdminToken.base64,
+  },
+  {}
+);
+
 const githubClientId = config.require("githubClientId");
 const githubClientSecret = config.requireSecret("githubClientSecret");
 
@@ -351,6 +377,26 @@ const controlCookieSecretCt = pulumi
   .all([controlDek.plaintext, controlCookieSecret.base64])
   .apply(([dek, secret]) => aesGcmEncryptToBase64(dek, secret));
 
+const controlAdminTokenCt = pulumi
+  .all([controlDek.plaintext, controlAdminToken.base64])
+  .apply(([dek, token]) => aesGcmEncryptToBase64(dek, token));
+
+const controlR2AccessKeyIdCt = pulumi
+  .all([controlDek.plaintext, controlR2.accessKeyId])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const controlR2SecretAccessKeyCt = pulumi
+  .all([controlDek.plaintext, controlR2.secretAccessKey])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const controlLambdaAccessKeyIdCt = pulumi
+  .all([controlDek.plaintext, hqAwsAccessKey.id])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const controlLambdaSecretAccessKeyCt = pulumi
+  .all([controlDek.plaintext, hqAwsAccessKey.secret])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const controlEnvYamlBootstrap = pulumi
   .all([
     controlDek.ciphertext,
@@ -358,20 +404,56 @@ const controlEnvYamlBootstrap = pulumi
     controlGithubSecretCt,
     controlTokenHmacCt,
     controlCookieSecretCt,
+    controlAdminTokenCt,
+    controlR2.accountId,
+    controlR2.bucketName,
+    controlR2AccessKeyIdCt,
+    controlR2SecretAccessKeyCt,
+    pulumi.output(cwasmCompilerRegion),
+    controlLambdaAccessKeyIdCt,
+    controlLambdaSecretAccessKeyCt,
   ])
-  .apply(([dekCt, clientId, ghCt, hmacCt, cookieCt]) =>
-    [
-      "__dek:",
-      `  encrypted: ${dekCt}`,
-      `GITHUB_CLIENT_ID: ${clientId}`,
-      "GITHUB_CLIENT_SECRET:",
-      `  secret: ${ghCt}`,
-      "FN0_TOKEN_HMAC_KEY:",
-      `  secret: ${hmacCt}`,
-      "COOKIE_SECRET:",
-      `  secret: ${cookieCt}`,
-      "",
-    ].join("\n")
+  .apply(
+    ([
+      dekCt,
+      clientId,
+      ghCt,
+      hmacCt,
+      cookieCt,
+      adminCt,
+      r2AccountId,
+      r2Bucket,
+      r2KeyCt,
+      r2SecretCt,
+      lambdaRegion,
+      lambdaKeyCt,
+      lambdaSecretCt,
+    ]) =>
+      [
+        "__dek:",
+        `  encrypted: ${dekCt}`,
+        `GITHUB_CLIENT_ID: ${clientId}`,
+        "GITHUB_CLIENT_SECRET:",
+        `  secret: ${ghCt}`,
+        "FN0_TOKEN_HMAC_KEY:",
+        `  secret: ${hmacCt}`,
+        "COOKIE_SECRET:",
+        `  secret: ${cookieCt}`,
+        "FN0_CONTROL_ADMIN_TOKEN:",
+        `  secret: ${adminCt}`,
+        `FN0_R2_ACCOUNT_ID: ${r2AccountId}`,
+        `FN0_R2_BUCKET: ${r2Bucket}`,
+        "FN0_R2_ACCESS_KEY_ID:",
+        `  secret: ${r2KeyCt}`,
+        "FN0_R2_SECRET_ACCESS_KEY:",
+        `  secret: ${r2SecretCt}`,
+        `FN0_LAMBDA_REGION: ${lambdaRegion}`,
+        "FN0_LAMBDA_ACCESS_KEY_ID:",
+        `  secret: ${lambdaKeyCt}`,
+        "FN0_LAMBDA_SECRET_ACCESS_KEY:",
+        `  secret: ${lambdaSecretCt}`,
+        "",
+      ].join("\n")
   );
 
 const dnsProvider = {
@@ -522,3 +604,10 @@ export const docDbToken = pulumi.secret(docDb.token);
 export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
 export const vaultKeyOcid = ociGlobalVault.keyOcid;
 export const controlBootstrapEnvYaml = pulumi.secret(controlEnvYamlBootstrap);
+export const controlR2AccountId = controlR2.accountId;
+export const controlR2BucketName = controlR2.bucketName;
+export const controlR2Endpoint = controlR2.endpoint;
+export const controlR2AccessKeyId = pulumi.secret(controlR2.accessKeyId);
+export const controlR2SecretAccessKey = pulumi.secret(controlR2.secretAccessKey);
+export const controlR2QueueId = controlR2.queueId;
+export const controlR2WorkerScriptName = controlR2Worker.scriptName;
