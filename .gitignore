@@ -2,14 +2,3 @@
 **/.DS_Store
 /docker/
 target/
-
-package-lock.json
-fn0/*/Cargo.lock
-forte/*/Cargo.lock
-
-# build outputs and node_modules in pulumi infra (do not track)
-infra/cloud/sdks/fn0/node_modules/
-infra/cloud/sdks/fn0/bin/
-infra/pulumi/sdks/b2/node_modules/
-infra/pulumi/sdks/b2/bin/
-infra/pulumi/bin/
