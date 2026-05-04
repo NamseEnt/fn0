@@ -64,7 +64,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let input_key = format!("original/{}.tar", req.body.project_id);
     for ver in &versions {
         let output_key = format!(
-            "compiled/{ver}/{}-{}.tar.zst",
+            "compiled/{ver}/{}/{}.tar.zst",
             req.body.project_id, req.body.last_modified,
         );
         let payload = serde_json::to_vec(&InvokePayload {
