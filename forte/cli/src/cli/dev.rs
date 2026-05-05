@@ -243,8 +243,8 @@ fn find_wasm_binary(release_dir: &Path, project_dir: &Path) -> Result<PathBuf> {
         name: String,
     }
 
-    let parsed: CargoToml = toml::from_str(&content)
-        .with_context(|| format!("parse {}", cargo_toml.display()))?;
+    let parsed: CargoToml =
+        toml::from_str(&content).with_context(|| format!("parse {}", cargo_toml.display()))?;
 
     let wasm_name = format!("{}.wasm", parsed.package.name.replace('-', "_"));
     let wasm_path = release_dir.join(&wasm_name);
@@ -331,15 +331,20 @@ pub async fn run(options: DevOptions) -> Result<()> {
         ));
     }
 
-    let (queue_tx, queue_rx) = tokio::sync::mpsc::unbounded_channel::<fn0::queue_hijack::LoopbackMessage>();
+    let (queue_tx, queue_rx) =
+        tokio::sync::mpsc::unbounded_channel::<fn0::queue_hijack::LoopbackMessage>();
     let queue_placeholder = "fn0-queue.fn0.dev".to_string();
+    let queue_tx_for_cron = queue_tx.clone();
     let queue_hijack = Arc::new(fn0::QueueHijack::new_loopback(
         queue_placeholder.clone(),
         queue_tx,
     ));
 
     if !env_vars.iter().any(|(k, _)| k == "FN0_QUEUE_URL") {
-        env_vars.push(("FN0_QUEUE_URL".to_string(), format!("http://{queue_placeholder}")));
+        env_vars.push((
+            "FN0_QUEUE_URL".to_string(),
+            format!("http://{queue_placeholder}"),
+        ));
     }
 
     let config = ServerConfig {
@@ -353,6 +358,13 @@ pub async fn run(options: DevOptions) -> Result<()> {
     };
 
     let handle = server::run(config).await?;
+
+    let _cron_handle = tokio::task::spawn_local({
+        let project_dir = project_dir.clone();
+        async move {
+            run_local_cron_ticker(project_dir, queue_tx_for_cron).await;
+        }
+    });
 
     let _consumer_handle = tokio::task::spawn_local({
         let executor = handle.executor.clone();
@@ -372,7 +384,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
                 };
                 let req = match hyper::Request::builder()
                     .method("POST")
-                    .uri("http://localhost/__forte_queue_task/execute")
+                    .uri("http://localhost/__fn0_queue_task/execute")
                     .header("content-type", "application/json")
                     .body(
                         http_body_util::Full::new(bytes::Bytes::from(body_bytes))
@@ -489,4 +501,56 @@ async fn rebuild_backend(project_dir: &Path, handle: &ServerHandle) -> Result<()
         .invalidate(server::DEV_CODE_ID)
         .await;
     Ok(())
+}
+
+async fn run_local_cron_ticker(
+    project_dir: PathBuf,
+    queue_tx: tokio::sync::mpsc::UnboundedSender<fn0::queue_hijack::LoopbackMessage>,
+) {
+    let mut interval = tokio::time::interval_at(next_minute_boundary(), Duration::from_secs(60));
+    loop {
+        interval.tick().await;
+        let now_secs = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs() as i64,
+            Err(_) => continue,
+        };
+        let epoch_minute = now_secs / 60;
+
+        let jobs = match super::cron::read_and_validate(&project_dir) {
+            Ok(j) => j,
+            Err(err) => {
+                tracing::warn!(?err, "local cron: cron.yaml read/validate failed");
+                continue;
+            }
+        };
+
+        for job in jobs {
+            if job.every_minutes == 0 {
+                continue;
+            }
+            if epoch_minute % (job.every_minutes as i64) != 0 {
+                continue;
+            }
+            let msg = fn0::queue_hijack::LoopbackMessage {
+                subdomain: server::DEV_CODE_ID.to_string(),
+                task_name: job.function.clone(),
+                payload: serde_json::Value::Null,
+            };
+            if let Err(err) = queue_tx.send(msg) {
+                tracing::warn!(?err, "local cron: enqueue failed");
+            } else {
+                tracing::info!(function = %job.function, "local cron fired");
+            }
+        }
+    }
+}
+
+fn next_minute_boundary() -> tokio::time::Instant {
+    let now = std::time::SystemTime::now();
+    let dur = now
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs_in_min = dur.as_secs() % 60;
+    let wait = Duration::from_secs(60 - secs_in_min);
+    tokio::time::Instant::now() + wait
 }

@@ -173,14 +173,16 @@ async fn run_remove_until_blocked(ctx: &Arc<DeployContext>, mut job: CustomDomai
     }
 }
 
-async fn advance_add_phase(
-    ctx: &Arc<DeployContext>,
-    job: &mut CustomDomainAddJob,
-) -> Result<bool> {
+async fn advance_add_phase(ctx: &Arc<DeployContext>, job: &mut CustomDomainAddJob) -> Result<bool> {
     match job.phase {
         CustomDomainAddPhase::Queued => {
             let hostname_id = if let Some(id) = job.cloudflare_hostname_id.clone() {
-                if ctx.cloudflare_saas.get_custom_hostname(&id).await?.is_some() {
+                if ctx
+                    .cloudflare_saas
+                    .get_custom_hostname(&id)
+                    .await?
+                    .is_some()
+                {
                     id
                 } else {
                     create_or_adopt_hostname(ctx, &job.domain).await?
@@ -202,25 +204,20 @@ async fn advance_add_phase(
                 .insert_custom_domain(&job.subdomain, &job.domain, &hostname_id)
                 .await?;
             match outcome {
-                InsertCustomDomainOutcome::Inserted
-                | InsertCustomDomainOutcome::AlreadyExists => {
+                InsertCustomDomainOutcome::Inserted | InsertCustomDomainOutcome::AlreadyExists => {
                     job.phase = CustomDomainAddPhase::DocPersisted;
                     Ok(true)
                 }
-                InsertCustomDomainOutcome::SubdomainTaken { existing_domain } => {
-                    Err(eyre!(
-                        "subdomain '{}' already has domain '{}'",
-                        job.subdomain,
-                        existing_domain
-                    ))
-                }
-                InsertCustomDomainOutcome::DomainTaken { existing_subdomain } => {
-                    Err(eyre!(
-                        "domain '{}' already mapped to subdomain '{}'",
-                        job.domain,
-                        existing_subdomain
-                    ))
-                }
+                InsertCustomDomainOutcome::SubdomainTaken { existing_domain } => Err(eyre!(
+                    "subdomain '{}' already has domain '{}'",
+                    job.subdomain,
+                    existing_domain
+                )),
+                InsertCustomDomainOutcome::DomainTaken { existing_subdomain } => Err(eyre!(
+                    "domain '{}' already mapped to subdomain '{}'",
+                    job.domain,
+                    existing_subdomain
+                )),
             }
         }
         CustomDomainAddPhase::DocPersisted => {
@@ -234,7 +231,10 @@ async fn advance_add_phase(
                 .cloudflare_hostname_id
                 .clone()
                 .ok_or_else(|| eyre!("Pushed without hostname_id"))?;
-            let info = ctx.cloudflare_saas.get_custom_hostname(&hostname_id).await?;
+            let info = ctx
+                .cloudflare_saas
+                .get_custom_hostname(&hostname_id)
+                .await?;
             let active = info.map(|h| h.status.is_active()).unwrap_or(false);
             if active {
                 job.phase = CustomDomainAddPhase::Verified;
@@ -250,10 +250,7 @@ async fn advance_add_phase(
     }
 }
 
-async fn create_or_adopt_hostname(
-    ctx: &Arc<DeployContext>,
-    domain: &str,
-) -> Result<String> {
+async fn create_or_adopt_hostname(ctx: &Arc<DeployContext>, domain: &str) -> Result<String> {
     match ctx.cloudflare_saas.create_custom_hostname(domain).await {
         Ok(h) => Ok(h.id),
         Err(_) => {
@@ -261,7 +258,9 @@ async fn create_or_adopt_hostname(
                 .cloudflare_saas
                 .find_custom_hostname_by_name(domain)
                 .await?
-                .ok_or_else(|| eyre!("create_custom_hostname failed and no existing match for {domain}"))?;
+                .ok_or_else(|| {
+                    eyre!("create_custom_hostname failed and no existing match for {domain}")
+                })?;
             Ok(existing.id)
         }
     }
@@ -293,7 +292,9 @@ async fn advance_remove_phase(
                 .find_custom_hostname_by_name(&job.domain)
                 .await?
             {
-                ctx.cloudflare_saas.delete_custom_hostname(&found.id).await?;
+                ctx.cloudflare_saas
+                    .delete_custom_hostname(&found.id)
+                    .await?;
             }
             job.phase = CustomDomainRemovePhase::CloudflareHostnameDeleted;
             Ok(true)

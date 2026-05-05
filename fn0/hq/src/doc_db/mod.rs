@@ -10,13 +10,13 @@ mod rename_job;
 mod scale_config;
 mod worker_target;
 
+use color_eyre::eyre::Result;
 pub use custom_domain::*;
 pub use custom_domain_job::*;
 pub use deploy_job::*;
 pub use deployment::*;
 pub use host_status::*;
 pub use rename_job::*;
-use color_eyre::eyre::Result;
 pub use worker_target::*;
 
 #[derive(Clone)]

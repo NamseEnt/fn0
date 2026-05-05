@@ -41,7 +41,8 @@ impl OtlpHijack {
         headers.remove(HOST);
         headers.insert(
             HOST,
-            HeaderValue::from_str(&self.target_host).map_err(|_| ErrorCode::HttpRequestUriInvalid)?,
+            HeaderValue::from_str(&self.target_host)
+                .map_err(|_| ErrorCode::HttpRequestUriInvalid)?,
         );
 
         let auth_value = format!("Basic {}", self.auth);

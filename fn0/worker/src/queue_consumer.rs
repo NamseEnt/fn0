@@ -1,11 +1,9 @@
 use anyhow::{Result, anyhow};
 use base64::Engine;
 use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
 use http_body_util::combinators::UnsyncBoxBody;
-use oci_rust_sdk::auth::{
-    RequestSigner, SimpleAuthProvider, SimpleAuthProviderRequiredFields,
-};
+use http_body_util::{BodyExt, Full};
+use oci_rust_sdk::auth::{RequestSigner, SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,8 +30,8 @@ impl QueueConsumerConfig {
         let Ok(messages_endpoint) = std::env::var("FN0_QUEUE_MESSAGES_ENDPOINT") else {
             return Ok(None);
         };
-        let queue_ocid = std::env::var("FN0_QUEUE_OCID")
-            .map_err(|_| anyhow!("FN0_QUEUE_OCID is required"))?;
+        let queue_ocid =
+            std::env::var("FN0_QUEUE_OCID").map_err(|_| anyhow!("FN0_QUEUE_OCID is required"))?;
         let tenancy = std::env::var("FN0_QUEUE_OCI_TENANCY_ID")
             .map_err(|_| anyhow!("FN0_QUEUE_OCI_TENANCY_ID is required"))?;
         let user = std::env::var("FN0_QUEUE_OCI_USER_ID")
@@ -45,7 +43,9 @@ impl QueueConsumerConfig {
         let private_key_pem = base64::engine::general_purpose::STANDARD
             .decode(private_key_b64.as_bytes())
             .map_err(|e| anyhow!("queue private key base64 decode: {e}"))
-            .and_then(|b| String::from_utf8(b).map_err(|e| anyhow!("queue private key utf8: {e}")))?;
+            .and_then(|b| {
+                String::from_utf8(b).map_err(|e| anyhow!("queue private key utf8: {e}"))
+            })?;
         Ok(Some(Self {
             queue_ocid,
             messages_endpoint,
@@ -214,7 +214,9 @@ impl Consumer {
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(anyhow!("queue DeleteMessage failed status={status} body={body}"));
+            return Err(anyhow!(
+                "queue DeleteMessage failed status={status} body={body}"
+            ));
         }
         Ok(())
     }
@@ -236,18 +238,17 @@ impl Consumer {
         }))
         .map_err(|e| anyhow!("queue inner body: {e}"))?;
 
-        let req: hyper::Request<UnsyncBoxBody<Bytes, anyhow::Error>> =
-            hyper::Request::builder()
-                .method("POST")
-                .uri("/__forte_queue_task/execute")
-                .header("host", format!("{}.fn0.dev", wrapped.subdomain))
-                .header("content-type", "application/json")
-                .body(
-                    Full::new(Bytes::from(inner_body))
-                        .map_err(|never: std::convert::Infallible| match never {})
-                        .boxed_unsync(),
-                )
-                .map_err(|e| anyhow!("queue req build: {e}"))?;
+        let req: hyper::Request<UnsyncBoxBody<Bytes, anyhow::Error>> = hyper::Request::builder()
+            .method("POST")
+            .uri("/__fn0_queue_task/execute")
+            .header("host", format!("{}.fn0.dev", wrapped.subdomain))
+            .header("content-type", "application/json")
+            .body(
+                Full::new(Bytes::from(inner_body))
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .map_err(|e| anyhow!("queue req build: {e}"))?;
 
         let (resp_tx, resp_rx) = oneshot::channel();
         let envelope = RequestEnvelope {

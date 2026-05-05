@@ -90,8 +90,10 @@ impl Site {
                             let id = host_id.clone();
                             let a = addr.clone();
                             tokio::spawn(async move {
-                                super::terminate::terminate_host(&provider, &db, &pool, &site, &id, &a)
-                                    .await;
+                                super::terminate::terminate_host(
+                                    &provider, &db, &pool, &site, &id, &a,
+                                )
+                                .await;
                             });
                         }
                     }

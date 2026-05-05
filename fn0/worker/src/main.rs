@@ -12,8 +12,9 @@ use base64::Engine;
 use bytes::Bytes;
 use cache::S3BundleCache;
 use color_eyre::eyre::Result;
-use fn0::{ExecutionContext, OtlpHijack, QueueHijack, TursoHijack, VaultHijack};
-use vault_client::VaultClient;
+use fn0::{
+    ControlInvokeQueueHijack, ExecutionContext, OtlpHijack, QueueHijack, TursoHijack, VaultHijack,
+};
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::server::conn::http1;
@@ -27,6 +28,7 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio_rustls::TlsAcceptor;
+use vault_client::VaultClient;
 use worker_pool::{DispatchError, RequestEnvelope};
 
 pub type WorkerContext = ExecutionContext<S3BundleCache>;
@@ -73,6 +75,22 @@ fn build_queue_hijack() -> Option<Arc<QueueHijack>> {
         }
         Err(err) => {
             tracing::error!(?err, "queue hijack build failed");
+            None
+        }
+    }
+}
+
+fn build_control_invoke_queue_hijack() -> Option<Arc<ControlInvokeQueueHijack>> {
+    match ControlInvokeQueueHijack::from_env() {
+        Ok(Some(hijack)) => Some(Arc::new(hijack)),
+        Ok(None) => {
+            tracing::warn!(
+                "FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT not set; control invoke queue hijack disabled"
+            );
+            None
+        }
+        Err(err) => {
+            tracing::error!(?err, "control invoke queue hijack build failed");
             None
         }
     }
@@ -205,6 +223,9 @@ async fn run() -> Result<()> {
         }
         if let Some(hijack) = build_queue_hijack() {
             ctx = ctx.with_queue_hijack(hijack);
+        }
+        if let Some(hijack) = build_control_invoke_queue_hijack() {
+            ctx = ctx.with_control_invoke_queue_hijack(hijack);
         }
         if let Some(hijack) = build_vault_hijack() {
             ctx = ctx.with_vault_hijack(hijack);
@@ -427,7 +448,7 @@ async fn handle_request(
             .unwrap()),
         "/health" => Ok(hyper::Response::new(Full::new(Bytes::from("good")))),
         "/role" => Ok(hyper::Response::new(Full::new(Bytes::from("worker")))),
-        path if path.starts_with("/__forte_queue_task/") => Ok(hyper::Response::builder()
+        path if path.starts_with("/__fn0_queue_task/") => Ok(hyper::Response::builder()
             .status(403)
             .body(Full::new(Bytes::from("Forbidden")))
             .unwrap()),

@@ -119,9 +119,7 @@ impl TursoDatabase {
 
     fn is_busy_error(error_message: &str) -> bool {
         let msg = error_message.to_ascii_lowercase();
-        msg.contains("database is locked")
-            || msg.contains("sqlite_busy")
-            || msg.contains("busy")
+        msg.contains("database is locked") || msg.contains("sqlite_busy") || msg.contains("busy")
     }
 
     async fn busy_backoff(attempt: u32) {
@@ -1292,8 +1290,7 @@ impl TursoTransaction {
             let stmt = match op {
                 WriteOp::Insert { pk, sk, data } => Stmt {
                     sql: Some(
-                        "INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0)"
-                            .to_string(),
+                        "INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0)".to_string(),
                     ),
                     sql_id: None,
                     args: vec![

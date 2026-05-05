@@ -53,9 +53,7 @@ pub async fn ensure_project_id(
         .map_err(|e| anyhow!("new_project failed: {e}"))?;
     let raw: NewProjectRaw = resp.json().await?;
     let id = match raw {
-        NewProjectRaw {
-            ok: Some(ok), ..
-        } => ok.project_id,
+        NewProjectRaw { ok: Some(ok), .. } => ok.project_id,
         NewProjectRaw {
             not_logged_in: Some(_),
             ..
@@ -74,6 +72,14 @@ struct DeployInput<'a> {
     project_id: &'a str,
     build_id: &'a str,
     files: Vec<DeployFile>,
+    jobs: &'a [CronJob],
+    cron_updated_at: &'a str,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CronJob {
+    pub function: String,
+    pub every_minutes: u32,
 }
 
 #[derive(Serialize)]
@@ -148,6 +154,7 @@ struct DeployStatusBody {
     compiled_versions: Vec<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn deploy_wasm(
     control_url: &str,
     token: &str,
@@ -155,6 +162,8 @@ pub async fn deploy_wasm(
     project_id: &mut Option<String>,
     build_id: &str,
     bundle_tar_path: &Path,
+    jobs: &[CronJob],
+    cron_updated_at: &str,
 ) -> Result<()> {
     let client = reqwest::Client::new();
     let project_id_resolved =
@@ -172,19 +181,28 @@ pub async fn deploy_wasm(
         &project_id_resolved,
         build_id,
         Vec::new(),
+        jobs,
+        cron_updated_at,
     )
     .await?;
 
     println!("uploading bundle to {object_key}...");
-    let last_modified =
-        upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
+    let last_modified = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
     println!("uploaded. last_modified={last_modified}");
 
-    poll_deploy_status(&client, control_url, token, &project_id_resolved, &last_modified).await?;
+    poll_deploy_status(
+        &client,
+        control_url,
+        token,
+        &project_id_resolved,
+        &last_modified,
+    )
+    .await?;
     println!("Deploy complete!");
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn deploy_forte(
     control_url: &str,
     token: &str,
@@ -193,6 +211,8 @@ pub async fn deploy_forte(
     build_id: &str,
     fe_dist_dir: &Path,
     bundle_tar_path: &Path,
+    jobs: &[CronJob],
+    cron_updated_at: &str,
 ) -> Result<()> {
     let client = reqwest::Client::new();
     let project_id_resolved =
@@ -223,6 +243,8 @@ pub async fn deploy_forte(
         &project_id_resolved,
         build_id,
         deploy_files,
+        jobs,
+        cron_updated_at,
     )
     .await?;
 
@@ -232,15 +254,22 @@ pub async fn deploy_forte(
     }
 
     println!("uploading bundle to {object_key}...");
-    let last_modified =
-        upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
+    let last_modified = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
     println!("uploaded. last_modified={last_modified}");
 
-    poll_deploy_status(&client, control_url, token, &project_id_resolved, &last_modified).await?;
+    poll_deploy_status(
+        &client,
+        control_url,
+        token,
+        &project_id_resolved,
+        &last_modified,
+    )
+    .await?;
     println!("Deploy complete!");
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn request_deploy(
     client: &reqwest::Client,
     control_url: &str,
@@ -248,6 +277,8 @@ async fn request_deploy(
     project_id: &str,
     build_id: &str,
     files: Vec<DeployFile>,
+    jobs: &[CronJob],
+    cron_updated_at: &str,
 ) -> Result<DeployOk> {
     let deploy_url = format!(
         "{}/__forte_action/deploy",
@@ -260,6 +291,8 @@ async fn request_deploy(
             project_id,
             build_id,
             files,
+            jobs,
+            cron_updated_at,
         })
         .send()
         .await?
@@ -323,7 +356,10 @@ async fn upload_static_assets(
     let mut tasks = futures::stream::FuturesUnordered::new();
     for file in files {
         let url = url_for_path.remove(&file.relative_path).ok_or_else(|| {
-            anyhow!("control did not return presigned URL for {}", file.relative_path)
+            anyhow!(
+                "control did not return presigned URL for {}",
+                file.relative_path
+            )
         })?;
         let bytes = std::fs::read(&file.absolute_path)
             .map_err(|e| anyhow!("read {}: {}", file.absolute_path.display(), e))?;
@@ -607,19 +643,13 @@ pub async fn rename(_project_name: &str, _new_project_name: &str) -> Result<()> 
 }
 
 pub async fn domain_add(_project_name: &str, _domain: &str) -> Result<()> {
-    Err(anyhow!(
-        "domain commands are not yet migrated to control."
-    ))
+    Err(anyhow!("domain commands are not yet migrated to control."))
 }
 
 pub async fn domain_remove(_project_name: &str) -> Result<()> {
-    Err(anyhow!(
-        "domain commands are not yet migrated to control."
-    ))
+    Err(anyhow!("domain commands are not yet migrated to control."))
 }
 
 pub async fn domain_status(_project_name: &str) -> Result<()> {
-    Err(anyhow!(
-        "domain commands are not yet migrated to control."
-    ))
+    Err(anyhow!("domain commands are not yet migrated to control."))
 }

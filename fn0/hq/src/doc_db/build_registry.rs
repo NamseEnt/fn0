@@ -4,11 +4,7 @@ use color_eyre::eyre::{Result, eyre};
 use doc_db::TrxResult;
 
 impl DocDb {
-    pub async fn register_build(
-        &self,
-        subdomain: &str,
-        build_id: &str,
-    ) -> Result<Vec<String>> {
+    pub async fn register_build(&self, subdomain: &str, build_id: &str) -> Result<Vec<String>> {
         let subdomain_owned = subdomain.to_string();
         let build_id_owned = build_id.to_string();
         match self

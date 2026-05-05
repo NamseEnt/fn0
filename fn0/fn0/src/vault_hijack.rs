@@ -180,8 +180,7 @@ fn build_oci_body(op: Op, key_ocid: &str, wasm_body: &[u8]) -> Result<Vec<u8>> {
     let mut value: Value = if wasm_body.is_empty() {
         Value::Object(serde_json::Map::new())
     } else {
-        serde_json::from_slice(wasm_body)
-            .map_err(|e| anyhow::anyhow!("vault body parse: {e}"))?
+        serde_json::from_slice(wasm_body).map_err(|e| anyhow::anyhow!("vault body parse: {e}"))?
     };
 
     let obj = value
@@ -191,9 +190,8 @@ fn build_oci_body(op: Op, key_ocid: &str, wasm_body: &[u8]) -> Result<Vec<u8>> {
     obj.insert("keyId".into(), Value::String(key_ocid.to_string()));
 
     if let Op::GenerateDek = op {
-        obj.entry("keyShape").or_insert_with(|| {
-            serde_json::json!({ "algorithm": "AES", "length": 32 })
-        });
+        obj.entry("keyShape")
+            .or_insert_with(|| serde_json::json!({ "algorithm": "AES", "length": 32 }));
         obj.entry("includePlaintextKey")
             .or_insert(Value::Bool(false));
     }
@@ -202,8 +200,8 @@ fn build_oci_body(op: Op, key_ocid: &str, wasm_body: &[u8]) -> Result<Vec<u8>> {
 }
 
 fn host_from_endpoint(endpoint: &str) -> Result<String> {
-    let url = url::Url::parse(endpoint)
-        .map_err(|e| anyhow::anyhow!("vault endpoint parse: {e}"))?;
+    let url =
+        url::Url::parse(endpoint).map_err(|e| anyhow::anyhow!("vault endpoint parse: {e}"))?;
     let host = url
         .host_str()
         .ok_or_else(|| anyhow::anyhow!("vault endpoint missing host: {endpoint}"))?;

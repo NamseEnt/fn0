@@ -10,6 +10,9 @@ pub struct Input {
     pub project_id: String,
     pub build_id: String,
     pub files: Vec<FileEntry>,
+    #[serde(default)]
+    pub jobs: Vec<CronJob>,
+    pub cron_updated_at: DateTime,
 }
 
 #[derive(Deserialize)]
@@ -143,10 +146,64 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             .collect()
     };
 
+    if let Err(e) = upsert_cron_config(
+        &db,
+        req.body.project_id.clone(),
+        req.body.jobs.clone(),
+        req.body.cron_updated_at,
+    )
+    .await
+    {
+        return Output::Error { message: e };
+    }
+
     Output::Ok {
         presigned_put_url,
         object_key,
         static_uploads,
+    }
+}
+
+async fn upsert_cron_config(
+    db: &doc_db::Database,
+    project_id: String,
+    jobs: Vec<CronJob>,
+    updated_at: DateTime,
+) -> Result<(), String> {
+    let result = db
+        .trx(|trx| {
+            let project_id = project_id.clone();
+            let jobs = jobs.clone();
+            async move {
+                let existing = trx
+                    .get(CronConfigDocGet {
+                        project_id: project_id.as_str(),
+                    })
+                    .await?;
+                match existing {
+                    Some(mut handle) => {
+                        if handle.updated_at < updated_at {
+                            handle.jobs = jobs;
+                            handle.updated_at = updated_at;
+                        }
+                    }
+                    None => {
+                        trx.create(CronConfigDoc {
+                            project_id,
+                            jobs,
+                            updated_at,
+                        })?;
+                    }
+                }
+                trx.commit::<_, ()>(())
+            }
+        })
+        .await;
+    match result {
+        doc_db::TrxResult::Committed(()) => Ok(()),
+        doc_db::TrxResult::Cancelled(()) => unreachable!(),
+        doc_db::TrxResult::Conflict(_) => Err("cron config conflict".to_string()),
+        doc_db::TrxResult::Err(e) => Err(e.to_string()),
     }
 }
 

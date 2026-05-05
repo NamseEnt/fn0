@@ -53,7 +53,11 @@ impl Site {
             };
             for record in existing {
                 if !current_ids.contains(&record.host_id) {
-                    if let Err(err) = self.doc_db.delete_host_status(&record.site_name, &record.host_id).await {
+                    if let Err(err) = self
+                        .doc_db
+                        .delete_host_status(&record.site_name, &record.host_id)
+                        .await
+                    {
                         warn!(%err, host_id = %record.host_id, "Failed to delete stale host-status");
                     }
                     self.ssh_pool.invalidate(&record.addr);

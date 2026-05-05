@@ -26,6 +26,8 @@ pub async fn execute() -> Result<()> {
 
     let mut project_id = config.project_id.clone();
     let build_id = Uuid::new_v4().to_string();
+    let jobs: Vec<fn0_deploy::CronJob> = Vec::new();
+    let cron_updated_at = chrono::Utc::now().to_rfc3339();
     fn0_deploy::deploy_wasm(
         &creds.control_url,
         &creds.token,
@@ -33,6 +35,8 @@ pub async fn execute() -> Result<()> {
         &mut project_id,
         &build_id,
         &bundle_path,
+        &jobs,
+        &cron_updated_at,
     )
     .await
     .map_err(|e| eyre!(e))?;

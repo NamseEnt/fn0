@@ -112,6 +112,7 @@ pub fn spawn_epoch_ticker(engine: Engine) {
         .expect("failed to spawn epoch ticker thread");
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_store<C>(
     engine: &Engine,
     code_id: &str,
@@ -121,6 +122,7 @@ pub(crate) fn build_store<C>(
     hooks: SelfInvokeHooks,
     turso_hijack: Option<&TursoHijack>,
     queue_hijack: Option<&crate::QueueHijack>,
+    control_invoke_queue_hijack: Option<&crate::ControlInvokeQueueHijack>,
     vault_hijack: Option<&crate::VaultHijack>,
 ) -> Store<ClientState<C>>
 where
@@ -137,6 +139,9 @@ where
             if queue_hijack.is_some() && key == "FN0_QUEUE_URL" {
                 continue;
             }
+            if control_invoke_queue_hijack.is_some() && key == "FN0_CONTROL_INVOKE_QUEUE_URL" {
+                continue;
+            }
             if vault_hijack.is_some() && key == "FN0_VAULT_URL" {
                 continue;
             }
@@ -148,6 +153,11 @@ where
         }
         if let Some(hijack) = queue_hijack {
             builder.env("FN0_QUEUE_URL", hijack.placeholder_url());
+        }
+        if let Some(hijack) = control_invoke_queue_hijack
+            && code_id == hijack.allowed_caller_subdomain()
+        {
+            builder.env("FN0_CONTROL_INVOKE_QUEUE_URL", hijack.placeholder_url());
         }
         if let Some(hijack) = vault_hijack {
             builder.env("FN0_VAULT_URL", hijack.placeholder_url());
@@ -186,6 +196,7 @@ where
 
 pub type WasmInjectEnvelope = (Request, oneshot::Sender<Result<Response>>);
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_wasm_instance_loop(
     engine: &Engine,
     bundle: Arc<Bundle>,
@@ -194,6 +205,7 @@ pub async fn run_wasm_instance_loop(
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<crate::OtlpHijack>>,
     queue_hijack: Option<Arc<crate::QueueHijack>>,
+    control_invoke_queue_hijack: Option<Arc<crate::ControlInvokeQueueHijack>>,
     vault_hijack: Option<Arc<crate::VaultHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
@@ -209,10 +221,12 @@ pub async fn run_wasm_instance_loop(
             turso_hijack.clone(),
             otlp_hijack.clone(),
             queue_hijack.clone(),
+            control_invoke_queue_hijack.clone(),
             vault_hijack.clone(),
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
+        control_invoke_queue_hijack.as_deref(),
         vault_hijack.as_deref(),
     );
 

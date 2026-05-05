@@ -154,10 +154,7 @@ async fn advance_one_phase(ctx: &Arc<DeployContext>, job: &mut DeployJob) -> Res
         DeployJobPhase::Deployed => {
             if let Some(build_id) = job.build_id.clone() {
                 if job.old_build_ids.is_none() {
-                    let mut olds = ctx
-                        .doc_db
-                        .register_build(&job.subdomain, &build_id)
-                        .await?;
+                    let mut olds = ctx.doc_db.register_build(&job.subdomain, &build_id).await?;
                     olds.retain(|id| id != &build_id);
                     job.old_build_ids = Some(olds);
                 }
@@ -240,4 +237,3 @@ async fn collect_target_versions(
     }
     Ok(versions)
 }
-

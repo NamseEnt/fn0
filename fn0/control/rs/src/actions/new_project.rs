@@ -28,13 +28,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         };
     }
 
-    let bytes = rand::get_random_bytes(16).await;
-    let Ok(uuid_bytes): Result<[u8; 16], _> = bytes.as_slice().try_into() else {
-        return Output::Error {
-            message: "rng returned wrong length".to_string(),
-        };
+    let project_id = match generate_project_id().await {
+        Ok(id) => id,
+        Err(e) => return Output::Error { message: e },
     };
-    let project_id = Uuid::from_bytes(uuid_bytes).to_string();
     let now = forte_sdk::now();
     let github_id = user.github_id;
 
@@ -130,4 +127,20 @@ fn root_domain(s: &str) -> &str {
         Some((_, rest)) => rest,
         None => s,
     }
+}
+
+const PROJECT_ID_ALPHABET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+const PROJECT_ID_LEN: usize = 8;
+
+async fn generate_project_id() -> Result<String, String> {
+    let bytes = rand::get_random_bytes(PROJECT_ID_LEN).await;
+    if bytes.len() < PROJECT_ID_LEN {
+        return Err("rng returned wrong length".to_string());
+    }
+    let alpha_len = PROJECT_ID_ALPHABET.len() as u8;
+    let mut out = String::with_capacity(PROJECT_ID_LEN);
+    for b in bytes.iter().take(PROJECT_ID_LEN) {
+        out.push(PROJECT_ID_ALPHABET[(b % alpha_len) as usize] as char);
+    }
+    Ok(out)
 }

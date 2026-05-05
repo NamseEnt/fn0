@@ -594,6 +594,17 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             FN0_QUEUE_OCI_FINGERPRINT: ociComputeWorker.queue.ociFingerprint,
             FN0_QUEUE_OCI_PRIVATE_KEY_BASE64:
               ociComputeWorker.queue.ociPrivateKeyBase64,
+            FN0_CONTROL_INVOKE_QUEUE_OCID: ociComputeWorker.queue.ocid,
+            FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT:
+              ociComputeWorker.queue.messagesEndpoint,
+            FN0_CONTROL_INVOKE_QUEUE_OCI_USER_ID: ociComputeWorker.queue.ociUserId,
+            FN0_CONTROL_INVOKE_QUEUE_OCI_TENANCY_ID:
+              ociComputeWorker.queue.ociTenancyId,
+            FN0_CONTROL_INVOKE_QUEUE_OCI_FINGERPRINT:
+              ociComputeWorker.queue.ociFingerprint,
+            FN0_CONTROL_INVOKE_QUEUE_OCI_PRIVATE_KEY_BASE64:
+              ociComputeWorker.queue.ociPrivateKeyBase64,
+            FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN: "fn0-control",
             FN0_VAULT_CRYPTO_ENDPOINT: ociGlobalVault.cryptoEndpoint,
             FN0_VAULT_KEY_OCID: ociGlobalVault.keyOcid,
             FN0_VAULT_REGION: ociGlobalVault.region,
@@ -619,6 +630,13 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
       },
     },
   ],
+});
+
+new fn0.EventBridgeCronTrigger("control-cron-trigger", {
+  controlUrl: pulumi.interpolate`https://fn0-control.${domain}`,
+  controlAdminToken: controlAdminToken.base64,
+  awsRegion: cwasmCompilerRegion,
+  suffix,
 });
 
 export const kubeconfig = pulumi.secret(ociHeadQuarter.kubeconfig);

@@ -51,7 +51,8 @@ impl MemoryDatabase {
 
     pub(crate) async fn delete(&self, pk: &str, sk: &str) -> Result<()> {
         self.store
-            .lock().unwrap()
+            .lock()
+            .unwrap()
             .remove(&(pk.to_string(), sk.to_string()));
         Ok(())
     }
@@ -116,7 +117,8 @@ impl MemoryDatabase {
                 DbOp::Get { pk, sk } => {
                     let data = self
                         .store
-                        .lock().unwrap()
+                        .lock()
+                        .unwrap()
                         .get(&(pk.clone(), sk.clone()))
                         .map(|doc| Bytes::from(doc.data.clone()));
                     results.push(DbResult::Single(data));
@@ -242,7 +244,9 @@ impl MemoryTransaction {
                     if staged.contains_key(&key) {
                         conflict = Some(crate::ConflictInfo {
                             step_index: i,
-                            message: format!("UNIQUE constraint failed: docs.pk, docs.sk ({pk}/{sk})"),
+                            message: format!(
+                                "UNIQUE constraint failed: docs.pk, docs.sk ({pk}/{sk})"
+                            ),
                         });
                         affected_counts.push(0);
                         break;

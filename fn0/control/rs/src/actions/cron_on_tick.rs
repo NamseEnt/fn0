@@ -1,0 +1,162 @@
+use crate::common::admin;
+use crate::docs::*;
+use forte_sdk::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+pub struct Input {
+    pub scheduled_time: String,
+}
+
+#[derive(Serialize)]
+pub enum Output {
+    Ok {
+        fired_count: u64,
+        scanned_projects_count: u64,
+        scanned_jobs_count: u64,
+    },
+    Unauthorized,
+    Error {
+        message: String,
+    },
+}
+
+const QUERY_PAGE_LIMIT: usize = 256;
+
+pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
+    if !admin::verify(req.headers) {
+        return Output::Unauthorized;
+    }
+
+    let scheduled = match chrono::DateTime::parse_from_rfc3339(&req.body.scheduled_time) {
+        Ok(dt) => dt.timestamp(),
+        Err(e) => {
+            return Output::Error {
+                message: format!("scheduled_time parse: {e}"),
+            };
+        }
+    };
+    let epoch_minute: i64 = scheduled / 60;
+
+    let invoke_queue_url = match std::env::var("FN0_CONTROL_INVOKE_QUEUE_URL") {
+        Ok(u) => u,
+        Err(_) => {
+            return Output::Error {
+                message: "FN0_CONTROL_INVOKE_QUEUE_URL not set".to_string(),
+            };
+        }
+    };
+
+    let db = doc_db::turso();
+    let client = http::Client::new();
+
+    let mut after: Option<String> = None;
+    let mut scanned_projects: u64 = 0;
+    let mut scanned_jobs: u64 = 0;
+    let mut fired: u64 = 0;
+
+    loop {
+        let docs: Vec<CronConfigDoc> = match (CronConfigDocQuery {
+            project_id: after.clone(),
+            limit: Some(QUERY_PAGE_LIMIT),
+        })
+        .send_with(&db)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(?e, "cron query failed");
+                return Output::Error {
+                    message: format!("query: {e}"),
+                };
+            }
+        };
+        if docs.is_empty() {
+            break;
+        }
+        let last = docs.last().map(|d| d.project_id.clone());
+        let page_len = docs.len();
+
+        for doc in docs {
+            scanned_projects += 1;
+            for job in &doc.jobs {
+                scanned_jobs += 1;
+                if job.every_minutes == 0 {
+                    continue;
+                }
+                if epoch_minute % (job.every_minutes as i64) != 0 {
+                    continue;
+                }
+                if let Err(e) = enqueue_invoke(
+                    &client,
+                    &invoke_queue_url,
+                    &doc.project_id,
+                    &job.function,
+                )
+                .await
+                {
+                    tracing::error!(
+                        project_id = %doc.project_id,
+                        function = %job.function,
+                        error = %e,
+                        "cron enqueue failed"
+                    );
+                    continue;
+                }
+                fired += 1;
+            }
+        }
+
+        if page_len < QUERY_PAGE_LIMIT {
+            break;
+        }
+        after = last;
+    }
+
+    tracing::info!(
+        fired_count = fired,
+        scanned_projects_count = scanned_projects,
+        scanned_jobs_count = scanned_jobs,
+        epoch_minute,
+        "cron_on_tick completed"
+    );
+
+    Output::Ok {
+        fired_count: fired,
+        scanned_projects_count: scanned_projects,
+        scanned_jobs_count: scanned_jobs,
+    }
+}
+
+#[derive(Serialize)]
+struct InvokeBody<'a> {
+    subdomain: &'a str,
+    task_name: &'a str,
+    payload: serde_json::Value,
+}
+
+async fn enqueue_invoke(
+    client: &http::Client,
+    invoke_queue_url: &str,
+    subdomain: &str,
+    task_name: &str,
+) -> anyhow::Result<()> {
+    let body = serde_json::to_vec(&InvokeBody {
+        subdomain,
+        task_name,
+        payload: serde_json::Value::Null,
+    })?;
+    let resp = client
+        .send(
+            http::Request::builder()
+                .method("POST")
+                .uri(invoke_queue_url)
+                .header("content-type", "application/json")
+                .body(body)?,
+        )
+        .await?;
+    if !resp.status().is_success() {
+        anyhow::bail!("invoke queue status {}", resp.status());
+    }
+    Ok(())
+}

@@ -6,8 +6,8 @@ use base64::Engine;
 const DEK_KEY: &str = "__dek";
 
 pub async fn load(bytes: &[u8], vault: &VaultClient) -> Result<Vec<(String, String)>> {
-    let mapping: serde_yaml::Mapping = serde_yaml::from_slice(bytes)
-        .map_err(|e| anyhow!("env.yaml parse: {e}"))?;
+    let mapping: serde_yaml::Mapping =
+        serde_yaml::from_slice(bytes).map_err(|e| anyhow!("env.yaml parse: {e}"))?;
 
     let dek_value = mapping
         .get(DEK_KEY)
