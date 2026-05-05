@@ -1,6 +1,7 @@
 pub mod add;
 pub mod admin;
 pub mod build;
+pub mod cron;
 pub mod deploy;
 pub mod dev;
 pub mod domain;

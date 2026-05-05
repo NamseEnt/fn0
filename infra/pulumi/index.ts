@@ -1,3 +1,4 @@
+export { EventBridgeCronTrigger } from "./EventBridgeCronTrigger";
 export { OciComputeWorker, OciRegion } from "./OciComputeWorker";
 export { OciGlobalVault } from "./OciGlobalVault";
 export { B2CloudflareStaticCdn } from "./B2CloudflareStaticCdn";

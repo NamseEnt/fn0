@@ -96,7 +96,9 @@ impl DocDb {
             .await
         {
             TrxResult::Committed(doc) => Ok(doc),
-            TrxResult::Conflict(d) => return Err(eyre!("get_worker_last_stable conflict: {:?}", d)),
+            TrxResult::Conflict(d) => {
+                return Err(eyre!("get_worker_last_stable conflict: {:?}", d));
+            }
             TrxResult::Err(e) => Err(eyre!("{}", e)),
             TrxResult::Cancelled(_) => unreachable!(),
         }

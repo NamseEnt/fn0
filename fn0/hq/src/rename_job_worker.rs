@@ -305,9 +305,7 @@ async fn copy_bundle_object(
         }
         Err(err) => {
             if required {
-                Err(eyre!(
-                    "copy {src_key} -> {dst_key}: read failed: {err}"
-                ))
+                Err(eyre!("copy {src_key} -> {dst_key}: read failed: {err}"))
             } else {
                 Ok(false)
             }

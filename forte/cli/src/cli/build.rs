@@ -243,8 +243,8 @@ fn find_wasm_binary(release_dir: &Path, project_dir: &Path) -> Result<PathBuf> {
         name: String,
     }
 
-    let parsed: CargoToml = toml::from_str(&content)
-        .with_context(|| format!("parse {}", cargo_toml.display()))?;
+    let parsed: CargoToml =
+        toml::from_str(&content).with_context(|| format!("parse {}", cargo_toml.display()))?;
 
     let wasm_name = format!("{}.wasm", parsed.package.name.replace('-', "_"));
     let wasm_path = release_dir.join(&wasm_name);
@@ -292,9 +292,7 @@ fn build_frontend(project_dir: &Path, static_base_url: Option<&str>) -> Result<(
         if let Some(base) = static_base_url {
             ssr_cmd.env("VITE_PUBLIC_URL", base);
         }
-        let status = ssr_cmd
-            .status()
-            .context("Failed to run vite build --ssr")?;
+        let status = ssr_cmd.status().context("Failed to run vite build --ssr")?;
         if !status.success() {
             anyhow::bail!("vite ssr build failed with status: {}", status);
         }

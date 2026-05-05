@@ -127,9 +127,9 @@ impl DnsProvide for CloudflareDnsProvider {
         for name in &names {
             for addr in &addrs {
                 let record_type = addr_to_record_type(addr);
-                let already = old_records.iter().any(|r| {
-                    r.name == *name && r.content == *addr && r.record_type == record_type
-                });
+                let already = old_records
+                    .iter()
+                    .any(|r| r.name == *name && r.content == *addr && r.record_type == record_type);
                 if !already {
                     posts.push(Post {
                         name,

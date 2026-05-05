@@ -158,7 +158,9 @@ impl CloudflareSaas {
             if cf_error_codes(&text).contains(&1436) {
                 return Ok(());
             }
-            return Err(eyre!("cloudflare_saas delete_custom_hostname failed: {text}"));
+            return Err(eyre!(
+                "cloudflare_saas delete_custom_hostname failed: {text}"
+            ));
         }
         Ok(())
     }
@@ -180,14 +182,19 @@ impl CloudflareSaas {
         let parsed: CfListResponse = serde_json::from_str(&text)
             .map_err(|e| eyre!("cloudflare_saas list parse failed: {e}: body={text}"))?;
         if !parsed.success {
-            return Err(eyre!("cloudflare_saas list_custom_hostnames failed: {text}"));
+            return Err(eyre!(
+                "cloudflare_saas list_custom_hostnames failed: {text}"
+            ));
         }
-        Ok(parsed.result.unwrap_or_default().into_iter().next().map(|r| {
-            CustomHostname {
+        Ok(parsed
+            .result
+            .unwrap_or_default()
+            .into_iter()
+            .next()
+            .map(|r| CustomHostname {
                 id: r.id,
                 status: CustomHostnameStatus::from_str(&r.status),
-            }
-        }))
+            }))
     }
 }
 

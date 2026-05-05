@@ -87,10 +87,8 @@ impl DocDb {
             .await
             .map_err(|e| eyre!("{}", e))?
             .into_iter();
-        let docs: Vec<DeployJobDoc> =
-            (prepared.parse)(&mut results).map_err(|e| eyre!("{}", e))?;
+        let docs: Vec<DeployJobDoc> = (prepared.parse)(&mut results).map_err(|e| eyre!("{}", e))?;
         let jobs: Vec<DeployJobDoc> = docs.into_iter().filter(|d| !d.is_terminal()).collect();
         Ok(jobs)
     }
 }
-

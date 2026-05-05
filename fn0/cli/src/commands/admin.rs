@@ -25,8 +25,9 @@ pub async fn run(
         (Some(_), Some(_)) => {
             return Err(eyre!("specify at most one of --input-file or --input"));
         }
-        (Some(path), None) => std::fs::read(&path)
-            .map_err(|e| eyre!("Failed to read {}: {}", path.display(), e))?,
+        (Some(path), None) => {
+            std::fs::read(&path).map_err(|e| eyre!("Failed to read {}: {}", path.display(), e))?
+        }
         (None, Some(s)) => s.into_bytes(),
         (None, None) => b"{}".to_vec(),
     };

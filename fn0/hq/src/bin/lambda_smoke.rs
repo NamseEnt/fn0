@@ -23,15 +23,10 @@ async fn main() -> Result<()> {
     );
 
     let client = LambdaClient::new(&region, &access_key_id, &secret_access_key);
-    let resp = client
-        .invoke(&function_name, payload.into_bytes())
-        .await?;
+    let resp = client.invoke(&function_name, payload.into_bytes()).await?;
 
     println!("function_error: {:?}", resp.function_error);
-    println!(
-        "payload: {}",
-        String::from_utf8_lossy(&resp.payload)
-    );
+    println!("payload: {}", String::from_utf8_lossy(&resp.payload));
 
     Ok(())
 }

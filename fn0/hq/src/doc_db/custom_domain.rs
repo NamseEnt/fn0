@@ -70,11 +70,9 @@ impl DocDb {
                                 }
                             }
                         }
-                        (None, Some(dom_doc)) => {
-                            InsertCustomDomainOutcome::DomainTaken {
-                                existing_subdomain: dom_doc.subdomain.clone(),
-                            }
-                        }
+                        (None, Some(dom_doc)) => InsertCustomDomainOutcome::DomainTaken {
+                            existing_subdomain: dom_doc.subdomain.clone(),
+                        },
                         (None, None) => {
                             trx.create(CustomDomainBySubdomainDoc {
                                 subdomain: subdomain.clone(),
@@ -145,10 +143,7 @@ impl DocDb {
         }
     }
 
-    pub async fn get_custom_domain_by_subdomain(
-        &self,
-        subdomain: &str,
-    ) -> Result<Option<String>> {
+    pub async fn get_custom_domain_by_subdomain(&self, subdomain: &str) -> Result<Option<String>> {
         let subdomain_owned = subdomain.to_string();
         match self
             .forte
@@ -168,7 +163,9 @@ impl DocDb {
             .await
         {
             TrxResult::Committed(d) => Ok(d),
-            TrxResult::Conflict(d) => Err(eyre!("get_custom_domain_by_subdomain conflict: {:?}", d)),
+            TrxResult::Conflict(d) => {
+                Err(eyre!("get_custom_domain_by_subdomain conflict: {:?}", d))
+            }
             TrxResult::Err(e) => Err(eyre!("{}", e)),
             TrxResult::Cancelled(_) => unreachable!(),
         }

@@ -3,7 +3,7 @@ use crate::{
     generators::typescript::TypeScriptGenerator,
     prompts::init::InitPrompts,
 };
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{Result, eyre::eyre};
 use std::path::PathBuf;
 
 pub async fn execute(name: Option<String>) -> Result<()> {

@@ -2,6 +2,7 @@
 
 pub mod bundle_compiled;
 pub mod bundle_uploaded;
+pub mod cron_on_tick;
 pub mod deploy;
 pub mod deploy_status;
 pub mod issue_token;

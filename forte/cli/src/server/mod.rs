@@ -135,7 +135,7 @@ async fn handle_request(
     let path = uri.path();
     let path_with_query = uri.path_and_query().map(|pq| pq.as_str()).unwrap_or(path);
 
-    if path.starts_with("/__forte_queue_task/") {
+    if path.starts_with("/__fn0_queue_task/") {
         return Ok(Response::builder()
             .status(StatusCode::FORBIDDEN)
             .body(

@@ -1,4 +1,4 @@
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{Result, eyre::eyre};
 
 pub async fn execute(new_name: &str) -> Result<()> {
     let mut config = crate::config::Config::load("fn0.toml")

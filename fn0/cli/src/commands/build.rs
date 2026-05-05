@@ -1,5 +1,5 @@
 use crate::config::{Config, LanguageEnvironment};
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{Result, eyre::eyre};
 use std::process::Command;
 
 pub async fn execute() -> Result<()> {

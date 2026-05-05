@@ -87,8 +87,7 @@ impl DocDb {
             .await
             .map_err(|e| eyre!("{}", e))?
             .into_iter();
-        let docs: Vec<RenameJobDoc> =
-            (prepared.parse)(&mut results).map_err(|e| eyre!("{}", e))?;
+        let docs: Vec<RenameJobDoc> = (prepared.parse)(&mut results).map_err(|e| eyre!("{}", e))?;
         let jobs: Vec<RenameJobDoc> = docs.into_iter().filter(|d| !d.is_terminal()).collect();
         Ok(jobs)
     }
@@ -98,8 +97,6 @@ impl DocDb {
         old_subdomain: &str,
     ) -> Result<Option<RenameJobDoc>> {
         let jobs = self.list_active_rename_jobs().await?;
-        Ok(jobs
-            .into_iter()
-            .find(|j| j.old_subdomain == old_subdomain))
+        Ok(jobs.into_iter().find(|j| j.old_subdomain == old_subdomain))
     }
 }

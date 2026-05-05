@@ -8,8 +8,6 @@ mod custom_domain_job_worker;
 mod cwasm_compile;
 mod deploy;
 mod deploy_job_worker;
-mod rename;
-mod rename_job_worker;
 mod deployment_cache;
 mod dns;
 mod dns_sync;
@@ -21,6 +19,8 @@ mod host_id;
 mod host_provider;
 mod job_processor;
 mod lambda;
+mod rename;
+mod rename_job_worker;
 mod self_dns;
 mod site;
 mod ssh;
@@ -201,9 +201,7 @@ async fn route(
         (&Method::POST, "/domain/remove") => {
             Ok(custom_domain::handle_domain_remove(req, ctx).await)
         }
-        (&Method::GET, "/domain/status") => {
-            Ok(custom_domain::handle_domain_status(req, ctx).await)
-        }
+        (&Method::GET, "/domain/status") => Ok(custom_domain::handle_domain_status(req, ctx).await),
         _ => Ok(Response::builder()
             .status(404)
             .body(Full::new(Bytes::from("not found")))

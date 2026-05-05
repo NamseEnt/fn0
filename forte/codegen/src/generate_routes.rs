@@ -37,7 +37,14 @@ pub fn generate_routes() {
     let actions = discover_actions(&actions_dir);
     let queue_tasks = discover_queue_tasks(&queue_task_dir);
     let admin_tasks = discover_admin_tasks(&admin_dir);
-    let tokens = generate_code(&pages, &hooks, &actions, &queue_tasks, &admin_tasks, &wit_dir_str);
+    let tokens = generate_code(
+        &pages,
+        &hooks,
+        &actions,
+        &queue_tasks,
+        &admin_tasks,
+        &wit_dir_str,
+    );
 
     let syntax_tree = syn::parse2::<syn::File>(tokens).expect("Failed to parse generated code");
     let pp_output = prettyplease::unparse(&syntax_tree);
@@ -897,7 +904,7 @@ fn generate_code(
                 return handle_action(action_name, uri_authority, &method, &headers, &mut cookie_jar, &body_bytes).await;
             }
 
-            if path == "/__forte_queue_task/execute" {
+            if path == "/__fn0_queue_task/execute" {
                 return handle_queue_task_execute(&body_bytes).await;
             }
 
@@ -1675,8 +1682,7 @@ fn generate_admin_task_handler(admin_tasks: &[AdminTaskInfo]) -> TokenStream {
         .iter()
         .map(|at| {
             let name = &at.name;
-            let module_path: Vec<_> =
-                vec![format_ident!("admin"), format_ident!("{}", at.name)];
+            let module_path: Vec<_> = vec![format_ident!("admin"), format_ident!("{}", at.name)];
 
             quote! {
                 #name => {
@@ -1794,8 +1800,8 @@ fn generate_classify_route(pages: &[PageInfo]) -> TokenStream {
             if path.strip_prefix("/__forte_admin/").is_some() {
                 return "/__forte_admin/[name]".to_string();
             }
-            if path == "/__forte_queue_task/execute" {
-                return "/__forte_queue_task/execute".to_string();
+            if path == "/__fn0_queue_task/execute" {
+                return "/__fn0_queue_task/execute".to_string();
             }
             if path.strip_prefix("/__self_invoke/").is_some() {
                 return "/__self_invoke/[name]".to_string();

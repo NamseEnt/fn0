@@ -104,7 +104,7 @@ impl DocDb {
                     }));
                 }
                 TrxResult::Committed(None) => {} // raced; fall through
-                TrxResult::Conflict(_) => {} // OCC retried internally; treat as race
+                TrxResult::Conflict(_) => {}     // OCC retried internally; treat as race
                 TrxResult::Err(e) => return Err(eyre!("{}", e)),
                 TrxResult::Cancelled(_) => unreachable!(),
             }

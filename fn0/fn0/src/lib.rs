@@ -1,11 +1,12 @@
 pub mod cache;
+pub mod control_invoke_queue_hijack;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
+pub mod otlp_hijack;
 pub mod queue_hijack;
 mod self_invoke;
 pub mod telemetry;
-pub mod otlp_hijack;
 pub mod turso_hijack;
 pub mod vault_hijack;
 
@@ -25,9 +26,10 @@ use wasmtime::Engine;
 use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
 
-pub use ski::{FetchHandler, FetchHandlerFuture};
+pub use control_invoke_queue_hijack::ControlInvokeQueueHijack;
 pub use otlp_hijack::OtlpHijack;
 pub use queue_hijack::QueueHijack;
+pub use ski::{FetchHandler, FetchHandlerFuture};
 pub use turso_hijack::TursoHijack;
 pub use vault_hijack::VaultHijack;
 pub use wasmtime;
@@ -69,6 +71,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
     pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
     pub(crate) queue_hijack: Option<Arc<QueueHijack>>,
+    pub(crate) control_invoke_queue_hijack: Option<Arc<ControlInvokeQueueHijack>>,
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
 }
 
@@ -81,6 +84,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             turso_hijack: None,
             otlp_hijack: None,
             queue_hijack: None,
+            control_invoke_queue_hijack: None,
             vault_hijack: None,
         }
     }
@@ -97,6 +101,14 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn with_queue_hijack(mut self, queue_hijack: Arc<QueueHijack>) -> Self {
         self.queue_hijack = Some(queue_hijack);
+        self
+    }
+
+    pub fn with_control_invoke_queue_hijack(
+        mut self,
+        hijack: Arc<ControlInvokeQueueHijack>,
+    ) -> Self {
+        self.control_invoke_queue_hijack = Some(hijack);
         self
     }
 
@@ -127,6 +139,10 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn queue_hijack(&self) -> Option<&Arc<QueueHijack>> {
         self.queue_hijack.as_ref()
+    }
+
+    pub fn control_invoke_queue_hijack(&self) -> Option<&Arc<ControlInvokeQueueHijack>> {
+        self.control_invoke_queue_hijack.as_ref()
     }
 
     pub fn vault_hijack(&self) -> Option<&Arc<VaultHijack>> {
@@ -351,6 +367,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let turso_hijack = ctx.turso_hijack.clone();
         let otlp_hijack = ctx.otlp_hijack.clone();
         let queue_hijack = ctx.queue_hijack.clone();
+        let control_invoke_queue_hijack = ctx.control_invoke_queue_hijack.clone();
         let vault_hijack = ctx.vault_hijack.clone();
         tokio::task::spawn_local(async move {
             let result = execute::run_wasm_instance_loop(
@@ -361,6 +378,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 turso_hijack,
                 otlp_hijack,
                 queue_hijack,
+                control_invoke_queue_hijack,
                 vault_hijack,
             )
             .await;

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use super::build::{BuildOptions, run_build};
+use super::cron;
 
 const DEFAULT_STATIC_BASE_DOMAIN: &str = "static.fn0.dev";
 
@@ -71,6 +72,9 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
     let env_yaml = fn0_deploy::read_env_yaml(&project_dir)?;
     fn0_deploy::create_raw_bundle_forte(&dist_dir, env_yaml.as_deref(), &bundle_path)?;
 
+    let jobs = cron::read_and_validate(&project_dir)?;
+    let cron_updated_at = chrono::Utc::now().to_rfc3339();
+
     let fe_dist = project_dir.join("fe/dist");
     let mut maybe_id = Some(project_id);
     fn0_deploy::deploy_forte(
@@ -81,6 +85,8 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
         &build_id,
         &fe_dist,
         &bundle_path,
+        &jobs,
+        &cron_updated_at,
     )
     .await?;
 

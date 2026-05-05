@@ -16,7 +16,9 @@ pub async fn execute(token_arg: Option<String>) -> Result<()> {
         return Err(eyre!("empty token"));
     }
     if !trimmed.starts_with("fn0_") {
-        return Err(eyre!("token does not look like an fn0 token (expected `fn0_…`)"));
+        return Err(eyre!(
+            "token does not look like an fn0 token (expected `fn0_…`)"
+        ));
     }
 
     credentials::save(&Credentials {

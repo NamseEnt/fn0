@@ -11,6 +11,7 @@ release = false
 [dependencies]
 anyhow = { workspace = true }
 bytes = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 color-eyre = { workspace = true }
 dirs = { workspace = true }

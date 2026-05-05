@@ -78,10 +78,7 @@ pub async fn unset(key: String) -> Result<()> {
     Ok(())
 }
 
-async fn ensure_dek(
-    mapping: &mut serde_yaml::Mapping,
-    creds: &Credentials,
-) -> Result<String> {
+async fn ensure_dek(mapping: &mut serde_yaml::Mapping, creds: &Credentials) -> Result<String> {
     if let Some(serde_yaml::Value::Mapping(dek_map)) = mapping.get(DEK_KEY)
         && let Some(serde_yaml::Value::String(s)) = dek_map.get("encrypted")
     {

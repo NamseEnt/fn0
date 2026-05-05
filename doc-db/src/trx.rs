@@ -1,7 +1,6 @@
 use crate::{Database, Transaction};
 use anyhow::{Result, anyhow, bail};
 use serde::{Serialize, de::DeserializeOwned};
-use tracing::Instrument;
 use std::{
     any::type_name,
     cell::UnsafeCell,
@@ -13,6 +12,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
+use tracing::Instrument;
 
 /// Wrapper around UnsafeCell that asserts Send/Sync when T: Send.
 /// DocHandle holds the only outstanding reference within a trx, so concurrent
@@ -87,7 +87,8 @@ where
             .ok_or_else(|| anyhow!("trx batch result missing for read"))?;
         let key = self.key();
         tx.inner
-            .lock().unwrap()
+            .lock()
+            .unwrap()
             .register_loaded::<R::Doc>(key, stored)
     }
 }
@@ -179,10 +180,8 @@ impl Trx {
             }
         }
 
-        let key_pairs: Vec<(String, String)> = keys
-            .iter()
-            .map(|k| (k.pk.clone(), k.sk.clone()))
-            .collect();
+        let key_pairs: Vec<(String, String)> =
+            keys.iter().map(|k| (k.pk.clone(), k.sk.clone())).collect();
         let stored = self.batch_load(&key_pairs).await?;
 
         let mut iter = stored.into_iter();

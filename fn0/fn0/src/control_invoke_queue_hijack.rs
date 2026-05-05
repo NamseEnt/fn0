@@ -1,7 +1,6 @@
 use anyhow::Result;
 use base64::Engine;
 use bytes::Bytes;
-use dashmap::DashMap;
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use http_body_util::combinators::UnsyncBoxBody;
@@ -9,13 +8,12 @@ use hyper::http::uri::Scheme;
 use oci_rust_sdk::auth::{RequestSigner, SimpleAuthProvider, SimpleAuthProviderRequiredFields};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::mpsc;
 use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 
 const PUT_MESSAGES_API_VERSION: &str = "20210201";
 
-pub struct LoopbackMessage {
+pub struct ControlInvokeMessage {
     pub subdomain: String,
     pub task_name: String,
     pub payload: serde_json::Value,
@@ -29,19 +27,20 @@ enum Backend {
         signer: Arc<RequestSigner>,
     },
     Loopback {
-        tx: mpsc::UnboundedSender<LoopbackMessage>,
+        tx: mpsc::UnboundedSender<ControlInvokeMessage>,
     },
 }
 
 #[derive(Clone)]
-pub struct QueueHijack {
+pub struct ControlInvokeQueueHijack {
     pub placeholder_host: String,
+    allowed_caller_subdomain: String,
     backend: Backend,
-    usage: Arc<DashMap<String, AtomicU64>>,
 }
 
 #[derive(Deserialize)]
-struct EnqueueBody {
+struct InvokeBody {
+    subdomain: String,
     task_name: String,
     payload: serde_json::Value,
 }
@@ -68,9 +67,11 @@ pub(crate) enum HijackAction {
     Synthesized(hyper::Response<UnsyncBoxBody<Bytes, ErrorCode>>),
 }
 
-impl QueueHijack {
+impl ControlInvokeQueueHijack {
+    #[allow(clippy::too_many_arguments)]
     pub fn new_oci(
         placeholder_host: String,
+        allowed_caller_subdomain: String,
         queue_ocid: String,
         messages_endpoint: String,
         tenancy: String,
@@ -91,56 +92,66 @@ impl QueueHijack {
         );
         let signer = Arc::new(
             RequestSigner::new(provider as Arc<dyn oci_rust_sdk::auth::AuthProvider>)
-                .map_err(|e| anyhow::anyhow!("queue signer init failed: {e:?}"))?,
+                .map_err(|e| anyhow::anyhow!("control invoke queue signer init failed: {e:?}"))?,
         );
 
         Ok(Self {
             placeholder_host,
+            allowed_caller_subdomain,
             backend: Backend::Oci {
                 queue_ocid,
                 messages_host,
                 signer,
             },
-            usage: Arc::new(DashMap::new()),
         })
     }
 
     pub fn new_loopback(
         placeholder_host: String,
-        tx: mpsc::UnboundedSender<LoopbackMessage>,
+        allowed_caller_subdomain: String,
+        tx: mpsc::UnboundedSender<ControlInvokeMessage>,
     ) -> Self {
         Self {
             placeholder_host,
+            allowed_caller_subdomain,
             backend: Backend::Loopback { tx },
-            usage: Arc::new(DashMap::new()),
         }
     }
 
     pub fn from_env() -> Result<Option<Self>> {
-        let Ok(messages_endpoint) = std::env::var("FN0_QUEUE_MESSAGES_ENDPOINT") else {
+        let Ok(messages_endpoint) = std::env::var("FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT")
+        else {
             return Ok(None);
         };
-        let placeholder_host = std::env::var("FN0_QUEUE_PLACEHOLDER_HOST")
-            .unwrap_or_else(|_| "fn0-queue.fn0.dev".to_string());
-        let queue_ocid = std::env::var("FN0_QUEUE_OCID")
-            .map_err(|_| anyhow::anyhow!("FN0_QUEUE_OCID is required"))?;
-        let tenancy = std::env::var("FN0_QUEUE_OCI_TENANCY_ID")
-            .map_err(|_| anyhow::anyhow!("FN0_QUEUE_OCI_TENANCY_ID is required"))?;
-        let user = std::env::var("FN0_QUEUE_OCI_USER_ID")
-            .map_err(|_| anyhow::anyhow!("FN0_QUEUE_OCI_USER_ID is required"))?;
-        let fingerprint = std::env::var("FN0_QUEUE_OCI_FINGERPRINT")
-            .map_err(|_| anyhow::anyhow!("FN0_QUEUE_OCI_FINGERPRINT is required"))?;
-        let private_key_b64 = std::env::var("FN0_QUEUE_OCI_PRIVATE_KEY_BASE64")
-            .map_err(|_| anyhow::anyhow!("FN0_QUEUE_OCI_PRIVATE_KEY_BASE64 is required"))?;
+        let placeholder_host = std::env::var("FN0_CONTROL_INVOKE_QUEUE_PLACEHOLDER_HOST")
+            .unwrap_or_else(|_| "fn0-control-invoke-queue.fn0.dev".to_string());
+        let allowed_caller_subdomain = std::env::var("FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN")
+            .map_err(|_| {
+                anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN is required")
+            })?;
+        let queue_ocid = std::env::var("FN0_CONTROL_INVOKE_QUEUE_OCID")
+            .map_err(|_| anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_OCID is required"))?;
+        let tenancy = std::env::var("FN0_CONTROL_INVOKE_QUEUE_OCI_TENANCY_ID")
+            .map_err(|_| anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_OCI_TENANCY_ID is required"))?;
+        let user = std::env::var("FN0_CONTROL_INVOKE_QUEUE_OCI_USER_ID")
+            .map_err(|_| anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_OCI_USER_ID is required"))?;
+        let fingerprint = std::env::var("FN0_CONTROL_INVOKE_QUEUE_OCI_FINGERPRINT")
+            .map_err(|_| anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_OCI_FINGERPRINT is required"))?;
+        let private_key_b64 = std::env::var("FN0_CONTROL_INVOKE_QUEUE_OCI_PRIVATE_KEY_BASE64")
+            .map_err(|_| {
+                anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_OCI_PRIVATE_KEY_BASE64 is required")
+            })?;
         let private_key_pem = base64::engine::general_purpose::STANDARD
             .decode(private_key_b64.as_bytes())
-            .map_err(|e| anyhow::anyhow!("queue private key base64 decode: {e}"))
+            .map_err(|e| anyhow::anyhow!("control invoke queue private key base64 decode: {e}"))
             .and_then(|b| {
-                String::from_utf8(b).map_err(|e| anyhow::anyhow!("queue private key utf8: {e}"))
+                String::from_utf8(b)
+                    .map_err(|e| anyhow::anyhow!("control invoke queue private key utf8: {e}"))
             })?;
 
         Ok(Some(Self::new_oci(
             placeholder_host,
+            allowed_caller_subdomain,
             queue_ocid,
             messages_endpoint,
             tenancy,
@@ -154,31 +165,34 @@ impl QueueHijack {
         format!("http://{}", self.placeholder_host)
     }
 
+    pub fn allowed_caller_subdomain(&self) -> &str {
+        &self.allowed_caller_subdomain
+    }
+
     pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
         uri.host() == Some(self.placeholder_host.as_str())
     }
 
-    pub(crate) fn record_usage(&self, subdomain: &str) {
-        self.usage
-            .entry(subdomain.to_string())
-            .or_insert_with(|| AtomicU64::new(0))
-            .fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn usage_count(&self, subdomain: &str) -> u64 {
-        self.usage
-            .get(subdomain)
-            .map(|c| c.load(Ordering::Relaxed))
-            .unwrap_or(0)
-    }
-
-    pub(crate) fn handle_enqueue(
+    pub(crate) fn handle_invoke(
         &self,
-        subdomain: &str,
+        caller_subdomain: &str,
         body_bytes: &[u8],
     ) -> Result<HijackAction, ErrorCode> {
-        let parsed: EnqueueBody = serde_json::from_slice(body_bytes)
-            .map_err(|e| ErrorCode::InternalError(Some(format!("enqueue body parse: {e}"))))?;
+        if caller_subdomain != self.allowed_caller_subdomain {
+            let resp = hyper::Response::builder()
+                .status(403)
+                .body(
+                    Full::new(Bytes::from_static(b"control invoke queue forbidden"))
+                        .map_err(|never: std::convert::Infallible| match never {})
+                        .boxed_unsync(),
+                )
+                .map_err(|e| ErrorCode::InternalError(Some(format!("synth resp: {e}"))))?;
+            return Ok(HijackAction::Synthesized(resp));
+        }
+
+        let parsed: InvokeBody = serde_json::from_slice(body_bytes).map_err(|e| {
+            ErrorCode::InternalError(Some(format!("control invoke body parse: {e}")))
+        })?;
 
         match &self.backend {
             Backend::Oci {
@@ -186,22 +200,18 @@ impl QueueHijack {
                 messages_host,
                 signer,
             } => {
-                let req = build_put_messages_request(
-                    queue_ocid,
-                    messages_host,
-                    signer,
-                    subdomain,
-                    &parsed,
-                )?;
+                let req = build_put_messages_request(queue_ocid, messages_host, signer, &parsed)?;
                 Ok(HijackAction::Forward(req))
             }
             Backend::Loopback { tx } => {
-                tx.send(LoopbackMessage {
-                    subdomain: subdomain.to_string(),
+                tx.send(ControlInvokeMessage {
+                    subdomain: parsed.subdomain,
                     task_name: parsed.task_name,
                     payload: parsed.payload,
                 })
-                .map_err(|_| ErrorCode::InternalError(Some("queue loopback closed".into())))?;
+                .map_err(|_| {
+                    ErrorCode::InternalError(Some("control invoke loopback closed".into()))
+                })?;
                 let resp = hyper::Response::builder()
                     .status(200)
                     .body(
@@ -220,11 +230,10 @@ fn build_put_messages_request(
     queue_ocid: &str,
     messages_host: &str,
     signer: &RequestSigner,
-    subdomain: &str,
-    parsed: &EnqueueBody,
+    parsed: &InvokeBody,
 ) -> Result<hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
     let wrapped = WrappedMessage {
-        subdomain,
+        subdomain: &parsed.subdomain,
         task_name: &parsed.task_name,
         payload: &parsed.payload,
     };
@@ -269,11 +278,11 @@ fn build_put_messages_request(
 }
 
 fn host_from_endpoint(endpoint: &str) -> Result<String> {
-    let url =
-        url::Url::parse(endpoint).map_err(|e| anyhow::anyhow!("queue endpoint parse: {e}"))?;
+    let url = url::Url::parse(endpoint)
+        .map_err(|e| anyhow::anyhow!("control invoke queue endpoint parse: {e}"))?;
     let host = url
         .host_str()
-        .ok_or_else(|| anyhow::anyhow!("queue endpoint missing host: {endpoint}"))?;
+        .ok_or_else(|| anyhow::anyhow!("control invoke queue endpoint missing host: {endpoint}"))?;
     if let Some(port) = url.port() {
         Ok(format!("{host}:{port}"))
     } else {

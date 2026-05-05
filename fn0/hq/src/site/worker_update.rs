@@ -95,7 +95,12 @@ impl Site {
             let now = chrono::Utc::now().to_rfc3339();
             if let Err(err) = self
                 .doc_db
-                .set_host_graceful(&victim.site_name, &victim.host_id, GracefulPurpose::ImageSwap, &now)
+                .set_host_graceful(
+                    &victim.site_name,
+                    &victim.host_id,
+                    GracefulPurpose::ImageSwap,
+                    &now,
+                )
                 .await
             {
                 warn!(%err, host_id = %victim.host_id, "set_host_graceful(ImageSwap) failed");

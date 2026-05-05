@@ -103,10 +103,9 @@ impl DocDb {
             .await
         {
             TrxResult::Committed(_) => Ok(()),
-            TrxResult::Conflict(d) => Err(eyre!(
-                "insert_custom_domain_remove_job conflict: {:?}",
-                d
-            )),
+            TrxResult::Conflict(d) => {
+                Err(eyre!("insert_custom_domain_remove_job conflict: {:?}", d))
+            }
             TrxResult::Err(e) => Err(eyre!("{}", e)),
             TrxResult::Cancelled(_) => unreachable!(),
         }
@@ -139,10 +138,9 @@ impl DocDb {
             .await
         {
             TrxResult::Committed(_) => Ok(()),
-            TrxResult::Conflict(d) => Err(eyre!(
-                "update_custom_domain_remove_job conflict: {:?}",
-                d
-            )),
+            TrxResult::Conflict(d) => {
+                Err(eyre!("update_custom_domain_remove_job conflict: {:?}", d))
+            }
             TrxResult::Err(e) => Err(eyre!("{}", e)),
             TrxResult::Cancelled(_) => unreachable!(),
         }

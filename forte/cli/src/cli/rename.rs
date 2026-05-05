@@ -30,11 +30,7 @@ pub async fn run(project_dir: PathBuf, new_name: String) -> Result<()> {
     let updated = rewrite_name_in_toml(&content, &project_name, &new_name)?;
     std::fs::write(&config_path, updated)
         .map_err(|e| anyhow!("Failed to update Forte.toml: {}", e))?;
-    println!(
-        "Updated {}: name = \"{}\"",
-        config_path.display(),
-        new_name
-    );
+    println!("Updated {}: name = \"{}\"", config_path.display(), new_name);
 
     Ok(())
 }

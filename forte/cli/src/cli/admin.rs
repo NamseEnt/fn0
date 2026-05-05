@@ -22,8 +22,9 @@ fn load_project_name(project_dir: &std::path::Path) -> Result<String> {
 fn read_input(input_file: Option<PathBuf>, input: Option<String>) -> Result<Vec<u8>> {
     match (input_file, input) {
         (Some(_), Some(_)) => Err(anyhow!("specify at most one of --input-file or --input")),
-        (Some(path), None) => std::fs::read(&path)
-            .map_err(|e| anyhow!("Failed to read {}: {}", path.display(), e)),
+        (Some(path), None) => {
+            std::fs::read(&path).map_err(|e| anyhow!("Failed to read {}: {}", path.display(), e))
+        }
         (None, Some(s)) => Ok(s.into_bytes()),
         (None, None) => Ok(b"{}".to_vec()),
     }

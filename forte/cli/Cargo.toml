@@ -1,6 +1,6 @@
 [package]
 name = "forte-cli"
-version = "0.3.29"
+version = "0.3.30"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -37,6 +37,9 @@ reqwest = { workspace = true }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+chrono = { workspace = true }
+syn = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true }
 toml = { workspace = true }

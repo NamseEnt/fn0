@@ -56,3 +56,17 @@ pub struct Fn0WasmtimeVersionDoc {
     pub active: String,
     pub pending: Option<String>,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CronJob {
+    pub function: String,
+    pub every_minutes: u32,
+}
+
+#[forte_doc]
+pub struct CronConfigDoc {
+    #[sk]
+    pub project_id: String,
+    pub jobs: Vec<CronJob>,
+    pub updated_at: DateTime,
+}
