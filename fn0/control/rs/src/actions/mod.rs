@@ -13,3 +13,4 @@ pub mod revoke_token;
 pub mod secrets_encrypt;
 pub mod secrets_init;
 pub mod set_pending_fn0_wasmtime;
+pub mod zombie_sweep;

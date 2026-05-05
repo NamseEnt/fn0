@@ -2918,6 +2918,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "fn0-worker-agent"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "rand 0.8.5",
+ "reqwest",
+ "rustls 0.23.28",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

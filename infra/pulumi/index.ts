@@ -7,6 +7,7 @@ export { ForteR2 } from "./ForteR2";
 export { BundleStoreR2 } from "./BundleStoreR2";
 export { BundleStoreR2Worker } from "./BundleStoreR2Worker";
 export { StaticAssetStorage } from "./StaticAssetStorage";
+export { Fn0WorkerInstance } from "./Fn0WorkerInstance";
 export { OciHeadQuarter } from "./OciHeadQuarter";
 export { OciHeadQuarterVcn } from "./OciHeadQuarterVcn";
 export * as dns from "./dns";
