@@ -1,3 +1,4 @@
+use crate::actions::zombie_sweep;
 use crate::common::admin;
 use crate::docs::*;
 use forte_sdk::*;
@@ -118,8 +119,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         scanned_projects_count = scanned_projects,
         scanned_jobs_count = scanned_jobs,
         epoch_minute,
-        "cron_on_tick completed"
+        "cron_on_tick dispatch completed"
     );
+
+    if let Err(err) = zombie_sweep::run_sweep().await {
+        tracing::error!(?err, "zombie_sweep within cron_on_tick failed");
+    }
 
     Output::Ok {
         fired_count: fired,

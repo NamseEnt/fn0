@@ -23,7 +23,7 @@ use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -240,6 +240,7 @@ async fn run() -> Result<()> {
 
     let generation = Arc::new(AtomicU64::new(0));
     let instance_count = Arc::new(AtomicU64::new(0));
+    let drain_flag = Arc::new(AtomicBool::new(false));
 
     let num_workers = worker_pool::default_num_threads();
     let worker_senders = Arc::new(worker_pool::spawn_workers(
@@ -280,12 +281,14 @@ async fn run() -> Result<()> {
         let instance_count = instance_count.clone();
         let admin_signing_key = admin_signing_key.clone();
         let cache = cache.clone();
+        let drain_flag = drain_flag.clone();
         async move {
             if let Err(err) = run_http_server(
                 http_port,
                 worker_senders,
                 generation,
                 instance_count,
+                drain_flag,
                 admin_signing_key,
                 cache,
             )
@@ -319,6 +322,7 @@ async fn run_http_server(
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     generation: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
+    drain_flag: Arc<AtomicBool>,
     admin_signing_key: Option<Arc<[u8; 32]>>,
     cache: S3BundleCache,
 ) -> Result<()> {
@@ -353,6 +357,7 @@ async fn run_http_server(
         let worker_senders = worker_senders.clone();
         let generation = generation.clone();
         let instance_count = instance_count.clone();
+        let drain_flag = drain_flag.clone();
         let tls_acceptor = tls_acceptor.clone();
         let admin_signing_key = admin_signing_key.clone();
         let cache = cache.clone();
@@ -362,6 +367,7 @@ async fn run_http_server(
                 let worker_senders = worker_senders.clone();
                 let generation = generation.clone();
                 let instance_count = instance_count.clone();
+                let drain_flag = drain_flag.clone();
                 let admin_signing_key = admin_signing_key.clone();
                 let cache = cache.clone();
                 async move {
@@ -370,6 +376,7 @@ async fn run_http_server(
                         worker_senders,
                         generation,
                         instance_count,
+                        drain_flag,
                         is_loopback,
                         admin_signing_key,
                         cache,
@@ -425,11 +432,22 @@ async fn handle_request(
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     generation: Arc<AtomicU64>,
     instance_count: Arc<AtomicU64>,
+    drain_flag: Arc<AtomicBool>,
     is_loopback: bool,
     admin_signing_key: Option<Arc<[u8; 32]>>,
     cache: S3BundleCache,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     match req.uri().path() {
+        "/readyz" => Ok(hyper::Response::new(Full::new(Bytes::from("ready")))),
+        "/drain" if is_loopback && req.method() == hyper::Method::POST => {
+            drain_flag.store(true, Ordering::Relaxed);
+            tracing::info!("worker entered drain mode");
+            Ok(hyper::Response::new(Full::new(Bytes::from("draining"))))
+        }
+        "/drain" => Ok(hyper::Response::builder()
+            .status(404)
+            .body(Full::new(Bytes::from("not found")))
+            .unwrap()),
         "/status" if is_loopback => {
             let body = serde_json::json!({
                 "generation": generation.load(Ordering::Relaxed),
@@ -453,6 +471,13 @@ async fn handle_request(
             .body(Full::new(Bytes::from("Forbidden")))
             .unwrap()),
         _ => {
+            if drain_flag.load(Ordering::Relaxed) {
+                return Ok(hyper::Response::builder()
+                    .status(503)
+                    .header("connection", "close")
+                    .body(Full::new(Bytes::from("draining")))
+                    .unwrap());
+            }
             let _guard = InFlightGuard::new(instance_count);
 
             let host = req
