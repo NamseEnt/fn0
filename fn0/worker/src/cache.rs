@@ -21,7 +21,7 @@ enum Manifest {
 }
 
 struct LruEntry {
-    subdomain: String,
+    project_id: String,
     version: (u64, u64),
     bundle: Arc<Bundle>,
     size_bytes: usize,
@@ -29,7 +29,7 @@ struct LruEntry {
 
 struct Inner {
     registry: HashMap<String, (u64, u64)>,
-    domain_to_subdomain: HashMap<String, String>,
+    domain_to_project_id: HashMap<String, String>,
     lru: VecDeque<LruEntry>,
     current_bytes: usize,
 }
@@ -60,7 +60,7 @@ impl S3BundleCache {
             vault,
             inner: Arc::new(Mutex::new(Inner {
                 registry: HashMap::new(),
-                domain_to_subdomain: HashMap::new(),
+                domain_to_project_id: HashMap::new(),
                 lru: VecDeque::new(),
                 current_bytes: 0,
             })),
@@ -69,57 +69,57 @@ impl S3BundleCache {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(subdomain = %subdomain, code_id, code_version))]
-    pub async fn register(&self, subdomain: &str, code_id: u64, code_version: u64) {
+    #[tracing::instrument(skip_all, fields(project_id = %project_id, code_id, code_version))]
+    pub async fn register(&self, project_id: &str, code_id: u64, code_version: u64) {
         let mut inner = self.inner.lock().await;
         let prev = inner
             .registry
-            .insert(subdomain.to_string(), (code_id, code_version));
+            .insert(project_id.to_string(), (code_id, code_version));
         if prev != Some((code_id, code_version))
-            && let Some(pos) = inner.lru.iter().position(|e| e.subdomain == subdomain)
+            && let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id)
         {
             let removed = inner.lru.remove(pos).unwrap();
             inner.current_bytes = inner.current_bytes.saturating_sub(removed.size_bytes);
         }
     }
 
-    pub async fn unregister(&self, subdomain: &str) {
+    pub async fn unregister(&self, project_id: &str) {
         let mut inner = self.inner.lock().await;
-        inner.registry.remove(subdomain);
-        if let Some(pos) = inner.lru.iter().position(|e| e.subdomain == subdomain) {
+        inner.registry.remove(project_id);
+        if let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id) {
             let removed = inner.lru.remove(pos).unwrap();
             inner.current_bytes = inner.current_bytes.saturating_sub(removed.size_bytes);
         }
     }
 
-    pub async fn register_domain(&self, domain: &str, subdomain: &str) {
+    pub async fn register_domain(&self, domain: &str, project_id: &str) {
         let mut inner = self.inner.lock().await;
         inner
-            .domain_to_subdomain
-            .insert(domain.to_string(), subdomain.to_string());
+            .domain_to_project_id
+            .insert(domain.to_string(), project_id.to_string());
     }
 
     pub async fn unregister_domain(&self, domain: &str) {
         let mut inner = self.inner.lock().await;
-        inner.domain_to_subdomain.remove(domain);
+        inner.domain_to_project_id.remove(domain);
     }
 
     pub async fn resolve_domain(&self, domain: &str) -> Option<String> {
         let inner = self.inner.lock().await;
-        inner.domain_to_subdomain.get(domain).cloned()
+        inner.domain_to_project_id.get(domain).cloned()
     }
 
-    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
-    async fn get_impl(&self, subdomain: &str) -> Result<Arc<Bundle>, Error> {
+    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
+    async fn get_impl(&self, project_id: &str) -> Result<Arc<Bundle>, Error> {
         let version = {
             let mut inner = self.inner.lock().await;
-            let Some(&version) = inner.registry.get(subdomain) else {
+            let Some(&version) = inner.registry.get(project_id) else {
                 return Err(Error::NotFound);
             };
             if let Some(pos) = inner
                 .lru
                 .iter()
-                .position(|e| e.subdomain == subdomain && e.version == version)
+                .position(|e| e.project_id == project_id && e.version == version)
             {
                 let entry = inner.lru.remove(pos).unwrap();
                 let bundle = entry.bundle.clone();
@@ -129,15 +129,15 @@ impl S3BundleCache {
             version
         };
 
-        let (bundle, size) = self.fetch_and_build(subdomain).await?;
+        let (bundle, size) = self.fetch_and_build(project_id).await?;
 
         let mut inner = self.inner.lock().await;
-        if let Some(pos) = inner.lru.iter().position(|e| e.subdomain == subdomain) {
+        if let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id) {
             let removed = inner.lru.remove(pos).unwrap();
             inner.current_bytes = inner.current_bytes.saturating_sub(removed.size_bytes);
         }
         inner.lru.push_front(LruEntry {
-            subdomain: subdomain.to_string(),
+            project_id: project_id.to_string(),
             version,
             bundle: bundle.clone(),
             size_bytes: size,
@@ -155,10 +155,10 @@ impl S3BundleCache {
         Ok(bundle)
     }
 
-    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
-    async fn fetch_and_build(&self, subdomain: &str) -> Result<(Arc<Bundle>, usize), Error> {
+    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
+    async fn fetch_and_build(&self, project_id: &str) -> Result<(Arc<Bundle>, usize), Error> {
         let key = format!(
-            "bundles/{version}/{subdomain}.tar.zst",
+            "bundles/{version}/{project_id}.tar.zst",
             version = fn0::FN0_WASMTIME_VERSION,
         );
         let compressed = match self.operator.read(&key).await {
@@ -263,8 +263,8 @@ impl S3BundleCache {
 }
 
 impl BundleCache for S3BundleCache {
-    async fn get(&self, subdomain: &str) -> Result<Arc<Bundle>, Error> {
-        let key = subdomain.to_string();
+    async fn get(&self, project_id: &str) -> Result<Arc<Bundle>, Error> {
+        let key = project_id.to_string();
         let provider = self.clone();
         let key_for_task = key.clone();
         let singleflight = provider.singleflight.clone();
@@ -274,10 +274,10 @@ impl BundleCache for S3BundleCache {
             .map_err(|opt| opt.unwrap_or(Error::SingleflightLeaderFailed))
     }
 
-    async fn invalidate(&self, subdomain: &str) {
-        let subdomain = subdomain.to_string();
+    async fn invalidate(&self, project_id: &str) {
+        let project_id = project_id.to_string();
         let mut inner = self.inner.lock().await;
-        if let Some(pos) = inner.lru.iter().position(|e| e.subdomain == subdomain) {
+        if let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id) {
             let removed = inner.lru.remove(pos).unwrap();
             inner.current_bytes = inner.current_bytes.saturating_sub(removed.size_bytes);
         }

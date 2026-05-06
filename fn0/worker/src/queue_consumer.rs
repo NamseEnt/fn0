@@ -78,7 +78,7 @@ struct IncomingMessage {
 
 #[derive(Deserialize)]
 struct WrappedMessage {
-    subdomain: String,
+    project_id: String,
     task_name: String,
     payload: serde_json::Value,
 }
@@ -241,7 +241,7 @@ impl Consumer {
         let req: hyper::Request<UnsyncBoxBody<Bytes, anyhow::Error>> = hyper::Request::builder()
             .method("POST")
             .uri("/__fn0_queue_task/execute")
-            .header("host", format!("{}.fn0.dev", wrapped.subdomain))
+            .header("host", format!("{}.fn0.dev", wrapped.project_id))
             .header("content-type", "application/json")
             .body(
                 Full::new(Bytes::from(inner_body))
@@ -252,14 +252,16 @@ impl Consumer {
 
         let (resp_tx, resp_rx) = oneshot::channel();
         let envelope = RequestEnvelope {
-            code_id: wrapped.subdomain.clone(),
+            code_id: wrapped.project_id.clone(),
             req,
             resp_tx,
         };
 
         if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
             return match err {
-                DispatchError::Full => Err(anyhow!("worker queue full for {}", wrapped.subdomain)),
+                DispatchError::Full => {
+                    Err(anyhow!("worker queue full for {}", wrapped.project_id))
+                }
                 DispatchError::Closed => Err(anyhow!("worker pool closed")),
             };
         }

@@ -7,7 +7,7 @@ type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Deserialize)]
 pub struct AdminTokenClaims {
-    pub subdomain: String,
+    pub project_id: String,
     pub task: String,
     pub github_login: String,
     pub iat: i64,
@@ -19,7 +19,7 @@ pub enum VerifyError {
     Malformed,
     BadSignature,
     Expired,
-    SubdomainMismatch,
+    ProjectIdMismatch,
 }
 
 pub fn decode_key_base64(s: &str) -> Result<[u8; 32], String> {
@@ -34,7 +34,7 @@ pub fn decode_key_base64(s: &str) -> Result<[u8; 32], String> {
 pub fn verify_token(
     token: &str,
     key: &[u8; 32],
-    expected_subdomain: &str,
+    expected_project_id: &str,
     now_unix: i64,
 ) -> Result<AdminTokenClaims, VerifyError> {
     let (payload_b64, sig_b64) = token.split_once('.').ok_or(VerifyError::Malformed)?;
@@ -56,8 +56,8 @@ pub fn verify_token(
     if claims.exp < now_unix {
         return Err(VerifyError::Expired);
     }
-    if claims.subdomain != expected_subdomain {
-        return Err(VerifyError::SubdomainMismatch);
+    if claims.project_id != expected_project_id {
+        return Err(VerifyError::ProjectIdMismatch);
     }
     Ok(claims)
 }
