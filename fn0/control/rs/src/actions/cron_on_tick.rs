@@ -135,7 +135,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
 #[derive(Serialize)]
 struct InvokeBody<'a> {
-    subdomain: &'a str,
+    project_id: &'a str,
     task_name: &'a str,
     payload: serde_json::Value,
 }
@@ -143,11 +143,11 @@ struct InvokeBody<'a> {
 async fn enqueue_invoke(
     client: &http::Client,
     invoke_queue_url: &str,
-    subdomain: &str,
+    project_id: &str,
     task_name: &str,
 ) -> anyhow::Result<()> {
     let body = serde_json::to_vec(&InvokeBody {
-        subdomain,
+        project_id,
         task_name,
         payload: serde_json::Value::Null,
     })?;

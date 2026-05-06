@@ -18,7 +18,8 @@ struct DeploymentsFile {
 
 #[derive(Deserialize, Clone)]
 struct DeploymentEntry {
-    subdomain: String,
+    #[serde(alias = "subdomain")]
+    project_id: String,
     code_id: u64,
     code_version: u64,
 }
@@ -59,11 +60,11 @@ pub async fn run(path: &Path, generation: Arc<AtomicU64>, cache: S3BundleCache) 
         let target: HashMap<String, (u64, u64)> = parsed
             .deployments
             .iter()
-            .map(|d| (d.subdomain.clone(), (d.code_id, d.code_version)))
+            .map(|d| (d.project_id.clone(), (d.code_id, d.code_version)))
             .collect();
 
-        for (sub, ver) in &target {
-            cache.register(sub, ver.0, ver.1).await;
+        for (id, ver) in &target {
+            cache.register(id, ver.0, ver.1).await;
         }
 
         let stale: Vec<String> = known
@@ -71,12 +72,12 @@ pub async fn run(path: &Path, generation: Arc<AtomicU64>, cache: S3BundleCache) 
             .filter(|s| !target.contains_key(*s))
             .cloned()
             .collect();
-        for sub in stale {
-            cache.unregister(&sub).await;
+        for id in stale {
+            cache.unregister(&id).await;
         }
 
-        for (domain, subdomain) in &parsed.custom_domains {
-            cache.register_domain(domain, subdomain).await;
+        for (domain, project_id) in &parsed.custom_domains {
+            cache.register_domain(domain, project_id).await;
         }
         let stale_domains: Vec<String> = known_domains
             .keys()
