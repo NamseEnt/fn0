@@ -1,5 +1,6 @@
 use crate::common::auth;
 use crate::common::aws_sign;
+use crate::common::cloudflare::CloudflareClient;
 use crate::docs::*;
 use crate::quota;
 use forte_sdk::*;
@@ -87,6 +88,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 total_size,
                 quota::MAX_TOTAL_SIZE_PER_BUILD
             ),
+        };
+    }
+
+    if let Err(e) = ensure_all_resources(&req.body.project_id).await {
+        return Output::Error {
+            message: e.to_string(),
         };
     }
 
@@ -248,5 +255,62 @@ impl StaticEnv {
                     anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY not set")
                 })?,
         })
+    }
+}
+
+async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
+    let cf = CloudflareClient::from_env()?;
+    let public_base_domain = std::env::var("FN0_STATIC_ASSET_STORAGE_PUBLIC_BASE_DOMAIN")
+        .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_PUBLIC_BASE_DOMAIN not set"))?;
+    let zone_id = std::env::var("FN0_CLOUDFLARE_ZONE_ID")
+        .map_err(|_| anyhow::anyhow!("FN0_CLOUDFLARE_ZONE_ID not set"))?;
+
+    let bucket = format!("fn0-static-asset-{project_id}");
+    let custom_domain = format!("{project_id}.{public_base_domain}");
+    let cors_origin = format!("https://*.{}", root_domain(&public_base_domain));
+
+    cf.create_r2_bucket(&bucket, "apac").await?;
+    cf.put_r2_bucket_cors(&bucket, &cors_origin).await?;
+    cf.register_r2_custom_domain(&bucket, &custom_domain, &zone_id)
+        .await?;
+    ensure_turso_database(project_id).await?;
+    Ok(())
+}
+
+async fn ensure_turso_database(project_id: &str) -> anyhow::Result<()> {
+    let api_token = std::env::var("FN0_TURSO_API_TOKEN")
+        .map_err(|_| anyhow::anyhow!("FN0_TURSO_API_TOKEN not set"))?;
+    let org_slug = std::env::var("FN0_TURSO_ORG_SLUG")
+        .map_err(|_| anyhow::anyhow!("FN0_TURSO_ORG_SLUG not set"))?;
+    let group_name = std::env::var("FN0_TURSO_GROUP_NAME")
+        .map_err(|_| anyhow::anyhow!("FN0_TURSO_GROUP_NAME not set"))?;
+
+    let url = format!("https://api.turso.tech/v1/organizations/{org_slug}/databases");
+    let body = serde_json::to_vec(&serde_json::json!({
+        "name": project_id,
+        "group": group_name,
+    }))?;
+    let req = http::Request::builder()
+        .uri(url)
+        .method("POST")
+        .header("Authorization", format!("Bearer {api_token}"))
+        .header("Content-Type", "application/json")
+        .body(body)?;
+    let resp = http::Client::new().send(req).await?;
+    let status = resp.status().as_u16();
+    if (200..300).contains(&status) || status == 409 {
+        return Ok(());
+    }
+    let body_bytes = resp.into_body().bytes().await.to_vec();
+    anyhow::bail!(
+        "turso ensure_database {project_id} failed (status={status}): {}",
+        String::from_utf8_lossy(&body_bytes)
+    );
+}
+
+fn root_domain(s: &str) -> &str {
+    match s.split_once('.') {
+        Some((_, rest)) => rest,
+        None => s,
     }
 }
