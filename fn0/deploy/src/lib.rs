@@ -158,17 +158,14 @@ struct DeployStatusBody {
 pub async fn deploy_wasm(
     control_url: &str,
     token: &str,
-    project_name: &str,
-    project_id: &mut Option<String>,
+    project_id: &str,
     build_id: &str,
     bundle_tar_path: &Path,
     jobs: &[CronJob],
     cron_updated_at: &str,
 ) -> Result<()> {
     let client = reqwest::Client::new();
-    let project_id_resolved =
-        ensure_project_id(&client, control_url, token, project_name, project_id).await?;
-    println!("project_id: {project_id_resolved}");
+    println!("project_id: {project_id}");
 
     let DeployOk {
         presigned_put_url,
@@ -178,7 +175,7 @@ pub async fn deploy_wasm(
         &client,
         control_url,
         token,
-        &project_id_resolved,
+        project_id,
         build_id,
         Vec::new(),
         jobs,
@@ -190,14 +187,7 @@ pub async fn deploy_wasm(
     let last_modified = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
     println!("uploaded. last_modified={last_modified}");
 
-    poll_deploy_status(
-        &client,
-        control_url,
-        token,
-        &project_id_resolved,
-        &last_modified,
-    )
-    .await?;
+    poll_deploy_status(&client, control_url, token, project_id, &last_modified).await?;
     println!("Deploy complete!");
     Ok(())
 }
@@ -206,8 +196,7 @@ pub async fn deploy_wasm(
 pub async fn deploy_forte(
     control_url: &str,
     token: &str,
-    project_name: &str,
-    project_id: &mut Option<String>,
+    project_id: &str,
     build_id: &str,
     fe_dist_dir: &Path,
     bundle_tar_path: &Path,
@@ -215,9 +204,7 @@ pub async fn deploy_forte(
     cron_updated_at: &str,
 ) -> Result<()> {
     let client = reqwest::Client::new();
-    let project_id_resolved =
-        ensure_project_id(&client, control_url, token, project_name, project_id).await?;
-    println!("project_id: {project_id_resolved}");
+    println!("project_id: {project_id}");
 
     let static_files = collect_static_files(fe_dist_dir)?;
     let deploy_files: Vec<DeployFile> = static_files
@@ -240,7 +227,7 @@ pub async fn deploy_forte(
         &client,
         control_url,
         token,
-        &project_id_resolved,
+        project_id,
         build_id,
         deploy_files,
         jobs,
@@ -257,14 +244,7 @@ pub async fn deploy_forte(
     let last_modified = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
     println!("uploaded. last_modified={last_modified}");
 
-    poll_deploy_status(
-        &client,
-        control_url,
-        token,
-        &project_id_resolved,
-        &last_modified,
-    )
-    .await?;
+    poll_deploy_status(&client, control_url, token, project_id, &last_modified).await?;
     println!("Deploy complete!");
     Ok(())
 }
@@ -626,7 +606,7 @@ pub struct AdminRunOutput {
 }
 
 pub async fn admin_run(
-    _project_name: &str,
+    _project_id: &str,
     _task: &str,
     _input_body: Vec<u8>,
     _timeout_secs: u64,
@@ -636,20 +616,14 @@ pub async fn admin_run(
     ))
 }
 
-pub async fn rename(_project_name: &str, _new_project_name: &str) -> Result<()> {
-    Err(anyhow!(
-        "rename is not yet migrated to control. See GitHub issue #5."
-    ))
-}
-
-pub async fn domain_add(_project_name: &str, _domain: &str) -> Result<()> {
+pub async fn domain_add(_project_id: &str, _domain: &str) -> Result<()> {
     Err(anyhow!("domain commands are not yet migrated to control."))
 }
 
-pub async fn domain_remove(_project_name: &str) -> Result<()> {
+pub async fn domain_remove(_project_id: &str) -> Result<()> {
     Err(anyhow!("domain commands are not yet migrated to control."))
 }
 
-pub async fn domain_status(_project_name: &str) -> Result<()> {
+pub async fn domain_status(_project_id: &str) -> Result<()> {
     Err(anyhow!("domain commands are not yet migrated to control."))
 }

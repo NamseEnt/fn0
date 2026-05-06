@@ -20,9 +20,6 @@ pub enum Commands {
     Login {
         token: Option<String>,
     },
-    Rename {
-        new_name: String,
-    },
     Local {
         #[arg(short, long)]
         port: Option<u16>,

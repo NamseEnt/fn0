@@ -7,6 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{AddCommands, AdminCommands, Cli, Commands, DomainCommands};
 
+
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -32,6 +33,10 @@ async fn async_main() -> Result<()> {
             cli::init::run(&name)?;
         }
 
+        Commands::Login { token } => {
+            cli::login::run(token)?;
+        }
+
         Commands::Add { command } => match command {
             AddCommands::Page { path } => {
                 cli::add::add_page(&path)?;
@@ -50,14 +55,9 @@ async fn async_main() -> Result<()> {
             .await?;
         }
 
-        Commands::Deploy { project } => {
+        Commands::Deploy { project, name } => {
             let project_dir = project.unwrap_or_else(|| ".".into());
-            cli::deploy::run(project_dir).await?;
-        }
-
-        Commands::Rename { new_name, project } => {
-            let project_dir = project.unwrap_or_else(|| ".".into());
-            cli::rename::run(project_dir, new_name).await?;
+            cli::deploy::run(project_dir, name).await?;
         }
 
         Commands::Admin { command } => match command {

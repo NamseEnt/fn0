@@ -31,6 +31,7 @@ hyper-util = { workspace = true, features = [
     "http1",
     "tokio",
 ] }
+inquire = { workspace = true }
 notify = { workspace = true }
 notify-debouncer-mini = { workspace = true }
 reqwest = { workspace = true }

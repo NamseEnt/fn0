@@ -15,7 +15,7 @@ pub fn run(name: &str) -> Result<()> {
     fs::create_dir_all(project_dir.join("fe/src/pages/index"))?;
     fs::create_dir_all(project_dir.join("fe/public"))?;
 
-    fs::write(project_dir.join("Forte.toml"), generate_forte_toml(name))?;
+    fs::write(project_dir.join("Forte.toml"), generate_forte_toml())?;
     fs::write(project_dir.join(".gitignore"), generate_root_gitignore())?;
     fs::write(
         project_dir.join("Cargo.toml"),
@@ -109,12 +109,8 @@ fn install_npm_packages(project_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_forte_toml(name: &str) -> String {
-    format!(
-        r#"[project]
-name = "{name}"
-"#
-    )
+fn generate_forte_toml() -> &'static str {
+    ""
 }
 
 fn generate_root_gitignore() -> &'static str {

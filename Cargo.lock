@@ -2977,6 +2977,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "inquire",
  "notify",
  "notify-debouncer-mini",
  "predicates",
