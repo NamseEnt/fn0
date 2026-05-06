@@ -161,3 +161,23 @@ Run it:
 ```sh
 forte admin run seed_database --input '{"count": 10}'
 ```
+
+## Cron Scheduling
+
+Queue tasks can be scheduled to run on a recurring interval by creating a `cron.yaml` file in the project root:
+
+```yaml
+# cron.yaml
+- function: send_digest
+  every_minutes: 60
+
+- function: cleanup_expired_sessions
+  every_minutes: 1440
+```
+
+Rules:
+- `function` must match the name of a file under `rs/src/queue_task/` (e.g. `send_digest` → `rs/src/queue_task/send_digest.rs`).
+- `every_minutes` must be a positive integer (no zero).
+- The task's `Input` type **must be unit** — either `pub type Input = ();` or an empty struct. Cron tasks receive no input.
+
+`forte deploy` validates `cron.yaml` against the source tree and uploads the schedule with the deployment. No `cron.yaml` means no scheduled tasks are registered.

@@ -21,6 +21,19 @@ cd my-app
 
 ---
 
+### `forte login [--token <token>]`
+
+Log in to fn0 Cloud. Opens the token page in a browser, prompts to paste the token, and saves credentials shared with the `fn0` CLI.
+
+```sh
+forte login
+forte login --token fn0_...   # non-interactive
+```
+
+Credentials are stored on disk (path printed on success). Required before `forte deploy`.
+
+---
+
 ### `forte dev [options]`
 
 Start the development server with hot reload.
@@ -51,7 +64,7 @@ Build the project for production without deploying.
 | `-p, --project <dir>` | `.` | Project directory |
 
 Build steps:
-1. **Codegen** — runs `forte-rs-to-ts` to generate `.props.ts` files, then generates frontend route file (`routes.generated.ts`)
+1. **Codegen** — runs `forte-rs-to-ts` to generate `.props.ts` files, then generates the frontend route table (`routes.generated.ts`)
 2. **Backend** — `cargo build --release --target wasm32-wasip2` inside `rs/`
 3. **Frontend** — `npx vite build --config <config>` (client) and `npx vite build --ssr <entry> --config <config>` (SSR)
 4. **Dist** — copies `backend.wasm` and `server.js` to `dist/`
@@ -73,9 +86,19 @@ Build and upload the project to fn0 Cloud.
 | Flag | Default | Description |
 |---|---|---|
 | `-p, --project <dir>` | `.` | Project directory |
+| `--name <name>` | *(prompted)* | Display name — used only on the **first** deploy to register the project |
+
+On the first deploy the command prompts for a display name (or use `--name`) and writes the assigned `project_id` back to `Forte.toml`. Subsequent deploys use the stored `project_id`.
+
+If a `cron.yaml` file exists in the project root, its scheduled jobs are validated and uploaded with the deployment. See [Actions & Tasks — Cron Scheduling](actions.md#cron-scheduling).
+
+If an `env.yaml` file exists in the project root, it is bundled with the deployment as encrypted environment variables.
+
+Requires credentials saved by `forte login`.
 
 ```sh
 forte deploy
+forte deploy --name "My App"   # first deploy only
 ```
 
 ---
@@ -110,16 +133,6 @@ forte add action products/list
 Creates:
 - `rs/src/actions/<path>.rs` — Rust action handler
 - `fe/src/actions/<path>.ts` — TypeScript fetch wrapper
-
----
-
-### `forte rename <new-name> [options]`
-
-Rename the deployed project (migrates Turso DB and switches subdomain).
-
-| Flag | Default | Description |
-|---|---|---|
-| `-p, --project <dir>` | `.` | Project directory |
 
 ---
 

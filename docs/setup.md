@@ -65,3 +65,21 @@ forte dev
 `forte init` scaffolds the project, installs npm packages, and prints next steps.
 
 See [forte/overview.md](forte/overview.md) for project layout and [forte/cli.md](forte/cli.md) for all CLI commands.
+
+## Deploying to fn0 Cloud
+
+1. **Log in** — run once to store credentials:
+
+   ```sh
+   forte login
+   ```
+
+   This opens your browser to the fn0 token page. Paste the token when prompted. Credentials are shared with the `fn0` CLI.
+
+2. **Deploy**:
+
+   ```sh
+   forte deploy
+   ```
+
+   On the first deploy you will be prompted for a project display name. The assigned `project_id` is written back to `Forte.toml` automatically.
