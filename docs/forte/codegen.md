@@ -21,11 +21,13 @@ This scans the backend source tree and writes:
 
 | Output | Description |
 |---|---|
-| `rs/src/route_generated.rs` | Complete HTTP dispatch, WASM export, and route matching |
+| `rs/src/route_generated.rs` | Complete HTTP dispatch, WASM export, route matching, and hook module declarations |
 | `fe/src/paths.generated.ts` | Type-safe path builder object |
-| `rs/src/actions/mod.rs` | Module declarations for discovered actions |
-| `rs/src/admin/mod.rs` | Module declarations for discovered admin tasks |
-| `rs/src/queue_task/mod.rs` | Module declarations for discovered queue tasks |
+| `rs/src/actions/mod.rs` | Module declarations for discovered actions (only written when actions exist) |
+| `rs/src/admin/mod.rs` | Module declarations for discovered admin tasks (only written when admin tasks exist) |
+| `rs/src/queue_task/mod.rs` | Module declarations for discovered queue tasks (only written when queue tasks exist) |
+
+Hook module declarations are generated directly inside `route_generated.rs` rather than a separate `hooks/mod.rs`.
 
 It also updates the `FORTE-MANAGED` block in `rs/src/lib.rs`.
 
@@ -44,12 +46,12 @@ Each handler type is discovered by statically parsing the Rust source:
 
 | Directory | Discovery rule |
 |---|---|
-| `src/pages/` | File contains `pub async fn handler` returning `Result<Props>` or `Result<Redirect>` |
+| `src/pages/` | File contains `pub async fn handler` (pages returning `Redirect` only are excluded from route table) |
 | `src/apis/` | Same as pages; route is prefixed with `/api/` |
-| `src/hooks/` | File has `struct Input`, `Output` type, and `pub async fn handler` |
-| `src/actions/` | File has `struct Input`, `Output` type, and `pub async fn handler` |
+| `src/hooks/` | File has `struct Input`, `Output` type or enum, and `pub async fn handler` |
+| `src/actions/` | File has `struct Input`, `Output` type or enum, and `pub async fn handler` |
 | `src/queue_task/` | File has `struct Input` and `pub async fn handle` |
-| `src/admin/` | Same as queue tasks |
+| `src/admin/` | Same as queue tasks (`struct Input` + `pub async fn handle`) |
 
 Files named `mod.rs` inside these directories are skipped (they are generated).
 
