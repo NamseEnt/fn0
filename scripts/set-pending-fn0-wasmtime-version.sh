@@ -53,11 +53,6 @@ BUILDER_AWS_ACCESS_KEY_ID="$(pick cwasmCompilerBuilderAccessKeyId)"
 BUILDER_AWS_SECRET_ACCESS_KEY="$(pick cwasmCompilerBuilderSecretAccessKey)"
 HQ_AWS_ACCESS_KEY_ID="$(pick hqAwsAccessKeyId)"
 HQ_AWS_SECRET_ACCESS_KEY="$(pick hqAwsSecretAccessKey)"
-SCCACHE_BUCKET="$(pick sccacheBucketName)"
-SCCACHE_REGION="$(pick sccacheBucketRegion)"
-SCCACHE_ENDPOINT="$(pick sccacheBucketEndpoint)"
-SCCACHE_ACCESS_KEY_ID="$(pick sccacheAccessKeyId)"
-SCCACHE_SECRET_ACCESS_KEY="$(pick sccacheSecretAccessKey)"
 R2_ENDPOINT="$(pick bundleStoreR2Endpoint)"
 R2_BUCKET="$(pick bundleStoreR2BucketName)"
 R2_ACCESS_KEY_ID="$(pick bundleStoreR2AccessKeyId)"
@@ -68,8 +63,6 @@ ADMIN_TOKEN="$(pick controlAdminTokenBase64)"
 for v in CWASM_REGION CWASM_ECR CWASM_ROLE_ARN \
          BUILDER_AWS_ACCESS_KEY_ID BUILDER_AWS_SECRET_ACCESS_KEY \
          HQ_AWS_ACCESS_KEY_ID HQ_AWS_SECRET_ACCESS_KEY \
-         SCCACHE_BUCKET SCCACHE_REGION SCCACHE_ENDPOINT \
-         SCCACHE_ACCESS_KEY_ID SCCACHE_SECRET_ACCESS_KEY \
          R2_ENDPOINT R2_BUCKET R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
          CONTROL_URL ADMIN_TOKEN; do
   if [[ -z "${!v}" ]]; then
@@ -163,11 +156,6 @@ normalize_lm() {
     --provenance=false \
     --sbom=false \
     --file "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
-    --build-arg SCCACHE_BUCKET="$SCCACHE_BUCKET" \
-    --build-arg SCCACHE_REGION="$SCCACHE_REGION" \
-    --build-arg SCCACHE_ENDPOINT="$SCCACHE_ENDPOINT" \
-    --build-arg AWS_ACCESS_KEY_ID="$SCCACHE_ACCESS_KEY_ID" \
-    --build-arg AWS_SECRET_ACCESS_KEY="$SCCACHE_SECRET_ACCESS_KEY" \
     --tag "$IMAGE_URI" \
     --push \
     "$REPO_ROOT"

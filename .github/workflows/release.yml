@@ -131,47 +131,6 @@ jobs:
         uses: "Swatinem/rust-cache@v2"
         with:
           "workspaces": "forte/cli -> target"
-      - name: "Fetch sccache config from Pulumi API"
-        run: |
-          set -euo pipefail
-          STACK_API="https://api.pulumi.com/api/stacks/namse/fn0Cloud/prod"
-
-          EXPORT="$(curl -sfS \
-            -H "Authorization: token $PULUMI_ACCESS_TOKEN" \
-            "$STACK_API/export")"
-
-          OUTPUTS="$(jq '.deployment.resources[] | select(.type == "pulumi:pulumi:Stack") | .outputs' <<<"$EXPORT")"
-
-          read_output() {
-            local raw ct
-            raw="$(jq -c --arg k "$1" '.[$k]' <<<"$OUTPUTS")"
-            ct="$(jq -r 'if type == "object" and has("ciphertext") then .ciphertext else "" end' <<<"$raw")"
-            if [ -n "$ct" ]; then
-              curl -sfS -X POST \
-                -H "Authorization: token $PULUMI_ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$(jq -cn --arg c "$ct" '{ciphertext: $c}')" \
-                "$STACK_API/decrypt" \
-                | jq -r '.plaintext' | base64 -d | jq -r .
-            else
-              jq -r . <<<"$raw"
-            fi
-          }
-
-          {
-            echo "RUSTC_WRAPPER=sccache"
-            echo "SCCACHE_S3_USE_SSL=true"
-            echo "SCCACHE_BUCKET=$(read_output sccacheBucketName)"
-            echo "SCCACHE_REGION=$(read_output sccacheBucketRegion)"
-            echo "SCCACHE_ENDPOINT=$(read_output sccacheBucketEndpoint)"
-            echo "AWS_ACCESS_KEY_ID=$(read_output sccacheAccessKeyId)"
-            echo "AWS_SECRET_ACCESS_KEY=$(read_output sccacheSecretAccessKey)"
-          } >> "$GITHUB_ENV"
-        shell: "bash"
-        env:
-          "PULUMI_ACCESS_TOKEN": "${{ secrets.PULUMI_ACCESS_TOKEN }}"
-      - name: "Install sccache"
-        uses: "mozilla-actions/sccache-action@v0.0.6"
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest

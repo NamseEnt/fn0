@@ -25,20 +25,12 @@ CWASM_ROLE_ARN="$(pick cwasmCompilerRoleArn)"
 BUILDER_AWS_ACCESS_KEY_ID="$(pick cwasmCompilerBuilderAccessKeyId)"
 BUILDER_AWS_SECRET_ACCESS_KEY="$(pick cwasmCompilerBuilderSecretAccessKey)"
 
-SCCACHE_BUCKET="$(pick sccacheBucketName)"
-SCCACHE_REGION="$(pick sccacheBucketRegion)"
-SCCACHE_ENDPOINT="$(pick sccacheBucketEndpoint)"
-SCCACHE_ACCESS_KEY_ID="$(pick sccacheAccessKeyId)"
-SCCACHE_SECRET_ACCESS_KEY="$(pick sccacheSecretAccessKey)"
-
 R2_ENDPOINT="$(pick bundleStoreR2Endpoint)"
 R2_ACCESS_KEY_ID="$(pick bundleStoreR2AccessKeyId)"
 R2_SECRET_ACCESS_KEY="$(pick bundleStoreR2SecretAccessKey)"
 
 for v in CWASM_REGION CWASM_BUCKET CWASM_ECR CWASM_ROLE_ARN \
          BUILDER_AWS_ACCESS_KEY_ID BUILDER_AWS_SECRET_ACCESS_KEY \
-         SCCACHE_BUCKET SCCACHE_REGION SCCACHE_ENDPOINT \
-         SCCACHE_ACCESS_KEY_ID SCCACHE_SECRET_ACCESS_KEY \
          R2_ENDPOINT R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
   if [[ -z "${!v}" ]]; then
     echo "missing Pulumi output for: ${v}" >&2
@@ -91,11 +83,6 @@ docker buildx build \
   --provenance=false \
   --sbom=false \
   --file "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
-  --build-arg SCCACHE_BUCKET="$SCCACHE_BUCKET" \
-  --build-arg SCCACHE_REGION="$SCCACHE_REGION" \
-  --build-arg SCCACHE_ENDPOINT="$SCCACHE_ENDPOINT" \
-  --build-arg AWS_ACCESS_KEY_ID="$SCCACHE_ACCESS_KEY_ID" \
-  --build-arg AWS_SECRET_ACCESS_KEY="$SCCACHE_SECRET_ACCESS_KEY" \
   --tag "$IMAGE_URI" \
   --push \
   "$REPO_ROOT"

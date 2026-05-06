@@ -35,11 +35,6 @@ export interface OciHeadQuarterArgs {
   awsSecretAccessKey: pulumi.Input<string>;
   envEncryptionKeyBase64: pulumi.Input<string>;
   adminSigningKeyBase64: pulumi.Input<string>;
-  sccacheBucket: pulumi.Input<string>;
-  sccacheRegion: pulumi.Input<string>;
-  sccacheEndpoint: pulumi.Input<string>;
-  sccacheAccessKeyId: pulumi.Input<string>;
-  sccacheSecretAccessKey: pulumi.Input<string>;
   selfDnsHostname: pulumi.Input<string>;
   selfDnsCloudflareZoneId: pulumi.Input<string>;
   selfDnsCloudflareApiToken: pulumi.Input<string>;
@@ -104,11 +99,6 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
       compartmentId,
       suffix,
       region: ociRegion,
-      sccacheBucket: args.sccacheBucket,
-      sccacheRegion: args.sccacheRegion,
-      sccacheEndpoint: args.sccacheEndpoint,
-      sccacheAccessKeyId: args.sccacheAccessKeyId,
-      sccacheSecretAccessKey: args.sccacheSecretAccessKey,
     });
 
     const augmentedSites = pulumi
