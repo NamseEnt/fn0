@@ -6,5 +6,4 @@ pub mod domain;
 pub mod init;
 pub mod local;
 pub mod login;
-pub mod rename;
 pub mod secrets;

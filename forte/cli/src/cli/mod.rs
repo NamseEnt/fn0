@@ -7,7 +7,7 @@ pub mod dev;
 pub mod domain;
 pub mod fe_runtime;
 pub mod init;
-pub mod rename;
+pub mod login;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -35,8 +35,15 @@ pub enum Commands {
 
     /// Initialize a new Forte project
     Init {
-        /// Project name
+        /// Directory name to create
         name: String,
+    },
+
+    /// Log in to fn0 control (saves shared credentials with fn0 CLI)
+    Login {
+        /// Token (skips interactive paste flow)
+        #[arg(long)]
+        token: Option<String>,
     },
 
     /// Add a new page or action
@@ -57,16 +64,10 @@ pub enum Commands {
         /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
-    },
 
-    /// Rename the deployed project (migrates Turso DB and switches subdomain)
-    Rename {
-        /// New project name
-        new_name: String,
-
-        /// Project directory (defaults to current directory)
-        #[arg(short, long)]
-        project: Option<PathBuf>,
+        /// Project display name (used only on first deploy to register the project)
+        #[arg(long)]
+        name: Option<String>,
     },
 
     /// Admin task commands

@@ -8,31 +8,36 @@ use super::cron;
 
 const DEFAULT_STATIC_BASE_DOMAIN: &str = "static.fn0.dev";
 
-#[derive(Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 struct ForteConfig {
-    name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     project_id: Option<String>,
 }
 
-pub async fn run(project_dir: PathBuf) -> Result<()> {
+pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
     let config_path = project_dir.join("Forte.toml");
     let content = std::fs::read_to_string(&config_path)
         .map_err(|_| anyhow!("Forte.toml not found. Are you in a Forte project directory?"))?;
     let mut config: ForteConfig =
         toml::from_str(&content).map_err(|e| anyhow!("Failed to parse Forte.toml: {}", e))?;
 
-    let project_name = config
-        .name
-        .clone()
-        .ok_or_else(|| anyhow!("'name' field missing in Forte.toml"))?;
-
-    let creds = fn0_deploy::credentials::require()?;
+    let creds = fn0_deploy::credentials::load()?.ok_or_else(|| {
+        anyhow!(
+            "not signed in. Run `forte login` first (credentials at {}).",
+            fn0_deploy::credentials::path()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+        )
+    })?;
     let client = reqwest::Client::new();
 
     let project_id = match config.project_id.clone() {
         Some(id) => id,
         None => {
+            let project_name = match name_arg {
+                Some(n) => n,
+                None => prompt_project_name()?,
+            };
             let mut maybe = None;
             let id = fn0_deploy::ensure_project_id(
                 &client,
@@ -76,12 +81,10 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
     let cron_updated_at = chrono::Utc::now().to_rfc3339();
 
     let fe_dist = project_dir.join("fe/dist");
-    let mut maybe_id = Some(project_id);
     fn0_deploy::deploy_forte(
         &creds.control_url,
         &creds.token,
-        &project_name,
-        &mut maybe_id,
+        &project_id,
         &build_id,
         &fe_dist,
         &bundle_path,
@@ -91,4 +94,15 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
     .await?;
 
     Ok(())
+}
+
+fn prompt_project_name() -> Result<String> {
+    let name = inquire::Text::new("Project name:")
+        .with_help_message("Used as a display label in the control plane.")
+        .prompt()?;
+    let trimmed = name.trim().to_string();
+    if trimmed.is_empty() {
+        return Err(anyhow!("project name cannot be empty"));
+    }
+    Ok(trimmed)
 }

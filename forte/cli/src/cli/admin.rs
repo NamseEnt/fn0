@@ -5,18 +5,18 @@ use std::path::PathBuf;
 
 #[derive(Deserialize)]
 struct ForteConfig {
-    name: Option<String>,
+    project_id: Option<String>,
 }
 
-fn load_project_name(project_dir: &std::path::Path) -> Result<String> {
+fn load_project_id(project_dir: &std::path::Path) -> Result<String> {
     let config_path = project_dir.join("Forte.toml");
     let content = std::fs::read_to_string(&config_path)
         .map_err(|_| anyhow!("Forte.toml not found. Are you in a Forte project directory?"))?;
     let config: ForteConfig =
         toml::from_str(&content).map_err(|e| anyhow!("Failed to parse Forte.toml: {}", e))?;
     config
-        .name
-        .ok_or_else(|| anyhow!("'name' field missing in Forte.toml"))
+        .project_id
+        .ok_or_else(|| anyhow!("'project_id' field missing in Forte.toml. Run `forte deploy` first to register the project."))
 }
 
 fn read_input(input_file: Option<PathBuf>, input: Option<String>) -> Result<Vec<u8>> {
@@ -37,10 +37,10 @@ pub async fn run(
     input: Option<String>,
     timeout_seconds: u64,
 ) -> Result<()> {
-    let project_name = load_project_name(&project_dir)?;
+    let project_id = load_project_id(&project_dir)?;
     let input_body = read_input(input_file, input)?;
 
-    let output = fn0_deploy::admin_run(&project_name, &task, input_body, timeout_seconds).await?;
+    let output = fn0_deploy::admin_run(&project_id, &task, input_body, timeout_seconds).await?;
 
     if (200..300).contains(&output.status) {
         std::io::stdout().write_all(&output.body)?;

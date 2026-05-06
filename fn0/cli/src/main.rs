@@ -39,9 +39,6 @@ async fn async_main() -> Result<()> {
         Commands::Login { token } => {
             commands::login::execute(token).await?;
         }
-        Commands::Rename { new_name } => {
-            commands::rename::execute(&new_name).await?;
-        }
         Commands::Local { port } => {
             commands::local::execute(port).await?;
         }

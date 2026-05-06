@@ -24,19 +24,14 @@ pub async fn execute() -> Result<()> {
     fn0_deploy::create_raw_bundle_wasm(&wasm_path, env_yaml.as_deref(), &bundle_path)
         .map_err(|e| eyre!(e))?;
 
+    let client = reqwest::Client::new();
     let mut project_id = config.project_id.clone();
-    let build_id = Uuid::new_v4().to_string();
-    let jobs: Vec<fn0_deploy::CronJob> = Vec::new();
-    let cron_updated_at = chrono::Utc::now().to_rfc3339();
-    fn0_deploy::deploy_wasm(
+    let project_id_resolved = fn0_deploy::ensure_project_id(
+        &client,
         &creds.control_url,
         &creds.token,
         &project_name,
         &mut project_id,
-        &build_id,
-        &bundle_path,
-        &jobs,
-        &cron_updated_at,
     )
     .await
     .map_err(|e| eyre!(e))?;
@@ -46,6 +41,21 @@ pub async fn execute() -> Result<()> {
         config.save(&config_path)?;
         println!("Saved project_id to fn0.toml");
     }
+
+    let build_id = Uuid::new_v4().to_string();
+    let jobs: Vec<fn0_deploy::CronJob> = Vec::new();
+    let cron_updated_at = chrono::Utc::now().to_rfc3339();
+    fn0_deploy::deploy_wasm(
+        &creds.control_url,
+        &creds.token,
+        &project_id_resolved,
+        &build_id,
+        &bundle_path,
+        &jobs,
+        &cron_updated_at,
+    )
+    .await
+    .map_err(|e| eyre!(e))?;
 
     Ok(())
 }
