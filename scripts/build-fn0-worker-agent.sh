@@ -22,19 +22,6 @@ if [[ -z "$REGISTRIES_JSON" || "$REGISTRIES_JSON" == "null" ]]; then
   exit 1
 fi
 
-SCCACHE_BUCKET="$(pick sccacheBucketName)"
-SCCACHE_REGION="$(pick sccacheBucketRegion)"
-SCCACHE_ENDPOINT="$(pick sccacheBucketEndpoint)"
-SCCACHE_ACCESS_KEY_ID="$(pick sccacheAccessKeyId)"
-SCCACHE_SECRET_ACCESS_KEY="$(pick sccacheSecretAccessKey)"
-
-for v in SCCACHE_BUCKET SCCACHE_REGION SCCACHE_ENDPOINT SCCACHE_ACCESS_KEY_ID SCCACHE_SECRET_ACCESS_KEY; do
-  if [[ -z "${!v}" ]]; then
-    echo "missing Pulumi output: ${v}" >&2
-    exit 1
-  fi
-done
-
 echo ">> Attempting cargo publish for fn0-worker-agent"
 PUBLISH_LOG="$(mktemp)"
 IID_FILE="$(mktemp)"
@@ -70,11 +57,6 @@ docker build \
   --file "${REPO_ROOT}/fn0/worker-agent/Dockerfile" \
   --iidfile "$IID_FILE" \
   --progress=plain \
-  --build-arg SCCACHE_BUCKET="$SCCACHE_BUCKET" \
-  --build-arg SCCACHE_REGION="$SCCACHE_REGION" \
-  --build-arg SCCACHE_ENDPOINT="$SCCACHE_ENDPOINT" \
-  --build-arg AWS_ACCESS_KEY_ID="$SCCACHE_ACCESS_KEY_ID" \
-  --build-arg AWS_SECRET_ACCESS_KEY="$SCCACHE_SECRET_ACCESS_KEY" \
   "$REPO_ROOT" 2>&1 | tee "$BUILD_LOG"
 DOCKER_BUILD_PIPESTATUS=("${PIPESTATUS[@]}")
 set -e

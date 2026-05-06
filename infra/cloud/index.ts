@@ -78,57 +78,6 @@ const forteR2 = new fn0.ForteR2(
   {}
 );
 
-const sccacheRegion = config.require("ociHeadQuarterRegion");
-
-const sccacheCompartment = new oci.identity.Compartment("sccache-compartment", {
-  name: pulumi.interpolate`fn0-sccache-${suffix}`,
-  description: "Compartment for fn0 sccache S3-compatible bucket",
-  enableDelete: true,
-});
-
-const sccacheNamespace = oci.objectstorage.getNamespaceOutput({}).namespace;
-
-const sccacheBucket = new oci.objectstorage.Bucket("sccache-bucket", {
-  compartmentId: sccacheCompartment.id,
-  namespace: sccacheNamespace,
-  name: pulumi.interpolate`fn0-sccache-${suffix}`,
-});
-
-const sccacheUser = new oci.identity.User("sccache-user", {
-  name: pulumi.interpolate`fn0-sccache-${suffix}`,
-  description: "User for fn0 sccache S3-compatible access",
-});
-
-const sccacheGroup = new oci.identity.Group("sccache-group", {
-  name: pulumi.interpolate`fn0-sccache-group-${suffix}`,
-  description: "Group for fn0 sccache bucket access",
-});
-
-new oci.identity.UserGroupMembership("sccache-membership", {
-  userId: sccacheUser.id,
-  groupId: sccacheGroup.id,
-});
-
-new oci.identity.Policy("sccache-policy", {
-  compartmentId: sccacheCompartment.id,
-  name: pulumi.interpolate`allow-sccache-${suffix}`,
-  description: "Policy for sccache bucket access",
-  statements: [
-    pulumi.interpolate`Allow group ${sccacheGroup.name} to manage objects in compartment id ${sccacheCompartment.id}`,
-    pulumi.interpolate`Allow group ${sccacheGroup.name} to manage buckets in compartment id ${sccacheCompartment.id}`,
-  ],
-});
-
-const sccacheCustomerKey = new oci.identity.CustomerSecretKey(
-  "sccache-customer-key",
-  {
-    userId: sccacheUser.id,
-    displayName: "fn0-sccache-s3-compat",
-  }
-);
-
-const sccacheEndpoint = pulumi.interpolate`https://${sccacheNamespace}.compat.objectstorage.${sccacheRegion}.oraclecloud.com`;
-
 const cwasmCompilerRegion = "ap-northeast-1";
 
 const cwasmCompilerBucketR = new aws.s3.Bucket("cwasm-compiler-bucket", {
@@ -558,11 +507,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
   awsSecretAccessKey: hqAwsAccessKey.secret,
   envEncryptionKeyBase64: envEncryptionKey.base64,
   adminSigningKeyBase64: adminSigningKey.base64,
-  sccacheBucket: sccacheBucket.name,
-  sccacheRegion: sccacheRegion,
-  sccacheEndpoint: sccacheEndpoint,
-  sccacheAccessKeyId: sccacheCustomerKey.id,
-  sccacheSecretAccessKey: sccacheCustomerKey.key,
   selfDnsHostname: `fn0-hq.${domain}`,
   selfDnsCloudflareZoneId: zoneId,
   selfDnsCloudflareApiToken: dns.dnsApiToken,
@@ -662,11 +606,6 @@ export const s3Region = ociComputeWorker.cwasmBucket.region;
 export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKeyId);
 export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
 export const workerSshPrivateKey = pulumi.secret(ociComputeWorker.sshPrivateKey);
-export const sccacheBucketName = sccacheBucket.name;
-export const sccacheBucketRegion = sccacheRegion;
-export const sccacheBucketEndpoint = sccacheEndpoint;
-export const sccacheAccessKeyId = pulumi.secret(sccacheCustomerKey.id);
-export const sccacheSecretAccessKey = pulumi.secret(sccacheCustomerKey.key);
 export const cwasmCompilerBucket = cwasmCompilerBucketR.bucket;
 export const cwasmCompilerBucketRegion = cwasmCompilerRegion;
 export const cwasmCompilerEcrRepository = cwasmCompilerEcrR.repositoryUrl;
