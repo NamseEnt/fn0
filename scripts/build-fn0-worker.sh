@@ -11,6 +11,10 @@ need pulumi
 need jq
 need cargo
 need docker
+need oci
+
+# shellcheck source=lib/ocir-cleanup.sh
+source "${REPO_ROOT}/scripts/lib/ocir-cleanup.sh"
 
 echo ">> Reading Pulumi stack outputs from ${PULUMI_DIR}"
 OUT="$(cd "$PULUMI_DIR" && pulumi stack output --show-secrets --json)"
@@ -19,6 +23,12 @@ pick() { jq -r ".${1} // empty" <<<"$OUT"; }
 REGISTRIES_JSON="$(jq -c '.workerImageRegistries' <<<"$OUT")"
 if [[ -z "$REGISTRIES_JSON" || "$REGISTRIES_JSON" == "null" ]]; then
   echo "missing Pulumi output: workerImageRegistries" >&2
+  exit 1
+fi
+
+WORKER_COMPARTMENT_ID="$(pick workerCompartmentId)"
+if [[ -z "$WORKER_COMPARTMENT_ID" ]]; then
+  echo "missing Pulumi output: workerCompartmentId" >&2
   exit 1
 fi
 
@@ -122,6 +132,14 @@ for i in $(seq 0 $((COUNT - 1))); do
       echo "docker manifest inspect failed for ${FULL_REF}" >&2
       exit 1
     fi
+  fi
+
+  if [[ "$URL" == *oraclecloud.com* ]]; then
+    ocir_cleanup_keep_top_semver \
+      --registry-url   "$URL" \
+      --repository     "$REPO" \
+      --compartment-id "$WORKER_COMPARTMENT_ID" \
+      --keep           2 || echo "warn: cleanup failed for ${URL}/${REPO}" >&2
   fi
 done
 
