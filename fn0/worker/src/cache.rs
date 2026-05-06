@@ -22,13 +22,13 @@ enum Manifest {
 
 struct LruEntry {
     project_id: String,
-    version: (u64, u64),
+    code_version: u64,
     bundle: Arc<Bundle>,
     size_bytes: usize,
 }
 
 struct Inner {
-    registry: HashMap<String, (u64, u64)>,
+    registry: HashMap<String, u64>,
     domain_to_project_id: HashMap<String, String>,
     lru: VecDeque<LruEntry>,
     current_bytes: usize,
@@ -69,13 +69,13 @@ impl S3BundleCache {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(project_id = %project_id, code_id, code_version))]
-    pub async fn register(&self, project_id: &str, code_id: u64, code_version: u64) {
+    #[tracing::instrument(skip_all, fields(project_id = %project_id, code_version))]
+    pub async fn register(&self, project_id: &str, code_version: u64) {
         let mut inner = self.inner.lock().await;
         let prev = inner
             .registry
-            .insert(project_id.to_string(), (code_id, code_version));
-        if prev != Some((code_id, code_version))
+            .insert(project_id.to_string(), code_version);
+        if prev != Some(code_version)
             && let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id)
         {
             let removed = inner.lru.remove(pos).unwrap();
@@ -111,22 +111,22 @@ impl S3BundleCache {
 
     #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     async fn get_impl(&self, project_id: &str) -> Result<Arc<Bundle>, Error> {
-        let version = {
+        let code_version = {
             let mut inner = self.inner.lock().await;
-            let Some(&version) = inner.registry.get(project_id) else {
+            let Some(&code_version) = inner.registry.get(project_id) else {
                 return Err(Error::NotFound);
             };
             if let Some(pos) = inner
                 .lru
                 .iter()
-                .position(|e| e.project_id == project_id && e.version == version)
+                .position(|e| e.project_id == project_id && e.code_version == code_version)
             {
                 let entry = inner.lru.remove(pos).unwrap();
                 let bundle = entry.bundle.clone();
                 inner.lru.push_front(entry);
                 return Ok(bundle);
             }
-            version
+            code_version
         };
 
         let (bundle, size) = self.fetch_and_build(project_id).await?;
@@ -138,7 +138,7 @@ impl S3BundleCache {
         }
         inner.lru.push_front(LruEntry {
             project_id: project_id.to_string(),
-            version,
+            code_version,
             bundle: bundle.clone(),
             size_bytes: size,
         });

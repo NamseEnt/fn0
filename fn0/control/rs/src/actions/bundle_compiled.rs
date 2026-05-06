@@ -2,6 +2,7 @@ use crate::common::admin;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct Input {
@@ -39,18 +40,58 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     })
                     .await?;
 
-                match existing {
+                let newly_compiled = match existing {
                     Some(mut handle) => {
-                        if !handle.fn0_wasmtime_versions.contains(&version) {
-                            handle.fn0_wasmtime_versions.push(version);
+                        if handle.fn0_wasmtime_versions.contains(&version) {
+                            false
+                        } else {
+                            handle.fn0_wasmtime_versions.push(version.clone());
+                            true
                         }
                     }
                     None => {
                         trx.create(CompiledBundleDoc {
-                            project_id,
-                            last_modified,
-                            fn0_wasmtime_versions: vec![version],
+                            project_id: project_id.clone(),
+                            last_modified: last_modified.clone(),
+                            fn0_wasmtime_versions: vec![version.clone()],
                         })?;
+                        true
+                    }
+                };
+
+                if newly_compiled {
+                    let active_version = trx
+                        .get(Fn0WasmtimeVersionDocGet {})
+                        .await?
+                        .map(|v| v.active.clone());
+                    if active_version.as_deref() == Some(version.as_str()) {
+                        match trx.get(WorkerManifestDocGet {}).await? {
+                            Some(mut manifest) => {
+                                let entry = manifest
+                                    .project_manifests
+                                    .entry(project_id.clone())
+                                    .or_insert(WorkerProjectManifest {
+                                        code_version: 0,
+                                        custom_domain: None,
+                                    });
+                                entry.code_version += 1;
+                                manifest.manifest_version += 1;
+                            }
+                            None => {
+                                let mut entries = HashMap::new();
+                                entries.insert(
+                                    project_id,
+                                    WorkerProjectManifest {
+                                        code_version: 1,
+                                        custom_domain: None,
+                                    },
+                                );
+                                trx.create(WorkerManifestDoc {
+                                    manifest_version: 1,
+                                    project_manifests: entries,
+                                })?;
+                            }
+                        }
                     }
                 }
                 trx.commit::<_, ()>(())

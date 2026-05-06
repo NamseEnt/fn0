@@ -616,14 +616,249 @@ pub async fn admin_run(
     ))
 }
 
-pub async fn domain_add(_project_id: &str, _domain: &str) -> Result<()> {
-    Err(anyhow!("domain commands are not yet migrated to control."))
+#[derive(Serialize)]
+struct DomainAddInput<'a> {
+    project_id: &'a str,
+    domain: &'a str,
 }
 
-pub async fn domain_remove(_project_id: &str) -> Result<()> {
-    Err(anyhow!("domain commands are not yet migrated to control."))
+#[derive(Deserialize)]
+struct DomainAddRaw {
+    #[serde(rename = "Ok")]
+    ok: Option<()>,
+    #[serde(rename = "NotLoggedIn")]
+    not_logged_in: Option<()>,
+    #[serde(rename = "Forbidden")]
+    forbidden: Option<()>,
+    #[serde(rename = "NotFound")]
+    not_found: Option<()>,
+    #[serde(rename = "InvalidDomain")]
+    invalid_domain: Option<MessageErr>,
+    #[serde(rename = "DomainTaken")]
+    domain_taken: Option<DomainTakenBody>,
+    #[serde(rename = "AlreadyHasDomain")]
+    already_has_domain: Option<AlreadyHasDomainBody>,
+    #[serde(rename = "Error")]
+    error: Option<MessageErr>,
 }
 
-pub async fn domain_status(_project_id: &str) -> Result<()> {
-    Err(anyhow!("domain commands are not yet migrated to control."))
+#[derive(Deserialize)]
+struct DomainTakenBody {
+    existing_project_id: String,
+}
+
+#[derive(Deserialize)]
+struct AlreadyHasDomainBody {
+    current_domain: String,
+}
+
+pub async fn domain_add(project_id: &str, domain: &str) -> Result<()> {
+    let creds = credentials::require()?;
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/__forte_action/domain_add",
+        creds.control_url.trim_end_matches('/')
+    );
+    let resp = client
+        .post(&url)
+        .bearer_auth(&creds.token)
+        .json(&DomainAddInput { project_id, domain })
+        .send()
+        .await?
+        .error_for_status()?;
+    let raw: DomainAddRaw = resp.json().await?;
+    match raw {
+        DomainAddRaw { ok: Some(()), .. } => {
+            println!("domain '{domain}' attached to project '{project_id}'");
+            println!("Cloudflare hostname registration is queued; run `fn0 domain status` to check.");
+            Ok(())
+        }
+        DomainAddRaw {
+            not_logged_in: Some(_),
+            ..
+        } => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        DomainAddRaw {
+            forbidden: Some(_), ..
+        } => Err(anyhow!("you do not own project '{project_id}'.")),
+        DomainAddRaw {
+            not_found: Some(_), ..
+        } => Err(anyhow!("project '{project_id}' not found.")),
+        DomainAddRaw {
+            invalid_domain: Some(e),
+            ..
+        } => Err(anyhow!("invalid domain: {}", e.message)),
+        DomainAddRaw {
+            domain_taken: Some(b),
+            ..
+        } => Err(anyhow!(
+            "domain '{domain}' already in use by project '{}'",
+            b.existing_project_id
+        )),
+        DomainAddRaw {
+            already_has_domain: Some(b),
+            ..
+        } => Err(anyhow!(
+            "project '{project_id}' already has domain '{}'; remove it first",
+            b.current_domain
+        )),
+        DomainAddRaw {
+            error: Some(err), ..
+        } => Err(anyhow!("domain_add: {}", err.message)),
+        _ => Err(anyhow!("unexpected domain_add response")),
+    }
+}
+
+#[derive(Serialize)]
+struct DomainProjectInput<'a> {
+    project_id: &'a str,
+}
+
+#[derive(Deserialize)]
+struct DomainRemoveRaw {
+    #[serde(rename = "Ok")]
+    ok: Option<DomainRemoveOk>,
+    #[serde(rename = "NotLoggedIn")]
+    not_logged_in: Option<()>,
+    #[serde(rename = "Forbidden")]
+    forbidden: Option<()>,
+    #[serde(rename = "NotFound")]
+    not_found: Option<()>,
+    #[serde(rename = "NoDomain")]
+    no_domain: Option<()>,
+    #[serde(rename = "Error")]
+    error: Option<MessageErr>,
+}
+
+#[derive(Deserialize)]
+struct DomainRemoveOk {
+    removed_domain: String,
+}
+
+pub async fn domain_remove(project_id: &str) -> Result<()> {
+    let creds = credentials::require()?;
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/__forte_action/domain_remove",
+        creds.control_url.trim_end_matches('/')
+    );
+    let resp = client
+        .post(&url)
+        .bearer_auth(&creds.token)
+        .json(&DomainProjectInput { project_id })
+        .send()
+        .await?
+        .error_for_status()?;
+    let raw: DomainRemoveRaw = resp.json().await?;
+    match raw {
+        DomainRemoveRaw { ok: Some(ok), .. } => {
+            println!("domain '{}' detached from project '{}'", ok.removed_domain, project_id);
+            println!("Cloudflare hostname removal is queued.");
+            Ok(())
+        }
+        DomainRemoveRaw {
+            not_logged_in: Some(_),
+            ..
+        } => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        DomainRemoveRaw {
+            forbidden: Some(_), ..
+        } => Err(anyhow!("you do not own project '{project_id}'.")),
+        DomainRemoveRaw {
+            not_found: Some(_), ..
+        } => Err(anyhow!("project '{project_id}' not found.")),
+        DomainRemoveRaw {
+            no_domain: Some(_), ..
+        } => Err(anyhow!("no custom domain attached to project '{project_id}'.")),
+        DomainRemoveRaw {
+            error: Some(err), ..
+        } => Err(anyhow!("domain_remove: {}", err.message)),
+        _ => Err(anyhow!("unexpected domain_remove response")),
+    }
+}
+
+#[derive(Deserialize)]
+struct DomainStatusRaw {
+    #[serde(rename = "NotConfigured")]
+    not_configured: Option<()>,
+    #[serde(rename = "Configured")]
+    configured: Option<ConfiguredBody>,
+    #[serde(rename = "NotLoggedIn")]
+    not_logged_in: Option<()>,
+    #[serde(rename = "Forbidden")]
+    forbidden: Option<()>,
+    #[serde(rename = "NotFound")]
+    not_found: Option<()>,
+    #[serde(rename = "Error")]
+    error: Option<MessageErr>,
+}
+
+#[derive(Deserialize)]
+struct ConfiguredBody {
+    domain: String,
+    cloudflare_status: serde_json::Value,
+}
+
+pub async fn domain_status(project_id: &str) -> Result<()> {
+    let creds = credentials::require()?;
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/__forte_action/domain_status",
+        creds.control_url.trim_end_matches('/')
+    );
+    let resp = client
+        .post(&url)
+        .bearer_auth(&creds.token)
+        .json(&DomainProjectInput { project_id })
+        .send()
+        .await?
+        .error_for_status()?;
+    let raw: DomainStatusRaw = resp.json().await?;
+    match raw {
+        DomainStatusRaw {
+            not_configured: Some(_),
+            ..
+        } => {
+            println!("project '{project_id}' has no custom domain configured.");
+            Ok(())
+        }
+        DomainStatusRaw {
+            configured: Some(b),
+            ..
+        } => {
+            println!("project '{project_id}' custom domain: {}", b.domain);
+            println!("cloudflare status: {}", format_cloudflare_status(&b.cloudflare_status));
+            Ok(())
+        }
+        DomainStatusRaw {
+            not_logged_in: Some(_),
+            ..
+        } => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        DomainStatusRaw {
+            forbidden: Some(_), ..
+        } => Err(anyhow!("you do not own project '{project_id}'.")),
+        DomainStatusRaw {
+            not_found: Some(_), ..
+        } => Err(anyhow!("project '{project_id}' not found.")),
+        DomainStatusRaw {
+            error: Some(err), ..
+        } => Err(anyhow!("domain_status: {}", err.message)),
+        _ => Err(anyhow!("unexpected domain_status response")),
+    }
+}
+
+fn format_cloudflare_status(value: &serde_json::Value) -> String {
+    if value.as_str() == Some("Active") {
+        return "active".to_string();
+    }
+    if value.as_str() == Some("Pending") {
+        return "pending (waiting for DV verification)".to_string();
+    }
+    if value.as_str() == Some("Missing") {
+        return "missing on Cloudflare (registration may still be in progress)".to_string();
+    }
+    if let Some(obj) = value.as_object()
+        && let Some(other) = obj.get("Other").and_then(|v| v.as_str())
+    {
+        return format!("other: {other}");
+    }
+    value.to_string()
 }
