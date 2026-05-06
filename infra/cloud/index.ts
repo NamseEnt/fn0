@@ -628,3 +628,4 @@ export const bundleStoreR2AccessKeyId = pulumi.secret(bundleStoreR2.accessKeyId)
 export const bundleStoreR2SecretAccessKey = pulumi.secret(bundleStoreR2.secretAccessKey);
 export const bundleStoreR2QueueId = bundleStoreR2.queueId;
 export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
+export const workerCompartmentId = ociComputeWorker.compartmentId;
