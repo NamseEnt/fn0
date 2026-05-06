@@ -1,13 +1,13 @@
 use anyhow::{Result, anyhow};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Deserialize)]
 struct ForteConfig {
     project_id: Option<String>,
 }
 
-fn project_id(project_dir: &PathBuf) -> Result<String> {
+fn project_id(project_dir: &Path) -> Result<String> {
     let config_path = project_dir.join("Forte.toml");
     let content = std::fs::read_to_string(&config_path)
         .map_err(|_| anyhow!("Forte.toml not found. Are you in a Forte project directory?"))?;

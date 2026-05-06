@@ -20,6 +20,8 @@ pub struct UpstreamRoute {
     pub weight: u32,
 }
 
+const OPS_PORT_OFFSET: u16 = 1;
+
 pub async fn run(
     shutdown: Shutdown,
     mut target_rx: watch::Receiver<Option<TargetWasmtimeVersion>>,
@@ -34,6 +36,7 @@ pub async fn run(
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(18443);
+    // We allocate a (user, ops) port pair per container; bump by 2 each time.
     let env_file = std::env::var("FN0_AGENT_WORKER_ENV_FILE").ok();
     let mut state = PoolState::default();
     let mut first_ready_tx = Some(first_ready_tx);
@@ -57,8 +60,10 @@ pub async fn run(
                 .map(|c| c.version == target)
                 .unwrap_or(false);
             if !already {
-                let port = allocate_port(&mut next_port);
-                match start_new_active(&podman, env_file.as_deref(), &target, port).await {
+                let (user_port, ops_port) = allocate_port_pair(&mut next_port);
+                match start_new_active(&podman, env_file.as_deref(), &target, user_port, ops_port)
+                    .await
+                {
                     Ok(new_container) => {
                         if let Some(prev) = state.active.take() {
                             info!(
@@ -66,7 +71,7 @@ pub async fn run(
                                 version = %prev.version.fn0_wasmtime_version,
                                 "demoting previous active to draining"
                             );
-                            if !signal_worker_drain(&prev.local_addr).await {
+                            if !signal_worker_drain(&prev.ops_addr).await {
                                 warn!(
                                     container_name = %prev.container_name,
                                     "POST /drain to previous active failed; relying on instances=0 polling"
@@ -147,6 +152,7 @@ struct RunningContainer {
     container_name: String,
     version: TargetWasmtimeVersion,
     local_addr: SocketAddr,
+    ops_addr: SocketAddr,
 }
 
 struct DrainingContainer {
@@ -155,29 +161,35 @@ struct DrainingContainer {
     ramp_overlap: bool,
 }
 
-fn allocate_port(next_port: &mut u16) -> u16 {
-    let port = *next_port;
-    *next_port = next_port.checked_add(1).unwrap_or(18443);
-    port
+fn allocate_port_pair(next_port: &mut u16) -> (u16, u16) {
+    let user_port = *next_port;
+    let ops_port = user_port + OPS_PORT_OFFSET;
+    *next_port = next_port.checked_add(2).unwrap_or(18443);
+    (user_port, ops_port)
 }
 
 async fn start_new_active(
     podman: &Podman,
     env_file: Option<&str>,
     target: &TargetWasmtimeVersion,
-    port: u16,
+    user_port: u16,
+    ops_port: u16,
 ) -> Result<RunningContainer, PoolError> {
     let container_name = format!(
         "fn0-worker-{ver}-{port}",
         ver = sanitize(&target.fn0_wasmtime_version),
-        port = port,
+        port = user_port,
     );
     podman
         .pull_image(&target.worker_image_ref)
         .await
         .map_err(PoolError::Podman)?;
-    let port_str = port.to_string();
-    let env: &[(&str, &str)] = &[("HTTP_PORT", &port_str)];
+    let user_port_str = user_port.to_string();
+    let ops_port_str = ops_port.to_string();
+    let env: &[(&str, &str)] = &[
+        ("HTTP_PORT", &user_port_str),
+        ("FN0_WORKER_OPS_PORT", &ops_port_str),
+    ];
     podman
         .run_detached(RunArgs {
             container_name: &container_name,
@@ -187,19 +199,25 @@ async fn start_new_active(
         })
         .await
         .map_err(PoolError::Podman)?;
-    let local_addr: SocketAddr = format!("127.0.0.1:{port}").parse().expect("loopback addr");
-    wait_until_ready(podman, &container_name, &local_addr).await?;
+    let local_addr: SocketAddr = format!("127.0.0.1:{user_port}")
+        .parse()
+        .expect("loopback addr");
+    let ops_addr: SocketAddr = format!("127.0.0.1:{ops_port}")
+        .parse()
+        .expect("loopback addr");
+    wait_until_ready(podman, &container_name, &ops_addr).await?;
     Ok(RunningContainer {
         container_name,
         version: target.clone(),
         local_addr,
+        ops_addr,
     })
 }
 
 async fn wait_until_ready(
     podman: &Podman,
     container_name: &str,
-    addr: &SocketAddr,
+    ops_addr: &SocketAddr,
 ) -> Result<(), PoolError> {
     let started = Instant::now();
     loop {
@@ -219,7 +237,7 @@ async fn wait_until_ready(
                 debug!(?err, %container_name, "is_running probe failed");
             }
         }
-        if tcp_probe(addr).await && worker_readyz_ok(addr).await {
+        if tcp_probe(ops_addr).await && worker_ready_ok(ops_addr).await {
             return Ok(());
         }
         tokio::time::sleep(READY_PROBE_INTERVAL).await;
@@ -233,27 +251,25 @@ async fn tcp_probe(addr: &SocketAddr) -> bool {
     )
 }
 
-async fn worker_readyz_ok(addr: &SocketAddr) -> bool {
+async fn worker_ready_ok(ops_addr: &SocketAddr) -> bool {
     let Ok(client) = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
         .timeout(Duration::from_secs(2))
         .build()
     else {
         return false;
     };
-    let url = format!("https://{addr}/readyz");
+    let url = format!("http://{ops_addr}/ready");
     matches!(client.get(&url).send().await, Ok(r) if r.status().is_success())
 }
 
-async fn signal_worker_drain(addr: &SocketAddr) -> bool {
+async fn signal_worker_drain(ops_addr: &SocketAddr) -> bool {
     let Ok(client) = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
         .timeout(Duration::from_secs(3))
         .build()
     else {
         return false;
     };
-    let url = format!("https://{addr}/drain");
+    let url = format!("http://{ops_addr}/drain");
     matches!(client.post(&url).send().await, Ok(r) if r.status().is_success())
 }
 
@@ -305,7 +321,7 @@ async fn drain_done(
         );
         return true;
     }
-    match worker_inflight_count(&draining.container.local_addr).await {
+    match worker_inflight_count(&draining.container.ops_addr).await {
         Some(0) => true,
         Some(n) => {
             debug!(
@@ -319,13 +335,12 @@ async fn drain_done(
     }
 }
 
-async fn worker_inflight_count(addr: &SocketAddr) -> Option<u64> {
+async fn worker_inflight_count(ops_addr: &SocketAddr) -> Option<u64> {
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
         .timeout(Duration::from_secs(3))
         .build()
         .ok()?;
-    let url = format!("https://{addr}/status");
+    let url = format!("http://{ops_addr}/status");
     let resp = client.get(&url).send().await.ok()?;
     let body: serde_json::Value = resp.json().await.ok()?;
     body.get("instances").and_then(|v| v.as_u64())

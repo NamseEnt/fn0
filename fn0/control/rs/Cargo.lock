@@ -291,6 +291,7 @@ dependencies = [
  "base64 0.22.1",
  "cookie",
  "fn0-doc-db",
+ "fn0-manifest-schema",
  "forte-codegen",
  "forte-json",
  "forte-sdk",
@@ -316,6 +317,17 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "fn0-manifest-schema"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fn0-doc-db",
+ "forte-macros",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

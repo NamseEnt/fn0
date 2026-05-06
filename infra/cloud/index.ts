@@ -387,6 +387,10 @@ const controlTursoApiTokenCt = pulumi
   .all([controlDek.plaintext, tursoApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
+const cloudflareSaasApiTokenCt = pulumi
+  .all([controlDek.plaintext, dns.saasApiToken])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const controlEnvYamlBootstrap = pulumi
   .all([
     controlDek.ciphertext,
@@ -411,6 +415,7 @@ const controlEnvYamlBootstrap = pulumi
     controlTursoApiTokenCt,
     pulumi.output(config.require("tursoOrganizationSlug")),
     forteDb.groupName,
+    cloudflareSaasApiTokenCt,
   ])
   .apply(
     ([
@@ -436,6 +441,7 @@ const controlEnvYamlBootstrap = pulumi
       tursoApiTokenCt,
       tursoOrgSlug,
       tursoGroupName,
+      cfSaasApiTokenCt,
     ]) =>
       [
         "__dek:",
@@ -473,6 +479,9 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${tursoApiTokenCt}`,
         `FN0_TURSO_ORG_SLUG: ${tursoOrgSlug}`,
         `FN0_TURSO_GROUP_NAME: ${tursoGroupName}`,
+        `FN0_CLOUDFLARE_SAAS_ZONE_ID: ${cfZoneId}`,
+        "FN0_CLOUDFLARE_SAAS_API_TOKEN:",
+        `  secret: ${cfSaasApiTokenCt}`,
         "",
       ].join("\n")
   );
@@ -556,7 +565,6 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
             ORIGIN_CERT_PEM: dns.certificate,
             ORIGIN_KEY_PEM: dns.privateKeyPem,
             FN0_ENV_KEY_BASE64: envEncryptionKey.base64,
-            FN0_ADMIN_SIGNING_KEY_BASE64: adminSigningKey.base64,
             TURSO_GROUP_TOKEN: forteDb.groupToken,
             TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
             FN0_QUEUE_OCID: ociComputeWorker.queue.ocid,

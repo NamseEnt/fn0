@@ -36,6 +36,50 @@ impl std::fmt::Display for Redirect {
     }
 }
 impl std::error::Error for Redirect {}
+pub mod enqueue {
+    pub async fn cloudflare_register(
+        input: crate::queue_task::cloudflare_register::Input,
+    ) -> forte_sdk::anyhow::Result<()> {
+        let payload = forte_sdk::serde_json::to_value(&input)?;
+        let body = forte_sdk::serde_json::to_vec(&forte_sdk::serde_json::json!(
+            { "task_name" : "cloudflare_register", "payload" : payload, }
+        ))?;
+        let url = std::env::var("FN0_QUEUE_URL")
+            .map_err(|_| forte_sdk::anyhow::anyhow!("FN0_QUEUE_URL is not set"))?;
+        let request = forte_sdk::http::Request::post(&url)
+            .header("Content-Type", "application/json")
+            .body(body)?;
+        let response = forte_sdk::http::Client::new().send(request).await?;
+        if !response.status().is_success() {
+            return Err(forte_sdk::anyhow::anyhow!(
+                "enqueue failed with status {}",
+                response.status()
+            ));
+        }
+        Ok(())
+    }
+    pub async fn cloudflare_unregister(
+        input: crate::queue_task::cloudflare_unregister::Input,
+    ) -> forte_sdk::anyhow::Result<()> {
+        let payload = forte_sdk::serde_json::to_value(&input)?;
+        let body = forte_sdk::serde_json::to_vec(&forte_sdk::serde_json::json!(
+            { "task_name" : "cloudflare_unregister", "payload" : payload, }
+        ))?;
+        let url = std::env::var("FN0_QUEUE_URL")
+            .map_err(|_| forte_sdk::anyhow::anyhow!("FN0_QUEUE_URL is not set"))?;
+        let request = forte_sdk::http::Request::post(&url)
+            .header("Content-Type", "application/json")
+            .body(body)?;
+        let response = forte_sdk::http::Client::new().send(request).await?;
+        if !response.status().is_success() {
+            return Err(forte_sdk::anyhow::anyhow!(
+                "enqueue failed with status {}",
+                response.status()
+            ));
+        }
+        Ok(())
+    }
+}
 #[allow(clippy::crate_in_macro_def)]
 mod proxy {
     forte_sdk::wit_bindgen::generate!(
@@ -379,6 +423,27 @@ async fn handle_action(
                 cookie_jar,
             ))
         }
+        "domain_remove" => {
+            let input: crate::actions::domain_remove::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::domain_remove::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
         "promote_pending_fn0_wasmtime" => {
             let input: crate::actions::promote_pending_fn0_wasmtime::Input =
                 forte_json::from_slice(body_bytes)?;
@@ -590,6 +655,27 @@ async fn handle_action(
                 cookie_jar,
             ))
         }
+        "domain_status" => {
+            let input: crate::actions::domain_status::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::domain_status::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
         "bundle_uploaded" => {
             let input: crate::actions::bundle_uploaded::Input = forte_json::from_slice(body_bytes)?;
             let req = ForteRequest {
@@ -601,6 +687,27 @@ async fn handle_action(
                 body: input,
             };
             let output = crate::actions::bundle_uploaded::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "domain_add" => {
+            let input: crate::actions::domain_add::Input = forte_json::from_slice(body_bytes)?;
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::domain_add::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(build_response_with_cookies(
                 Response::builder()
@@ -638,11 +745,42 @@ async fn handle_action(
             .unwrap()),
     }
 }
-async fn handle_queue_task_execute(_body_bytes: &[u8]) -> Result<Response<Body>> {
-    Ok(Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::from("No queue tasks defined"))
-        .unwrap())
+async fn handle_queue_task_execute(body_bytes: &[u8]) -> Result<Response<Body>> {
+    let request: forte_sdk::serde_json::Value = forte_sdk::serde_json::from_slice(body_bytes)?;
+    let task_name = request["task_name"]
+        .as_str()
+        .ok_or_else(|| forte_sdk::anyhow::Error::msg("missing task_name"))?;
+    let payload = request["payload"]
+        .as_str()
+        .ok_or_else(|| forte_sdk::anyhow::Error::msg("missing payload"))?;
+    let result = match task_name {
+        "cloudflare_register" => {
+            let input: crate::queue_task::cloudflare_register::Input =
+                forte_sdk::serde_json::from_str(payload)?;
+            crate::queue_task::cloudflare_register::handle(input).await
+        }
+        "cloudflare_unregister" => {
+            let input: crate::queue_task::cloudflare_unregister::Input =
+                forte_sdk::serde_json::from_str(payload)?;
+            crate::queue_task::cloudflare_unregister::handle(input).await
+        }
+        _ => {
+            return Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from(format!("Queue task '{}' not found", task_name)))
+                .unwrap());
+        }
+    };
+    match result {
+        Ok(()) => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap()),
+        Err(e) => Ok(Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(Body::from(format!("{:?}", e)))
+            .unwrap()),
+    }
 }
 async fn handle_admin_task(
     _task_name: &str,

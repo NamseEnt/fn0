@@ -2,6 +2,10 @@ use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
 pub use doc_db::DbRequest;
+pub use fn0_manifest_schema::{
+    WorkerManifestDoc, WorkerManifestDocGet, WorkerManifestDocPut, WorkerManifestDocQuery,
+    WorkerProjectManifest,
+};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CliTokenEntry {
@@ -70,3 +74,4 @@ pub struct CronConfigDoc {
     pub jobs: Vec<CronJob>,
     pub updated_at: DateTime,
 }
+
