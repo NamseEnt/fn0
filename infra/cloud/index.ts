@@ -51,6 +51,21 @@ const forteDb = new fn0.ForteDb(
 
 const tursoApiToken = new pulumi.Config("turso").requireSecret("apiToken");
 
+new fn0.ControlProjectBootstrap(
+  "control-project-bootstrap",
+  {
+    organizationSlug: config.require("tursoOrganizationSlug"),
+    location: config.require("tursoLocation"),
+    groupName: forteDb.groupName,
+    jwt: forteDb.groupToken,
+    projectId: "fn0-control",
+    ownerGithubId: config.requireNumber("controlOwnerGithubId"),
+    ownerGithubLogin: config.require("controlOwnerGithubLogin"),
+    displayName: "fn0-control",
+  },
+  { dependsOn: [forteDb] }
+);
+
 const forteR2 = new fn0.ForteR2(
   "forte-r2",
   {
