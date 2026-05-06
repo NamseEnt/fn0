@@ -3,6 +3,8 @@ export { OciComputeWorker, OciRegion } from "./OciComputeWorker";
 export { OciGlobalVault } from "./OciGlobalVault";
 export { B2CloudflareStaticCdn } from "./B2CloudflareStaticCdn";
 export * as docDb from "./docDb";
+export { ControlProjectSeed } from "./ControlProjectSeed";
+export { ControlProjectBootstrap } from "./ControlProjectBootstrap";
 export { ForteR2 } from "./ForteR2";
 export { BundleStoreR2 } from "./BundleStoreR2";
 export { BundleStoreR2Worker } from "./BundleStoreR2Worker";
