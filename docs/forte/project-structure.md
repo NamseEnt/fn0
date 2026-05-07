@@ -6,6 +6,7 @@ A Forte project created by `forte init <name>` has the following layout:
 <name>/
 ├── Forte.toml                 # Project config (name, etc.)
 ├── Cargo.toml                 # Workspace root (members = ["rs"])
+├── cron.yaml                  # (optional) Scheduled cron job definitions
 ├── .gitignore
 │
 ├── rs/                        # Rust backend (compiles to WASM)
@@ -92,6 +93,17 @@ name = "my-app"
 ```
 
 The name determines the fn0 Cloud subdomain when deployed.
+
+## cron.yaml (optional)
+
+Place this file in the project root to schedule queue tasks on fn0 Cloud. Registered during `forte deploy`.
+
+```yaml
+- function: send_digest_email
+  every_minutes: 60
+```
+
+Each `function` must match a `rs/src/queue_task/<name>.rs` file whose `Input` is a unit struct. See [forte/cli.md#cron-jobs](cli.md#cron-jobs).
 
 ## Cargo.toml (rs/)
 

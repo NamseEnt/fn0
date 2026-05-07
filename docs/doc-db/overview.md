@@ -187,19 +187,42 @@ let rows = db.execute_raw(
 
 ## Mocking (Tests)
 
+Use `doc_db::memory()` to get an in-memory database. Register mock rules before running code under test; rules are consumed in FIFO order per `(op, pk, sk)` key.
+
 ```rust
 let db = doc_db::memory();
 
-// Set up expectations
+// Get: return data
 db.mock_get("User/id=42", "profile")
-    .returns(Some(my_data));
+    .returns(my_data_bytes);       // returns Ok(Some(bytes))
 
+// Get: return not found
+db.mock_get("User/id=99", "profile")
+    .returns_none();               // returns Ok(None)
+
+// Get: return error
+db.mock_get("User/id=00", "profile")
+    .returns_err("db error");      // returns Err(...)
+
+// Put: succeed
 db.mock_put("User/id=42", "profile")
     .returns_ok();
 
+// Put: fail
+db.mock_put("User/id=42", "profile")
+    .returns_err("write failed");
+
+// Delete: succeed
+db.mock_delete("User/id=42", "profile")
+    .returns_ok();
+
+// Delete: fail
+db.mock_delete("User/id=42", "profile")
+    .returns_err("delete failed");
+
 // ... run code under test ...
 
-db.clear_mocks();
+db.clear_mocks();  // remove all remaining rules
 ```
 
-The mock API is in `doc_db::mock`. Unknown from repository: the exact builder API surface — check `doc-db/src/mock.rs` for `MockGetBuilder`, `MockPutBuilder`, `MockDeleteBuilder`.
+Builder types: `MockGetBuilder`, `MockPutBuilder`, `MockDeleteBuilder` (in `doc_db::mock`, used via the `Database` methods above).
