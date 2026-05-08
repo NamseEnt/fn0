@@ -10,7 +10,7 @@ Forte is the full-stack web framework built on fn0.
 
 - [Overview](forte/overview.md) — Architecture and key packages
 - [Project Structure](forte/project-structure.md) — Directory layout and conventions
-- [CLI Reference](forte/cli.md) — All `forte` commands
+- [CLI Reference](forte/cli.md) — All `forte` commands (including login and cron jobs)
 - [Pages](forte/pages.md) — Page handlers, path/search params, redirects, cookies
 - [Actions & Tasks](forte/actions.md) — Server actions, hooks, queue tasks, admin tasks
 - [SDK Reference](forte/sdk.md) — `ForteRequest`, HTTP client, cookies, re-exported crates

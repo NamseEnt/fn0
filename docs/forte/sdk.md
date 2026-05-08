@@ -133,9 +133,23 @@ let id = Uuid::new_v4();
 
 ## Randomness
 
+Backed by WASI random. All functions are `async`.
+
 ```rust
 use forte_sdk::rand;
-// See forte/sdk/src/rand.rs — Unknown from repository which exact API is exposed.
+
+// Fill a buffer with cryptographically secure random bytes
+rand::fill_bytes(&mut buf).await;
+
+// Get a Vec<u8> of secure random bytes
+let bytes: Vec<u8> = rand::get_random_bytes(32).await;
+
+// Get a single u64
+let n: u64 = rand::get_random_u64().await;
+
+// Insecure (fast) variants — not suitable for secrets
+rand::get_insecure_random_bytes(&mut buf).await;
+let n: u64 = rand::get_insecure_random_u64().await;
 ```
 
 ## Tracing / Logging
@@ -147,7 +161,9 @@ tracing::info!("processing request");
 tracing::error!("something failed: {}", err);
 ```
 
-OpenTelemetry is initialized once per instance on the first request (via `otel::init_once()`). OTLP exporter configuration is Unknown from repository — check `forte/sdk/src/otel.rs`.
+OpenTelemetry is initialized once per instance on the first request via `otel::init_once()`, which is called automatically by the `serve` function. Spans are exported to `http://fn0-otel.fn0.dev/v1/traces` (the fn0 Cloud collector) using the OTLP protobuf format.
+
+The service name defaults to `"forte-app"` and can be overridden with the `OTEL_SERVICE_NAME` environment variable.
 
 ## Re-exported Crates
 
