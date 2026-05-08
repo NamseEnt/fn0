@@ -1,5 +1,5 @@
 use crate::config::{Framework, Language, PackageManager};
-use color_eyre::Result;
+use color_eyre::{Result, eyre::eyre};
 use inquire::Select;
 
 pub struct InitPrompts;
@@ -7,9 +7,22 @@ pub struct InitPrompts;
 impl InitPrompts {
     pub fn ask_project_name(default: Option<String>) -> Result<String> {
         let name = if let Some(default_name) = default {
-            default_name
+            let trimmed = default_name.trim();
+            if let Err(e) = fn0_deploy::validate_project_name(trimmed) {
+                return Err(eyre!(e));
+            }
+            trimmed.to_string()
         } else {
-            inquire::Text::new("What is your project name?").prompt()?
+            inquire::Text::new("What is your project name?")
+                .with_validator(|input: &str| match fn0_deploy::validate_project_name(
+                    input.trim(),
+                ) {
+                    Ok(()) => Ok(inquire::validator::Validation::Valid),
+                    Err(e) => Ok(inquire::validator::Validation::Invalid(e.to_string().into())),
+                })
+                .prompt()?
+                .trim()
+                .to_string()
         };
         Ok(name)
     }

@@ -36,6 +36,9 @@ async fn async_main() -> Result<()> {
         Commands::Destroy => {
             commands::destroy::execute().await?;
         }
+        Commands::Rename { new_name } => {
+            commands::rename::execute(&new_name).await?;
+        }
         Commands::Login { token } => {
             commands::login::execute(token).await?;
         }

@@ -12,6 +12,7 @@ pub mod issue_token;
 pub mod list_tokens;
 pub mod new_project;
 pub mod promote_pending_fn0_wasmtime;
+pub mod rename_project;
 pub mod revoke_token;
 pub mod secrets_encrypt;
 pub mod secrets_init;

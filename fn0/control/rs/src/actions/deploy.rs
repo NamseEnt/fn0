@@ -34,10 +34,7 @@ pub enum Output {
     },
     NotLoggedIn,
     NotFound,
-    Forbidden,
-    Error {
-        message: String,
-    },
+    InternalError,
 }
 
 #[derive(Serialize)]
@@ -61,14 +58,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         Ok(Some(p)) => p,
         Ok(None) => return Output::NotFound,
         Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("deploy ProjectDocGet: {e}");
+            return Output::InternalError;
         }
     };
 
     if project.owner_github_id != user.github_id {
-        return Output::Forbidden;
+        return Output::NotFound;
     }
 
     if req.body.files.len() > quota::MAX_FILES_PER_BUILD {
@@ -92,17 +88,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     if let Err(e) = ensure_all_resources(&req.body.project_id).await {
-        return Output::Error {
-            message: e.to_string(),
-        };
+        tracing::error!("deploy ensure_all_resources: {e}");
+        return Output::InternalError;
     }
 
     let bundle_env = match BundleEnv::from_env() {
         Ok(v) => v,
         Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("deploy BundleEnv::from_env: {e}");
+            return Output::InternalError;
         }
     };
     let object_key = format!("original/{}.tar", project.project_id);
@@ -123,9 +117,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         let static_env = match StaticEnv::from_env() {
             Ok(v) => v,
             Err(e) => {
-                return Output::Error {
-                    message: e.to_string(),
-                };
+                tracing::error!("deploy StaticEnv::from_env: {e}");
+                return Output::InternalError;
             }
         };
         let static_bucket = format!("fn0-static-asset-{}", project.project_id);
@@ -161,7 +154,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     )
     .await
     {
-        return Output::Error { message: e };
+        tracing::error!("deploy upsert_cron_config: {e}");
+        return Output::InternalError;
     }
 
     Output::Ok {

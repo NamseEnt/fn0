@@ -1,27 +1,24 @@
 use color_eyre::{Result, eyre::eyre};
 
-fn project_name() -> Result<String> {
+fn project_id() -> Result<String> {
     let config = crate::config::Config::load("fn0.toml")
         .map_err(|_| eyre!("fn0.toml not found. Run 'fn0 init' first."))?;
-    config
-        .name
-        .clone()
-        .ok_or_else(|| eyre!("'name' field missing in fn0.toml"))
+    config.project_id.clone().ok_or_else(|| {
+        eyre!("no project_id in fn0.toml; run `fn0 deploy` first to create the project.")
+    })
 }
 
 pub async fn add(domain: &str) -> Result<()> {
-    let name = project_name()?;
-    fn0_deploy::domain_add(&name, domain)
-        .await
-        .map_err(|e| eyre!(e))
+    let id = project_id()?;
+    fn0_deploy::domain_add(&id, domain).await.map_err(|e| eyre!(e))
 }
 
 pub async fn remove() -> Result<()> {
-    let name = project_name()?;
-    fn0_deploy::domain_remove(&name).await.map_err(|e| eyre!(e))
+    let id = project_id()?;
+    fn0_deploy::domain_remove(&id).await.map_err(|e| eyre!(e))
 }
 
 pub async fn status() -> Result<()> {
-    let name = project_name()?;
-    fn0_deploy::domain_status(&name).await.map_err(|e| eyre!(e))
+    let id = project_id()?;
+    fn0_deploy::domain_status(&id).await.map_err(|e| eyre!(e))
 }

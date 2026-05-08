@@ -15,17 +15,15 @@ pub struct Input {
 pub enum Output {
     Ok,
     NotLoggedIn,
-    Forbidden,
     NotFound,
     InvalidDomain { message: String },
     DomainTaken { existing_project_id: String },
     AlreadyHasDomain { current_domain: String },
-    Error { message: String },
+    InternalError,
 }
 
 enum Cancel {
     NotFound,
-    Forbidden,
     DomainTaken { existing_project_id: String },
     AlreadyHasDomain { current_domain: String },
 }
@@ -58,7 +56,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     None => return trx.cancel(Cancel::NotFound),
                 };
                 if project.owner_github_id != github_id {
-                    return trx.cancel(Cancel::Forbidden);
+                    return trx.cancel(Cancel::NotFound);
                 }
 
                 let mut handle = match trx.get(WorkerManifestDocGet {}).await? {
@@ -115,7 +113,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     match result {
         doc_db::TrxResult::Committed(()) => {}
         doc_db::TrxResult::Cancelled(Cancel::NotFound) => return Output::NotFound,
-        doc_db::TrxResult::Cancelled(Cancel::Forbidden) => return Output::Forbidden,
         doc_db::TrxResult::Cancelled(Cancel::DomainTaken {
             existing_project_id,
         }) => {
@@ -126,15 +123,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         doc_db::TrxResult::Cancelled(Cancel::AlreadyHasDomain { current_domain }) => {
             return Output::AlreadyHasDomain { current_domain };
         }
-        doc_db::TrxResult::Conflict(_) => {
-            return Output::Error {
-                message: "manifest trx conflict".to_string(),
-            };
+        doc_db::TrxResult::Conflict(d) => {
+            tracing::error!("domain_add trx conflict: {d:?}");
+            return Output::InternalError;
         }
         doc_db::TrxResult::Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("domain_add trx err: {e}");
+            return Output::InternalError;
         }
     }
 
@@ -145,9 +140,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     )
     .await
     {
-        return Output::Error {
-            message: format!("enqueue cloudflare_register: {e}"),
-        };
+        tracing::error!("domain_add enqueue cloudflare_register: {e}");
+        return Output::InternalError;
     }
 
     Output::Ok

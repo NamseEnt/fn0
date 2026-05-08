@@ -1,4 +1,5 @@
 use crate::common::auth;
+use crate::common::project_name::is_valid_project_name;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,8 @@ pub struct Input {
 pub enum Output {
     Ok { project_id: String },
     NotLoggedIn,
-    Error { message: String },
+    InvalidName,
+    InternalError,
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
@@ -21,15 +23,16 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
 
     let name = req.body.name.trim().to_string();
-    if name.is_empty() {
-        return Output::Error {
-            message: "name cannot be empty".to_string(),
-        };
+    if !is_valid_project_name(&name) {
+        return Output::InvalidName;
     }
 
     let project_id = match generate_project_id().await {
         Ok(id) => id,
-        Err(e) => return Output::Error { message: e },
+        Err(e) => {
+            tracing::error!("new_project generate_project_id: {e}");
+            return Output::InternalError;
+        }
     };
     let now = forte_sdk::now();
     let github_id = user.github_id;
@@ -45,7 +48,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 let mut user_handle = trx
                     .get(UserDocGet { github_id })
                     .await?
-                    .ok_or_else(|| anyhow::anyhow!("user not found"))?;
+                    .ok_or_else(|| anyhow::anyhow!("authenticated user has no UserDoc"))?;
                 user_handle.projects.push(ProjectIndexEntry {
                     project_id: project_id.clone(),
                     name: name.clone(),
@@ -64,12 +67,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     match result {
         doc_db::TrxResult::Committed(()) => Output::Ok { project_id },
         doc_db::TrxResult::Cancelled(()) => unreachable!(),
-        doc_db::TrxResult::Conflict(_) => Output::Error {
-            message: "conflict".to_string(),
-        },
-        doc_db::TrxResult::Err(e) => Output::Error {
-            message: e.to_string(),
-        },
+        doc_db::TrxResult::Conflict(d) => {
+            tracing::error!("new_project trx conflict: {d:?}");
+            Output::InternalError
+        }
+        doc_db::TrxResult::Err(e) => {
+            tracing::error!("new_project trx err: {e}");
+            Output::InternalError
+        }
     }
 }
 
