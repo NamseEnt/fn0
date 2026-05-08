@@ -17,11 +17,8 @@ pub enum Output {
         cloudflare_status: CloudflareStatus,
     },
     NotLoggedIn,
-    Forbidden,
     NotFound,
-    Error {
-        message: String,
-    },
+    InternalError,
 }
 
 #[derive(Serialize)]
@@ -29,7 +26,7 @@ pub enum CloudflareStatus {
     Active,
     Pending,
     Missing,
-    Other(String),
+    Other { value: String },
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
@@ -47,22 +44,20 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         Ok(Some(p)) => p,
         Ok(None) => return Output::NotFound,
         Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("domain_status ProjectDocGet: {e}");
+            return Output::InternalError;
         }
     };
     if project.owner_github_id != user.github_id {
-        return Output::Forbidden;
+        return Output::NotFound;
     }
 
     let manifest = match (WorkerManifestDocGet {}).send_with(&db).await {
         Ok(Some(m)) => m,
         Ok(None) => return Output::NotConfigured,
         Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("domain_status WorkerManifestDocGet: {e}");
+            return Output::InternalError;
         }
     };
 
@@ -76,23 +71,23 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let client = match CloudflareSaasClient::from_env() {
         Ok(c) => c,
         Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("domain_status CloudflareSaasClient::from_env: {e}");
+            return Output::InternalError;
         }
     };
     let cloudflare_status = match client.find_by_name(&domain).await {
         Ok(Some(h)) => match h.status {
             HostnameStatus::Active => CloudflareStatus::Active,
             HostnameStatus::Pending => CloudflareStatus::Pending,
-            HostnameStatus::Other(s) => CloudflareStatus::Other(s),
-            other => CloudflareStatus::Other(format!("{other:?}")),
+            HostnameStatus::Other(s) => CloudflareStatus::Other { value: s },
+            other => CloudflareStatus::Other {
+                value: format!("{other:?}"),
+            },
         },
         Ok(None) => CloudflareStatus::Missing,
         Err(e) => {
-            return Output::Error {
-                message: format!("cloudflare lookup: {e}"),
-            };
+            tracing::error!("domain_status cloudflare lookup: {e}");
+            return Output::InternalError;
         }
     };
 

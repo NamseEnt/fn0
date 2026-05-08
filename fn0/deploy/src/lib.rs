@@ -4,29 +4,66 @@ use std::path::{Path, PathBuf};
 
 pub mod credentials;
 
+pub const MAX_PROJECT_NAME_LEN: usize = 100;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NameError {
+    Empty,
+    TooLong { len: usize },
+    InvalidChar { ch: char },
+}
+
+impl std::fmt::Display for NameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NameError::Empty => write!(f, "name cannot be empty"),
+            NameError::TooLong { len } => write!(
+                f,
+                "name too long: {len} chars (max {MAX_PROJECT_NAME_LEN})"
+            ),
+            NameError::InvalidChar { ch } => write!(
+                f,
+                "name contains invalid character {ch:?}; allowed: letters, digits, '.', '_', '-'"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for NameError {}
+
+pub fn validate_project_name(s: &str) -> std::result::Result<(), NameError> {
+    let len = s.chars().count();
+    if len == 0 {
+        return Err(NameError::Empty);
+    }
+    if len > MAX_PROJECT_NAME_LEN {
+        return Err(NameError::TooLong { len });
+    }
+    if let Some(ch) = s
+        .chars()
+        .find(|c| !c.is_ascii_alphanumeric() && *c != '.' && *c != '_' && *c != '-')
+    {
+        return Err(NameError::InvalidChar { ch });
+    }
+    Ok(())
+}
+
+pub fn is_valid_project_name(s: &str) -> bool {
+    validate_project_name(s).is_ok()
+}
+
 #[derive(Serialize)]
 struct NewProjectInput<'a> {
     name: &'a str,
 }
 
 #[derive(Deserialize)]
-struct NewProjectRaw {
-    #[serde(rename = "Ok")]
-    ok: Option<NewProjectOk>,
-    #[serde(rename = "NotLoggedIn")]
-    not_logged_in: Option<()>,
-    #[serde(rename = "Error")]
-    error: Option<MessageErr>,
-}
-
-#[derive(Deserialize)]
-struct NewProjectOk {
-    project_id: String,
-}
-
-#[derive(Deserialize)]
-struct MessageErr {
-    message: String,
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum NewProject {
+    Ok { project_id: String },
+    NotLoggedIn,
+    InvalidName,
+    InternalError,
 }
 
 pub async fn ensure_project_id(
@@ -51,17 +88,22 @@ pub async fn ensure_project_id(
         .await?
         .error_for_status()
         .map_err(|e| anyhow!("new_project failed: {e}"))?;
-    let raw: NewProjectRaw = resp.json().await?;
+    let raw: NewProject = resp.json().await?;
     let id = match raw {
-        NewProjectRaw { ok: Some(ok), .. } => ok.project_id,
-        NewProjectRaw {
-            not_logged_in: Some(_),
-            ..
-        } => return Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        NewProjectRaw {
-            error: Some(err), ..
-        } => return Err(anyhow!("new_project: {}", err.message)),
-        _ => return Err(anyhow!("unexpected new_project response")),
+        NewProject::Ok { project_id } => project_id,
+        NewProject::NotLoggedIn => {
+            return Err(anyhow!("control rejected token; run `fn0 login` again."));
+        }
+        NewProject::InvalidName => {
+            return Err(anyhow!(
+                "control rejected project name '{project_name}': must be 1-{MAX_PROJECT_NAME_LEN} chars of letters, digits, '.', '_', '-'"
+            ));
+        }
+        NewProject::InternalError => {
+            return Err(anyhow!(
+                "new_project: server error; check fn0-control logs"
+            ));
+        }
     };
     *project_id = Some(id.clone());
     Ok(id)
@@ -89,37 +131,25 @@ struct DeployFile {
 }
 
 #[derive(Deserialize)]
-struct DeployRaw {
-    #[serde(rename = "Ok")]
-    ok: Option<DeployOk>,
-    #[serde(rename = "QuotaExceeded")]
-    quota_exceeded: Option<QuotaExceededBody>,
-    #[serde(rename = "NotLoggedIn")]
-    not_logged_in: Option<()>,
-    #[serde(rename = "NotFound")]
-    not_found: Option<()>,
-    #[serde(rename = "Forbidden")]
-    forbidden: Option<()>,
-    #[serde(rename = "Error")]
-    error: Option<MessageErr>,
-}
-
-#[derive(Deserialize)]
-struct DeployOk {
-    presigned_put_url: String,
-    object_key: String,
-    static_uploads: Vec<StaticUpload>,
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum Deploy {
+    Ok {
+        presigned_put_url: String,
+        object_key: String,
+        static_uploads: Vec<StaticUpload>,
+    },
+    QuotaExceeded {
+        reason: String,
+    },
+    NotLoggedIn,
+    NotFound,
+    InternalError,
 }
 
 #[derive(Deserialize)]
 struct StaticUpload {
     path: String,
     presigned_url: String,
-}
-
-#[derive(Deserialize)]
-struct QuotaExceededBody {
-    reason: String,
 }
 
 #[derive(Serialize)]
@@ -129,29 +159,24 @@ struct DeployStatusInput<'a> {
 }
 
 #[derive(Deserialize)]
-struct DeployStatusRaw {
-    #[serde(rename = "Done")]
-    done: Option<DeployStatusBody>,
-    #[serde(rename = "Pending")]
-    pending: Option<DeployStatusBody>,
-    #[serde(rename = "NoActiveVersion")]
-    no_active_version: Option<()>,
-    #[serde(rename = "NotLoggedIn")]
-    not_logged_in: Option<()>,
-    #[serde(rename = "NotFound")]
-    not_found: Option<()>,
-    #[serde(rename = "Forbidden")]
-    forbidden: Option<()>,
-    #[serde(rename = "Error")]
-    error: Option<MessageErr>,
-}
-
-#[derive(Deserialize)]
-struct DeployStatusBody {
-    active_version: String,
-    pending_version: Option<String>,
-    pending_compiled: bool,
-    compiled_versions: Vec<String>,
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum DeployStatus {
+    Done {
+        active_version: String,
+        pending_version: Option<String>,
+        pending_compiled: bool,
+        compiled_versions: Vec<String>,
+    },
+    Pending {
+        active_version: String,
+        pending_version: Option<String>,
+        pending_compiled: bool,
+        compiled_versions: Vec<String>,
+    },
+    NoActiveVersion,
+    NotLoggedIn,
+    NotFound,
+    InternalError,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -190,6 +215,12 @@ pub async fn deploy_wasm(
     poll_deploy_status(&client, control_url, token, project_id, &last_modified).await?;
     println!("Deploy complete!");
     Ok(())
+}
+
+struct DeployOk {
+    presigned_put_url: String,
+    object_key: String,
+    static_uploads: Vec<StaticUpload>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -264,7 +295,7 @@ async fn request_deploy(
         "{}/__forte_action/deploy",
         control_url.trim_end_matches('/')
     );
-    let raw: DeployRaw = client
+    let raw: Deploy = client
         .post(&deploy_url)
         .bearer_auth(token)
         .json(&DeployInput {
@@ -281,25 +312,19 @@ async fn request_deploy(
         .json()
         .await?;
     match raw {
-        DeployRaw { ok: Some(ok), .. } => Ok(ok),
-        DeployRaw {
-            quota_exceeded: Some(q),
-            ..
-        } => Err(anyhow!("deploy quota exceeded: {}", q.reason)),
-        DeployRaw {
-            not_logged_in: Some(_),
-            ..
-        } => Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        DeployRaw {
-            not_found: Some(_), ..
-        } => Err(anyhow!("project not found")),
-        DeployRaw {
-            forbidden: Some(_), ..
-        } => Err(anyhow!("not the owner of this project")),
-        DeployRaw {
-            error: Some(err), ..
-        } => Err(anyhow!("deploy: {}", err.message)),
-        _ => Err(anyhow!("unexpected deploy response")),
+        Deploy::Ok {
+            presigned_put_url,
+            object_key,
+            static_uploads,
+        } => Ok(DeployOk {
+            presigned_put_url,
+            object_key,
+            static_uploads,
+        }),
+        Deploy::QuotaExceeded { reason } => Err(anyhow!("deploy quota exceeded: {reason}")),
+        Deploy::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        Deploy::NotFound => Err(anyhow!("project '{project_id}' not found or not owned by you.")),
+        Deploy::InternalError => Err(anyhow!("deploy: server error; check fn0-control logs")),
     }
 }
 
@@ -470,7 +495,7 @@ async fn poll_deploy_status(
     let mut last_state: Option<String> = None;
 
     loop {
-        let raw: DeployStatusRaw = client
+        let raw: DeployStatus = client
             .post(&url)
             .bearer_auth(token)
             .json(&DeployStatusInput {
@@ -484,43 +509,71 @@ async fn poll_deploy_status(
             .json()
             .await?;
 
-        if let Some(body) = raw.done {
-            log_status_line(&body, &mut last_state);
-            return Ok(());
-        }
-        if raw.no_active_version.is_some() {
-            return Err(anyhow!("control has no active fn0-wasmtime version yet"));
-        }
-        if raw.not_logged_in.is_some() {
-            return Err(anyhow!("control rejected token; run `fn0 login` again."));
-        }
-        if raw.not_found.is_some() {
-            return Err(anyhow!("project not found"));
-        }
-        if raw.forbidden.is_some() {
-            return Err(anyhow!("not the owner of this project"));
-        }
-        if let Some(err) = raw.error {
-            return Err(anyhow!("deploy_status: {}", err.message));
-        }
-        if let Some(body) = raw.pending {
-            log_status_line(&body, &mut last_state);
-            if start.elapsed() > timeout {
+        match raw {
+            DeployStatus::Done {
+                active_version,
+                pending_version,
+                pending_compiled,
+                compiled_versions,
+            } => {
+                log_status_line(
+                    &active_version,
+                    &compiled_versions,
+                    &pending_version,
+                    pending_compiled,
+                    &mut last_state,
+                );
+                return Ok(());
+            }
+            DeployStatus::Pending {
+                active_version,
+                pending_version,
+                pending_compiled,
+                compiled_versions,
+            } => {
+                log_status_line(
+                    &active_version,
+                    &compiled_versions,
+                    &pending_version,
+                    pending_compiled,
+                    &mut last_state,
+                );
+                if start.elapsed() > timeout {
+                    return Err(anyhow!(
+                        "deploy_status timed out after {}s",
+                        timeout.as_secs()
+                    ));
+                }
+            }
+            DeployStatus::NoActiveVersion => {
+                return Err(anyhow!("control has no active fn0-wasmtime version yet"));
+            }
+            DeployStatus::NotLoggedIn => {
+                return Err(anyhow!("control rejected token; run `fn0 login` again."));
+            }
+            DeployStatus::NotFound => {
                 return Err(anyhow!(
-                    "deploy_status timed out after {}s",
-                    timeout.as_secs()
+                    "project '{project_id}' not found or not owned by you."
                 ));
             }
-            continue;
+            DeployStatus::InternalError => {
+                return Err(anyhow!(
+                    "deploy_status: server error; check fn0-control logs"
+                ));
+            }
         }
-        return Err(anyhow!("unexpected deploy_status response"));
     }
 }
 
-fn log_status_line(body: &DeployStatusBody, last_state: &mut Option<String>) {
+fn log_status_line(
+    active_version: &str,
+    compiled_versions: &[String],
+    pending_version: &Option<String>,
+    pending_compiled: bool,
+    last_state: &mut Option<String>,
+) {
     let state = format!(
-        "active={} compiled={:?} pending={:?} pending_compiled={}",
-        body.active_version, body.compiled_versions, body.pending_version, body.pending_compiled,
+        "active={active_version} compiled={compiled_versions:?} pending={pending_version:?} pending_compiled={pending_compiled}",
     );
     if last_state.as_deref() != Some(&state) {
         println!("  {state}");
@@ -623,33 +676,15 @@ struct DomainAddInput<'a> {
 }
 
 #[derive(Deserialize)]
-struct DomainAddRaw {
-    #[serde(rename = "Ok")]
-    ok: Option<()>,
-    #[serde(rename = "NotLoggedIn")]
-    not_logged_in: Option<()>,
-    #[serde(rename = "Forbidden")]
-    forbidden: Option<()>,
-    #[serde(rename = "NotFound")]
-    not_found: Option<()>,
-    #[serde(rename = "InvalidDomain")]
-    invalid_domain: Option<MessageErr>,
-    #[serde(rename = "DomainTaken")]
-    domain_taken: Option<DomainTakenBody>,
-    #[serde(rename = "AlreadyHasDomain")]
-    already_has_domain: Option<AlreadyHasDomainBody>,
-    #[serde(rename = "Error")]
-    error: Option<MessageErr>,
-}
-
-#[derive(Deserialize)]
-struct DomainTakenBody {
-    existing_project_id: String,
-}
-
-#[derive(Deserialize)]
-struct AlreadyHasDomainBody {
-    current_domain: String,
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum DomainAdd {
+    Ok,
+    NotLoggedIn,
+    NotFound,
+    InvalidDomain { message: String },
+    DomainTaken { existing_project_id: String },
+    AlreadyHasDomain { current_domain: String },
+    InternalError,
 }
 
 pub async fn domain_add(project_id: &str, domain: &str) -> Result<()> {
@@ -666,45 +701,29 @@ pub async fn domain_add(project_id: &str, domain: &str) -> Result<()> {
         .send()
         .await?
         .error_for_status()?;
-    let raw: DomainAddRaw = resp.json().await?;
+    let raw: DomainAdd = resp.json().await?;
     match raw {
-        DomainAddRaw { ok: Some(()), .. } => {
+        DomainAdd::Ok => {
             println!("domain '{domain}' attached to project '{project_id}'");
-            println!("Cloudflare hostname registration is queued; run `fn0 domain status` to check.");
+            println!(
+                "Cloudflare hostname registration is queued; run `fn0 domain status` to check."
+            );
             Ok(())
         }
-        DomainAddRaw {
-            not_logged_in: Some(_),
-            ..
-        } => Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        DomainAddRaw {
-            forbidden: Some(_), ..
-        } => Err(anyhow!("you do not own project '{project_id}'.")),
-        DomainAddRaw {
-            not_found: Some(_), ..
-        } => Err(anyhow!("project '{project_id}' not found.")),
-        DomainAddRaw {
-            invalid_domain: Some(e),
-            ..
-        } => Err(anyhow!("invalid domain: {}", e.message)),
-        DomainAddRaw {
-            domain_taken: Some(b),
-            ..
-        } => Err(anyhow!(
-            "domain '{domain}' already in use by project '{}'",
-            b.existing_project_id
+        DomainAdd::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        DomainAdd::NotFound => Err(anyhow!(
+            "project '{project_id}' not found or not owned by you."
         )),
-        DomainAddRaw {
-            already_has_domain: Some(b),
-            ..
+        DomainAdd::InvalidDomain { message } => Err(anyhow!("invalid domain: {message}")),
+        DomainAdd::DomainTaken {
+            existing_project_id,
         } => Err(anyhow!(
-            "project '{project_id}' already has domain '{}'; remove it first",
-            b.current_domain
+            "domain '{domain}' already in use by project '{existing_project_id}'"
         )),
-        DomainAddRaw {
-            error: Some(err), ..
-        } => Err(anyhow!("domain_add: {}", err.message)),
-        _ => Err(anyhow!("unexpected domain_add response")),
+        DomainAdd::AlreadyHasDomain { current_domain } => Err(anyhow!(
+            "project '{project_id}' already has domain '{current_domain}'; remove it first"
+        )),
+        DomainAdd::InternalError => Err(anyhow!("domain_add: server error; check fn0-control logs")),
     }
 }
 
@@ -714,24 +733,13 @@ struct DomainProjectInput<'a> {
 }
 
 #[derive(Deserialize)]
-struct DomainRemoveRaw {
-    #[serde(rename = "Ok")]
-    ok: Option<DomainRemoveOk>,
-    #[serde(rename = "NotLoggedIn")]
-    not_logged_in: Option<()>,
-    #[serde(rename = "Forbidden")]
-    forbidden: Option<()>,
-    #[serde(rename = "NotFound")]
-    not_found: Option<()>,
-    #[serde(rename = "NoDomain")]
-    no_domain: Option<()>,
-    #[serde(rename = "Error")]
-    error: Option<MessageErr>,
-}
-
-#[derive(Deserialize)]
-struct DomainRemoveOk {
-    removed_domain: String,
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum DomainRemove {
+    Ok { removed_domain: String },
+    NotLoggedIn,
+    NotFound,
+    NoDomain,
+    InternalError,
 }
 
 pub async fn domain_remove(project_id: &str) -> Result<()> {
@@ -748,53 +756,46 @@ pub async fn domain_remove(project_id: &str) -> Result<()> {
         .send()
         .await?
         .error_for_status()?;
-    let raw: DomainRemoveRaw = resp.json().await?;
+    let raw: DomainRemove = resp.json().await?;
     match raw {
-        DomainRemoveRaw { ok: Some(ok), .. } => {
-            println!("domain '{}' detached from project '{}'", ok.removed_domain, project_id);
+        DomainRemove::Ok { removed_domain } => {
+            println!("domain '{removed_domain}' detached from project '{project_id}'");
             println!("Cloudflare hostname removal is queued.");
             Ok(())
         }
-        DomainRemoveRaw {
-            not_logged_in: Some(_),
-            ..
-        } => Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        DomainRemoveRaw {
-            forbidden: Some(_), ..
-        } => Err(anyhow!("you do not own project '{project_id}'.")),
-        DomainRemoveRaw {
-            not_found: Some(_), ..
-        } => Err(anyhow!("project '{project_id}' not found.")),
-        DomainRemoveRaw {
-            no_domain: Some(_), ..
-        } => Err(anyhow!("no custom domain attached to project '{project_id}'.")),
-        DomainRemoveRaw {
-            error: Some(err), ..
-        } => Err(anyhow!("domain_remove: {}", err.message)),
-        _ => Err(anyhow!("unexpected domain_remove response")),
+        DomainRemove::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        DomainRemove::NotFound => Err(anyhow!(
+            "project '{project_id}' not found or not owned by you."
+        )),
+        DomainRemove::NoDomain => Err(anyhow!(
+            "no custom domain attached to project '{project_id}'."
+        )),
+        DomainRemove::InternalError => Err(anyhow!(
+            "domain_remove: server error; check fn0-control logs"
+        )),
     }
 }
 
 #[derive(Deserialize)]
-struct DomainStatusRaw {
-    #[serde(rename = "NotConfigured")]
-    not_configured: Option<()>,
-    #[serde(rename = "Configured")]
-    configured: Option<ConfiguredBody>,
-    #[serde(rename = "NotLoggedIn")]
-    not_logged_in: Option<()>,
-    #[serde(rename = "Forbidden")]
-    forbidden: Option<()>,
-    #[serde(rename = "NotFound")]
-    not_found: Option<()>,
-    #[serde(rename = "Error")]
-    error: Option<MessageErr>,
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum DomainStatus {
+    NotConfigured,
+    Configured {
+        domain: String,
+        cloudflare_status: CloudflareStatus,
+    },
+    NotLoggedIn,
+    NotFound,
+    InternalError,
 }
 
 #[derive(Deserialize)]
-struct ConfiguredBody {
-    domain: String,
-    cloudflare_status: serde_json::Value,
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum CloudflareStatus {
+    Active,
+    Pending,
+    Missing,
+    Other { value: String },
 }
 
 pub async fn domain_status(project_id: &str) -> Result<()> {
@@ -811,54 +812,89 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
         .send()
         .await?
         .error_for_status()?;
-    let raw: DomainStatusRaw = resp.json().await?;
+    let raw: DomainStatus = resp.json().await?;
     match raw {
-        DomainStatusRaw {
-            not_configured: Some(_),
-            ..
-        } => {
+        DomainStatus::NotConfigured => {
             println!("project '{project_id}' has no custom domain configured.");
             Ok(())
         }
-        DomainStatusRaw {
-            configured: Some(b),
-            ..
+        DomainStatus::Configured {
+            domain,
+            cloudflare_status,
         } => {
-            println!("project '{project_id}' custom domain: {}", b.domain);
-            println!("cloudflare status: {}", format_cloudflare_status(&b.cloudflare_status));
+            println!("project '{project_id}' custom domain: {domain}");
+            println!(
+                "cloudflare status: {}",
+                format_cloudflare_status(&cloudflare_status)
+            );
             Ok(())
         }
-        DomainStatusRaw {
-            not_logged_in: Some(_),
-            ..
-        } => Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        DomainStatusRaw {
-            forbidden: Some(_), ..
-        } => Err(anyhow!("you do not own project '{project_id}'.")),
-        DomainStatusRaw {
-            not_found: Some(_), ..
-        } => Err(anyhow!("project '{project_id}' not found.")),
-        DomainStatusRaw {
-            error: Some(err), ..
-        } => Err(anyhow!("domain_status: {}", err.message)),
-        _ => Err(anyhow!("unexpected domain_status response")),
+        DomainStatus::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        DomainStatus::NotFound => Err(anyhow!(
+            "project '{project_id}' not found or not owned by you."
+        )),
+        DomainStatus::InternalError => Err(anyhow!(
+            "domain_status: server error; check fn0-control logs"
+        )),
     }
 }
 
-fn format_cloudflare_status(value: &serde_json::Value) -> String {
-    if value.as_str() == Some("Active") {
-        return "active".to_string();
+fn format_cloudflare_status(status: &CloudflareStatus) -> String {
+    match status {
+        CloudflareStatus::Active => "active".to_string(),
+        CloudflareStatus::Pending => "pending (waiting for DV verification)".to_string(),
+        CloudflareStatus::Missing => {
+            "missing on Cloudflare (registration may still be in progress)".to_string()
+        }
+        CloudflareStatus::Other { value } => format!("other: {value}"),
     }
-    if value.as_str() == Some("Pending") {
-        return "pending (waiting for DV verification)".to_string();
+}
+
+#[derive(Serialize)]
+struct RenameProjectInput<'a> {
+    project_id: &'a str,
+    new_name: &'a str,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum RenameProject {
+    Ok,
+    NotLoggedIn,
+    NotFound,
+    InvalidName,
+    InternalError,
+}
+
+pub async fn rename_project(project_id: &str, new_name: &str) -> Result<()> {
+    let creds = credentials::require()?;
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/__forte_action/rename_project",
+        creds.control_url.trim_end_matches('/')
+    );
+    let resp = client
+        .post(&url)
+        .bearer_auth(&creds.token)
+        .json(&RenameProjectInput {
+            project_id,
+            new_name,
+        })
+        .send()
+        .await?
+        .error_for_status()?;
+    let raw: RenameProject = resp.json().await?;
+    match raw {
+        RenameProject::Ok => Ok(()),
+        RenameProject::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        RenameProject::NotFound => Err(anyhow!(
+            "project '{project_id}' not found or not owned by you."
+        )),
+        RenameProject::InvalidName => Err(anyhow!(
+            "control rejected name '{new_name}': must be 1-{MAX_PROJECT_NAME_LEN} chars of letters, digits, '.', '_', '-'"
+        )),
+        RenameProject::InternalError => Err(anyhow!(
+            "rename_project: server error; check fn0-control logs"
+        )),
     }
-    if value.as_str() == Some("Missing") {
-        return "missing on Cloudflare (registration may still be in progress)".to_string();
-    }
-    if let Some(obj) = value.as_object()
-        && let Some(other) = obj.get("Other").and_then(|v| v.as_str())
-    {
-        return format!("other: {other}");
-    }
-    value.to_string()
 }

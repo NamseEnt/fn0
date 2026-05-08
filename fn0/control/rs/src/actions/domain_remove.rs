@@ -13,15 +13,13 @@ pub struct Input {
 pub enum Output {
     Ok { removed_domain: String },
     NotLoggedIn,
-    Forbidden,
     NotFound,
     NoDomain,
-    Error { message: String },
+    InternalError,
 }
 
 enum Cancel {
     NotFound,
-    Forbidden,
     NoDomain,
 }
 
@@ -47,7 +45,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     None => return trx.cancel(Cancel::NotFound),
                 };
                 if project.owner_github_id != github_id {
-                    return trx.cancel(Cancel::Forbidden);
+                    return trx.cancel(Cancel::NotFound);
                 }
 
                 let mut handle = match trx.get(WorkerManifestDocGet {}).await? {
@@ -71,17 +69,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let removed_domain = match result {
         doc_db::TrxResult::Committed(d) => d,
         doc_db::TrxResult::Cancelled(Cancel::NotFound) => return Output::NotFound,
-        doc_db::TrxResult::Cancelled(Cancel::Forbidden) => return Output::Forbidden,
         doc_db::TrxResult::Cancelled(Cancel::NoDomain) => return Output::NoDomain,
-        doc_db::TrxResult::Conflict(_) => {
-            return Output::Error {
-                message: "manifest trx conflict".to_string(),
-            };
+        doc_db::TrxResult::Conflict(d) => {
+            tracing::error!("domain_remove trx conflict: {d:?}");
+            return Output::InternalError;
         }
         doc_db::TrxResult::Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("domain_remove trx err: {e}");
+            return Output::InternalError;
         }
     };
 
@@ -92,9 +87,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     )
     .await
     {
-        return Output::Error {
-            message: format!("enqueue cloudflare_unregister: {e}"),
-        };
+        tracing::error!("domain_remove enqueue cloudflare_unregister: {e}");
+        return Output::InternalError;
     }
 
     Output::Ok { removed_domain }

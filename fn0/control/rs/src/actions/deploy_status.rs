@@ -26,10 +26,7 @@ pub enum Output {
     NoActiveVersion,
     NotLoggedIn,
     NotFound,
-    Forbidden,
-    Error {
-        message: String,
-    },
+    InternalError,
 }
 
 const POLL_INTERVAL: time_wasi::Duration = time_wasi::Duration::from_secs(2);
@@ -50,13 +47,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         Ok(Some(p)) => p,
         Ok(None) => return Output::NotFound,
         Err(e) => {
-            return Output::Error {
-                message: e.to_string(),
-            };
+            tracing::error!("deploy_status ProjectDocGet: {e}");
+            return Output::InternalError;
         }
     };
     if project.owner_github_id != user.github_id {
-        return Output::Forbidden;
+        return Output::NotFound;
     }
 
     let started = time_wasi::Instant::now().await;
@@ -64,9 +60,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         let snapshot = match load_state(&db, &req.body.project_id, &req.body.last_modified).await {
             Ok(v) => v,
             Err(e) => {
-                return Output::Error {
-                    message: e.to_string(),
-                };
+                tracing::error!("deploy_status load_state: {e}");
+                return Output::InternalError;
             }
         };
 
