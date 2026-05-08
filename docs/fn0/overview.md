@@ -102,11 +102,13 @@ Unknown from repository: detailed `fn0-cli` commands — check `fn0/cli/README.m
 
 fn0 has built-in OpenTelemetry support:
 
-- OTLP exporter via `fn0/fn0/src/otlp_hijack.rs`
+- OTLP span exporter via `fn0/fn0/src/otlp_hijack.rs` (worker-side) and `forte/sdk/src/otel.rs` (WASM-side)
 - Structured logging via `tracing`
-- Metrics and distributed tracing
+- Distributed tracing with per-request spans
 
-Unknown from repository: OTLP endpoint configuration for self-hosted deployments — check `fn0/fn0/src/telemetry.rs`.
+For Forte apps running on fn0 Cloud, traces are exported to `http://fn0-otel.fn0.dev/v1/traces`. The service name is controlled via the `OTEL_SERVICE_NAME` environment variable (defaults to `"forte-app"`).
+
+For self-hosted fn0 worker deployments, OTLP endpoint configuration is Unknown from repository — check `fn0/fn0/src/otlp_hijack.rs` and `fn0/worker/src/telemetry.rs`.
 
 ## Hijack Architecture
 

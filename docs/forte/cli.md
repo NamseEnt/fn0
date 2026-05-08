@@ -73,9 +73,13 @@ Build and upload the project to fn0 Cloud.
 | Flag | Default | Description |
 |---|---|---|
 | `-p, --project <dir>` | `.` | Project directory |
+| `--name <name>` | — | Display name for first-time registration |
+
+If a `cron.yaml` file exists in the project root, its scheduled jobs are registered during deploy. See [Cron Jobs](#cron-jobs) below.
 
 ```sh
 forte deploy
+forte deploy --name "My App"
 ```
 
 ---
@@ -113,13 +117,20 @@ Creates:
 
 ---
 
-### `forte rename <new-name> [options]`
+### `forte login`
 
-Rename the deployed project (migrates Turso DB and switches subdomain).
+Authenticate with fn0 Cloud. Opens a browser to the fn0 tokens page, prompts you to paste an API token, and saves credentials locally (shared with the `fn0` CLI).
 
 | Flag | Default | Description |
 |---|---|---|
-| `-p, --project <dir>` | `.` | Project directory |
+| `--token <token>` | — | Provide token directly (skips interactive flow) |
+
+Tokens must start with `fn0_`. Credentials are saved to a local file (path printed on success).
+
+```sh
+forte login
+forte login --token fn0_xxxxx
+```
 
 ---
 
@@ -164,3 +175,23 @@ Same as `run` but targets a locally-running `forte dev` server.
 | Flag | Default | Description |
 |---|---|---|
 | `-P, --port <port>` | 3000 | Local dev server port |
+
+---
+
+## Cron Jobs
+
+Place a `cron.yaml` file in the project root to schedule queue tasks. The file is read during `forte deploy` and the jobs are registered with fn0 Cloud.
+
+```yaml
+# cron.yaml
+- function: send_digest_email
+  every_minutes: 60
+- function: cleanup_old_sessions
+  every_minutes: 1440
+```
+
+Each entry:
+- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must be a unit struct (no fields).
+- `every_minutes` — run interval (must be ≥ 1).
+
+Cron jobs are not supported in local development (`forte dev`).
