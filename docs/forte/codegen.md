@@ -104,9 +104,49 @@ For each page handler (`rs/src/pages/<path>/mod.rs`), it generates:
 - `fe/src/pages/<path>/.props.ts` — the `Props` type as a TypeScript discriminated union
 
 For each action handler (`rs/src/actions/<name>.rs`), it generates:
-- Type files for `Input` and `Output` (format: Unknown from repository — check `forte/rs-to-ts/`)
+- `fe/src/actions/.generated/<name>.ts` — TypeScript types (with Zod schemas) for `Input` and `Output`
 
-The generated Props type uses `{ t: "VariantName", v: { ... } }` shape for enum variants with fields.
+For each hook handler (`rs/src/hooks/<name>.rs`), it generates:
+- `fe/src/hooks/.generated/<name>.ts` — TypeScript types for `Input` and `Output`
+
+The hand-written fetch wrappers in `fe/src/actions/<name>.ts` (created by `forte add action`) import from `.generated/` for their types.
+
+The generated Props type uses a discriminated-union format. See [forte/json.md](json.md) for the exact JSON shape for each enum variant kind.
+
+## `generate_env()` (optional)
+
+`forte_codegen::generate_env()` reads the project's `.env` file (one directory above `rs/`) and writes `rs/src/env_generated.rs` with one typed accessor function per variable.
+
+Call it from `build.rs` in addition to `generate_routes()`:
+
+```rust
+fn main() {
+    forte_codegen::generate_routes();
+    forte_codegen::generate_env(); // optional
+}
+```
+
+Given a `.env` file like:
+
+```
+COOKIE_SECRET=abc123
+STRIPE_KEY=sk_test_...
+```
+
+The generated file contains:
+
+```rust
+pub fn cookie_secret() -> &'static str { /* reads env var, cached via LazyLock */ }
+pub fn stripe_key() -> &'static str { /* ... */ }
+```
+
+Function names are the lowercased variable name. The value is read from the environment at first call and cached for the lifetime of the process. If the variable is missing at runtime the call panics.
+
+The build script reruns when `.env` changes (`cargo:rerun-if-changed=../.env`).
+
+## `extract_wit(out_dir)` (internal)
+
+`forte_codegen::extract_wit(&out_dir)` unpacks the WIT interface files bundled inside `forte-codegen` into `<out_dir>/forte-wit/` and returns that path. It is called automatically by `generate_routes()` — you do not need to call it directly.
 
 ## The `FORTE-MANAGED` Block
 
