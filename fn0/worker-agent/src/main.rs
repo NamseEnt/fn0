@@ -1,8 +1,19 @@
+//! Per-host supervisor for fn0-worker containers.
+//!
+//! Polls doc-db for the latest worker version, provisions the new
+//! worker, and gracefully shuts down the previous one.
+//!
+//! Each agent acts independently. There is no host-to-host coordination,
+//! so when the target advances every agent races to the new version
+//! simultaneously and cluster capacity briefly doubles during the swap.
+//! Rolling updates across hosts will be added later.
+
+mod host_status_reporter;
 mod inbound_proxy;
 mod podman;
 mod self_dns;
 mod shutdown;
-mod wasmtime_version_poller;
+mod target_config;
 mod worker_container_pool;
 
 use color_eyre::eyre::Result;
@@ -10,7 +21,6 @@ use shutdown::Shutdown;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinSet;
 use tracing::*;
-use wasmtime_version_poller::TargetWasmtimeVersion;
 use worker_container_pool::UpstreamRoute;
 
 fn main() -> Result<()> {
@@ -36,20 +46,27 @@ async fn async_main() -> Result<()> {
 
     let shutdown = Shutdown::new();
 
-    let (target_version_tx, target_version_rx) = watch::channel::<Option<TargetWasmtimeVersion>>(None);
+    let host_id = std::env::var("FN0_AGENT_HOST_ID")
+        .expect("FN0_AGENT_HOST_ID must be set");
+
+    let (target_image_tx, target_image_rx) = watch::channel::<Option<String>>(None);
+    let (active_image_tx, active_image_rx) = watch::channel::<Option<String>>(None);
     let (upstream_tx, upstream_rx) = watch::channel::<Vec<UpstreamRoute>>(Vec::new());
     let (worker_first_ready_tx, worker_first_ready_rx) = oneshot::channel::<()>();
 
     let mut tasks: JoinSet<()> = JoinSet::new();
-    tasks.spawn(wasmtime_version_poller::run(
-        shutdown.clone(),
-        target_version_tx,
-    ));
+    tasks.spawn(target_config::run(shutdown.clone(), target_image_tx));
     tasks.spawn(worker_container_pool::run(
         shutdown.clone(),
-        target_version_rx,
+        target_image_rx,
+        active_image_tx,
         upstream_tx,
         worker_first_ready_tx,
+    ));
+    tasks.spawn(host_status_reporter::run(
+        shutdown.clone(),
+        active_image_rx,
+        host_id,
     ));
     tasks.spawn(inbound_proxy::run(shutdown.clone(), upstream_rx));
 

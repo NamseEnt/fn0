@@ -10,7 +10,10 @@ description = "Per-instance agent that supervises fn0-worker containers (lifecyc
 release = false
 
 [dependencies]
+anyhow = { workspace = true }
 color-eyre = { workspace = true }
+doc-db = { workspace = true }
+forte-macros = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
