@@ -1,6 +1,5 @@
 use crate::podman::{Podman, RunArgs};
 use crate::shutdown::Shutdown;
-use crate::wasmtime_version_poller::TargetWasmtimeVersion;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::sync::{oneshot, watch};
@@ -24,7 +23,8 @@ const OPS_PORT_OFFSET: u16 = 1;
 
 pub async fn run(
     shutdown: Shutdown,
-    mut target_rx: watch::Receiver<Option<TargetWasmtimeVersion>>,
+    mut target_rx: watch::Receiver<Option<String>>,
+    active_image_tx: watch::Sender<Option<String>>,
     upstream_tx: watch::Sender<Vec<UpstreamRoute>>,
     first_ready_tx: oneshot::Sender<()>,
 ) {
@@ -53,22 +53,28 @@ pub async fn run(
         }
 
         let target = target_rx.borrow_and_update().clone();
-        if let Some(target) = target {
+        if let Some(image_ref) = target {
             let already = state
                 .active
                 .as_ref()
-                .map(|c| c.version == target)
+                .map(|c| c.image_ref == image_ref)
                 .unwrap_or(false);
             if !already {
                 let (user_port, ops_port) = allocate_port_pair(&mut next_port);
-                match start_new_active(&podman, env_file.as_deref(), &target, user_port, ops_port)
-                    .await
+                match start_new_active(
+                    &podman,
+                    env_file.as_deref(),
+                    &image_ref,
+                    user_port,
+                    ops_port,
+                )
+                .await
                 {
                     Ok(new_container) => {
                         if let Some(prev) = state.active.take() {
                             info!(
                                 container_name = %prev.container_name,
-                                version = %prev.version.fn0_wasmtime_version,
+                                image_ref = %prev.image_ref,
                                 "demoting previous active to draining"
                             );
                             if !signal_worker_drain(&prev.ops_addr).await {
@@ -89,9 +95,10 @@ pub async fn run(
                         state.active = Some(new_container);
                         info!(
                             container_name = %state.active.as_ref().unwrap().container_name,
-                            version = %target.fn0_wasmtime_version,
+                            image_ref = %image_ref,
                             "new active worker container ready"
                         );
+                        let _ = active_image_tx.send(Some(image_ref.clone()));
                         if let Some(tx) = first_ready_tx.take() {
                             let _ = tx.send(());
                         }
@@ -99,8 +106,7 @@ pub async fn run(
                     Err(err) => {
                         warn!(
                             ?err,
-                            version = %target.fn0_wasmtime_version,
-                            image = %target.worker_image_ref,
+                            image_ref = %image_ref,
                             "failed to bring up new worker container; will retry next tick"
                         );
                     }
@@ -133,6 +139,7 @@ pub async fn run(
 
     info!("worker container pool: shutdown received; tearing down all containers");
     let _ = upstream_tx.send(Vec::new());
+    let _ = active_image_tx.send(None);
     if let Some(active) = state.active.take() {
         teardown(&podman, &active.container_name).await;
     }
@@ -150,7 +157,7 @@ struct PoolState {
 
 struct RunningContainer {
     container_name: String,
-    version: TargetWasmtimeVersion,
+    image_ref: String,
     local_addr: SocketAddr,
     ops_addr: SocketAddr,
 }
@@ -171,17 +178,17 @@ fn allocate_port_pair(next_port: &mut u16) -> (u16, u16) {
 async fn start_new_active(
     podman: &Podman,
     env_file: Option<&str>,
-    target: &TargetWasmtimeVersion,
+    image_ref: &str,
     user_port: u16,
     ops_port: u16,
 ) -> Result<RunningContainer, PoolError> {
     let container_name = format!(
-        "fn0-worker-{ver}-{port}",
-        ver = sanitize(&target.fn0_wasmtime_version),
+        "fn0-worker-{tag}-{port}",
+        tag = sanitize(image_ref),
         port = user_port,
     );
     podman
-        .pull_image(&target.worker_image_ref)
+        .pull_image(image_ref)
         .await
         .map_err(PoolError::Podman)?;
     let user_port_str = user_port.to_string();
@@ -193,7 +200,7 @@ async fn start_new_active(
     podman
         .run_detached(RunArgs {
             container_name: &container_name,
-            image_ref: &target.worker_image_ref,
+            image_ref,
             env,
             env_file,
         })
@@ -208,7 +215,7 @@ async fn start_new_active(
     wait_until_ready(podman, &container_name, &ops_addr).await?;
     Ok(RunningContainer {
         container_name,
-        version: target.clone(),
+        image_ref: image_ref.to_string(),
         local_addr,
         ops_addr,
     })
@@ -292,14 +299,14 @@ fn compute_routes(state: &PoolState, ramp_duration: Duration) -> Vec<UpstreamRou
         local_addr: active.local_addr,
         weight: new_weight,
     });
-    if new_weight < 100 {
-        if let Some(r) = ramp_partner {
-            routes.push(UpstreamRoute {
-                container_name: r.container.container_name.clone(),
-                local_addr: r.container.local_addr,
-                weight: 100 - new_weight,
-            });
-        }
+    if new_weight < 100
+        && let Some(r) = ramp_partner
+    {
+        routes.push(UpstreamRoute {
+            container_name: r.container.container_name.clone(),
+            local_addr: r.container.local_addr,
+            weight: 100 - new_weight,
+        });
     }
     routes
 }

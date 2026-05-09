@@ -94,8 +94,6 @@ function renderCloudInit(
   const agentEnvFile = renderEnvFile({
     ...agentEnv,
     FN0_AGENT_WORKER_ENV_FILE: "/etc/fn0-worker-agent/worker-env",
-    FN0_AGENT_INITIAL_WORKER_IMAGE_REF:
-      agentEnv.FN0_AGENT_INITIAL_WORKER_IMAGE_REF ?? "",
   });
   const workerEnvFile = renderEnvFile(workerEnv);
   const systemdUnit = `[Unit]
