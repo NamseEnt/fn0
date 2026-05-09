@@ -9,11 +9,12 @@ Both run automatically during `forte build` and `forte dev`.
 
 ## `forte-codegen` (build.rs)
 
-Every Forte project's `build.rs` calls:
+Every Forte project's `build.rs` calls one or both codegen functions:
 
 ```rust
 fn main() {
     forte_codegen::generate_routes();
+    forte_codegen::generate_env(); // optional, see below
 }
 ```
 
@@ -96,17 +97,50 @@ export const paths = {
 
 Rust types are mapped to TypeScript: `String`/`&str` → `string`, integer types → `number`, `bool` → `boolean`.
 
+### `generate_env` (optional)
+
+`forte_codegen::generate_env()` reads the project's `.env` file and generates `rs/src/env_generated.rs` with typed accessor functions for each variable:
+
+```rust
+// rs/src/env_generated.rs  (auto-generated)
+pub fn database_url() -> &'static str { ... }
+pub fn api_key() -> &'static str { ... }
+```
+
+Each function returns a `&'static str` cached in a `LazyLock`. Missing variables panic at first call (not at startup).
+
+Cargo reruns the build script whenever `../.env` changes.
+
 ## `forte-rs-to-ts`
 
 A standalone binary (`forte-rs-to-ts`) that reads the Rust source tree and generates TypeScript type files. Run automatically during `forte build`.
 
 For each page handler (`rs/src/pages/<path>/mod.rs`), it generates:
-- `fe/src/pages/<path>/.props.ts` — the `Props` type as a TypeScript discriminated union
+- `fe/src/pages/<path>/.props.ts` — a Zod schema (`PropsSchema`) and an inferred `Props` type
 
 For each action handler (`rs/src/actions/<name>.rs`), it generates:
-- Type files for `Input` and `Output` (format: Unknown from repository — check `forte/rs-to-ts/`)
+- `fe/src/actions/.generated/<name>.ts` — Zod schemas for `Input` and `Output`, plus a typed `callAction` wrapper function
+- `fe/src/actions/.generated/index.ts` — re-exports all generated action callers
 
-The generated Props type uses `{ t: "VariantName", v: { ... } }` shape for enum variants with fields.
+For each hook handler (`rs/src/hooks/<name>.rs`), it generates:
+- `fe/src/hooks/.generated/<name>.ts` — Zod schemas and a React hook using `useForteHook` from `@forte/react`
+
+The generated `.props.ts` file structure:
+
+```ts
+// Auto-generated from rs/src/pages/product/[id]/mod.rs
+
+import { z } from "zod";
+
+export const PropsSchema = z.discriminatedUnion("t", [
+  z.object({ t: z.literal("Ok"), v: z.object({ id: z.string() }) }),
+  z.object({ t: z.literal("NotFound") }),
+]);
+
+export type Props = z.infer<typeof PropsSchema>;
+```
+
+Enum variants use `{ t: "VariantName", v: { ... } }` shape. Unit variants (no fields) omit `v`. Supporting types referenced by `Props` are generated as named Zod schemas in the same file.
 
 ## The `FORTE-MANAGED` Block
 
