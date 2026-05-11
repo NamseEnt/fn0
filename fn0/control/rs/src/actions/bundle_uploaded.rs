@@ -33,7 +33,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     let db = doc_db::turso();
-    let version_doc = match (Fn0WasmtimeVersionDocGet {}).send_with(&db).await {
+    let fn0_wasmtime_version_doc = match (Fn0WasmtimeVersionDocGet {}).send_with(&db).await {
         Ok(Some(v)) => v,
         Ok(None) => {
             return Output::Error {
@@ -47,9 +47,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    let mut versions = vec![version_doc.active];
-    if let Some(p) = version_doc.pending {
-        versions.push(p);
+    let mut fn0_wasmtime_versions = vec![fn0_wasmtime_version_doc.active];
+    if let Some(p) = fn0_wasmtime_version_doc.pending {
+        fn0_wasmtime_versions.push(p);
     }
 
     let env = match read_env() {
@@ -62,9 +62,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
 
     let input_key = format!("original/{}.tar", req.body.project_id);
-    for ver in &versions {
+    for fn0_wasmtime_version in &fn0_wasmtime_versions {
         let output_key = format!(
-            "compiled/{ver}/{}/{}.tar.zst",
+            "compiled/{fn0_wasmtime_version}/{}/{}.tar.zst",
             req.body.project_id, req.body.last_modified,
         );
         let payload = serde_json::to_vec(&InvokePayload {
@@ -77,7 +77,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         })
         .expect("serialize invoke payload");
 
-        let function_name = lambda_function_name(ver);
+        let function_name = lambda_function_name(fn0_wasmtime_version);
         if let Err(e) = aws_sign::lambda_invoke_async(aws_sign::LambdaInvokeArgs {
             region: &env.region,
             access_key_id: &env.access_key_id,

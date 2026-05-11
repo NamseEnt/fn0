@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # fn0-wasmtime cwasm-compiler lambda lifecycle. Source-only.
 #
-# ensure_cwasm_pending <new_wasmtime_version>
+# ensure_cwasm_pending <new_fn0_wasmtime_version>
 #   Idempotent. Builds (if needed) the cwasm-compiler lambda for <new_wasmtime>,
 #   registers <new_wasmtime> as control's pending (or seeds active if none),
 #   and synchronously compiles every R2 /original/ object that is not yet under
@@ -18,13 +18,13 @@ __FN0_CWASM_COMPILER_LOADED=1
 CWASM_COMPILER_PARALLEL="${CWASM_COMPILER_PARALLEL:-20}"
 
 ensure_cwasm_pending() {
-  local new_version="$1"
-  if [[ -z "$new_version" ]]; then
+  local new_fn0_wasmtime_version="$1"
+  if [[ -z "$new_fn0_wasmtime_version" ]]; then
     echo "ensure_cwasm_pending: missing version" >&2
     return 2
   fi
-  local new_version_dash="${new_version//./-}"
-  local function_name="fn0-cwasm-compiler-${new_version_dash}"
+  local new_fn0_wasmtime_version_dash="${new_fn0_wasmtime_version//./-}"
+  local function_name="fn0-cwasm-compiler-${new_fn0_wasmtime_version_dash}"
 
   local cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk hq_ak hq_sk
   local r2_endpoint r2_bucket r2_ak r2_sk
@@ -52,7 +52,7 @@ ensure_cwasm_pending() {
   work_dir="$(mktemp -d)"
   trap 'rm -rf "$work_dir"' RETURN
 
-  local image_uri="${cwasm_ecr}:${new_version_dash}"
+  local image_uri="${cwasm_ecr}:${new_fn0_wasmtime_version_dash}"
 
   echo ">> ensure cwasm-compiler image ${image_uri}"
   (
@@ -116,10 +116,10 @@ ensure_cwasm_pending() {
     aws lambda wait function-updated --region "$cwasm_region" --function-name "$function_name"
   )
 
-  echo ">> register pending fn0-wasmtime ${new_version} in control"
-  control_set_pending_fn0_wasmtime "$new_version"
+  echo ">> register pending fn0-wasmtime ${new_fn0_wasmtime_version} in control"
+  control_set_pending_fn0_wasmtime "$new_fn0_wasmtime_version"
 
-  __cwasm_sync_compile_all "$new_version" "$function_name" \
+  __cwasm_sync_compile_all "$new_fn0_wasmtime_version" "$function_name" \
     "$cwasm_region" "$hq_ak" "$hq_sk" \
     "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" \
     "$work_dir"
@@ -165,7 +165,7 @@ __cwasm_invoke_one() {
   pid="$(jq -r '.project_id' <<<"$entry")"
   lm="$(jq -r '.last_modified' <<<"$entry")"
   input_key="original/${pid}.tar"
-  output_key="compiled/${CWASM_INVOKE_NEW_VERSION}/${pid}/${lm}.tar.zst"
+  output_key="compiled/${CWASM_INVOKE_NEW_FN0_WASMTIME_VERSION}/${pid}/${lm}.tar.zst"
 
   payload_file="${CWASM_INVOKE_WORK_DIR}/payload.${pid}.${lm//[:.]/_}.json"
   out_file="${CWASM_INVOKE_WORK_DIR}/out.${pid}.${lm//[:.]/_}.json"
@@ -219,7 +219,7 @@ __cwasm_invoke_one() {
 export -f __cwasm_invoke_one
 
 __cwasm_sync_compile_all() {
-  local new_version="$1" function_name="$2" region="$3" hq_ak="$4" hq_sk="$5"
+  local new_fn0_wasmtime_version="$1" function_name="$2" region="$3" hq_ak="$4" hq_sk="$5"
   local r2_endpoint="$6" r2_bucket="$7" r2_ak="$8" r2_sk="$9"
   local work_dir="${10}"
 
@@ -238,7 +238,7 @@ __cwasm_sync_compile_all() {
     | jq -c 'select(.Key | test("^original/[^/]+\\.tar$")) | {project_id: (.Key | capture("^original/(?<p>[^/]+)\\.tar$").p), last_modified_raw: .LastModified}' \
     > "$originals_file" || true
 
-  __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "compiled/${new_version}/" \
+  __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "compiled/${new_fn0_wasmtime_version}/" \
     | jq -r 'select(.Key | test("^compiled/[^/]+/[^/]+/.+\\.tar\\.zst$")) | (.Key | capture("^compiled/[^/]+/(?<p>[^/]+)/(?<lm>.+)\\.tar\\.zst$") | "\(.p)|\(.lm)")' \
     > "$compiled_file" || true
 
@@ -263,7 +263,7 @@ __cwasm_sync_compile_all() {
 
   if [[ "$todo_count" -gt 0 ]]; then
     echo ">> invoking lambda for ${todo_count} bundle(s) (parallel=${CWASM_COMPILER_PARALLEL})"
-    CWASM_INVOKE_NEW_VERSION="$new_version" \
+    CWASM_INVOKE_NEW_FN0_WASMTIME_VERSION="$new_fn0_wasmtime_version" \
     CWASM_INVOKE_WORK_DIR="$work_dir" \
     CWASM_INVOKE_R2_BUCKET="$r2_bucket" \
     CWASM_INVOKE_FUNCTION_NAME="$function_name" \
@@ -294,5 +294,5 @@ __cwasm_sync_compile_all() {
     echo ">> incomplete coverage (${total_success}/${total}); rerun." >&2
     return 1
   fi
-  echo ">> cwasm full coverage gated; pending ${new_version} ready."
+  echo ">> cwasm full coverage gated; pending ${new_fn0_wasmtime_version} ready."
 }
