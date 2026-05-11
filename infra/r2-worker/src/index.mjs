@@ -1,5 +1,5 @@
 const ORIGINAL_RE = /^original\/([^\/]+)\.tar$/;
-const COMPILED_RE = /^compiled\/([^\/]+)\/([^\/]+)\/(.+)\.tar\.zst$/;
+const COMPILED_RE = /^compiled\/([^\/]+)\/([^\/]+)\/(\d+)\.tar\.zst$/;
 const RELEVANT_ACTIONS = new Set([
   "PutObject",
   "CompleteMultipartUpload",
@@ -39,10 +39,10 @@ async function handleMessage(msg, env) {
       msg.ack();
       return;
     }
-    const lastModified = head.uploaded.toISOString().replace(/\.\d{3}Z$/, "Z");
+    const codeVersion = Math.floor(head.uploaded.getTime() / 1000);
     const ok = await postAction(env, "bundle_uploaded", {
       project_id: projectId,
-      last_modified: lastModified,
+      code_version: codeVersion,
     });
     if (ok) msg.ack();
     else msg.retry();
@@ -53,7 +53,7 @@ async function handleMessage(msg, env) {
   if (compiled) {
     const ok = await postAction(env, "bundle_compiled", {
       project_id: compiled[2],
-      last_modified: compiled[3],
+      code_version: Number.parseInt(compiled[3], 10),
       fn0_wasmtime_version: compiled[1],
     });
     if (ok) msg.ack();

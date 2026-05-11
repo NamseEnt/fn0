@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 pub struct Input {
     pub project_id: String,
-    pub last_modified: String,
+    pub code_version: u64,
 }
 
 #[derive(Serialize)]
@@ -65,7 +65,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     for fn0_wasmtime_version in &fn0_wasmtime_versions {
         let output_key = format!(
             "compiled/{fn0_wasmtime_version}/{}/{}.tar.zst",
-            req.body.project_id, req.body.last_modified,
+            req.body.project_id, req.body.code_version,
         );
         let payload = serde_json::to_vec(&InvokePayload {
             input_bucket: &env.bucket,

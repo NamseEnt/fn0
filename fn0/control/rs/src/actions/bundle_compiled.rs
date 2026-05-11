@@ -7,7 +7,7 @@ use std::collections::HashMap;
 #[derive(Deserialize)]
 pub struct Input {
     pub project_id: String,
-    pub last_modified: String,
+    pub code_version: u64,
     pub fn0_wasmtime_version: String,
 }
 
@@ -24,47 +24,50 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     let project_id = req.body.project_id.clone();
-    let last_modified = req.body.last_modified.clone();
-    let version = req.body.fn0_wasmtime_version.clone();
+    let code_version = req.body.code_version;
+    let fn0_wasmtime_version = req.body.fn0_wasmtime_version.clone();
 
     let result = doc_db::turso()
         .trx(|trx| {
             let project_id = project_id.clone();
-            let last_modified = last_modified.clone();
-            let version = version.clone();
+            let fn0_wasmtime_version = fn0_wasmtime_version.clone();
             async move {
                 let existing = trx
                     .get(CompiledBundleDocGet {
                         project_id: &project_id,
-                        last_modified: &last_modified,
+                        code_version,
                     })
                     .await?;
 
                 let newly_compiled = match existing {
                     Some(mut handle) => {
-                        if handle.fn0_wasmtime_versions.contains(&version) {
+                        if handle.fn0_wasmtime_versions.contains(&fn0_wasmtime_version) {
                             false
                         } else {
-                            handle.fn0_wasmtime_versions.push(version.clone());
+                            handle
+                                .fn0_wasmtime_versions
+                                .push(fn0_wasmtime_version.clone());
                             true
                         }
                     }
                     None => {
                         trx.create(CompiledBundleDoc {
                             project_id: project_id.clone(),
-                            last_modified: last_modified.clone(),
-                            fn0_wasmtime_versions: vec![version.clone()],
+                            code_version,
+                            fn0_wasmtime_versions: vec![fn0_wasmtime_version.clone()],
                         })?;
                         true
                     }
                 };
 
                 if newly_compiled {
-                    let active_version = trx
+                    let active_fn0_wasmtime_version = trx
                         .get(Fn0WasmtimeVersionDocGet {})
                         .await?
                         .map(|v| v.active.clone());
-                    if active_version.as_deref() == Some(version.as_str()) {
+                    if active_fn0_wasmtime_version.as_deref()
+                        == Some(fn0_wasmtime_version.as_str())
+                    {
                         match trx.get(WorkerManifestDocGet {}).await? {
                             Some(mut manifest) => {
                                 let entry = manifest
@@ -74,15 +77,17 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                                         code_version: 0,
                                         custom_domain: None,
                                     });
-                                entry.code_version += 1;
-                                manifest.manifest_version += 1;
+                                if code_version > entry.code_version {
+                                    entry.code_version = code_version;
+                                    manifest.manifest_version += 1;
+                                }
                             }
                             None => {
                                 let mut entries = HashMap::new();
                                 entries.insert(
                                     project_id,
                                     WorkerProjectManifest {
-                                        code_version: 1,
+                                        code_version,
                                         custom_domain: None,
                                     },
                                 );
