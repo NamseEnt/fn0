@@ -39,6 +39,8 @@ pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
 
 The `Props` type is serialized to JSON and passed to the React component via the SSR pipeline.
 
+> **Scaffold note:** `forte add page` generates a starter file with the signature `handler(_headers: HeaderMap, _jar: CookieJar)`. This does **not** match the calling convention — the generated router always passes a `ForteRequest` struct as the first argument. Replace the generated signature with `handler(_req: ForteRequest<'_>)` before running `forte build`.
+
 ## ForteRequest
 
 `ForteRequest<'a, Body>` is the request context injected into handlers:
