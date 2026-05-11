@@ -158,8 +158,8 @@ impl S3BundleCache {
     #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     async fn fetch_and_build(&self, project_id: &str) -> Result<(Arc<Bundle>, usize), Error> {
         let key = format!(
-            "bundles/{version}/{project_id}.tar.zst",
-            version = fn0::FN0_WASMTIME_VERSION,
+            "bundles/{fn0_wasmtime_version}/{project_id}.tar.zst",
+            fn0_wasmtime_version = fn0::FN0_WASMTIME_VERSION,
         );
         let compressed = match self.operator.read(&key).await {
             Ok(buf) => buf.to_vec(),
