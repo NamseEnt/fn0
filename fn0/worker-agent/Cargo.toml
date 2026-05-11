@@ -13,6 +13,7 @@ release = false
 anyhow = { workspace = true }
 color-eyre = { workspace = true }
 doc-db = { workspace = true }
+fn0-shared-schema = { path = "../shared-schema" }
 forte-macros = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }

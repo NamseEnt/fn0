@@ -391,6 +391,10 @@ const cloudflareSaasApiTokenCt = pulumi
   .all([controlDek.plaintext, dns.saasApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
+const controlDnsApiTokenCt = pulumi
+  .all([controlDek.plaintext, dns.dnsApiToken])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const controlEnvYamlBootstrap = pulumi
   .all([
     controlDek.ciphertext,
@@ -416,6 +420,7 @@ const controlEnvYamlBootstrap = pulumi
     pulumi.output(config.require("tursoOrganizationSlug")),
     forteDb.groupName,
     cloudflareSaasApiTokenCt,
+    controlDnsApiTokenCt,
   ])
   .apply(
     ([
@@ -442,6 +447,7 @@ const controlEnvYamlBootstrap = pulumi
       tursoOrgSlug,
       tursoGroupName,
       cfSaasApiTokenCt,
+      dnsApiTokenCt,
     ]) =>
       [
         "__dek:",
@@ -482,6 +488,10 @@ const controlEnvYamlBootstrap = pulumi
         `FN0_CLOUDFLARE_SAAS_ZONE_ID: ${cfZoneId}`,
         "FN0_CLOUDFLARE_SAAS_API_TOKEN:",
         `  secret: ${cfSaasApiTokenCt}`,
+        "FN0_AGENT_DNS_API_TOKEN:",
+        `  secret: ${dnsApiTokenCt}`,
+        `FN0_AGENT_DNS_ZONE_ID: ${cfZoneId}`,
+        `FN0_AGENT_DNS_HOSTNAME: "*.${domain}"`,
         "",
       ].join("\n")
   );

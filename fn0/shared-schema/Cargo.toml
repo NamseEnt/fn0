@@ -1,10 +1,10 @@
 [package]
-name = "fn0-manifest-schema"
+name = "fn0-shared-schema"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Shared schema for the worker manifest doc consumed by fn0-control and fn0-worker"
+description = "Shared doc schemas consumed by fn0-control, fn0-worker and fn0-worker-agent"
 
 [package.metadata.release]
 release = false

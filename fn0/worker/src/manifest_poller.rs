@@ -1,6 +1,6 @@
 use crate::cache::S3BundleCache;
 use doc_db::{DbRequest, Database};
-use fn0_manifest_schema::WorkerManifestDocGet;
+use fn0_shared_schema::WorkerManifestDocGet;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

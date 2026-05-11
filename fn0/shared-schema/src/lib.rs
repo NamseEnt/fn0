@@ -15,3 +15,11 @@ pub struct WorkerManifestDoc {
     pub manifest_version: u64,
     pub project_manifests: HashMap<String, WorkerProjectManifest>,
 }
+
+#[forte_doc]
+pub struct WorkerHeartbeatDoc {
+    #[sk]
+    pub host_id: String,
+    pub addr: String,
+    pub last_seen_at: i64,
+}
