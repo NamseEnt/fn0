@@ -103,7 +103,7 @@ async fn delete_record(
     Ok(())
 }
 
-async fn detect_public_ipv4() -> Result<String, SelfDnsError> {
+pub async fn detect_public_ipv4() -> Result<String, SelfDnsError> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()?;

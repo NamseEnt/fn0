@@ -2,7 +2,7 @@ use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
 pub use doc_db::DbRequest;
-pub use fn0_manifest_schema::{
+pub use fn0_shared_schema::{
     WorkerManifestDoc, WorkerManifestDocGet, WorkerManifestDocPut, WorkerManifestDocQuery,
     WorkerProjectManifest,
 };

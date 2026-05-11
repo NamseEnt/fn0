@@ -8,6 +8,7 @@
 //! simultaneously and cluster capacity briefly doubles during the swap.
 //! Rolling updates across hosts will be added later.
 
+mod heartbeat;
 mod host_status_reporter;
 mod inbound_proxy;
 mod podman;
@@ -49,6 +50,10 @@ async fn async_main() -> Result<()> {
     let host_id = std::env::var("FN0_AGENT_HOST_ID")
         .expect("FN0_AGENT_HOST_ID must be set");
 
+    let public_ip = self_dns::detect_public_ipv4()
+        .await
+        .expect("detect public ipv4 failed");
+
     let (target_image_tx, target_image_rx) = watch::channel::<Option<String>>(None);
     let (active_image_tx, active_image_rx) = watch::channel::<Option<String>>(None);
     let (upstream_tx, upstream_rx) = watch::channel::<Vec<UpstreamRoute>>(Vec::new());
@@ -66,7 +71,12 @@ async fn async_main() -> Result<()> {
     tasks.spawn(host_status_reporter::run(
         shutdown.clone(),
         active_image_rx,
-        host_id,
+        host_id.clone(),
+    ));
+    tasks.spawn(heartbeat::run(
+        shutdown.clone(),
+        host_id.clone(),
+        public_ip.clone(),
     ));
     tasks.spawn(inbound_proxy::run(shutdown.clone(), upstream_rx));
 
@@ -88,6 +98,10 @@ async fn async_main() -> Result<()> {
             while tasks.join_next().await.is_some() {}
             return Ok(());
         }
+    }
+
+    if let Err(err) = heartbeat::write_initial(&host_id, &public_ip).await {
+        warn!(?err, "initial heartbeat write failed; continuing anyway");
     }
 
     if let Err(err) = self_dns::register().await {

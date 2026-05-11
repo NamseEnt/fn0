@@ -19,7 +19,7 @@ bytes = { workspace = true }
 color-eyre = { workspace = true }
 doc-db = { workspace = true }
 fn0 = { workspace = true }
-fn0-manifest-schema = { path = "../manifest-schema" }
+fn0-shared-schema = { path = "../shared-schema" }
 futures = { workspace = true }
 hmac = { workspace = true }
 http = { workspace = true }

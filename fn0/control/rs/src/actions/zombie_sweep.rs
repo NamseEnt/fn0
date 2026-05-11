@@ -1,6 +1,13 @@
 use crate::common::admin;
+use fn0_shared_schema::{
+    DbRequest, WorkerHeartbeatDoc, WorkerHeartbeatDocDelete, WorkerHeartbeatDocQuery,
+};
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
+
+const CLOUDFLARE_API_BASE: &str = "https://api.cloudflare.com/client/v4";
+
+pub const ZOMBIE_TIMEOUT_SECS: i64 = 60;
 
 #[derive(Deserialize)]
 pub struct Input {}
@@ -18,8 +25,6 @@ pub enum Output {
     },
 }
 
-pub const ZOMBIE_TIMEOUT_SECS: i64 = 5 * 60;
-
 pub struct SweepStats {
     pub scanned_instances: u64,
     pub terminated_instances: u64,
@@ -27,16 +32,140 @@ pub struct SweepStats {
 }
 
 pub async fn run_sweep() -> anyhow::Result<SweepStats> {
-    tracing::info!(
-        timeout_secs = ZOMBIE_TIMEOUT_SECS,
-        "zombie_sweep stub: TODO list OCI compute instances, ping each, terminate ones whose \
-         last normal signal is older than the timeout, then delete matching Cloudflare DNS A records"
-    );
+    let api_token = std::env::var("FN0_AGENT_DNS_API_TOKEN")
+        .map_err(|_| anyhow::anyhow!("FN0_AGENT_DNS_API_TOKEN not set"))?;
+    let zone_id = std::env::var("FN0_AGENT_DNS_ZONE_ID")
+        .map_err(|_| anyhow::anyhow!("FN0_AGENT_DNS_ZONE_ID not set"))?;
+    let hostname = std::env::var("FN0_AGENT_DNS_HOSTNAME")
+        .map_err(|_| anyhow::anyhow!("FN0_AGENT_DNS_HOSTNAME not set"))?;
+
+    let db = doc_db::turso();
+    let docs: Vec<WorkerHeartbeatDoc> = WorkerHeartbeatDocQuery {
+        host_id: None,
+        limit: None,
+    }
+    .send_with(&db)
+    .await?;
+
+    let scanned_instances = docs.len() as u64;
+    let now = chrono::Utc::now().timestamp();
+    let stale: Vec<WorkerHeartbeatDoc> = docs
+        .into_iter()
+        .filter(|d| now - d.last_seen_at > ZOMBIE_TIMEOUT_SECS)
+        .collect();
+
+    let client = http::Client::new();
+    let mut cleaned_dns_records: u64 = 0;
+
+    for d in stale {
+        let deleted = match delete_a_records_for_addr(
+            &client,
+            &api_token,
+            &zone_id,
+            &hostname,
+            &d.addr,
+        )
+        .await
+        {
+            Ok(n) => n,
+            Err(e) => {
+                tracing::error!(
+                    host_id = %d.host_id,
+                    addr = %d.addr,
+                    error = %e,
+                    "zombie_sweep dns delete failed",
+                );
+                continue;
+            }
+        };
+        cleaned_dns_records += deleted as u64;
+
+        if let Err(e) = (WorkerHeartbeatDocDelete {
+            host_id: d.host_id.clone(),
+        })
+        .send_with(&db)
+        .await
+        {
+            tracing::error!(
+                host_id = %d.host_id,
+                error = %e,
+                "zombie_sweep doc delete failed",
+            );
+            continue;
+        }
+
+        tracing::info!(
+            host_id = %d.host_id,
+            addr = %d.addr,
+            deleted_dns_records = deleted,
+            "zombie_sweep reaped host",
+        );
+    }
+
     Ok(SweepStats {
-        scanned_instances: 0,
+        scanned_instances,
         terminated_instances: 0,
-        cleaned_dns_records: 0,
+        cleaned_dns_records,
     })
+}
+
+#[derive(Deserialize)]
+struct DnsListResponse {
+    result: Option<Vec<DnsRecord>>,
+}
+
+#[derive(Deserialize)]
+struct DnsRecord {
+    id: String,
+    content: String,
+}
+
+async fn delete_a_records_for_addr(
+    client: &http::Client,
+    api_token: &str,
+    zone_id: &str,
+    hostname: &str,
+    addr: &str,
+) -> anyhow::Result<usize> {
+    let list_url = format!(
+        "{CLOUDFLARE_API_BASE}/zones/{zone_id}/dns_records?type=A&name={hostname}"
+    );
+    let list_req = http::Request::builder()
+        .method("GET")
+        .uri(list_url)
+        .header("Authorization", format!("Bearer {api_token}"))
+        .body(Vec::new())?;
+    let list_resp = client.send(list_req).await?;
+    if !list_resp.status().is_success() {
+        anyhow::bail!("cloudflare list dns_records status {}", list_resp.status());
+    }
+    let body = list_resp.into_body().bytes().await.to_vec();
+    let parsed: DnsListResponse = serde_json::from_slice(&body)?;
+    let records = parsed.result.unwrap_or_default();
+
+    let mut deleted = 0usize;
+    for record in records.into_iter().filter(|r| r.content == addr) {
+        let delete_url = format!(
+            "{CLOUDFLARE_API_BASE}/zones/{zone_id}/dns_records/{}",
+            record.id
+        );
+        let delete_req = http::Request::builder()
+            .method("DELETE")
+            .uri(delete_url)
+            .header("Authorization", format!("Bearer {api_token}"))
+            .body(Vec::new())?;
+        let resp = client.send(delete_req).await?;
+        if !resp.status().is_success() {
+            anyhow::bail!(
+                "cloudflare delete dns_record {} status {}",
+                record.id,
+                resp.status()
+            );
+        }
+        deleted += 1;
+    }
+
+    Ok(deleted)
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {

@@ -291,7 +291,7 @@ dependencies = [
  "base64 0.22.1",
  "cookie",
  "fn0-doc-db",
- "fn0-manifest-schema",
+ "fn0-shared-schema",
  "forte-codegen",
  "forte-json",
  "forte-sdk",
@@ -320,7 +320,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fn0-manifest-schema"
+name = "fn0-shared-schema"
 version = "0.1.0"
 dependencies = [
  "anyhow",
