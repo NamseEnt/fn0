@@ -6,9 +6,6 @@ license.workspace = true
 repository.workspace = true
 description = "Shared doc schemas consumed by fn0-control, fn0-worker and fn0-worker-agent"
 
-[package.metadata.release]
-release = false
-
 [dependencies]
 anyhow = { workspace = true }
 doc-db = { workspace = true }
