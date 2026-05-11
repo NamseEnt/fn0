@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 pub struct Input {
     pub project_id: String,
-    pub last_modified: String,
+    pub code_version: u64,
 }
 
 #[derive(Serialize)]
@@ -57,7 +57,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     let started = time_wasi::Instant::now().await;
     loop {
-        let snapshot = match load_state(&db, &req.body.project_id, &req.body.last_modified).await {
+        let snapshot = match load_state(&db, &req.body.project_id, req.body.code_version).await {
             Ok(v) => v,
             Err(e) => {
                 tracing::error!("deploy_status load_state: {e}");
@@ -107,12 +107,12 @@ struct Snapshot {
 async fn load_state(
     db: &doc_db::Database,
     project_id: &str,
-    last_modified: &str,
+    code_version: u64,
 ) -> anyhow::Result<Snapshot> {
     let (compiled_doc, version_doc) = (
         CompiledBundleDocGet {
             project_id,
-            last_modified,
+            code_version,
         },
         Fn0WasmtimeVersionDocGet {},
     )

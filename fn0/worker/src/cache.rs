@@ -129,7 +129,7 @@ impl S3BundleCache {
             code_version
         };
 
-        let (bundle, size) = self.fetch_and_build(project_id).await?;
+        let (bundle, size) = self.fetch_and_build(project_id, code_version).await?;
 
         let mut inner = self.inner.lock().await;
         if let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id) {
@@ -155,10 +155,14 @@ impl S3BundleCache {
         Ok(bundle)
     }
 
-    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
-    async fn fetch_and_build(&self, project_id: &str) -> Result<(Arc<Bundle>, usize), Error> {
+    #[tracing::instrument(skip_all, fields(project_id = %project_id, code_version))]
+    async fn fetch_and_build(
+        &self,
+        project_id: &str,
+        code_version: u64,
+    ) -> Result<(Arc<Bundle>, usize), Error> {
         let key = format!(
-            "bundles/{fn0_wasmtime_version}/{project_id}.tar.zst",
+            "compiled/{fn0_wasmtime_version}/{project_id}/{code_version}.tar.zst",
             fn0_wasmtime_version = fn0::FN0_WASMTIME_VERSION,
         );
         let compressed = match self.operator.read(&key).await {

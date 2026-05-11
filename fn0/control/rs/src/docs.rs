@@ -51,7 +51,7 @@ pub struct CompiledBundleDoc {
     #[pk]
     pub project_id: String,
     #[pk]
-    pub last_modified: String,
+    pub code_version: u64,
     pub fn0_wasmtime_versions: Vec<String>,
 }
 

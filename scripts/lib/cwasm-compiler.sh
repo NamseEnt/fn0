@@ -155,21 +155,17 @@ __cwasm_list_r2() {
   done
 }
 
-__cwasm_normalize_lm() {
-  echo "$1" | sed -E 's/\.[0-9]+\+00:00$/Z/; s/\+00:00$/Z/'
-}
-
 __cwasm_invoke_one() {
-  local entry pid lm input_key output_key payload_file out_file meta_file rc fn_err log_b64
+  local entry pid code_version input_key output_key payload_file out_file meta_file rc fn_err log_b64
   entry="$1"
   pid="$(jq -r '.project_id' <<<"$entry")"
-  lm="$(jq -r '.last_modified' <<<"$entry")"
+  code_version="$(jq -r '.code_version' <<<"$entry")"
   input_key="original/${pid}.tar"
-  output_key="compiled/${CWASM_INVOKE_NEW_FN0_WASMTIME_VERSION}/${pid}/${lm}.tar.zst"
+  output_key="compiled/${CWASM_INVOKE_NEW_FN0_WASMTIME_VERSION}/${pid}/${code_version}.tar.zst"
 
-  payload_file="${CWASM_INVOKE_WORK_DIR}/payload.${pid}.${lm//[:.]/_}.json"
-  out_file="${CWASM_INVOKE_WORK_DIR}/out.${pid}.${lm//[:.]/_}.json"
-  meta_file="${CWASM_INVOKE_WORK_DIR}/meta.${pid}.${lm//[:.]/_}.json"
+  payload_file="${CWASM_INVOKE_WORK_DIR}/payload.${pid}.${code_version}.json"
+  out_file="${CWASM_INVOKE_WORK_DIR}/out.${pid}.${code_version}.json"
+  meta_file="${CWASM_INVOKE_WORK_DIR}/meta.${pid}.${code_version}.json"
 
   jq -nc --arg ib "$CWASM_INVOKE_R2_BUCKET" --arg ik "$input_key" \
          --arg ob "$CWASM_INVOKE_R2_BUCKET" --arg ok "$output_key" \
@@ -191,7 +187,7 @@ __cwasm_invoke_one() {
 
   if [[ $rc -ne 0 ]]; then
     {
-      echo "[FAIL] ${pid} ${lm}: aws cli rc=${rc}"
+      echo "[FAIL] ${pid} ${code_version}: aws cli rc=${rc}"
       sed 's/^/  /' < "$meta_file"
       echo "---"
     } >> "$CWASM_INVOKE_FAIL_FILE"
@@ -203,7 +199,7 @@ __cwasm_invoke_one() {
 
   if [[ -n "$fn_err" ]]; then
     {
-      echo "[FAIL] ${pid} ${lm}: FunctionError=${fn_err}"
+      echo "[FAIL] ${pid} ${code_version}: FunctionError=${fn_err}"
       echo "  payload:"
       sed 's/^/    /' < "$out_file"
       if [[ -n "$log_b64" ]]; then
@@ -213,7 +209,7 @@ __cwasm_invoke_one() {
       echo "---"
     } >> "$CWASM_INVOKE_FAIL_FILE"
   else
-    echo "${pid} ${lm}" >> "$CWASM_INVOKE_SUCCESS_FILE"
+    echo "${pid} ${code_version}" >> "$CWASM_INVOKE_SUCCESS_FILE"
   fi
 }
 export -f __cwasm_invoke_one
@@ -235,23 +231,22 @@ __cwasm_sync_compile_all() {
   : > "$fail_file"
 
   __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "original/" \
-    | jq -c 'select(.Key | test("^original/[^/]+\\.tar$")) | {project_id: (.Key | capture("^original/(?<p>[^/]+)\\.tar$").p), last_modified_raw: .LastModified}' \
+    | jq -c 'select(.Key | test("^original/[^/]+\\.tar$")) | {project_id: (.Key | capture("^original/(?<p>[^/]+)\\.tar$").p), code_version: (.LastModified | sub("\\.[0-9]+\\+00:00$"; "+00:00") | fromdateiso8601)}' \
     > "$originals_file" || true
 
   __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "compiled/${new_fn0_wasmtime_version}/" \
-    | jq -r 'select(.Key | test("^compiled/[^/]+/[^/]+/.+\\.tar\\.zst$")) | (.Key | capture("^compiled/[^/]+/(?<p>[^/]+)/(?<lm>.+)\\.tar\\.zst$") | "\(.p)|\(.lm)")' \
+    | jq -r 'select(.Key | test("^compiled/[^/]+/[^/]+/[0-9]+\\.tar\\.zst$")) | (.Key | capture("^compiled/[^/]+/(?<p>[^/]+)/(?<cv>[0-9]+)\\.tar\\.zst$") | "\(.p)|\(.cv)")' \
     > "$compiled_file" || true
 
-  local line pid lm_raw lm key
+  local line pid code_version key
   while IFS= read -r line; do
     pid="$(jq -r '.project_id' <<<"$line")"
-    lm_raw="$(jq -r '.last_modified_raw' <<<"$line")"
-    lm="$(__cwasm_normalize_lm "$lm_raw")"
-    key="${pid}|${lm}"
+    code_version="$(jq -r '.code_version' <<<"$line")"
+    key="${pid}|${code_version}"
     if grep -Fxq "$key" "$compiled_file"; then
       continue
     fi
-    jq -nc --arg p "$pid" --arg lm "$lm" '{project_id: $p, last_modified: $lm}' >> "$todo_file"
+    jq -nc --arg p "$pid" --argjson cv "$code_version" '{project_id: $p, code_version: $cv}' >> "$todo_file"
   done < "$originals_file"
 
   local total todo_count already

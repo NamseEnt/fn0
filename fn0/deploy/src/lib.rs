@@ -155,7 +155,7 @@ struct StaticUpload {
 #[derive(Serialize)]
 struct DeployStatusInput<'a> {
     project_id: &'a str,
-    last_modified: &'a str,
+    code_version: u64,
 }
 
 #[derive(Deserialize)]
@@ -209,10 +209,10 @@ pub async fn deploy_wasm(
     .await?;
 
     println!("uploading bundle to {object_key}...");
-    let last_modified = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
-    println!("uploaded. last_modified={last_modified}");
+    let code_version = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
+    println!("uploaded. code_version={code_version}");
 
-    poll_deploy_status(&client, control_url, token, project_id, &last_modified).await?;
+    poll_deploy_status(&client, control_url, token, project_id, code_version).await?;
     println!("Deploy complete!");
     Ok(())
 }
@@ -272,10 +272,10 @@ pub async fn deploy_forte(
     }
 
     println!("uploading bundle to {object_key}...");
-    let last_modified = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
-    println!("uploaded. last_modified={last_modified}");
+    let code_version = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
+    println!("uploaded. code_version={code_version}");
 
-    poll_deploy_status(&client, control_url, token, project_id, &last_modified).await?;
+    poll_deploy_status(&client, control_url, token, project_id, code_version).await?;
     println!("Deploy complete!");
     Ok(())
 }
@@ -332,7 +332,7 @@ async fn upload_bundle(
     client: &reqwest::Client,
     presigned_put_url: &str,
     bundle_tar_path: &Path,
-) -> Result<String> {
+) -> Result<u64> {
     let bundle_bytes = std::fs::read(bundle_tar_path)
         .map_err(|e| anyhow!("Failed to read {}: {}", bundle_tar_path.display(), e))?;
     let put_resp = client
@@ -342,7 +342,7 @@ async fn upload_bundle(
         .await?
         .error_for_status()
         .map_err(|e| anyhow!("bundle upload failed: {e}"))?;
-    extract_last_modified(&put_resp)
+    extract_code_version(&put_resp)
 }
 
 async fn upload_static_assets(
@@ -464,7 +464,7 @@ pub fn content_type_for(path: &Path) -> &'static str {
     }
 }
 
-fn extract_last_modified(resp: &reqwest::Response) -> Result<String> {
+fn extract_code_version(resp: &reqwest::Response) -> Result<u64> {
     let hv = resp
         .headers()
         .get(reqwest::header::LAST_MODIFIED)
@@ -473,10 +473,8 @@ fn extract_last_modified(resp: &reqwest::Response) -> Result<String> {
         .map_err(|e| anyhow!("Last-Modified not utf-8: {e}"))?;
     let dt = chrono::DateTime::parse_from_rfc2822(hv)
         .map_err(|e| anyhow!("Last-Modified parse: {e}; raw={hv}"))?;
-    Ok(dt
-        .with_timezone(&chrono::Utc)
-        .format("%Y-%m-%dT%H:%M:%SZ")
-        .to_string())
+    let secs = dt.timestamp();
+    u64::try_from(secs).map_err(|_| anyhow!("Last-Modified before epoch: {secs}"))
 }
 
 async fn poll_deploy_status(
@@ -484,7 +482,7 @@ async fn poll_deploy_status(
     control_url: &str,
     token: &str,
     project_id: &str,
-    last_modified: &str,
+    code_version: u64,
 ) -> Result<()> {
     let url = format!(
         "{}/__forte_action/deploy_status",
@@ -500,7 +498,7 @@ async fn poll_deploy_status(
             .bearer_auth(token)
             .json(&DeployStatusInput {
                 project_id,
-                last_modified,
+                code_version,
             })
             .send()
             .await?
