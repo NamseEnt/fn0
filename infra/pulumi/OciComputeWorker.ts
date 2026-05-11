@@ -416,6 +416,16 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       { parent: this, retainOnDelete: false }
     );
 
+    new oci.artifacts.ContainerRepository(
+      "worker-agent-repo",
+      {
+        compartmentId: compartment.id,
+        displayName: pulumi.interpolate`fn0-worker-${compartmentSuffix}-agent`,
+        isPublic: true,
+      },
+      { parent: this, retainOnDelete: false }
+    );
+
     const workerDockerUser = new oci.identity.User(
       "worker-docker-user",
       {

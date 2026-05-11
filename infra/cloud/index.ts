@@ -650,7 +650,7 @@ const fn0WorkerAgentImageRef = ociComputeWorker.workerImageRegistries.apply(
 );
 
 new fn0.Fn0WorkerPool("fn0-worker", {
-  count: 1,
+  count: 0,
   compartmentId: ociComputeWorker.compartmentId,
   availabilityDomain: ociComputeWorker.infraEnvs.OCI_AVAILABILITY_DOMAIN,
   subnetId: ociComputeWorker.subnetId,
