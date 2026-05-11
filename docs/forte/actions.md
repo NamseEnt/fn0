@@ -106,9 +106,9 @@ Background tasks live under `rs/src/queue_task/`. They have an `Input` struct an
 ```rust
 // rs/src/queue_task/send_email.rs
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]  // both required: Deserialize for execution, Serialize for enqueue
 pub struct Input {
     pub to: String,
     pub subject: String,
@@ -125,8 +125,9 @@ To enqueue a task from anywhere in the backend:
 
 ```rust
 use crate::enqueue;
+use crate::queue_task::send_email;
 
-enqueue::send_email(enqueue::send_email::Input {
+enqueue::send_email(send_email::Input {
     to: "user@example.com".to_string(),
     subject: "Welcome".to_string(),
     body: "...".to_string(),

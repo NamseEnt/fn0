@@ -52,32 +52,38 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.2.27 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0` | 0.2.28 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
 | `fn0-cli` | 0.1.0 | Local development CLI |
-| `fn0-worker` | 0.3.23 | Worker binary (distributed execution node) |
-| `fn0-worker-agent` | 0.1.0 | Per-instance container supervisor (blue-green deploys, self DNS, in-host TCP proxy) |
+| `fn0-worker` | 0.3.24 | Worker binary (distributed execution node) |
+| `fn0-worker-agent` | 0.1.1 | Per-instance container supervisor (blue-green deploys, self DNS, in-host TCP proxy) |
 | `fn0-deploy` | 0.1.6 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.1.3 | Wasmtime wrapper with fn0-specific config |
 | `fn0-ski` | 0.1.4 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | Compiler utilities (internal) |
 | `hq` | 0.1.0 | Headquarter management service |
 
-## fn0-cli (Local Development)
+## fn0-cli Commands
 
-The fn0 CLI (`fn0/cli`) provides local development tooling:
+The fn0 CLI (`fn0/cli`) provides tooling for projects deployed directly to fn0 without Forte:
 
-```sh
-# Initialize a new fn0 project
-fn0 init
+| Command | Description |
+|---|---|
+| `fn0 init [--name <name>]` | Scaffold a new fn0 project (prompts for framework and language) |
+| `fn0 build` | Compile the project to WASM |
+| `fn0 local [--port <port>]` | Run locally on the given port (default: auto) |
+| `fn0 deploy` | Build and deploy to fn0 Cloud |
+| `fn0 destroy` | Delete the deployed project |
+| `fn0 rename <new-name>` | Rename the deployed project |
+| `fn0 login [token]` | Authenticate with fn0 Cloud |
+| `fn0 admin run <task>` | Run an admin task against the deployed app |
+| `fn0 domain add <domain>` | Attach a custom domain (CNAME) |
+| `fn0 domain remove` | Detach the custom domain |
+| `fn0 domain status` | Show custom domain status |
+| `fn0 secrets set <key> <value>` | Set a secret (injected via vault_hijack at runtime) |
+| `fn0 secrets list` | List secret keys |
+| `fn0 secrets unset <key>` | Remove a secret |
 
-# Build (compiles to WASM)
-fn0 build
-
-# Run locally
-fn0 local
-```
-
-Unknown from repository: detailed `fn0-cli` commands — check `fn0/cli/README.md` and `fn0/cli/src/`.
+> **Note:** Most Forte developers use `forte` CLI instead of `fn0` CLI. `fn0` CLI is for projects that use fn0 as a raw FaaS platform (e.g., Hono-based TypeScript apps).
 
 ## Supported Languages
 

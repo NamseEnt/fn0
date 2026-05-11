@@ -165,6 +165,42 @@ OpenTelemetry is initialized once per instance on the first request via `otel::i
 
 The service name defaults to `"forte-app"` and can be overridden with the `OTEL_SERVICE_NAME` environment variable.
 
+## `forte_json` — Serialization Format
+
+`forte-json` is a custom JSON serializer/deserializer used for all handler I/O. It differs from `serde_json` in two ways:
+
+**Serialization (Rust → JSON):**
+- Struct field names are converted to camelCase (`user_name` → `"userName"`)
+- Enum variants use a `t` discriminant field:
+
+| Variant kind | Rust | JSON |
+|---|---|---|
+| Unit | `Ok` | `{"t":"Ok"}` |
+| Tuple/newtype (1 field) | `Ok(String)` | `{"t":"Ok","v":"..."}` |
+| Struct | `Ok { message: String }` | `{"t":"Ok","message":"..."}` |
+
+For struct variants the fields are spread flat alongside `t`; there is no `v` wrapper.
+
+**Deserialization (JSON → Rust):**
+- All object keys are converted to snake_case before deserializing (`"userName"` → `"user_name"`)
+- This means TypeScript action input shapes use camelCase while Rust struct fields use snake_case
+
+```rust
+// Rust
+#[derive(Deserialize)]
+pub struct Input {
+    pub user_name: String,   // receives "userName" from the browser
+}
+```
+
+The API:
+```rust
+use forte_sdk::forte_json;
+
+let bytes: Vec<u8> = forte_json::to_vec(&my_value);
+let value: MyType = forte_json::from_slice(&bytes)?;
+```
+
 ## Re-exported Crates
 
 All re-exported at the crate root and usable via `forte_sdk::`:
