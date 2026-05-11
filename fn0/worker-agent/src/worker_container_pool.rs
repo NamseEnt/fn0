@@ -20,6 +20,7 @@ pub struct UpstreamRoute {
 }
 
 const OPS_PORT_OFFSET: u16 = 1;
+const WORKER_BASE_PORT: u16 = 18443;
 
 pub async fn run(
     shutdown: Shutdown,
@@ -32,12 +33,9 @@ pub async fn run(
     let podman = Podman::from_env();
     let ramp_duration = duration_from_env_secs("FN0_AGENT_RAMP_DURATION_SECS", RAMP_DURATION_DEFAULT);
     let drain_timeout = duration_from_env_secs("FN0_AGENT_DRAIN_TIMEOUT_SECS", DRAIN_TIMEOUT_DEFAULT);
-    let mut next_port: u16 = std::env::var("FN0_AGENT_WORKER_BASE_PORT")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(18443);
-    // We allocate a (user, ops) port pair per container; bump by 2 each time.
-    let env_file = std::env::var("FN0_AGENT_WORKER_ENV_FILE").ok();
+    let mut next_port: u16 = WORKER_BASE_PORT;
+    let env_file = std::env::var("FN0_AGENT_WORKER_ENV_FILE")
+        .expect("FN0_AGENT_WORKER_ENV_FILE must be set");
     let mut state = PoolState::default();
     let mut first_ready_tx = Some(first_ready_tx);
 
@@ -63,7 +61,7 @@ pub async fn run(
                 let (user_port, ops_port) = allocate_port_pair(&mut next_port);
                 match start_new_active(
                     &podman,
-                    env_file.as_deref(),
+                    &env_file,
                     &image_ref,
                     user_port,
                     ops_port,
@@ -171,13 +169,15 @@ struct DrainingContainer {
 fn allocate_port_pair(next_port: &mut u16) -> (u16, u16) {
     let user_port = *next_port;
     let ops_port = user_port + OPS_PORT_OFFSET;
-    *next_port = next_port.checked_add(2).unwrap_or(18443);
+    *next_port = next_port
+        .checked_add(2)
+        .expect("worker port range exhausted");
     (user_port, ops_port)
 }
 
 async fn start_new_active(
     podman: &Podman,
-    env_file: Option<&str>,
+    env_file: &str,
     image_ref: &str,
     user_port: u16,
     ops_port: u16,

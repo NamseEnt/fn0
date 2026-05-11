@@ -45,105 +45,61 @@ pub fn read_pem_env(name: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
-fn build_otlp_hijack() -> Option<Arc<OtlpHijack>> {
-    let target_host = std::env::var("FN0_OTLP_TARGET_HOST")
-        .ok()
-        .filter(|s| !s.is_empty())?;
-    let auth = std::env::var("FN0_OTLP_AUTH")
-        .ok()
-        .filter(|s| !s.is_empty())?;
+fn build_otlp_hijack() -> Arc<OtlpHijack> {
+    let target_host =
+        std::env::var("FN0_OTLP_TARGET_HOST").expect("FN0_OTLP_TARGET_HOST must be set");
+    let auth = std::env::var("FN0_OTLP_AUTH").expect("FN0_OTLP_AUTH must be set");
     let target_path_prefix =
         std::env::var("FN0_OTLP_TARGET_PATH_PREFIX").unwrap_or_else(|_| "".to_string());
     let placeholder_host = std::env::var("FN0_OTLP_PLACEHOLDER_HOST")
         .unwrap_or_else(|_| "fn0-otel.fn0.dev".to_string());
-    Some(Arc::new(OtlpHijack {
+    Arc::new(OtlpHijack {
         placeholder_host,
         target_host,
         target_path_prefix,
         auth,
-    }))
+    })
 }
 
-fn build_queue_hijack() -> Option<Arc<QueueHijack>> {
-    match QueueHijack::from_env() {
-        Ok(Some(hijack)) => Some(Arc::new(hijack)),
-        Ok(None) => {
-            tracing::warn!("FN0_QUEUE_MESSAGES_ENDPOINT not set; queue hijack disabled");
-            None
-        }
-        Err(err) => {
-            tracing::error!(?err, "queue hijack build failed");
-            None
-        }
-    }
+fn build_queue_hijack() -> Arc<QueueHijack> {
+    Arc::new(QueueHijack::from_env().expect("queue hijack init failed"))
 }
 
-fn build_control_invoke_queue_hijack() -> Option<Arc<ControlInvokeQueueHijack>> {
-    match ControlInvokeQueueHijack::from_env() {
-        Ok(Some(hijack)) => Some(Arc::new(hijack)),
-        Ok(None) => {
-            tracing::warn!(
-                "FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT not set; control invoke queue hijack disabled"
-            );
-            None
-        }
-        Err(err) => {
-            tracing::error!(?err, "control invoke queue hijack build failed");
-            None
-        }
-    }
+fn build_control_invoke_queue_hijack() -> Arc<ControlInvokeQueueHijack> {
+    Arc::new(
+        ControlInvokeQueueHijack::from_env().expect("control invoke queue hijack init failed"),
+    )
 }
 
-fn build_vault_hijack() -> Option<Arc<VaultHijack>> {
-    match VaultHijack::from_env() {
-        Ok(Some(hijack)) => Some(Arc::new(hijack)),
-        Ok(None) => {
-            tracing::warn!("FN0_VAULT_CRYPTO_ENDPOINT not set; vault hijack disabled");
-            None
-        }
-        Err(err) => {
-            tracing::error!(?err, "vault hijack build failed");
-            None
-        }
-    }
+fn build_vault_hijack() -> Arc<VaultHijack> {
+    Arc::new(VaultHijack::from_env().expect("vault hijack init failed"))
 }
 
-fn build_turso_hijack() -> Option<Arc<TursoHijack>> {
-    let group_token = std::env::var("TURSO_GROUP_TOKEN")
-        .ok()
-        .filter(|s| !s.is_empty());
-    let target_host_suffix = std::env::var("TURSO_DB_HOST_SUFFIX")
-        .ok()
-        .filter(|s| !s.is_empty());
-    match (group_token, target_host_suffix) {
-        (Some(group_token), Some(target_host_suffix)) => {
-            let placeholder_host = std::env::var("TURSO_PLACEHOLDER_HOST")
-                .unwrap_or_else(|_| "fn0-db.fn0.dev".to_string());
-            Some(Arc::new(TursoHijack {
-                placeholder_host,
-                target_host_suffix,
-                group_token,
-            }))
-        }
-        _ => {
-            tracing::warn!(
-                "TURSO_GROUP_TOKEN or TURSO_DB_HOST_SUFFIX not set; Turso hijack disabled"
-            );
-            None
-        }
-    }
+fn build_turso_hijack() -> Arc<TursoHijack> {
+    let group_token =
+        std::env::var("TURSO_GROUP_TOKEN").expect("TURSO_GROUP_TOKEN must be set");
+    let target_host_suffix =
+        std::env::var("TURSO_DB_HOST_SUFFIX").expect("TURSO_DB_HOST_SUFFIX must be set");
+    let placeholder_host =
+        std::env::var("TURSO_PLACEHOLDER_HOST").unwrap_or_else(|_| "fn0-db.fn0.dev".to_string());
+    Arc::new(TursoHijack {
+        placeholder_host,
+        target_host_suffix,
+        group_token,
+    })
 }
 
 fn main() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     color_eyre::install()?;
 
-    let otlp_endpoint = std::env::var("OTLP_ENDPOINT").expect("OTLP_ENDPOINT is required");
-    let otlp_basic_auth = std::env::var("OTLP_BASIC_AUTH").ok();
+    let otlp_endpoint = std::env::var("OTLP_ENDPOINT").expect("OTLP_ENDPOINT must be set");
+    let otlp_basic_auth =
+        std::env::var("OTLP_BASIC_AUTH").expect("OTLP_BASIC_AUTH must be set");
 
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
-    let telemetry_providers = telemetry::setup(&otlp_endpoint, otlp_basic_auth.as_deref())?;
+    let telemetry_providers = telemetry::setup(&otlp_endpoint, Some(&otlp_basic_auth))?;
 
     let result = rt.block_on(run());
 
@@ -168,14 +124,9 @@ async fn run() -> Result<()> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_OPS_PORT);
 
-    let vault_client = match VaultClient::from_env() {
-        Ok(Some(c)) => Some(Arc::new(c)),
-        Ok(None) => {
-            tracing::warn!("FN0_VAULT_CRYPTO_ENDPOINT not set; vault client disabled");
-            None
-        }
-        Err(err) => return Err(color_eyre::eyre::eyre!("vault client init: {err}")),
-    };
+    let vault_client = Arc::new(
+        VaultClient::from_env().map_err(|err| color_eyre::eyre::eyre!("vault client init: {err}"))?,
+    );
 
     let cache_size_bytes = std::env::var("FN0_BUNDLE_CACHE_SIZE_BYTES")
         .ok()
@@ -206,27 +157,14 @@ async fn run() -> Result<()> {
         cache_size_bytes,
     );
 
-    let execution_context = {
-        let mut ctx = ExecutionContext::new(engine, linker, cache.clone());
-        if let Some(hijack) = build_turso_hijack() {
-            ctx = ctx.with_turso_hijack(hijack);
-        }
-        if let Some(hijack) = build_queue_hijack() {
-            ctx = ctx.with_queue_hijack(hijack);
-        }
-        if let Some(hijack) = build_control_invoke_queue_hijack() {
-            ctx = ctx.with_control_invoke_queue_hijack(hijack);
-        }
-        if let Some(hijack) = build_vault_hijack() {
-            ctx = ctx.with_vault_hijack(hijack);
-        }
-        if let Some(hijack) = build_otlp_hijack() {
-            ctx = ctx.with_otlp_hijack(hijack);
-        } else {
-            tracing::warn!("FN0_OTLP_TARGET_HOST or FN0_OTLP_AUTH not set; OTLP hijack disabled");
-        }
-        Arc::new(ctx)
-    };
+    let execution_context = Arc::new(
+        ExecutionContext::new(engine, linker, cache.clone())
+            .with_turso_hijack(build_turso_hijack())
+            .with_queue_hijack(build_queue_hijack())
+            .with_control_invoke_queue_hijack(build_control_invoke_queue_hijack())
+            .with_vault_hijack(build_vault_hijack())
+            .with_otlp_hijack(build_otlp_hijack()),
+    );
 
     let manifest_loaded = Arc::new(AtomicBool::new(false));
     let instance_count = Arc::new(AtomicU64::new(0));
@@ -249,21 +187,13 @@ async fn run() -> Result<()> {
         }
     });
 
-    let queue_consumer_handle = match queue_consumer::QueueConsumerConfig::from_env() {
-        Ok(Some(config)) => {
-            let worker_senders = worker_senders.clone();
-            Some(tokio::spawn(async move {
-                queue_consumer::run(config, worker_senders).await;
-            }))
-        }
-        Ok(None) => {
-            tracing::warn!("FN0_QUEUE_MESSAGES_ENDPOINT not set; queue consumer disabled");
-            None
-        }
-        Err(err) => {
-            tracing::error!(?err, "queue consumer config invalid; consumer disabled");
-            None
-        }
+    let queue_consumer_handle = {
+        let config = queue_consumer::QueueConsumerConfig::from_env()
+            .map_err(|err| color_eyre::eyre::eyre!("queue consumer config: {err}"))?;
+        let worker_senders = worker_senders.clone();
+        tokio::spawn(async move {
+            queue_consumer::run(config, worker_senders).await;
+        })
     };
 
     let user_handle = tokio::spawn({
@@ -297,13 +227,7 @@ async fn run() -> Result<()> {
         _ = manifest_handle => {},
         _ = user_handle => {},
         _ = ops_handle => {},
-        _ = async {
-            if let Some(h) = queue_consumer_handle {
-                let _ = h.await;
-            } else {
-                std::future::pending::<()>().await;
-            }
-        } => {},
+        _ = queue_consumer_handle => {},
         _ = tokio::signal::ctrl_c() => {
             tracing::info!("Received ctrl-c, shutting down");
         },
@@ -319,29 +243,24 @@ async fn run_user_server(
     drain_flag: Arc<AtomicBool>,
     cache: S3BundleCache,
 ) -> Result<()> {
-    let tls_acceptor = match (
-        read_pem_env("ORIGIN_CERT_PEM"),
-        read_pem_env("ORIGIN_KEY_PEM"),
-    ) {
-        (Some(cert_pem), Some(key_pem)) => {
-            let certs: Vec<_> = rustls_pemfile::certs(&mut cert_pem.as_bytes())
-                .collect::<std::result::Result<_, _>>()?;
-            let key = rustls_pemfile::private_key(&mut key_pem.as_bytes())?
-                .ok_or_else(|| color_eyre::eyre::eyre!("no private key found in ORIGIN_KEY_PEM"))?;
-            let config = rustls::ServerConfig::builder()
-                .with_no_client_auth()
-                .with_single_cert(certs, key)?;
-            Some(TlsAcceptor::from(Arc::new(config)))
-        }
-        _ => {
-            tracing::warn!("ORIGIN_CERT_PEM/ORIGIN_KEY_PEM not set, running plain HTTP");
-            None
-        }
+    let tls_acceptor = {
+        let cert_pem = read_pem_env("ORIGIN_CERT_PEM")
+            .expect("ORIGIN_CERT_PEM (or _BASE64) must be set");
+        let key_pem = read_pem_env("ORIGIN_KEY_PEM")
+            .expect("ORIGIN_KEY_PEM (or _BASE64) must be set");
+        let certs: Vec<_> = rustls_pemfile::certs(&mut cert_pem.as_bytes())
+            .collect::<std::result::Result<_, _>>()?;
+        let key = rustls_pemfile::private_key(&mut key_pem.as_bytes())?
+            .ok_or_else(|| color_eyre::eyre::eyre!("no private key found in ORIGIN_KEY_PEM"))?;
+        let config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)?;
+        TlsAcceptor::from(Arc::new(config))
     };
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await?;
-    tracing::info!(%addr, tls = tls_acceptor.is_some(), "user server listening");
+    tracing::info!(%addr, "user server listening (TLS)");
 
     loop {
         let (socket, _peer_addr) = listener.accept().await?;
@@ -364,22 +283,16 @@ async fn run_user_server(
                 }
             });
 
-            let result = if let Some(acceptor) = tls_acceptor {
-                match acceptor.accept(socket).await {
-                    Ok(tls_stream) => {
-                        http1::Builder::new()
-                            .serve_connection(TokioIo::new(tls_stream), service)
-                            .await
-                    }
-                    Err(err) => {
-                        tracing::error!(%err, "TLS handshake failed");
-                        return;
-                    }
+            let result = match tls_acceptor.accept(socket).await {
+                Ok(tls_stream) => {
+                    http1::Builder::new()
+                        .serve_connection(TokioIo::new(tls_stream), service)
+                        .await
                 }
-            } else {
-                http1::Builder::new()
-                    .serve_connection(TokioIo::new(socket), service)
-                    .await
+                Err(err) => {
+                    tracing::error!(%err, "TLS handshake failed");
+                    return;
+                }
             };
 
             if let Err(err) = result {

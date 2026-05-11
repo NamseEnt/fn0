@@ -44,6 +44,8 @@ export interface OciHeadQuarterArgs {
 
 export class OciHeadQuarter extends pulumi.ComponentResource {
   kubeconfig: pulumi.Output<string>;
+  workerOtlpEndpoint: pulumi.Output<string>;
+  workerOtlpBasicAuth: pulumi.Output<string>;
   constructor(
     name: string,
     args: OciHeadQuarterArgs,
@@ -94,6 +96,8 @@ export class OciHeadQuarter extends pulumi.ComponentResource {
         k8sProvider: k8sProvider,
         suffix,
       });
+    this.workerOtlpEndpoint = workerOtlpEndpoint;
+    this.workerOtlpBasicAuth = workerOtlpBasicAuth;
 
     const { hqImage } = createDockerRegistry(this, {
       compartmentId,

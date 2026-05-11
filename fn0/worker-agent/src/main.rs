@@ -12,7 +12,7 @@ mod heartbeat;
 mod host_status_reporter;
 mod inbound_proxy;
 mod podman;
-mod self_dns;
+mod dns_register;
 mod shutdown;
 mod target_config;
 mod worker_container_pool;
@@ -50,7 +50,7 @@ async fn async_main() -> Result<()> {
     let host_id = std::env::var("FN0_AGENT_HOST_ID")
         .expect("FN0_AGENT_HOST_ID must be set");
 
-    let public_ip = self_dns::detect_public_ipv4()
+    let public_ip = dns_register::detect_public_ipv4()
         .await
         .expect("detect public ipv4 failed");
 
@@ -83,7 +83,7 @@ async fn async_main() -> Result<()> {
     tokio::select! {
         ready = worker_first_ready_rx => {
             match ready {
-                Ok(()) => info!("first worker container ready; registering self DNS"),
+                Ok(()) => info!("first worker container ready; registering DNS"),
                 Err(_) => {
                     warn!("worker container pool exited before first ready; aborting startup");
                     shutdown.trigger();
@@ -104,15 +104,15 @@ async fn async_main() -> Result<()> {
         warn!(?err, "initial heartbeat write failed; continuing anyway");
     }
 
-    if let Err(err) = self_dns::register().await {
-        warn!(?err, "self DNS register failed; continuing anyway");
+    if let Err(err) = dns_register::register().await {
+        warn!(?err, "DNS register failed; continuing anyway");
     }
 
     shutdown::wait_for_signal().await;
     info!("shutdown signal received");
 
-    if let Err(err) = self_dns::deregister().await {
-        warn!(?err, "self DNS deregister failed");
+    if let Err(err) = dns_register::deregister().await {
+        warn!(?err, "DNS deregister failed");
     }
 
     shutdown.trigger();

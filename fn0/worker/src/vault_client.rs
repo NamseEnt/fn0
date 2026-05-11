@@ -25,10 +25,9 @@ struct DecryptResponse {
 }
 
 impl VaultClient {
-    pub fn from_env() -> Result<Option<Self>> {
-        let Ok(crypto_endpoint) = std::env::var("FN0_VAULT_CRYPTO_ENDPOINT") else {
-            return Ok(None);
-        };
+    pub fn from_env() -> Result<Self> {
+        let crypto_endpoint = std::env::var("FN0_VAULT_CRYPTO_ENDPOINT")
+            .map_err(|_| anyhow!("FN0_VAULT_CRYPTO_ENDPOINT is required"))?;
         let key_ocid = std::env::var("FN0_VAULT_KEY_OCID")
             .map_err(|_| anyhow!("FN0_VAULT_KEY_OCID is required"))?;
         let tenancy = std::env::var("FN0_VAULT_OCI_TENANCY_ID")
@@ -60,12 +59,12 @@ impl VaultClient {
                 .map_err(|e| anyhow!("vault signer init: {e:?}"))?,
         );
 
-        Ok(Some(Self {
+        Ok(Self {
             crypto_endpoint,
             key_ocid,
             signer,
             client: reqwest::Client::new(),
-        }))
+        })
     }
 
     pub async fn decrypt(&self, ciphertext_b64: &str) -> Result<Vec<u8>> {

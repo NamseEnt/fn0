@@ -24,8 +24,8 @@
 //! doc" code path needed).
 //!
 //! `main.rs` enforces this ordering by calling [`write_initial`] before
-//! `self_dns::register`, and by ensuring the periodic task only does its
-//! final `Delete` after `self_dns::deregister` has run.
+//! `dns_register::register`, and by ensuring the periodic task only does its
+//! final `Delete` after `dns_register::deregister` has run.
 
 use crate::shutdown::Shutdown;
 use fn0_shared_schema::{
