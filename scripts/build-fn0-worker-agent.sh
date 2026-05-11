@@ -27,10 +27,6 @@ if [[ -z "$REGISTRIES_JSON" || "$REGISTRIES_JSON" == "null" ]]; then
 fi
 
 WORKER_COMPARTMENT_ID="$(pick workerCompartmentId)"
-if [[ -z "$WORKER_COMPARTMENT_ID" ]]; then
-  echo "missing Pulumi output: workerCompartmentId" >&2
-  exit 1
-fi
 
 echo ">> Attempting cargo publish for fn0-worker-agent"
 PUBLISH_LOG="$(mktemp)"
@@ -136,11 +132,15 @@ for i in $(seq 0 $((COUNT - 1))); do
   fi
 
   if [[ "$URL" == *oraclecloud.com* ]]; then
-    ocir_cleanup_keep_top_semver \
-      --registry-url   "$URL" \
-      --repository     "$REPO" \
-      --compartment-id "$WORKER_COMPARTMENT_ID" \
-      --keep           2 || echo "warn: cleanup failed for ${URL}/${REPO}" >&2
+    if [[ -z "$WORKER_COMPARTMENT_ID" ]]; then
+      echo "warn: workerCompartmentId not in Pulumi outputs; skipping OCIR cleanup for ${URL}/${REPO}" >&2
+    else
+      ocir_cleanup_keep_top_semver \
+        --registry-url   "$URL" \
+        --repository     "$REPO" \
+        --compartment-id "$WORKER_COMPARTMENT_ID" \
+        --keep           2 || echo "warn: cleanup failed for ${URL}/${REPO}" >&2
+    fi
   fi
 done
 
