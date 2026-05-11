@@ -6,9 +6,6 @@ license.workspace = true
 repository.workspace = true
 description = "Worker binary for the fn0 FaaS platform"
 
-[package.metadata.release]
-release = false
-
 [dependencies]
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }

@@ -6,9 +6,6 @@ license.workspace = true
 repository.workspace = true
 description = "Per-instance agent that supervises fn0-worker containers (lifecycle, blue-green, in-host proxy, DNS register)."
 
-[package.metadata.release]
-release = false
-
 [dependencies]
 anyhow = { workspace = true }
 color-eyre = { workspace = true }
