@@ -2675,7 +2675,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.27"
+version = "0.2.28"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2828,7 +2828,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-doc-db"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2888,7 +2888,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "aes-gcm 0.10.3",
  "anyhow",
@@ -2932,7 +2932,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker-agent"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "color-eyre",

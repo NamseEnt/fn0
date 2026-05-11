@@ -26,10 +26,9 @@ pub struct QueueConsumerConfig {
 }
 
 impl QueueConsumerConfig {
-    pub fn from_env() -> Result<Option<Self>> {
-        let Ok(messages_endpoint) = std::env::var("FN0_QUEUE_MESSAGES_ENDPOINT") else {
-            return Ok(None);
-        };
+    pub fn from_env() -> Result<Self> {
+        let messages_endpoint = std::env::var("FN0_QUEUE_MESSAGES_ENDPOINT")
+            .map_err(|_| anyhow!("FN0_QUEUE_MESSAGES_ENDPOINT is required"))?;
         let queue_ocid =
             std::env::var("FN0_QUEUE_OCID").map_err(|_| anyhow!("FN0_QUEUE_OCID is required"))?;
         let tenancy = std::env::var("FN0_QUEUE_OCI_TENANCY_ID")
@@ -46,14 +45,14 @@ impl QueueConsumerConfig {
             .and_then(|b| {
                 String::from_utf8(b).map_err(|e| anyhow!("queue private key utf8: {e}"))
             })?;
-        Ok(Some(Self {
+        Ok(Self {
             queue_ocid,
             messages_endpoint,
             tenancy,
             user,
             fingerprint,
             private_key_pem,
-        }))
+        })
     }
 }
 

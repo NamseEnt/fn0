@@ -6,27 +6,22 @@ const CLOUDFLARE_API: &str = "https://api.cloudflare.com/client/v4";
 const PUBLIC_IP_PROBE_URL: &str = "https://checkip.amazonaws.com";
 const RECORD_TTL_SECONDS: u32 = 60;
 
-pub async fn register() -> Result<(), SelfDnsError> {
-    let Some(args) = SelfDnsArgs::from_env()? else {
-        warn!("FN0_AGENT_DNS_* env not set; skipping self DNS register");
-        return Ok(());
-    };
+pub async fn register() -> Result<(), DnsRegisterError> {
+    let args = DnsRegisterArgs::from_env();
     let public_ip = detect_public_ipv4().await?;
     let client = build_http_client()?;
     let existing = list_a_records(&client, &args).await?;
     if existing.iter().any(|r| r.content == public_ip) {
-        info!(%public_ip, hostname = %args.hostname, "self DNS already registered");
+        info!(%public_ip, hostname = %args.hostname, "DNS already registered");
         return Ok(());
     }
     create_a_record(&client, &args, &public_ip).await?;
-    info!(%public_ip, hostname = %args.hostname, "self DNS registered");
+    info!(%public_ip, hostname = %args.hostname, "DNS registered");
     Ok(())
 }
 
-pub async fn deregister() -> Result<(), SelfDnsError> {
-    let Some(args) = SelfDnsArgs::from_env()? else {
-        return Ok(());
-    };
+pub async fn deregister() -> Result<(), DnsRegisterError> {
+    let args = DnsRegisterArgs::from_env();
     let public_ip = detect_public_ipv4().await?;
     let client = build_http_client()?;
     let existing = list_a_records(&client, &args).await?;
@@ -35,14 +30,14 @@ pub async fn deregister() -> Result<(), SelfDnsError> {
         delete_record(&client, &args, &record.id).await?;
         deleted += 1;
     }
-    info!(%public_ip, hostname = %args.hostname, deleted, "self DNS deregistered");
+    info!(%public_ip, hostname = %args.hostname, deleted, "DNS deregistered");
     Ok(())
 }
 
 async fn list_a_records(
     client: &reqwest::Client,
-    args: &SelfDnsArgs,
-) -> Result<Vec<DnsRecord>, SelfDnsError> {
+    args: &DnsRegisterArgs,
+) -> Result<Vec<DnsRecord>, DnsRegisterError> {
     #[derive(Deserialize)]
     struct ListResponse {
         result: Option<Vec<DnsRecord>>,
@@ -64,9 +59,9 @@ async fn list_a_records(
 
 async fn create_a_record(
     client: &reqwest::Client,
-    args: &SelfDnsArgs,
+    args: &DnsRegisterArgs,
     ip: &str,
-) -> Result<(), SelfDnsError> {
+) -> Result<(), DnsRegisterError> {
     client
         .post(format!(
             "{CLOUDFLARE_API}/zones/{}/dns_records",
@@ -88,9 +83,9 @@ async fn create_a_record(
 
 async fn delete_record(
     client: &reqwest::Client,
-    args: &SelfDnsArgs,
+    args: &DnsRegisterArgs,
     record_id: &str,
-) -> Result<(), SelfDnsError> {
+) -> Result<(), DnsRegisterError> {
     client
         .delete(format!(
             "{CLOUDFLARE_API}/zones/{}/dns_records/{record_id}",
@@ -103,7 +98,7 @@ async fn delete_record(
     Ok(())
 }
 
-pub async fn detect_public_ipv4() -> Result<String, SelfDnsError> {
+pub async fn detect_public_ipv4() -> Result<String, DnsRegisterError> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()?;
@@ -116,12 +111,12 @@ pub async fn detect_public_ipv4() -> Result<String, SelfDnsError> {
         .trim()
         .to_string();
     if ip.is_empty() {
-        return Err(SelfDnsError::EmptyPublicIp);
+        return Err(DnsRegisterError::EmptyPublicIp);
     }
     Ok(ip)
 }
 
-fn build_http_client() -> Result<reqwest::Client, SelfDnsError> {
+fn build_http_client() -> Result<reqwest::Client, DnsRegisterError> {
     Ok(reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
         .build()?)
@@ -133,33 +128,27 @@ struct DnsRecord {
     content: String,
 }
 
-struct SelfDnsArgs {
+struct DnsRegisterArgs {
     api_token: String,
     zone_id: String,
     hostname: String,
 }
 
-impl SelfDnsArgs {
-    fn from_env() -> Result<Option<Self>, SelfDnsError> {
-        let Ok(api_token) = std::env::var("FN0_AGENT_DNS_API_TOKEN") else {
-            return Ok(None);
-        };
-        let zone_id = std::env::var("FN0_AGENT_DNS_ZONE_ID")
-            .map_err(|_| SelfDnsError::EnvMissing("FN0_AGENT_DNS_ZONE_ID"))?;
-        let hostname = std::env::var("FN0_AGENT_DNS_HOSTNAME")
-            .map_err(|_| SelfDnsError::EnvMissing("FN0_AGENT_DNS_HOSTNAME"))?;
-        Ok(Some(Self {
-            api_token,
-            zone_id,
-            hostname,
-        }))
+impl DnsRegisterArgs {
+    fn from_env() -> Self {
+        Self {
+            api_token: std::env::var("FN0_AGENT_DNS_API_TOKEN")
+                .expect("FN0_AGENT_DNS_API_TOKEN must be set"),
+            zone_id: std::env::var("FN0_AGENT_DNS_ZONE_ID")
+                .expect("FN0_AGENT_DNS_ZONE_ID must be set"),
+            hostname: std::env::var("FN0_AGENT_DNS_HOSTNAME")
+                .expect("FN0_AGENT_DNS_HOSTNAME must be set"),
+        }
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum SelfDnsError {
-    #[error("required env var not set: {0}")]
-    EnvMissing(&'static str),
+pub enum DnsRegisterError {
     #[error("http: {0}")]
     Http(#[from] reqwest::Error),
     #[error("public IP probe returned empty body")]

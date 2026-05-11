@@ -118,11 +118,11 @@ impl ControlInvokeQueueHijack {
         }
     }
 
-    pub fn from_env() -> Result<Option<Self>> {
-        let Ok(messages_endpoint) = std::env::var("FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT")
-        else {
-            return Ok(None);
-        };
+    pub fn from_env() -> Result<Self> {
+        let messages_endpoint =
+            std::env::var("FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT").map_err(|_| {
+                anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT is required")
+            })?;
         let placeholder_host = std::env::var("FN0_CONTROL_INVOKE_QUEUE_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-control-invoke-queue.fn0.dev".to_string());
         let allowed_caller_subdomain = std::env::var("FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN")
@@ -149,7 +149,7 @@ impl ControlInvokeQueueHijack {
                     .map_err(|e| anyhow::anyhow!("control invoke queue private key utf8: {e}"))
             })?;
 
-        Ok(Some(Self::new_oci(
+        Self::new_oci(
             placeholder_host,
             allowed_caller_subdomain,
             queue_ocid,
@@ -158,7 +158,7 @@ impl ControlInvokeQueueHijack {
             user,
             fingerprint,
             private_key_pem,
-        )?))
+        )
     }
 
     pub fn placeholder_url(&self) -> String {

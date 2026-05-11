@@ -80,14 +80,13 @@ impl VaultHijack {
         })
     }
 
-    pub fn from_env() -> Result<Option<Self>> {
-        let Ok(crypto_endpoint) = std::env::var("FN0_VAULT_CRYPTO_ENDPOINT") else {
-            return Ok(None);
-        };
+    pub fn from_env() -> Result<Self> {
+        let crypto_endpoint = std::env::var("FN0_VAULT_CRYPTO_ENDPOINT")
+            .map_err(|_| anyhow::anyhow!("FN0_VAULT_CRYPTO_ENDPOINT is required"))?;
         let placeholder_host = std::env::var("FN0_VAULT_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-vault.fn0.dev".to_string());
         let allowed_subdomain = std::env::var("FN0_VAULT_ALLOWED_SUBDOMAIN")
-            .unwrap_or_else(|_| "fn0-control".to_string());
+            .map_err(|_| anyhow::anyhow!("FN0_VAULT_ALLOWED_SUBDOMAIN is required"))?;
         let key_ocid = std::env::var("FN0_VAULT_KEY_OCID")
             .map_err(|_| anyhow::anyhow!("FN0_VAULT_KEY_OCID is required"))?;
         let tenancy = std::env::var("FN0_VAULT_OCI_TENANCY_ID")
@@ -105,7 +104,7 @@ impl VaultHijack {
                 String::from_utf8(b).map_err(|e| anyhow::anyhow!("vault private key utf8: {e}"))
             })?;
 
-        Ok(Some(Self::new(
+        Self::new(
             placeholder_host,
             crypto_endpoint,
             allowed_subdomain,
@@ -114,7 +113,7 @@ impl VaultHijack {
             user,
             fingerprint,
             private_key_pem,
-        )?))
+        )
     }
 
     pub fn placeholder_url(&self) -> String {

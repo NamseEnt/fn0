@@ -39,7 +39,7 @@ pub struct S3BundleCache {
     engine: Engine,
     linker: Linker<ClientState<SystemClock>>,
     operator: Operator,
-    vault: Option<Arc<VaultClient>>,
+    vault: Arc<VaultClient>,
     inner: Arc<Mutex<Inner>>,
     cache_size_bytes: usize,
     singleflight: Arc<Group<String, Arc<Bundle>, Error>>,
@@ -50,7 +50,7 @@ impl S3BundleCache {
         engine: Engine,
         linker: Linker<ClientState<SystemClock>>,
         operator: Operator,
-        vault: Option<Arc<VaultClient>>,
+        vault: Arc<VaultClient>,
         cache_size_bytes: usize,
     ) -> Self {
         Self {
@@ -241,16 +241,9 @@ impl S3BundleCache {
         let js_size = js.as_ref().map(|s| s.len()).unwrap_or(0);
 
         let env_vars = match env_yaml_bytes {
-            Some(bytes) => {
-                let vault = self.vault.as_ref().ok_or_else(|| {
-                    Error::Decode(anyhow::anyhow!(
-                        "bundle has env.yaml but vault client is not configured"
-                    ))
-                })?;
-                env_yaml::load(&bytes, vault)
-                    .await
-                    .map_err(|e| Error::Decode(anyhow::anyhow!("env.yaml load: {e}")))?
-            }
+            Some(bytes) => env_yaml::load(&bytes, &self.vault)
+                .await
+                .map_err(|e| Error::Decode(anyhow::anyhow!("env.yaml load: {e}")))?,
             None => Vec::new(),
         };
 

@@ -5,6 +5,8 @@ import * as oci from "@pulumi/oci";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as random from "@pulumi/random";
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const config = new pulumi.Config();
 
@@ -621,6 +623,93 @@ const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
       },
     },
   ],
+});
+
+const fn0WorkerAgentVersion = (() => {
+  const toml = fs.readFileSync(
+    path.join(__dirname, "../../fn0/worker-agent/Cargo.toml"),
+    "utf8"
+  );
+  const m = toml.match(/^version\s*=\s*"([^"]+)"/m);
+  if (!m) {
+    throw new Error(
+      "could not parse version from fn0/worker-agent/Cargo.toml"
+    );
+  }
+  return m[1];
+})();
+
+const fn0WorkerAgentImageRef = ociComputeWorker.workerImageRegistries.apply(
+  (regs) => {
+    if (regs.length === 0) {
+      throw new Error("workerImageRegistries is empty");
+    }
+    const r = regs[0];
+    return `${r.url}/${r.repository}-agent:${fn0WorkerAgentVersion}`;
+  }
+);
+
+new fn0.Fn0WorkerPool("fn0-worker", {
+  count: 1,
+  compartmentId: ociComputeWorker.compartmentId,
+  availabilityDomain: ociComputeWorker.infraEnvs.OCI_AVAILABILITY_DOMAIN,
+  subnetId: ociComputeWorker.subnetId,
+  imageId: ociComputeWorker.osImageId,
+  shape: "VM.Standard.A1.Flex",
+  ocpus: 1,
+  memoryInGbs: 6,
+  sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
+  agent: {
+    imageRef: fn0WorkerAgentImageRef,
+    docDb: {
+      url: docDb.url,
+      authToken: docDb.token,
+    },
+    dnsRegister: {
+      apiToken: dns.dnsApiToken,
+      zoneId,
+      hostname: `*.${domain}`,
+    },
+  },
+  worker: {
+    cwasmBucket: {
+      name: ociComputeWorker.cwasmBucket.bucketName,
+      endpoint: ociComputeWorker.cwasmBucket.endpoint,
+      region: ociComputeWorker.cwasmBucket.region,
+      accessKeyId: ociComputeWorker.cwasmBucket.accessKeyId,
+      secretAccessKey: ociComputeWorker.cwasmBucket.secretAccessKey,
+    },
+    tlsOrigin: {
+      certPem: dns.certificate,
+      keyPem: dns.privateKeyPem,
+    },
+    envEncryptionKeyBase64: envEncryptionKey.base64,
+    forteDb: {
+      groupToken: forteDb.groupToken,
+      hostSuffix: forteDb.hostSuffix,
+    },
+    queue: {
+      ocid: ociComputeWorker.queue.ocid,
+      messagesEndpoint: ociComputeWorker.queue.messagesEndpoint,
+      region: ociComputeWorker.queue.region,
+      ociUserId: ociComputeWorker.queue.ociUserId,
+      ociTenancyId: ociComputeWorker.queue.ociTenancyId,
+      ociFingerprint: ociComputeWorker.queue.ociFingerprint,
+      ociPrivateKeyBase64: ociComputeWorker.queue.ociPrivateKeyBase64,
+    },
+    controlInvokeAllowedSubdomain: "fn0-control",
+    vault: {
+      cryptoEndpoint: ociGlobalVault.cryptoEndpoint,
+      keyOcid: ociGlobalVault.keyOcid,
+      region: ociGlobalVault.region,
+      allowedSubdomain: ociGlobalVault.allowedSubdomain,
+      workerCredentials: ociGlobalVault.workerCredentials,
+    },
+    otlp: {
+      endpoint: ociHeadQuarter.workerOtlpEndpoint,
+      basicAuth: ociHeadQuarter.workerOtlpBasicAuth,
+    },
+  },
 });
 
 new fn0.EventBridgeCronTrigger("control-cron-trigger", {

@@ -27,10 +27,8 @@ impl Podman {
             argv.push("--env".into());
             argv.push(format!("{k}={v}"));
         }
-        if let Some(env_file) = args.env_file {
-            argv.push("--env-file".into());
-            argv.push(env_file.into());
-        }
+        argv.push("--env-file".into());
+        argv.push(args.env_file.into());
         argv.push("--restart=no".into());
         argv.push(args.image_ref.into());
         debug!(?argv, "podman run");
@@ -93,7 +91,7 @@ pub struct RunArgs<'a> {
     pub container_name: &'a str,
     pub image_ref: &'a str,
     pub env: &'a [(&'a str, &'a str)],
-    pub env_file: Option<&'a str>,
+    pub env_file: &'a str,
 }
 
 #[derive(Debug, thiserror::Error)]
