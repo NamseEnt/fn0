@@ -3041,7 +3041,7 @@ dependencies = [
 
 [[package]]
 name = "forte-macros"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "proc-macro2",
  "quote",
