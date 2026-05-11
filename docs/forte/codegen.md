@@ -96,6 +96,32 @@ export const paths = {
 
 Rust types are mapped to TypeScript: `String`/`&str` → `string`, integer types → `number`, `bool` → `boolean`.
 
+## `generate_env` (build.rs)
+
+`forte-codegen` also exports a second build-script function:
+
+```rust
+fn main() {
+    forte_codegen::generate_routes();
+    forte_codegen::generate_env(); // optional, call after generate_routes
+}
+```
+
+When called, `generate_env` reads the project's `.env` file (located one directory above `rs/`, i.e. `<project>/.env`) and writes `rs/src/env_generated.rs`. For each `KEY=value` line it generates a zero-cost accessor:
+
+```rust
+pub fn cookie_secret() -> &'static str { ... }  // for COOKIE_SECRET=...
+pub fn turso_url() -> &'static str { ... }       // for TURSO_URL=...
+```
+
+Values are loaded from the real environment at first use via `std::sync::LazyLock`. This means the function always returns the runtime value of the variable, not the value in `.env`; `.env` is only used to determine which accessor functions to generate.
+
+`cargo:rerun-if-changed=../.env` is emitted automatically so the file is regenerated when `.env` changes.
+
+To use the generated module, add `mod env_generated;` to your `lib.rs` and call `env_generated::cookie_secret()` etc.
+
+> **Note:** `generate_env` is not called by default. You must add it to `build.rs` explicitly.
+
 ## `forte-rs-to-ts`
 
 A standalone binary (`forte-rs-to-ts`) that reads the Rust source tree and generates TypeScript type files. Run automatically during `forte build`.
