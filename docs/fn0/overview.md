@@ -60,7 +60,6 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 | `fn0-wasmtime` | 0.1.3 | Wasmtime wrapper with fn0-specific config |
 | `fn0-ski` | 0.1.4 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | Compiler utilities (internal) |
-| `hq` | 0.1.0 | Headquarter management service |
 
 ## fn0-cli Commands
 

@@ -26,21 +26,21 @@ ensure_cwasm_pending() {
   local new_fn0_wasmtime_version_dash="${new_fn0_wasmtime_version//./-}"
   local function_name="fn0-cwasm-compiler-${new_fn0_wasmtime_version_dash}"
 
-  local cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk hq_ak hq_sk
+  local cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk control_ak control_sk
   local r2_endpoint r2_bucket r2_ak r2_sk
   cwasm_region="$(pulumi_pick cwasmCompilerBucketRegion)"
   cwasm_ecr="$(pulumi_pick cwasmCompilerEcrRepository)"
   cwasm_role="$(pulumi_pick cwasmCompilerRoleArn)"
   builder_ak="$(pulumi_pick cwasmCompilerBuilderAccessKeyId)"
   builder_sk="$(pulumi_pick cwasmCompilerBuilderSecretAccessKey)"
-  hq_ak="$(pulumi_pick hqAwsAccessKeyId)"
-  hq_sk="$(pulumi_pick hqAwsSecretAccessKey)"
+  control_ak="$(pulumi_pick controlAwsAccessKeyId)"
+  control_sk="$(pulumi_pick controlAwsSecretAccessKey)"
   r2_endpoint="$(pulumi_pick bundleStoreR2Endpoint)"
   r2_bucket="$(pulumi_pick bundleStoreR2BucketName)"
   r2_ak="$(pulumi_pick bundleStoreR2AccessKeyId)"
   r2_sk="$(pulumi_pick bundleStoreR2SecretAccessKey)"
   local v
-  for v in cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk hq_ak hq_sk \
+  for v in cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk control_ak control_sk \
            r2_endpoint r2_bucket r2_ak r2_sk; do
     if [[ -z "${!v}" ]]; then
       echo "ensure_cwasm_pending: missing pulumi output (${v})" >&2
@@ -120,7 +120,7 @@ ensure_cwasm_pending() {
   control_set_pending_fn0_wasmtime "$new_fn0_wasmtime_version"
 
   __cwasm_sync_compile_all "$new_fn0_wasmtime_version" "$function_name" \
-    "$cwasm_region" "$hq_ak" "$hq_sk" \
+    "$cwasm_region" "$control_ak" "$control_sk" \
     "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" \
     "$work_dir"
 }
@@ -173,8 +173,8 @@ __cwasm_invoke_one() {
     > "$payload_file"
 
   rc=0
-  AWS_ACCESS_KEY_ID="$CWASM_INVOKE_HQ_AK" \
-  AWS_SECRET_ACCESS_KEY="$CWASM_INVOKE_HQ_SK" \
+  AWS_ACCESS_KEY_ID="$CWASM_INVOKE_CONTROL_AK" \
+  AWS_SECRET_ACCESS_KEY="$CWASM_INVOKE_CONTROL_SK" \
   AWS_DEFAULT_REGION="$CWASM_INVOKE_REGION" \
   aws lambda invoke \
     --function-name "$CWASM_INVOKE_FUNCTION_NAME" \
@@ -215,7 +215,7 @@ __cwasm_invoke_one() {
 export -f __cwasm_invoke_one
 
 __cwasm_sync_compile_all() {
-  local new_fn0_wasmtime_version="$1" function_name="$2" region="$3" hq_ak="$4" hq_sk="$5"
+  local new_fn0_wasmtime_version="$1" function_name="$2" region="$3" control_ak="$4" control_sk="$5"
   local r2_endpoint="$6" r2_bucket="$7" r2_ak="$8" r2_sk="$9"
   local work_dir="${10}"
 
@@ -262,8 +262,8 @@ __cwasm_sync_compile_all() {
     CWASM_INVOKE_WORK_DIR="$work_dir" \
     CWASM_INVOKE_R2_BUCKET="$r2_bucket" \
     CWASM_INVOKE_FUNCTION_NAME="$function_name" \
-    CWASM_INVOKE_HQ_AK="$hq_ak" \
-    CWASM_INVOKE_HQ_SK="$hq_sk" \
+    CWASM_INVOKE_CONTROL_AK="$control_ak" \
+    CWASM_INVOKE_CONTROL_SK="$control_sk" \
     CWASM_INVOKE_REGION="$region" \
     CWASM_INVOKE_SUCCESS_FILE="$success_file" \
     CWASM_INVOKE_FAIL_FILE="$fail_file" \
