@@ -25,31 +25,10 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
 
     const { accountId, zoneId, publicBaseDomain } = args;
 
-    const permissionGroups = cloudflare.getAccountApiTokenPermissionGroupsListOutput(
-      {
-        accountId,
-        maxItems: 1000,
-      },
-      { parent: this }
-    );
-
-    const groupId = (preferred: string, fallbacks: string[] = []) =>
-      permissionGroups.apply((list) => {
-        const groups = list.results ?? [];
-        for (const candidate of [preferred, ...fallbacks]) {
-          const found = groups.find((g) => g.name === candidate);
-          if (found) return found.id!;
-        }
-        const names = groups.map((g) => g.name).join(", ");
-        throw new Error(
-          `Could not find permission group; tried ${[preferred, ...fallbacks].join(", ")}; available: ${names}`
-        );
-      });
-
-    const r2ItemReadId = groupId("Workers R2 Storage Bucket Item Read");
-    const r2ItemWriteId = groupId("Workers R2 Storage Bucket Item Write");
-    const r2EditId = groupId("Workers R2 Storage Edit");
-    const dnsWriteId = groupId("DNS Write");
+    const r2ItemReadId = "6a018a9f2fc74eb6b293b0c548f38b39";
+    const r2ItemWriteId = "2efd5506f9c8494dacb1fa10a3e7d5b6";
+    const r2EditId = "bf7481a1826f439697cb59a20b22293e";
+    const dnsWriteId = "4755a26eedb94da69e1066d98aa820be";
 
     const presignToken = new cloudflare.AccountToken(
       "presign-token",
