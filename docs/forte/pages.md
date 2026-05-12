@@ -171,6 +171,8 @@ pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
 
 The frontend counterpart lives at `fe/src/pages/<path>/page.tsx`:
 
+> **Scaffold note:** `forte add page` generates a component that accesses `props.v.message`. This is wrong for struct variants — struct variant fields are spread flat, so the correct access is `props.message` (after narrowing on `props.t`). Only tuple/newtype variants use the `v` wrapper. Fix the generated component before running `forte build`.
+
 ```tsx
 // fe/src/pages/index/page.tsx
 import type { Props } from "./.props";

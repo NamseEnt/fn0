@@ -56,7 +56,7 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 | `fn0-cli` | 0.1.0 | Local development CLI |
 | `fn0-worker` | 0.3.24 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.1 | Per-instance container supervisor (blue-green deploys, self DNS, in-host TCP proxy) |
-| `fn0-deploy` | 0.1.6 | fn0 Cloud deployment client |
+| `fn0-deploy` | 0.1.7 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.1.3 | Wasmtime wrapper with fn0-specific config |
 | `fn0-ski` | 0.1.4 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | Compiler utilities (internal) |

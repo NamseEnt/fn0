@@ -124,27 +124,87 @@ To use the generated module, add `mod env_generated;` to your `lib.rs` and call 
 
 ## `forte-rs-to-ts`
 
-A standalone binary (`forte-rs-to-ts`) that reads the Rust source tree and generates TypeScript type files. Run automatically during `forte build`.
+A standalone binary (`forte-rs-to-ts`) that reads the Rust source tree and generates TypeScript files. Run automatically during `forte build` and `forte dev`.
+
+### Pages → `.props.ts`
 
 For each page handler (`rs/src/pages/<path>/mod.rs`), it generates:
-- `fe/src/pages/<path>/.props.ts` — the `Props` type as a TypeScript discriminated union
 
-For each action handler (`rs/src/actions/<name>.rs`), it generates:
-- `fe/src/actions/.generated/<name>.ts` — Zod schema and TypeScript types for `Input` and `Output`
-
-For each hook handler (`rs/src/hooks/<name>.rs`), it generates:
-- `fe/src/hooks/.generated/<name>.ts` — Zod schema and TypeScript types for `Input` and `Output`
-
-Each generated file imports `zod` and exports:
-```ts
-export const InputSchema = z.object({ ... });
-export type Input = z.infer<typeof InputSchema>;
-
-export const OutputSchema = z.discriminatedUnion("t", [ ... ]);
-export type Output = z.infer<typeof OutputSchema>;
+```
+fe/src/pages/<path>/.props.ts
 ```
 
-The generated Props type uses `{ t: "VariantName", v: { ... } }` shape for enum variants with fields.
+The file exports a Zod schema and a `Props` TypeScript type:
+
+```ts
+import { z } from "zod";
+
+export const PropsSchema = z.discriminatedUnion("t", [
+    z.object({ t: z.literal("Ok"), message: z.string() }),
+]);
+
+export type Props = z.infer<typeof PropsSchema>;
+```
+
+Variant shape mapping (same as pages.md):
+
+| Rust variant kind | JSON / TypeScript shape |
+|---|---|
+| Unit: `Ok` | `{ t: "Ok" }` |
+| Newtype/tuple: `Ok(String)` | `{ t: "Ok", v: string }` |
+| Struct: `Ok { message: String }` | `{ t: "Ok", message: string }` (fields spread flat, no `v` wrapper) |
+
+### Actions → callable functions
+
+For each action handler (`rs/src/actions/<name>.rs`), it generates:
+
+```
+fe/src/actions/.generated/<name>.ts
+```
+
+The file exports a camelCase function that wraps `callAction` from `@forte/react`:
+
+```ts
+import { z } from "zod";
+import { callAction } from "@forte/react";
+
+const InputSchema = z.object({ ... });
+const OutputSchema = z.discriminatedUnion("t", [ ... ]);
+
+export function userLogin(input: z.infer<typeof InputSchema>) {
+    return callAction("user_login", input, OutputSchema);
+}
+```
+
+An `index.ts` re-exporting all action functions is also generated at `fe/src/actions/.generated/index.ts`.
+
+### Hooks → React hooks
+
+For each hook handler (`rs/src/hooks/<name>.rs`), it generates:
+
+```
+fe/src/hooks/.generated/use<Name>.ts
+```
+
+The file exports a React hook using `useForteHook` from `@forte/react`:
+
+```ts
+import { z } from "zod";
+import { useForteHook } from "@forte/react";
+
+const InputSchema = z.object({ ... });
+const OutputSchema = z.discriminatedUnion("t", [ ... ]);
+
+export function useMyHook(input: z.infer<typeof InputSchema>) {
+    return useForteHook("my_hook", input, OutputSchema);
+}
+```
+
+`useForteHook` uses React Suspense (throws a promise) to fetch the hook result server-side during SSR and cache-hit on the client.
+
+### `@forte/react`
+
+`@forte/react` is a Vite module alias resolved to a file bundled by `forte-cli`. It is **not** a published npm package. Both `callAction` and `useForteHook` are defined there.
 
 ## The `FORTE-MANAGED` Block
 
