@@ -28,7 +28,15 @@ jobs:
       - name: Publish unpublished workspace crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo release publish --workspace --execute --no-confirm
+        shell: bash
+        run: |
+          set +e
+          cargo release publish --workspace --execute --no-confirm
+          rc=$?
+          set -e
+          if [[ $rc -ne 0 && $rc -ne 2 ]]; then
+            exit $rc
+          fi
 
       - name: Create release tags
         shell: bash
