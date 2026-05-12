@@ -9,6 +9,9 @@ description = "Runs wasi:http@0.3 wasm test binaries (cargo test runner for doc-
 [package.metadata.release]
 release = false
 
+[package.metadata.dist]
+dist = false
+
 [[bin]]
 name = "forte-test-runner"
 path = "src/main.rs"

@@ -8,6 +8,9 @@ repository.workspace = true
 [package.metadata.release]
 release = false
 
+[package.metadata.dist]
+dist = false
+
 [dependencies]
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }

@@ -1,4 +1,8 @@
-- name: Rust Cache
+- name: Rust Cache (forte/cli)
   uses: Swatinem/rust-cache@v2
   with:
     workspaces: "forte/cli -> target"
+- name: Rust Cache (fn0/cli)
+  uses: Swatinem/rust-cache@v2
+  with:
+    workspaces: "fn0/cli -> target"

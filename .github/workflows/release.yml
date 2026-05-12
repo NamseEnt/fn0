@@ -127,10 +127,14 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
-      - name: "Rust Cache"
+      - name: "Rust Cache (forte/cli)"
         uses: "Swatinem/rust-cache@v2"
         with:
           "workspaces": "forte/cli -> target"
+      - name: "Rust Cache (fn0/cli)"
+        uses: "Swatinem/rust-cache@v2"
+        with:
+          "workspaces": "fn0/cli -> target"
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest

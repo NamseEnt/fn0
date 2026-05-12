@@ -4,9 +4,19 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "CLI for fn0 cloud"
+
+[[bin]]
+name = "fn0"
+path = "src/main.rs"
 
 [package.metadata.release]
 release = false
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-{ target }{ archive-suffix }"
+bin-dir = "{ name }-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "txz"
 
 [dependencies]
 anyhow = { workspace = true }
