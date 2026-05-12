@@ -10,8 +10,8 @@
 #   get <site_name>              Print the scale config for the given site.
 #   set <site_name> '<json>'     Validate and write a new scale config for the given site.
 #
-# The site_name must match the "name" field in the site's hq-args.json config.
-# For example: "oci-compute-vm", "oci-container-instance"
+# The site_name must match the Pulumi name of the OciFn0WorkerSite component
+# in infra/cloud/index.ts (currently "oci-fn0-worker-site").
 #
 # Fields (all required, integer >= 1):
 #   instances_per_gb               Max instances per GB of host memory.
