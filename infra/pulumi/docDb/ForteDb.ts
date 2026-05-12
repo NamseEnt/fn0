@@ -26,11 +26,13 @@ export class ForteDb extends pulumi.ComponentResource {
     super("pkg:index:forte-db", name, args, opts);
     const { location, organizationSlug } = args;
 
+    const groupName = "forte-db";
+
     const group = new TursoGroup(
       "group",
       {
         organizationSlug,
-        name: "forte-db",
+        name: groupName,
         location,
       },
       { parent: this }
@@ -40,12 +42,12 @@ export class ForteDb extends pulumi.ComponentResource {
       "token",
       {
         organizationSlug,
-        groupName: group.name,
+        groupName,
       },
-      { parent: this }
+      { parent: this, dependsOn: [group] }
     );
 
-    this.groupName = group.name;
+    this.groupName = pulumi.output(groupName);
     this.groupToken = token.jwt;
     this.hostSuffix = pulumi.interpolate`-${organizationSlug}.${location}.turso.io`;
 

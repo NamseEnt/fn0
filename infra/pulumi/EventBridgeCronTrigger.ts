@@ -9,7 +9,7 @@ export interface EventBridgeCronTriggerArgs {
 }
 
 export class EventBridgeCronTrigger extends pulumi.ComponentResource {
-  public readonly scheduleArn: pulumi.Output<string>;
+  public readonly eventRuleArn: pulumi.Output<string>;
   public readonly apiDestinationArn: pulumi.Output<string>;
   public readonly connectionArn: pulumi.Output<string>;
 
@@ -20,15 +20,10 @@ export class EventBridgeCronTrigger extends pulumi.ComponentResource {
   ) {
     super("pkg:index:event-bridge-cron-trigger", name, args, opts);
 
-    const provider = new aws.Provider(
-      "provider",
-      { region: args.awsRegion as pulumi.Input<aws.Region> },
-      { parent: this }
-    );
-
     const connection = new aws.cloudwatch.EventConnection(
       "connection",
       {
+        region: args.awsRegion,
         name: pulumi.interpolate`fn0-control-cron-${args.suffix}`,
         authorizationType: "API_KEY",
         authParameters: {
@@ -38,42 +33,43 @@ export class EventBridgeCronTrigger extends pulumi.ComponentResource {
           },
         },
       },
-      { parent: this, provider }
+      { parent: this }
     );
 
     const apiDestination = new aws.cloudwatch.EventApiDestination(
       "api-destination",
       {
+        region: args.awsRegion,
         name: pulumi.interpolate`fn0-control-cron-${args.suffix}`,
         connectionArn: connection.arn,
         httpMethod: "POST",
         invocationEndpoint: pulumi.interpolate`${args.controlUrl}/__forte_action/cron_on_tick`,
       },
-      { parent: this, provider }
+      { parent: this }
     );
 
-    const role = new aws.iam.Role(
-      "scheduler-role",
+    const invokerRole = new aws.iam.Role(
+      "invoker-role",
       {
-        name: pulumi.interpolate`fn0-control-cron-scheduler-${args.suffix}`,
+        name: pulumi.interpolate`fn0-control-cron-invoker-${args.suffix}`,
         assumeRolePolicy: JSON.stringify({
           Version: "2012-10-17",
           Statement: [
             {
               Effect: "Allow",
-              Principal: { Service: "scheduler.amazonaws.com" },
+              Principal: { Service: "events.amazonaws.com" },
               Action: "sts:AssumeRole",
             },
           ],
         }),
       },
-      { parent: this, provider }
+      { parent: this }
     );
 
     new aws.iam.RolePolicy(
-      "scheduler-role-policy",
+      "invoker-role-policy",
       {
-        role: role.id,
+        role: invokerRole.id,
         policy: apiDestination.arn.apply((arn) =>
           JSON.stringify({
             Version: "2012-10-17",
@@ -87,33 +83,45 @@ export class EventBridgeCronTrigger extends pulumi.ComponentResource {
           })
         ),
       },
-      { parent: this, provider }
+      { parent: this }
     );
 
-    const schedule = new aws.scheduler.Schedule(
-      "schedule",
+    const eventRule = new aws.cloudwatch.EventRule(
+      "rule",
       {
+        region: args.awsRegion,
         name: pulumi.interpolate`fn0-control-cron-${args.suffix}`,
         scheduleExpression: "rate(1 minute)",
-        flexibleTimeWindow: { mode: "OFF" },
-        target: {
-          arn: apiDestination.arn,
-          roleArn: role.arn,
-          input: '{"scheduled_time":"<aws.scheduler.scheduled-time>"}',
-          retryPolicy: {
-            maximumRetryAttempts: 0,
-          },
-        },
+        state: "ENABLED",
       },
-      { parent: this, provider }
+      { parent: this }
     );
 
-    this.scheduleArn = schedule.arn;
+    new aws.cloudwatch.EventTarget(
+      "target",
+      {
+        region: args.awsRegion,
+        rule: eventRule.name,
+        arn: apiDestination.arn,
+        roleArn: invokerRole.arn,
+        inputTransformer: {
+          inputPaths: { time: "$.time" },
+          inputTemplate: '{"scheduled_time": "<time>"}',
+        },
+        retryPolicy: {
+          maximumRetryAttempts: 0,
+          maximumEventAgeInSeconds: 60,
+        },
+      },
+      { parent: this }
+    );
+
+    this.eventRuleArn = eventRule.arn;
     this.apiDestinationArn = apiDestination.arn;
     this.connectionArn = connection.arn;
 
     this.registerOutputs({
-      scheduleArn: this.scheduleArn,
+      eventRuleArn: this.eventRuleArn,
       apiDestinationArn: this.apiDestinationArn,
       connectionArn: this.connectionArn,
     });

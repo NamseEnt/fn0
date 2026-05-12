@@ -1,5 +1,5 @@
 export { EventBridgeCronTrigger } from "./EventBridgeCronTrigger";
-export { OciComputeWorker, OciRegion } from "./OciComputeWorker";
+export { OciFn0WorkerSite } from "./OciFn0WorkerSite";
 export { OciGlobalVault } from "./OciGlobalVault";
 export { B2CloudflareStaticCdn } from "./B2CloudflareStaticCdn";
 export * as docDb from "./docDb";
@@ -9,8 +9,5 @@ export { ForteR2 } from "./ForteR2";
 export { BundleStoreR2 } from "./BundleStoreR2";
 export { BundleStoreR2Worker } from "./BundleStoreR2Worker";
 export { StaticAssetStorage } from "./StaticAssetStorage";
-export { Fn0WorkerPool } from "./Fn0WorkerPool";
-export { OciHeadQuarter } from "./OciHeadQuarter";
-export { OciHeadQuarterVcn } from "./OciHeadQuarterVcn";
 export * as dns from "./dns";
 export { Suffix } from "./Suffix";

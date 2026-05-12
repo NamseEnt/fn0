@@ -106,9 +106,10 @@ export class ForteR2 extends pulumi.ComponentResource {
           {
             effect: "allow",
             resources: pulumi.all([accountId, bucket.name]).apply(
-              ([acct, name]) => ({
-                [`com.cloudflare.edge.r2.bucket.${acct}_default_${name}`]: "*",
-              })
+              ([acct, name]) =>
+                JSON.stringify({
+                  [`com.cloudflare.edge.r2.bucket.${acct}_default_${name}`]: "*",
+                })
             ),
             permissionGroups: r2PermissionIds,
           },
