@@ -8,5 +8,8 @@ repository.workspace = true
 [package.metadata.release]
 release = false
 
+[package.metadata.dist]
+dist = false
+
 [dependencies]
 fn0 = { workspace = true }

@@ -53,3 +53,4 @@ jobs:
 
           tag_if_needed "forte/cli" "forte-cli"
           tag_if_needed "forte/rs-to-ts" "forte-rs-to-ts"
+          tag_if_needed "fn0/cli" "fn0-cli"
