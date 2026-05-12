@@ -38,3 +38,5 @@ config:
   fn0Cloud:githubClientId: Ov23liRuIJf1NSe9ccP8
   fn0Cloud:githubClientSecret:
     secure: AAABAPjb842PxNqtIqH+dLnkomhrmgUHIZrEpIi9eJaiCL4xPuh0i+H8UxCQJD7pYBWnxurckIy1ocZGa1DU01b7TC2jbOti
+  fn0Cloud:controlOwnerGithubId: "3580430"
+  fn0Cloud:controlOwnerGithubLogin: namse
