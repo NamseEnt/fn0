@@ -130,7 +130,19 @@ For each page handler (`rs/src/pages/<path>/mod.rs`), it generates:
 - `fe/src/pages/<path>/.props.ts` — the `Props` type as a TypeScript discriminated union
 
 For each action handler (`rs/src/actions/<name>.rs`), it generates:
-- Type files for `Input` and `Output` (format: Unknown from repository — check `forte/rs-to-ts/`)
+- `fe/src/actions/.generated/<name>.ts` — Zod schema and TypeScript types for `Input` and `Output`
+
+For each hook handler (`rs/src/hooks/<name>.rs`), it generates:
+- `fe/src/hooks/.generated/<name>.ts` — Zod schema and TypeScript types for `Input` and `Output`
+
+Each generated file imports `zod` and exports:
+```ts
+export const InputSchema = z.object({ ... });
+export type Input = z.infer<typeof InputSchema>;
+
+export const OutputSchema = z.discriminatedUnion("t", [ ... ]);
+export type Output = z.infer<typeof OutputSchema>;
+```
 
 The generated Props type uses `{ t: "VariantName", v: { ... } }` shape for enum variants with fields.
 
