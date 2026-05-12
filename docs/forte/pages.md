@@ -179,11 +179,25 @@ export default function IndexPage(props: Props) {
     if (props.t !== "Ok") {
         return <div>Error</div>;
     }
-    return <div>{props.v.message}</div>;
+    return <div>{props.message}</div>;
 }
 ```
 
-The `.props.ts` file is auto-generated from the Rust `Props` type by `forte-rs-to-ts`. The generated type uses a discriminated union with `t` (tag) and `v` (value) fields corresponding to enum variants.
+The `.props.ts` file is auto-generated from the Rust `Props` type by `forte-rs-to-ts`. It exports a Zod schema and a `Props` type as a TypeScript discriminated union on the `t` field.
+
+The JSON shape varies by variant kind:
+
+| Rust variant kind | JSON shape | TypeScript type |
+|---|---|---|
+| Unit: `Ok` | `{"t":"Ok"}` | `{ t: "Ok" }` |
+| Tuple/newtype: `Ok(String)` | `{"t":"Ok","v":"..."}` | `{ t: "Ok", v: string }` |
+| Struct: `Ok { message: String }` | `{"t":"Ok","message":"..."}` | `{ t: "Ok", message: string }` |
+
+Struct variant fields are spread alongside `t` (flat); there is no `v` wrapper. Rust field names are converted to camelCase (`user_name` → `userName`).
+
+**Example** for `Props::Ok { message: String }`:
+- JSON from Rust: `{"t":"Ok","message":"Hello"}`
+- TypeScript access: `props.message` (after narrowing with `props.t === "Ok"`)
 
 ## API Endpoints
 
