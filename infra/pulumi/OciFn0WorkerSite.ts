@@ -4,9 +4,75 @@ import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
 import { CustomWorkerImage } from "./CustomWorkerImage";
 
-export interface OciComputeWorkerArgs {
+export interface OciFn0WorkerSiteArgs {
   region: pulumi.Input<string>;
-  hqIpv6CidrBlocks: pulumi.Input<string[]>;
+  count: number;
+  shape: pulumi.Input<string>;
+  ocpus: pulumi.Input<number>;
+  memoryInGbs: pulumi.Input<number>;
+  workerAgentVersion: string;
+  agentDocDb: AgentDocDbArgs;
+  agentDnsRegister: AgentDnsRegisterArgs;
+  worker: WorkerArgs;
+}
+
+export interface AgentDocDbArgs {
+  url: pulumi.Input<string>;
+  authToken: pulumi.Input<string>;
+}
+
+export interface AgentDnsRegisterArgs {
+  apiToken: pulumi.Input<string>;
+  zoneId: pulumi.Input<string>;
+  hostname: pulumi.Input<string>;
+}
+
+export interface WorkerArgs {
+  tlsOrigin: WorkerTlsOriginArgs;
+  envEncryptionKeyBase64: pulumi.Input<string>;
+  forteDb: WorkerForteDbArgs;
+  controlInvokeAllowedSubdomain: pulumi.Input<string>;
+  vault: WorkerVaultArgs;
+  otlp: WorkerOtlpArgs;
+  hostObservability: WorkerHostObservabilityArgs;
+}
+
+export interface WorkerOtlpArgs {
+  endpoint: pulumi.Input<string>;
+  basicAuth: pulumi.Input<string>;
+}
+
+export interface WorkerHostObservabilityArgs {
+  prometheusUrl: pulumi.Input<string>;
+  prometheusUserId: pulumi.Input<string>;
+  lokiUrl: pulumi.Input<string>;
+  lokiUserId: pulumi.Input<string>;
+  basicAuthPassword: pulumi.Input<string>;
+}
+
+export interface WorkerTlsOriginArgs {
+  certPem: pulumi.Input<string>;
+  keyPem: pulumi.Input<string>;
+}
+
+export interface WorkerForteDbArgs {
+  groupToken: pulumi.Input<string>;
+  hostSuffix: pulumi.Input<string>;
+}
+
+export interface WorkerVaultArgs {
+  cryptoEndpoint: pulumi.Input<string>;
+  keyOcid: pulumi.Input<string>;
+  region: pulumi.Input<string>;
+  allowedSubdomain: pulumi.Input<string>;
+  workerCredentials: pulumi.Input<WorkerVaultCredentials>;
+}
+
+export interface WorkerVaultCredentials {
+  ociUserId: string;
+  ociTenancyId: string;
+  ociFingerprint: string;
+  ociPrivateKeyBase64: string;
 }
 
 export interface OciCwasmBucketInfo {
@@ -35,7 +101,7 @@ export interface WorkerImageRegistry {
   repository: string;
 }
 
-export interface OciWorkerInfraEnvs {
+export interface OciFn0WorkerSiteInfraEnvs {
   OCI_PRIVATE_KEY_BASE64: string;
   OCI_USER_ID: string;
   OCI_FINGERPRINT: string;
@@ -46,25 +112,28 @@ export interface OciWorkerInfraEnvs {
   OCI_AVAILABILITY_DOMAIN: string;
 }
 
-export class OciComputeWorker extends pulumi.ComponentResource {
+const MANAGED_BY_TAG_VALUE = "fn0-control";
+
+export class OciFn0WorkerSite extends pulumi.ComponentResource {
   public readonly compartmentId: pulumi.Output<string>;
   public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
-  public readonly infraEnvs: pulumi.Output<OciWorkerInfraEnvs>;
+  public readonly infraEnvs: pulumi.Output<OciFn0WorkerSiteInfraEnvs>;
   public readonly workerImageRegistries: pulumi.Output<WorkerImageRegistry[]>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
   public readonly queue: OciQueueInfo;
-  public readonly ipv6CidrBlocks: pulumi.Output<string[]>;
   public readonly sshPublicKey: pulumi.Output<string>;
   public readonly sshPrivateKey: pulumi.Output<string>;
+  public readonly instanceIds: pulumi.Output<string[]>;
+  public readonly publicIps: pulumi.Output<(string | undefined)[]>;
 
   constructor(
     name: string,
-    args: OciComputeWorkerArgs,
-    opts: pulumi.ComponentResourceOptions
+    args: OciFn0WorkerSiteArgs,
+    opts?: pulumi.ComponentResourceOptions
   ) {
-    super("pkg:index:oci-compute-worker", name, args, opts);
+    super("pkg:index:oci-fn0-worker-site", name, args, opts);
 
     const compartmentSuffix = new random.RandomString(
       "compartment-suffix",
@@ -79,7 +148,7 @@ export class OciComputeWorker extends pulumi.ComponentResource {
     const compartment = new oci.identity.Compartment(
       "compartment",
       {
-        description: "Compartment for fn0 OCI Compute Worker",
+        description: "Compartment for fn0 OCI Worker",
         name: pulumi.interpolate`fn0-host-${compartmentSuffix}`,
         enableDelete: true,
       },
@@ -182,8 +251,6 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       { parent: this }
     );
 
-    this.ipv6CidrBlocks = vcn.ipv6cidrBlocks;
-
     const workerSshKey = new tls.PrivateKey(
       "worker-ssh-key",
       {
@@ -201,37 +268,25 @@ export class OciComputeWorker extends pulumi.ComponentResource {
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
-        ingressSecurityRules: pulumi
-          .all([args.hqIpv6CidrBlocks])
-          .apply(([hqIpv6CidrBlocks]) => [
-            {
-              protocol: "6",
-              source: "0.0.0.0/0",
-              tcpOptions: { min: 22, max: 22 },
-            },
-            {
-              protocol: "6",
-              source: "::/0",
-              tcpOptions: { min: 22, max: 22 },
-            },
-            ...[...cloudflareIpv4Ranges, ...clareflareIpv6Ranges].map(
-              (source) => ({
-                protocol: "6",
-                source,
-                tcpOptions: { min: 443, max: 443 },
-              })
-            ),
-            ...hqIpv6CidrBlocks.map((source) => ({
+        ingressSecurityRules: [
+          {
+            protocol: "6",
+            source: "0.0.0.0/0",
+            tcpOptions: { min: 22, max: 22 },
+          },
+          {
+            protocol: "6",
+            source: "::/0",
+            tcpOptions: { min: 22, max: 22 },
+          },
+          ...[...cloudflareIpv4Ranges, ...cloudflareIpv6Ranges].map(
+            (source) => ({
               protocol: "6",
               source,
               tcpOptions: { min: 443, max: 443 },
-            })),
-            ...hqIpv6CidrBlocks.map((source) => ({
-              protocol: "17",
-              source,
-              udpOptions: { min: 10000, max: 10000 },
-            })),
-          ]),
+            })
+          ),
+        ],
         egressSecurityRules: [
           {
             destination: "0.0.0.0/0",
@@ -350,10 +405,10 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         instanceDetails: {
           instanceType: "compute",
           launchDetails: {
-            shape: "VM.Standard.A1.Flex",
+            shape: args.shape,
             shapeConfig: {
-              ocpus: 1,
-              memoryInGbs: 6,
+              ocpus: args.ocpus,
+              memoryInGbs: args.memoryInGbs,
             },
             sourceDetails: {
               sourceType: "image",
@@ -643,50 +698,376 @@ export class OciComputeWorker extends pulumi.ComponentResource {
         Buffer.from(pem).toString("base64")
       ),
     };
+
+    const agentImageRef = this.workerImageRegistries.apply((regs) => {
+      if (regs.length === 0) {
+        throw new Error("workerImageRegistries is empty");
+      }
+      const r = regs[0];
+      return `${r.url}/${r.repository}-agent:${args.workerAgentVersion}`;
+    });
+
+    const agentEnv = buildAgentEnv(args.agentDocDb, args.agentDnsRegister);
+    const workerEnv = buildWorkerEnv(args.worker, this.cwasmBucket, this.queue);
+    const alloyConfig = pulumi
+      .all([
+        args.worker.hostObservability.prometheusUrl,
+        args.worker.hostObservability.prometheusUserId,
+        args.worker.hostObservability.lokiUrl,
+        args.worker.hostObservability.lokiUserId,
+        args.worker.hostObservability.basicAuthPassword,
+      ])
+      .apply(([promUrl, promUser, lokiUrl, lokiUser, password]) =>
+        renderAlloyConfig({ promUrl, promUser, lokiUrl, lokiUser, password })
+      );
+
+    const cloudInit = pulumi
+      .all([agentImageRef, agentEnv, workerEnv, alloyConfig])
+      .apply(([agentImageRef, agentEnv, workerEnv, alloyConfig]) =>
+        renderCloudInit(agentImageRef, agentEnv, workerEnv, alloyConfig)
+      );
+    const userData = cloudInit.apply((s) =>
+      Buffer.from(s, "utf8").toString("base64")
+    );
+
+    const metadata = pulumi
+      .all([userData, this.sshPublicKey])
+      .apply(([ud, ssh]) => {
+        const m: { [k: string]: string } = { user_data: ud };
+        if (ssh) m["ssh_authorized_keys"] = ssh;
+        return m;
+      });
+
+    const instances: oci.core.Instance[] = [];
+    for (let i = 0; i < args.count; i++) {
+      instances.push(
+        new oci.core.Instance(
+          `instance-${i}`,
+          {
+            compartmentId: compartment.id,
+            availabilityDomain,
+            displayName: `${name}-${i}`,
+            shape: args.shape,
+            shapeConfig: {
+              ocpus: args.ocpus,
+              memoryInGbs: args.memoryInGbs,
+            },
+            sourceDetails: {
+              sourceType: "image",
+              sourceId: imageId,
+            },
+            createVnicDetails: {
+              subnetId: subnet.id,
+              assignPublicIp: "true",
+              assignIpv6ip: true,
+            },
+            metadata,
+            freeformTags: {
+              managed_by: MANAGED_BY_TAG_VALUE,
+              fn0_role: "worker",
+            },
+          },
+          { parent: this }
+        )
+      );
+    }
+
+    this.instanceIds = pulumi.all(instances.map((i) => i.id));
+    this.publicIps = pulumi.all(instances.map((i) => i.publicIp));
+
+    this.registerOutputs({
+      compartmentId: this.compartmentId,
+      subnetId: this.subnetId,
+      instanceConfigurationId: this.instanceConfigurationId,
+      infraEnvs: this.infraEnvs,
+      workerImageRegistries: this.workerImageRegistries,
+      osImageId: this.osImageId,
+      cwasmBucket: this.cwasmBucket,
+      queue: this.queue,
+      sshPublicKey: this.sshPublicKey,
+      sshPrivateKey: this.sshPrivateKey,
+      instanceIds: this.instanceIds,
+      publicIps: this.publicIps,
+    });
   }
 }
 
-export enum OciRegion {
-  AP_SYDNEY_1 = "ap-sydney-1",
-  AP_MELBOURNE_1 = "ap-melbourne-1",
-  SA_SAOPAULO_1 = "sa-saopaulo-1",
-  SA_VINHEDO_1 = "sa-vinhedo-1",
-  CA_MONTREAL_1 = "ca-montreal-1",
-  CA_TORONTO_1 = "ca-toronto-1",
-  SA_SANTIAGO_1 = "sa-santiago-1",
-  SA_VALPARAISO_1 = "sa-valparaiso-1",
-  SA_BOGOTA_1 = "sa-bogota-1",
-  EU_PARIS_1 = "eu-paris-1",
-  EU_MARSEILLE_1 = "eu-marseille-1",
-  EU_FRANKFURT_1 = "eu-frankfurt-1",
-  AP_HYDERABAD_1 = "ap-hyderabad-1",
-  AP_MUMBAI_1 = "ap-mumbai-1",
-  IL_JERUSALEM_1 = "il-jerusalem-1",
-  EU_MILAN_1 = "eu-milan-1",
-  AP_OSAKA_1 = "ap-osaka-1",
-  AP_TOKYO_1 = "ap-tokyo-1",
-  MX_QUERETARO_1 = "mx-queretaro-1",
-  MX_MONTERREY_1 = "mx-monterrey-1",
-  EU_AMSTERDAM_1 = "eu-amsterdam-1",
-  ME_RIYADH_1 = "me-riyadh-1",
-  ME_JEDDAH_1 = "me-jeddah-1",
-  AP_SINGAPORE_1 = "ap-singapore-1",
-  AP_SINGAPORE_2 = "ap-singapore-2",
-  AF_JOHANNESBURG_1 = "af-johannesburg-1",
-  AP_SEOUL_1 = "ap-seoul-1",
-  AP_CHUNCHEON_1 = "ap-chuncheon-1",
-  EU_MADRID_1 = "eu-madrid-1",
-  EU_STOCKHOLM_1 = "eu-stockholm-1",
-  EU_ZURICH_1 = "eu-zurich-1",
-  ME_ABU_DHABI_1 = "me-abudhabi-1",
-  ME_DUBAI_1 = "me-dubai-1",
-  UK_LONDON_1 = "uk-london-1",
-  UK_CARDIFF_1 = "uk-cardiff-1",
-  US_ASHBURN_1 = "us-ashburn-1",
-  US_CHICAGO_1 = "us-chicago-1",
-  US_PHOENIX_1 = "us-phoenix-1",
-  US_SALT_LAKE_2 = "us-saltlake-2",
-  US_SAN_JOSE_1 = "us-sanjose-1",
+function buildAgentEnv(
+  docDb: AgentDocDbArgs,
+  dnsRegister: AgentDnsRegisterArgs
+): pulumi.Output<{ [k: string]: string }> {
+  const base: { [k: string]: pulumi.Input<string> } = {
+    TURSO_URL: docDb.url,
+    TURSO_AUTH_TOKEN: docDb.authToken,
+    FN0_AGENT_DNS_API_TOKEN: dnsRegister.apiToken,
+    FN0_AGENT_DNS_ZONE_ID: dnsRegister.zoneId,
+    FN0_AGENT_DNS_HOSTNAME: dnsRegister.hostname,
+  };
+  return resolveEnvMap(base);
+}
+
+function buildWorkerEnv(
+  worker: WorkerArgs,
+  cwasmBucket: OciCwasmBucketInfo,
+  queue: OciQueueInfo
+): pulumi.Output<{ [k: string]: string }> {
+  const otlpParsed = pulumi.output(worker.otlp.endpoint).apply((u) => {
+    const url = new URL(u);
+    return {
+      targetHost: url.host,
+      targetPathPrefix: url.pathname.replace(/\/$/, ""),
+    };
+  });
+
+  const vaultCredsEnv = pulumi
+    .output(worker.vault.workerCredentials)
+    .apply((c): { [k: string]: string } => ({
+      FN0_VAULT_OCI_USER_ID: c.ociUserId,
+      FN0_VAULT_OCI_TENANCY_ID: c.ociTenancyId,
+      FN0_VAULT_OCI_FINGERPRINT: c.ociFingerprint,
+      FN0_VAULT_OCI_PRIVATE_KEY_BASE64: c.ociPrivateKeyBase64,
+    }));
+
+  const base: { [k: string]: pulumi.Input<string> } = {
+    CWASM_BUCKET: cwasmBucket.bucketName,
+    S3_ENDPOINT: cwasmBucket.endpoint,
+    S3_REGION: cwasmBucket.region,
+    AWS_ACCESS_KEY_ID: cwasmBucket.accessKeyId,
+    AWS_SECRET_ACCESS_KEY: cwasmBucket.secretAccessKey,
+
+    ORIGIN_CERT_PEM: worker.tlsOrigin.certPem,
+    ORIGIN_KEY_PEM: worker.tlsOrigin.keyPem,
+
+    FN0_ENV_KEY_BASE64: worker.envEncryptionKeyBase64,
+
+    TURSO_GROUP_TOKEN: worker.forteDb.groupToken,
+    TURSO_DB_HOST_SUFFIX: worker.forteDb.hostSuffix,
+
+    FN0_QUEUE_OCID: queue.ocid,
+    FN0_QUEUE_MESSAGES_ENDPOINT: queue.messagesEndpoint,
+    FN0_QUEUE_REGION: queue.region,
+    FN0_QUEUE_OCI_USER_ID: queue.ociUserId,
+    FN0_QUEUE_OCI_TENANCY_ID: queue.ociTenancyId,
+    FN0_QUEUE_OCI_FINGERPRINT: queue.ociFingerprint,
+    FN0_QUEUE_OCI_PRIVATE_KEY_BASE64: queue.ociPrivateKeyBase64,
+
+    FN0_CONTROL_INVOKE_QUEUE_OCID: queue.ocid,
+    FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT: queue.messagesEndpoint,
+    FN0_CONTROL_INVOKE_QUEUE_OCI_USER_ID: queue.ociUserId,
+    FN0_CONTROL_INVOKE_QUEUE_OCI_TENANCY_ID: queue.ociTenancyId,
+    FN0_CONTROL_INVOKE_QUEUE_OCI_FINGERPRINT: queue.ociFingerprint,
+    FN0_CONTROL_INVOKE_QUEUE_OCI_PRIVATE_KEY_BASE64: queue.ociPrivateKeyBase64,
+    FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN:
+      worker.controlInvokeAllowedSubdomain,
+
+    FN0_VAULT_CRYPTO_ENDPOINT: worker.vault.cryptoEndpoint,
+    FN0_VAULT_KEY_OCID: worker.vault.keyOcid,
+    FN0_VAULT_REGION: worker.vault.region,
+    FN0_VAULT_ALLOWED_SUBDOMAIN: worker.vault.allowedSubdomain,
+
+    OTLP_ENDPOINT: worker.otlp.endpoint,
+    OTLP_BASIC_AUTH: worker.otlp.basicAuth,
+    FN0_OTLP_TARGET_HOST: otlpParsed.targetHost,
+    FN0_OTLP_TARGET_PATH_PREFIX: otlpParsed.targetPathPrefix,
+    FN0_OTLP_AUTH: worker.otlp.basicAuth,
+  };
+
+  return pulumi
+    .all([resolveEnvMap(base), vaultCredsEnv])
+    .apply(([b, v]) => ({ ...b, ...v }));
+}
+
+function resolveEnvMap(m: {
+  [k: string]: pulumi.Input<string>;
+}): pulumi.Output<{ [k: string]: string }> {
+  const keys = Object.keys(m);
+  const values = keys.map((k) => pulumi.output(m[k]));
+  return pulumi.all(values).apply((resolved) => {
+    const out: { [k: string]: string } = {};
+    keys.forEach((k, i) => {
+      out[k] = resolved[i];
+    });
+    return out;
+  });
+}
+
+const ALLOY_IMAGE_REF = "docker.io/grafana/alloy:latest";
+
+function renderAlloyConfig(args: {
+  promUrl: string;
+  promUser: string;
+  lokiUrl: string;
+  lokiUser: string;
+  password: string;
+}): string {
+  return `prometheus.exporter.unix "node" {
+  set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "netstat", "vmstat", "uname", "time"]
+  rootfs_path     = "/host/root"
+  procfs_path     = "/host/proc"
+  sysfs_path      = "/host/sys"
+}
+
+prometheus.scrape "node" {
+  targets    = prometheus.exporter.unix.node.targets
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    url = "${args.promUrl}"
+    basic_auth {
+      username = "${args.promUser}"
+      password = "${args.password}"
+    }
+  }
+  external_labels = {
+    fn0_role = "worker",
+  }
+}
+
+loki.source.journal "default" {
+  forward_to    = [loki.write.default.receiver]
+  relabel_rules = loki.relabel.journal.rules
+  labels        = { fn0_role = "worker" }
+  path          = "/host/var/log/journal"
+}
+
+loki.relabel "journal" {
+  forward_to = []
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal__hostname"]
+    target_label  = "host"
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "${args.lokiUrl}/loki/api/v1/push"
+    basic_auth {
+      username = "${args.lokiUser}"
+      password = "${args.password}"
+    }
+  }
+}
+`;
+}
+
+function renderCloudInit(
+  agentImageRef: string,
+  agentEnv: { [k: string]: string },
+  workerEnv: { [k: string]: string },
+  alloyConfig: string
+): string {
+  const agentEnvFile = renderEnvFile({
+    ...agentEnv,
+    FN0_AGENT_WORKER_ENV_FILE: "/etc/fn0-worker-agent/worker-env",
+  });
+  const workerEnvFile = renderEnvFile(workerEnv);
+  const agentSystemdUnit = `[Unit]
+Description=fn0 worker agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/fn0-worker-agent/env
+ExecStartPre=-/usr/bin/podman pull ${agentImageRef}
+ExecStart=/usr/local/bin/fn0-worker-agent
+Restart=on-failure
+RestartSec=5
+User=opc
+
+[Install]
+WantedBy=multi-user.target
+`;
+  const alloySystemdUnit = `[Unit]
+Description=fn0 alloy host observability
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+ExecStartPre=-/usr/bin/podman rm -f fn0-alloy
+ExecStartPre=/usr/bin/podman pull ${ALLOY_IMAGE_REF}
+ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
+  --network host \\
+  --pid host \\
+  -v /:/host/root:ro,rslave \\
+  -v /proc:/host/proc:ro \\
+  -v /sys:/host/sys:ro \\
+  -v /var/log/journal:/host/var/log/journal:ro \\
+  -v /etc/machine-id:/etc/machine-id:ro \\
+  -v /etc/fn0-alloy:/etc/fn0-alloy:ro \\
+  ${ALLOY_IMAGE_REF} run --server.http.listen-addr=127.0.0.1:12345 /etc/fn0-alloy/config.alloy
+ExecStop=/usr/bin/podman stop fn0-alloy
+
+[Install]
+WantedBy=multi-user.target
+`;
+  return `#!/bin/bash
+set -euxo pipefail
+
+if ! command -v podman >/dev/null 2>&1; then
+  dnf install -y podman
+fi
+
+HOST_ID=$(curl -fsSH "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/id)
+if [ -z "$HOST_ID" ]; then
+  echo "failed to fetch FN0_AGENT_HOST_ID from OCI metadata" >&2
+  exit 1
+fi
+
+mkdir -p /etc/fn0-worker-agent
+cat > /etc/fn0-worker-agent/env <<'EOF_AGENT_ENV'
+${agentEnvFile}EOF_AGENT_ENV
+echo "FN0_AGENT_HOST_ID=$HOST_ID" >> /etc/fn0-worker-agent/env
+chmod 600 /etc/fn0-worker-agent/env
+
+cat > /etc/fn0-worker-agent/worker-env <<'EOF_WORKER_ENV'
+${workerEnvFile}EOF_WORKER_ENV
+chmod 600 /etc/fn0-worker-agent/worker-env
+
+podman pull ${agentImageRef}
+agent_cid=$(podman create ${agentImageRef})
+podman cp "$agent_cid:/usr/local/bin/fn0-worker-agent" /usr/local/bin/fn0-worker-agent.new
+podman rm "$agent_cid"
+chmod +x /usr/local/bin/fn0-worker-agent.new
+mv /usr/local/bin/fn0-worker-agent.new /usr/local/bin/fn0-worker-agent
+
+cat > /etc/systemd/system/fn0-worker-agent.service <<'EOF_AGENT_UNIT'
+${agentSystemdUnit}EOF_AGENT_UNIT
+
+mkdir -p /etc/fn0-alloy
+cat > /etc/fn0-alloy/config.alloy <<'EOF_ALLOY_CFG'
+${alloyConfig}EOF_ALLOY_CFG
+chmod 600 /etc/fn0-alloy/config.alloy
+
+cat > /etc/systemd/system/fn0-alloy.service <<'EOF_ALLOY_UNIT'
+${alloySystemdUnit}EOF_ALLOY_UNIT
+
+systemctl daemon-reload
+systemctl enable --now fn0-worker-agent.service
+systemctl enable --now fn0-alloy.service
+`;
+}
+
+function renderEnvFile(env: { [k: string]: string }): string {
+  const lines: string[] = [];
+  for (const [k, v] of Object.entries(env)) {
+    if (v === undefined || v === null) continue;
+    lines.push(`${k}=${escapeEnvValue(v)}`);
+  }
+  return lines.length === 0 ? "" : lines.join("\n") + "\n";
+}
+
+function escapeEnvValue(v: string): string {
+  return v.replace(/\n/g, "\\n");
 }
 
 const cloudflareIpv4Ranges = [
@@ -707,7 +1088,7 @@ const cloudflareIpv4Ranges = [
   "131.0.72.0/22",
 ];
 
-const clareflareIpv6Ranges = [
+const cloudflareIpv6Ranges = [
   "2400:cb00::/32",
   "2606:4700::/32",
   "2803:f800::/32",

@@ -13,6 +13,8 @@ config:
     type: string
   fn0Cloud:ociComputeWorkerRegion:
     type: string
+  fn0Cloud:ociVaultRegion:
+    type: string
   fn0Cloud:grafanaSlug:
     type: string
   fn0Cloud:grafanaRegion:

@@ -32,11 +32,14 @@ export class TursoDocDb extends pulumi.ComponentResource {
       { parent: this }
     ).result;
 
+    const groupName = "fn0-doc-db";
+    const databaseName = pulumi.interpolate`fn0-doc-db-${nameSuffix8}`;
+
     const group = new TursoGroup(
       "group",
       {
         organizationSlug,
-        name: "fn0-doc-db",
+        name: groupName,
         location,
       },
       { parent: this }
@@ -46,19 +49,19 @@ export class TursoDocDb extends pulumi.ComponentResource {
       "database",
       {
         organizationSlug,
-        name: pulumi.interpolate`fn0-doc-db-${nameSuffix8}`,
-        group: group.name,
+        name: databaseName,
+        group: groupName,
       },
-      { parent: this }
+      { parent: this, dependsOn: [group] }
     );
 
     const token = new TursoDatabaseToken(
       "token",
       {
         organizationSlug,
-        databaseName: database.name,
+        databaseName,
       },
-      { parent: this }
+      { parent: this, dependsOn: [database] }
     );
 
     new TursoTable(
@@ -67,7 +70,7 @@ export class TursoDocDb extends pulumi.ComponentResource {
         organizationSlug,
         location,
         jwt: token.jwt,
-        databaseName: database.name,
+        databaseName,
         createTableSql: `
 CREATE TABLE IF NOT EXISTS docs (
   pk BLOB NOT NULL,
@@ -76,17 +79,10 @@ CREATE TABLE IF NOT EXISTS docs (
   PRIMARY KEY (pk, sk)
 ) WITHOUT ROWID;`.trim(),
       },
-      { parent: this }
+      { parent: this, dependsOn: [database] }
     );
 
-    this.url = pulumi.interpolate`libsql://${database.name}-${organizationSlug}.${location}.turso.io`;
-    const tursoConfig = new pulumi.Config("turso");
-    this.token = database.name.apply((dbName) => {
-      const apiKey = tursoConfig.require("apiToken");
-      return fetch(
-        `https://api.turso.tech/v1/organizations/${organizationSlug}/databases/${dbName}/auth/tokens`,
-        { method: "POST", headers: { Authorization: `Bearer ${apiKey}` } }
-      ).then((r) => r.json()).then((d: any) => d.jwt as string);
-    });
+    this.url = pulumi.interpolate`libsql://${databaseName}-${organizationSlug}.${location}.turso.io`;
+    this.token = token.jwt;
   }
 }

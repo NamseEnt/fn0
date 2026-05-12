@@ -38,17 +38,17 @@ export class ControlProjectBootstrap extends pulumi.ComponentResource {
       {
         organizationSlug: args.organizationSlug,
         location: args.location,
-        databaseName: database.name,
+        databaseName: args.projectId,
         jwt: args.jwt,
         projectId: args.projectId,
         ownerGithubId: args.ownerGithubId,
         ownerGithubLogin: args.ownerGithubLogin,
         displayName: args.displayName,
       },
-      { parent: this }
+      { parent: this, dependsOn: [database] }
     );
 
-    this.databaseName = database.name;
+    this.databaseName = pulumi.output(args.projectId);
 
     this.registerOutputs({
       databaseName: this.databaseName,

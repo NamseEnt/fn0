@@ -3,6 +3,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as oci from "@pulumi/oci";
 import * as cloudflare from "@pulumi/cloudflare";
+import * as grafana from "@pulumiverse/grafana";
 import * as random from "@pulumi/random";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -152,12 +153,12 @@ new aws.iam.RolePolicy("cwasm-compiler-role-policy", {
 
 const awsCallerIdentity = aws.getCallerIdentityOutput({});
 
-const hqAwsUser = new aws.iam.User("hq-aws-user", {
-  name: "fn0-hq",
+const controlAwsUser = new aws.iam.User("control-aws-user", {
+  name: "fn0-control",
 });
 
-const hqAwsAccessKey = new aws.iam.AccessKey("hq-aws-access-key", {
-  user: hqAwsUser.name,
+const controlAwsAccessKey = new aws.iam.AccessKey("control-aws-access-key", {
+  user: controlAwsUser.name,
 });
 
 const cwasmCompilerBuilderUser = new aws.iam.User("cwasm-compiler-builder-user", {
@@ -225,8 +226,8 @@ new aws.iam.UserPolicy("cwasm-compiler-builder-user-policy", {
     ),
 });
 
-new aws.iam.UserPolicy("hq-aws-user-policy", {
-  user: hqAwsUser.name,
+new aws.iam.UserPolicy("control-aws-user-policy", {
+  user: controlAwsUser.name,
   policy: pulumi
     .all([cwasmCompilerBucketR.arn, awsCallerIdentity.accountId])
     .apply(([bucketArn, accountId]) =>
@@ -253,18 +254,8 @@ new aws.iam.UserPolicy("hq-aws-user-policy", {
     ),
 });
 
-const ociHeadQuarterVcn = new fn0.OciHeadQuarterVcn("oci-head-quarter-vcn", {
-  suffix,
-  region: config.require("ociHeadQuarterRegion"),
-});
-
-const ociComputeWorker = new fn0.OciComputeWorker("oci-compute-worker", {
-  region: config.require("ociComputeWorkerRegion"),
-  hqIpv6CidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
-});
-
 const ociGlobalVault = new fn0.OciGlobalVault("oci-global-vault", {
-  region: config.require("ociHeadQuarterRegion"),
+  region: config.require("ociVaultRegion"),
   allowedSubdomain: "fn0-control",
 });
 
@@ -306,6 +297,7 @@ const staticAssetStorage = new fn0.StaticAssetStorage(
     accountId,
     zoneId,
     publicBaseDomain: `static.${domain}`,
+    cloudflareUserApiToken: config.requireSecret("cloudflareUserApiToken"),
   },
   {}
 );
@@ -366,11 +358,11 @@ const bundleStoreR2SecretAccessKeyCt = pulumi
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
 const controlLambdaAccessKeyIdCt = pulumi
-  .all([controlDek.plaintext, hqAwsAccessKey.id])
+  .all([controlDek.plaintext, controlAwsAccessKey.id])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
 const controlLambdaSecretAccessKeyCt = pulumi
-  .all([controlDek.plaintext, hqAwsAccessKey.secret])
+  .all([controlDek.plaintext, controlAwsAccessKey.secret])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
 const staticAssetPresignAccessKeyIdCt = pulumi
@@ -507,124 +499,6 @@ const dnsProvider = {
   },
 };
 
-const ociHeadQuarter = new fn0.OciHeadQuarter("oci-head-quarter", {
-  suffix,
-  ociRegion: config.require("ociHeadQuarterRegion"),
-  compartmentId: ociHeadQuarterVcn.compartmentId,
-  vcnId: ociHeadQuarterVcn.vcnId,
-  ipv6cidrBlocks: ociHeadQuarterVcn.ipv6cidrBlocks,
-  grafanaSlug: config.require("grafanaSlug"),
-  grafanaRegion: config.require("grafanaRegion"),
-  docDbUrl: docDb.url,
-  docDbToken: docDb.token,
-  forteDb: {
-    apiToken: tursoApiToken,
-    organizationSlug: config.require("tursoOrganizationSlug"),
-    groupName: forteDb.groupName,
-  },
-  forteR2: {
-    bucket: forteR2.bucketName,
-    endpoint: forteR2.endpoint,
-    accessKeyId: forteR2.accessKeyId,
-    secretAccessKey: forteR2.secretAccessKey,
-    publicBaseUrl: forteR2.publicBaseUrl,
-  },
-  awsRegion: cwasmCompilerRegion,
-  wasmBucket: cwasmCompilerBucketR.bucket,
-  cwasmBucket: {
-    name: ociComputeWorker.cwasmBucket.bucketName,
-    endpoint: ociComputeWorker.cwasmBucket.endpoint,
-    region: ociComputeWorker.cwasmBucket.region,
-    accessKeyId: ociComputeWorker.cwasmBucket.accessKeyId,
-    secretAccessKey: ociComputeWorker.cwasmBucket.secretAccessKey,
-  },
-  awsAccessKeyId: hqAwsAccessKey.id,
-  awsSecretAccessKey: hqAwsAccessKey.secret,
-  envEncryptionKeyBase64: envEncryptionKey.base64,
-  adminSigningKeyBase64: adminSigningKey.base64,
-  selfDnsHostname: `fn0-hq.${domain}`,
-  selfDnsCloudflareZoneId: zoneId,
-  selfDnsCloudflareApiToken: dns.dnsApiToken,
-  dnsProvider,
-  cloudflareSaas: {
-    zoneId,
-    apiToken: dns.saasApiToken,
-  },
-  sites: [
-    {
-      name: "oci-compute-vm",
-      hostProvider: {
-        ociComputeVm: {
-          privateKeyBase64: ociComputeWorker.infraEnvs.OCI_PRIVATE_KEY_BASE64,
-          userId: ociComputeWorker.infraEnvs.OCI_USER_ID,
-          fingerprint: ociComputeWorker.infraEnvs.OCI_FINGERPRINT,
-          tenancyId: ociComputeWorker.infraEnvs.OCI_TENANCY_ID,
-          region: config.require("ociComputeWorkerRegion"),
-          compartmentId: ociComputeWorker.compartmentId,
-          availabilityDomain: ociComputeWorker.infraEnvs.OCI_AVAILABILITY_DOMAIN,
-          shape: "VM.Standard.A1.Flex",
-          ocpus: 1,
-          physicsCpuCores: 1,
-          memoryInGbs: 6,
-          subnetId: ociComputeWorker.subnetId,
-          imageId: ociComputeWorker.osImageId,
-          envs: {
-            CWASM_BUCKET: ociComputeWorker.cwasmBucket.bucketName,
-            S3_ENDPOINT: ociComputeWorker.cwasmBucket.endpoint,
-            S3_REGION: ociComputeWorker.cwasmBucket.region,
-            AWS_ACCESS_KEY_ID: ociComputeWorker.cwasmBucket.accessKeyId,
-            AWS_SECRET_ACCESS_KEY: ociComputeWorker.cwasmBucket.secretAccessKey,
-            ORIGIN_CERT_PEM: dns.certificate,
-            ORIGIN_KEY_PEM: dns.privateKeyPem,
-            FN0_ENV_KEY_BASE64: envEncryptionKey.base64,
-            TURSO_GROUP_TOKEN: forteDb.groupToken,
-            TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
-            FN0_QUEUE_OCID: ociComputeWorker.queue.ocid,
-            FN0_QUEUE_MESSAGES_ENDPOINT: ociComputeWorker.queue.messagesEndpoint,
-            FN0_QUEUE_REGION: ociComputeWorker.queue.region,
-            FN0_QUEUE_OCI_USER_ID: ociComputeWorker.queue.ociUserId,
-            FN0_QUEUE_OCI_TENANCY_ID: ociComputeWorker.queue.ociTenancyId,
-            FN0_QUEUE_OCI_FINGERPRINT: ociComputeWorker.queue.ociFingerprint,
-            FN0_QUEUE_OCI_PRIVATE_KEY_BASE64:
-              ociComputeWorker.queue.ociPrivateKeyBase64,
-            FN0_CONTROL_INVOKE_QUEUE_OCID: ociComputeWorker.queue.ocid,
-            FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT:
-              ociComputeWorker.queue.messagesEndpoint,
-            FN0_CONTROL_INVOKE_QUEUE_OCI_USER_ID: ociComputeWorker.queue.ociUserId,
-            FN0_CONTROL_INVOKE_QUEUE_OCI_TENANCY_ID:
-              ociComputeWorker.queue.ociTenancyId,
-            FN0_CONTROL_INVOKE_QUEUE_OCI_FINGERPRINT:
-              ociComputeWorker.queue.ociFingerprint,
-            FN0_CONTROL_INVOKE_QUEUE_OCI_PRIVATE_KEY_BASE64:
-              ociComputeWorker.queue.ociPrivateKeyBase64,
-            FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN: "fn0-control",
-            FN0_VAULT_CRYPTO_ENDPOINT: ociGlobalVault.cryptoEndpoint,
-            FN0_VAULT_KEY_OCID: ociGlobalVault.keyOcid,
-            FN0_VAULT_REGION: ociGlobalVault.region,
-            FN0_VAULT_ALLOWED_SUBDOMAIN: ociGlobalVault.allowedSubdomain,
-            FN0_VAULT_OCI_USER_ID: ociGlobalVault.workerCredentials.apply(
-              (c) => c.ociUserId
-            ),
-            FN0_VAULT_OCI_TENANCY_ID: ociGlobalVault.workerCredentials.apply(
-              (c) => c.ociTenancyId
-            ),
-            FN0_VAULT_OCI_FINGERPRINT: ociGlobalVault.workerCredentials.apply(
-              (c) => c.ociFingerprint
-            ),
-            FN0_VAULT_OCI_PRIVATE_KEY_BASE64: ociGlobalVault.workerCredentials.apply(
-              (c) => c.ociPrivateKeyBase64
-            ),
-          },
-          sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
-          sshPrivateKeyBase64: ociComputeWorker.sshPrivateKey.apply(
-            (key) => Buffer.from(key).toString("base64")
-          ),
-        },
-      },
-    },
-  ],
-});
-
 const fn0WorkerAgentVersion = (() => {
   const toml = fs.readFileSync(
     path.join(__dirname, "../../fn0/worker-agent/Cargo.toml"),
@@ -639,46 +513,41 @@ const fn0WorkerAgentVersion = (() => {
   return m[1];
 })();
 
-const fn0WorkerAgentImageRef = ociComputeWorker.workerImageRegistries.apply(
-  (regs) => {
-    if (regs.length === 0) {
-      throw new Error("workerImageRegistries is empty");
-    }
-    const r = regs[0];
-    return `${r.url}/${r.repository}-agent:${fn0WorkerAgentVersion}`;
-  }
+const grafanaStack = grafana.cloud.getStackOutput({
+  slug: config.require("grafanaSlug"),
+});
+const grafanaCloudAccessPolicyToken = new pulumi.Config("grafana").requireSecret(
+  "cloudAccessPolicyToken"
 );
+const workerOtlpEndpoint = grafanaStack.otlpUrl.apply((url) => `${url}/otlp`);
+const workerOtlpBasicAuth = pulumi
+  .all([grafanaStack.id, grafanaCloudAccessPolicyToken])
+  .apply(([id, pw]) => Buffer.from(`${id}:${pw}`).toString("base64"));
+const workerHostObservability = {
+  prometheusUrl: grafanaStack.prometheusRemoteWriteEndpoint,
+  prometheusUserId: grafanaStack.prometheusUserId.apply((id) => id.toString()),
+  lokiUrl: grafanaStack.logsUrl,
+  lokiUserId: grafanaStack.logsUserId.apply((id) => id.toString()),
+  basicAuthPassword: grafanaCloudAccessPolicyToken,
+};
 
-new fn0.Fn0WorkerPool("fn0-worker", {
+const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
+  region: config.require("ociComputeWorkerRegion"),
   count: 0,
-  compartmentId: ociComputeWorker.compartmentId,
-  availabilityDomain: ociComputeWorker.infraEnvs.OCI_AVAILABILITY_DOMAIN,
-  subnetId: ociComputeWorker.subnetId,
-  imageId: ociComputeWorker.osImageId,
   shape: "VM.Standard.A1.Flex",
   ocpus: 1,
   memoryInGbs: 6,
-  sshAuthorizedKeys: ociComputeWorker.sshPublicKey,
-  agent: {
-    imageRef: fn0WorkerAgentImageRef,
-    docDb: {
-      url: docDb.url,
-      authToken: docDb.token,
-    },
-    dnsRegister: {
-      apiToken: dns.dnsApiToken,
-      zoneId,
-      hostname: `*.${domain}`,
-    },
+  workerAgentVersion: fn0WorkerAgentVersion,
+  agentDocDb: {
+    url: docDb.url,
+    authToken: docDb.token,
+  },
+  agentDnsRegister: {
+    apiToken: dns.dnsApiToken,
+    zoneId,
+    hostname: `*.${domain}`,
   },
   worker: {
-    cwasmBucket: {
-      name: ociComputeWorker.cwasmBucket.bucketName,
-      endpoint: ociComputeWorker.cwasmBucket.endpoint,
-      region: ociComputeWorker.cwasmBucket.region,
-      accessKeyId: ociComputeWorker.cwasmBucket.accessKeyId,
-      secretAccessKey: ociComputeWorker.cwasmBucket.secretAccessKey,
-    },
     tlsOrigin: {
       certPem: dns.certificate,
       keyPem: dns.privateKeyPem,
@@ -687,15 +556,6 @@ new fn0.Fn0WorkerPool("fn0-worker", {
     forteDb: {
       groupToken: forteDb.groupToken,
       hostSuffix: forteDb.hostSuffix,
-    },
-    queue: {
-      ocid: ociComputeWorker.queue.ocid,
-      messagesEndpoint: ociComputeWorker.queue.messagesEndpoint,
-      region: ociComputeWorker.queue.region,
-      ociUserId: ociComputeWorker.queue.ociUserId,
-      ociTenancyId: ociComputeWorker.queue.ociTenancyId,
-      ociFingerprint: ociComputeWorker.queue.ociFingerprint,
-      ociPrivateKeyBase64: ociComputeWorker.queue.ociPrivateKeyBase64,
     },
     controlInvokeAllowedSubdomain: "fn0-control",
     vault: {
@@ -706,9 +566,10 @@ new fn0.Fn0WorkerPool("fn0-worker", {
       workerCredentials: ociGlobalVault.workerCredentials,
     },
     otlp: {
-      endpoint: ociHeadQuarter.workerOtlpEndpoint,
-      basicAuth: ociHeadQuarter.workerOtlpBasicAuth,
+      endpoint: workerOtlpEndpoint,
+      basicAuth: workerOtlpBasicAuth,
     },
+    hostObservability: workerHostObservability,
   },
 });
 
@@ -719,22 +580,21 @@ new fn0.EventBridgeCronTrigger("control-cron-trigger", {
   suffix,
 });
 
-export const kubeconfig = pulumi.secret(ociHeadQuarter.kubeconfig);
-export const workerImageRegistries = pulumi.secret(ociComputeWorker.workerImageRegistries);
-export const cwasmBucket = ociComputeWorker.cwasmBucket.bucketName;
-export const s3Endpoint = ociComputeWorker.cwasmBucket.endpoint;
-export const s3Region = ociComputeWorker.cwasmBucket.region;
-export const s3AccessKeyId = pulumi.secret(ociComputeWorker.cwasmBucket.accessKeyId);
-export const s3SecretAccessKey = pulumi.secret(ociComputeWorker.cwasmBucket.secretAccessKey);
-export const workerSshPrivateKey = pulumi.secret(ociComputeWorker.sshPrivateKey);
+export const workerImageRegistries = pulumi.secret(ociFn0WorkerSite.workerImageRegistries);
+export const cwasmBucket = ociFn0WorkerSite.cwasmBucket.bucketName;
+export const s3Endpoint = ociFn0WorkerSite.cwasmBucket.endpoint;
+export const s3Region = ociFn0WorkerSite.cwasmBucket.region;
+export const s3AccessKeyId = pulumi.secret(ociFn0WorkerSite.cwasmBucket.accessKeyId);
+export const s3SecretAccessKey = pulumi.secret(ociFn0WorkerSite.cwasmBucket.secretAccessKey);
+export const workerSshPrivateKey = pulumi.secret(ociFn0WorkerSite.sshPrivateKey);
 export const cwasmCompilerBucket = cwasmCompilerBucketR.bucket;
 export const cwasmCompilerBucketRegion = cwasmCompilerRegion;
 export const cwasmCompilerEcrRepository = cwasmCompilerEcrR.repositoryUrl;
 export const cwasmCompilerRoleArn = cwasmCompilerRoleR.arn;
 export const cwasmCompilerBuilderAccessKeyId = pulumi.secret(cwasmCompilerBuilderAccessKey.id);
 export const cwasmCompilerBuilderSecretAccessKey = pulumi.secret(cwasmCompilerBuilderAccessKey.secret);
-export const hqAwsAccessKeyId = pulumi.secret(hqAwsAccessKey.id);
-export const hqAwsSecretAccessKey = pulumi.secret(hqAwsAccessKey.secret);
+export const controlAwsAccessKeyId = pulumi.secret(controlAwsAccessKey.id);
+export const controlAwsSecretAccessKey = pulumi.secret(controlAwsAccessKey.secret);
 export const docDbUrl = docDb.url;
 export const docDbToken = pulumi.secret(docDb.token);
 export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
@@ -749,4 +609,4 @@ export const bundleStoreR2AccessKeyId = pulumi.secret(bundleStoreR2.accessKeyId)
 export const bundleStoreR2SecretAccessKey = pulumi.secret(bundleStoreR2.secretAccessKey);
 export const bundleStoreR2QueueId = bundleStoreR2.queueId;
 export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
-export const workerCompartmentId = ociComputeWorker.compartmentId;
+export const workerCompartmentId = ociFn0WorkerSite.compartmentId;

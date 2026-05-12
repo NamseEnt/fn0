@@ -43,9 +43,9 @@ export class CloudflareDns extends pulumi.ComponentResource {
         policies: [
           {
             effect: "allow",
-            resources: {
+            resources: JSON.stringify({
               [`com.cloudflare.api.account.zone.${zoneId}`]: "*",
-            },
+            }),
             permissionGroups: [
               { id: PERMISSION_IDS.DNS_WRITE },
               { id: PERMISSION_IDS.WORKERS_ROUTES_WRITE },
@@ -55,9 +55,9 @@ export class CloudflareDns extends pulumi.ComponentResource {
           },
           {
             effect: "allow",
-            resources: {
+            resources: JSON.stringify({
               [`com.cloudflare.api.account.${accountId}`]: "*",
-            },
+            }),
             permissionGroups: [
               { id: PERMISSION_IDS.WORKERS_SCRIPTS_WRITE },
             ],
@@ -112,9 +112,9 @@ export class CloudflareDns extends pulumi.ComponentResource {
         policies: [
           {
             effect: "allow",
-            resources: {
+            resources: JSON.stringify({
               [`com.cloudflare.api.account.zone.${zoneId}`]: "*",
-            },
+            }),
             permissionGroups: [
               { id: PERMISSION_IDS.SSL_AND_CERTIFICATES_WRITE },
               { id: PERMISSION_IDS.ZONE_READ },

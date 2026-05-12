@@ -97,9 +97,11 @@ export class BundleStoreR2 extends pulumi.ComponentResource {
             effect: "allow",
             resources: pulumi
               .all([accountId, bucket.name])
-              .apply(([acct, bn]) => ({
-                [`com.cloudflare.edge.r2.bucket.${acct}_default_${bn}`]: "*",
-              })),
+              .apply(([acct, bn]) =>
+                JSON.stringify({
+                  [`com.cloudflare.edge.r2.bucket.${acct}_default_${bn}`]: "*",
+                })
+              ),
             permissionGroups: r2PermissionIds,
           },
         ],

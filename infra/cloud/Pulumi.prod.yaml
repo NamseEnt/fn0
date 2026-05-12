@@ -3,9 +3,6 @@ config:
   fn0Cloud:cloudflareZoneId: 35b3cf9096f0074cf95bb2d1a5b2f8ae
   fn0Cloud:domain: fn0.dev
   fn0Cloud:ociComputeWorkerRegion: ap-osaka-1
-  fn0Cloud:ociHeadQuarterRegion: ap-osaka-1
-  fn0Cloud:grafanaSlug: fn0
-  fn0Cloud:grafanaRegion: prod-ap-northeast-0
   fn0Cloud:tursoOrganizationSlug: namse
   fn0Cloud:tursoLocation: aws-ap-northeast-1
   cloudflare:apiToken:
@@ -40,3 +37,8 @@ config:
     secure: AAABAPjb842PxNqtIqH+dLnkomhrmgUHIZrEpIi9eJaiCL4xPuh0i+H8UxCQJD7pYBWnxurckIy1ocZGa1DU01b7TC2jbOti
   fn0Cloud:controlOwnerGithubId: "3580430"
   fn0Cloud:controlOwnerGithubLogin: namse
+  fn0Cloud:cloudflareUserApiToken:
+    secure: AAABAP7PZvea0YThoOZUK33gcuz6nSpCFJuNojAWsyq97Mos+Ly1i/yznPkZCZo8Wvcz+mKVR+VPdv7TSFgoIAW2JG8DW1V6IQXeiUxktiRjwECkRQ==
+  fn0Cloud:ociVaultRegion: ap-osaka-1
+  fn0Cloud:grafanaSlug: fn0
+  fn0Cloud:grafanaRegion: prod-ap-northeast-0
