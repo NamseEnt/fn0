@@ -464,13 +464,11 @@ impl<'a> ser::SerializeStruct for Compound<'a> {
         key: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error> {
-        {
-            let mut temp = Serializer::new();
-            value.serialize(&mut temp)?;
-            let value_bytes = temp.into_vec();
-            if value_bytes == b"null" {
-                return Ok(());
-            }
+        let mut temp = Serializer::new();
+        value.serialize(&mut temp)?;
+        let value_bytes = temp.into_vec();
+        if value_bytes == b"null" {
+            return Ok(());
         }
 
         let state = match self {
@@ -521,13 +519,11 @@ impl<'a> ser::SerializeStructVariant for Compound<'a> {
         key: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error> {
-        {
-            let mut temp = Serializer::new();
-            value.serialize(&mut temp)?;
-            let value_bytes = temp.into_vec();
-            if value_bytes == b"null" {
-                return Ok(());
-            }
+        let mut temp = Serializer::new();
+        value.serialize(&mut temp)?;
+        let value_bytes = temp.into_vec();
+        if value_bytes == b"null" {
+            return Ok(());
         }
 
         let state = match self {
