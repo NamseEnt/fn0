@@ -1,16 +1,16 @@
 import * as pulumi from "@pulumi/pulumi";
 import { TursoDatabase } from "./docDb/turso/database";
-import { ControlProjectSeed } from "./ControlProjectSeed";
 
+/**
+ * Provisions the turso database that hosts the fn0-control application. Doc
+ * seeding (UserDoc / ProjectDoc / Fn0WasmtimeVersionDoc / CompiledBundleDoc /
+ * WorkerManifestDoc) lives in scripts/bootstrap-fn0-control.sh — pulumi's
+ * job ends at "the database exists".
+ */
 export interface ControlProjectBootstrapArgs {
   organizationSlug: pulumi.Input<string>;
-  location: pulumi.Input<string>;
   groupName: pulumi.Input<string>;
-  jwt: pulumi.Input<string>;
   projectId: pulumi.Input<string>;
-  ownerGithubId: pulumi.Input<number>;
-  ownerGithubLogin: pulumi.Input<string>;
-  displayName: pulumi.Input<string>;
 }
 
 export class ControlProjectBootstrap extends pulumi.ComponentResource {
@@ -23,7 +23,7 @@ export class ControlProjectBootstrap extends pulumi.ComponentResource {
   ) {
     super("pkg:index:control-project-bootstrap", name, args, opts);
 
-    const database = new TursoDatabase(
+    new TursoDatabase(
       "database",
       {
         organizationSlug: args.organizationSlug,
@@ -31,21 +31,6 @@ export class ControlProjectBootstrap extends pulumi.ComponentResource {
         group: args.groupName,
       },
       { parent: this }
-    );
-
-    new ControlProjectSeed(
-      "seed",
-      {
-        organizationSlug: args.organizationSlug,
-        location: args.location,
-        databaseName: args.projectId,
-        jwt: args.jwt,
-        projectId: args.projectId,
-        ownerGithubId: args.ownerGithubId,
-        ownerGithubLogin: args.ownerGithubLogin,
-        displayName: args.displayName,
-      },
-      { parent: this, dependsOn: [database] }
     );
 
     this.databaseName = pulumi.output(args.projectId);

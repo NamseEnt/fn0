@@ -24,7 +24,11 @@ export interface AgentDocDbArgs {
 export interface AgentDnsRegisterArgs {
   apiToken: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
-  hostname: pulumi.Input<string>;
+  // Comma-separated list of A-record hostnames the agent registers /
+  // deregisters on its public IP. Must include the SaaS fallback origin
+  // hostname (e.g. `fallback.${domain}`) because Cloudflare requires an
+  // explicit proxied A record for the fallback origin, not just a wildcard.
+  hostnames: pulumi.Input<string>;
 }
 
 export interface WorkerArgs {
@@ -35,6 +39,15 @@ export interface WorkerArgs {
   vault: WorkerVaultArgs;
   otlp: WorkerOtlpArgs;
   hostObservability: WorkerHostObservabilityArgs;
+  bundleStorage: WorkerBundleStorageArgs;
+}
+
+export interface WorkerBundleStorageArgs {
+  bucketName: pulumi.Input<string>;
+  endpoint: pulumi.Input<string>;
+  region: pulumi.Input<string>;
+  accessKeyId: pulumi.Input<string>;
+  secretAccessKey: pulumi.Input<string>;
 }
 
 export interface WorkerOtlpArgs {
@@ -801,7 +814,7 @@ function buildAgentEnv(
     TURSO_AUTH_TOKEN: docDb.authToken,
     FN0_AGENT_DNS_API_TOKEN: dnsRegister.apiToken,
     FN0_AGENT_DNS_ZONE_ID: dnsRegister.zoneId,
-    FN0_AGENT_DNS_HOSTNAME: dnsRegister.hostname,
+    FN0_AGENT_DNS_HOSTNAMES: dnsRegister.hostnames,
   };
   return resolveEnvMap(base);
 }
@@ -829,14 +842,18 @@ function buildWorkerEnv(
     }));
 
   const base: { [k: string]: pulumi.Input<string> } = {
-    CWASM_BUCKET: cwasmBucket.bucketName,
-    S3_ENDPOINT: cwasmBucket.endpoint,
-    S3_REGION: cwasmBucket.region,
-    AWS_ACCESS_KEY_ID: cwasmBucket.accessKeyId,
-    AWS_SECRET_ACCESS_KEY: cwasmBucket.secretAccessKey,
+    CWASM_BUCKET: worker.bundleStorage.bucketName,
+    S3_ENDPOINT: worker.bundleStorage.endpoint,
+    S3_REGION: worker.bundleStorage.region,
+    AWS_ACCESS_KEY_ID: worker.bundleStorage.accessKeyId,
+    AWS_SECRET_ACCESS_KEY: worker.bundleStorage.secretAccessKey,
 
-    ORIGIN_CERT_PEM: worker.tlsOrigin.certPem,
-    ORIGIN_KEY_PEM: worker.tlsOrigin.keyPem,
+    ORIGIN_CERT_PEM_BASE64: pulumi
+      .output(worker.tlsOrigin.certPem)
+      .apply((s) => Buffer.from(s, "utf8").toString("base64")),
+    ORIGIN_KEY_PEM_BASE64: pulumi
+      .output(worker.tlsOrigin.keyPem)
+      .apply((s) => Buffer.from(s, "utf8").toString("base64")),
 
     FN0_ENV_KEY_BASE64: worker.envEncryptionKeyBase64,
 
@@ -980,6 +997,7 @@ ExecStart=/usr/local/bin/fn0-worker-agent
 Restart=on-failure
 RestartSec=5
 User=opc
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
@@ -1031,6 +1049,7 @@ chmod 600 /etc/fn0-worker-agent/env
 
 cat > /etc/fn0-worker-agent/worker-env <<'EOF_WORKER_ENV'
 ${workerEnvFile}EOF_WORKER_ENV
+chown opc:opc /etc/fn0-worker-agent/worker-env
 chmod 600 /etc/fn0-worker-agent/worker-env
 
 podman pull ${agentImageRef}
@@ -1050,6 +1069,17 @@ chmod 600 /etc/fn0-alloy/config.alloy
 
 cat > /etc/systemd/system/fn0-alloy.service <<'EOF_ALLOY_UNIT'
 ${alloySystemdUnit}EOF_ALLOY_UNIT
+
+# Without lingering, opc's user-1000.slice tears down whenever the last SSH
+# session ends, taking podman's conmon (and the worker container with it)
+# with it. fn0-worker-agent.service stays up but its containers get SIGTERM'd.
+loginctl enable-linger opc
+
+# Oracle Linux ships firewalld enabled by default, which blocks 443 even
+# though the OCI SecurityList allows it. Open the port through firewalld
+# (kept in sync with the SecurityList).
+firewall-cmd --permanent --add-port=443/tcp
+firewall-cmd --reload
 
 systemctl daemon-reload
 systemctl enable --now fn0-worker-agent.service
