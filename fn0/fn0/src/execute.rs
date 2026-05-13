@@ -218,6 +218,7 @@ pub async fn run_wasm_instance_loop(
         time_tracker.clone(),
         is_timeout.clone(),
         SelfInvokeHooks::new(
+            project_id.clone(),
             turso_hijack.clone(),
             otlp_hijack.clone(),
             queue_hijack.clone(),
@@ -242,7 +243,7 @@ pub async fn run_wasm_instance_loop(
     let project_id_for_closure = project_id.clone();
     let run_result = store
         .run_concurrent(async move |accessor| -> Result<()> {
-            scope_wasm_execution(project_id_for_closure.clone(), accessor, &service, async {
+            scope_wasm_execution(accessor, &service, async {
                 let mut pending: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>> =
                     FuturesUnordered::new();
 

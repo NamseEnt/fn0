@@ -45,6 +45,7 @@ pub struct VaultHijack {
 }
 
 impl VaultHijack {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         placeholder_host: String,
         crypto_endpoint: String,
