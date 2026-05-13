@@ -130,21 +130,47 @@ For each page handler (`rs/src/pages/<path>/mod.rs`), it generates:
 - `fe/src/pages/<path>/.props.ts` — the `Props` type as a TypeScript discriminated union
 
 For each action handler (`rs/src/actions/<name>.rs`), it generates:
-- `fe/src/actions/.generated/<name>.ts` — Zod schema and TypeScript types for `Input` and `Output`
+- `fe/src/actions/.generated/<name>.ts` — exported typed function using `callAction` from `@forte/react`
+- `fe/src/actions/.generated/index.ts` — barrel re-export of all action functions
 
 For each hook handler (`rs/src/hooks/<name>.rs`), it generates:
-- `fe/src/hooks/.generated/<name>.ts` — Zod schema and TypeScript types for `Input` and `Output`
+- `fe/src/hooks/.generated/use<HookName>.ts` — exported hook using `useForteHook` from `@forte/react`
 
-Each generated file imports `zod` and exports:
+Each generated file imports `zod` and exports typed schemas. For example, an action file (`fe/src/actions/.generated/<name>.ts`) looks like:
+
 ```ts
-export const InputSchema = z.object({ ... });
-export type Input = z.infer<typeof InputSchema>;
+// Auto-generated from ...
+import { z } from "zod";
+import { callAction } from "@forte/react";
 
-export const OutputSchema = z.discriminatedUnion("t", [ ... ]);
-export type Output = z.infer<typeof OutputSchema>;
+const InputSchema = z.object({ ... });
+const OutputSchema = z.discriminatedUnion("t", [ ... ]);
+
+export function myAction(input: z.infer<typeof InputSchema>) {
+  return callAction("my_action", input, OutputSchema);
+}
 ```
 
-The generated Props type uses `{ t: "VariantName", v: { ... } }` shape for enum variants with fields.
+A hook file (`fe/src/hooks/.generated/use<HookName>.ts`) looks like:
+
+```ts
+import { z } from "zod";
+import { useForteHook } from "@forte/react";
+
+export function useMyHook(input: z.infer<typeof InputSchema>) {
+  return useForteHook("my_hook", input, OutputSchema);
+}
+```
+
+The JSON shape for enum variants follows `forte-json` conventions:
+
+| Variant kind | Rust | JSON |
+|---|---|---|
+| Unit | `Ok` | `{"t":"Ok"}` |
+| Tuple/newtype (1 field) | `Ok(String)` | `{"t":"Ok","v":"..."}` |
+| Struct | `Ok { message: String }` | `{"t":"Ok","message":"..."}` |
+
+The `v` wrapper applies to **tuple/newtype variants only**. Struct variant fields are spread flat alongside `t` (no `v` wrapper).
 
 ## The `FORTE-MANAGED` Block
 

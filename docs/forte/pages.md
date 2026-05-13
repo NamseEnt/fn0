@@ -39,7 +39,12 @@ pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
 
 The `Props` type is serialized to JSON and passed to the React component via the SSR pipeline.
 
-> **Scaffold note:** `forte add page` generates a starter file with the signature `handler(_headers: HeaderMap, _jar: CookieJar)`. This does **not** match the calling convention — the generated router always passes a `ForteRequest` struct as the first argument. Replace the generated signature with `handler(_req: ForteRequest<'_>)` before running `forte build`.
+> **Scaffold note:** `forte add page` generates a starter file with several issues that prevent it from building:
+> - The handler signature is `handler(_headers: HeaderMap, _jar: CookieJar)` — replace with `handler(_req: ForteRequest<'_>)`.
+> - For dynamic routes, the scaffold generates a `Params` struct — codegen expects `PathParams`. Rename it before building.
+> - The generated React component accesses `props.v.message` — this is only correct for tuple/newtype variants. For struct variants like `Ok { message: String }`, the correct access is `props.message` after narrowing on `props.t`.
+>
+> Fix all three before running `forte build`.
 
 ## ForteRequest
 
@@ -80,7 +85,9 @@ pub async fn handler(_req: ForteRequest<'_>, params: PathParams) -> Result<Props
 }
 ```
 
-The codegen reads the `PathParams` struct and generates the extraction code. The parameter names must match the directory segment names (e.g. `[id]` → field named `id`).
+The codegen reads a struct named exactly `PathParams` and generates the extraction code. The parameter names must match the directory segment names (e.g. `[id]` → field named `id`).
+
+> **Note:** `forte add page` generates a struct named `Params`, not `PathParams`. The codegen will not extract path parameters from a struct named `Params`. Rename it to `PathParams` before building.
 
 Supported param types: `String`, and any type that implements `FromStr` (e.g. `u32`, `i64`). Non-`String` types that fail to parse return HTTP 400.
 
