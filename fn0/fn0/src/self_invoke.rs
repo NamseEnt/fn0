@@ -23,7 +23,6 @@ use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 use wasmtime_wasi_http::p3::{RequestOptions, WasiHttpHooks, default_send_request};
 
 tokio::task_local! {
-    pub(crate) static PROJECT_ID: String;
     pub(crate) static WASM_RAW: WasmRaw;
     pub(crate) static SELF_HOST: String;
 }
@@ -55,7 +54,6 @@ impl WasmRaw {
 }
 
 pub(crate) async fn scope_wasm_execution<F, T>(
-    project_id: String,
     accessor: &Accessor<ClientState<SystemClock>>,
     service: &Service,
     future: F,
@@ -64,22 +62,23 @@ where
     F: Future<Output = T>,
 {
     let raw = WasmRaw::new(accessor, service);
-    PROJECT_ID
-        .scope(project_id, WASM_RAW.scope(raw, future))
-        .await
+    WASM_RAW.scope(raw, future).await
 }
 
 pub async fn call_wasm_direct(req: Request) -> Result<Response> {
     let raw = WASM_RAW
         .try_with(|r| *r)
         .map_err(|_| anyhow!("call_wasm_direct invoked outside wasm scope"))?;
-    let project_id = PROJECT_ID.with(|p| p.clone());
     let accessor = unsafe { raw.accessor() };
     let service = unsafe { raw.service() };
 
-    let (time_tracker, is_timeout) = accessor.with(|mut access| {
+    let (time_tracker, is_timeout, project_id) = accessor.with(|mut access| {
         let state = access.data_mut();
-        (state.time_tracker.clone(), state.is_timeout.clone())
+        (
+            state.time_tracker.clone(),
+            state.is_timeout.clone(),
+            state.project_id.clone(),
+        )
     });
 
     let req_http = req.map(|body| {
@@ -121,6 +120,7 @@ type HookResponse = (
 type HookResult = std::result::Result<HookResponse, TrappableError<ErrorCode>>;
 
 pub(crate) struct SelfInvokeHooks {
+    project_id: String,
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<OtlpHijack>>,
     queue_hijack: Option<Arc<QueueHijack>>,
@@ -130,6 +130,7 @@ pub(crate) struct SelfInvokeHooks {
 
 impl SelfInvokeHooks {
     pub(crate) fn new(
+        project_id: String,
         turso_hijack: Option<Arc<TursoHijack>>,
         otlp_hijack: Option<Arc<OtlpHijack>>,
         queue_hijack: Option<Arc<QueueHijack>>,
@@ -137,6 +138,7 @@ impl SelfInvokeHooks {
         vault_hijack: Option<Arc<VaultHijack>>,
     ) -> Self {
         Self {
+            project_id,
             turso_hijack,
             otlp_hijack,
             queue_hijack,
@@ -166,25 +168,25 @@ impl WasiHttpHooks for SelfInvokeHooks {
         if let Some(hijack) = self.turso_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return turso_send(hijack, request, options);
+            return turso_send(hijack, self.project_id.clone(), request, options);
         }
 
         if let Some(hijack) = self.queue_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return queue_send(hijack, request, options);
+            return queue_send(hijack, self.project_id.clone(), request, options);
         }
 
         if let Some(hijack) = self.control_invoke_queue_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return control_invoke_queue_send(hijack, request, options);
+            return control_invoke_queue_send(hijack, self.project_id.clone(), request, options);
         }
 
         if let Some(hijack) = self.vault_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return vault_send(hijack, request, options);
+            return vault_send(hijack, self.project_id.clone(), request, options);
         }
 
         if let Some(hijack) = self.otlp_hijack.clone()
@@ -231,16 +233,11 @@ fn self_invoke_send(
 
 fn turso_send(
     hijack: Arc<TursoHijack>,
+    project_id: String,
     mut request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
-            TrappableError::from(ErrorCode::InternalError(Some(
-                "turso hijack outside wasm scope".into(),
-            )))
-        })?;
-
         if let Err(e) = hijack.rewrite(&mut request, &project_id) {
             return Err(e.into());
         }
@@ -254,16 +251,11 @@ fn turso_send(
 
 fn queue_send(
     hijack: Arc<QueueHijack>,
+    project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
-            TrappableError::from(ErrorCode::InternalError(Some(
-                "queue hijack outside wasm scope".into(),
-            )))
-        })?;
-
         let (_parts, body) = request.into_parts();
         let body_bytes = match body.collect().await {
             Ok(c) => c.to_bytes(),
@@ -296,16 +288,11 @@ fn queue_send(
 
 fn control_invoke_queue_send(
     hijack: Arc<ControlInvokeQueueHijack>,
+    project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
-            TrappableError::from(ErrorCode::InternalError(Some(
-                "control invoke queue hijack outside wasm scope".into(),
-            )))
-        })?;
-
         let (_parts, body) = request.into_parts();
         let body_bytes = match body.collect().await {
             Ok(c) => c.to_bytes(),
@@ -336,16 +323,11 @@ fn control_invoke_queue_send(
 
 fn vault_send(
     hijack: Arc<VaultHijack>,
+    project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
-            TrappableError::from(ErrorCode::InternalError(Some(
-                "vault hijack outside wasm scope".into(),
-            )))
-        })?;
-
         let (parts, body) = request.into_parts();
         let body_bytes = match body.collect().await {
             Ok(c) => c.to_bytes(),
