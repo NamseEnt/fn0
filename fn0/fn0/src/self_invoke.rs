@@ -74,7 +74,10 @@ impl AccessorGuard {
         accessor: &Accessor<ClientState<SystemClock>>,
         service: &Service,
     ) -> Self {
-        ACCESSOR_PTR.with(|c| c.set(Some(accessor as *const _)));
+        let tid = std::thread::current().id();
+        let ptr = accessor as *const _;
+        tracing::info!(?tid, ?ptr, "AccessorGuard install");
+        ACCESSOR_PTR.with(|c| c.set(Some(ptr)));
         SERVICE_PTR.with(|c| c.set(Some(service as *const _)));
         Self
     }
@@ -82,6 +85,8 @@ impl AccessorGuard {
 
 impl Drop for AccessorGuard {
     fn drop(&mut self) {
+        let tid = std::thread::current().id();
+        tracing::info!(?tid, "AccessorGuard drop");
         ACCESSOR_PTR.with(|c| c.set(None));
         SERVICE_PTR.with(|c| c.set(None));
     }
@@ -225,7 +230,10 @@ fn turso_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
+        let tid = format!("{:?}", std::thread::current().id());
         let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
+        let ptr_dbg = format!("{:?}", acc_ptr.map(|p| p as usize));
+        tracing::info!(tid, ptr = ptr_dbg, "turso_send entry");
         let Some(acc_ptr) = acc_ptr else {
             return Err(
                 ErrorCode::InternalError(Some("turso hijack accessor slot empty".into())).into(),
