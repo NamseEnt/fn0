@@ -17,42 +17,43 @@ __FN0_CWASM_COMPILER_LOADED=1
 
 CWASM_COMPILER_PARALLEL="${CWASM_COMPILER_PARALLEL:-20}"
 
-ensure_cwasm_pending() {
+ensure_cwasm_lambda() {
   local new_fn0_wasmtime_version="$1"
   if [[ -z "$new_fn0_wasmtime_version" ]]; then
-    echo "ensure_cwasm_pending: missing version" >&2
+    echo "ensure_cwasm_lambda: missing version" >&2
     return 2
   fi
   local new_fn0_wasmtime_version_dash="${new_fn0_wasmtime_version//./-}"
-  local function_name="fn0-cwasm-compiler-${new_fn0_wasmtime_version_dash}"
+  CWASM_LAMBDA_FUNCTION_NAME="fn0-cwasm-compiler-${new_fn0_wasmtime_version_dash}"
 
-  local cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk control_ak control_sk
+  local cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk
   local r2_endpoint r2_bucket r2_ak r2_sk
   cwasm_region="$(pulumi_pick cwasmCompilerBucketRegion)"
   cwasm_ecr="$(pulumi_pick cwasmCompilerEcrRepository)"
   cwasm_role="$(pulumi_pick cwasmCompilerRoleArn)"
   builder_ak="$(pulumi_pick cwasmCompilerBuilderAccessKeyId)"
   builder_sk="$(pulumi_pick cwasmCompilerBuilderSecretAccessKey)"
-  control_ak="$(pulumi_pick controlAwsAccessKeyId)"
-  control_sk="$(pulumi_pick controlAwsSecretAccessKey)"
   r2_endpoint="$(pulumi_pick bundleStoreR2Endpoint)"
   r2_bucket="$(pulumi_pick bundleStoreR2BucketName)"
   r2_ak="$(pulumi_pick bundleStoreR2AccessKeyId)"
   r2_sk="$(pulumi_pick bundleStoreR2SecretAccessKey)"
   local v
-  for v in cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk control_ak control_sk \
+  for v in cwasm_region cwasm_ecr cwasm_role builder_ak builder_sk \
            r2_endpoint r2_bucket r2_ak r2_sk; do
     if [[ -z "${!v}" ]]; then
-      echo "ensure_cwasm_pending: missing pulumi output (${v})" >&2
+      echo "ensure_cwasm_lambda: missing pulumi output (${v})" >&2
       return 1
     fi
   done
+
+  CWASM_LAMBDA_REGION="$cwasm_region"
 
   local work_dir
   work_dir="$(mktemp -d)"
   trap 'rm -rf "$work_dir"' RETURN
 
   local image_uri="${cwasm_ecr}:${new_fn0_wasmtime_version_dash}"
+  local function_name="$CWASM_LAMBDA_FUNCTION_NAME"
 
   echo ">> ensure cwasm-compiler image ${image_uri}"
   (
@@ -115,12 +116,34 @@ ensure_cwasm_pending() {
     aws lambda wait function-active --region "$cwasm_region" --function-name "$function_name"
     aws lambda wait function-updated --region "$cwasm_region" --function-name "$function_name"
   )
+}
+
+ensure_cwasm_pending() {
+  local new_fn0_wasmtime_version="$1"
+  if [[ -z "$new_fn0_wasmtime_version" ]]; then
+    echo "ensure_cwasm_pending: missing version" >&2
+    return 2
+  fi
+
+  ensure_cwasm_lambda "$new_fn0_wasmtime_version"
+
+  local control_ak control_sk r2_endpoint r2_bucket r2_ak r2_sk
+  control_ak="$(pulumi_pick controlAwsAccessKeyId)"
+  control_sk="$(pulumi_pick controlAwsSecretAccessKey)"
+  r2_endpoint="$(pulumi_pick bundleStoreR2Endpoint)"
+  r2_bucket="$(pulumi_pick bundleStoreR2BucketName)"
+  r2_ak="$(pulumi_pick bundleStoreR2AccessKeyId)"
+  r2_sk="$(pulumi_pick bundleStoreR2SecretAccessKey)"
 
   echo ">> register pending fn0-wasmtime ${new_fn0_wasmtime_version} in control"
   control_set_pending_fn0_wasmtime "$new_fn0_wasmtime_version"
 
-  __cwasm_sync_compile_all "$new_fn0_wasmtime_version" "$function_name" \
-    "$cwasm_region" "$control_ak" "$control_sk" \
+  local work_dir
+  work_dir="$(mktemp -d)"
+  trap 'rm -rf "$work_dir"' RETURN
+
+  __cwasm_sync_compile_all "$new_fn0_wasmtime_version" "$CWASM_LAMBDA_FUNCTION_NAME" \
+    "$CWASM_LAMBDA_REGION" "$control_ak" "$control_sk" \
     "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" \
     "$work_dir"
 }

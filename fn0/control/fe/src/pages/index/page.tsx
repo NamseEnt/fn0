@@ -8,7 +8,7 @@ export default function IndexPage(props: Props) {
     return (
         <div>
             <h1>Welcome to Forte</h1>
-            <p>{props.v.message}</p>
+            <p>{props.message}</p>
         </div>
     );
 }

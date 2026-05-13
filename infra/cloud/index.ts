@@ -58,13 +58,8 @@ new fn0.ControlProjectBootstrap(
   "control-project-bootstrap",
   {
     organizationSlug: config.require("tursoOrganizationSlug"),
-    location: config.require("tursoLocation"),
     groupName: forteDb.groupName,
-    jwt: forteDb.groupToken,
     projectId: "fn0-control",
-    ownerGithubId: config.requireNumber("controlOwnerGithubId"),
-    ownerGithubLogin: config.require("controlOwnerGithubLogin"),
-    displayName: "fn0-control",
   },
   { dependsOn: [forteDb] }
 );
@@ -207,6 +202,7 @@ new aws.iam.UserPolicy("cwasm-compiler-builder-user-policy", {
             Action: [
               "lambda:CreateFunction",
               "lambda:GetFunction",
+              "lambda:GetFunctionConfiguration",
               "lambda:UpdateFunctionCode",
               "lambda:UpdateFunctionConfiguration",
               "lambda:DeleteFunction",
@@ -533,7 +529,7 @@ const workerHostObservability = {
 
 const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   region: config.require("ociComputeWorkerRegion"),
-  count: 0,
+  count: 1,
   shape: "VM.Standard.A1.Flex",
   ocpus: 1,
   memoryInGbs: 6,
@@ -545,7 +541,9 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   agentDnsRegister: {
     apiToken: dns.dnsApiToken,
     zoneId,
-    hostname: `*.${domain}`,
+    // Wildcard for system-assigned subdomains, plus the explicit fallback
+    // origin hostname (Cloudflare SaaS requires its own proxied A record).
+    hostnames: `*.${domain},fallback.${domain}`,
   },
   worker: {
     tlsOrigin: {
@@ -570,6 +568,13 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       basicAuth: workerOtlpBasicAuth,
     },
     hostObservability: workerHostObservability,
+    bundleStorage: {
+      bucketName: bundleStoreR2.bucketName,
+      endpoint: bundleStoreR2.endpoint,
+      region: "auto",
+      accessKeyId: bundleStoreR2.accessKeyId,
+      secretAccessKey: bundleStoreR2.secretAccessKey,
+    },
   },
 });
 
@@ -578,6 +583,16 @@ new fn0.EventBridgeCronTrigger("control-cron-trigger", {
   controlAdminToken: controlAdminToken.base64,
   awsRegion: cwasmCompilerRegion,
   suffix,
+});
+
+new cloudflare.CustomHostname("control-custom-hostname", {
+  zoneId,
+  hostname: pulumi.interpolate`fn0-control.${domain}`,
+  ssl: {
+    method: "txt",
+    type: "dv",
+    settings: { minTlsVersion: "1.2" },
+  },
 });
 
 export const workerImageRegistries = pulumi.secret(ociFn0WorkerSite.workerImageRegistries);
@@ -597,6 +612,10 @@ export const controlAwsAccessKeyId = pulumi.secret(controlAwsAccessKey.id);
 export const controlAwsSecretAccessKey = pulumi.secret(controlAwsAccessKey.secret);
 export const docDbUrl = docDb.url;
 export const docDbToken = pulumi.secret(docDb.token);
+export const forteDbGroupToken = pulumi.secret(forteDb.groupToken);
+export const forteDbHostSuffix = forteDb.hostSuffix;
+export const controlOwnerGithubId = config.requireNumber("controlOwnerGithubId");
+export const controlOwnerGithubLogin = config.require("controlOwnerGithubLogin");
 export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
 export const vaultKeyOcid = ociGlobalVault.keyOcid;
 export const controlBootstrapEnvYaml = pulumi.secret(controlEnvYamlBootstrap);
