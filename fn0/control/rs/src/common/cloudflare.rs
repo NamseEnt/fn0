@@ -133,7 +133,7 @@ impl CloudflareClient {
             min_tls: "1.2",
         })?;
         let create_path = format!(
-            "/accounts/{}/r2/buckets/{}/custom_domains",
+            "/accounts/{}/r2/buckets/{}/domains/custom",
             self.account_id, bucket_name
         );
         let (status, body) = self.call("POST", &create_path, create_payload).await?;
@@ -150,7 +150,7 @@ impl CloudflareClient {
         }
         let edit_payload = serde_json::to_vec(&EditBody { enabled: true })?;
         let edit_path = format!(
-            "/accounts/{}/r2/buckets/{}/custom_domains/{}",
+            "/accounts/{}/r2/buckets/{}/domains/custom/{}",
             self.account_id, bucket_name, domain
         );
         let (status, body) = self.call("PUT", &edit_path, edit_payload).await?;

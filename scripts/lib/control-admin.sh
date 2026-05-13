@@ -8,11 +8,11 @@ __FN0_CONTROL_ADMIN_LOADED=1
 
 # Calls a control __forte_action endpoint. Echoes the response body to stdout.
 # Args: <action_name> <json_body>
-# Returns: HTTP status via global CONTROL_ADMIN_HTTP_CODE, response body via stdout.
+# Returns: zero exit when HTTP 200, nonzero otherwise (HTTP code emitted on stderr).
 control_admin_invoke() {
   local action="$1"
   local body="$2"
-  local control_url admin_token resp_file
+  local control_url admin_token resp_file http_code
   control_url="$(pulumi_pick controlUrl)"
   admin_token="$(pulumi_pick controlAdminTokenBase64)"
   if [[ -z "$control_url" || -z "$admin_token" ]]; then
@@ -20,13 +20,17 @@ control_admin_invoke() {
     return 1
   fi
   resp_file="$(mktemp)"
-  CONTROL_ADMIN_HTTP_CODE="$(curl -sS -o "$resp_file" -w '%{http_code}' \
+  http_code="$(curl -sS -o "$resp_file" -w '%{http_code}' \
     -X POST "${control_url%/}/__forte_action/${action}" \
     -H "Authorization: Bearer ${admin_token}" \
     -H "Content-Type: application/json" \
     --data "$body")"
   cat "$resp_file"
   rm -f "$resp_file"
+  if [[ "$http_code" != "200" ]]; then
+    echo "control_admin_invoke ${action} HTTP ${http_code}" >&2
+    return 1
+  fi
 }
 
 # Reads Fn0WasmtimeVersionDoc directly from doc-db (control-independent).
@@ -75,9 +79,8 @@ control_set_pending_fn0_wasmtime() {
   local version="$1"
   local body resp outcome
   body="$(jq -nc --arg v "$version" '{version: $v}')"
-  resp="$(control_admin_invoke set_pending_fn0_wasmtime "$body")"
-  if [[ "$CONTROL_ADMIN_HTTP_CODE" != "200" ]]; then
-    echo "set_pending_fn0_wasmtime HTTP ${CONTROL_ADMIN_HTTP_CODE}: ${resp}" >&2
+  if ! resp="$(control_admin_invoke set_pending_fn0_wasmtime "$body")"; then
+    echo "set_pending_fn0_wasmtime failed: ${resp}" >&2
     return 1
   fi
   outcome="$(jq -r 'if type == "string" then . else (keys[0]) end' <<<"$resp")"
@@ -93,9 +96,8 @@ control_set_pending_fn0_wasmtime() {
 # empty string on NoPending (noop).
 control_promote_pending_fn0_wasmtime() {
   local resp outcome
-  resp="$(control_admin_invoke promote_pending_fn0_wasmtime '{}')"
-  if [[ "$CONTROL_ADMIN_HTTP_CODE" != "200" ]]; then
-    echo "promote_pending_fn0_wasmtime HTTP ${CONTROL_ADMIN_HTTP_CODE}: ${resp}" >&2
+  if ! resp="$(control_admin_invoke promote_pending_fn0_wasmtime '{}')"; then
+    echo "promote_pending_fn0_wasmtime failed: ${resp}" >&2
     return 1
   fi
   outcome="$(jq -r '
