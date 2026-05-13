@@ -34,7 +34,7 @@ enum Backend {
 #[derive(Clone)]
 pub struct ControlInvokeQueueHijack {
     pub placeholder_host: String,
-    allowed_caller_subdomain: String,
+    allowed_caller_project_id: String,
     backend: Backend,
 }
 
@@ -71,7 +71,7 @@ impl ControlInvokeQueueHijack {
     #[allow(clippy::too_many_arguments)]
     pub fn new_oci(
         placeholder_host: String,
-        allowed_caller_subdomain: String,
+        allowed_caller_project_id: String,
         queue_ocid: String,
         messages_endpoint: String,
         tenancy: String,
@@ -97,7 +97,7 @@ impl ControlInvokeQueueHijack {
 
         Ok(Self {
             placeholder_host,
-            allowed_caller_subdomain,
+            allowed_caller_project_id,
             backend: Backend::Oci {
                 queue_ocid,
                 messages_host,
@@ -108,12 +108,12 @@ impl ControlInvokeQueueHijack {
 
     pub fn new_loopback(
         placeholder_host: String,
-        allowed_caller_subdomain: String,
+        allowed_caller_project_id: String,
         tx: mpsc::UnboundedSender<ControlInvokeMessage>,
     ) -> Self {
         Self {
             placeholder_host,
-            allowed_caller_subdomain,
+            allowed_caller_project_id,
             backend: Backend::Loopback { tx },
         }
     }
@@ -125,7 +125,7 @@ impl ControlInvokeQueueHijack {
             })?;
         let placeholder_host = std::env::var("FN0_CONTROL_INVOKE_QUEUE_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-control-invoke-queue.fn0.dev".to_string());
-        let allowed_caller_subdomain = std::env::var("FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN")
+        let allowed_caller_project_id = std::env::var("FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN")
             .map_err(|_| {
                 anyhow::anyhow!("FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN is required")
             })?;
@@ -151,7 +151,7 @@ impl ControlInvokeQueueHijack {
 
         Self::new_oci(
             placeholder_host,
-            allowed_caller_subdomain,
+            allowed_caller_project_id,
             queue_ocid,
             messages_endpoint,
             tenancy,
@@ -165,8 +165,8 @@ impl ControlInvokeQueueHijack {
         format!("http://{}", self.placeholder_host)
     }
 
-    pub fn allowed_caller_subdomain(&self) -> &str {
-        &self.allowed_caller_subdomain
+    pub fn allowed_caller_project_id(&self) -> &str {
+        &self.allowed_caller_project_id
     }
 
     pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
@@ -175,10 +175,10 @@ impl ControlInvokeQueueHijack {
 
     pub(crate) fn handle_invoke(
         &self,
-        caller_subdomain: &str,
+        caller_project_id: &str,
         body_bytes: &[u8],
     ) -> Result<HijackAction, ErrorCode> {
-        if caller_subdomain != self.allowed_caller_subdomain {
+        if caller_project_id != self.allowed_caller_project_id {
             let resp = hyper::Response::builder()
                 .status(403)
                 .body(

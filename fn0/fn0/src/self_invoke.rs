@@ -11,7 +11,6 @@ use bytes::Bytes;
 use http_body_util::BodyExt;
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::http;
-use std::cell::Cell;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -23,22 +22,64 @@ use wasmtime_wasi_http::p3::bindings::Service;
 use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 use wasmtime_wasi_http::p3::{RequestOptions, WasiHttpHooks, default_send_request};
 
-pub async fn call_wasm_direct(req: Request) -> Result<Response> {
-    let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
-    let svc_ptr = SERVICE_PTR.with(|c| c.get());
-    let (Some(acc_ptr), Some(svc_ptr)) = (acc_ptr, svc_ptr) else {
-        return Err(anyhow!("no accessor installed in current thread"));
-    };
-    let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
-    let service: &Service = unsafe { &*svc_ptr };
+tokio::task_local! {
+    pub(crate) static PROJECT_ID: String;
+    pub(crate) static WASM_RAW: WasmRaw;
+    pub(crate) static SELF_HOST: String;
+}
 
-    let (time_tracker, is_timeout, code_id) = accessor.with(|mut access| {
+#[derive(Copy, Clone)]
+pub(crate) struct WasmRaw {
+    accessor: usize,
+    service: usize,
+}
+
+impl WasmRaw {
+    pub(crate) fn new(
+        accessor: &Accessor<ClientState<SystemClock>>,
+        service: &Service,
+    ) -> Self {
+        Self {
+            accessor: accessor as *const _ as usize,
+            service: service as *const _ as usize,
+        }
+    }
+
+    unsafe fn accessor(self) -> &'static Accessor<ClientState<SystemClock>> {
+        unsafe { &*(self.accessor as *const Accessor<ClientState<SystemClock>>) }
+    }
+
+    unsafe fn service(self) -> &'static Service {
+        unsafe { &*(self.service as *const Service) }
+    }
+}
+
+pub(crate) async fn scope_wasm_execution<F, T>(
+    project_id: String,
+    accessor: &Accessor<ClientState<SystemClock>>,
+    service: &Service,
+    future: F,
+) -> T
+where
+    F: Future<Output = T>,
+{
+    let raw = WasmRaw::new(accessor, service);
+    PROJECT_ID
+        .scope(project_id, WASM_RAW.scope(raw, future))
+        .await
+}
+
+pub async fn call_wasm_direct(req: Request) -> Result<Response> {
+    let raw = WASM_RAW
+        .try_with(|r| *r)
+        .map_err(|_| anyhow!("call_wasm_direct invoked outside wasm scope"))?;
+    let project_id = PROJECT_ID.with(|p| p.clone());
+    let accessor = unsafe { raw.accessor() };
+    let service = unsafe { raw.service() };
+
+    let (time_tracker, is_timeout) = accessor.with(|mut access| {
         let state = access.data_mut();
-        (
-            state.time_tracker.clone(),
-            state.is_timeout.clone(),
-            state.code_id.clone(),
-        )
+        (state.time_tracker.clone(), state.is_timeout.clone())
     });
 
     let req_http = req.map(|body| {
@@ -51,45 +92,11 @@ pub async fn call_wasm_direct(req: Request) -> Result<Response> {
         service,
         p3_req,
         req_io,
-        &code_id,
+        &project_id,
         time_tracker,
         &is_timeout,
     )
     .await
-}
-
-thread_local! {
-    static ACCESSOR_PTR: Cell<Option<*const Accessor<ClientState<SystemClock>>>> = const { Cell::new(None) };
-    static SERVICE_PTR: Cell<Option<*const Service>> = const { Cell::new(None) };
-}
-
-tokio::task_local! {
-    pub(crate) static SELF_HOST: String;
-}
-
-pub(crate) struct AccessorGuard;
-
-impl AccessorGuard {
-    pub(crate) fn install(
-        accessor: &Accessor<ClientState<SystemClock>>,
-        service: &Service,
-    ) -> Self {
-        let tid = std::thread::current().id();
-        let ptr = accessor as *const _;
-        tracing::info!(?tid, ?ptr, "AccessorGuard install");
-        ACCESSOR_PTR.with(|c| c.set(Some(ptr)));
-        SERVICE_PTR.with(|c| c.set(Some(service as *const _)));
-        Self
-    }
-}
-
-impl Drop for AccessorGuard {
-    fn drop(&mut self) {
-        let tid = std::thread::current().id();
-        tracing::info!(?tid, "AccessorGuard drop");
-        ACCESSOR_PTR.with(|c| c.set(None));
-        SERVICE_PTR.with(|c| c.set(None));
-    }
 }
 
 pub(crate) fn extract_host(headers: &hyper::HeaderMap) -> Option<String> {
@@ -194,15 +201,13 @@ fn self_invoke_send(
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
-        let svc_ptr = SERVICE_PTR.with(|c| c.get());
-        let (Some(acc_ptr), Some(svc_ptr)) = (acc_ptr, svc_ptr) else {
-            return Err(
-                ErrorCode::InternalError(Some("self-invoke accessor slot empty".into())).into(),
-            );
-        };
-        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
-        let service: &Service = unsafe { &*svc_ptr };
+        let raw = WASM_RAW.try_with(|r| *r).map_err(|_| {
+            TrappableError::from(ErrorCode::InternalError(Some(
+                "self-invoke outside wasm scope".into(),
+            )))
+        })?;
+        let accessor = unsafe { raw.accessor() };
+        let service = unsafe { raw.service() };
 
         let (p3_req, req_io) = P3Request::from_http(request);
         let handle_result = service.handle(accessor, p3_req).await;
@@ -230,19 +235,13 @@ fn turso_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let tid = format!("{:?}", std::thread::current().id());
-        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
-        let ptr_dbg = format!("{:?}", acc_ptr.map(|p| p as usize));
-        tracing::info!(tid, ptr = ptr_dbg, "turso_send entry");
-        let Some(acc_ptr) = acc_ptr else {
-            return Err(
-                ErrorCode::InternalError(Some("turso hijack accessor slot empty".into())).into(),
-            );
-        };
-        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
-        let subdomain = accessor.with(|mut access| access.data_mut().code_id.clone());
+        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
+            TrappableError::from(ErrorCode::InternalError(Some(
+                "turso hijack outside wasm scope".into(),
+            )))
+        })?;
 
-        if let Err(e) = hijack.rewrite(&mut request, &subdomain) {
+        if let Err(e) = hijack.rewrite(&mut request, &project_id) {
             return Err(e.into());
         }
 
@@ -259,14 +258,11 @@ fn queue_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
-        let Some(acc_ptr) = acc_ptr else {
-            return Err(
-                ErrorCode::InternalError(Some("queue hijack accessor slot empty".into())).into(),
-            );
-        };
-        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
-        let subdomain = accessor.with(|mut access| access.data_mut().code_id.clone());
+        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
+            TrappableError::from(ErrorCode::InternalError(Some(
+                "queue hijack outside wasm scope".into(),
+            )))
+        })?;
 
         let (_parts, body) = request.into_parts();
         let body_bytes = match body.collect().await {
@@ -274,12 +270,12 @@ fn queue_send(
             Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
         };
 
-        let action = match hijack.handle_enqueue(&subdomain, &body_bytes) {
+        let action = match hijack.handle_enqueue(&project_id, &body_bytes) {
             Ok(a) => a,
             Err(ec) => return Err(ec.into()),
         };
 
-        hijack.record_usage(&subdomain);
+        hijack.record_usage(&project_id);
 
         match action {
             crate::queue_hijack::HijackAction::Forward(signed) => {
@@ -304,15 +300,11 @@ fn control_invoke_queue_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
-        let Some(acc_ptr) = acc_ptr else {
-            return Err(ErrorCode::InternalError(Some(
-                "control invoke queue hijack accessor slot empty".into(),
-            ))
-            .into());
-        };
-        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
-        let caller_subdomain = accessor.with(|mut access| access.data_mut().code_id.clone());
+        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
+            TrappableError::from(ErrorCode::InternalError(Some(
+                "control invoke queue hijack outside wasm scope".into(),
+            )))
+        })?;
 
         let (_parts, body) = request.into_parts();
         let body_bytes = match body.collect().await {
@@ -320,7 +312,7 @@ fn control_invoke_queue_send(
             Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
         };
 
-        let action = match hijack.handle_invoke(&caller_subdomain, &body_bytes) {
+        let action = match hijack.handle_invoke(&project_id, &body_bytes) {
             Ok(a) => a,
             Err(ec) => return Err(ec.into()),
         };
@@ -348,14 +340,11 @@ fn vault_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let acc_ptr = ACCESSOR_PTR.with(|c| c.get());
-        let Some(acc_ptr) = acc_ptr else {
-            return Err(
-                ErrorCode::InternalError(Some("vault hijack accessor slot empty".into())).into(),
-            );
-        };
-        let accessor: &Accessor<ClientState<SystemClock>> = unsafe { &*acc_ptr };
-        let subdomain = accessor.with(|mut access| access.data_mut().code_id.clone());
+        let project_id = PROJECT_ID.try_with(|p| p.clone()).map_err(|_| {
+            TrappableError::from(ErrorCode::InternalError(Some(
+                "vault hijack outside wasm scope".into(),
+            )))
+        })?;
 
         let (parts, body) = request.into_parts();
         let body_bytes = match body.collect().await {
@@ -370,7 +359,7 @@ fn vault_send(
             .map(|pq| pq.path())
             .unwrap_or("/");
 
-        let signed = match hijack.build_signed_request(&subdomain, method, path, &body_bytes) {
+        let signed = match hijack.build_signed_request(&project_id, method, path, &body_bytes) {
             Ok(req) => req,
             Err(ec) => return Err(ec.into()),
         };
@@ -444,7 +433,7 @@ pub(crate) async fn call_service<C: Clock>(
     service: &Service,
     p3_req: P3Request,
     req_io: impl Future<Output = std::result::Result<(), ErrorCode>> + Send + 'static,
-    code_id: &str,
+    project_id: &str,
     time_tracker: TimeTracker<C>,
     is_timeout: &Arc<AtomicBool>,
 ) -> Result<Response> {
@@ -456,7 +445,7 @@ pub(crate) async fn call_service<C: Clock>(
             let http_resp = accessor
                 .with(|mut access| resp.into_http(access.as_context_mut(), req_io))
                 .map_err(|error| {
-                    telemetry::wasmtime_error("response_into_http", code_id, &format!("{error:?}"));
+                    telemetry::wasmtime_error("response_into_http", project_id, &format!("{error:?}"));
                     anyhow!("response into_http failed: {error:?}")
                 })?;
             Ok(http_resp.map(|body| {
@@ -465,34 +454,30 @@ pub(crate) async fn call_service<C: Clock>(
             }))
         }
         Ok(Err(ec)) => {
-            telemetry::proxy_returns_error_code(code_id, &format!("{ec:?}"));
+            telemetry::proxy_returns_error_code(project_id, &format!("{ec:?}"));
             Err(anyhow!("proxy returned error code: {ec:?}"))
         }
-        Err(error) => Err(classify_wasm_error(error, code_id, is_timeout)),
+        Err(error) => Err(classify_wasm_error(error, project_id, is_timeout)),
     }
 }
 
 pub(crate) fn classify_wasm_error(
     error: wasmtime::Error,
-    code_id: &str,
+    project_id: &str,
     is_timeout: &Arc<AtomicBool>,
 ) -> anyhow::Error {
     match error.downcast::<wasmtime::Trap>() {
         Ok(trap) => {
-            telemetry::trapped(code_id, &format!("{trap:?}"));
+            telemetry::trapped(project_id, &format!("{trap:?}"));
             if is_timeout.load(Ordering::Relaxed) {
                 anyhow!("CPU time limit exceeded (trapped: {trap:?})")
             } else {
-                anyhow!("trapped: {trap:?}")
+                anyhow!("wasm trapped: {trap:?}")
             }
         }
         Err(error) => {
-            telemetry::canceled_unexpectedly(code_id, &format!("{error:?}"));
-            if is_timeout.load(Ordering::Relaxed) {
-                anyhow!("CPU time limit exceeded: {error:?}")
-            } else {
-                anyhow!("canceled unexpectedly: {error:?}")
-            }
+            telemetry::canceled_unexpectedly(project_id, &format!("{error:?}"));
+            anyhow!("wasm error: {error:?}")
         }
     }
 }

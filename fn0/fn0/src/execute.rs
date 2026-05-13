@@ -1,6 +1,6 @@
 use crate::cache::Bundle;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
-use crate::self_invoke::{self, AccessorGuard, SELF_HOST, SelfInvokeHooks, call_service};
+use crate::self_invoke::{self, SELF_HOST, SelfInvokeHooks, call_service, scope_wasm_execution};
 use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
@@ -26,15 +26,15 @@ use wasmtime_wasi_http::{
 };
 
 struct TracingWriter {
-    code_id: String,
+    project_id: String,
     is_stderr: bool,
     buf: Vec<u8>,
 }
 
 impl TracingWriter {
-    fn new(code_id: String, is_stderr: bool) -> Self {
+    fn new(project_id: String, is_stderr: bool) -> Self {
         Self {
-            code_id,
+            project_id,
             is_stderr,
             buf: Vec::with_capacity(1024),
         }
@@ -42,9 +42,9 @@ impl TracingWriter {
 
     fn emit_line(&self, line: &str) {
         if self.is_stderr {
-            tracing::error!(code_id = %self.code_id, stream = "stderr", "{}", line);
+            tracing::error!(project_id = %self.project_id, stream = "stderr", "{}", line);
         } else {
-            tracing::info!(code_id = %self.code_id, stream = "stdout", "{}", line);
+            tracing::info!(project_id = %self.project_id, stream = "stdout", "{}", line);
         }
     }
 }
@@ -86,8 +86,8 @@ impl AsyncWrite for TracingWriter {
     }
 }
 
-fn make_tracing_stream(code_id: String, is_stderr: bool) -> AsyncStdoutStream {
-    AsyncStdoutStream::new(4096, TracingWriter::new(code_id, is_stderr))
+fn make_tracing_stream(project_id: String, is_stderr: bool) -> AsyncStdoutStream {
+    AsyncStdoutStream::new(4096, TracingWriter::new(project_id, is_stderr))
 }
 
 pub use fn0_wasmtime::engine_config;
@@ -115,7 +115,7 @@ pub fn spawn_epoch_ticker(engine: Engine) {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn build_store<C>(
     engine: &Engine,
-    code_id: &str,
+    project_id: &str,
     env_vars: &[(String, String)],
     time_tracker: TimeTracker<C>,
     is_timeout: Arc<AtomicBool>,
@@ -130,8 +130,8 @@ where
 {
     let wasi = {
         let mut builder = WasiCtx::builder();
-        builder.stdout(make_tracing_stream(code_id.to_string(), false));
-        builder.stderr(make_tracing_stream(code_id.to_string(), true));
+        builder.stdout(make_tracing_stream(project_id.to_string(), false));
+        builder.stderr(make_tracing_stream(project_id.to_string(), true));
         for (key, value) in env_vars {
             if turso_hijack.is_some() && (key == "TURSO_URL" || key == "TURSO_AUTH_TOKEN") {
                 continue;
@@ -155,7 +155,7 @@ where
             builder.env("FN0_QUEUE_URL", hijack.placeholder_url());
         }
         if let Some(hijack) = control_invoke_queue_hijack
-            && code_id == hijack.allowed_caller_subdomain()
+            && project_id == hijack.allowed_caller_project_id()
         {
             builder.env("FN0_CONTROL_INVOKE_QUEUE_URL", hijack.placeholder_url());
         }
@@ -172,7 +172,7 @@ where
             wasi,
             http: WasiHttpCtx::new(),
             time_tracker,
-            code_id: code_id.to_string(),
+            project_id: project_id.to_string(),
             is_timeout,
             hooks,
         },
@@ -184,7 +184,7 @@ where
         let state = context.data();
         let cpu_time = state.time_tracker.duration();
         if cpu_time > Duration::from_millis(1000) {
-            telemetry::cpu_timeout(&state.code_id, cpu_time);
+            telemetry::cpu_timeout(&state.project_id, cpu_time);
             state.is_timeout.store(true, Ordering::Relaxed);
             return Ok(wasmtime::UpdateDeadline::Interrupt);
         }
@@ -200,7 +200,7 @@ pub type WasmInjectEnvelope = (Request, oneshot::Sender<Result<Response>>);
 pub async fn run_wasm_instance_loop(
     engine: &Engine,
     bundle: Arc<Bundle>,
-    subdomain: String,
+    project_id: String,
     mut rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<crate::OtlpHijack>>,
@@ -213,7 +213,7 @@ pub async fn run_wasm_instance_loop(
 
     let mut store = build_store(
         engine,
-        &subdomain,
+        &project_id,
         &bundle.env_vars,
         time_tracker.clone(),
         is_timeout.clone(),
@@ -235,74 +235,75 @@ pub async fn run_wasm_instance_loop(
         .instantiate_async(&mut store)
         .await
         .map_err(|error| {
-            telemetry::wasmtime_error("instantiate_async", &subdomain, &format!("{error:?}"));
+            telemetry::wasmtime_error("instantiate_async", &project_id, &format!("{error:?}"));
             anyhow!("instantiate_async failed: {error:?}")
         })?;
 
-    let code_id_for_closure = subdomain.clone();
+    let project_id_for_closure = project_id.clone();
     let run_result = store
         .run_concurrent(async move |accessor| -> Result<()> {
-            let _guard = AccessorGuard::install(accessor, &service);
+            scope_wasm_execution(project_id_for_closure.clone(), accessor, &service, async {
+                let mut pending: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>> =
+                    FuturesUnordered::new();
 
-            let mut pending: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>> =
-                FuturesUnordered::new();
-
-            loop {
-                tokio::select! {
-                    biased;
-                    maybe = rx.recv() => {
-                        match maybe {
-                            Some((req, resp_tx)) => {
-                                let self_host = self_invoke::extract_host(req.headers())
-                                    .unwrap_or_default();
-                                let service_ref = &service;
-                                let code_id = code_id_for_closure.clone();
-                                let time_tracker = time_tracker.clone();
-                                let is_timeout = is_timeout.clone();
-                                pending.push(Box::pin(async move {
-                                    let result = SELF_HOST
-                                        .scope(self_host, async move {
-                                            let req_http = req.map(|body| {
-                                                body.map_err(|err| {
-                                                    ErrorCode::InternalError(Some(err.to_string()))
-                                                })
-                                                .boxed_unsync()
-                                            });
-                                            let (p3_req, req_io) = P3Request::from_http(req_http);
-                                            call_service(
-                                                accessor,
-                                                service_ref,
-                                                p3_req,
-                                                req_io,
-                                                &code_id,
-                                                time_tracker,
-                                                &is_timeout,
-                                            )
-                                            .await
-                                        })
-                                        .await;
-                                    let _ = resp_tx.send(result);
-                                }));
-                            }
-                            None => {
-                                while pending.next().await.is_some() {}
-                                break;
+                loop {
+                    tokio::select! {
+                        biased;
+                        maybe = rx.recv() => {
+                            match maybe {
+                                Some((req, resp_tx)) => {
+                                    let self_host = self_invoke::extract_host(req.headers())
+                                        .unwrap_or_default();
+                                    let service_ref = &service;
+                                    let project_id = project_id_for_closure.clone();
+                                    let time_tracker = time_tracker.clone();
+                                    let is_timeout = is_timeout.clone();
+                                    pending.push(Box::pin(async move {
+                                        let result = SELF_HOST
+                                            .scope(self_host, async move {
+                                                let req_http = req.map(|body| {
+                                                    body.map_err(|err| {
+                                                        ErrorCode::InternalError(Some(err.to_string()))
+                                                    })
+                                                    .boxed_unsync()
+                                                });
+                                                let (p3_req, req_io) = P3Request::from_http(req_http);
+                                                call_service(
+                                                    accessor,
+                                                    service_ref,
+                                                    p3_req,
+                                                    req_io,
+                                                    &project_id,
+                                                    time_tracker,
+                                                    &is_timeout,
+                                                )
+                                                .await
+                                            })
+                                            .await;
+                                        let _ = resp_tx.send(result);
+                                    }));
+                                }
+                                None => {
+                                    while pending.next().await.is_some() {}
+                                    break;
+                                }
                             }
                         }
+                        Some(()) = pending.next() => {}
                     }
-                    Some(()) = pending.next() => {}
                 }
-            }
 
-            telemetry::cpu_time(&code_id_for_closure, time_tracker.duration());
-            Ok(())
+                telemetry::cpu_time(&project_id_for_closure, time_tracker.duration());
+                Ok(())
+            })
+            .await
         })
         .await;
 
     match run_result {
         Ok(inner) => inner,
         Err(error) => {
-            telemetry::wasmtime_error("run_concurrent", &subdomain, &format!("{error:?}"));
+            telemetry::wasmtime_error("run_concurrent", &project_id, &format!("{error:?}"));
             Err(anyhow!("run_concurrent failed: {error:?}"))
         }
     }
@@ -313,7 +314,7 @@ pub struct ClientState<C: Clock> {
     http: WasiHttpCtx,
     table: ResourceTable,
     pub(crate) time_tracker: TimeTracker<C>,
-    pub(crate) code_id: String,
+    pub(crate) project_id: String,
     pub(crate) is_timeout: Arc<AtomicBool>,
     hooks: SelfInvokeHooks,
 }

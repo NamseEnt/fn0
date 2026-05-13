@@ -12,8 +12,8 @@ pub struct TursoHijack {
 }
 
 impl TursoHijack {
-    pub fn target_host(&self, subdomain: &str) -> String {
-        format!("{}{}", subdomain, self.target_host_suffix)
+    pub fn target_host(&self, project_id: &str) -> String {
+        format!("{}{}", project_id, self.target_host_suffix)
     }
 
     pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
@@ -23,9 +23,9 @@ impl TursoHijack {
     pub(crate) fn rewrite(
         &self,
         req: &mut hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
-        subdomain: &str,
+        project_id: &str,
     ) -> Result<(), ErrorCode> {
-        let target_host = self.target_host(subdomain);
+        let target_host = self.target_host(project_id);
 
         let path_and_query = req
             .uri()
