@@ -330,8 +330,15 @@ impl<C: BundleCache> CodeExecutor<C> {
         );
 
         let driver_instance = instance.clone();
+        let wasm_raw = self_invoke::WASM_RAW.try_with(|r| *r).ok();
         tokio::task::spawn_local(async move {
-            driver_instance.drive_forever().await;
+            let driver = async move {
+                driver_instance.drive_forever().await;
+            };
+            match wasm_raw {
+                Some(raw) => self_invoke::WASM_RAW.scope(raw, driver).await,
+                None => driver.await,
+            }
         });
 
         Ok(instance)

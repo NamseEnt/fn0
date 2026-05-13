@@ -9,7 +9,7 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/NamseEnt/fn0"
 
 [workspace.dependencies]
-fn0 = { path = "fn0/fn0", version = "=0.2.29" }
+fn0 = { path = "fn0/fn0", version = "=0.2.30" }
 fn0-shared-schema = { path = "fn0/shared-schema", version = "=0.1.0" }
 fn0-deploy = { path = "fn0/deploy", version = "=0.1.7" }
 fn0-wasmtime = { path = "fn0/wasmtime", version = "=0.1.3" }

@@ -2263,7 +2263,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.29"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2476,7 +2476,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.29"
+version = "0.3.30"
 dependencies = [
  "aes-gcm",
  "anyhow",
