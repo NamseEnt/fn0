@@ -1,6 +1,7 @@
 test.sh
 
 /sdks/
+/sdk/
 /bin/
 /node_modules/
 
