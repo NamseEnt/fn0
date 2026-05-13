@@ -265,10 +265,9 @@ async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
 
     let bucket = format!("fn0-static-asset-{project_id}");
     let custom_domain = format!("{project_id}.{public_base_domain}");
-    let cors_origin = format!("https://*.{}", root_domain(&public_base_domain));
 
     cf.create_r2_bucket(&bucket, "apac").await?;
-    cf.put_r2_bucket_cors(&bucket, &cors_origin).await?;
+    cf.put_r2_bucket_cors(&bucket, "*").await?;
     cf.register_r2_custom_domain(&bucket, &custom_domain, &zone_id)
         .await?;
     ensure_turso_database(project_id).await?;
@@ -306,9 +305,3 @@ async fn ensure_turso_database(project_id: &str) -> anyhow::Result<()> {
     );
 }
 
-fn root_domain(s: &str) -> &str {
-    match s.split_once('.') {
-        Some((_, rest)) => rest,
-        None => s,
-    }
-}

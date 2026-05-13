@@ -128,15 +128,9 @@ build_id="$(uuidgen | tr 'A-Z' 'a-z')"
 export VITE_PUBLIC_URL="https://${static_custom_domain}/${build_id}/"
 echo ">> build_id=${build_id} VITE_PUBLIC_URL=${VITE_PUBLIC_URL}"
 
-control_url="$(pulumi_pick controlUrl)"
-if [[ -z "$control_url" ]]; then
-  echo "missing pulumi output: controlUrl" >&2
-  exit 1
-fi
-control_page_origin="${control_url%/}"
 ensure_static_asset_bucket \
   "$static_asset_account_id" "$static_asset_cf_token" \
-  "$static_bucket" "$static_custom_domain" "$static_asset_zone_id" "$control_page_origin"
+  "$static_bucket" "$static_custom_domain" "$static_asset_zone_id"
 
 bundle_path="${work_dir}/bundle.raw.tar"
 build_control_raw_bundle "$env_yaml_path" "$bundle_path"
