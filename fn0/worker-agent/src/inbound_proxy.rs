@@ -11,10 +11,10 @@ use tracing::*;
 const DEFAULT_LISTEN_ADDR: &str = "0.0.0.0:443";
 
 pub async fn run(shutdown: Shutdown, upstream_rx: watch::Receiver<Vec<UpstreamRoute>>) {
-    let listen_addr: SocketAddr = std::env::var("FN0_AGENT_LISTEN_ADDR")
+    let listen_addr: SocketAddr = std::env::var("FN0_WORKER_AGENT_LISTEN_ADDR")
         .unwrap_or_else(|_| DEFAULT_LISTEN_ADDR.to_string())
         .parse()
-        .expect("FN0_AGENT_LISTEN_ADDR must be host:port");
+        .expect("FN0_WORKER_AGENT_LISTEN_ADDR must be host:port");
 
     let listener = match TcpListener::bind(listen_addr).await {
         Ok(l) => {

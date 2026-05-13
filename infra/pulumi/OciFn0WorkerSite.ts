@@ -24,10 +24,6 @@ export interface AgentDocDbArgs {
 export interface AgentDnsRegisterArgs {
   apiToken: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
-  // Comma-separated list of A-record hostnames the agent registers /
-  // deregisters on its public IP. Must include the SaaS fallback origin
-  // hostname (e.g. `fallback.${domain}`) because Cloudflare requires an
-  // explicit proxied A record for the fallback origin, not just a wildcard.
   hostnames: pulumi.Input<string>;
 }
 
@@ -144,7 +140,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   constructor(
     name: string,
     args: OciFn0WorkerSiteArgs,
-    opts?: pulumi.ComponentResourceOptions
+    opts?: pulumi.ComponentResourceOptions,
   ) {
     super("pkg:index:oci-fn0-worker-site", name, args, opts);
 
@@ -155,7 +151,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         special: false,
         upper: false,
       },
-      { parent: this }
+      { parent: this },
     ).result;
 
     const compartment = new oci.identity.Compartment(
@@ -165,7 +161,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0-host-${compartmentSuffix}`,
         enableDelete: true,
       },
-      { parent: this }
+      { parent: this },
     );
 
     this.compartmentId = compartment.id;
@@ -176,7 +172,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         algorithm: "RSA",
         rsaBits: 2048,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const workerManager = new oci.identity.User(
@@ -184,7 +180,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       {
         description: "fn0 worker manager",
       },
-      { parent: this }
+      { parent: this },
     );
 
     const apiKey = new oci.identity.ApiKey(
@@ -193,7 +189,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: workerManager.id,
         keyValue: privateKey.publicKeyPem,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const group = new oci.identity.Group(
@@ -201,7 +197,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       {
         description: "fn0 worker manager group",
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.UserGroupMembership(
@@ -210,7 +206,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: workerManager.id,
         groupId: group.id,
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.Policy(
@@ -227,7 +223,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           pulumi.interpolate`Allow group ${group.name} to use tag-namespaces in tenancy`,
         ],
       },
-      { parent: this }
+      { parent: this },
     );
 
     const imageBuilderDynGroup = new oci.identity.DynamicGroup(
@@ -238,7 +234,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         matchingRule: pulumi.interpolate`ANY {instance.compartment.id = '${compartment.id}'}`,
         name: pulumi.interpolate`fn0-image-builder-${compartmentSuffix}`,
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.Policy(
@@ -250,7 +246,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           pulumi.interpolate`Allow dynamic-group ${imageBuilderDynGroup.name} to manage instance-family in compartment id ${compartment.id}`,
         ],
       },
-      { parent: this, dependsOn: [imageBuilderDynGroup] }
+      { parent: this, dependsOn: [imageBuilderDynGroup] },
     );
 
     const vcn = new oci.core.Vcn(
@@ -261,7 +257,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         isOracleGuaAllocationEnabled: true,
         cidrBlocks: ["10.0.0.0/16"],
       },
-      { parent: this }
+      { parent: this },
     );
 
     const workerSshKey = new tls.PrivateKey(
@@ -270,7 +266,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         algorithm: "RSA",
         rsaBits: 4096,
       },
-      { parent: this }
+      { parent: this },
     );
 
     this.sshPublicKey = workerSshKey.publicKeyOpenssh;
@@ -297,7 +293,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               protocol: "6",
               source,
               tcpOptions: { min: 443, max: 443 },
-            })
+            }),
           ),
         ],
         egressSecurityRules: [
@@ -311,7 +307,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           },
         ],
       },
-      { parent: this }
+      { parent: this },
     );
 
     const internetGateway = new oci.core.InternetGateway(
@@ -320,7 +316,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         compartmentId: compartment.id,
         vcnId: vcn.id,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const routeTable = new oci.core.RouteTable(
@@ -341,7 +337,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           },
         ],
       },
-      { parent: this }
+      { parent: this },
     );
 
     const subnet = new oci.core.Subnet(
@@ -351,14 +347,14 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         vcnId: vcn.id,
         ipv4cidrBlocks: ["10.0.0.0/24"],
         ipv6cidrBlocks: vcn.ipv6cidrBlocks.apply((x) =>
-          x.map((x) => x.replace("/56", "/64"))
+          x.map((x) => x.replace("/56", "/64")),
         ),
         prohibitInternetIngress: false,
         prohibitPublicIpOnVnic: false,
         securityListIds: [securityList.id],
         routeTableId: routeTable.id,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const availabilityDomain = compartment.id.apply((compartmentId) =>
@@ -372,7 +368,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             throw new Error("can not find availability domain");
           }
           return ad;
-        })
+        }),
     );
 
     const baseImageId = compartment.id.apply((compartmentId) =>
@@ -385,7 +381,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         })
         .then((x) => {
           const imageId = x.images.find(
-            (x) => x.createImageAllowed && x.displayName.includes("-aarch64-")
+            (x) => x.createImageAllowed && x.displayName.includes("-aarch64-"),
           )?.id;
 
           if (!imageId) {
@@ -393,7 +389,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           }
 
           return imageId;
-        })
+        }),
     );
 
     const customWorkerImage = new CustomWorkerImage(
@@ -406,7 +402,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         displayName: "fn0-ol10-podman-aarch64",
         internetGatewayId: internetGateway.id,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const imageId = customWorkerImage.imageId;
@@ -435,7 +431,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           },
         },
       },
-      { parent: this }
+      { parent: this },
     );
 
     this.subnetId = subnet.id;
@@ -471,7 +467,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           OCI_COMPARTMENT_ID: compartmentId,
           OCI_INSTANCE_CONFIGURATION_ID: instanceConfigurationId,
           OCI_AVAILABILITY_DOMAIN: availabilityDomain,
-        })
+        }),
       );
 
     const workerRepo = new oci.artifacts.ContainerRepository(
@@ -481,7 +477,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         displayName: pulumi.interpolate`fn0-worker-${compartmentSuffix}`,
         isPublic: true,
       },
-      { parent: this, retainOnDelete: false }
+      { parent: this, retainOnDelete: false },
     );
 
     new oci.artifacts.ContainerRepository(
@@ -491,7 +487,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         displayName: pulumi.interpolate`fn0-worker-${compartmentSuffix}-agent`,
         isPublic: true,
       },
-      { parent: this, retainOnDelete: false }
+      { parent: this, retainOnDelete: false },
     );
 
     const workerDockerUser = new oci.identity.User(
@@ -500,7 +496,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0-worker-docker-${compartmentSuffix}`,
         description: "User for fn0-worker image push",
       },
-      { parent: this }
+      { parent: this },
     );
 
     const workerDockerGroup = new oci.identity.Group(
@@ -509,7 +505,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0-worker-pushers-${compartmentSuffix}`,
         description: "Group allowed to push worker images",
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.UserGroupMembership(
@@ -518,7 +514,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: workerDockerUser.id,
         groupId: workerDockerGroup.id,
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.Policy(
@@ -531,7 +527,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           pulumi.interpolate`Allow group ${workerDockerGroup.name} to manage repos in compartment id ${compartment.id}`,
         ],
       },
-      { dependsOn: [workerDockerGroup], parent: this }
+      { dependsOn: [workerDockerGroup], parent: this },
     );
 
     const workerAuthToken = new oci.identity.AuthToken(
@@ -540,7 +536,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: workerDockerUser.id,
         description: "AuthToken for fn0-worker image push",
       },
-      { parent: this }
+      { parent: this },
     );
 
     const registryUrl = pulumi.interpolate`ocir.${args.region}.oci.oraclecloud.com`;
@@ -569,7 +565,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0-cwasm-${compartmentSuffix}`,
         description: "User for cwasm S3-compatible access",
       },
-      { parent: this }
+      { parent: this },
     );
 
     const cwasmBucketGroup = new oci.identity.Group(
@@ -578,7 +574,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0-cwasm-group-${compartmentSuffix}`,
         description: "Group for cwasm bucket access",
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.UserGroupMembership(
@@ -587,7 +583,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: cwasmBucketUser.id,
         groupId: cwasmBucketGroup.id,
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.Policy(
@@ -601,7 +597,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           pulumi.interpolate`Allow group ${cwasmBucketGroup.name} to manage buckets in compartment id ${compartment.id}`,
         ],
       },
-      { dependsOn: [cwasmBucketGroup], parent: this }
+      { dependsOn: [cwasmBucketGroup], parent: this },
     );
 
     const customerSecretKey = new oci.identity.CustomerSecretKey(
@@ -610,7 +606,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: cwasmBucketUser.id,
         displayName: "cwasm-s3-compatible-key",
       },
-      { parent: this }
+      { parent: this },
     );
 
     const ociObjectStorageBucket = new oci.objectstorage.Bucket(
@@ -621,7 +617,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         namespace: workerRepo.namespace,
         accessType: "NoPublicAccess",
       },
-      { parent: this }
+      { parent: this },
     );
 
     this.cwasmBucket = {
@@ -639,7 +635,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         compartmentId: compartment.id,
         displayName: pulumi.interpolate`fn0-queue-${compartmentSuffix}`,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const queueUser = new oci.identity.User(
@@ -648,7 +644,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0-queue-${compartmentSuffix}`,
         description: "User for fn0 queue produce/consume",
       },
-      { parent: this }
+      { parent: this },
     );
 
     const queueGroup = new oci.identity.Group(
@@ -657,7 +653,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0-queue-group-${compartmentSuffix}`,
         description: "Group for fn0 queue access",
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.UserGroupMembership(
@@ -666,7 +662,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: queueUser.id,
         groupId: queueGroup.id,
       },
-      { parent: this }
+      { parent: this },
     );
 
     new oci.identity.Policy(
@@ -679,7 +675,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           pulumi.interpolate`Allow group ${queueGroup.name} to use queues in compartment id ${compartment.id}`,
         ],
       },
-      { dependsOn: [queueGroup], parent: this }
+      { dependsOn: [queueGroup], parent: this },
     );
 
     const queueApiPrivateKey = new tls.PrivateKey(
@@ -688,7 +684,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         algorithm: "RSA",
         rsaBits: 2048,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const queueApiKey = new oci.identity.ApiKey(
@@ -697,7 +693,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         userId: queueUser.id,
         keyValue: queueApiPrivateKey.publicKeyPem,
       },
-      { parent: this }
+      { parent: this },
     );
 
     this.queue = {
@@ -708,7 +704,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       ociTenancyId: queueUser.compartmentId,
       ociFingerprint: queueApiKey.fingerprint,
       ociPrivateKeyBase64: queueApiPrivateKey.privateKeyPemPkcs8.apply((pem) =>
-        Buffer.from(pem).toString("base64")
+        Buffer.from(pem).toString("base64"),
       ),
     };
 
@@ -731,16 +727,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         args.worker.hostObservability.basicAuthPassword,
       ])
       .apply(([promUrl, promUser, lokiUrl, lokiUser, password]) =>
-        renderAlloyConfig({ promUrl, promUser, lokiUrl, lokiUser, password })
+        renderAlloyConfig({ promUrl, promUser, lokiUrl, lokiUser, password }),
       );
 
     const cloudInit = pulumi
       .all([agentImageRef, agentEnv, workerEnv, alloyConfig])
       .apply(([agentImageRef, agentEnv, workerEnv, alloyConfig]) =>
-        renderCloudInit(agentImageRef, agentEnv, workerEnv, alloyConfig)
+        renderCloudInit(agentImageRef, agentEnv, workerEnv, alloyConfig),
       );
     const userData = cloudInit.apply((s) =>
-      Buffer.from(s, "utf8").toString("base64")
+      Buffer.from(s, "utf8").toString("base64"),
     );
 
     const metadata = pulumi
@@ -780,8 +776,8 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               fn0_role: "worker",
             },
           },
-          { parent: this }
-        )
+          { parent: this },
+        ),
       );
     }
 
@@ -807,14 +803,14 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
 function buildAgentEnv(
   docDb: AgentDocDbArgs,
-  dnsRegister: AgentDnsRegisterArgs
+  dnsRegister: AgentDnsRegisterArgs,
 ): pulumi.Output<{ [k: string]: string }> {
   const base: { [k: string]: pulumi.Input<string> } = {
     TURSO_URL: docDb.url,
     TURSO_AUTH_TOKEN: docDb.authToken,
-    FN0_AGENT_DNS_API_TOKEN: dnsRegister.apiToken,
-    FN0_AGENT_DNS_ZONE_ID: dnsRegister.zoneId,
-    FN0_AGENT_DNS_HOSTNAMES: dnsRegister.hostnames,
+    FN0_WORKER_DNS_API_TOKEN: dnsRegister.apiToken,
+    FN0_WORKER_DNS_ZONE_ID: dnsRegister.zoneId,
+    FN0_WORKER_DNS_HOSTNAMES: dnsRegister.hostnames,
   };
   return resolveEnvMap(base);
 }
@@ -822,7 +818,7 @@ function buildAgentEnv(
 function buildWorkerEnv(
   worker: WorkerArgs,
   cwasmBucket: OciCwasmBucketInfo,
-  queue: OciQueueInfo
+  queue: OciQueueInfo,
 ): pulumi.Output<{ [k: string]: string }> {
   const otlpParsed = pulumi.output(worker.otlp.endpoint).apply((u) => {
     const url = new URL(u);
@@ -977,11 +973,11 @@ function renderCloudInit(
   agentImageRef: string,
   agentEnv: { [k: string]: string },
   workerEnv: { [k: string]: string },
-  alloyConfig: string
+  alloyConfig: string,
 ): string {
   const agentEnvFile = renderEnvFile({
     ...agentEnv,
-    FN0_AGENT_WORKER_ENV_FILE: "/etc/fn0-worker-agent/worker-env",
+    FN0_WORKER_ENV_FILE: "/etc/fn0-worker-agent/worker-env",
   });
   const workerEnvFile = renderEnvFile(workerEnv);
   const agentSystemdUnit = `[Unit]
@@ -1037,14 +1033,14 @@ fi
 
 HOST_ID=$(curl -fsSH "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/id)
 if [ -z "$HOST_ID" ]; then
-  echo "failed to fetch FN0_AGENT_HOST_ID from OCI metadata" >&2
+  echo "failed to fetch FN0_WORKER_AGENT_HOST_ID from OCI metadata" >&2
   exit 1
 fi
 
 mkdir -p /etc/fn0-worker-agent
 cat > /etc/fn0-worker-agent/env <<'EOF_AGENT_ENV'
 ${agentEnvFile}EOF_AGENT_ENV
-echo "FN0_AGENT_HOST_ID=$HOST_ID" >> /etc/fn0-worker-agent/env
+echo "FN0_WORKER_AGENT_HOST_ID=$HOST_ID" >> /etc/fn0-worker-agent/env
 chmod 600 /etc/fn0-worker-agent/env
 
 cat > /etc/fn0-worker-agent/worker-env <<'EOF_WORKER_ENV'
