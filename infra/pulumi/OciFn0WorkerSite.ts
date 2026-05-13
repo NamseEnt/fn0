@@ -11,17 +11,17 @@ export interface OciFn0WorkerSiteArgs {
   ocpus: pulumi.Input<number>;
   memoryInGbs: pulumi.Input<number>;
   workerAgentVersion: string;
-  agentDocDb: AgentDocDbArgs;
-  agentDnsRegister: AgentDnsRegisterArgs;
+  workerAgentDocDb: WorkerAgentDocDbArgs;
+  workerDns: WorkerDnsArgs;
   worker: WorkerArgs;
 }
 
-export interface AgentDocDbArgs {
+export interface WorkerAgentDocDbArgs {
   url: pulumi.Input<string>;
   authToken: pulumi.Input<string>;
 }
 
-export interface AgentDnsRegisterArgs {
+export interface WorkerDnsArgs {
   apiToken: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
   hostnames: pulumi.Input<string>;
@@ -716,7 +716,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       return `${r.url}/${r.repository}-agent:${args.workerAgentVersion}`;
     });
 
-    const agentEnv = buildAgentEnv(args.agentDocDb, args.agentDnsRegister);
+    const agentEnv = buildWorkerAgentEnv(args.workerAgentDocDb, args.workerDns);
     const workerEnv = buildWorkerEnv(args.worker, this.cwasmBucket, this.queue);
     const alloyConfig = pulumi
       .all([
@@ -801,16 +801,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   }
 }
 
-function buildAgentEnv(
-  docDb: AgentDocDbArgs,
-  dnsRegister: AgentDnsRegisterArgs,
+function buildWorkerAgentEnv(
+  docDb: WorkerAgentDocDbArgs,
+  dns: WorkerDnsArgs,
 ): pulumi.Output<{ [k: string]: string }> {
   const base: { [k: string]: pulumi.Input<string> } = {
     TURSO_URL: docDb.url,
     TURSO_AUTH_TOKEN: docDb.authToken,
-    FN0_WORKER_DNS_API_TOKEN: dnsRegister.apiToken,
-    FN0_WORKER_DNS_ZONE_ID: dnsRegister.zoneId,
-    FN0_WORKER_DNS_HOSTNAMES: dnsRegister.hostnames,
+    FN0_WORKER_DNS_API_TOKEN: dns.apiToken,
+    FN0_WORKER_DNS_ZONE_ID: dns.zoneId,
+    FN0_WORKER_DNS_HOSTNAMES: dns.hostnames,
   };
   return resolveEnvMap(base);
 }

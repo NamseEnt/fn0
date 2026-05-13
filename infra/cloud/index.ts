@@ -535,11 +535,11 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   ocpus: 1,
   memoryInGbs: 6,
   workerAgentVersion: fn0WorkerAgentVersion,
-  agentDocDb: {
+  workerAgentDocDb: {
     url: docDb.url,
     authToken: docDb.token,
   },
-  agentDnsRegister: {
+  workerDns: {
     apiToken: dns.dnsApiToken,
     zoneId,
     hostnames: `*.${domain},fallback.${domain}`,
