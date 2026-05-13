@@ -183,7 +183,7 @@ __cwasm_invoke_one() {
   entry="$1"
   pid="$(jq -r '.project_id' <<<"$entry")"
   code_version="$(jq -r '.code_version' <<<"$entry")"
-  input_key="original/${pid}.tar"
+  input_key="original/${pid}/${code_version}.tar"
   output_key="compiled/${CWASM_INVOKE_NEW_FN0_WASMTIME_VERSION}/${pid}/${code_version}.tar.zst"
 
   payload_file="${CWASM_INVOKE_WORK_DIR}/payload.${pid}.${code_version}.json"
@@ -254,7 +254,7 @@ __cwasm_sync_compile_all() {
   : > "$fail_file"
 
   __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "original/" \
-    | jq -c 'select(.Key | test("^original/[^/]+\\.tar$")) | {project_id: (.Key | capture("^original/(?<p>[^/]+)\\.tar$").p), code_version: (.LastModified | sub("\\.[0-9]+\\+00:00$"; "+00:00") | fromdateiso8601)}' \
+    | jq -c 'select(.Key | test("^original/[^/]+/[0-9]+\\.tar$")) | (.Key | capture("^original/(?<p>[^/]+)/(?<cv>[0-9]+)\\.tar$")) | {project_id: .p, code_version: (.cv | tonumber)}' \
     > "$originals_file" || true
 
   __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "compiled/${new_fn0_wasmtime_version}/" \

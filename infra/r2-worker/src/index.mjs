@@ -1,4 +1,4 @@
-const ORIGINAL_RE = /^original\/([^\/]+)\.tar$/;
+const ORIGINAL_RE = /^original\/([^\/]+)\/(\d+)\.tar$/;
 const COMPILED_RE = /^compiled\/([^\/]+)\/([^\/]+)\/(\d+)\.tar\.zst$/;
 const RELEVANT_ACTIONS = new Set([
   "PutObject",
@@ -33,16 +33,9 @@ async function handleMessage(msg, env) {
 
   const original = ORIGINAL_RE.exec(key);
   if (original) {
-    const projectId = original[1];
-    const head = await env.BUCKET.head(key);
-    if (!head) {
-      msg.ack();
-      return;
-    }
-    const codeVersion = Math.floor(head.uploaded.getTime() / 1000);
     const ok = await postAction(env, "bundle_uploaded", {
-      project_id: projectId,
-      code_version: codeVersion,
+      project_id: original[1],
+      code_version: Number.parseInt(original[2], 10),
     });
     if (ok) msg.ack();
     else msg.retry();

@@ -88,7 +88,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 if epoch_minute % (job.every_minutes as i64) != 0 {
                     continue;
                 }
-                if let Err(e) = enqueue_invoke(
+                if let Err(e) = enqueue_other_project_cron_task(
                     &client,
                     &invoke_queue_url,
                     &doc.project_id,
@@ -134,19 +134,19 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 }
 
 #[derive(Serialize)]
-struct InvokeBody<'a> {
+struct CrossProjectCronInvokeBody<'a> {
     project_id: &'a str,
     task_name: &'a str,
     payload: serde_json::Value,
 }
 
-async fn enqueue_invoke(
+async fn enqueue_other_project_cron_task(
     client: &http::Client,
     invoke_queue_url: &str,
     project_id: &str,
     task_name: &str,
 ) -> anyhow::Result<()> {
-    let body = serde_json::to_vec(&InvokeBody {
+    let body = serde_json::to_vec(&CrossProjectCronInvokeBody {
         project_id,
         task_name,
         payload: serde_json::Value::Null,

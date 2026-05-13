@@ -145,13 +145,13 @@ upload_fe_dist \
   "$static_asset_account_id" "$static_asset_access_key" "$static_asset_secret_key" \
   "$static_bucket" "$build_id" "${REPO_ROOT}/fn0/control/fe/dist"
 
-# Step 4 — R2 upload of original/.
-upload_r2_original "$CONTROL_PROJECT_ID" "$bundle_path"
-
-# Step 5 — cwasm-compiler invoke. code_version = epoch seconds (monotonic
-# across re-runs; the worker treats each as a new version, but the manifest
-# below only references the latest one).
+# Step 4-5 — R2 upload of original/ + cwasm-compiler invoke. code_version =
+# epoch seconds (monotonic across re-runs; the worker treats each as a new
+# version, but the manifest below only references the latest one). Decide it
+# up front so the same value is embedded in both R2 key and the cwasm output
+# key.
 code_version="$(date +%s)"
+upload_r2_original "$CONTROL_PROJECT_ID" "$code_version" "$bundle_path"
 compile_via_cwasm "$CONTROL_PROJECT_ID" "$code_version" "$target_wasmtime" "$CWASM_LAMBDA_FUNCTION_NAME"
 
 # Step 6 — seed the fn0-control turso DB.

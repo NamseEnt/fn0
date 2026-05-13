@@ -168,6 +168,9 @@ fn response_indicates_already_exists(body: &[u8]) -> bool {
     };
     env.errors.iter().any(|e| {
         let m = e.message.to_lowercase();
-        m.contains("already exists") || m.contains("already configured") || m.contains("duplicate")
+        m.contains("already exists")
+            || m.contains("already configured")
+            || m.contains("already in use")
+            || m.contains("duplicate")
     })
 }

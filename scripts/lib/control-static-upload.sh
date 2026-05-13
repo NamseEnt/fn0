@@ -27,7 +27,7 @@ __cf_api_call() {
 
 __cf_response_indicates_exists() {
   local body_file="$1"
-  jq -r '.errors // [] | map(.message // "" | ascii_downcase) | .[]' < "$body_file" 2>/dev/null | grep -qE "already exists|already configured|duplicate"
+  jq -r '.errors // [] | map(.message // "" | ascii_downcase) | .[]' < "$body_file" 2>/dev/null | grep -qE "already exists|already configured|already in use|duplicate"
 }
 
 # ensure_static_asset_bucket <account_id> <cf_token> <bucket> <asset_custom_domain> <zone_id> <page_origin>

@@ -32,6 +32,7 @@ const OutputSchema = z.discriminatedUnion("t", [
     presignedPutUrl: z.string(),
     objectKey: z.string(),
     staticUploads: z.array(StaticUploadSchema),
+    codeVersion: z.number(),
   }),
     z.object({
     t: z.literal("QuotaExceeded"),

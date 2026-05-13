@@ -123,6 +123,15 @@ pub(crate) fn init_once() {
             .build();
         let tracer = opentelemetry::trace::TracerProvider::tracer(&provider, service_name);
         let _ = tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+            )
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_ansi(false),
+            )
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
             .try_init();
         opentelemetry::global::set_tracer_provider(provider);

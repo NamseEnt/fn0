@@ -28,6 +28,7 @@ pub enum Output {
         presigned_put_url: String,
         object_key: String,
         static_uploads: Vec<StaticUpload>,
+        code_version: u64,
     },
     QuotaExceeded {
         reason: String,
@@ -99,7 +100,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             return Output::InternalError;
         }
     };
-    let object_key = format!("original/{}.tar", project.project_id);
+    let code_version: u64 = u64::try_from(forte_sdk::now().timestamp())
+        .expect("system clock returns positive timestamp");
+    let object_key = format!("original/{}/{}.tar", project.project_id, code_version);
     let presigned_put_url = aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
         account_id: &bundle_env.account_id,
         bucket: &bundle_env.bucket,
@@ -162,6 +165,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         presigned_put_url,
         object_key,
         static_uploads,
+        code_version,
     }
 }
 

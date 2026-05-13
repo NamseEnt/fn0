@@ -61,7 +61,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    let input_key = format!("original/{}.tar", req.body.project_id);
+    let input_key = format!(
+        "original/{}/{}.tar",
+        req.body.project_id, req.body.code_version
+    );
     for fn0_wasmtime_version in &fn0_wasmtime_versions {
         let output_key = format!(
             "compiled/{fn0_wasmtime_version}/{}/{}.tar.zst",
