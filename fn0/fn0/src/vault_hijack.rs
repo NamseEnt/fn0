@@ -39,7 +39,7 @@ impl Op {
 pub struct VaultHijack {
     pub placeholder_host: String,
     crypto_host: String,
-    allowed_subdomain: String,
+    allowed_project_id: String,
     key_ocid: String,
     signer: Arc<RequestSigner>,
 }
@@ -48,7 +48,7 @@ impl VaultHijack {
     pub fn new(
         placeholder_host: String,
         crypto_endpoint: String,
-        allowed_subdomain: String,
+        allowed_project_id: String,
         key_ocid: String,
         tenancy: String,
         user: String,
@@ -74,7 +74,7 @@ impl VaultHijack {
         Ok(Self {
             placeholder_host,
             crypto_host,
-            allowed_subdomain,
+            allowed_project_id,
             key_ocid,
             signer,
         })
@@ -85,7 +85,7 @@ impl VaultHijack {
             .map_err(|_| anyhow::anyhow!("FN0_VAULT_CRYPTO_ENDPOINT is required"))?;
         let placeholder_host = std::env::var("FN0_VAULT_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-vault.fn0.dev".to_string());
-        let allowed_subdomain = std::env::var("FN0_VAULT_ALLOWED_SUBDOMAIN")
+        let allowed_project_id = std::env::var("FN0_VAULT_ALLOWED_SUBDOMAIN")
             .map_err(|_| anyhow::anyhow!("FN0_VAULT_ALLOWED_SUBDOMAIN is required"))?;
         let key_ocid = std::env::var("FN0_VAULT_KEY_OCID")
             .map_err(|_| anyhow::anyhow!("FN0_VAULT_KEY_OCID is required"))?;
@@ -107,7 +107,7 @@ impl VaultHijack {
         Self::new(
             placeholder_host,
             crypto_endpoint,
-            allowed_subdomain,
+            allowed_project_id,
             key_ocid,
             tenancy,
             user,
@@ -126,12 +126,12 @@ impl VaultHijack {
 
     pub(crate) fn build_signed_request(
         &self,
-        subdomain: &str,
+        project_id: &str,
         method: &str,
         path: &str,
         body_bytes: &[u8],
     ) -> Result<hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
-        if subdomain != self.allowed_subdomain {
+        if project_id != self.allowed_project_id {
             return Err(ErrorCode::HttpRequestDenied);
         }
         if method != hyper::Method::POST.as_str() {

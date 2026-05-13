@@ -179,20 +179,20 @@ impl<C: BundleCache> CodeExecutor<C> {
         &self.ctx
     }
 
-    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
+    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     pub async fn run(
         &self,
-        subdomain: &str,
+        project_id: &str,
         _script_path: &str,
         request: Request,
         _fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
-        let bundle = self.ctx.bundle_cache.get(subdomain).await?;
+        let bundle = self.ctx.bundle_cache.get(project_id).await?;
 
-        telemetry::function_invocation(subdomain);
+        telemetry::function_invocation(project_id);
         let start = std::time::Instant::now();
 
-        let result = self.run_with_next(subdomain, bundle, request).await;
+        let result = self.run_with_next(project_id, bundle, request).await;
 
         let key = result
             .as_ref()
@@ -201,27 +201,27 @@ impl<C: BundleCache> CodeExecutor<C> {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("unknown")
             .to_string();
-        telemetry::execution_time(subdomain, &key, start.elapsed());
+        telemetry::execution_time(project_id, &key, start.elapsed());
         result.map(strip_fn0_headers)
     }
 
-    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
-    pub async fn run_backend_only(&self, subdomain: &str, request: Request) -> Result<Response> {
-        let bundle = self.ctx.bundle_cache.get(subdomain).await?;
-        self.run_wasm(subdomain, &bundle, request).await
+    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
+    pub async fn run_backend_only(&self, project_id: &str, request: Request) -> Result<Response> {
+        let bundle = self.ctx.bundle_cache.get(project_id).await?;
+        self.run_wasm(project_id, &bundle, request).await
     }
 
-    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
+    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     async fn run_with_next(
         &self,
-        subdomain: &str,
+        project_id: &str,
         bundle: Arc<Bundle>,
         request: Request,
     ) -> Result<Response> {
         let external_headers = request.headers().clone();
         let uri = request.uri().clone();
 
-        let wasm_resp = self.run_wasm(subdomain, &bundle, request).await?;
+        let wasm_resp = self.run_wasm(project_id, &bundle, request).await?;
 
         if wasm_resp.status() != hyper::StatusCode::OK {
             return Ok(wasm_resp);
@@ -236,24 +236,24 @@ impl<C: BundleCache> CodeExecutor<C> {
         match next.as_deref() {
             None | Some("") => Ok(wasm_resp),
             Some("js") => {
-                self.delegate_to_js(subdomain, &bundle, &external_headers, uri, wasm_resp)
+                self.delegate_to_js(project_id, &bundle, &external_headers, uri, wasm_resp)
                     .await
             }
             Some(other) => {
-                tracing::error!(runtime = other, subdomain, "unknown x-fn0-next runtime");
+                tracing::error!(runtime = other, project_id, "unknown x-fn0-next runtime");
                 Ok(internal_error())
             }
         }
     }
 
-    #[tracing::instrument(skip_all, fields(subdomain = %subdomain))]
+    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     async fn run_wasm(
         &self,
-        subdomain: &str,
+        project_id: &str,
         bundle: &Arc<Bundle>,
         request: Request,
     ) -> Result<Response> {
-        let tx = self.wasm_instance_sender(subdomain, bundle);
+        let tx = self.wasm_instance_sender(project_id, bundle);
         let (resp_tx, resp_rx) = oneshot::channel();
         if tx.send((request, resp_tx)).is_err() {
             return Err(anyhow!("wasm instance channel closed"));
@@ -265,17 +265,17 @@ impl<C: BundleCache> CodeExecutor<C> {
 
     async fn delegate_to_js(
         &self,
-        subdomain: &str,
+        project_id: &str,
         bundle: &Arc<Bundle>,
         external_headers: &hyper::HeaderMap,
         uri: hyper::Uri,
         wasm_resp: Response,
     ) -> Result<Response> {
         if bundle.js.is_none() {
-            tracing::error!(subdomain, "x-fn0-next=js requested but bundle has no js");
+            tracing::error!(project_id, "x-fn0-next=js requested but bundle has no js");
             return Ok(internal_error());
         }
-        let ski = self.get_or_spawn_js_instance(subdomain, bundle).await?;
+        let ski = self.get_or_spawn_js_instance(project_id, bundle).await?;
 
         let js_entry_req = hyper::Request::builder()
             .method("POST")
@@ -295,23 +295,23 @@ impl<C: BundleCache> CodeExecutor<C> {
 
     async fn get_or_spawn_js_instance(
         &self,
-        subdomain: &str,
+        project_id: &str,
         bundle: &Arc<Bundle>,
     ) -> Result<std::rc::Rc<ski::SkiInstance>> {
         {
             let mut js_instances = self.js_instances.borrow_mut();
-            if let Some(slot) = js_instances.get(subdomain) {
+            if let Some(slot) = js_instances.get(project_id) {
                 if Arc::ptr_eq(&slot.bundle, bundle) {
                     return Ok(slot.instance.clone());
                 }
-                js_instances.remove(subdomain);
+                js_instances.remove(project_id);
             }
         }
 
         let js_code = bundle
             .js
             .as_ref()
-            .ok_or_else(|| anyhow!("bundle has no js code for {subdomain}"))?;
+            .ok_or_else(|| anyhow!("bundle has no js code for {project_id}"))?;
 
         let fetch_handler: std::sync::Arc<dyn ski::FetchHandler> =
             std::sync::Arc::new(js::WasmForwardingFetchHandler);
@@ -322,7 +322,7 @@ impl<C: BundleCache> CodeExecutor<C> {
             Some(fetch_handler),
         )?);
         self.js_instances.borrow_mut().insert(
-            subdomain.to_string(),
+            project_id.to_string(),
             JsSlot {
                 instance: instance.clone(),
                 bundle: bundle.clone(),
@@ -339,22 +339,22 @@ impl<C: BundleCache> CodeExecutor<C> {
 
     fn wasm_instance_sender(
         &self,
-        subdomain: &str,
+        project_id: &str,
         bundle: &Arc<Bundle>,
     ) -> mpsc::UnboundedSender<execute::WasmInjectEnvelope> {
         {
             let mut instances = self.instances.borrow_mut();
-            if let Some(slot) = instances.get(subdomain) {
+            if let Some(slot) = instances.get(project_id) {
                 if Arc::ptr_eq(&slot.bundle, bundle) {
                     return slot.sender.clone();
                 }
-                instances.remove(subdomain);
+                instances.remove(project_id);
             }
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
         self.instances.borrow_mut().insert(
-            subdomain.to_string(),
+            project_id.to_string(),
             WasmSlot {
                 sender: tx.clone(),
                 bundle: bundle.clone(),
@@ -363,7 +363,7 @@ impl<C: BundleCache> CodeExecutor<C> {
 
         let ctx = self.ctx.clone();
         let bundle = bundle.clone();
-        let subdomain_owned = subdomain.to_string();
+        let project_id_owned = project_id.to_string();
         let turso_hijack = ctx.turso_hijack.clone();
         let otlp_hijack = ctx.otlp_hijack.clone();
         let queue_hijack = ctx.queue_hijack.clone();
@@ -373,7 +373,7 @@ impl<C: BundleCache> CodeExecutor<C> {
             let result = execute::run_wasm_instance_loop(
                 &ctx.engine,
                 bundle,
-                subdomain_owned,
+                project_id_owned,
                 rx,
                 turso_hijack,
                 otlp_hijack,

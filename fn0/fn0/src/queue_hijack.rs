@@ -16,7 +16,7 @@ use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 const PUT_MESSAGES_API_VERSION: &str = "20210201";
 
 pub struct LoopbackMessage {
-    pub subdomain: String,
+    pub project_id: String,
     pub task_name: String,
     pub payload: serde_json::Value,
 }
@@ -48,7 +48,7 @@ struct EnqueueBody {
 
 #[derive(Serialize)]
 struct WrappedMessage<'a> {
-    subdomain: &'a str,
+    project_id: &'a str,
     task_name: &'a str,
     payload: &'a serde_json::Value,
 }
@@ -157,23 +157,23 @@ impl QueueHijack {
         uri.host() == Some(self.placeholder_host.as_str())
     }
 
-    pub(crate) fn record_usage(&self, subdomain: &str) {
+    pub(crate) fn record_usage(&self, project_id: &str) {
         self.usage
-            .entry(subdomain.to_string())
+            .entry(project_id.to_string())
             .or_insert_with(|| AtomicU64::new(0))
             .fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn usage_count(&self, subdomain: &str) -> u64 {
+    pub fn usage_count(&self, project_id: &str) -> u64 {
         self.usage
-            .get(subdomain)
+            .get(project_id)
             .map(|c| c.load(Ordering::Relaxed))
             .unwrap_or(0)
     }
 
     pub(crate) fn handle_enqueue(
         &self,
-        subdomain: &str,
+        project_id: &str,
         body_bytes: &[u8],
     ) -> Result<HijackAction, ErrorCode> {
         let parsed: EnqueueBody = serde_json::from_slice(body_bytes)
@@ -189,14 +189,14 @@ impl QueueHijack {
                     queue_ocid,
                     messages_host,
                     signer,
-                    subdomain,
+                    project_id,
                     &parsed,
                 )?;
                 Ok(HijackAction::Forward(req))
             }
             Backend::Loopback { tx } => {
                 tx.send(LoopbackMessage {
-                    subdomain: subdomain.to_string(),
+                    project_id: project_id.to_string(),
                     task_name: parsed.task_name,
                     payload: parsed.payload,
                 })
@@ -219,11 +219,11 @@ fn build_put_messages_request(
     queue_ocid: &str,
     messages_host: &str,
     signer: &RequestSigner,
-    subdomain: &str,
+    project_id: &str,
     parsed: &EnqueueBody,
 ) -> Result<hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
     let wrapped = WrappedMessage {
-        subdomain,
+        project_id,
         task_name: &parsed.task_name,
         payload: &parsed.payload,
     };

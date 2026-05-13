@@ -13,9 +13,9 @@ pub struct Bundle {
 
 #[allow(async_fn_in_trait)]
 pub trait BundleCache: Send + Sync + 'static {
-    async fn get(&self, subdomain: &str) -> Result<Arc<Bundle>, Error>;
+    async fn get(&self, project_id: &str) -> Result<Arc<Bundle>, Error>;
 
-    async fn invalidate(&self, subdomain: &str);
+    async fn invalidate(&self, project_id: &str);
 }
 
 #[derive(Debug)]

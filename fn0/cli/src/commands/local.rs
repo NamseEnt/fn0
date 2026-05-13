@@ -129,8 +129,8 @@ impl LocalCache {
 }
 
 impl BundleCache for LocalCache {
-    async fn get(&self, subdomain: &str) -> Result<Arc<Bundle>, CacheError> {
-        if subdomain != "local" {
+    async fn get(&self, project_id: &str) -> Result<Arc<Bundle>, CacheError> {
+        if project_id != "local" {
             return Err(CacheError::NotFound);
         }
         self.cell
@@ -139,5 +139,5 @@ impl BundleCache for LocalCache {
             .cloned()
     }
 
-    async fn invalidate(&self, _subdomain: &str) {}
+    async fn invalidate(&self, _project_id: &str) {}
 }
