@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Handle;
 use tracing::info;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -89,7 +90,11 @@ pub fn setup(
     let log_bridge = OpenTelemetryTracingBridge::new(&logger_provider);
 
     let tracer = tracer_provider.tracer("fn0-worker-tracer");
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new("info,hyper=warn,hyper_util=warn,reqwest=warn,h2=warn,tower=warn")
+    });
     tracing_subscriber::registry()
+        .with(env_filter)
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .with(log_bridge)

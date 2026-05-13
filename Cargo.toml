@@ -101,7 +101,7 @@ tower = "=0.5.3"
 tower-http = "=0.6.8"
 tracing = "=0.1.44"
 tracing-opentelemetry = { version = "=0.32.1", default-features = false }
-tracing-subscriber = { version = "=0.3.23", default-features = false }
+tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["env-filter", "fmt", "std"] }
 url = "=2.5.8"
 uuid = "=1.19.0"
 wasmtime = { version = "=43.0.1", default-features = false }
