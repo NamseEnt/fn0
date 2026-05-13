@@ -102,16 +102,11 @@ async fn call_secrets_init(creds: &Credentials) -> Result<String> {
     #[derive(Serialize)]
     struct Empty {}
     #[derive(Deserialize)]
-    #[serde(tag = "t")]
+    #[serde(tag = "t", rename_all_fields = "camelCase")]
     enum InitResp {
-        Ok {
-            #[serde(rename = "encryptedDek")]
-            encrypted_dek: String,
-        },
+        Ok { encrypted_dek: String },
         Unauthorized,
-        Error {
-            message: String,
-        },
+        Error { message: String },
     }
     let resp: InitResp = post_action(creds, "secrets_init", &Empty {}).await?;
     match resp {
@@ -133,7 +128,7 @@ async fn call_secrets_encrypt(
         value: &'a str,
     }
     #[derive(Deserialize)]
-    #[serde(tag = "t")]
+    #[serde(tag = "t", rename_all_fields = "camelCase")]
     enum EncResp {
         Ok { ciphertext: String },
         Unauthorized,
