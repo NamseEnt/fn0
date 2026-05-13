@@ -102,7 +102,7 @@ async fn call_secrets_init(creds: &Credentials) -> Result<String> {
     #[derive(Serialize)]
     struct Empty {}
     #[derive(Deserialize)]
-    #[serde(tag = "t", rename_all = "camelCase")]
+    #[serde(tag = "t")]
     enum InitResp {
         Ok {
             #[serde(rename = "encryptedDek")]
