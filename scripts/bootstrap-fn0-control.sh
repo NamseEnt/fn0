@@ -47,6 +47,8 @@ source "${REPO_ROOT}/scripts/lib/control-bundle.sh"
 source "${REPO_ROOT}/scripts/lib/control-deploy.sh"
 # shellcheck source=lib/control-seed.sh
 source "${REPO_ROOT}/scripts/lib/control-seed.sh"
+# shellcheck source=lib/control-static-upload.sh
+source "${REPO_ROOT}/scripts/lib/control-static-upload.sh"
 
 need pulumi
 need jq
@@ -56,6 +58,7 @@ need aws
 need oci
 need curl
 need tar
+need uuidgen
 
 load_pulumi_outputs
 
@@ -103,8 +106,44 @@ fi
 env_yaml_path="${work_dir}/env.yaml"
 printf '%s' "$control_env_yaml" > "$env_yaml_path"
 
+# 3a — provision fn0-control static-asset R2 bucket (idempotent) and build
+# the frontend against a stable build_id so vite emits real asset URLs
+# under https://{project_id}.{public_base_domain}/{build_id}/ instead of
+# the __FORTE_BASE__ placeholder. We then upload fe/dist after forte build.
+static_asset_account_id="$(pulumi_pick staticAssetAccountId)"
+static_asset_public_base_domain="$(pulumi_pick staticAssetPublicBaseDomain)"
+static_asset_zone_id="$(pulumi_pick staticAssetZoneId)"
+static_asset_cf_token="$(pulumi_pick staticAssetCloudflareApiToken)"
+static_asset_access_key="$(pulumi_pick staticAssetPresignAccessKeyId)"
+static_asset_secret_key="$(pulumi_pick staticAssetPresignSecretAccessKey)"
+if [[ -z "$static_asset_account_id" || -z "$static_asset_public_base_domain" \
+   || -z "$static_asset_zone_id" || -z "$static_asset_cf_token" \
+   || -z "$static_asset_access_key" || -z "$static_asset_secret_key" ]]; then
+  echo "missing pulumi outputs for static asset storage (staticAsset* family)" >&2
+  exit 1
+fi
+static_bucket="fn0-static-asset-${CONTROL_PROJECT_ID}"
+static_custom_domain="${CONTROL_PROJECT_ID}.${static_asset_public_base_domain}"
+build_id="$(uuidgen | tr 'A-Z' 'a-z')"
+export VITE_PUBLIC_URL="https://${static_custom_domain}/${build_id}/"
+echo ">> build_id=${build_id} VITE_PUBLIC_URL=${VITE_PUBLIC_URL}"
+
+control_url="$(pulumi_pick controlUrl)"
+if [[ -z "$control_url" ]]; then
+  echo "missing pulumi output: controlUrl" >&2
+  exit 1
+fi
+control_page_origin="${control_url%/}"
+ensure_static_asset_bucket \
+  "$static_asset_account_id" "$static_asset_cf_token" \
+  "$static_bucket" "$static_custom_domain" "$static_asset_zone_id" "$control_page_origin"
+
 bundle_path="${work_dir}/bundle.raw.tar"
 build_control_raw_bundle "$env_yaml_path" "$bundle_path"
+
+upload_fe_dist \
+  "$static_asset_account_id" "$static_asset_access_key" "$static_asset_secret_key" \
+  "$static_bucket" "$build_id" "${REPO_ROOT}/fn0/control/fe/dist"
 
 # Step 4 — R2 upload of original/.
 upload_r2_original "$CONTROL_PROJECT_ID" "$bundle_path"
