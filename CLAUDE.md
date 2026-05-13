@@ -1,0 +1,2 @@
+- This project uses English everywhere (code, comments, docs, commit messages).
+- Rust: verify with `cargo clippy`, not `cargo check`. 0 warnings + 0 errors.
