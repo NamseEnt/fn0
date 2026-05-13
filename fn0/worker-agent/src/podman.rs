@@ -9,7 +9,7 @@ pub struct Podman {
 impl Podman {
     pub fn from_env() -> Self {
         Self {
-            bin: std::env::var("FN0_AGENT_PODMAN_BIN").unwrap_or_else(|_| "podman".to_string()),
+            bin: std::env::var("FN0_WORKER_AGENT_PODMAN_BIN").unwrap_or_else(|_| "podman".to_string()),
         }
     }
 

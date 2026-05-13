@@ -142,21 +142,21 @@ struct DnsRegisterArgs {
 
 impl DnsRegisterArgs {
     fn from_env() -> Self {
-        let raw = std::env::var("FN0_AGENT_DNS_HOSTNAMES")
-            .expect("FN0_AGENT_DNS_HOSTNAMES must be set");
+        let raw = std::env::var("FN0_WORKER_DNS_HOSTNAMES")
+            .expect("FN0_WORKER_DNS_HOSTNAMES must be set");
         let hostnames: Vec<String> = raw
             .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
         if hostnames.is_empty() {
-            panic!("FN0_AGENT_DNS_HOSTNAMES is empty");
+            panic!("FN0_WORKER_DNS_HOSTNAMES is empty");
         }
         Self {
-            api_token: std::env::var("FN0_AGENT_DNS_API_TOKEN")
-                .expect("FN0_AGENT_DNS_API_TOKEN must be set"),
-            zone_id: std::env::var("FN0_AGENT_DNS_ZONE_ID")
-                .expect("FN0_AGENT_DNS_ZONE_ID must be set"),
+            api_token: std::env::var("FN0_WORKER_DNS_API_TOKEN")
+                .expect("FN0_WORKER_DNS_API_TOKEN must be set"),
+            zone_id: std::env::var("FN0_WORKER_DNS_ZONE_ID")
+                .expect("FN0_WORKER_DNS_ZONE_ID must be set"),
             hostnames,
         }
     }

@@ -28,7 +28,6 @@ pub fn strip_undefined(ty: &TsType) -> String {
     }
 }
 
-// Helper to generate Zod schema string
 pub fn to_zod(ty: &TsType) -> String {
     match ty {
         TsType::Literal(s) => format!("z.literal({s})"),
@@ -72,7 +71,6 @@ pub fn to_zod(ty: &TsType) -> String {
     }
 }
 
-// Display implementation kept for debugging or fallback types
 impl fmt::Display for TsType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

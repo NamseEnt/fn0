@@ -22,61 +22,37 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Start the development server with hot reload
     Dev {
-        /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
-
-        /// Port to listen on (auto-selects from 3000 if not specified)
         #[arg(short = 'P', long)]
         port: Option<u16>,
     },
-
-    /// Initialize a new Forte project
     Init {
-        /// Directory name to create
         name: String,
     },
-
-    /// Log in to fn0 control (saves shared credentials with fn0 CLI)
     Login {
-        /// Token (skips interactive paste flow)
         #[arg(long)]
         token: Option<String>,
     },
-
-    /// Add a new page or action
     Add {
         #[command(subcommand)]
         command: AddCommands,
     },
-
-    /// Build the project locally without deploying
     Build {
-        /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
     },
-
-    /// Build and deploy the project to fn0 cloud
     Deploy {
-        /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
-
-        /// Project display name (used only on first deploy to register the project)
         #[arg(long)]
         name: Option<String>,
     },
-
-    /// Admin task commands
     Admin {
         #[command(subcommand)]
         command: AdminCommands,
     },
-
-    /// Custom domain management
     Domain {
         #[command(subcommand)]
         command: DomainCommands,
@@ -87,21 +63,15 @@ pub enum Commands {
 pub enum DomainCommands {
     /// Attach a custom domain to this project (CNAME-based)
     Add {
-        /// Domain to attach (e.g. www.example.com)
         domain: String,
-        /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
     },
-    /// Detach the custom domain from this project
     Remove {
-        /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
     },
-    /// Show custom domain status for this project
     Status {
-        /// Project directory (defaults to current directory)
         #[arg(short, long)]
         project: Option<PathBuf>,
     },
@@ -109,9 +79,7 @@ pub enum DomainCommands {
 
 #[derive(Subcommand)]
 pub enum AdminCommands {
-    /// Run an admin task against the deployed app
     Run {
-        /// Task name (matches src/admin/<name>.rs)
         task: String,
         #[arg(short, long)]
         project: Option<PathBuf>,
@@ -122,9 +90,7 @@ pub enum AdminCommands {
         #[arg(long, default_value_t = 300)]
         timeout_seconds: u64,
     },
-    /// Run an admin task against a locally-running `forte dev`
     RunLocal {
-        /// Task name
         task: String,
         #[arg(short = 'P', long, default_value_t = 3000)]
         port: u16,
@@ -139,15 +105,10 @@ pub enum AdminCommands {
 
 #[derive(Subcommand)]
 pub enum AddCommands {
-    /// Add a new page
     Page {
-        /// Page path (e.g., "product/[id]")
         path: String,
     },
-
-    /// Add a new action
     Action {
-        /// Action path (e.g., "user/login")
         path: String,
     },
 }

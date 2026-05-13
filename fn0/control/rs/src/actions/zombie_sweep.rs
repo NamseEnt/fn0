@@ -32,12 +32,20 @@ pub struct SweepStats {
 }
 
 pub async fn run_sweep() -> anyhow::Result<SweepStats> {
-    let api_token = std::env::var("FN0_AGENT_DNS_API_TOKEN")
-        .map_err(|_| anyhow::anyhow!("FN0_AGENT_DNS_API_TOKEN not set"))?;
-    let zone_id = std::env::var("FN0_AGENT_DNS_ZONE_ID")
-        .map_err(|_| anyhow::anyhow!("FN0_AGENT_DNS_ZONE_ID not set"))?;
-    let hostname = std::env::var("FN0_AGENT_DNS_HOSTNAME")
-        .map_err(|_| anyhow::anyhow!("FN0_AGENT_DNS_HOSTNAME not set"))?;
+    let api_token = std::env::var("FN0_WORKER_DNS_API_TOKEN")
+        .map_err(|_| anyhow::anyhow!("FN0_WORKER_DNS_API_TOKEN not set"))?;
+    let zone_id = std::env::var("FN0_WORKER_DNS_ZONE_ID")
+        .map_err(|_| anyhow::anyhow!("FN0_WORKER_DNS_ZONE_ID not set"))?;
+    let hostnames_raw = std::env::var("FN0_WORKER_DNS_HOSTNAMES")
+        .map_err(|_| anyhow::anyhow!("FN0_WORKER_DNS_HOSTNAMES not set"))?;
+    let hostnames: Vec<String> = hostnames_raw
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if hostnames.is_empty() {
+        anyhow::bail!("FN0_WORKER_DNS_HOSTNAMES is empty");
+    }
 
     let db = doc_db::turso();
     let docs: Vec<WorkerHeartbeatDoc> = WorkerHeartbeatDocQuery {
@@ -58,27 +66,38 @@ pub async fn run_sweep() -> anyhow::Result<SweepStats> {
     let mut cleaned_dns_records: u64 = 0;
 
     for d in stale {
-        let deleted = match delete_a_records_for_addr(
-            &client,
-            &api_token,
-            &zone_id,
-            &hostname,
-            &d.addr,
-        )
-        .await
-        {
-            Ok(n) => n,
-            Err(e) => {
-                tracing::error!(
-                    host_id = %d.host_id,
-                    addr = %d.addr,
-                    error = %e,
-                    "zombie_sweep dns delete failed",
-                );
-                continue;
+        let mut all_hostnames_ok = true;
+        let mut deleted_for_host: u64 = 0;
+        for hostname in &hostnames {
+            match delete_a_records_for_addr(
+                &client,
+                &api_token,
+                &zone_id,
+                hostname,
+                &d.addr,
+            )
+            .await
+            {
+                Ok(n) => {
+                    deleted_for_host += n as u64;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        host_id = %d.host_id,
+                        addr = %d.addr,
+                        hostname = %hostname,
+                        error = %e,
+                        "zombie_sweep dns delete failed",
+                    );
+                    all_hostnames_ok = false;
+                }
             }
-        };
-        cleaned_dns_records += deleted as u64;
+        }
+        cleaned_dns_records += deleted_for_host;
+
+        if !all_hostnames_ok {
+            continue;
+        }
 
         if let Err(e) = (WorkerHeartbeatDocDelete {
             host_id: d.host_id.clone(),
@@ -97,7 +116,7 @@ pub async fn run_sweep() -> anyhow::Result<SweepStats> {
         tracing::info!(
             host_id = %d.host_id,
             addr = %d.addr,
-            deleted_dns_records = deleted,
+            deleted_dns_records = deleted_for_host,
             "zombie_sweep reaped host",
         );
     }

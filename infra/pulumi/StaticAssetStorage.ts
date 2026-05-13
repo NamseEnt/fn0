@@ -20,7 +20,7 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
   constructor(
     name: string,
     args: StaticAssetStorageArgs,
-    opts: pulumi.ComponentResourceOptions
+    opts: pulumi.ComponentResourceOptions,
   ) {
     super("pkg:index:static-asset-storage", name, args, opts);
 
@@ -55,7 +55,7 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
         permissionGroupIds: [r2ItemReadId, r2ItemWriteId],
         userApiToken: args.cloudflareUserApiToken,
       },
-      { parent: this }
+      { parent: this },
     );
 
     const adminToken = new cloudflare.AccountToken(
@@ -69,7 +69,7 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
             resources: pulumi.output(accountId).apply((acct) =>
               JSON.stringify({
                 [`com.cloudflare.api.account.${acct}`]: "*",
-              })
+              }),
             ),
             permissionGroups: [{ id: r2EditId }],
           },
@@ -78,13 +78,13 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
             resources: pulumi.output(zoneId).apply((zid) =>
               JSON.stringify({
                 [`com.cloudflare.api.account.zone.${zid}`]: "*",
-              })
+              }),
             ),
             permissionGroups: [{ id: dnsWriteId }],
           },
         ],
       },
-      { parent: this }
+      { parent: this },
     );
 
     this.accountId = pulumi.output(accountId);
@@ -93,8 +93,8 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
     this.presignAccessKeyId = presignToken.id;
     this.presignSecretAccessKey = pulumi.secret(
       presignToken.value.apply((v) =>
-        crypto.createHash("sha256").update(v).digest("hex")
-      )
+        crypto.createHash("sha256").update(v).digest("hex"),
+      ),
     );
     this.cloudflareApiToken = pulumi.secret(adminToken.value);
   }
@@ -113,13 +113,13 @@ class R2AllBucketsItemToken extends pulumi.dynamic.Resource {
   constructor(
     name: string,
     args: R2AllBucketsItemTokenArgs,
-    opts?: pulumi.CustomResourceOptions
+    opts?: pulumi.CustomResourceOptions,
   ) {
     super(
       new R2AllBucketsItemTokenProvider(),
       name,
       { ...args, value: undefined },
-      opts
+      opts,
     );
   }
 }
@@ -139,9 +139,6 @@ function buildTokenPolicies(inputs: R2AllBucketsItemTokenInputs) {
   return [
     {
       effect: "allow",
-      // Nested form: account-scoped wildcard over all R2 buckets. This is the
-      // only Cloudflare-documented way to grant item-level R2 permissions
-      // across every bucket in an account.
       resources: {
         [`com.cloudflare.api.account.${inputs.accountId}`]: {
           "com.cloudflare.edge.r2.bucket.*": "*",
@@ -155,7 +152,7 @@ function buildTokenPolicies(inputs: R2AllBucketsItemTokenInputs) {
 async function cloudflareUserTokenRequest(
   userApiToken: string,
   path: string,
-  init: RequestInit
+  init: RequestInit,
 ): Promise<{ id: string; value?: string }> {
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/user/tokens${path}`,
@@ -166,32 +163,29 @@ async function cloudflareUserTokenRequest(
         "Content-Type": "application/json",
         ...(init.headers ?? {}),
       },
-    }
+    },
   );
   const text = await response.text();
   if (!response.ok) {
     throw new Error(
-      `Cloudflare token API ${init.method} ${path} failed: ${response.status} ${text}`
+      `Cloudflare token API ${init.method} ${path} failed: ${response.status} ${text}`,
     );
   }
   const body = JSON.parse(text);
   if (body.success === false) {
     throw new Error(
-      `Cloudflare token API ${init.method} ${path} returned errors: ${JSON.stringify(body.errors)}`
+      `Cloudflare token API ${init.method} ${path} returned errors: ${JSON.stringify(body.errors)}`,
     );
   }
   return body.result;
 }
 
-class R2AllBucketsItemTokenProvider
-  implements
-    pulumi.dynamic.ResourceProvider<
-      R2AllBucketsItemTokenInputs,
-      R2AllBucketsItemTokenOutputs
-    >
-{
+class R2AllBucketsItemTokenProvider implements pulumi.dynamic.ResourceProvider<
+  R2AllBucketsItemTokenInputs,
+  R2AllBucketsItemTokenOutputs
+> {
   async create(
-    inputs: R2AllBucketsItemTokenInputs
+    inputs: R2AllBucketsItemTokenInputs,
   ): Promise<pulumi.dynamic.CreateResult<R2AllBucketsItemTokenOutputs>> {
     const result = await cloudflareUserTokenRequest(inputs.userApiToken, "", {
       method: "POST",
@@ -212,12 +206,13 @@ class R2AllBucketsItemTokenProvider
   async diff(
     _id: string,
     oldOutputs: R2AllBucketsItemTokenOutputs,
-    newInputs: R2AllBucketsItemTokenInputs
+    newInputs: R2AllBucketsItemTokenInputs,
   ): Promise<pulumi.dynamic.DiffResult> {
     // accountId change means a different Cloudflare account entirely — token
     // cannot be transferred, must replace.
     const replaces: string[] = [];
-    if (oldOutputs.accountId !== newInputs.accountId) replaces.push("accountId");
+    if (oldOutputs.accountId !== newInputs.accountId)
+      replaces.push("accountId");
     const changed =
       oldOutputs.accountId !== newInputs.accountId ||
       oldOutputs.name !== newInputs.name ||
@@ -229,7 +224,7 @@ class R2AllBucketsItemTokenProvider
   async update(
     id: string,
     oldOutputs: R2AllBucketsItemTokenOutputs,
-    newInputs: R2AllBucketsItemTokenInputs
+    newInputs: R2AllBucketsItemTokenInputs,
   ): Promise<pulumi.dynamic.UpdateResult<R2AllBucketsItemTokenOutputs>> {
     await cloudflareUserTokenRequest(newInputs.userApiToken, `/${id}`, {
       method: "PUT",
@@ -248,11 +243,11 @@ class R2AllBucketsItemTokenProvider
       {
         method: "DELETE",
         headers: { Authorization: `Bearer ${outputs.userApiToken}` },
-      }
+      },
     );
     if (!response.ok && response.status !== 404) {
       throw new Error(
-        `Cloudflare token DELETE failed: ${response.status} ${await response.text()}`
+        `Cloudflare token DELETE failed: ${response.status} ${await response.text()}`,
       );
     }
   }

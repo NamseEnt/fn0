@@ -31,11 +31,11 @@ pub async fn run(
 ) {
     info!("worker container pool started");
     let podman = Podman::from_env();
-    let ramp_duration = duration_from_env_secs("FN0_AGENT_RAMP_DURATION_SECS", RAMP_DURATION_DEFAULT);
-    let drain_timeout = duration_from_env_secs("FN0_AGENT_DRAIN_TIMEOUT_SECS", DRAIN_TIMEOUT_DEFAULT);
+    let ramp_duration = duration_from_env_secs("FN0_WORKER_AGENT_RAMP_DURATION_SECS", RAMP_DURATION_DEFAULT);
+    let drain_timeout = duration_from_env_secs("FN0_WORKER_AGENT_DRAIN_TIMEOUT_SECS", DRAIN_TIMEOUT_DEFAULT);
     let mut next_port: u16 = WORKER_BASE_PORT;
-    let env_file = std::env::var("FN0_AGENT_WORKER_ENV_FILE")
-        .expect("FN0_AGENT_WORKER_ENV_FILE must be set");
+    let env_file = std::env::var("FN0_WORKER_ENV_FILE")
+        .expect("FN0_WORKER_ENV_FILE must be set");
     let mut state = PoolState::default();
     let mut first_ready_tx = Some(first_ready_tx);
 

@@ -49,7 +49,7 @@ const forteDb = new fn0.ForteDb(
     organizationSlug: config.require("tursoOrganizationSlug"),
     location: config.require("tursoLocation"),
   },
-  {}
+  {},
 );
 
 const tursoApiToken = new pulumi.Config("turso").requireSecret("apiToken");
@@ -61,7 +61,7 @@ new fn0.ControlProjectBootstrap(
     groupName: forteDb.groupName,
     projectId: "fn0-control",
   },
-  { dependsOn: [forteDb] }
+  { dependsOn: [forteDb] },
 );
 
 const forteR2 = new fn0.ForteR2(
@@ -73,7 +73,7 @@ const forteR2 = new fn0.ForteR2(
     staticHostname: `forte-static.${domain}`,
     bucketName: pulumi.interpolate`fn0-forte-static-${suffix}`,
   },
-  {}
+  {},
 );
 
 const cwasmCompilerRegion = "ap-northeast-1";
@@ -107,7 +107,7 @@ new aws.ecr.RepositoryPolicy("cwasm-compiler-ecr-policy", {
           },
         },
       ],
-    })
+    }),
   ),
 });
 
@@ -142,7 +142,7 @@ new aws.iam.RolePolicy("cwasm-compiler-role-policy", {
           Resource: `${arn}/*`,
         },
       ],
-    })
+    }),
   ),
 });
 
@@ -156,13 +156,16 @@ const controlAwsAccessKey = new aws.iam.AccessKey("control-aws-access-key", {
   user: controlAwsUser.name,
 });
 
-const cwasmCompilerBuilderUser = new aws.iam.User("cwasm-compiler-builder-user", {
-  name: "fn0-cwasm-compiler-builder",
-});
+const cwasmCompilerBuilderUser = new aws.iam.User(
+  "cwasm-compiler-builder-user",
+  {
+    name: "fn0-cwasm-compiler-builder",
+  },
+);
 
 const cwasmCompilerBuilderAccessKey = new aws.iam.AccessKey(
   "cwasm-compiler-builder-access-key",
-  { user: cwasmCompilerBuilderUser.name }
+  { user: cwasmCompilerBuilderUser.name },
 );
 
 new aws.iam.UserPolicy("cwasm-compiler-builder-user-policy", {
@@ -218,7 +221,7 @@ new aws.iam.UserPolicy("cwasm-compiler-builder-user-policy", {
             },
           },
         ],
-      })
+      }),
     ),
 });
 
@@ -246,7 +249,7 @@ new aws.iam.UserPolicy("control-aws-user-policy", {
             Resource: `arn:aws:lambda:${cwasmCompilerRegion}:${accountId}:function:fn0-cwasm-compiler-*`,
           },
         ],
-      })
+      }),
     ),
 });
 
@@ -263,16 +266,19 @@ const controlDek = new oci.kms.GeneratedKey(
     keyShape: { algorithm: "AES", length: 32 },
     includePlaintextKey: true,
   },
-  { dependsOn: [ociGlobalVault] }
+  { dependsOn: [ociGlobalVault] },
 );
 
 const fn0TokenHmacKey = new random.RandomBytes("fn0-token-hmac-key", {
   length: 32,
 });
 
-const controlCookieSecret = new random.RandomBytes("fn0-control-cookie-secret", {
-  length: 32,
-});
+const controlCookieSecret = new random.RandomBytes(
+  "fn0-control-cookie-secret",
+  {
+    length: 32,
+  },
+);
 
 const controlAdminToken = new random.RandomBytes("fn0-control-admin-token", {
   length: 32,
@@ -284,7 +290,7 @@ const bundleStoreR2 = new fn0.BundleStoreR2(
     accountId,
     bucketName: pulumi.interpolate`fn0-bundle-store-${suffix}`,
   },
-  {}
+  {},
 );
 
 const staticAssetStorage = new fn0.StaticAssetStorage(
@@ -295,7 +301,7 @@ const staticAssetStorage = new fn0.StaticAssetStorage(
     publicBaseDomain: `static.${domain}`,
     cloudflareUserApiToken: config.requireSecret("cloudflareUserApiToken"),
   },
-  {}
+  {},
 );
 
 const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
@@ -308,7 +314,7 @@ const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
     controlUrl: pulumi.interpolate`https://fn0-control.${domain}`,
     adminToken: controlAdminToken.base64,
   },
-  {}
+  {},
 );
 
 const githubClientId = config.require("githubClientId");
@@ -321,10 +327,7 @@ function aesGcmEncryptToBase64(dekBase64: string, plaintext: string): string {
   }
   const nonce = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce);
-  const ct = Buffer.concat([
-    cipher.update(plaintext, "utf8"),
-    cipher.final(),
-  ]);
+  const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([nonce, ct, tag]).toString("base64");
 }
@@ -478,12 +481,12 @@ const controlEnvYamlBootstrap = pulumi
         `FN0_CLOUDFLARE_SAAS_ZONE_ID: ${cfZoneId}`,
         "FN0_CLOUDFLARE_SAAS_API_TOKEN:",
         `  secret: ${cfSaasApiTokenCt}`,
-        "FN0_AGENT_DNS_API_TOKEN:",
+        "FN0_WORKER_DNS_API_TOKEN:",
         `  secret: ${dnsApiTokenCt}`,
-        `FN0_AGENT_DNS_ZONE_ID: ${cfZoneId}`,
-        `FN0_AGENT_DNS_HOSTNAME: "*.${domain}"`,
+        `FN0_WORKER_DNS_ZONE_ID: ${cfZoneId}`,
+        `FN0_WORKER_DNS_HOSTNAMES: "*.${domain},fallback.${domain}"`,
         "",
-      ].join("\n")
+      ].join("\n"),
   );
 
 const dnsProvider = {
@@ -498,13 +501,11 @@ const dnsProvider = {
 const fn0WorkerAgentVersion = (() => {
   const toml = fs.readFileSync(
     path.join(__dirname, "../../fn0/worker-agent/Cargo.toml"),
-    "utf8"
+    "utf8",
   );
   const m = toml.match(/^version\s*=\s*"([^"]+)"/m);
   if (!m) {
-    throw new Error(
-      "could not parse version from fn0/worker-agent/Cargo.toml"
-    );
+    throw new Error("could not parse version from fn0/worker-agent/Cargo.toml");
   }
   return m[1];
 })();
@@ -512,9 +513,9 @@ const fn0WorkerAgentVersion = (() => {
 const grafanaStack = grafana.cloud.getStackOutput({
   slug: config.require("grafanaSlug"),
 });
-const grafanaCloudAccessPolicyToken = new pulumi.Config("grafana").requireSecret(
-  "cloudAccessPolicyToken"
-);
+const grafanaCloudAccessPolicyToken = new pulumi.Config(
+  "grafana",
+).requireSecret("cloudAccessPolicyToken");
 const workerOtlpEndpoint = grafanaStack.otlpUrl.apply((url) => `${url}/otlp`);
 const workerOtlpBasicAuth = pulumi
   .all([grafanaStack.id, grafanaCloudAccessPolicyToken])
@@ -541,8 +542,6 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   agentDnsRegister: {
     apiToken: dns.dnsApiToken,
     zoneId,
-    // Wildcard for system-assigned subdomains, plus the explicit fallback
-    // origin hostname (Cloudflare SaaS requires its own proxied A record).
     hostnames: `*.${domain},fallback.${domain}`,
   },
   worker: {
@@ -595,27 +594,45 @@ new cloudflare.CustomHostname("control-custom-hostname", {
   },
 });
 
-export const workerImageRegistries = pulumi.secret(ociFn0WorkerSite.workerImageRegistries);
+export const workerImageRegistries = pulumi.secret(
+  ociFn0WorkerSite.workerImageRegistries,
+);
 export const cwasmBucket = ociFn0WorkerSite.cwasmBucket.bucketName;
 export const s3Endpoint = ociFn0WorkerSite.cwasmBucket.endpoint;
 export const s3Region = ociFn0WorkerSite.cwasmBucket.region;
-export const s3AccessKeyId = pulumi.secret(ociFn0WorkerSite.cwasmBucket.accessKeyId);
-export const s3SecretAccessKey = pulumi.secret(ociFn0WorkerSite.cwasmBucket.secretAccessKey);
-export const workerSshPrivateKey = pulumi.secret(ociFn0WorkerSite.sshPrivateKey);
+export const s3AccessKeyId = pulumi.secret(
+  ociFn0WorkerSite.cwasmBucket.accessKeyId,
+);
+export const s3SecretAccessKey = pulumi.secret(
+  ociFn0WorkerSite.cwasmBucket.secretAccessKey,
+);
+export const workerSshPrivateKey = pulumi.secret(
+  ociFn0WorkerSite.sshPrivateKey,
+);
 export const cwasmCompilerBucket = cwasmCompilerBucketR.bucket;
 export const cwasmCompilerBucketRegion = cwasmCompilerRegion;
 export const cwasmCompilerEcrRepository = cwasmCompilerEcrR.repositoryUrl;
 export const cwasmCompilerRoleArn = cwasmCompilerRoleR.arn;
-export const cwasmCompilerBuilderAccessKeyId = pulumi.secret(cwasmCompilerBuilderAccessKey.id);
-export const cwasmCompilerBuilderSecretAccessKey = pulumi.secret(cwasmCompilerBuilderAccessKey.secret);
+export const cwasmCompilerBuilderAccessKeyId = pulumi.secret(
+  cwasmCompilerBuilderAccessKey.id,
+);
+export const cwasmCompilerBuilderSecretAccessKey = pulumi.secret(
+  cwasmCompilerBuilderAccessKey.secret,
+);
 export const controlAwsAccessKeyId = pulumi.secret(controlAwsAccessKey.id);
-export const controlAwsSecretAccessKey = pulumi.secret(controlAwsAccessKey.secret);
+export const controlAwsSecretAccessKey = pulumi.secret(
+  controlAwsAccessKey.secret,
+);
 export const docDbUrl = docDb.url;
 export const docDbToken = pulumi.secret(docDb.token);
 export const forteDbGroupToken = pulumi.secret(forteDb.groupToken);
 export const forteDbHostSuffix = forteDb.hostSuffix;
-export const controlOwnerGithubId = config.requireNumber("controlOwnerGithubId");
-export const controlOwnerGithubLogin = config.require("controlOwnerGithubLogin");
+export const controlOwnerGithubId = config.requireNumber(
+  "controlOwnerGithubId",
+);
+export const controlOwnerGithubLogin = config.require(
+  "controlOwnerGithubLogin",
+);
 export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
 export const vaultKeyOcid = ociGlobalVault.keyOcid;
 export const controlBootstrapEnvYaml = pulumi.secret(controlEnvYamlBootstrap);
@@ -624,8 +641,12 @@ export const controlAdminTokenBase64 = pulumi.secret(controlAdminToken.base64);
 export const bundleStoreR2AccountId = bundleStoreR2.accountId;
 export const bundleStoreR2BucketName = bundleStoreR2.bucketName;
 export const bundleStoreR2Endpoint = bundleStoreR2.endpoint;
-export const bundleStoreR2AccessKeyId = pulumi.secret(bundleStoreR2.accessKeyId);
-export const bundleStoreR2SecretAccessKey = pulumi.secret(bundleStoreR2.secretAccessKey);
+export const bundleStoreR2AccessKeyId = pulumi.secret(
+  bundleStoreR2.accessKeyId,
+);
+export const bundleStoreR2SecretAccessKey = pulumi.secret(
+  bundleStoreR2.secretAccessKey,
+);
 export const bundleStoreR2QueueId = bundleStoreR2.queueId;
 export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
 export const workerCompartmentId = ociFn0WorkerSite.compartmentId;
