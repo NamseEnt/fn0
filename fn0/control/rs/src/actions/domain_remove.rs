@@ -1,5 +1,4 @@
 use crate::common::auth;
-use crate::common::queue;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -80,10 +79,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    if let Err(e) = queue::enqueue(
-        "fn0-control",
-        "cloudflare_unregister",
-        serde_json::json!({ "domain": removed_domain }),
+    if let Err(e) = crate::enqueue::cloudflare_unregister(
+        crate::queue_task::cloudflare_unregister::Input {
+            domain: removed_domain.clone(),
+        },
     )
     .await
     {

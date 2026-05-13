@@ -132,7 +132,6 @@ pub async fn lambda_invoke_async(args: LambdaInvokeArgs<'_>) -> anyhow::Result<(
 
     let url = format!("https://{host}{path}");
     let request = http::Request::post(&url)
-        .header("Host", host)
         .header("Authorization", auth)
         .header("x-amz-content-sha256", payload_hash)
         .header("x-amz-date", amz_date)

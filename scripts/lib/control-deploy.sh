@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # fn0-control deploy helpers (R2 upload + cwasm-compiler invoke). Source-only.
 #
-# upload_r2_original <project_id> <local_tar_path>
+# upload_r2_original <project_id> <code_version> <local_tar_path>
 # compile_via_cwasm <project_id> <code_version> <wasmtime_version> <lambda_function_name>
 
 if [[ -n "${__FN0_CONTROL_DEPLOY_LOADED:-}" ]]; then
@@ -10,8 +10,8 @@ fi
 __FN0_CONTROL_DEPLOY_LOADED=1
 
 upload_r2_original() {
-  local project_id="$1" local_tar="$2"
-  if [[ -z "$project_id" || -z "$local_tar" ]]; then
+  local project_id="$1" code_version="$2" local_tar="$3"
+  if [[ -z "$project_id" || -z "$code_version" || -z "$local_tar" ]]; then
     echo "upload_r2_original: missing args" >&2
     return 2
   fi
@@ -30,14 +30,14 @@ upload_r2_original() {
       return 1
     fi
   done
-  echo ">> R2 upload original/${project_id}.tar"
+  echo ">> R2 upload original/${project_id}/${code_version}.tar"
   AWS_ACCESS_KEY_ID="$r2_ak" \
   AWS_SECRET_ACCESS_KEY="$r2_sk" \
   AWS_DEFAULT_REGION=auto \
   aws s3api put-object \
     --endpoint-url "$r2_endpoint" \
     --bucket "$r2_bucket" \
-    --key "original/${project_id}.tar" \
+    --key "original/${project_id}/${code_version}.tar" \
     --body "$local_tar" \
     >/dev/null
 }
@@ -60,7 +60,7 @@ compile_via_cwasm() {
     fi
   done
 
-  local input_key="original/${project_id}.tar"
+  local input_key="original/${project_id}/${code_version}.tar"
   local output_key="compiled/${wasmtime}/${project_id}/${code_version}.tar.zst"
   local payload_file out_file meta_file
   payload_file="$(mktemp)"

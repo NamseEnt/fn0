@@ -5,5 +5,4 @@ pub mod cloudflare;
 pub mod cloudflare_saas;
 pub mod github;
 pub mod project_name;
-pub mod queue;
 pub mod vault;

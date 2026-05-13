@@ -65,7 +65,10 @@ where
 
     let http_resp = match dispatch(http_req).instrument(span.clone()).await {
         Ok(r) => r,
-        Err(e) => return Err(p3::ErrorCode::InternalError(Some(format!("{e:?}")))),
+        Err(e) => {
+            tracing::error!(error = ?e, "dispatch failed");
+            return Err(p3::ErrorCode::InternalError(Some(format!("{e:#?}"))));
+        }
     };
 
     span.record("http.response.status_code", http_resp.status().as_u16());

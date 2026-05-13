@@ -137,6 +137,7 @@ enum Deploy {
         presigned_put_url: String,
         object_key: String,
         static_uploads: Vec<StaticUpload>,
+        code_version: u64,
     },
     QuotaExceeded {
         reason: String,
@@ -147,6 +148,7 @@ enum Deploy {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct StaticUpload {
     path: String,
     presigned_url: String,
@@ -196,6 +198,7 @@ pub async fn deploy_wasm(
         presigned_put_url,
         object_key,
         static_uploads: _,
+        code_version,
     } = request_deploy(
         &client,
         control_url,
@@ -208,9 +211,8 @@ pub async fn deploy_wasm(
     )
     .await?;
 
-    println!("uploading bundle to {object_key}...");
-    let code_version = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
-    println!("uploaded. code_version={code_version}");
+    println!("uploading bundle to {object_key} (code_version={code_version})...");
+    upload_bundle(&client, &presigned_put_url, bundle_tar_path, code_version).await?;
 
     poll_deploy_status(&client, control_url, token, project_id, code_version).await?;
     println!("Deploy complete!");
@@ -221,6 +223,7 @@ struct DeployOk {
     presigned_put_url: String,
     object_key: String,
     static_uploads: Vec<StaticUpload>,
+    code_version: u64,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -254,6 +257,7 @@ pub async fn deploy_forte(
         presigned_put_url,
         object_key,
         static_uploads,
+        code_version,
     } = request_deploy(
         &client,
         control_url,
@@ -271,9 +275,8 @@ pub async fn deploy_forte(
         upload_static_assets(&client, &static_files, static_uploads).await?;
     }
 
-    println!("uploading bundle to {object_key}...");
-    let code_version = upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
-    println!("uploaded. code_version={code_version}");
+    println!("uploading bundle to {object_key} (code_version={code_version})...");
+    upload_bundle(&client, &presigned_put_url, bundle_tar_path, code_version).await?;
 
     poll_deploy_status(&client, control_url, token, project_id, code_version).await?;
     println!("Deploy complete!");
@@ -316,10 +319,12 @@ async fn request_deploy(
             presigned_put_url,
             object_key,
             static_uploads,
+            code_version,
         } => Ok(DeployOk {
             presigned_put_url,
             object_key,
             static_uploads,
+            code_version,
         }),
         Deploy::QuotaExceeded { reason } => Err(anyhow!("deploy quota exceeded: {reason}")),
         Deploy::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
@@ -332,17 +337,19 @@ async fn upload_bundle(
     client: &reqwest::Client,
     presigned_put_url: &str,
     bundle_tar_path: &Path,
-) -> Result<u64> {
+    code_version: u64,
+) -> Result<()> {
     let bundle_bytes = std::fs::read(bundle_tar_path)
         .map_err(|e| anyhow!("Failed to read {}: {}", bundle_tar_path.display(), e))?;
-    let put_resp = client
+    let _ = code_version;
+    client
         .put(presigned_put_url)
         .body(bundle_bytes)
         .send()
         .await?
         .error_for_status()
         .map_err(|e| anyhow!("bundle upload failed: {e}"))?;
-    extract_code_version(&put_resp)
+    Ok(())
 }
 
 async fn upload_static_assets(
@@ -462,19 +469,6 @@ pub fn content_type_for(path: &Path) -> &'static str {
         Some("wav") => "audio/wav",
         _ => "application/octet-stream",
     }
-}
-
-fn extract_code_version(resp: &reqwest::Response) -> Result<u64> {
-    let hv = resp
-        .headers()
-        .get(reqwest::header::LAST_MODIFIED)
-        .ok_or_else(|| anyhow!("R2 PUT response missing Last-Modified header"))?
-        .to_str()
-        .map_err(|e| anyhow!("Last-Modified not utf-8: {e}"))?;
-    let dt = chrono::DateTime::parse_from_rfc2822(hv)
-        .map_err(|e| anyhow!("Last-Modified parse: {e}; raw={hv}"))?;
-    let secs = dt.timestamp();
-    u64::try_from(secs).map_err(|_| anyhow!("Last-Modified before epoch: {secs}"))
 }
 
 async fn poll_deploy_status(

@@ -30,6 +30,6 @@ sha2 = { workspace = true }
 time = { workspace = true }
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true, default-features = false }
-tracing-subscriber = { workspace = true, default-features = false, features = ["registry"] }
+tracing-subscriber = { workspace = true, default-features = false, features = ["registry", "fmt", "env-filter", "std"] }
 uuid = { workspace = true, features = ["v7"] }
 wit-bindgen = { workspace = true }

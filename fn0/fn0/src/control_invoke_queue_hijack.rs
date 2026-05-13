@@ -14,7 +14,7 @@ use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 const PUT_MESSAGES_API_VERSION: &str = "20210201";
 
 pub struct ControlInvokeMessage {
-    pub subdomain: String,
+    pub project_id: String,
     pub task_name: String,
     pub payload: serde_json::Value,
 }
@@ -40,14 +40,14 @@ pub struct ControlInvokeQueueHijack {
 
 #[derive(Deserialize)]
 struct InvokeBody {
-    subdomain: String,
+    project_id: String,
     task_name: String,
     payload: serde_json::Value,
 }
 
 #[derive(Serialize)]
 struct WrappedMessage<'a> {
-    subdomain: &'a str,
+    project_id: &'a str,
     task_name: &'a str,
     payload: &'a serde_json::Value,
 }
@@ -205,7 +205,7 @@ impl ControlInvokeQueueHijack {
             }
             Backend::Loopback { tx } => {
                 tx.send(ControlInvokeMessage {
-                    subdomain: parsed.subdomain,
+                    project_id: parsed.project_id,
                     task_name: parsed.task_name,
                     payload: parsed.payload,
                 })
@@ -233,7 +233,7 @@ fn build_put_messages_request(
     parsed: &InvokeBody,
 ) -> Result<hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
     let wrapped = WrappedMessage {
-        subdomain: &parsed.subdomain,
+        project_id: &parsed.project_id,
         task_name: &parsed.task_name,
         payload: &parsed.payload,
     };
