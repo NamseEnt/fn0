@@ -118,7 +118,7 @@ impl CloudflareClient {
         zone_id: &str,
     ) -> anyhow::Result<()> {
         #[derive(Serialize)]
-        struct Body<'a> {
+        struct CreateBody<'a> {
             domain: &'a str,
             #[serde(rename = "zoneId")]
             zone_id: &'a str,
@@ -126,25 +126,39 @@ impl CloudflareClient {
             #[serde(rename = "minTLS")]
             min_tls: &'a str,
         }
-        let payload = serde_json::to_vec(&Body {
+        let create_payload = serde_json::to_vec(&CreateBody {
             domain,
             zone_id,
             enabled: true,
             min_tls: "1.2",
         })?;
-        let path = format!(
+        let create_path = format!(
             "/accounts/{}/r2/buckets/{}/custom_domains",
             self.account_id, bucket_name
         );
-        let (status, body) = self.call("POST", &path, payload).await?;
+        let (status, body) = self.call("POST", &create_path, create_payload).await?;
+        if !(200..300).contains(&status) && !response_indicates_already_exists(&body) {
+            anyhow::bail!(
+                "register_r2_custom_domain {domain} failed (status={status}): {}",
+                String::from_utf8_lossy(&body)
+            );
+        }
+
+        #[derive(Serialize)]
+        struct EditBody {
+            enabled: bool,
+        }
+        let edit_payload = serde_json::to_vec(&EditBody { enabled: true })?;
+        let edit_path = format!(
+            "/accounts/{}/r2/buckets/{}/custom_domains/{}",
+            self.account_id, bucket_name, domain
+        );
+        let (status, body) = self.call("PUT", &edit_path, edit_payload).await?;
         if (200..300).contains(&status) {
             return Ok(());
         }
-        if response_indicates_already_exists(&body) {
-            return Ok(());
-        }
         anyhow::bail!(
-            "register_r2_custom_domain {domain} failed (status={status}): {}",
+            "enable_r2_custom_domain {domain} failed (status={status}): {}",
             String::from_utf8_lossy(&body)
         );
     }
