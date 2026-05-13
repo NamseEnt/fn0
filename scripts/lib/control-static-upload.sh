@@ -30,12 +30,14 @@ __cf_response_indicates_exists() {
   jq -r '.errors // [] | map(.message // "" | ascii_downcase) | .[]' < "$body_file" 2>/dev/null | grep -qE "already exists|already configured|already in use|duplicate"
 }
 
-# ensure_static_asset_bucket <account_id> <cf_token> <bucket> <asset_custom_domain> <zone_id> <page_origin>
+# ensure_static_asset_bucket <account_id> <cf_token> <bucket> <asset_custom_domain> <zone_id>
 # - asset_custom_domain: where the bucket is served (e.g. fn0-control.static.fn0.dev)
-# - page_origin: the origin loading the assets (e.g. https://fn0-control.fn0.dev),
-#   used verbatim as the single CORS Allow-Origin entry.
+# CORS allow-origin is "*": static asset buckets serve publicly readable
+# bundles, no credentialed requests cross them, and projects mount the
+# assets under arbitrary custom domains added at runtime via fn0 domain
+# add — wildcard avoids per-project CORS sync.
 ensure_static_asset_bucket() {
-  local account_id="$1" cf_token="$2" bucket="$3" asset_custom_domain="$4" zone_id="$5" page_origin="$6"
+  local account_id="$1" cf_token="$2" bucket="$3" asset_custom_domain="$4" zone_id="$5"
   local code body
 
   echo ">> ensure R2 bucket ${bucket}"
@@ -51,9 +53,8 @@ ensure_static_asset_bucket() {
     fi
   fi
 
-  echo ">> put R2 CORS on ${bucket} (origin=${page_origin})"
-  body=$(jq -nc --arg origin "$page_origin" \
-    '{rules:[{allowed:{methods:["GET","HEAD"],origins:[$origin],headers:["*"]}, maxAgeSeconds:86400}]}')
+  echo ">> put R2 CORS on ${bucket} (origin=*)"
+  body='{"rules":[{"allowed":{"methods":["GET","HEAD"],"origins":["*"],"headers":["*"]},"maxAgeSeconds":86400}]}'
   code=$(__cf_api_call PUT "/accounts/${account_id}/r2/buckets/${bucket}/cors" "$cf_token" "$body")
   if [[ ! "$code" =~ ^2 ]]; then
     echo "put_r2_bucket_cors failed (status=${code}):" >&2
