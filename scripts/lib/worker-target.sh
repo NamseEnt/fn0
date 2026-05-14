@@ -9,6 +9,9 @@ __FN0_WORKER_TARGET_LOADED=1
 WORKER_CONVERGE_TIMEOUT="${WORKER_CONVERGE_TIMEOUT:-1800}"      # 30 min
 WORKER_CONVERGE_POLL_INTERVAL="${WORKER_CONVERGE_POLL_INTERVAL:-10}"
 WORKER_CONVERGE_HOST_LIVE_WINDOW="${WORKER_CONVERGE_HOST_LIVE_WINDOW:-90}"  # seconds
+# Abort if `live=0` for this many consecutive polls. Default 18 ≈ 3 min,
+# which fits a worker docker pull + restart cycle without flagging it.
+WORKER_CONVERGE_ZERO_LIVE_LIMIT="${WORKER_CONVERGE_ZERO_LIVE_LIMIT:-18}"
 
 __doc_db_https_url() {
   local url
@@ -79,10 +82,11 @@ wait_worker_target_converged() {
   req="$(jq -nc --arg sql "$sql" \
     '{requests: [{type: "execute", stmt: {sql: $sql, args: []}}, {type: "close"}]}')"
 
-  echo ">> waiting for hosts to converge to ${target_image_ref} (timeout ${WORKER_CONVERGE_TIMEOUT}s)"
-  local start_ts deadline now elapsed http_code rows now_epoch
+  echo ">> waiting for hosts to converge to ${target_image_ref} (timeout ${WORKER_CONVERGE_TIMEOUT}s, abort after ${WORKER_CONVERGE_ZERO_LIVE_LIMIT} live=0 polls)"
+  local start_ts deadline now elapsed http_code rows now_epoch zero_live_count
   start_ts="$(date +%s)"
   deadline=$((start_ts + WORKER_CONVERGE_TIMEOUT))
+  zero_live_count=0
   resp_file="$(mktemp)"
   trap 'rm -f "$resp_file"' RETURN
 
@@ -113,7 +117,7 @@ wait_worker_target_converged() {
         | { live: length,
             on_target: (map(select(.active_image_ref == $target)) | length),
             others: (map(select(.active_image_ref != $target)) | map(.active_image_ref // "<none>") | unique) }
-      ' <"$resp_file")"
+      ' <<<"$rows")"
 
       local live on_target others_csv
       live="$(jq -r '.live' <<<"$report")"
@@ -127,6 +131,18 @@ wait_worker_target_converged() {
       fi
 
       echo "  live=${live} on_target=${on_target} others=[${others_csv}]"
+
+      if [[ "$live" -eq 0 ]]; then
+        zero_live_count=$((zero_live_count + 1))
+        if (( zero_live_count >= WORKER_CONVERGE_ZERO_LIVE_LIMIT )); then
+          elapsed=$(( $(date +%s) - start_ts ))
+          echo "no live hosts for ${zero_live_count} consecutive polls (${elapsed}s); aborting" >&2
+          echo "  hint: workers may be down, terminated, or unable to fetch the new image; check WorkerHostStatusDoc.reported_at and host system logs" >&2
+          return 1
+        fi
+      else
+        zero_live_count=0
+      fi
     fi
 
     now="$(date +%s)"
