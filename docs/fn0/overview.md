@@ -42,7 +42,7 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 ### Cluster Architecture (Internal)
 
 - **Monolith architecture** — no microservices.
-- On startup, each instance calls the cloud provider's Instance Discovery API (AWS or OCI), then uses [memberlist](https://github.com/al8n/memberlist) for gossip-based cluster membership.
+- On startup, each instance calls the cloud provider's Instance Discovery API (AWS or OCI).
 - Request routing uses the **Power of Two Choices** algorithm: pick two warmed instances, forward to the less loaded one.
 - If the first forward is rejected, retry once. If all retries fail or no warm instances exist, attempt a cold-start (the instance may start on itself).
 - If all instances are overloaded, return HTTP 503.

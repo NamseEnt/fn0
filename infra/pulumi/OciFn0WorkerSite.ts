@@ -153,7 +153,82 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     ).result;
 
-    const compartment = new oci.identity.Compartment(
+    const compartment = this.setupCompartment(compartmentSuffix);
+    this.compartmentId = compartment.id;
+
+    const { privateKey, workerManager, apiKey } = this.setupIdentity(
+      compartmentSuffix,
+      compartment,
+    );
+
+    const { vcn, internetGateway, subnet, workerSshKey } =
+      this.setupNetwork(compartment);
+    this.sshPublicKey = workerSshKey.publicKeyOpenssh;
+    this.sshPrivateKey = workerSshKey.privateKeyPem;
+    this.subnetId = subnet.id;
+
+    const { availabilityDomain, imageId, instanceConfiguration } =
+      this.setupImage(args, compartment, vcn, internetGateway, subnet);
+    this.instanceConfigurationId = instanceConfiguration.id;
+    this.osImageId = imageId;
+
+    this.infraEnvs = this.buildInfraEnvs(
+      args,
+      privateKey,
+      workerManager,
+      apiKey,
+      compartment,
+      instanceConfiguration,
+      availabilityDomain,
+    );
+
+    const { workerRepo, workerImageRegistries } = this.setupContainerRegistry(
+      args,
+      compartmentSuffix,
+      compartment,
+    );
+    this.workerImageRegistries = workerImageRegistries;
+
+    this.cwasmBucket = this.setupCwasmBucket(
+      args,
+      compartmentSuffix,
+      compartment,
+      workerRepo,
+    );
+
+    this.queue = this.setupQueue(args, compartmentSuffix, compartment);
+
+    const instances = this.setupInstances(
+      name,
+      args,
+      compartment,
+      subnet,
+      availabilityDomain,
+      imageId,
+    );
+    this.instanceIds = pulumi.all(instances.map((i) => i.id));
+    this.publicIps = pulumi.all(instances.map((i) => i.publicIp));
+
+    this.registerOutputs({
+      compartmentId: this.compartmentId,
+      subnetId: this.subnetId,
+      instanceConfigurationId: this.instanceConfigurationId,
+      infraEnvs: this.infraEnvs,
+      workerImageRegistries: this.workerImageRegistries,
+      osImageId: this.osImageId,
+      cwasmBucket: this.cwasmBucket,
+      queue: this.queue,
+      sshPublicKey: this.sshPublicKey,
+      sshPrivateKey: this.sshPrivateKey,
+      instanceIds: this.instanceIds,
+      publicIps: this.publicIps,
+    });
+  }
+
+  private setupCompartment(
+    compartmentSuffix: pulumi.Output<string>,
+  ): oci.identity.Compartment {
+    return new oci.identity.Compartment(
       "compartment",
       {
         description: "Compartment for fn0 OCI Worker",
@@ -162,9 +237,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       },
       { parent: this },
     );
+  }
 
-    this.compartmentId = compartment.id;
-
+  private setupIdentity(
+    compartmentSuffix: pulumi.Output<string>,
+    compartment: oci.identity.Compartment,
+  ): {
+    privateKey: tls.PrivateKey;
+    workerManager: oci.identity.User;
+    apiKey: oci.identity.ApiKey;
+  } {
     const privateKey = new tls.PrivateKey(
       "oci-api-key-pair",
       {
@@ -248,6 +330,15 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this, dependsOn: [imageBuilderDynGroup] },
     );
 
+    return { privateKey, workerManager, apiKey };
+  }
+
+  private setupNetwork(compartment: oci.identity.Compartment): {
+    vcn: oci.core.Vcn;
+    internetGateway: oci.core.InternetGateway;
+    subnet: oci.core.Subnet;
+    workerSshKey: tls.PrivateKey;
+  } {
     const vcn = new oci.core.Vcn(
       "vcn",
       {
@@ -267,9 +358,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       },
       { parent: this },
     );
-
-    this.sshPublicKey = workerSshKey.publicKeyOpenssh;
-    this.sshPrivateKey = workerSshKey.privateKeyPem;
 
     const securityList = new oci.core.SecurityList(
       "security-list",
@@ -356,6 +444,20 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
+    return { vcn, internetGateway, subnet, workerSshKey };
+  }
+
+  private setupImage(
+    args: OciFn0WorkerSiteArgs,
+    compartment: oci.identity.Compartment,
+    vcn: oci.core.Vcn,
+    internetGateway: oci.core.InternetGateway,
+    subnet: oci.core.Subnet,
+  ): {
+    availabilityDomain: pulumi.Output<string>;
+    imageId: pulumi.Output<string>;
+    instanceConfiguration: oci.core.InstanceConfiguration;
+  } {
     const availabilityDomain = compartment.id.apply((compartmentId) =>
       oci.identity
         .getAvailabilityDomains({
@@ -433,10 +535,19 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    this.subnetId = subnet.id;
-    this.instanceConfigurationId = instanceConfiguration.id;
+    return { availabilityDomain, imageId, instanceConfiguration };
+  }
 
-    this.infraEnvs = pulumi
+  private buildInfraEnvs(
+    args: OciFn0WorkerSiteArgs,
+    privateKey: tls.PrivateKey,
+    workerManager: oci.identity.User,
+    apiKey: oci.identity.ApiKey,
+    compartment: oci.identity.Compartment,
+    instanceConfiguration: oci.core.InstanceConfiguration,
+    availabilityDomain: pulumi.Output<string>,
+  ): pulumi.Output<OciFn0WorkerSiteInfraEnvs> {
+    return pulumi
       .all([
         privateKey.privateKeyPemPkcs8,
         workerManager.id,
@@ -468,7 +579,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           OCI_AVAILABILITY_DOMAIN: availabilityDomain,
         }),
       );
+  }
 
+  private setupContainerRegistry(
+    args: OciFn0WorkerSiteArgs,
+    compartmentSuffix: pulumi.Output<string>,
+    compartment: oci.identity.Compartment,
+  ): {
+    workerRepo: oci.artifacts.ContainerRepository;
+    workerImageRegistries: pulumi.Output<WorkerImageRegistry[]>;
+  } {
     const workerRepo = new oci.artifacts.ContainerRepository(
       "worker-repo",
       {
@@ -550,7 +670,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
     const registryUrl = pulumi.interpolate`ocir.${args.region}.oci.oraclecloud.com`;
 
-    this.workerImageRegistries = pulumi
+    const workerImageRegistries = pulumi
       .all([
         registryUrl,
         workerRepo.namespace,
@@ -566,8 +686,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           repository: `${namespace}/${repoName}`,
         },
       ]);
-    this.osImageId = imageId;
 
+    return { workerRepo, workerImageRegistries };
+  }
+
+  private setupCwasmBucket(
+    args: OciFn0WorkerSiteArgs,
+    compartmentSuffix: pulumi.Output<string>,
+    compartment: oci.identity.Compartment,
+    workerRepo: oci.artifacts.ContainerRepository,
+  ): OciCwasmBucketInfo {
     const cwasmBucketUser = new oci.identity.User(
       "cwasm-bucket-user",
       {
@@ -629,7 +757,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    this.cwasmBucket = {
+    return {
       endpoint: pulumi.interpolate`https://${workerRepo.namespace}.compat.objectstorage.${args.region}.oraclecloud.com`,
       region: pulumi.output(args.region),
       bucketName: ociObjectStorageBucket.name,
@@ -637,7 +765,13 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       secretAccessKey: customerSecretKey.key,
       namespace: workerRepo.namespace,
     };
+  }
 
+  private setupQueue(
+    args: OciFn0WorkerSiteArgs,
+    compartmentSuffix: pulumi.Output<string>,
+    compartment: oci.identity.Compartment,
+  ): OciQueueInfo {
     const queue = new oci.queue.Queue(
       "queue",
       {
@@ -705,7 +839,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    this.queue = {
+    return {
       ocid: queue.id,
       messagesEndpoint: queue.messagesEndpoint,
       region: pulumi.output(args.region),
@@ -716,7 +850,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         Buffer.from(pem).toString("base64"),
       ),
     };
+  }
 
+  private setupInstances(
+    name: string,
+    args: OciFn0WorkerSiteArgs,
+    compartment: oci.identity.Compartment,
+    subnet: oci.core.Subnet,
+    availabilityDomain: pulumi.Output<string>,
+    imageId: pulumi.Output<string>,
+  ): oci.core.Instance[] {
     // Mutable tag: agent_image_pull_poller relies on `:latest` moving to a new
     // digest to self-update.
     const agentImageRef = this.workerImageRegistries.apply((regs) => {
@@ -806,23 +949,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       );
     }
 
-    this.instanceIds = pulumi.all(instances.map((i) => i.id));
-    this.publicIps = pulumi.all(instances.map((i) => i.publicIp));
-
-    this.registerOutputs({
-      compartmentId: this.compartmentId,
-      subnetId: this.subnetId,
-      instanceConfigurationId: this.instanceConfigurationId,
-      infraEnvs: this.infraEnvs,
-      workerImageRegistries: this.workerImageRegistries,
-      osImageId: this.osImageId,
-      cwasmBucket: this.cwasmBucket,
-      queue: this.queue,
-      sshPublicKey: this.sshPublicKey,
-      sshPrivateKey: this.sshPrivateKey,
-      instanceIds: this.instanceIds,
-      publicIps: this.publicIps,
-    });
+    return instances;
   }
 }
 

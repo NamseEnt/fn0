@@ -124,274 +124,236 @@ fn generate_ts_file_content(
     file_content
 }
 
-impl Callbacks for Analyzer {
-    fn after_analysis<'tcx>(&mut self, _compiler: &Compiler, tcx: TyCtxt<'tcx>) -> Compilation {
-        let items = tcx.hir_crate_items(());
-        let page_modules = Mutex::new(Vec::new());
-        let _ = items.par_items(|item_id| {
-            let owner_id = item_id.owner_id;
-            let def_id: DefId = owner_id.to_def_id();
-            if tcx.def_kind(def_id) == DefKind::Mod {
-                let span = get_module_actual_span(tcx, def_id);
-                let source_map = tcx.sess.source_map();
-                let filename = source_map.span_to_filename(span);
-                if let rustc_span::FileName::Real(path) = filename
-                    && let Some(local_path) = path.into_local_path()
-                {
-                    let path_str = local_path.to_string_lossy();
-                    if path_str.contains("src/pages") {
-                        let is_mod_rs = path_str.ends_with("mod.rs");
-                        let is_single_page_rs =
-                            !is_mod_rs && path_str.ends_with(".rs") && !path_str.contains("/api/");
+fn filename_to_path_string(filename: &rustc_span::FileName) -> String {
+    if let rustc_span::FileName::Real(path) = filename {
+        path.clone()
+            .into_local_path()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| format!("{:?}", filename))
+    } else {
+        format!("{:?}", filename)
+    }
+}
 
-                        if is_mod_rs || is_single_page_rs {
-                            let path_parts: Vec<&str> = path_str.split('/').collect();
-                            let src_pages_idx = path_parts.iter().position(|&p| p == "pages");
-                            if let Some(idx) = src_pages_idx {
-                                let after_pages = if is_mod_rs {
-                                    &path_parts[idx + 1..path_parts.len() - 1]
-                                } else {
-                                    &path_parts[idx + 1..path_parts.len()]
-                                };
-                                if after_pages.len() <= 2 {
-                                    let mut modules = page_modules.lock().unwrap();
-                                    modules.push(def_id);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(())
-        });
-        let source_map = tcx.sess.source_map();
-        let modules = page_modules.lock().unwrap();
-        for def_id in modules.iter() {
-            let def_id = *def_id;
+fn filename_to_local_path(filename: &rustc_span::FileName) -> Option<String> {
+    if let rustc_span::FileName::Real(path) = filename {
+        path.clone()
+            .into_local_path()
+            .map(|p| p.to_string_lossy().to_string())
+    } else {
+        None
+    }
+}
+
+fn discover_module_paths<'tcx>(tcx: TyCtxt<'tcx>) -> Vec<(DefId, String)> {
+    let items = tcx.hir_crate_items(());
+    let modules = Mutex::new(Vec::new());
+    let _ = items.par_items(|item_id| {
+        let owner_id = item_id.owner_id;
+        let def_id: DefId = owner_id.to_def_id();
+        if tcx.def_kind(def_id) == DefKind::Mod {
             let span = get_module_actual_span(tcx, def_id);
+            let source_map = tcx.sess.source_map();
             let filename = source_map.span_to_filename(span);
-            if let rustc_span::FileName::Real(ref path) = filename
-                && let Some(local_path) = path.clone().into_local_path()
+            if let rustc_span::FileName::Real(path) = filename
+                && let Some(local_path) = path.into_local_path()
             {
-                let path_str = local_path.to_string_lossy();
-                println!("Found: {}", path_str);
-            }
-            let local_def_id = match def_id.as_local() {
-                Some(id) => id,
-                None => continue,
-            };
-            let hir_id = tcx.local_def_id_to_hir_id(local_def_id);
-            let filename = source_map.span_to_filename(span);
-            let mut handler_found = false;
-            let mut props_def_id: Option<DefId> = None;
-            let mut props_kind: Option<DefKind> = None;
-
-            if let rustc_hir::Node::Item(item) = tcx.hir_node(hir_id)
-                && let rustc_hir::ItemKind::Mod(_, mod_ref) = &item.kind
-            {
-                for item_id in mod_ref.item_ids {
-                    let item_hir_id = item_id.hir_id();
-                    if let rustc_hir::Node::Item(child_item) = tcx.hir_node(item_hir_id) {
-                        let child_def_id = child_item.owner_id.to_def_id();
-                        let item_name_str = tcx.def_path_str(child_def_id);
-                        if let Some((_, name)) = item_name_str.rsplit_once("::") {
-                            if name == "handler" {
-                                if tcx.def_kind(child_def_id) == DefKind::Fn {
-                                    if matches!(tcx.visibility(child_def_id), Visibility::Public) {
-                                        handler_found = true;
-                                    } else {
-                                        let path_str = if let rustc_span::FileName::Real(ref path) =
-                                            filename
-                                        {
-                                            path.clone()
-                                                .into_local_path()
-                                                .map(|p| p.to_string_lossy().to_string())
-                                                .unwrap_or_else(|| format!("{:?}", filename))
-                                        } else {
-                                            format!("{:?}", filename)
-                                        };
-                                        eprintln!("Error: handler in {} must be public", path_str);
-                                        std::process::exit(1);
-                                    }
-                                }
-                            } else if name == "Props" {
-                                let item_def_kind = tcx.def_kind(child_def_id);
-                                if item_def_kind == DefKind::Struct
-                                    || item_def_kind == DefKind::Enum
-                                    || item_def_kind == DefKind::TyAlias
-                                {
-                                    props_def_id = Some(child_def_id);
-                                    props_kind = Some(item_def_kind);
-                                } else {
-                                    let path_str =
-                                        if let rustc_span::FileName::Real(ref path) = filename {
-                                            path.clone()
-                                                .into_local_path()
-                                                .map(|p| p.to_string_lossy().to_string())
-                                                .unwrap_or_else(|| format!("{:?}", filename))
-                                        } else {
-                                            format!("{:?}", filename)
-                                        };
-                                    eprintln!(
-                                        "Error: Props in {} must be a struct, enum, or type alias",
-                                        path_str
-                                    );
-                                    std::process::exit(1);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if !handler_found {
-                let span = get_module_actual_span(tcx, def_id);
-                let filename = source_map.span_to_filename(span);
-                let path_str = if let rustc_span::FileName::Real(ref path) = filename {
-                    path.clone()
-                        .into_local_path()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_else(|| format!("{:?}", filename))
-                } else {
-                    format!("{:?}", filename)
-                };
-                eprintln!("Error: handler not found or not public in {}", path_str);
-                std::process::exit(1);
-            }
-            if let Some(props_id) = props_def_id {
-                let props_ty = tcx.type_of(props_id).instantiate_identity();
-                let props_ty_str = format!("{:?}", props_ty);
-                if props_ty_str.contains("Redirect") {
-                    continue;
-                }
-
-                let kind_name = match props_kind {
-                    Some(DefKind::Struct) => "struct",
-                    Some(DefKind::Enum) => "enum",
-                    Some(DefKind::TyAlias) => "alias",
-                    _ => "unknown",
-                };
-                let span = get_module_actual_span(tcx, def_id);
-                let filename = source_map.span_to_filename(span);
-                let rust_source_path = if let rustc_span::FileName::Real(ref path) = filename
-                    && let Some(local_path) = path.clone().into_local_path()
-                {
-                    local_path.to_string_lossy().to_string()
-                } else {
-                    format!("{:?}", filename)
-                };
-
-                println!("{} -> Props ({})", rust_source_path, kind_name);
-
-                let mut converter = TypeConverter::new(tcx);
-                let context = format!("{:?}", filename);
-                let mut ts_type = converter.convert_type(props_ty, &context);
-                let name_map = resolve_type_names(&converter.definitions);
-
-                for def in &mut converter.definitions {
-                    if let Some(resolved) = name_map.get(&def.full_path) {
-                        def.namespace = resolved.namespace.clone();
-                        def.type_name = resolved.type_name.clone();
-                    }
-                }
-
-                for def in &mut converter.definitions {
-                    apply_name_resolution_to_type(&mut def.ty, &name_map);
-                }
-
-                apply_name_resolution_to_type(&mut ts_type, &name_map);
-
-                if let TsType::Reference(ref root_ref_string) = ts_type {
-                    let found_idx = converter.definitions.iter().position(|def| {
-                        let def_ref = if def.namespace.is_empty() {
-                            def.type_name.clone()
-                        } else {
-                            format!("{}.{}", def.namespace.join("."), def.type_name)
-                        };
-                        &def_ref == root_ref_string
-                    });
-
-                    if let Some(idx) = found_idx {
-                        let root_def = converter.definitions.remove(idx);
-                        ts_type = root_def.ty;
-                    }
-                }
-
-                let file_content =
-                    generate_ts_file_content(&rust_source_path, &ts_type, &converter.definitions);
-
-                println!("self.ts_output_dir: {}", self.ts_output_dir);
-
-                let ts_output_path =
-                    convert_rust_path_to_ts_path(&rust_source_path, &self.ts_output_dir);
-
-                if let Some(parent) = ts_output_path.parent()
-                    && let Err(e) = std::fs::create_dir_all(parent)
-                {
-                    eprintln!("Error creating directory {}: {}", parent.display(), e);
-                    std::process::exit(1);
-                }
-
-                if let Err(e) = std::fs::write(&ts_output_path, &file_content) {
-                    eprintln!("Error writing file {}: {}", ts_output_path.display(), e);
-                    std::process::exit(1);
-                }
-
-                println!(
-                    "Generated: {} -> {}",
-                    rust_source_path,
-                    ts_output_path.canonicalize().unwrap().display()
-                );
-            } else {
-                let span = get_module_actual_span(tcx, def_id);
-                let filename = source_map.span_to_filename(span);
-                let path_str = if let rustc_span::FileName::Real(ref path) = filename {
-                    path.clone()
-                        .into_local_path()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_else(|| format!("{:?}", filename))
-                } else {
-                    format!("{:?}", filename)
-                };
-                eprintln!("Error: Props not found in {}", path_str);
-                std::process::exit(1);
+                let path_str = local_path.to_string_lossy().to_string();
+                let mut modules = modules.lock().unwrap();
+                modules.push((def_id, path_str));
             }
         }
+        Ok(())
+    });
+    modules.into_inner().unwrap()
+}
 
-        // Process hooks
-        let hook_modules = Mutex::new(Vec::new());
-        let _ = items.par_items(|item_id| {
-            let owner_id = item_id.owner_id;
-            let def_id: DefId = owner_id.to_def_id();
-            if tcx.def_kind(def_id) == DefKind::Mod {
-                let span = get_module_actual_span(tcx, def_id);
-                let source_map = tcx.sess.source_map();
-                let filename = source_map.span_to_filename(span);
-                if let rustc_span::FileName::Real(path) = filename
-                    && let Some(local_path) = path.into_local_path()
-                {
-                    let path_str = local_path.to_string_lossy();
-                    if path_str.contains("src/hooks/")
-                        && path_str.ends_with(".rs")
-                        && !path_str.ends_with("mod.rs")
-                    {
-                        let mut modules = hook_modules.lock().unwrap();
-                        modules.push(def_id);
+fn is_page_path(path_str: &str) -> bool {
+    if !path_str.contains("src/pages") {
+        return false;
+    }
+    let is_mod_rs = path_str.ends_with("mod.rs");
+    let is_single_page_rs =
+        !is_mod_rs && path_str.ends_with(".rs") && !path_str.contains("/api/");
+    if !is_mod_rs && !is_single_page_rs {
+        return false;
+    }
+    let path_parts: Vec<&str> = path_str.split('/').collect();
+    let Some(idx) = path_parts.iter().position(|&p| p == "pages") else {
+        return false;
+    };
+    let after_pages = if is_mod_rs {
+        &path_parts[idx + 1..path_parts.len() - 1]
+    } else {
+        &path_parts[idx + 1..path_parts.len()]
+    };
+    after_pages.len() <= 2
+}
+
+fn is_hook_path(path_str: &str) -> bool {
+    path_str.contains("src/hooks/")
+        && path_str.ends_with(".rs")
+        && !path_str.ends_with("mod.rs")
+}
+
+fn is_action_path(path_str: &str) -> bool {
+    path_str.contains("src/actions/")
+        && path_str.ends_with(".rs")
+        && !path_str.ends_with("mod.rs")
+}
+
+fn scan_io_module<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    hir_id: rustc_hir::HirId,
+) -> (bool, Option<DefId>, Option<DefId>) {
+    let mut input_def_id: Option<DefId> = None;
+    let mut output_def_id: Option<DefId> = None;
+    let mut handler_found = false;
+
+    if let rustc_hir::Node::Item(item) = tcx.hir_node(hir_id)
+        && let rustc_hir::ItemKind::Mod(_, mod_ref) = &item.kind
+    {
+        for item_id in mod_ref.item_ids {
+            let item_hir_id = item_id.hir_id();
+            if let rustc_hir::Node::Item(child_item) = tcx.hir_node(item_hir_id) {
+                let child_def_id = child_item.owner_id.to_def_id();
+                let item_name_str = tcx.def_path_str(child_def_id);
+                if let Some((_, name)) = item_name_str.rsplit_once("::") {
+                    match name {
+                        "Input" => {
+                            let kind = tcx.def_kind(child_def_id);
+                            if kind == DefKind::Struct {
+                                input_def_id = Some(child_def_id);
+                            }
+                        }
+                        "Output" => {
+                            let kind = tcx.def_kind(child_def_id);
+                            if kind == DefKind::Struct || kind == DefKind::Enum {
+                                output_def_id = Some(child_def_id);
+                            }
+                        }
+                        "handler" => {
+                            if tcx.def_kind(child_def_id) == DefKind::Fn
+                                && matches!(tcx.visibility(child_def_id), Visibility::Public)
+                            {
+                                handler_found = true;
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
-            Ok(())
-        });
+        }
+    }
 
-        let hook_modules = hook_modules.lock().unwrap();
-        for def_id in hook_modules.iter() {
-            let def_id = *def_id;
+    (handler_found, input_def_id, output_def_id)
+}
+
+fn scan_page_module<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    hir_id: rustc_hir::HirId,
+    filename: &rustc_span::FileName,
+) -> (bool, Option<DefId>, Option<DefKind>) {
+    let mut handler_found = false;
+    let mut props_def_id: Option<DefId> = None;
+    let mut props_kind: Option<DefKind> = None;
+
+    if let rustc_hir::Node::Item(item) = tcx.hir_node(hir_id)
+        && let rustc_hir::ItemKind::Mod(_, mod_ref) = &item.kind
+    {
+        for item_id in mod_ref.item_ids {
+            let item_hir_id = item_id.hir_id();
+            if let rustc_hir::Node::Item(child_item) = tcx.hir_node(item_hir_id) {
+                let child_def_id = child_item.owner_id.to_def_id();
+                let item_name_str = tcx.def_path_str(child_def_id);
+                if let Some((_, name)) = item_name_str.rsplit_once("::") {
+                    if name == "handler" {
+                        if tcx.def_kind(child_def_id) == DefKind::Fn {
+                            if matches!(tcx.visibility(child_def_id), Visibility::Public) {
+                                handler_found = true;
+                            } else {
+                                eprintln!(
+                                    "Error: handler in {} must be public",
+                                    filename_to_path_string(filename)
+                                );
+                                std::process::exit(1);
+                            }
+                        }
+                    } else if name == "Props" {
+                        let item_def_kind = tcx.def_kind(child_def_id);
+                        if item_def_kind == DefKind::Struct
+                            || item_def_kind == DefKind::Enum
+                            || item_def_kind == DefKind::TyAlias
+                        {
+                            props_def_id = Some(child_def_id);
+                            props_kind = Some(item_def_kind);
+                        } else {
+                            eprintln!(
+                                "Error: Props in {} must be a struct, enum, or type alias",
+                                filename_to_path_string(filename)
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (handler_found, props_def_id, props_kind)
+}
+
+fn resolve_names(converter: &mut TypeConverter<'_>, root_types: Vec<&mut TsType>) {
+    let name_map = resolve_type_names(&converter.definitions);
+
+    for def in &mut converter.definitions {
+        if let Some(resolved) = name_map.get(&def.full_path) {
+            def.namespace = resolved.namespace.clone();
+            def.type_name = resolved.type_name.clone();
+        }
+    }
+
+    for def in &mut converter.definitions {
+        apply_name_resolution_to_type(&mut def.ty, &name_map);
+    }
+
+    for ty in root_types {
+        apply_name_resolution_to_type(ty, &name_map);
+    }
+}
+
+fn inline_root_reference(definitions: &mut Vec<TsDefinition>, ts_type: &mut TsType) {
+    let TsType::Reference(root_ref_string) = &*ts_type else {
+        return;
+    };
+    let found_idx = definitions.iter().position(|def| {
+        let def_ref = if def.namespace.is_empty() {
+            def.type_name.clone()
+        } else {
+            format!("{}.{}", def.namespace.join("."), def.type_name)
+        };
+        &def_ref == root_ref_string
+    });
+    if let Some(idx) = found_idx {
+        let root_def = definitions.remove(idx);
+        *ts_type = root_def.ty;
+    }
+}
+
+impl Analyzer {
+    fn process_pages<'tcx>(&self, tcx: TyCtxt<'tcx>) {
+        let modules: Vec<DefId> = discover_module_paths(tcx)
+            .into_iter()
+            .filter(|(_, path_str)| is_page_path(path_str))
+            .map(|(def_id, _)| def_id)
+            .collect();
+
+        let source_map = tcx.sess.source_map();
+        for def_id in modules {
             let span = get_module_actual_span(tcx, def_id);
             let filename = source_map.span_to_filename(span);
-            if let rustc_span::FileName::Real(ref path) = filename
-                && let Some(local_path) = path.clone().into_local_path()
-            {
-                let path_str = local_path.to_string_lossy();
-                println!("Found hook: {}", path_str);
+            if let Some(path) = filename_to_local_path(&filename) {
+                println!("Found: {}", path);
             }
 
             let local_def_id = match def_id.as_local() {
@@ -400,48 +362,97 @@ impl Callbacks for Analyzer {
             };
             let hir_id = tcx.local_def_id_to_hir_id(local_def_id);
 
-            let mut input_def_id: Option<DefId> = None;
-            let mut output_def_id: Option<DefId> = None;
-            let mut handler_found = false;
+            let (handler_found, props_def_id, props_kind) =
+                scan_page_module(tcx, hir_id, &filename);
 
-            if let rustc_hir::Node::Item(item) = tcx.hir_node(hir_id)
-                && let rustc_hir::ItemKind::Mod(_, mod_ref) = &item.kind
-            {
-                for item_id in mod_ref.item_ids {
-                    let item_hir_id = item_id.hir_id();
-                    if let rustc_hir::Node::Item(child_item) = tcx.hir_node(item_hir_id) {
-                        let child_def_id = child_item.owner_id.to_def_id();
-                        let item_name_str = tcx.def_path_str(child_def_id);
-                        if let Some((_, name)) = item_name_str.rsplit_once("::") {
-                            match name {
-                                "Input" => {
-                                    let kind = tcx.def_kind(child_def_id);
-                                    if kind == DefKind::Struct {
-                                        input_def_id = Some(child_def_id);
-                                    }
-                                }
-                                "Output" => {
-                                    let kind = tcx.def_kind(child_def_id);
-                                    if kind == DefKind::Struct || kind == DefKind::Enum {
-                                        output_def_id = Some(child_def_id);
-                                    }
-                                }
-                                "handler" => {
-                                    if tcx.def_kind(child_def_id) == DefKind::Fn
-                                        && matches!(
-                                            tcx.visibility(child_def_id),
-                                            Visibility::Public
-                                        )
-                                    {
-                                        handler_found = true;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
+            if !handler_found {
+                eprintln!(
+                    "Error: handler not found or not public in {}",
+                    filename_to_path_string(&filename)
+                );
+                std::process::exit(1);
             }
+
+            let Some(props_id) = props_def_id else {
+                eprintln!(
+                    "Error: Props not found in {}",
+                    filename_to_path_string(&filename)
+                );
+                std::process::exit(1);
+            };
+
+            let props_ty = tcx.type_of(props_id).instantiate_identity();
+            let props_ty_str = format!("{:?}", props_ty);
+            if props_ty_str.contains("Redirect") {
+                continue;
+            }
+
+            let kind_name = match props_kind {
+                Some(DefKind::Struct) => "struct",
+                Some(DefKind::Enum) => "enum",
+                Some(DefKind::TyAlias) => "alias",
+                _ => "unknown",
+            };
+            let rust_source_path = filename_to_path_string(&filename);
+
+            println!("{} -> Props ({})", rust_source_path, kind_name);
+
+            let mut converter = TypeConverter::new(tcx);
+            let context = format!("{:?}", filename);
+            let mut ts_type = converter.convert_type(props_ty, &context);
+            resolve_names(&mut converter, vec![&mut ts_type]);
+            inline_root_reference(&mut converter.definitions, &mut ts_type);
+
+            let file_content =
+                generate_ts_file_content(&rust_source_path, &ts_type, &converter.definitions);
+
+            println!("self.ts_output_dir: {}", self.ts_output_dir);
+
+            let ts_output_path =
+                convert_rust_path_to_ts_path(&rust_source_path, &self.ts_output_dir);
+
+            if let Some(parent) = ts_output_path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                eprintln!("Error creating directory {}: {}", parent.display(), e);
+                std::process::exit(1);
+            }
+
+            if let Err(e) = std::fs::write(&ts_output_path, &file_content) {
+                eprintln!("Error writing file {}: {}", ts_output_path.display(), e);
+                std::process::exit(1);
+            }
+
+            println!(
+                "Generated: {} -> {}",
+                rust_source_path,
+                ts_output_path.canonicalize().unwrap().display()
+            );
+        }
+    }
+
+    fn process_hooks<'tcx>(&self, tcx: TyCtxt<'tcx>) {
+        let modules: Vec<DefId> = discover_module_paths(tcx)
+            .into_iter()
+            .filter(|(_, path_str)| is_hook_path(path_str))
+            .map(|(def_id, _)| def_id)
+            .collect();
+
+        let source_map = tcx.sess.source_map();
+        for def_id in modules {
+            let span = get_module_actual_span(tcx, def_id);
+            let filename = source_map.span_to_filename(span);
+            if let Some(path) = filename_to_local_path(&filename) {
+                println!("Found hook: {}", path);
+            }
+
+            let local_def_id = match def_id.as_local() {
+                Some(id) => id,
+                None => continue,
+            };
+            let hir_id = tcx.local_def_id_to_hir_id(local_def_id);
+
+            let (handler_found, input_def_id, output_def_id) = scan_io_module(tcx, hir_id);
 
             if !handler_found || input_def_id.is_none() || output_def_id.is_none() {
                 continue;
@@ -450,12 +461,9 @@ impl Callbacks for Analyzer {
             let input_id = input_def_id.unwrap();
             let output_id = output_def_id.unwrap();
 
-            let rust_source_path = if let rustc_span::FileName::Real(ref path) = filename
-                && let Some(local_path) = path.clone().into_local_path()
-            {
-                local_path.to_string_lossy().to_string()
-            } else {
-                continue;
+            let rust_source_path = match filename_to_local_path(&filename) {
+                Some(p) => p,
+                None => continue,
             };
 
             let hook_name = rust_source_path
@@ -472,51 +480,13 @@ impl Callbacks for Analyzer {
             let output_ty = tcx.type_of(output_id).instantiate_identity();
             let mut output_ts_type = converter.convert_type(output_ty, &rust_source_path);
 
-            let name_map = resolve_type_names(&converter.definitions);
+            resolve_names(
+                &mut converter,
+                vec![&mut input_ts_type, &mut output_ts_type],
+            );
 
-            for def in &mut converter.definitions {
-                if let Some(resolved) = name_map.get(&def.full_path) {
-                    def.namespace = resolved.namespace.clone();
-                    def.type_name = resolved.type_name.clone();
-                }
-            }
-
-            for def in &mut converter.definitions {
-                apply_name_resolution_to_type(&mut def.ty, &name_map);
-            }
-
-            apply_name_resolution_to_type(&mut input_ts_type, &name_map);
-            apply_name_resolution_to_type(&mut output_ts_type, &name_map);
-
-            if let TsType::Reference(ref root_ref_string) = input_ts_type {
-                let found_idx = converter.definitions.iter().position(|def| {
-                    let def_ref = if def.namespace.is_empty() {
-                        def.type_name.clone()
-                    } else {
-                        format!("{}.{}", def.namespace.join("."), def.type_name)
-                    };
-                    &def_ref == root_ref_string
-                });
-                if let Some(idx) = found_idx {
-                    let root_def = converter.definitions.remove(idx);
-                    input_ts_type = root_def.ty;
-                }
-            }
-
-            if let TsType::Reference(ref root_ref_string) = output_ts_type {
-                let found_idx = converter.definitions.iter().position(|def| {
-                    let def_ref = if def.namespace.is_empty() {
-                        def.type_name.clone()
-                    } else {
-                        format!("{}.{}", def.namespace.join("."), def.type_name)
-                    };
-                    &def_ref == root_ref_string
-                });
-                if let Some(idx) = found_idx {
-                    let root_def = converter.definitions.remove(idx);
-                    output_ts_type = root_def.ty;
-                }
-            }
+            inline_root_reference(&mut converter.definitions, &mut input_ts_type);
+            inline_root_reference(&mut converter.definitions, &mut output_ts_type);
 
             let file_content = generate_hook_file_content(
                 &rust_source_path,
@@ -552,44 +522,23 @@ impl Callbacks for Analyzer {
                 output_path.canonicalize().unwrap().display()
             );
         }
+    }
 
-        // Process actions
-        let action_modules = Mutex::new(Vec::new());
-        let _ = items.par_items(|item_id| {
-            let owner_id = item_id.owner_id;
-            let def_id: DefId = owner_id.to_def_id();
-            if tcx.def_kind(def_id) == DefKind::Mod {
-                let span = get_module_actual_span(tcx, def_id);
-                let source_map = tcx.sess.source_map();
-                let filename = source_map.span_to_filename(span);
-                if let rustc_span::FileName::Real(path) = filename
-                    && let Some(local_path) = path.into_local_path()
-                {
-                    let path_str = local_path.to_string_lossy();
-                    if path_str.contains("src/actions/")
-                        && path_str.ends_with(".rs")
-                        && !path_str.ends_with("mod.rs")
-                    {
-                        let mut modules = action_modules.lock().unwrap();
-                        modules.push(def_id);
-                    }
-                }
-            }
-            Ok(())
-        });
+    fn process_actions<'tcx>(&self, tcx: TyCtxt<'tcx>) {
+        let modules: Vec<DefId> = discover_module_paths(tcx)
+            .into_iter()
+            .filter(|(_, path_str)| is_action_path(path_str))
+            .map(|(def_id, _)| def_id)
+            .collect();
 
-        let action_modules = action_modules.lock().unwrap();
+        let source_map = tcx.sess.source_map();
         let mut action_names: Vec<String> = Vec::new();
 
-        for def_id in action_modules.iter() {
-            let def_id = *def_id;
+        for def_id in modules {
             let span = get_module_actual_span(tcx, def_id);
             let filename = source_map.span_to_filename(span);
-            if let rustc_span::FileName::Real(ref path) = filename
-                && let Some(local_path) = path.clone().into_local_path()
-            {
-                let path_str = local_path.to_string_lossy();
-                println!("Found action: {}", path_str);
+            if let Some(path) = filename_to_local_path(&filename) {
+                println!("Found action: {}", path);
             }
 
             let local_def_id = match def_id.as_local() {
@@ -598,48 +547,7 @@ impl Callbacks for Analyzer {
             };
             let hir_id = tcx.local_def_id_to_hir_id(local_def_id);
 
-            let mut input_def_id: Option<DefId> = None;
-            let mut output_def_id: Option<DefId> = None;
-            let mut handler_found = false;
-
-            if let rustc_hir::Node::Item(item) = tcx.hir_node(hir_id)
-                && let rustc_hir::ItemKind::Mod(_, mod_ref) = &item.kind
-            {
-                for item_id in mod_ref.item_ids {
-                    let item_hir_id = item_id.hir_id();
-                    if let rustc_hir::Node::Item(child_item) = tcx.hir_node(item_hir_id) {
-                        let child_def_id = child_item.owner_id.to_def_id();
-                        let item_name_str = tcx.def_path_str(child_def_id);
-                        if let Some((_, name)) = item_name_str.rsplit_once("::") {
-                            match name {
-                                "Input" => {
-                                    let kind = tcx.def_kind(child_def_id);
-                                    if kind == DefKind::Struct {
-                                        input_def_id = Some(child_def_id);
-                                    }
-                                }
-                                "Output" => {
-                                    let kind = tcx.def_kind(child_def_id);
-                                    if kind == DefKind::Struct || kind == DefKind::Enum {
-                                        output_def_id = Some(child_def_id);
-                                    }
-                                }
-                                "handler" => {
-                                    if tcx.def_kind(child_def_id) == DefKind::Fn
-                                        && matches!(
-                                            tcx.visibility(child_def_id),
-                                            Visibility::Public
-                                        )
-                                    {
-                                        handler_found = true;
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-            }
+            let (handler_found, input_def_id, output_def_id) = scan_io_module(tcx, hir_id);
 
             if !handler_found || input_def_id.is_none() || output_def_id.is_none() {
                 continue;
@@ -648,12 +556,9 @@ impl Callbacks for Analyzer {
             let input_id = input_def_id.unwrap();
             let output_id = output_def_id.unwrap();
 
-            let rust_source_path = if let rustc_span::FileName::Real(ref path) = filename
-                && let Some(local_path) = path.clone().into_local_path()
-            {
-                local_path.to_string_lossy().to_string()
-            } else {
-                continue;
+            let rust_source_path = match filename_to_local_path(&filename) {
+                Some(p) => p,
+                None => continue,
             };
 
             let action_name = rust_source_path
@@ -672,51 +577,13 @@ impl Callbacks for Analyzer {
             let output_ty = tcx.type_of(output_id).instantiate_identity();
             let mut output_ts_type = converter.convert_type(output_ty, &rust_source_path);
 
-            let name_map = resolve_type_names(&converter.definitions);
+            resolve_names(
+                &mut converter,
+                vec![&mut input_ts_type, &mut output_ts_type],
+            );
 
-            for def in &mut converter.definitions {
-                if let Some(resolved) = name_map.get(&def.full_path) {
-                    def.namespace = resolved.namespace.clone();
-                    def.type_name = resolved.type_name.clone();
-                }
-            }
-
-            for def in &mut converter.definitions {
-                apply_name_resolution_to_type(&mut def.ty, &name_map);
-            }
-
-            apply_name_resolution_to_type(&mut input_ts_type, &name_map);
-            apply_name_resolution_to_type(&mut output_ts_type, &name_map);
-
-            if let TsType::Reference(ref root_ref_string) = input_ts_type {
-                let found_idx = converter.definitions.iter().position(|def| {
-                    let def_ref = if def.namespace.is_empty() {
-                        def.type_name.clone()
-                    } else {
-                        format!("{}.{}", def.namespace.join("."), def.type_name)
-                    };
-                    &def_ref == root_ref_string
-                });
-                if let Some(idx) = found_idx {
-                    let root_def = converter.definitions.remove(idx);
-                    input_ts_type = root_def.ty;
-                }
-            }
-
-            if let TsType::Reference(ref root_ref_string) = output_ts_type {
-                let found_idx = converter.definitions.iter().position(|def| {
-                    let def_ref = if def.namespace.is_empty() {
-                        def.type_name.clone()
-                    } else {
-                        format!("{}.{}", def.namespace.join("."), def.type_name)
-                    };
-                    &def_ref == root_ref_string
-                });
-                if let Some(idx) = found_idx {
-                    let root_def = converter.definitions.remove(idx);
-                    output_ts_type = root_def.ty;
-                }
-            }
+            inline_root_reference(&mut converter.definitions, &mut input_ts_type);
+            inline_root_reference(&mut converter.definitions, &mut output_ts_type);
 
             let file_content = generate_action_file_content(
                 &rust_source_path,
@@ -749,7 +616,6 @@ impl Callbacks for Analyzer {
             );
         }
 
-        // Generate actions index.ts
         if !action_names.is_empty() {
             let index_content = generate_actions_index(&action_names);
             let mut index_path = PathBuf::from(&self.actions_output_dir);
@@ -769,7 +635,14 @@ impl Callbacks for Analyzer {
 
             println!("Generated actions index: {}", index_path.display());
         }
+    }
+}
 
+impl Callbacks for Analyzer {
+    fn after_analysis<'tcx>(&mut self, _compiler: &Compiler, tcx: TyCtxt<'tcx>) -> Compilation {
+        self.process_pages(tcx);
+        self.process_hooks(tcx);
+        self.process_actions(tcx);
         Compilation::Stop
     }
 }

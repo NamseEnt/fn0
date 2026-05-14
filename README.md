@@ -74,7 +74,7 @@ fn0 does not enforce this contract at runtime. Violating it will produce request
 
 - Monolith architecture
 - Load Balancing and Auto Scaling is provided by the cloud provider.
-- When instance started, it runs Cloud Provider's Instance Discovery API to bootstrap, then use [membership](https://github.com/al8n/memberlist.git) to form a cluster.
+- When instance started, it runs Cloud Provider's Instance Discovery API to bootstrap.
 - On user request;
   1. Instance finds [two](https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf) warmed up instances and forwards the request to less loaded instance.
   2. If forwarding is rejected, instance trys one more time.

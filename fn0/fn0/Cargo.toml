@@ -19,7 +19,6 @@ http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["server", "client", "http1", "http2"] }
 hyper-rustls = { workspace = true }
 hyper-util = { workspace = true, features = ["service", "client", "client-legacy", "http1", "http2", "tokio"] }
-memberlist = { workspace = true }
 oci-rust-sdk = { workspace = true }
 opentelemetry = { workspace = true, features = ["logs", "metrics"] }
 opentelemetry-otlp = { workspace = true, features = [
