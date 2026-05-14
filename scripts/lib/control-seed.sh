@@ -140,18 +140,76 @@ seed_compiled_bundle() {
 
 seed_worker_manifest() {
   local db_url="$1" db_token="$2" project_id="$3" code_version="$4" custom_domain="$5"
+  # Read existing manifest (if any), upsert this project's entry while
+  # preserving every other project's entry, then write back. The previous
+  # implementation overwrote the whole doc with a single-entry manifest, so
+  # any second invocation evicted every other project from worker routing.
+  # `bootstrap-fn0-control.sh` is called for redeploys too, so this MUST be
+  # idempotent without dropping siblings.
+  #
   # manifest_version must monotonically increase across runs; worker's
   # manifest_poller dedupes on it and would skip a new bundle otherwise.
-  # code_version is already epoch-seconds at bootstrap time, so reuse it.
-  local data
-  data="$(jq -nc \
-    --argjson mv "$code_version" \
+  local https_url existing_data merged data
+  https_url="${db_url/libsql:\/\//https://}"
+  https_url="${https_url%/}"
+
+  existing_data="$(__select_doc_data "$https_url" "$db_token" "WorkerManifestDoc" "")"
+  if [[ -z "$existing_data" ]]; then
+    existing_data='{"manifest_version":0,"project_manifests":{}}'
+  fi
+
+  merged="$(jq -c \
     --arg pid "$project_id" \
     --argjson cv "$code_version" \
     --arg dom "$custom_domain" \
-    '{manifest_version:$mv, project_manifests:{($pid):{code_version:$cv, custom_domain:$dom}}}')"
-  echo ">> seed WorkerManifestDoc project=${project_id} domain=${custom_domain} manifest_version=${code_version}"
-  __upsert_doc "$db_url" "$db_token" "WorkerManifestDoc" "" "$data"
+    --argjson floor "$code_version" '
+      .project_manifests[$pid] = {code_version:$cv, custom_domain:(if $dom == "" then null else $dom end)}
+      | .manifest_version = ([(.manifest_version // 0) + 1, $floor] | max)
+    ' <<<"$existing_data")"
+
+  local mv
+  mv="$(jq -r '.manifest_version' <<<"$merged")"
+  echo ">> seed WorkerManifestDoc project=${project_id} domain=${custom_domain:-<none>} manifest_version=${mv} (siblings preserved)"
+  __upsert_doc "$db_url" "$db_token" "WorkerManifestDoc" "" "$merged"
+}
+
+# __select_doc_data <https_url> <db_token> <pk> <sk>
+# Echoes the doc's data column as utf-8 JSON, or empty string if no row.
+__select_doc_data() {
+  local url="$1" token="$2" pk="$3" sk="$4"
+  local sql="SELECT data FROM docs WHERE pk = ? AND sk = ?"
+  local req resp_file http_code
+  req="$(jq -nc --arg sql "$sql" --arg pk "$pk" --arg sk "$sk" '{requests:[
+    {type:"execute",stmt:{sql:$sql,args:[
+      {type:"text",value:$pk},
+      {type:"text",value:$sk}
+    ]}},
+    {type:"close"}
+  ]}')"
+  resp_file="$(mktemp)"
+  http_code="$(curl -sS -o "$resp_file" -w '%{http_code}' \
+    -X POST "${url}/v2/pipeline" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    --data "$req")"
+  if [[ "$http_code" != "200" ]] || ! jq -e '.results[0].type == "ok"' <"$resp_file" >/dev/null 2>&1; then
+    cat "$resp_file" >&2
+    rm -f "$resp_file"
+    echo "__select_doc_data HTTP ${http_code}" >&2
+    return 1
+  fi
+  local cell_type cell_value
+  cell_type="$(jq -r '.results[0].response.result.rows[0][0].type // empty' <"$resp_file")"
+  if [[ -z "$cell_type" ]]; then
+    rm -f "$resp_file"
+    return 0
+  fi
+  if [[ "$cell_type" == "blob" ]]; then
+    jq -r '.results[0].response.result.rows[0][0].base64' <"$resp_file" | base64 -d
+  else
+    jq -r '.results[0].response.result.rows[0][0].value' <"$resp_file"
+  fi
+  rm -f "$resp_file"
 }
 
 seed_target_fn0_worker_config() {
