@@ -4,27 +4,19 @@
 # build_and_push_fn0_worker
 #   Idempotent. Publishes fn0-worker (skips if already), builds linux/arm64
 #   image, pushes to every registry in pulumi.workerImageRegistries (skip if
-#   remote config digest matches local), runs OCIR cleanup. Echoes the resulting
-#   image_ref (first registry) on stdout via FN0_WORKER_PUSHED_IMAGE_REF.
+#   remote config digest matches local). Echoes the resulting image_ref
+#   (first registry) on stdout via FN0_WORKER_PUSHED_IMAGE_REF.
 
 if [[ -n "${__FN0_WORKER_IMAGE_LOADED:-}" ]]; then
   return 0
 fi
 __FN0_WORKER_IMAGE_LOADED=1
 
-# shellcheck source=ocir-cleanup.sh
-source "${REPO_ROOT}/scripts/lib/ocir-cleanup.sh"
-
 build_and_push_fn0_worker() {
-  local registries_json worker_compartment_id
+  local registries_json
   registries_json="$(pulumi_pick_json workerImageRegistries)"
   if [[ -z "$registries_json" || "$registries_json" == "null" ]]; then
     echo "missing pulumi output: workerImageRegistries" >&2
-    return 1
-  fi
-  worker_compartment_id="$(pulumi_pick workerCompartmentId)"
-  if [[ -z "$worker_compartment_id" ]]; then
-    echo "missing pulumi output: workerCompartmentId" >&2
     return 1
   fi
 
@@ -129,14 +121,6 @@ build_and_push_fn0_worker() {
         cat "$inspect_log" >&2
         return 1
       fi
-    fi
-
-    if [[ "$url" == *oraclecloud.com* ]]; then
-      ocir_cleanup_keep_top_semver \
-        --registry-url   "$url" \
-        --repository     "$repo" \
-        --compartment-id "$worker_compartment_id" \
-        --keep           2 || echo "warn: cleanup failed for ${url}/${repo}" >&2
     fi
 
     if [[ -z "$first_image_ref" ]]; then
