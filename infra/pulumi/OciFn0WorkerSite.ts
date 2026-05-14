@@ -489,6 +489,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this, retainOnDelete: false },
     );
 
+    new oci.artifacts.ContainerRepository(
+      "worker-proxy-repo",
+      {
+        compartmentId: compartment.id,
+        displayName: pulumi.interpolate`fn0-worker-${compartmentSuffix}-proxy`,
+        isPublic: true,
+      },
+      { parent: this, retainOnDelete: false },
+    );
+
     const workerDockerUser = new oci.identity.User(
       "worker-docker-user",
       {
@@ -707,16 +717,22 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       ),
     };
 
-    // Mutable `:latest` tag — the pull poller inside the agent re-pulls and
-    // detects digest changes, then triggers soft restart. The build script
-    // (scripts/build-fn0-worker-agent.sh) pushes both `:VERSION` (immutable
-    // archive for rollback) and `:latest` (mutable, what the host pulls).
+    // Mutable tag: agent_image_pull_poller relies on `:latest` moving to a new
+    // digest to self-update.
     const agentImageRef = this.workerImageRegistries.apply((regs) => {
       if (regs.length === 0) {
         throw new Error("workerImageRegistries is empty");
       }
       const r = regs[0];
       return `${r.url}/${r.repository}-agent:latest`;
+    });
+
+    const proxyImageRef = this.workerImageRegistries.apply((regs) => {
+      if (regs.length === 0) {
+        throw new Error("workerImageRegistries is empty");
+      }
+      const r = regs[0];
+      return `${r.url}/${r.repository}-proxy:latest`;
     });
 
     const agentEnv = buildWorkerAgentEnv(args.workerAgentDocDb, args.workerDns);
@@ -734,9 +750,15 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       );
 
     const cloudInit = pulumi
-      .all([agentImageRef, agentEnv, workerEnv, alloyConfig])
-      .apply(([agentImageRef, agentEnv, workerEnv, alloyConfig]) =>
-        renderCloudInit(agentImageRef, agentEnv, workerEnv, alloyConfig),
+      .all([agentImageRef, proxyImageRef, agentEnv, workerEnv, alloyConfig])
+      .apply(([agentImageRef, proxyImageRef, agentEnv, workerEnv, alloyConfig]) =>
+        renderCloudInit(
+          agentImageRef,
+          proxyImageRef,
+          agentEnv,
+          workerEnv,
+          alloyConfig,
+        ),
       );
     const userData = cloudInit.apply((s) =>
       Buffer.from(s, "utf8").toString("base64"),
@@ -974,6 +996,7 @@ loki.write "default" {
 
 function renderCloudInit(
   agentImageRef: string,
+  proxyImageRef: string,
   agentEnv: { [k: string]: string },
   workerEnv: { [k: string]: string },
   alloyConfig: string,
@@ -983,15 +1006,6 @@ function renderCloudInit(
     FN0_WORKER_ENV_FILE: "/etc/fn0-worker-agent/worker-env",
   });
   const workerEnvFile = renderEnvFile(workerEnv);
-  // Agent runs as a rootless podman container under opc, talking back to opc's
-  // host podman socket via --remote --url to manage worker containers as siblings.
-  //
-  // agentImageRef points at a mutable tag (`:latest`). Restart=always +
-  // ExecStartPre `podman pull` means each restart re-resolves the digest. The
-  // agent's pull poller (agent_image_pull_poller.rs) detects digest changes at
-  // runtime and triggers soft shutdown; worker containers survive (Phase 1b)
-  // and the new agent adopts them (Phase 1a).
-  //
   // Hardcoded UID 1000: opc is always uid 1000 on Oracle Linux cloud images.
   const agentSystemdUnit = `[Unit]
 Description=fn0 worker agent
@@ -1008,10 +1022,34 @@ ExecStart=/usr/bin/podman run --name fn0-agent --rm \\
   -e FN0_WORKER_AGENT_PODMAN_REMOTE_URL=unix:///run/podman/podman.sock \\
   -e FN0_WORKER_AGENT_SOFT_SHUTDOWN_ON_SIGTERM=1 \\
   -e FN0_WORKER_AGENT_IMAGE_REF=${agentImageRef} \\
+  -e FN0_WORKER_AGENT_PROXY_TARGET_FILE=/etc/fn0-worker-proxy/target \\
   --env-file /etc/fn0-worker-agent/env \\
   -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock \\
+  -v /etc/fn0-worker-proxy:/etc/fn0-worker-proxy \\
   ${agentImageRef}
 ExecStop=/usr/bin/podman stop -t 30 fn0-agent
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`;
+  const proxySystemdUnit = `[Unit]
+Description=fn0 worker proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opc
+ExecStartPre=-/usr/bin/podman rm -f fn0-proxy
+ExecStartPre=/usr/bin/podman pull ${proxyImageRef}
+ExecStart=/usr/bin/podman run --name fn0-proxy --rm \\
+  --network host \\
+  -e FN0_WORKER_PROXY_TARGET_FILE=/etc/fn0-worker-proxy/target \\
+  -v /etc/fn0-worker-proxy:/etc/fn0-worker-proxy:ro \\
+  ${proxyImageRef}
+ExecStop=/usr/bin/podman stop -t 10 fn0-proxy
 Restart=always
 RestartSec=5
 
@@ -1061,8 +1099,6 @@ mkdir -p /etc/fn0-worker-agent
 cat > /etc/fn0-worker-agent/env <<'EOF_AGENT_ENV'
 ${agentEnvFile}EOF_AGENT_ENV
 echo "FN0_WORKER_AGENT_HOST_ID=$HOST_ID" >> /etc/fn0-worker-agent/env
-# opc owns the env file because the systemd unit (User=opc) reads it via
-# podman --env-file at run-time.
 chown opc:opc /etc/fn0-worker-agent/env
 chmod 600 /etc/fn0-worker-agent/env
 
@@ -1071,25 +1107,27 @@ ${workerEnvFile}EOF_WORKER_ENV
 chown opc:opc /etc/fn0-worker-agent/worker-env
 chmod 600 /etc/fn0-worker-agent/worker-env
 
+mkdir -p /etc/fn0-worker-proxy
+chown opc:opc /etc/fn0-worker-proxy
+chmod 755 /etc/fn0-worker-proxy
+
 # Lingering must precede any opc user systemd / runtime dir use below.
 loginctl enable-linger opc
 
-# Wait for opc's XDG_RUNTIME_DIR to materialize before enabling the rootless
-# podman socket the agent container will mount.
 opc_uid="$(id -u opc)"
 for _ in $(seq 1 30); do
   if [ -d "/run/user/$opc_uid" ]; then break; fi
   sleep 1
 done
 
-# Enable opc's rootless podman API socket. The containerized agent calls back
-# into it via --remote --url unix:///run/podman/podman.sock to manage worker
-# containers as opc-owned siblings.
 sudo -u opc XDG_RUNTIME_DIR="/run/user/$opc_uid" \\
   systemctl --user enable --now podman.socket
 
 cat > /etc/systemd/system/fn0-worker-agent.service <<'EOF_AGENT_UNIT'
 ${agentSystemdUnit}EOF_AGENT_UNIT
+
+cat > /etc/systemd/system/fn0-worker-proxy.service <<'EOF_PROXY_UNIT'
+${proxySystemdUnit}EOF_PROXY_UNIT
 
 mkdir -p /etc/fn0-alloy
 cat > /etc/fn0-alloy/config.alloy <<'EOF_ALLOY_CFG'
@@ -1105,14 +1143,13 @@ ${alloySystemdUnit}EOF_ALLOY_UNIT
 firewall-cmd --permanent --add-port=443/tcp
 firewall-cmd --reload
 
-# Allow opc (rootless user) to bind 443 directly. Capabilities granted inside a
-# user-namespaced rootless podman container do NOT translate to host-kernel
-# privilege, so --cap-add NET_BIND_SERVICE alone is insufficient. Lower the
-# unprivileged port floor so opc can bind 443 from within the agent container.
-echo 'net.ipv4.ip_unprivileged_port_start=443' > /etc/sysctl.d/90-fn0-worker-agent.conf
-sysctl -p /etc/sysctl.d/90-fn0-worker-agent.conf
+# Rootless containers can't bind <1024 via NET_BIND_SERVICE (user-ns caps
+# don't reach the host kernel); lower the unprivileged port floor instead.
+echo 'net.ipv4.ip_unprivileged_port_start=443' > /etc/sysctl.d/90-fn0-worker-proxy.conf
+sysctl -p /etc/sysctl.d/90-fn0-worker-proxy.conf
 
 systemctl daemon-reload
+systemctl enable --now fn0-worker-proxy.service
 systemctl enable --now fn0-worker-agent.service
 systemctl enable --now fn0-alloy.service
 `;

@@ -61,6 +61,7 @@ cargo test -p doc-db
 | Forte backend | `wasm32-wasip2` | Set via `rs/.cargo/config.toml` |
 | fn0-worker | Native (aarch64/x86_64) | Via `scripts/build-fn0-worker.sh` |
 | fn0-worker-agent | Native | Via `scripts/build-fn0-worker-agent.sh` |
+| fn0-worker-proxy | Native | Via `scripts/build-fn0-worker-proxy.sh` |
 | cwasm-compiler | Node.js | Via `scripts/build-cwasm-compiler.sh` |
 
 ## Workspace Layout

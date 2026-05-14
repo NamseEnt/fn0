@@ -1,23 +1,9 @@
 //! Agent self-update via OCIR pull.
 //!
-//! Periodically `podman pull`s the agent's own image ref (a mutable tag
-//! like `:latest`) and compares the local image digest against the digest
-//! observed at boot. On change, triggers soft shutdown so systemd
-//! `Restart=always` re-pulls and starts the new digest. Worker containers
-//! survive (Phase 1b) and the new agent adopts them (Phase 1a).
-//!
-//! ## Failure visibility
-//!
-//! Pull / inspect failures are emitted as `tracing::error!()` with stable,
-//! structured fields:
-//!
-//! - `event = "ocir_pull_failed"` — the network/registry call failed
-//! - `event = "image_inspect_failed"` — pull succeeded but inspect didn't
-//!
-//! Agent stdout is captured by podman's journald log driver (default) →
-//! systemd journal → fn0-alloy's `loki.source.journal` → Grafana Cloud Loki.
-//! Alert with LogQL e.g.
-//! `{fn0_role="worker"} |~ "ocir_pull_failed|image_inspect_failed"`.
+//! Periodically `podman pull`s the agent's own image ref and compares the
+//! local digest against the one observed at boot. On change it triggers a
+//! soft shutdown; systemd `Restart=always` then re-pulls and starts the new
+//! digest, worker containers surviving for the next agent to adopt.
 
 use crate::podman::Podman;
 use crate::shutdown::Shutdown;

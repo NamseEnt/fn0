@@ -63,7 +63,8 @@ __write_target_image_doc() {
   echo ">> ${pk}.image_ref = ${image_ref}"
 }
 
-# Writes TargetFn0WorkerConfigDoc.image_ref directly to doc-db. Idempotent.
+# Writes TargetFn0WorkerConfigDoc.image_ref directly to doc-db. Idempotent
+# (same image_ref re-written has no harm; version increments).
 write_worker_target_image() {
   local image_ref="$1"
   if [[ -z "$image_ref" ]]; then

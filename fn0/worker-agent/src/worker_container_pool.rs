@@ -7,19 +7,11 @@ use tracing::*;
 
 const TICK_INTERVAL: Duration = Duration::from_millis(500);
 const READY_PROBE_INTERVAL: Duration = Duration::from_millis(500);
-const RAMP_DURATION_DEFAULT: Duration = Duration::from_secs(30);
 const DRAIN_TIMEOUT_DEFAULT: Duration = Duration::from_secs(60);
 const READY_TIMEOUT: Duration = Duration::from_secs(300);
 const STOP_GRACE_SECS: u32 = 5;
 const ADOPTION_TARGET_WAIT: Duration = Duration::from_secs(30);
 const CONTAINER_NAME_PREFIX: &str = "fn0-worker-";
-
-#[derive(Clone, Debug)]
-pub struct UpstreamRoute {
-    pub container_name: String,
-    pub local_addr: SocketAddr,
-    pub weight: u32,
-}
 
 const OPS_PORT_OFFSET: u16 = 1;
 const WORKER_BASE_PORT: u16 = 18443;
@@ -28,34 +20,27 @@ pub async fn run(
     shutdown: Shutdown,
     mut target_rx: watch::Receiver<Option<String>>,
     active_image_tx: watch::Sender<Option<String>>,
-    upstream_tx: watch::Sender<Vec<UpstreamRoute>>,
+    active_addr_tx: watch::Sender<Option<SocketAddr>>,
     first_ready_tx: oneshot::Sender<()>,
 ) {
     info!("worker container pool started");
     let podman = Podman::from_env();
-    let ramp_duration = duration_from_env_secs("FN0_WORKER_AGENT_RAMP_DURATION_SECS", RAMP_DURATION_DEFAULT);
-    let drain_timeout = duration_from_env_secs("FN0_WORKER_AGENT_DRAIN_TIMEOUT_SECS", DRAIN_TIMEOUT_DEFAULT);
+    let drain_timeout =
+        duration_from_env_secs("FN0_WORKER_AGENT_DRAIN_TIMEOUT_SECS", DRAIN_TIMEOUT_DEFAULT);
     let mut next_port: u16 = WORKER_BASE_PORT;
-    let env_file = std::env::var("FN0_WORKER_ENV_FILE")
-        .expect("FN0_WORKER_ENV_FILE must be set");
+    let env_file = std::env::var("FN0_WORKER_ENV_FILE").expect("FN0_WORKER_ENV_FILE must be set");
     let mut first_ready_tx = Some(first_ready_tx);
 
-    // === Adoption ===
-    // Recover state from pre-existing podman containers (left by a previous
-    // agent process: crash, soft-shutdown restart, or image replace). Without
-    // this the new agent would start a duplicate worker and ignore the live
-    // ones until manual cleanup.
     let initial_target = wait_initial_target(&mut target_rx, ADOPTION_TARGET_WAIT).await;
     let mut state =
         adopt_existing_containers(&podman, &mut next_port, initial_target.as_deref()).await;
     if let Some(active) = state.active.as_ref() {
         let _ = active_image_tx.send(Some(active.image_ref.clone()));
+        let _ = active_addr_tx.send(Some(active.local_addr));
         if let Some(tx) = first_ready_tx.take() {
             let _ = tx.send(());
         }
     }
-    let routes = compute_routes(&state, ramp_duration);
-    let _ = upstream_tx.send(routes);
 
     loop {
         tokio::select! {
@@ -77,15 +62,7 @@ pub async fn run(
                 .unwrap_or(false);
             if !already {
                 let (user_port, ops_port) = allocate_port_pair(&mut next_port);
-                match start_new_active(
-                    &podman,
-                    &env_file,
-                    &image_ref,
-                    user_port,
-                    ops_port,
-                )
-                .await
-                {
+                match start_new_active(&podman, &env_file, &image_ref, user_port, ops_port).await {
                     Ok(new_container) => {
                         if let Some(prev) = state.active.take() {
                             info!(
@@ -93,21 +70,13 @@ pub async fn run(
                                 image_ref = %prev.image_ref,
                                 "demoting previous active to draining"
                             );
-                            if !signal_worker_drain(&prev.ops_addr).await {
-                                warn!(
-                                    container_name = %prev.container_name,
-                                    "POST /drain to previous active failed; relying on instances=0 polling"
-                                );
-                            }
-                            for d in state.draining.iter_mut() {
-                                d.ramp_overlap = false;
-                            }
                             state.draining.push(DrainingContainer {
                                 container: prev,
                                 drain_started_at: Instant::now(),
-                                ramp_overlap: true,
+                                drain_confirmed: false,
                             });
                         }
+                        let new_addr = new_container.local_addr;
                         state.active = Some(new_container);
                         info!(
                             container_name = %state.active.as_ref().unwrap().container_name,
@@ -115,6 +84,7 @@ pub async fn run(
                             "new active worker container ready"
                         );
                         let _ = active_image_tx.send(Some(image_ref.clone()));
+                        let _ = active_addr_tx.send(Some(new_addr));
                         if let Some(tx) = first_ready_tx.take() {
                             let _ = tx.send(());
                         }
@@ -130,12 +100,13 @@ pub async fn run(
             }
         }
 
-        let routes = compute_routes(&state, ramp_duration);
-        let _ = upstream_tx.send(routes);
-
         let mut still_draining = Vec::with_capacity(state.draining.len());
-        for d in state.draining.drain(..) {
-            if drain_done(&d, ramp_duration, drain_timeout).await {
+        for mut d in state.draining.drain(..) {
+            if !d.drain_confirmed && signal_worker_drain(&d.container.ops_addr).await {
+                d.drain_confirmed = true;
+                info!(container_name = %d.container.container_name, "/drain confirmed");
+            }
+            if drain_done(&d, drain_timeout).await {
                 info!(
                     container_name = %d.container.container_name,
                     "drain complete; stopping container"
@@ -155,15 +126,14 @@ pub async fn run(
 
     if shutdown.is_soft() {
         info!(
-            "worker container pool: soft shutdown; leaving worker containers running for the next agent to adopt"
+            "worker container pool: soft shutdown; leaving worker containers running for the next agent to adopt (proxy keeps its target)"
         );
-        let _ = upstream_tx.send(Vec::new());
         info!("worker container pool stopped");
         return;
     }
 
     info!("worker container pool: shutdown received; tearing down all containers");
-    let _ = upstream_tx.send(Vec::new());
+    let _ = active_addr_tx.send(None);
     let _ = active_image_tx.send(None);
     if let Some(active) = state.active.take() {
         teardown(&podman, &active.container_name).await;
@@ -190,7 +160,7 @@ struct RunningContainer {
 struct DrainingContainer {
     container: RunningContainer,
     drain_started_at: Instant,
-    ramp_overlap: bool,
+    drain_confirmed: bool,
 }
 
 fn allocate_port_pair(next_port: &mut u16) -> (u16, u16) {
@@ -280,7 +250,8 @@ async fn wait_until_ready(
 
 async fn tcp_probe(addr: &SocketAddr) -> bool {
     matches!(
-        tokio::time::timeout(Duration::from_millis(500), tokio::net::TcpStream::connect(addr)).await,
+        tokio::time::timeout(Duration::from_millis(500), tokio::net::TcpStream::connect(addr))
+            .await,
         Ok(Ok(_))
     )
 }
@@ -307,47 +278,9 @@ async fn signal_worker_drain(ops_addr: &SocketAddr) -> bool {
     matches!(client.post(&url).send().await, Ok(r) if r.status().is_success())
 }
 
-fn compute_routes(state: &PoolState, ramp_duration: Duration) -> Vec<UpstreamRoute> {
-    let mut routes = Vec::new();
-    let now = Instant::now();
-    let Some(active) = &state.active else {
-        return routes;
-    };
-    let ramp_partner = state.draining.iter().find(|d| d.ramp_overlap);
-    let new_weight = match ramp_partner {
-        Some(r) => {
-            let elapsed = now.duration_since(r.drain_started_at);
-            ((elapsed.as_secs_f32() / ramp_duration.as_secs_f32()) * 100.0).min(100.0) as u32
-        }
-        None => 100,
-    };
-    routes.push(UpstreamRoute {
-        container_name: active.container_name.clone(),
-        local_addr: active.local_addr,
-        weight: new_weight,
-    });
-    if new_weight < 100
-        && let Some(r) = ramp_partner
-    {
-        routes.push(UpstreamRoute {
-            container_name: r.container.container_name.clone(),
-            local_addr: r.container.local_addr,
-            weight: 100 - new_weight,
-        });
-    }
-    routes
-}
-
-async fn drain_done(
-    draining: &DrainingContainer,
-    ramp_duration: Duration,
-    drain_timeout: Duration,
-) -> bool {
+async fn drain_done(draining: &DrainingContainer, drain_timeout: Duration) -> bool {
     let elapsed = Instant::now().duration_since(draining.drain_started_at);
-    if elapsed < ramp_duration {
-        return false;
-    }
-    if elapsed > ramp_duration + drain_timeout {
+    if elapsed > drain_timeout {
         warn!(
             container_name = %draining.container.container_name,
             elapsed_secs = elapsed.as_secs(),
@@ -476,7 +409,6 @@ async fn adopt_existing_containers(
         });
     }
 
-    // Advance next_port past any adopted container so subsequent allocations don't collide.
     if max_port >= WORKER_BASE_PORT {
         *next_port = max_port.saturating_add(2);
     }
@@ -485,15 +417,6 @@ async fn adopt_existing_containers(
         return PoolState::default();
     }
 
-    // Decide which adopted container is "current active".
-    //
-    // - Target known: containers matching target are active candidates; the rest get
-    //   /drain signaled (image differs from target = obsolete from a prior rollout).
-    // - Target unknown: there's no truth to compare against, so adopt all without
-    //   /drain signal and let the main loop reconcile when target arrives.
-    // - No matching candidate: still promote the highest-port non-matching one as
-    //   pseudo-active so traffic keeps flowing; the main tick will then run the
-    //   normal blue-green replacement.
     let (active_pool, drain_pool): (Vec<_>, Vec<_>) = match target {
         Some(t) => {
             let (matching, non_matching): (Vec<_>, Vec<_>) =
@@ -530,13 +453,10 @@ async fn adopt_existing_containers(
         state.draining.push(DrainingContainer {
             container: c,
             drain_started_at: Instant::now(),
-            ramp_overlap: false,
+            drain_confirmed: false,
         });
     }
     for c in drain_pool {
-        if !signal_worker_drain(&c.ops_addr).await {
-            warn!(container_name = %c.container_name, "drain signal failed during adoption");
-        }
         info!(
             container_name = %c.container_name,
             image_ref = %c.image_ref,
@@ -545,7 +465,7 @@ async fn adopt_existing_containers(
         state.draining.push(DrainingContainer {
             container: c,
             drain_started_at: Instant::now(),
-            ramp_overlap: false,
+            drain_confirmed: false,
         });
     }
     state
