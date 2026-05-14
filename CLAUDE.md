@@ -1,2 +1,3 @@
 - This project uses English everywhere (code, comments, docs, commit messages).
 - Rust: verify with `cargo clippy`, not `cargo check`. 0 warnings + 0 errors.
+- Grafana Cloud logs: never trust the portal `status` field or UI to judge ingest/query health. Always probe the data plane directly — `POST {otlpUrl}/v1/logs` (expect 204) for ingest, `GET {lokiUrl}/loki/api/v1/query_range` (expect 200) for query, using stack id + `grafana:cloudAccessPolicyToken` as Basic auth. `status: paused` is a portal-level metadata flag and does not necessarily block ingest/query.

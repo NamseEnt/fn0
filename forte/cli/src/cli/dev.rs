@@ -397,7 +397,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
                         continue;
                     }
                 };
-                if let Err(err) = executor.run(&msg.subdomain, "", req, None).await {
+                if let Err(err) = executor.run(&msg.project_id, "", req, None).await {
                     tracing::warn!(?err, task = %msg.task_name, "loopback queue task failed");
                 }
             }
@@ -532,7 +532,7 @@ async fn run_local_cron_ticker(
                 continue;
             }
             let msg = fn0::queue_hijack::LoopbackMessage {
-                subdomain: server::DEV_CODE_ID.to_string(),
+                project_id: server::DEV_CODE_ID.to_string(),
                 task_name: job.function.clone(),
                 payload: serde_json::Value::Null,
             };

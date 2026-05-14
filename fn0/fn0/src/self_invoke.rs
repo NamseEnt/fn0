@@ -1,6 +1,6 @@
 use crate::control_invoke_queue_hijack::ControlInvokeQueueHijack;
-use crate::execute::ClientState;
-use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker, measure_cpu_time};
+use crate::execute::{ClientState, WasmInjectEnvelope};
+use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::otlp_hijack::OtlpHijack;
 use crate::queue_hijack::QueueHijack;
 use crate::turso_hijack::TursoHijack;
@@ -14,6 +14,7 @@ use hyper::http;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::{mpsc, oneshot};
 use wasmtime::AsContextMut;
 use wasmtime::component::Accessor;
 use wasmtime_wasi::TrappableError;
@@ -23,79 +24,32 @@ use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 use wasmtime_wasi_http::p3::{RequestOptions, WasiHttpHooks, default_send_request};
 
 tokio::task_local! {
-    pub(crate) static WASM_RAW: WasmRaw;
     pub(crate) static SELF_HOST: String;
 }
 
-#[derive(Copy, Clone)]
-pub(crate) struct WasmRaw {
-    accessor: usize,
-    service: usize,
+// Inject a request into the wasm instance loop (same project) and await its
+// response via oneshot. Used by both call_wasm_direct (JS fetch -> wasm) and
+// self_invoke_send (wasm wasi-http hook -> wasm). Replaces the previous raw
+// pointer / WASM_RAW task_local plumbing — no unsafe, no
+// `accessor.lifetime`-dependent state across tasks.
+async fn inject_and_await(
+    sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
+    req: Request,
+) -> Result<Response> {
+    let (resp_tx, resp_rx) = oneshot::channel();
+    if sender.send((req, resp_tx)).is_err() {
+        return Err(anyhow!("self-invoke target wasm instance channel closed"));
+    }
+    resp_rx
+        .await
+        .unwrap_or_else(|_| Err(anyhow!("self-invoke target dropped response")))
 }
 
-impl WasmRaw {
-    pub(crate) fn new(
-        accessor: &Accessor<ClientState<SystemClock>>,
-        service: &Service,
-    ) -> Self {
-        Self {
-            accessor: accessor as *const _ as usize,
-            service: service as *const _ as usize,
-        }
-    }
-
-    unsafe fn accessor(self) -> &'static Accessor<ClientState<SystemClock>> {
-        unsafe { &*(self.accessor as *const Accessor<ClientState<SystemClock>>) }
-    }
-
-    unsafe fn service(self) -> &'static Service {
-        unsafe { &*(self.service as *const Service) }
-    }
-}
-
-pub(crate) async fn scope_wasm_execution<F, T>(
-    accessor: &Accessor<ClientState<SystemClock>>,
-    service: &Service,
-    future: F,
-) -> T
-where
-    F: Future<Output = T>,
-{
-    let raw = WasmRaw::new(accessor, service);
-    WASM_RAW.scope(raw, future).await
-}
-
-pub async fn call_wasm_direct(req: Request) -> Result<Response> {
-    let raw = WASM_RAW
-        .try_with(|r| *r)
-        .map_err(|_| anyhow!("call_wasm_direct invoked outside wasm scope"))?;
-    let accessor = unsafe { raw.accessor() };
-    let service = unsafe { raw.service() };
-
-    let (time_tracker, is_timeout, project_id) = accessor.with(|mut access| {
-        let state = access.data_mut();
-        (
-            state.time_tracker.clone(),
-            state.is_timeout.clone(),
-            state.project_id.clone(),
-        )
-    });
-
-    let req_http = req.map(|body| {
-        body.map_err(|err| ErrorCode::InternalError(Some(err.to_string())))
-            .boxed_unsync()
-    });
-    let (p3_req, req_io) = P3Request::from_http(req_http);
-    call_service(
-        accessor,
-        service,
-        p3_req,
-        req_io,
-        &project_id,
-        time_tracker,
-        &is_timeout,
-    )
-    .await
+pub async fn call_wasm_direct(
+    sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
+    req: Request,
+) -> Result<Response> {
+    inject_and_await(sender, req).await
 }
 
 pub(crate) fn extract_host(headers: &hyper::HeaderMap) -> Option<String> {
@@ -121,6 +75,7 @@ type HookResult = std::result::Result<HookResponse, TrappableError<ErrorCode>>;
 
 pub(crate) struct SelfInvokeHooks {
     project_id: String,
+    self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<OtlpHijack>>,
     queue_hijack: Option<Arc<QueueHijack>>,
@@ -131,6 +86,7 @@ pub(crate) struct SelfInvokeHooks {
 impl SelfInvokeHooks {
     pub(crate) fn new(
         project_id: String,
+        self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
         turso_hijack: Option<Arc<TursoHijack>>,
         otlp_hijack: Option<Arc<OtlpHijack>>,
         queue_hijack: Option<Arc<QueueHijack>>,
@@ -139,6 +95,7 @@ impl SelfInvokeHooks {
     ) -> Self {
         Self {
             project_id,
+            self_invoke_sender,
             turso_hijack,
             otlp_hijack,
             queue_hijack,
@@ -162,7 +119,7 @@ impl WasiHttpHooks for SelfInvokeHooks {
             .unwrap_or(false);
 
         if is_self {
-            return self_invoke_send(request);
+            return self_invoke_send(self.self_invoke_sender.clone(), request);
         }
 
         if let Some(hijack) = self.turso_hijack.clone()
@@ -200,34 +157,27 @@ impl WasiHttpHooks for SelfInvokeHooks {
 }
 
 fn self_invoke_send(
+    sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        let raw = WASM_RAW.try_with(|r| *r).map_err(|_| {
-            TrappableError::from(ErrorCode::InternalError(Some(
-                "self-invoke outside wasm scope".into(),
-            )))
-        })?;
-        let accessor = unsafe { raw.accessor() };
-        let service = unsafe { raw.service() };
-
-        let (p3_req, req_io) = P3Request::from_http(request);
-        let handle_result = service.handle(accessor, p3_req).await;
-
-        match handle_result {
-            Ok(Ok(resp)) => {
-                let http_resp = accessor
-                    .with(|mut access| resp.into_http(access.as_context_mut(), req_io))
-                    .map_err(|e| {
-                        TrappableError::from(ErrorCode::InternalError(Some(format!("{e:?}"))))
-                    })?;
-                let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
-                    Box::new(async { Ok(()) });
-                Ok((http_resp, io))
-            }
-            Ok(Err(ec)) => Err(ec.into()),
-            Err(e) => Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
-        }
+        let req: Request = request.map(|body| {
+            body.map_err(|ec: ErrorCode| anyhow!("error_code: {ec:?}"))
+                .boxed_unsync()
+        });
+        let resp = match inject_and_await(sender, req).await {
+            Ok(r) => r,
+            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        };
+        let http_resp = resp.map(|body| {
+            body.map_err(|err: anyhow::Error| {
+                ErrorCode::InternalError(Some(err.to_string()))
+            })
+            .boxed_unsync()
+        });
+        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+            Box::new(async { Ok(()) });
+        Ok((http_resp, io))
     })
 }
 
