@@ -11,18 +11,18 @@
 mod agent_image_pull_poller;
 mod dns_register;
 mod host_status_reporter;
-mod inbound_proxy;
 mod podman;
+mod proxy_target;
 mod shutdown;
 mod target_config;
 mod worker_container_pool;
 
 use color_eyre::eyre::Result;
 use shutdown::Shutdown;
+use std::net::SocketAddr;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinSet;
 use tracing::*;
-use worker_container_pool::UpstreamRoute;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -56,7 +56,7 @@ async fn async_main() -> Result<()> {
 
     let (target_image_tx, target_image_rx) = watch::channel::<Option<String>>(None);
     let (active_image_tx, active_image_rx) = watch::channel::<Option<String>>(None);
-    let (upstream_tx, upstream_rx) = watch::channel::<Vec<UpstreamRoute>>(Vec::new());
+    let (active_addr_tx, active_addr_rx) = watch::channel::<Option<SocketAddr>>(None);
     let (worker_first_ready_tx, worker_first_ready_rx) = oneshot::channel::<()>();
 
     let mut tasks: JoinSet<()> = JoinSet::new();
@@ -65,7 +65,7 @@ async fn async_main() -> Result<()> {
         shutdown.clone(),
         target_image_rx,
         active_image_tx,
-        upstream_tx,
+        active_addr_tx,
         worker_first_ready_tx,
     ));
     tasks.spawn(host_status_reporter::run(
@@ -74,7 +74,7 @@ async fn async_main() -> Result<()> {
         host_id.clone(),
         public_ip.clone(),
     ));
-    tasks.spawn(inbound_proxy::run(shutdown.clone(), upstream_rx));
+    tasks.spawn(proxy_target::run(shutdown.clone(), active_addr_rx));
     tasks.spawn(agent_image_pull_poller::run(shutdown.clone()));
 
     tokio::select! {
@@ -125,9 +125,6 @@ async fn async_main() -> Result<()> {
             }
         }
         _ = shutdown.cancelled() => {
-            // Triggered internally (e.g. agent_target_config saw a new image
-            // and called trigger_soft). Already in soft mode; nothing to do
-            // beyond joining tasks.
             info!(soft = shutdown.is_soft(), "shutdown triggered by internal task");
         }
     }

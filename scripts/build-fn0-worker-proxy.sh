@@ -13,7 +13,6 @@ need jq
 need cargo
 need docker
 need oci
-need curl
 
 # shellcheck source=lib/ocir-cleanup.sh
 source "${REPO_ROOT}/scripts/lib/ocir-cleanup.sh"
@@ -30,7 +29,7 @@ fi
 
 WORKER_COMPARTMENT_ID="$(pulumi_pick workerCompartmentId)"
 
-echo ">> Attempting cargo publish for fn0-worker-agent"
+echo ">> Attempting cargo publish for fn0-worker-proxy"
 PUBLISH_LOG="$(mktemp)"
 IID_FILE="$(mktemp)"
 INSPECT_LOG="$(mktemp)"
@@ -38,7 +37,7 @@ BUILD_LOG="$(mktemp)"
 cleanup() { rm -f "$PUBLISH_LOG" "$IID_FILE" "$INSPECT_LOG" "$BUILD_LOG"; }
 trap cleanup EXIT
 
-if (cd "${REPO_ROOT}" && cargo publish -p fn0-worker-agent) 2>&1 | tee "$PUBLISH_LOG"; then
+if (cd "${REPO_ROOT}" && cargo publish -p fn0-worker-proxy) 2>&1 | tee "$PUBLISH_LOG"; then
   echo "   published."
 else
   if grep -qE "already (uploaded|exists)" "$PUBLISH_LOG"; then
@@ -49,20 +48,20 @@ else
   fi
 fi
 
-VERSION="$(cd "${REPO_ROOT}" && cargo pkgid -p fn0-worker-agent | sed -E 's/.*[#@]([^:]+)$/\1/')"
+VERSION="$(cd "${REPO_ROOT}" && cargo pkgid -p fn0-worker-proxy | sed -E 's/.*[#@]([^:]+)$/\1/')"
 if [[ -z "$VERSION" ]]; then
-  echo "failed to determine fn0-worker-agent version" >&2
+  echo "failed to determine fn0-worker-proxy version" >&2
   exit 1
 fi
 TAG="$VERSION"
 
-echo ">> fn0-worker-agent version: ${VERSION}"
+echo ">> fn0-worker-proxy version: ${VERSION}"
 echo ">> Building local image (host-native)"
 
 DOCKER_BUILD_PIPESTATUS=0
 set +e
 docker build \
-  --file "${REPO_ROOT}/fn0/worker-agent/Dockerfile" \
+  --file "${REPO_ROOT}/fn0/worker-proxy/Dockerfile" \
   --iidfile "$IID_FILE" \
   --progress=plain \
   "$REPO_ROOT" 2>&1 | tee "$BUILD_LOG"
@@ -93,7 +92,7 @@ for i in $(seq 0 $((COUNT - 1))); do
   USERNAME="$(jq -r .username <<<"$REG")"
   PASSWORD="$(jq -r .password <<<"$REG")"
   REPO_BASE="$(jq -r .repository <<<"$REG")"
-  REPO="${REPO_BASE}-agent"
+  REPO="${REPO_BASE}-proxy"
   FULL_REF="${URL}/${REPO}:${TAG}"
   LATEST_REF="${URL}/${REPO}:latest"
 
@@ -134,7 +133,7 @@ for i in $(seq 0 $((COUNT - 1))); do
     fi
   fi
 
-  echo ">> Pushing ${LATEST_REF} (mutable; running agents poll this)"
+  echo ">> Pushing ${LATEST_REF} (mutable; pulled on proxy restart)"
   docker tag "$LOCAL_IID" "$LATEST_REF"
   docker push "$LATEST_REF"
 

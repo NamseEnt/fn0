@@ -3,12 +3,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio_util::sync::CancellationToken;
 
-/// Shutdown handle shared across all agent tasks.
-///
-/// `soft` distinguishes "agent is being replaced; keep the worker containers
-/// alive for the next process to adopt" from "agent is going down for real;
-/// tear everything down". Set before `trigger()` so tasks can read it on
-/// their cancellation path.
 #[derive(Clone)]
 pub struct Shutdown {
     token: CancellationToken,

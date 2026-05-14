@@ -108,7 +108,7 @@ impl Podman {
         }
         let parsed: Vec<ContainerSnapshot> =
             serde_json::from_str(trimmed).map_err(|e| PodmanError::Parse(e.to_string()))?;
-        // `--filter name=X` is a substring/regex match in podman; re-filter by exact prefix.
+        // podman's `--filter name=` is a substring match, not exact; re-filter by prefix.
         Ok(parsed
             .into_iter()
             .filter(|c| c.primary_name().is_some_and(|n| n.starts_with(prefix)))
