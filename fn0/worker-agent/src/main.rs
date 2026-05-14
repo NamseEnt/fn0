@@ -8,6 +8,7 @@
 //! simultaneously and cluster capacity briefly doubles during the swap.
 //! Rolling updates across hosts will be added later.
 
+mod agent_image_pull_poller;
 mod dns_register;
 mod host_status_reporter;
 mod inbound_proxy;
@@ -74,6 +75,7 @@ async fn async_main() -> Result<()> {
         public_ip.clone(),
     ));
     tasks.spawn(inbound_proxy::run(shutdown.clone(), upstream_rx));
+    tasks.spawn(agent_image_pull_poller::run(shutdown.clone()));
 
     tokio::select! {
         ready = worker_first_ready_rx => {
@@ -103,14 +105,32 @@ async fn async_main() -> Result<()> {
         warn!(?err, "DNS register failed; continuing anyway");
     }
 
-    shutdown::wait_for_signal().await;
-    info!("shutdown signal received");
-
-    if let Err(err) = dns_register::deregister().await {
-        warn!(?err, "DNS deregister failed");
+    tokio::select! {
+        _ = shutdown::wait_for_signal() => {
+            let soft = std::env::var("FN0_WORKER_AGENT_SOFT_SHUTDOWN_ON_SIGTERM")
+                .ok()
+                .as_deref()
+                == Some("1");
+            info!(soft, "shutdown signal received");
+            if soft {
+                info!(
+                    "soft shutdown: keeping DNS A record + WorkerHostStatusDoc + worker containers for next agent to adopt"
+                );
+                shutdown.trigger_soft();
+            } else {
+                if let Err(err) = dns_register::deregister().await {
+                    warn!(?err, "DNS deregister failed");
+                }
+                shutdown.trigger();
+            }
+        }
+        _ = shutdown.cancelled() => {
+            // Triggered internally (e.g. agent_target_config saw a new image
+            // and called trigger_soft). Already in soft mode; nothing to do
+            // beyond joining tasks.
+            info!(soft = shutdown.is_soft(), "shutdown triggered by internal task");
+        }
     }
-
-    shutdown.trigger();
 
     while let Some(res) = tasks.join_next().await {
         if let Err(err) = res {

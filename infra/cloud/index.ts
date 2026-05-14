@@ -6,8 +6,6 @@ import * as cloudflare from "@pulumi/cloudflare";
 import * as grafana from "@pulumiverse/grafana";
 import * as random from "@pulumi/random";
 import * as crypto from "node:crypto";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 const config = new pulumi.Config();
 
@@ -498,18 +496,6 @@ const dnsProvider = {
   },
 };
 
-const fn0WorkerAgentVersion = (() => {
-  const toml = fs.readFileSync(
-    path.join(__dirname, "../../fn0/worker-agent/Cargo.toml"),
-    "utf8",
-  );
-  const m = toml.match(/^version\s*=\s*"([^"]+)"/m);
-  if (!m) {
-    throw new Error("could not parse version from fn0/worker-agent/Cargo.toml");
-  }
-  return m[1];
-})();
-
 const grafanaStack = grafana.cloud.getStackOutput({
   slug: config.require("grafanaSlug"),
 });
@@ -534,7 +520,6 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   shape: "VM.Standard.A1.Flex",
   ocpus: 1,
   memoryInGbs: 6,
-  workerAgentVersion: fn0WorkerAgentVersion,
   workerAgentDocDb: {
     url: docDb.url,
     authToken: docDb.token,

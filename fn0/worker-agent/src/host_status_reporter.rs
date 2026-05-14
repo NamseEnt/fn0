@@ -67,6 +67,14 @@ pub async fn run(
             _ = tokio::time::sleep(REPORT_INTERVAL) => {}
         }
     }
+    if shutdown.is_soft() {
+        info!(
+            %host_id,
+            "host status reporter: soft shutdown; keeping doc so the next agent inherits liveness without a sweep gap"
+        );
+        info!("host status reporter stopped");
+        return;
+    }
     if let Err(err) = (WorkerHostStatusDocDelete {
         host_id: host_id.clone(),
     })
