@@ -23,7 +23,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     fi
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y ca-certificates podman \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/fn0-worker-agent-bin /usr/local/bin/fn0-worker-agent
 ENTRYPOINT ["/usr/local/bin/fn0-worker-agent"]

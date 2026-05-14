@@ -25,12 +25,10 @@ __doc_db_token() {
   pulumi_pick docDbToken
 }
 
-# Writes TargetFn0WorkerConfigDoc.image_ref directly to doc-db. Idempotent
-# (same image_ref re-written has no harm; version increments).
-write_worker_target_image() {
-  local image_ref="$1"
-  if [[ -z "$image_ref" ]]; then
-    echo "write_worker_target_image: missing image_ref" >&2
+__write_target_image_doc() {
+  local pk="$1" image_ref="$2"
+  if [[ -z "$pk" || -z "$image_ref" ]]; then
+    echo "__write_target_image_doc: missing pk or image_ref" >&2
     return 2
   fi
   local https_url token data_b64 sql req resp_file http_code
@@ -40,7 +38,7 @@ write_worker_target_image() {
   sql="INSERT INTO docs (pk, sk, data, version) VALUES (?, '', ?, 0) ON CONFLICT(pk, sk) DO UPDATE SET data = excluded.data, version = docs.version + 1"
   req="$(jq -nc \
     --arg sql "$sql" \
-    --arg pk "TargetFn0WorkerConfigDoc" \
+    --arg pk "$pk" \
     --arg b64 "$data_b64" \
     '{requests: [
       {type: "execute", stmt: {sql: $sql, args: [
@@ -62,7 +60,17 @@ write_worker_target_image() {
     return 1
   fi
   rm -f "$resp_file"
-  echo ">> TargetFn0WorkerConfigDoc.image_ref = ${image_ref}"
+  echo ">> ${pk}.image_ref = ${image_ref}"
+}
+
+# Writes TargetFn0WorkerConfigDoc.image_ref directly to doc-db. Idempotent.
+write_worker_target_image() {
+  local image_ref="$1"
+  if [[ -z "$image_ref" ]]; then
+    echo "write_worker_target_image: missing image_ref" >&2
+    return 2
+  fi
+  __write_target_image_doc "TargetFn0WorkerConfigDoc" "$image_ref"
 }
 
 # Polls WorkerHostStatusDoc rows until every live host reports

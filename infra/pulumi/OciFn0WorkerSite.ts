@@ -10,7 +10,6 @@ export interface OciFn0WorkerSiteArgs {
   shape: pulumi.Input<string>;
   ocpus: pulumi.Input<number>;
   memoryInGbs: pulumi.Input<number>;
-  workerAgentVersion: string;
   workerAgentDocDb: WorkerAgentDocDbArgs;
   workerDns: WorkerDnsArgs;
   worker: WorkerArgs;
@@ -708,12 +707,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       ),
     };
 
+    // Mutable `:latest` tag — the pull poller inside the agent re-pulls and
+    // detects digest changes, then triggers soft restart. The build script
+    // (scripts/build-fn0-worker-agent.sh) pushes both `:VERSION` (immutable
+    // archive for rollback) and `:latest` (mutable, what the host pulls).
     const agentImageRef = this.workerImageRegistries.apply((regs) => {
       if (regs.length === 0) {
         throw new Error("workerImageRegistries is empty");
       }
       const r = regs[0];
-      return `${r.url}/${r.repository}-agent:${args.workerAgentVersion}`;
+      return `${r.url}/${r.repository}-agent:latest`;
     });
 
     const agentEnv = buildWorkerAgentEnv(args.workerAgentDocDb, args.workerDns);
@@ -980,6 +983,16 @@ function renderCloudInit(
     FN0_WORKER_ENV_FILE: "/etc/fn0-worker-agent/worker-env",
   });
   const workerEnvFile = renderEnvFile(workerEnv);
+  // Agent runs as a rootless podman container under opc, talking back to opc's
+  // host podman socket via --remote --url to manage worker containers as siblings.
+  //
+  // agentImageRef points at a mutable tag (`:latest`). Restart=always +
+  // ExecStartPre `podman pull` means each restart re-resolves the digest. The
+  // agent's pull poller (agent_image_pull_poller.rs) detects digest changes at
+  // runtime and triggers soft shutdown; worker containers survive (Phase 1b)
+  // and the new agent adopts them (Phase 1a).
+  //
+  // Hardcoded UID 1000: opc is always uid 1000 on Oracle Linux cloud images.
   const agentSystemdUnit = `[Unit]
 Description=fn0 worker agent
 After=network-online.target
@@ -987,13 +1000,20 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=/etc/fn0-worker-agent/env
-ExecStartPre=-/usr/bin/podman pull ${agentImageRef}
-ExecStart=/usr/local/bin/fn0-worker-agent
-Restart=on-failure
-RestartSec=5
 User=opc
-AmbientCapabilities=CAP_NET_BIND_SERVICE
+ExecStartPre=-/usr/bin/podman rm -f fn0-agent
+ExecStartPre=/usr/bin/podman pull ${agentImageRef}
+ExecStart=/usr/bin/podman run --name fn0-agent --rm \\
+  --network host \\
+  -e FN0_WORKER_AGENT_PODMAN_REMOTE_URL=unix:///run/podman/podman.sock \\
+  -e FN0_WORKER_AGENT_SOFT_SHUTDOWN_ON_SIGTERM=1 \\
+  -e FN0_WORKER_AGENT_IMAGE_REF=${agentImageRef} \\
+  --env-file /etc/fn0-worker-agent/env \\
+  -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock \\
+  ${agentImageRef}
+ExecStop=/usr/bin/podman stop -t 30 fn0-agent
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -1041,6 +1061,9 @@ mkdir -p /etc/fn0-worker-agent
 cat > /etc/fn0-worker-agent/env <<'EOF_AGENT_ENV'
 ${agentEnvFile}EOF_AGENT_ENV
 echo "FN0_WORKER_AGENT_HOST_ID=$HOST_ID" >> /etc/fn0-worker-agent/env
+# opc owns the env file because the systemd unit (User=opc) reads it via
+# podman --env-file at run-time.
+chown opc:opc /etc/fn0-worker-agent/env
 chmod 600 /etc/fn0-worker-agent/env
 
 cat > /etc/fn0-worker-agent/worker-env <<'EOF_WORKER_ENV'
@@ -1048,12 +1071,22 @@ ${workerEnvFile}EOF_WORKER_ENV
 chown opc:opc /etc/fn0-worker-agent/worker-env
 chmod 600 /etc/fn0-worker-agent/worker-env
 
-podman pull ${agentImageRef}
-agent_cid=$(podman create ${agentImageRef})
-podman cp "$agent_cid:/usr/local/bin/fn0-worker-agent" /usr/local/bin/fn0-worker-agent.new
-podman rm "$agent_cid"
-chmod +x /usr/local/bin/fn0-worker-agent.new
-mv /usr/local/bin/fn0-worker-agent.new /usr/local/bin/fn0-worker-agent
+# Lingering must precede any opc user systemd / runtime dir use below.
+loginctl enable-linger opc
+
+# Wait for opc's XDG_RUNTIME_DIR to materialize before enabling the rootless
+# podman socket the agent container will mount.
+opc_uid="$(id -u opc)"
+for _ in $(seq 1 30); do
+  if [ -d "/run/user/$opc_uid" ]; then break; fi
+  sleep 1
+done
+
+# Enable opc's rootless podman API socket. The containerized agent calls back
+# into it via --remote --url unix:///run/podman/podman.sock to manage worker
+# containers as opc-owned siblings.
+sudo -u opc XDG_RUNTIME_DIR="/run/user/$opc_uid" \\
+  systemctl --user enable --now podman.socket
 
 cat > /etc/systemd/system/fn0-worker-agent.service <<'EOF_AGENT_UNIT'
 ${agentSystemdUnit}EOF_AGENT_UNIT
@@ -1066,16 +1099,18 @@ chmod 600 /etc/fn0-alloy/config.alloy
 cat > /etc/systemd/system/fn0-alloy.service <<'EOF_ALLOY_UNIT'
 ${alloySystemdUnit}EOF_ALLOY_UNIT
 
-# Without lingering, opc's user-1000.slice tears down whenever the last SSH
-# session ends, taking podman's conmon (and the worker container with it)
-# with it. fn0-worker-agent.service stays up but its containers get SIGTERM'd.
-loginctl enable-linger opc
-
 # Oracle Linux ships firewalld enabled by default, which blocks 443 even
 # though the OCI SecurityList allows it. Open the port through firewalld
 # (kept in sync with the SecurityList).
 firewall-cmd --permanent --add-port=443/tcp
 firewall-cmd --reload
+
+# Allow opc (rootless user) to bind 443 directly. Capabilities granted inside a
+# user-namespaced rootless podman container do NOT translate to host-kernel
+# privilege, so --cap-add NET_BIND_SERVICE alone is insufficient. Lower the
+# unprivileged port floor so opc can bind 443 from within the agent container.
+echo 'net.ipv4.ip_unprivileged_port_start=443' > /etc/sysctl.d/90-fn0-worker-agent.conf
+sysctl -p /etc/sysctl.d/90-fn0-worker-agent.conf
 
 systemctl daemon-reload
 systemctl enable --now fn0-worker-agent.service

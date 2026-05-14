@@ -1,16 +1,48 @@
+use serde::Deserialize;
 use std::process::Stdio;
 use tokio::process::Command;
 use tracing::*;
 
 pub struct Podman {
     bin: String,
+    remote_url: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ContainerSnapshot {
+    #[serde(rename = "Names", default)]
+    pub names: Vec<String>,
+    #[serde(rename = "Image", default)]
+    pub image_ref: String,
+    #[serde(rename = "State", default)]
+    pub state: String,
+}
+
+impl ContainerSnapshot {
+    pub fn primary_name(&self) -> Option<&str> {
+        self.names.first().map(String::as_str)
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.state == "running"
+    }
 }
 
 impl Podman {
     pub fn from_env() -> Self {
         Self {
-            bin: std::env::var("FN0_WORKER_AGENT_PODMAN_BIN").unwrap_or_else(|_| "podman".to_string()),
+            bin: std::env::var("FN0_WORKER_AGENT_PODMAN_BIN")
+                .unwrap_or_else(|_| "podman".to_string()),
+            remote_url: std::env::var("FN0_WORKER_AGENT_PODMAN_REMOTE_URL").ok(),
         }
+    }
+
+    fn cmd(&self) -> Command {
+        let mut cmd = Command::new(&self.bin);
+        if let Some(url) = &self.remote_url {
+            cmd.args(["--remote", "--url", url]);
+        }
+        cmd
     }
 
     pub async fn pull_image(&self, image_ref: &str) -> Result<(), PodmanError> {
@@ -48,8 +80,75 @@ impl Podman {
         self.run_checked(&["rm", "-f", container_name]).await
     }
 
+    pub async fn list_with_name_prefix(
+        &self,
+        prefix: &str,
+    ) -> Result<Vec<ContainerSnapshot>, PodmanError> {
+        let filter = format!("name={prefix}");
+        let output = self
+            .cmd()
+            .args(["ps", "--all", "--filter", &filter, "--format", "json"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .await
+            .map_err(PodmanError::Spawn)?;
+        if !output.status.success() {
+            return Err(PodmanError::NonZeroExit {
+                code: output.status.code(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+        let stdout =
+            String::from_utf8(output.stdout).map_err(|e| PodmanError::Parse(e.to_string()))?;
+        let trimmed = stdout.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+        let parsed: Vec<ContainerSnapshot> =
+            serde_json::from_str(trimmed).map_err(|e| PodmanError::Parse(e.to_string()))?;
+        // `--filter name=X` is a substring/regex match in podman; re-filter by exact prefix.
+        Ok(parsed
+            .into_iter()
+            .filter(|c| c.primary_name().is_some_and(|n| n.starts_with(prefix)))
+            .collect())
+    }
+
+    pub async fn image_digest(&self, image_ref: &str) -> Result<String, PodmanError> {
+        let output = self
+            .cmd()
+            .args([
+                "image",
+                "inspect",
+                image_ref,
+                "--format",
+                "{{.Digest}}",
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .await
+            .map_err(PodmanError::Spawn)?;
+        if !output.status.success() {
+            return Err(PodmanError::NonZeroExit {
+                code: output.status.code(),
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+        let digest = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if digest.is_empty() {
+            return Err(PodmanError::Parse(format!(
+                "empty digest for image {image_ref}"
+            )));
+        }
+        Ok(digest)
+    }
+
     pub async fn is_running(&self, container_name: &str) -> Result<bool, PodmanError> {
-        let output = Command::new(&self.bin)
+        let output = self
+            .cmd()
             .args([
                 "inspect",
                 "--format",
@@ -69,7 +168,8 @@ impl Podman {
     }
 
     async fn run_checked(&self, args: &[&str]) -> Result<(), PodmanError> {
-        let output = Command::new(&self.bin)
+        let output = self
+            .cmd()
             .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -103,4 +203,6 @@ pub enum PodmanError {
         code: Option<i32>,
         stderr: String,
     },
+    #[error("parse: {0}")]
+    Parse(String),
 }

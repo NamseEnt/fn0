@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export REPO_ROOT
 PULUMI_DIR="${PULUMI_DIR:-${REPO_ROOT}/infra/cloud}"
 
 need() {
@@ -12,21 +13,22 @@ need jq
 need cargo
 need docker
 need oci
+need curl
 
 # shellcheck source=lib/ocir-cleanup.sh
 source "${REPO_ROOT}/scripts/lib/ocir-cleanup.sh"
+# shellcheck source=lib/pulumi-outputs.sh
+source "${REPO_ROOT}/scripts/lib/pulumi-outputs.sh"
 
-echo ">> Reading Pulumi stack outputs from ${PULUMI_DIR}"
-OUT="$(cd "$PULUMI_DIR" && pulumi stack output --show-secrets --json)"
-pick() { jq -r ".${1} // empty" <<<"$OUT"; }
+load_pulumi_outputs
 
-REGISTRIES_JSON="$(jq -c '.workerImageRegistries' <<<"$OUT")"
+REGISTRIES_JSON="$(pulumi_pick_json workerImageRegistries)"
 if [[ -z "$REGISTRIES_JSON" || "$REGISTRIES_JSON" == "null" ]]; then
   echo "missing Pulumi output: workerImageRegistries" >&2
   exit 1
 fi
 
-WORKER_COMPARTMENT_ID="$(pick workerCompartmentId)"
+WORKER_COMPARTMENT_ID="$(pulumi_pick workerCompartmentId)"
 
 echo ">> Attempting cargo publish for fn0-worker-agent"
 PUBLISH_LOG="$(mktemp)"
@@ -93,6 +95,7 @@ for i in $(seq 0 $((COUNT - 1))); do
   REPO_BASE="$(jq -r .repository <<<"$REG")"
   REPO="${REPO_BASE}-agent"
   FULL_REF="${URL}/${REPO}:${TAG}"
+  LATEST_REF="${URL}/${REPO}:latest"
 
   echo ">> Login ${URL}"
   echo "$PASSWORD" | docker login "$URL" -u "$USERNAME" --password-stdin >/dev/null
@@ -131,6 +134,12 @@ for i in $(seq 0 $((COUNT - 1))); do
     fi
   fi
 
+  # Mutable :latest is what running agents pull on their poll cycle. Always
+  # (re)tag and push so agents converge to this digest within the poll window.
+  echo ">> Pushing ${LATEST_REF} (mutable; running agents poll this)"
+  docker tag "$LOCAL_IID" "$LATEST_REF"
+  docker push "$LATEST_REF"
+
   if [[ "$URL" == *oraclecloud.com* ]]; then
     if [[ -z "$WORKER_COMPARTMENT_ID" ]]; then
       echo "warn: workerCompartmentId not in Pulumi outputs; skipping OCIR cleanup for ${URL}/${REPO}" >&2
@@ -144,4 +153,4 @@ for i in $(seq 0 $((COUNT - 1))); do
   fi
 done
 
-echo ">> Done. TAG=${TAG}"
+echo ">> Done. TAG=${TAG} (mutable :latest also updated)"

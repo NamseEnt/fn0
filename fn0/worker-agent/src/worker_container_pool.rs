@@ -11,6 +11,8 @@ const RAMP_DURATION_DEFAULT: Duration = Duration::from_secs(30);
 const DRAIN_TIMEOUT_DEFAULT: Duration = Duration::from_secs(60);
 const READY_TIMEOUT: Duration = Duration::from_secs(300);
 const STOP_GRACE_SECS: u32 = 5;
+const ADOPTION_TARGET_WAIT: Duration = Duration::from_secs(30);
+const CONTAINER_NAME_PREFIX: &str = "fn0-worker-";
 
 #[derive(Clone, Debug)]
 pub struct UpstreamRoute {
@@ -36,8 +38,24 @@ pub async fn run(
     let mut next_port: u16 = WORKER_BASE_PORT;
     let env_file = std::env::var("FN0_WORKER_ENV_FILE")
         .expect("FN0_WORKER_ENV_FILE must be set");
-    let mut state = PoolState::default();
     let mut first_ready_tx = Some(first_ready_tx);
+
+    // === Adoption ===
+    // Recover state from pre-existing podman containers (left by a previous
+    // agent process: crash, soft-shutdown restart, or image replace). Without
+    // this the new agent would start a duplicate worker and ignore the live
+    // ones until manual cleanup.
+    let initial_target = wait_initial_target(&mut target_rx, ADOPTION_TARGET_WAIT).await;
+    let mut state =
+        adopt_existing_containers(&podman, &mut next_port, initial_target.as_deref()).await;
+    if let Some(active) = state.active.as_ref() {
+        let _ = active_image_tx.send(Some(active.image_ref.clone()));
+        if let Some(tx) = first_ready_tx.take() {
+            let _ = tx.send(());
+        }
+    }
+    let routes = compute_routes(&state, ramp_duration);
+    let _ = upstream_tx.send(routes);
 
     loop {
         tokio::select! {
@@ -133,6 +151,15 @@ pub async fn run(
             }
         }
         state.draining = still_draining;
+    }
+
+    if shutdown.is_soft() {
+        info!(
+            "worker container pool: soft shutdown; leaving worker containers running for the next agent to adopt"
+        );
+        let _ = upstream_tx.send(Vec::new());
+        info!("worker container pool stopped");
+        return;
     }
 
     info!("worker container pool: shutdown received; tearing down all containers");
@@ -366,6 +393,174 @@ fn sanitize(s: &str) -> String {
     s.chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect()
+}
+
+async fn wait_initial_target(
+    target_rx: &mut watch::Receiver<Option<String>>,
+    timeout: Duration,
+) -> Option<String> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(t) = target_rx.borrow().clone() {
+            return Some(t);
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return None;
+        }
+        if tokio::time::timeout(remaining, target_rx.changed())
+            .await
+            .is_err()
+        {
+            return None;
+        }
+    }
+}
+
+async fn adopt_existing_containers(
+    podman: &Podman,
+    next_port: &mut u16,
+    target: Option<&str>,
+) -> PoolState {
+    let snapshots = match podman.list_with_name_prefix(CONTAINER_NAME_PREFIX).await {
+        Ok(s) => s,
+        Err(err) => {
+            warn!(?err, "podman list for adoption failed; starting fresh");
+            return PoolState::default();
+        }
+    };
+    if snapshots.is_empty() {
+        return PoolState::default();
+    }
+
+    let mut candidates: Vec<RunningContainer> = Vec::new();
+    let mut max_port: u16 = 0;
+    for snap in &snapshots {
+        let Some(name) = snap.primary_name() else {
+            continue;
+        };
+        if !snap.is_running() {
+            warn!(
+                container_name = %name,
+                state = %snap.state,
+                "found non-running container with worker prefix; leaving alone (no adoption, no teardown)"
+            );
+            continue;
+        }
+        let Some(user_port) = parse_port_from_container_name(name) else {
+            warn!(container_name = %name, "could not parse port from container name; skipping adoption");
+            continue;
+        };
+        let ops_port = user_port + OPS_PORT_OFFSET;
+        let local_addr: SocketAddr = format!("127.0.0.1:{user_port}")
+            .parse()
+            .expect("loopback addr");
+        let ops_addr: SocketAddr = format!("127.0.0.1:{ops_port}")
+            .parse()
+            .expect("loopback addr");
+        if !worker_ready_ok(&ops_addr).await {
+            warn!(
+                container_name = %name,
+                "adopted candidate did not respond on /ready; skipping (will leave running)"
+            );
+            continue;
+        }
+        if user_port > max_port {
+            max_port = user_port;
+        }
+        candidates.push(RunningContainer {
+            container_name: name.to_string(),
+            image_ref: snap.image_ref.clone(),
+            local_addr,
+            ops_addr,
+        });
+    }
+
+    // Advance next_port past any adopted container so subsequent allocations don't collide.
+    if max_port >= WORKER_BASE_PORT {
+        *next_port = max_port.saturating_add(2);
+    }
+
+    if candidates.is_empty() {
+        return PoolState::default();
+    }
+
+    // Decide which adopted container is "current active".
+    //
+    // - Target known: containers matching target are active candidates; the rest get
+    //   /drain signaled (image differs from target = obsolete from a prior rollout).
+    // - Target unknown: there's no truth to compare against, so adopt all without
+    //   /drain signal and let the main loop reconcile when target arrives.
+    // - No matching candidate: still promote the highest-port non-matching one as
+    //   pseudo-active so traffic keeps flowing; the main tick will then run the
+    //   normal blue-green replacement.
+    let (active_pool, drain_pool): (Vec<_>, Vec<_>) = match target {
+        Some(t) => {
+            let (matching, non_matching): (Vec<_>, Vec<_>) =
+                candidates.into_iter().partition(|c| c.image_ref == t);
+            if matching.is_empty() {
+                (non_matching, Vec::new())
+            } else {
+                (matching, non_matching)
+            }
+        }
+        None => {
+            warn!(
+                "adopted containers exist but target unknown; promoting highest-port as active without drain signal"
+            );
+            (candidates, Vec::new())
+        }
+    };
+
+    let mut state = PoolState::default();
+    let (active, extra) = pick_highest_port(active_pool);
+    if let Some(active) = active {
+        info!(
+            container_name = %active.container_name,
+            image_ref = %active.image_ref,
+            "adopted as active"
+        );
+        state.active = Some(active);
+    }
+    for c in extra {
+        info!(
+            container_name = %c.container_name,
+            "duplicate active-pool container demoted to draining during adoption"
+        );
+        state.draining.push(DrainingContainer {
+            container: c,
+            drain_started_at: Instant::now(),
+            ramp_overlap: false,
+        });
+    }
+    for c in drain_pool {
+        if !signal_worker_drain(&c.ops_addr).await {
+            warn!(container_name = %c.container_name, "drain signal failed during adoption");
+        }
+        info!(
+            container_name = %c.container_name,
+            image_ref = %c.image_ref,
+            "adopted as draining (image differs from target)"
+        );
+        state.draining.push(DrainingContainer {
+            container: c,
+            drain_started_at: Instant::now(),
+            ramp_overlap: false,
+        });
+    }
+    state
+}
+
+fn pick_highest_port(
+    mut candidates: Vec<RunningContainer>,
+) -> (Option<RunningContainer>, Vec<RunningContainer>) {
+    candidates.sort_by_key(|c| parse_port_from_container_name(&c.container_name).unwrap_or(0));
+    let active = candidates.pop();
+    (active, candidates)
+}
+
+fn parse_port_from_container_name(name: &str) -> Option<u16> {
+    name.rsplit_once('-').and_then(|(_, p)| p.parse::<u16>().ok())
 }
 
 fn duration_from_env_secs(name: &str, default: Duration) -> Duration {
