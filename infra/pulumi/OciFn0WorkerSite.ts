@@ -801,10 +801,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               fn0_role: "worker",
             },
           },
-          // The tenancy-compute-cap quota leaves no room for two A1 instances
-          // at once, so a replacement must terminate the old instance before
-          // creating the new one.
-          { parent: this, deleteBeforeReplace: true },
+          { parent: this },
         ),
       );
     }
@@ -1010,6 +1007,8 @@ function renderCloudInit(
   });
   const workerEnvFile = renderEnvFile(workerEnv);
   // Hardcoded UID 1000: opc is always uid 1000 on Oracle Linux cloud images.
+  // --security-opt label=disable: OL ships SELinux enforcing, which otherwise
+  // blocks the container from the bind-mounted podman socket and config dirs.
   const agentSystemdUnit = `[Unit]
 Description=fn0 worker agent
 After=network-online.target
@@ -1021,6 +1020,7 @@ User=opc
 ExecStartPre=-/usr/bin/podman rm -f fn0-agent
 ExecStartPre=/usr/bin/podman pull ${agentImageRef}
 ExecStart=/usr/bin/podman run --name fn0-agent --rm \\
+  --security-opt label=disable \\
   --network host \\
   -e FN0_WORKER_AGENT_PODMAN_REMOTE_URL=unix:///run/podman/podman.sock \\
   -e FN0_WORKER_AGENT_SOFT_SHUTDOWN_ON_SIGTERM=1 \\
@@ -1028,6 +1028,7 @@ ExecStart=/usr/bin/podman run --name fn0-agent --rm \\
   -e FN0_WORKER_AGENT_PROXY_TARGET_FILE=/etc/fn0-worker-proxy/target \\
   --env-file /etc/fn0-worker-agent/env \\
   -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock \\
+  -v /etc/fn0-worker-agent:/etc/fn0-worker-agent:ro \\
   -v /etc/fn0-worker-proxy:/etc/fn0-worker-proxy \\
   ${agentImageRef}
 ExecStop=/usr/bin/podman stop -t 30 fn0-agent
@@ -1048,6 +1049,7 @@ User=opc
 ExecStartPre=-/usr/bin/podman rm -f fn0-proxy
 ExecStartPre=/usr/bin/podman pull ${proxyImageRef}
 ExecStart=/usr/bin/podman run --name fn0-proxy --rm \\
+  --security-opt label=disable \\
   --network host \\
   -e FN0_WORKER_PROXY_TARGET_FILE=/etc/fn0-worker-proxy/target \\
   -v /etc/fn0-worker-proxy:/etc/fn0-worker-proxy:ro \\
