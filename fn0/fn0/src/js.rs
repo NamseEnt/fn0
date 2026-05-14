@@ -1,3 +1,4 @@
+use crate::execute::WasmInjectEnvelope;
 use crate::self_invoke;
 use crate::{Body, Request, Response};
 use anyhow::anyhow;
@@ -5,10 +6,19 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::http::header;
 use ski::{FetchHandler, FetchHandlerFuture};
+use tokio::sync::mpsc;
 
 pub(crate) const SELF_INVOKE_PATH_PREFIX: &str = "/__self_invoke/";
 
-pub(crate) struct WasmForwardingFetchHandler;
+pub(crate) struct WasmForwardingFetchHandler {
+    sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
+}
+
+impl WasmForwardingFetchHandler {
+    pub(crate) fn new(sender: mpsc::UnboundedSender<WasmInjectEnvelope>) -> Self {
+        Self { sender }
+    }
+}
 
 impl FetchHandler for WasmForwardingFetchHandler {
     fn handle(&self, req: Request) -> FetchHandlerFuture {
@@ -16,8 +26,9 @@ impl FetchHandler for WasmForwardingFetchHandler {
         if !path.starts_with(SELF_INVOKE_PATH_PREFIX) {
             return Box::pin(async { None });
         }
+        let sender = self.sender.clone();
         Box::pin(async move {
-            match self_invoke::call_wasm_direct(req).await {
+            match self_invoke::call_wasm_direct(sender, req).await {
                 Ok(resp) => Some(resp),
                 Err(e) => Some(error_response(500, &format!("self-invoke failed: {e}"))),
             }

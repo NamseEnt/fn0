@@ -4,11 +4,14 @@ pub mod execute;
 mod js;
 pub mod measure_cpu_time;
 pub mod otlp_hijack;
+mod panic_util;
 pub mod queue_hijack;
 mod self_invoke;
 pub mod telemetry;
 pub mod turso_hijack;
 pub mod vault_hijack;
+
+pub use panic_util::panic_payload_string;
 
 use crate::measure_cpu_time::SystemClock;
 use anyhow::{Result, anyhow};
@@ -16,10 +19,12 @@ use bytes::Bytes;
 pub use cache::{Bundle, BundleCache, build_service_pre};
 use execute::ClientState;
 pub use execute::{build_linker, spawn_epoch_ticker};
+use futures::FutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::UnsyncBoxBody;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use wasmtime::Engine;
@@ -313,8 +318,9 @@ impl<C: BundleCache> CodeExecutor<C> {
             .as_ref()
             .ok_or_else(|| anyhow!("bundle has no js code for {project_id}"))?;
 
+        let wasm_sender = self.wasm_instance_sender(project_id, bundle);
         let fetch_handler: std::sync::Arc<dyn ski::FetchHandler> =
-            std::sync::Arc::new(js::WasmForwardingFetchHandler);
+            std::sync::Arc::new(js::WasmForwardingFetchHandler::new(wasm_sender));
 
         let instance = std::rc::Rc::new(ski::SkiInstance::load(
             js_code,
@@ -369,21 +375,36 @@ impl<C: BundleCache> CodeExecutor<C> {
         let queue_hijack = ctx.queue_hijack.clone();
         let control_invoke_queue_hijack = ctx.control_invoke_queue_hijack.clone();
         let vault_hijack = ctx.vault_hijack.clone();
+        let project_id_for_log = project_id_owned.clone();
+        let self_invoke_sender = tx.clone();
         tokio::task::spawn_local(async move {
-            let result = execute::run_wasm_instance_loop(
+            let outcome = AssertUnwindSafe(execute::run_wasm_instance_loop(
                 &ctx.engine,
                 bundle,
                 project_id_owned,
+                self_invoke_sender,
                 rx,
                 turso_hijack,
                 otlp_hijack,
                 queue_hijack,
                 control_invoke_queue_hijack,
                 vault_hijack,
-            )
+            ))
+            .catch_unwind()
             .await;
-            if let Err(e) = result {
-                tracing::error!(?e, "wasm instance loop failed");
+            match outcome {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    tracing::error!(project_id = %project_id_for_log, ?e, "wasm instance loop failed");
+                }
+                Err(panic) => {
+                    let panic_msg = panic_util::panic_payload_string(&panic);
+                    tracing::error!(
+                        project_id = %project_id_for_log,
+                        panic = %panic_msg,
+                        "wasm instance loop panicked; receiver dropped, all subsequent envelopes will fail"
+                    );
+                }
             }
         });
 

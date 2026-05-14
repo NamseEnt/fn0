@@ -1,6 +1,6 @@
 use crate::cache::Bundle;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
-use crate::self_invoke::{self, SELF_HOST, SelfInvokeHooks, call_service, scope_wasm_execution};
+use crate::self_invoke::{self, SELF_HOST, SelfInvokeHooks, call_service};
 use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
@@ -201,6 +201,7 @@ pub async fn run_wasm_instance_loop(
     engine: &Engine,
     bundle: Arc<Bundle>,
     project_id: String,
+    self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
     mut rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<crate::OtlpHijack>>,
@@ -219,6 +220,7 @@ pub async fn run_wasm_instance_loop(
         is_timeout.clone(),
         SelfInvokeHooks::new(
             project_id.clone(),
+            self_invoke_sender,
             turso_hijack.clone(),
             otlp_hijack.clone(),
             queue_hijack.clone(),
@@ -243,61 +245,58 @@ pub async fn run_wasm_instance_loop(
     let project_id_for_closure = project_id.clone();
     let run_result = store
         .run_concurrent(async move |accessor| -> Result<()> {
-            scope_wasm_execution(accessor, &service, async {
-                let mut pending: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>> =
-                    FuturesUnordered::new();
+            let mut pending: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>> =
+                FuturesUnordered::new();
 
-                loop {
-                    tokio::select! {
-                        biased;
-                        maybe = rx.recv() => {
-                            match maybe {
-                                Some((req, resp_tx)) => {
-                                    let self_host = self_invoke::extract_host(req.headers())
-                                        .unwrap_or_default();
-                                    let service_ref = &service;
-                                    let project_id = project_id_for_closure.clone();
-                                    let time_tracker = time_tracker.clone();
-                                    let is_timeout = is_timeout.clone();
-                                    pending.push(Box::pin(async move {
-                                        let result = SELF_HOST
-                                            .scope(self_host, async move {
-                                                let req_http = req.map(|body| {
-                                                    body.map_err(|err| {
-                                                        ErrorCode::InternalError(Some(err.to_string()))
-                                                    })
-                                                    .boxed_unsync()
-                                                });
-                                                let (p3_req, req_io) = P3Request::from_http(req_http);
-                                                call_service(
-                                                    accessor,
-                                                    service_ref,
-                                                    p3_req,
-                                                    req_io,
-                                                    &project_id,
-                                                    time_tracker,
-                                                    &is_timeout,
-                                                )
-                                                .await
-                                            })
-                                            .await;
-                                        let _ = resp_tx.send(result);
-                                    }));
-                                }
-                                None => {
-                                    while pending.next().await.is_some() {}
-                                    break;
-                                }
+            loop {
+                tokio::select! {
+                    biased;
+                    maybe = rx.recv() => {
+                        match maybe {
+                            Some((req, resp_tx)) => {
+                                let self_host = self_invoke::extract_host(req.headers())
+                                    .unwrap_or_default();
+                                let service_ref = &service;
+                                let project_id = project_id_for_closure.clone();
+                                let time_tracker = time_tracker.clone();
+                                let is_timeout = is_timeout.clone();
+                                pending.push(Box::pin(async move {
+                                    let result = SELF_HOST
+                                        .scope(self_host, async move {
+                                            let req_http = req.map(|body| {
+                                                body.map_err(|err| {
+                                                    ErrorCode::InternalError(Some(err.to_string()))
+                                                })
+                                                .boxed_unsync()
+                                            });
+                                            let (p3_req, req_io) = P3Request::from_http(req_http);
+                                            call_service(
+                                                accessor,
+                                                service_ref,
+                                                p3_req,
+                                                req_io,
+                                                &project_id,
+                                                time_tracker,
+                                                &is_timeout,
+                                            )
+                                            .await
+                                        })
+                                        .await;
+                                    let _ = resp_tx.send(result);
+                                }));
+                            }
+                            None => {
+                                while pending.next().await.is_some() {}
+                                break;
                             }
                         }
-                        Some(()) = pending.next() => {}
                     }
+                    Some(()) = pending.next() => {}
                 }
+            }
 
-                telemetry::cpu_time(&project_id_for_closure, time_tracker.duration());
-                Ok(())
-            })
-            .await
+            telemetry::cpu_time(&project_id_for_closure, time_tracker.duration());
+            Ok(())
         })
         .await;
 

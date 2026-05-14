@@ -1,7 +1,7 @@
 use anyhow::Result;
 use bytes::Bytes;
 use fn0::cache::BundleCache;
-use fn0::{CodeExecutor, ExecutionContext};
+use fn0::{CodeExecutor, ExecutionContext, panic_payload_string};
 use futures::FutureExt;
 use http_body_util::combinators::UnsyncBoxBody;
 use std::hash::Hasher;
@@ -112,16 +112,6 @@ where
     }));
 
     tracing::info!(worker = idx, "worker thread exiting");
-}
-
-fn panic_payload_string(payload: &Box<dyn std::any::Any + Send>) -> String {
-    if let Some(s) = payload.downcast_ref::<&'static str>() {
-        (*s).to_string()
-    } else if let Some(s) = payload.downcast_ref::<String>() {
-        s.clone()
-    } else {
-        format!("non-string panic payload (type_id={:?})", payload.type_id())
-    }
 }
 
 pub fn default_num_threads() -> usize {

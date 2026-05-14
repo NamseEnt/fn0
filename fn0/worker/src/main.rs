@@ -100,11 +100,38 @@ fn main() -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
     let telemetry_providers = telemetry::setup(&otlp_endpoint, Some(&otlp_basic_auth))?;
+    install_panic_hook();
 
     let result = rt.block_on(run());
 
     telemetry::shutdown(telemetry_providers)?;
     result
+}
+
+fn install_panic_hook() {
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "<unknown>".to_string());
+        let payload = info.payload();
+        let message = if let Some(s) = payload.downcast_ref::<&'static str>() {
+            (*s).to_string()
+        } else if let Some(s) = payload.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "<non-string panic payload>".to_string()
+        };
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        tracing::error!(
+            location = %location,
+            message = %message,
+            backtrace = %backtrace,
+            "panic captured"
+        );
+        prev(info);
+    }));
 }
 
 async fn run() -> Result<()> {
