@@ -1,3 +1,11 @@
 - This project uses English everywhere (code, comments, docs, commit messages).
+- Comments: write only what code and history tools cannot carry. Run every comment through 3 filters, drop it if it fails any:
+  1. Can it be expressed in code? (renaming, types, structure) → fix the code, not add a comment.
+  2. Does Git (commit/blame) or the issue tracker already record it? → leave it there. No `// fixed issue #1425`, no change logs, no commented-out code.
+  3. Would a competent teammate actually break something without this `why`? → if no, skip it even if it is a real `why`.
+  - Worth keeping (passes all 3): non-obvious intent/rationale, unidiomatic code that looks wrong but is correct, workarounds / perf trade-offs / system limits, links to external sources or standards, `// TODO`, math derivations.
+  - Never write: code restating (`i += 1; // add one`), syntax explanation, comments excusing bad names, commented-out code, history/bugfix notes, stale comments. Update comments when the code changes.
+  - `why` is necessary but not sufficient — skip a `why` that is self-evident, has no consequence, is already encoded elsewhere, or is speculative/future.
+- Rust `//!` doc comments are a separate category — they are public API documentation for `cargo doc` readers, not inline code commentary, so the "write only necessary comments" rule does not gate them. Add a `//!` at the top of `lib.rs`/`main.rs` (crate purpose, setup, gotchas) and at the top of a module file when its role/interactions are not obvious from structure; first line is a one-line summary. Do not add trivial `//! User module`-style headers to self-evident internal modules.
 - Rust: verify with `cargo clippy`, not `cargo check`. 0 warnings + 0 errors.
 - Grafana Cloud logs: never trust the portal `status` field or UI to judge ingest/query health. Always probe the data plane directly — `POST {otlpUrl}/v1/logs` (expect 204) for ingest, `GET {lokiUrl}/loki/api/v1/query_range` (expect 200) for query, using stack id + `grafana:cloudAccessPolicyToken` as Basic auth. `status: paused` is a portal-level metadata flag and does not necessarily block ingest/query.
