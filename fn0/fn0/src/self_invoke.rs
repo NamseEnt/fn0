@@ -149,10 +149,10 @@ impl WasiHttpHooks for SelfInvokeHooks {
         if let Some(hijack) = self.otlp_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return otlp_send(hijack, request, options);
+            return otlp_send(hijack, self.project_id.clone(), request, options);
         }
 
-        default_send(request, options)
+        default_send(self.project_id.clone(), request, options)
     }
 }
 
@@ -192,7 +192,9 @@ fn turso_send(
             return Err(e.into());
         }
 
+        let send_start = std::time::Instant::now();
         let (res, io) = default_send_request(request, options).await?;
+        telemetry::stage_duration("hijack_turso", &project_id, send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))
@@ -221,7 +223,9 @@ fn queue_send(
 
         match action {
             crate::queue_hijack::HijackAction::Forward(signed) => {
+                let send_start = std::time::Instant::now();
                 let (res, io) = default_send_request(signed, options).await?;
+                telemetry::stage_duration("hijack_queue", &project_id, send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
                     Box::new(io);
@@ -256,7 +260,13 @@ fn control_invoke_queue_send(
 
         match action {
             crate::control_invoke_queue_hijack::HijackAction::Forward(signed) => {
+                let send_start = std::time::Instant::now();
                 let (res, io) = default_send_request(signed, options).await?;
+                telemetry::stage_duration(
+                    "hijack_control_invoke",
+                    &project_id,
+                    send_start.elapsed(),
+                );
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
                     Box::new(io);
@@ -296,7 +306,9 @@ fn vault_send(
             Err(ec) => return Err(ec.into()),
         };
 
+        let send_start = std::time::Instant::now();
         let (res, io) = default_send_request(signed, options).await?;
+        telemetry::stage_duration("hijack_vault", &project_id, send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))
@@ -305,6 +317,7 @@ fn vault_send(
 
 fn otlp_send(
     hijack: Arc<OtlpHijack>,
+    project_id: String,
     mut request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
@@ -324,9 +337,11 @@ fn otlp_send(
         let forward_request = http::Request::from_parts(parts, forward_body);
 
         tokio::task::spawn_local(async move {
+            let send_start = std::time::Instant::now();
             match default_send_request(forward_request, options).await {
                 Ok((_resp, io)) => {
                     let _ = io.await;
+                    telemetry::stage_duration("hijack_otlp", &project_id, send_start.elapsed());
                 }
                 Err(err) => {
                     tracing::warn!(?err, "otlp forward failed");
@@ -349,11 +364,14 @@ fn otlp_send(
 }
 
 fn default_send(
+    project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
+        let send_start = std::time::Instant::now();
         let (res, io) = default_send_request(request, options).await?;
+        telemetry::stage_duration("outbound_fetch", &project_id, send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))

@@ -273,6 +273,7 @@ impl Consumer {
             code_id: wrapped.project_id.clone(),
             req,
             resp_tx,
+            enqueued_at: std::time::Instant::now(),
         };
 
         if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {

@@ -19,6 +19,7 @@ pub struct RequestEnvelope {
     pub code_id: String,
     pub req: Request,
     pub resp_tx: oneshot::Sender<Result<Response>>,
+    pub enqueued_at: std::time::Instant,
 }
 
 pub enum DispatchError {
@@ -83,12 +84,14 @@ where
     rt.block_on(local.run_until(async move {
         let executor = Rc::new(CodeExecutor::new(ctx));
         while let Some(env) = rx.recv().await {
+            fn0::telemetry::stage_duration("queue_wait", &env.code_id, env.enqueued_at.elapsed());
             let executor = executor.clone();
             tokio::task::spawn_local(async move {
                 let RequestEnvelope {
                     code_id,
                     req,
                     resp_tx,
+                    enqueued_at: _,
                 } = env;
                 let outcome =
                     AssertUnwindSafe(executor.run(&code_id, "/", req, None))
@@ -96,10 +99,13 @@ where
                         .await;
                 match outcome {
                     Ok(result) => {
-                        let _ = resp_tx.send(result);
+                        if resp_tx.send(result).is_err() {
+                            fn0::telemetry::oneshot_drop_before_response(&code_id);
+                        }
                     }
                     Err(panic) => {
                         let panic_msg = panic_payload_string(&panic);
+                        fn0::telemetry::panicked(&code_id);
                         tracing::error!(
                             %code_id,
                             panic = %panic_msg,

@@ -233,6 +233,7 @@ pub async fn run_wasm_instance_loop(
         vault_hijack.as_deref(),
     );
 
+    let instantiate_start = std::time::Instant::now();
     let service = bundle
         .service_pre
         .instantiate_async(&mut store)
@@ -241,6 +242,7 @@ pub async fn run_wasm_instance_loop(
             telemetry::wasmtime_error("instantiate_async", &project_id, &format!("{error:?}"));
             anyhow!("instantiate_async failed: {error:?}")
         })?;
+    telemetry::stage_duration("instantiate", &project_id, instantiate_start.elapsed());
 
     let project_id_for_closure = project_id.clone();
     let run_result = store
@@ -258,9 +260,11 @@ pub async fn run_wasm_instance_loop(
                                     .unwrap_or_default();
                                 let service_ref = &service;
                                 let project_id = project_id_for_closure.clone();
+                                let project_id_for_metric = project_id_for_closure.clone();
                                 let time_tracker = time_tracker.clone();
                                 let is_timeout = is_timeout.clone();
                                 pending.push(Box::pin(async move {
+                                    let call_start = std::time::Instant::now();
                                     let result = SELF_HOST
                                         .scope(self_host, async move {
                                             let req_http = req.map(|body| {
@@ -282,7 +286,16 @@ pub async fn run_wasm_instance_loop(
                                             .await
                                         })
                                         .await;
-                                    let _ = resp_tx.send(result);
+                                    telemetry::stage_duration(
+                                        "wasm_call",
+                                        &project_id_for_metric,
+                                        call_start.elapsed(),
+                                    );
+                                    if resp_tx.send(result).is_err() {
+                                        telemetry::oneshot_drop_before_response(
+                                            &project_id_for_metric,
+                                        );
+                                    }
                                 }));
                             }
                             None => {

@@ -33,6 +33,7 @@ pub type WorkerContext = ExecutionContext<S3BundleCache>;
 
 const DEFAULT_CACHE_SIZE_BYTES: usize = 512 * 1024 * 1024;
 const DEFAULT_OPS_PORT: u16 = 9090;
+const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
 
 pub fn read_pem_env(name: &str) -> Option<String> {
     if let Ok(v) = std::env::var(name) {
@@ -461,6 +462,7 @@ async fn handle_user_request(
         .to_string();
     let host_no_port = host.split(':').next().unwrap_or("").to_string();
 
+    let resolve_start = std::time::Instant::now();
     let code_id = match cache.resolve_domain(&host_no_port).await {
         Some(sub) => sub,
         None => host_no_port
@@ -469,6 +471,7 @@ async fn handle_user_request(
             .unwrap_or("unknown")
             .to_string(),
     };
+    fn0::telemetry::stage_duration("resolve_domain", &code_id, resolve_start.elapsed());
 
     let mapped_req = req.map(|body| {
         UnsyncBoxBody::new(body)
@@ -481,6 +484,7 @@ async fn handle_user_request(
         code_id: code_id.clone(),
         req: mapped_req,
         resp_tx,
+        enqueued_at: std::time::Instant::now(),
     };
 
     if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
@@ -502,13 +506,22 @@ async fn handle_user_request(
         }
     }
 
-    let run_result = match resp_rx.await {
-        Ok(r) => r,
-        Err(_) => {
+    let run_result = match tokio::time::timeout(REQUEST_DEADLINE, resp_rx).await {
+        Ok(Ok(r)) => r,
+        Ok(Err(_)) => {
             tracing::error!(%code_id, "worker dropped response channel");
             return Ok(hyper::Response::builder()
                 .status(500)
                 .body(Full::new(Bytes::from("Internal Server Error")))
+                .unwrap());
+        }
+        Err(_) => {
+            fn0::telemetry::request_deadline_exceeded(&code_id);
+            tracing::error!(%code_id, "request exceeded deadline");
+            return Ok(hyper::Response::builder()
+                .status(504)
+                .header("connection", "close")
+                .body(Full::new(Bytes::from("Gateway Timeout")))
                 .unwrap());
         }
     };
@@ -516,11 +529,19 @@ async fn handle_user_request(
     match run_result {
         Ok(resp) => {
             let (parts, body) = resp.into_parts();
+            let collect_start = std::time::Instant::now();
             let collected: std::result::Result<http_body_util::Collected<Bytes>, anyhow::Error> =
                 body.collect().await;
+            fn0::telemetry::stage_duration("body_collect", &code_id, collect_start.elapsed());
             let body_bytes = match collected {
                 Ok(c) => c.to_bytes(),
-                Err(_) => Bytes::new(),
+                Err(err) => {
+                    tracing::error!(%err, %code_id, "response body collect failed");
+                    return Ok(hyper::Response::builder()
+                        .status(502)
+                        .body(Full::new(Bytes::from("Bad Gateway")))
+                        .unwrap());
+                }
             };
             Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)))
         }

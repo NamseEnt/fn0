@@ -138,3 +138,28 @@ pub fn execution_time(code_id: &str, route: &str, duration: Duration) {
         ],
     );
 }
+
+pub fn panicked(code_id: &str) {
+    let counter = global::meter("fn0").u64_counter("panicked").build();
+    counter.add(1, &[KeyValue::new("code_id", code_id.to_string())]);
+}
+
+pub fn request_deadline_exceeded(code_id: &str) {
+    let counter = global::meter("fn0")
+        .u64_counter("request_deadline_exceeded")
+        .build();
+    counter.add(1, &[KeyValue::new("code_id", code_id.to_string())]);
+}
+
+pub fn stage_duration(stage: &'static str, code_id: &str, duration: Duration) {
+    let histogram = global::meter("fn0")
+        .f64_histogram("stage_duration_seconds")
+        .build();
+    histogram.record(
+        duration.as_secs_f64(),
+        &[
+            KeyValue::new("stage", stage),
+            KeyValue::new("code_id", code_id.to_string()),
+        ],
+    );
+}
