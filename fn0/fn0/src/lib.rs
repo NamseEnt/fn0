@@ -192,7 +192,9 @@ impl<C: BundleCache> CodeExecutor<C> {
         request: Request,
         _fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
+        let bundle_start = std::time::Instant::now();
         let bundle = self.ctx.bundle_cache.get(project_id).await?;
+        telemetry::stage_duration("bundle_get", project_id, bundle_start.elapsed());
 
         telemetry::function_invocation(project_id);
         let start = std::time::Instant::now();
@@ -351,14 +353,20 @@ impl<C: BundleCache> CodeExecutor<C> {
         {
             let mut instances = self.instances.borrow_mut();
             if let Some(slot) = instances.get(project_id) {
-                if Arc::ptr_eq(&slot.bundle, bundle) {
+                let same_bundle = Arc::ptr_eq(&slot.bundle, bundle);
+                let alive = !slot.sender.is_closed();
+                if same_bundle && alive {
                     return slot.sender.clone();
+                }
+                if same_bundle && !alive {
+                    tracing::warn!(project_id, "wasm instance dead; respawning");
                 }
                 instances.remove(project_id);
             }
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
+        telemetry::create_instance(project_id);
         self.instances.borrow_mut().insert(
             project_id.to_string(),
             WasmSlot {
@@ -399,10 +407,11 @@ impl<C: BundleCache> CodeExecutor<C> {
                 }
                 Err(panic) => {
                     let panic_msg = panic_util::panic_payload_string(&panic);
+                    telemetry::panicked(&project_id_for_log);
                     tracing::error!(
                         project_id = %project_id_for_log,
                         panic = %panic_msg,
-                        "wasm instance loop panicked; receiver dropped, all subsequent envelopes will fail"
+                        "wasm instance loop panicked; will respawn on next request"
                     );
                 }
             }
