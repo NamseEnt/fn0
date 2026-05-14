@@ -801,7 +801,10 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               fn0_role: "worker",
             },
           },
-          { parent: this },
+          // The tenancy-compute-cap quota leaves no room for two A1 instances
+          // at once, so a replacement must terminate the old instance before
+          // creating the new one.
+          { parent: this, deleteBeforeReplace: true },
         ),
       );
     }
