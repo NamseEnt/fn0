@@ -225,11 +225,30 @@ impl Consumer {
         msg: IncomingMessage,
         worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     ) -> Result<()> {
-        let content_bytes = base64::engine::general_purpose::STANDARD
+        let content_bytes = match base64::engine::general_purpose::STANDARD
             .decode(msg.content.as_bytes())
-            .map_err(|e| anyhow!("queue content base64: {e}"))?;
-        let wrapped: WrappedMessage = serde_json::from_slice(&content_bytes)
-            .map_err(|e| anyhow!("queue content parse: {e}"))?;
+        {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                tracing::warn!(
+                    receipt = %msg.receipt,
+                    error = %e,
+                    "queue content base64 unrecoverable; acking malformed message"
+                );
+                return self.delete_message(&msg.receipt).await;
+            }
+        };
+        let wrapped: WrappedMessage = match serde_json::from_slice(&content_bytes) {
+            Ok(w) => w,
+            Err(e) => {
+                tracing::warn!(
+                    receipt = %msg.receipt,
+                    error = %e,
+                    "queue content parse unrecoverable; acking malformed message"
+                );
+                return self.delete_message(&msg.receipt).await;
+            }
+        };
 
         let inner_body = serde_json::to_vec(&serde_json::json!({
             "task_name": wrapped.task_name,

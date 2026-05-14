@@ -2,8 +2,10 @@ use anyhow::Result;
 use bytes::Bytes;
 use fn0::cache::BundleCache;
 use fn0::{CodeExecutor, ExecutionContext};
+use futures::FutureExt;
 use http_body_util::combinators::UnsyncBoxBody;
 use std::hash::Hasher;
+use std::panic::AssertUnwindSafe;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
@@ -88,13 +90,38 @@ where
                     req,
                     resp_tx,
                 } = env;
-                let result = executor.run(&code_id, "/", req, None).await;
-                let _ = resp_tx.send(result);
+                let outcome =
+                    AssertUnwindSafe(executor.run(&code_id, "/", req, None))
+                        .catch_unwind()
+                        .await;
+                match outcome {
+                    Ok(result) => {
+                        let _ = resp_tx.send(result);
+                    }
+                    Err(panic) => {
+                        let panic_msg = panic_payload_string(&panic);
+                        tracing::error!(
+                            %code_id,
+                            panic = %panic_msg,
+                            "executor panicked; response channel dropped"
+                        );
+                    }
+                }
             });
         }
     }));
 
     tracing::info!(worker = idx, "worker thread exiting");
+}
+
+fn panic_payload_string(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        format!("non-string panic payload (type_id={:?})", payload.type_id())
+    }
 }
 
 pub fn default_num_threads() -> usize {
