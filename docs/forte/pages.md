@@ -39,7 +39,11 @@ pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
 
 The `Props` type is serialized to JSON and passed to the React component via the SSR pipeline.
 
-> **Scaffold note:** `forte add page` generates a starter file with the signature `handler(_headers: HeaderMap, _jar: CookieJar)`. This does **not** match the calling convention — the generated router always passes a `ForteRequest` struct as the first argument. Replace the generated signature with `handler(_req: ForteRequest<'_>)` before running `forte build`.
+> **Scaffold note:** `forte add page` generates starter code with several issues that must be fixed before running `forte build`:
+>
+> 1. **Wrong handler signature.** The generated signature is `handler(_headers: HeaderMap, _jar: CookieJar)`. The generated router always passes a `ForteRequest` struct. Replace it with `handler(_req: ForteRequest<'_>)`.
+> 2. **Wrong path-params struct name (dynamic routes).** For pages with `[param]` segments, the scaffold generates a struct named `Params` instead of `PathParams`. Codegen looks for a struct named exactly `PathParams`; rename it, or path parameters will not be extracted (the handler will not receive them).
+> 3. **Wrong frontend props access.** The generated React component uses `props.v.message` for struct-variant props. Struct variants are spread flat (see [React Component](#react-component) below), so the correct access is `props.message` after narrowing with `props.t === "Ok"`.
 
 ## ForteRequest
 
