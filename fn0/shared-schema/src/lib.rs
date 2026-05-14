@@ -17,9 +17,10 @@ pub struct WorkerManifestDoc {
 }
 
 #[forte_doc]
-pub struct WorkerHeartbeatDoc {
+pub struct WorkerHostStatusDoc {
     #[sk]
     pub host_id: String,
     pub addr: String,
-    pub last_seen_at: i64,
+    pub active_image_ref: Option<String>,
+    pub reported_at: i64,
 }

@@ -1,6 +1,6 @@
 use crate::common::admin;
 use fn0_shared_schema::{
-    DbRequest, WorkerHeartbeatDoc, WorkerHeartbeatDocDelete, WorkerHeartbeatDocQuery,
+    DbRequest, WorkerHostStatusDoc, WorkerHostStatusDocDelete, WorkerHostStatusDocQuery,
 };
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ pub async fn run_sweep() -> anyhow::Result<SweepStats> {
     }
 
     let db = doc_db::turso();
-    let docs: Vec<WorkerHeartbeatDoc> = WorkerHeartbeatDocQuery {
+    let docs: Vec<WorkerHostStatusDoc> = WorkerHostStatusDocQuery {
         host_id: None,
         limit: None,
     }
@@ -57,9 +57,9 @@ pub async fn run_sweep() -> anyhow::Result<SweepStats> {
 
     let scanned_instances = docs.len() as u64;
     let now = chrono::Utc::now().timestamp();
-    let stale: Vec<WorkerHeartbeatDoc> = docs
+    let stale: Vec<WorkerHostStatusDoc> = docs
         .into_iter()
-        .filter(|d| now - d.last_seen_at > ZOMBIE_TIMEOUT_SECS)
+        .filter(|d| now - d.reported_at > ZOMBIE_TIMEOUT_SECS)
         .collect();
 
     let client = http::Client::new();
@@ -99,7 +99,7 @@ pub async fn run_sweep() -> anyhow::Result<SweepStats> {
             continue;
         }
 
-        if let Err(e) = (WorkerHeartbeatDocDelete {
+        if let Err(e) = (WorkerHostStatusDocDelete {
             host_id: d.host_id.clone(),
         })
         .send_with(&db)
