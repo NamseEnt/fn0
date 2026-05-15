@@ -110,7 +110,7 @@ lokiq() {
     "$LOKI/loki/api/v1/query_range" 2>/dev/null
 }
 lokiq '{service_name="fn0-worker"} |~ "worker threads started|executor panicked|panic captured|wasm instance dead|request exceeded deadline|response body collect failed|wasm instance loop panicked"' 30 \
- | python3 -c "import sys,json,datetime,collections
+ | python3 -c "import sys,json,collections
 try:
   rs=json.load(sys.stdin)['data']['result']
   lines=[(v[0],v[1]) for s in rs for v in s.get('values',[])]
@@ -121,6 +121,12 @@ try:
       if key in m: counts[key]+=1
   for k,c in counts.items(): print(f'    {c:4d}  {k}')
   if not counts: print('    (clean)')
+  panics=collections.Counter()
+  for s in rs:
+    p=s.get('stream',{}).get('panic')
+    if p: panics[p]+=len(s.get('values',[]))
+  for p,c in sorted(panics.items(),key=lambda x:-x[1]):
+    print(f'      panic ({c}x): {p}')
 except Exception as e: print('    query failed:',e)"
 
 loki_count() {
