@@ -86,7 +86,7 @@ mod proxy {
         { inline :
         "package forte:user; world service-export { import wasi:http/types@0.3.0-rc-2026-03-15; export wasi:http/handler@0.3.0-rc-2026-03-15; }",
         path :
-        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/release/build/fn0-control-f6e9b948ff726a5a/out/forte-wit",
+        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/debug/build/fn0-control-8d7b5d5a33ab1b06/out/forte-wit",
         world : "service-export", default_bindings_module :
         "crate::route_generated::proxy", pub_export_macro : true, async : true, features
         : ["clocks-timezone"], with : { "wasi:http/handler@0.3.0-rc-2026-03-15" :
@@ -382,7 +382,15 @@ async fn handle_action(
     match action_name {
         "set_pending_fn0_wasmtime" => {
             let input: crate::actions::set_pending_fn0_wasmtime::Input =
-                forte_json::from_slice(body_bytes)?;
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -403,7 +411,16 @@ async fn handle_action(
             ))
         }
         "revoke_token" => {
-            let input: crate::actions::revoke_token::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::revoke_token::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -424,7 +441,16 @@ async fn handle_action(
             ))
         }
         "domain_remove" => {
-            let input: crate::actions::domain_remove::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::domain_remove::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -446,7 +472,15 @@ async fn handle_action(
         }
         "promote_pending_fn0_wasmtime" => {
             let input: crate::actions::promote_pending_fn0_wasmtime::Input =
-                forte_json::from_slice(body_bytes)?;
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -467,7 +501,15 @@ async fn handle_action(
             ))
         }
         "deploy" => {
-            let input: crate::actions::deploy::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::deploy::Input = match forte_json::from_slice(body_bytes) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from(format!("invalid request body: {}", e)))
+                        .unwrap());
+                }
+            };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -488,7 +530,16 @@ async fn handle_action(
             ))
         }
         "zombie_sweep" => {
-            let input: crate::actions::zombie_sweep::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::zombie_sweep::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -509,7 +560,16 @@ async fn handle_action(
             ))
         }
         "secrets_init" => {
-            let input: crate::actions::secrets_init::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::secrets_init::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -530,7 +590,16 @@ async fn handle_action(
             ))
         }
         "new_project" => {
-            let input: crate::actions::new_project::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::new_project::Input = match forte_json::from_slice(body_bytes)
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from(format!("invalid request body: {}", e)))
+                        .unwrap());
+                }
+            };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -551,7 +620,16 @@ async fn handle_action(
             ))
         }
         "rename_project" => {
-            let input: crate::actions::rename_project::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::rename_project::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -572,7 +650,16 @@ async fn handle_action(
             ))
         }
         "bundle_compiled" => {
-            let input: crate::actions::bundle_compiled::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::bundle_compiled::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -593,7 +680,16 @@ async fn handle_action(
             ))
         }
         "secrets_encrypt" => {
-            let input: crate::actions::secrets_encrypt::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::secrets_encrypt::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -614,7 +710,16 @@ async fn handle_action(
             ))
         }
         "list_tokens" => {
-            let input: crate::actions::list_tokens::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::list_tokens::Input = match forte_json::from_slice(body_bytes)
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from(format!("invalid request body: {}", e)))
+                        .unwrap());
+                }
+            };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -635,7 +740,16 @@ async fn handle_action(
             ))
         }
         "issue_token" => {
-            let input: crate::actions::issue_token::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::issue_token::Input = match forte_json::from_slice(body_bytes)
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from(format!("invalid request body: {}", e)))
+                        .unwrap());
+                }
+            };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -656,7 +770,16 @@ async fn handle_action(
             ))
         }
         "cron_on_tick" => {
-            let input: crate::actions::cron_on_tick::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::cron_on_tick::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -677,7 +800,16 @@ async fn handle_action(
             ))
         }
         "domain_status" => {
-            let input: crate::actions::domain_status::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::domain_status::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -698,7 +830,16 @@ async fn handle_action(
             ))
         }
         "bundle_uploaded" => {
-            let input: crate::actions::bundle_uploaded::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::bundle_uploaded::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -719,7 +860,16 @@ async fn handle_action(
             ))
         }
         "domain_add" => {
-            let input: crate::actions::domain_add::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::domain_add::Input = match forte_json::from_slice(body_bytes)
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from(format!("invalid request body: {}", e)))
+                        .unwrap());
+                }
+            };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -740,7 +890,16 @@ async fn handle_action(
             ))
         }
         "deploy_status" => {
-            let input: crate::actions::deploy_status::Input = forte_json::from_slice(body_bytes)?;
+            let input: crate::actions::deploy_status::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
             let req = ForteRequest {
                 uri_authority,
                 method,
@@ -767,22 +926,65 @@ async fn handle_action(
     }
 }
 async fn handle_queue_task_execute(body_bytes: &[u8]) -> Result<Response<Body>> {
-    let request: forte_sdk::serde_json::Value = forte_sdk::serde_json::from_slice(body_bytes)?;
-    let task_name = request["task_name"]
-        .as_str()
-        .ok_or_else(|| forte_sdk::anyhow::Error::msg("missing task_name"))?;
-    let payload = request["payload"]
-        .as_str()
-        .ok_or_else(|| forte_sdk::anyhow::Error::msg("missing payload"))?;
+    let request: forte_sdk::serde_json::Value = match forte_sdk::serde_json::from_slice(body_bytes)
+    {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from(format!("invalid request body: {}", e)))
+                .unwrap());
+        }
+    };
+    let task_name = match request["task_name"].as_str() {
+        Some(s) => s,
+        None => {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("missing or non-string task_name"))
+                .unwrap());
+        }
+    };
+    let payload = match request["payload"].as_str() {
+        Some(s) => s,
+        None => {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("missing or non-string payload"))
+                .unwrap());
+        }
+    };
     let result = match task_name {
         "cloudflare_register" => {
             let input: crate::queue_task::cloudflare_register::Input =
-                forte_sdk::serde_json::from_str(payload)?;
+                match forte_sdk::serde_json::from_str(payload) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!(
+                                "invalid payload for task '{}': {}",
+                                task_name, e
+                            )))
+                            .unwrap());
+                    }
+                };
             crate::queue_task::cloudflare_register::handle(input).await
         }
         "cloudflare_unregister" => {
             let input: crate::queue_task::cloudflare_unregister::Input =
-                forte_sdk::serde_json::from_str(payload)?;
+                match forte_sdk::serde_json::from_str(payload) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!(
+                                "invalid payload for task '{}': {}",
+                                task_name, e
+                            )))
+                            .unwrap());
+                    }
+                };
             crate::queue_task::cloudflare_unregister::handle(input).await
         }
         _ => {
