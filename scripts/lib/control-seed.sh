@@ -44,7 +44,7 @@ __upsert_doc() {
   local url="$1" token="$2" pk="$3" sk="$4" data="$5"
   local data_b64
   data_b64="$(printf '%s' "$data" | base64 | tr -d '\n')"
-  local sql="INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0) ON CONFLICT(pk, sk) DO UPDATE SET data = excluded.data, version = docs.version + 1"
+  local sql="INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0) ON CONFLICT(pk, sk) DO UPDATE SET data = excluded.data, version = docs.version + 1 WHERE docs.data IS NOT excluded.data"
   local https_url="${url/libsql:\/\//https://}"
   https_url="${https_url%/}"
   local req
@@ -76,28 +76,41 @@ __upsert_doc() {
   rm -f "$resp_file"
 }
 
-# forte_doc generates an i64 pk by mapping the value through
-# `(value as u64).wrapping_add(2^63)` and then zero-padding to 20 digits.
-# Reproduce that mapping here so the pk we INSERT matches what
-# UserDocGet / control reads with.
-__forte_doc_pk_i64() {
-  python3 -c 'import sys; print(format(int(sys.argv[1]) + (1 << 63), "020d"))' "$1"
-}
-
-seed_user_doc() {
-  local db_url="$1" db_token="$2"
-  local github_id="$3" github_login="$4" project_id="$5"
-  local pk_id created_at data
-  pk_id="$(__forte_doc_pk_i64 "$github_id")"
-  created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  data="$(jq -nc \
-    --argjson gid "$github_id" \
-    --arg login "$github_login" \
-    --arg created "$created_at" \
-    --arg pid "$project_id" \
-    '{github_id:$gid, github_login:$login, created_at:$created, cli_tokens:[], web_sessions:[], projects:[{project_id:$pid, name:$pid}]}')"
-  echo ">> seed UserDoc github_id=${github_id}"
-  __upsert_doc "$db_url" "$db_token" "UserDoc/github_id=${pk_id}" "" "$data"
+# __insert_doc_if_missing <db_url> <db_token> <pk> <sk> <json_data>
+__insert_doc_if_missing() {
+  local url="$1" token="$2" pk="$3" sk="$4" data="$5"
+  local data_b64
+  data_b64="$(printf '%s' "$data" | base64 | tr -d '\n')"
+  local sql="INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0) ON CONFLICT(pk, sk) DO NOTHING"
+  local https_url="${url/libsql:\/\//https://}"
+  https_url="${https_url%/}"
+  local req
+  req="$(jq -nc \
+    --arg sql "$sql" \
+    --arg pk "$pk" \
+    --arg sk "$sk" \
+    --arg blob "$data_b64" \
+    '{requests:[{type:"execute",stmt:{sql:$sql,args:[{type:"text",value:$pk},{type:"text",value:$sk},{type:"blob",base64:$blob}]}},{type:"close"}]}')"
+  local resp_file http_code
+  resp_file="$(mktemp)"
+  http_code="$(curl -sS -o "$resp_file" -w '%{http_code}' \
+    -X POST "${https_url}/v2/pipeline" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    --data "$req")"
+  if [[ "$http_code" != "200" ]]; then
+    echo "doc insert HTTP ${http_code} for pk=${pk}" >&2
+    cat "$resp_file" >&2
+    rm -f "$resp_file"
+    return 1
+  fi
+  if jq -e '.results[0].type == "error"' <"$resp_file" >/dev/null 2>&1; then
+    echo "doc insert SQL error for pk=${pk}:" >&2
+    jq '.results[0]' <"$resp_file" >&2
+    rm -f "$resp_file"
+    return 1
+  fi
+  rm -f "$resp_file"
 }
 
 seed_project_doc() {
@@ -111,16 +124,16 @@ seed_project_doc() {
     --arg name "$name" \
     --arg created "$created_at" \
     '{project_id:$pid, owner_github_id:$owner, name:$name, created_at:$created}')"
-  echo ">> seed ProjectDoc project_id=${project_id}"
-  __upsert_doc "$db_url" "$db_token" "ProjectDoc/project_id=${project_id}" "" "$data"
+  echo ">> seed ProjectDoc project_id=${project_id} (insert-only)"
+  __insert_doc_if_missing "$db_url" "$db_token" "ProjectDoc/project_id=${project_id}" "" "$data"
 }
 
 seed_fn0_wasmtime_version() {
   local db_url="$1" db_token="$2" version="$3"
   local data
   data="$(jq -nc --arg v "$version" '{active:$v, pending:null}')"
-  echo ">> seed Fn0WasmtimeVersionDoc active=${version}"
-  __upsert_doc "$db_url" "$db_token" "Fn0WasmtimeVersionDoc" "" "$data"
+  echo ">> seed Fn0WasmtimeVersionDoc active=${version} (insert-only)"
+  __insert_doc_if_missing "$db_url" "$db_token" "Fn0WasmtimeVersionDoc" "" "$data"
 }
 
 seed_compiled_bundle() {

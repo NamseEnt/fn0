@@ -609,9 +609,6 @@ export const controlDbUrl = pulumi.interpolate`https://fn0-control${forteDb.host
 export const controlOwnerGithubId = config.requireNumber(
   "controlOwnerGithubId",
 );
-export const controlOwnerGithubLogin = config.require(
-  "controlOwnerGithubLogin",
-);
 export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
 export const vaultKeyOcid = ociGlobalVault.keyOcid;
 export const controlBootstrapEnvYaml = pulumi.secret(controlEnvYamlBootstrap);
