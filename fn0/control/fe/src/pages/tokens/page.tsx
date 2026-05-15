@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Props } from "./.props";
 import { issueToken } from "../../actions/.generated/issue_token";
 import { listTokens } from "../../actions/.generated/list_tokens";
@@ -11,15 +11,20 @@ type TokenRow = {
 };
 
 export default function TokensPage(props: Props) {
-    const [tokens, setTokens] = useState<TokenRow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [tokens, setTokens] = useState<TokenRow[]>(
+        props.tokens.map((t) => ({
+            id: t.id,
+            label: t.label,
+            createdAt: t.createdAt.toISOString(),
+        })),
+    );
     const [error, setError] = useState<string | null>(null);
     const [label, setLabel] = useState("");
     const [issuedToken, setIssuedToken] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     async function refresh() {
-        setLoading(true);
         const res = await listTokens({});
         if (res.t === "Ok") {
             setTokens(res.tokens);
@@ -27,12 +32,7 @@ export default function TokensPage(props: Props) {
         } else {
             setError("Not signed in.");
         }
-        setLoading(false);
     }
-
-    useEffect(() => {
-        refresh();
-    }, []);
 
     async function onIssue(e: React.FormEvent) {
         e.preventDefault();
@@ -42,6 +42,7 @@ export default function TokensPage(props: Props) {
         setBusy(false);
         if (res.t === "Ok") {
             setIssuedToken(res.token);
+            setCopied(false);
             setLabel("");
             refresh();
         } else if (res.t === "Error") {
@@ -49,6 +50,12 @@ export default function TokensPage(props: Props) {
         } else {
             setError("Not signed in.");
         }
+    }
+
+    async function onCopyIssuedToken() {
+        if (!issuedToken) return;
+        await navigator.clipboard.writeText(issuedToken);
+        setCopied(true);
     }
 
     async function onRevoke(id: string) {
@@ -96,21 +103,24 @@ export default function TokensPage(props: Props) {
                         border: "1px solid #888",
                         background: "#fffbe6",
                     }}
+                    data-fn0-token={issuedToken}
                 >
                     <p>
-                        <strong>Copy this token now.</strong> You will not see it again.
+                        <strong>Token issued.</strong> Click Copy to grab it — the value
+                        is not displayed on screen and will not be shown again.
                     </p>
-                    <code style={{ wordBreak: "break-all" }}>{issuedToken}</code>
-                    <div style={{ marginTop: 8 }}>
+                    <span style={visuallyHidden}>{issuedToken}</span>
+                    <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                        <button onClick={onCopyIssuedToken}>
+                            {copied ? "Copied" : "Copy token"}
+                        </button>
                         <button onClick={() => setIssuedToken(null)}>Done</button>
                     </div>
                 </div>
             )}
 
             <h2 style={{ marginTop: 32 }}>Existing tokens</h2>
-            {loading ? (
-                <p>Loading…</p>
-            ) : tokens.length === 0 ? (
+            {tokens.length === 0 ? (
                 <p>No tokens yet.</p>
             ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -118,7 +128,6 @@ export default function TokensPage(props: Props) {
                         <tr>
                             <th style={cell}>Label</th>
                             <th style={cell}>Created</th>
-                            <th style={cell}>Token id</th>
                             <th style={cell}></th>
                         </tr>
                     </thead>
@@ -127,9 +136,6 @@ export default function TokensPage(props: Props) {
                             <tr key={t.id}>
                                 <td style={cell}>{t.label}</td>
                                 <td style={cell}>{new Date(t.createdAt).toLocaleString()}</td>
-                                <td style={{ ...cell, fontFamily: "monospace", fontSize: 12 }}>
-                                    {t.id}
-                                </td>
                                 <td style={cell}>
                                     <button onClick={() => onRevoke(t.id)} disabled={busy}>
                                         Revoke
@@ -152,4 +158,16 @@ const cell: React.CSSProperties = {
     padding: 8,
     borderBottom: "1px solid #eee",
     textAlign: "left",
+};
+
+const visuallyHidden: React.CSSProperties = {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    border: 0,
 };
