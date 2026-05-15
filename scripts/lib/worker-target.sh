@@ -13,16 +13,15 @@ WORKER_CONVERGE_HOST_LIVE_WINDOW="${WORKER_CONVERGE_HOST_LIVE_WINDOW:-90}"  # se
 # which fits a worker docker pull + restart cycle without flagging it.
 WORKER_CONVERGE_ZERO_LIVE_LIMIT="${WORKER_CONVERGE_ZERO_LIVE_LIMIT:-18}"
 
-__doc_db_https_url() {
+__control_db_https_url() {
   local url
-  url="$(pulumi_pick docDbUrl)"
-  url="${url/libsql:\/\//https://}"
+  url="$(pulumi_pick controlDbUrl)"
   url="${url%/}"
   echo "$url"
 }
 
-__doc_db_token() {
-  pulumi_pick docDbToken
+__control_db_token() {
+  pulumi_pick forteDbGroupToken
 }
 
 __write_target_image_doc() {
@@ -32,8 +31,8 @@ __write_target_image_doc() {
     return 2
   fi
   local https_url token data_b64 sql req resp_file http_code
-  https_url="$(__doc_db_https_url)"
-  token="$(__doc_db_token)"
+  https_url="$(__control_db_https_url)"
+  token="$(__control_db_token)"
   data_b64="$(jq -nc --arg r "$image_ref" '{image_ref: $r}' | base64 | tr -d '\n')"
   sql="INSERT INTO docs (pk, sk, data, version) VALUES (?, '', ?, 0) ON CONFLICT(pk, sk) DO UPDATE SET data = excluded.data, version = docs.version + 1"
   req="$(jq -nc \
@@ -56,14 +55,14 @@ __write_target_image_doc() {
   if [[ "$http_code" != "200" ]] || ! jq -e '.results[0].type == "ok"' <"$resp_file" >/dev/null 2>&1; then
     cat "$resp_file" >&2
     rm -f "$resp_file"
-    echo "doc-db write failed (HTTP ${http_code})" >&2
+    echo "control DB write failed (HTTP ${http_code})" >&2
     return 1
   fi
   rm -f "$resp_file"
   echo ">> ${pk}.image_ref = ${image_ref}"
 }
 
-# Writes TargetFn0WorkerConfigDoc.image_ref directly to doc-db. Idempotent
+# Writes TargetFn0WorkerConfigDoc.image_ref directly to the control DB. Idempotent
 # (same image_ref re-written has no harm; version increments).
 write_worker_target_image() {
   local image_ref="$1"
@@ -85,8 +84,8 @@ wait_worker_target_converged() {
     return 2
   fi
   local https_url token sql req resp_file
-  https_url="$(__doc_db_https_url)"
-  token="$(__doc_db_token)"
+  https_url="$(__control_db_https_url)"
+  token="$(__control_db_token)"
   sql="SELECT data FROM docs WHERE pk = 'WorkerHostStatusDoc' ORDER BY sk"
   req="$(jq -nc --arg sql "$sql" \
     '{requests: [{type: "execute", stmt: {sql: $sql, args: []}}, {type: "close"}]}')"
@@ -107,7 +106,7 @@ wait_worker_target_converged() {
       --data-raw "$req" || echo 000)"
 
     if [[ "$http_code" != "200" ]] || ! jq -e '.results[0].type == "ok"' <"$resp_file" >/dev/null 2>&1; then
-      echo "  doc-db query failed (HTTP ${http_code}); retrying" >&2
+      echo "  control DB query failed (HTTP ${http_code}); retrying" >&2
     else
       now_epoch="$(date +%s)"
       rows="$(jq -c '.results[0].response.result.rows // []' <"$resp_file")"
