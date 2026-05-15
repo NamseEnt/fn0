@@ -69,6 +69,9 @@ pub async fn handler(
     };
 
     auth::create_session(req.jar, user).await?;
+    if let Some(pending) = auth::take_pending_cli_consent(req.jar) {
+        return Ok(Redirect::External { url: pending });
+    }
     Ok(Redirect::Tokens)
 }
 

@@ -10,8 +10,11 @@ type HmacSha256 = Hmac<Sha256>;
 
 pub const SESSION_COOKIE: &str = "fn0_session";
 pub const OAUTH_STATE_COOKIE: &str = "fn0_oauth_state";
+pub const PENDING_CLI_CONSENT_COOKIE: &str = "fn0_pending_cli_consent";
 const SESSION_MAX_AGE_DAYS: i64 = 30;
 const OAUTH_STATE_MAX_AGE_SECS: i64 = 600;
+const PENDING_CLI_CONSENT_MAX_AGE_SECS: i64 = 600;
+const PENDING_CLI_CONSENT_PATH_PREFIX: &str = "/oauth/cli/authorize";
 const CLI_TOKEN_PREFIX: &str = "fn0_";
 const CLI_TOKEN_PAYLOAD_LEN: usize = 24;
 
@@ -177,4 +180,41 @@ pub async fn bearer_user(headers: &::http::HeaderMap) -> Option<UserDoc> {
     let raw = headers.get(http_header::AUTHORIZATION)?.to_str().ok()?;
     let token = raw.strip_prefix("Bearer ")?.trim();
     verify_cli_token(token).await
+}
+
+pub fn stash_pending_cli_consent(jar: &mut CookieJar, url: &str) {
+    if !url.starts_with(PENDING_CLI_CONSENT_PATH_PREFIX) {
+        return;
+    }
+    jar.add(
+        cookie::CookieBuilder::new(PENDING_CLI_CONSENT_COOKIE, url.to_string())
+            .http_only(true)
+            .secure(true)
+            .same_site(cookie::SameSite::Lax)
+            .path("/")
+            .max_age(time::Duration::seconds(PENDING_CLI_CONSENT_MAX_AGE_SECS)),
+    );
+}
+
+pub fn is_loopback_redirect(redirect_uri: &str) -> bool {
+    let Ok(uri) = redirect_uri.parse::<::http::Uri>() else {
+        return false;
+    };
+    if uri.scheme_str() != Some("http") {
+        return false;
+    }
+    let Some(host) = uri.host() else {
+        return false;
+    };
+    matches!(host, "127.0.0.1" | "localhost" | "::1")
+}
+
+pub fn take_pending_cli_consent(jar: &mut CookieJar) -> Option<String> {
+    let cookie = jar.get(PENDING_CLI_CONSENT_COOKIE)?;
+    let url = cookie.value().to_string();
+    jar.remove(cookie::CookieBuilder::new(PENDING_CLI_CONSENT_COOKIE, "").path("/"));
+    if !url.starts_with(PENDING_CLI_CONSENT_PATH_PREFIX) {
+        return None;
+    }
+    Some(url)
 }

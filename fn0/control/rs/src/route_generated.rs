@@ -2,6 +2,8 @@
 mod pages_index;
 #[path = "pages/login/mod.rs"]
 mod pages_login;
+#[path = "pages/oauth/cli/authorize/mod.rs"]
+mod pages_oauth_cli_authorize;
 #[path = "pages/oauth/github/callback/mod.rs"]
 mod pages_oauth_github_callback;
 #[path = "pages/tokens/mod.rs"]
@@ -14,6 +16,7 @@ use forte_sdk::*;
 #[allow(non_camel_case_types)]
 pub enum Redirect {
     External { url: String },
+    OauthCliAuthorize,
     OauthGithubCallback,
     Index,
     Tokens,
@@ -23,6 +26,7 @@ impl Redirect {
     pub fn to_path(&self) -> String {
         match self {
             Redirect::External { url } => url.clone(),
+            Redirect::OauthCliAuthorize => "/oauth/cli/authorize".to_string(),
             Redirect::OauthGithubCallback => "/oauth/github/callback".to_string(),
             Redirect::Index => "/".to_string(),
             Redirect::Tokens => "/tokens".to_string(),
@@ -133,6 +137,9 @@ fn classify_route(path: &str) -> String {
     if path.strip_prefix("/__self_invoke/").is_some() {
         return "/__self_invoke/[name]".to_string();
     }
+    if path == "/oauth/cli/authorize" {
+        return "/oauth/cli/authorize".to_string();
+    }
     if path == "/oauth/github/callback" {
         return "/oauth/github/callback".to_string();
     }
@@ -189,7 +196,105 @@ async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
     if let Some(task_name) = path.strip_prefix("/__forte_admin/") {
         return handle_admin_task(task_name, &headers, &body_bytes).await;
     }
-    if path == "/oauth/github/callback" {
+    if path == "/oauth/cli/authorize" {
+        use std::collections::HashMap;
+        let query = parts.uri.query().unwrap_or("");
+        let query_params: HashMap<String, String> =
+            forte_sdk::form_urlencoded::parse(query.as_bytes())
+                .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                .collect();
+        let Some(redirect_uri) = query_params.get("redirect_uri").cloned() else {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from(format!(
+                    "Missing required query parameter: {}",
+                    "redirect_uri"
+                )))
+                .unwrap());
+        };
+        let Some(code_challenge) = query_params.get("code_challenge").cloned() else {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from(format!(
+                    "Missing required query parameter: {}",
+                    "code_challenge"
+                )))
+                .unwrap());
+        };
+        let Some(code_challenge_method) = query_params.get("code_challenge_method").cloned() else {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from(format!(
+                    "Missing required query parameter: {}",
+                    "code_challenge_method"
+                )))
+                .unwrap());
+        };
+        let Some(state) = query_params.get("state").cloned() else {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from(format!(
+                    "Missing required query parameter: {}",
+                    "state"
+                )))
+                .unwrap());
+        };
+        let Some(label) = query_params.get("label").cloned() else {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from(format!(
+                    "Missing required query parameter: {}",
+                    "label"
+                )))
+                .unwrap());
+        };
+        let search_params = pages_oauth_cli_authorize::SearchParams {
+            redirect_uri,
+            code_challenge,
+            code_challenge_method,
+            state,
+            label,
+        };
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+        };
+        match pages_oauth_cli_authorize::handler(req, search_params).await {
+            Ok(props) => {
+                let body_bytes = forte_json::to_vec(&props);
+                Ok(build_response_with_cookies(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("x-fn0-next", "js")
+                        .body(Body::from(body_bytes))
+                        .unwrap(),
+                    &cookie_jar,
+                ))
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ))
+                } else {
+                    eprintln!("Error at {}: {:?}", path, e);
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap())
+                }
+            }
+        }
+    } else if path == "/oauth/github/callback" {
         use std::collections::HashMap;
         let query = parts.uri.query().unwrap_or("");
         let query_params: HashMap<String, String> =
@@ -609,6 +714,66 @@ async fn handle_action(
                 body: input,
             };
             let output = crate::actions::new_project::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "approve_cli_authorization" => {
+            let input: crate::actions::approve_cli_authorization::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::approve_cli_authorization::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "oauth_cli_exchange" => {
+            let input: crate::actions::oauth_cli_exchange::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::oauth_cli_exchange::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(build_response_with_cookies(
                 Response::builder()

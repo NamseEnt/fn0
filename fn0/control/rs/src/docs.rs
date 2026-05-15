@@ -75,3 +75,14 @@ pub struct CronConfigDoc {
     pub updated_at: DateTime,
 }
 
+#[forte_doc]
+pub struct CliAuthorizationCodeDoc {
+    #[pk]
+    pub code: String,
+    pub github_id: i64,
+    pub code_challenge: String,
+    pub redirect_uri: String,
+    pub label: String,
+    pub expires_at: DateTime,
+}
+

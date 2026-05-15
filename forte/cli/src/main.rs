@@ -34,7 +34,7 @@ async fn async_main() -> Result<()> {
         }
 
         Commands::Login { token } => {
-            cli::login::run(token)?;
+            cli::login::run(token).await?;
         }
 
         Commands::Add { command } => match command {
