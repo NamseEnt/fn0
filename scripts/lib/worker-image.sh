@@ -20,12 +20,13 @@ build_and_push_fn0_worker() {
     return 1
   fi
 
-  local publish_log iid_file inspect_log build_log
+  local publish_log iid_file inspect_log build_log bin_dir
   publish_log="$(mktemp)"
   iid_file="$(mktemp)"
   inspect_log="$(mktemp)"
   build_log="$(mktemp)"
-  trap 'rm -f "$publish_log" "$iid_file" "$inspect_log" "$build_log"' RETURN
+  bin_dir="$(mktemp -d)"
+  trap 'rm -f "$publish_log" "$iid_file" "$inspect_log" "$build_log"; rm -rf "$bin_dir"' RETURN
 
   echo ">> cargo publish fn0-worker"
   if (cd "$REPO_ROOT" && cargo publish -p fn0-worker) 2>&1 | tee "$publish_log"; then
@@ -48,14 +49,16 @@ build_and_push_fn0_worker() {
   tag="$version"
   echo ">> fn0-worker version: ${version}"
 
+  "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-worker "$bin_dir"
+
   local docker_status
-  echo ">> docker build (host-native)"
+  echo ">> docker build runtime image"
   set +e
   docker build \
     --file "${REPO_ROOT}/fn0/worker/Dockerfile" \
     --iidfile "$iid_file" \
     --progress=plain \
-    "$REPO_ROOT" 2>&1 | tee "$build_log"
+    "$bin_dir" 2>&1 | tee "$build_log"
   docker_status=("${PIPESTATUS[@]}")
   set -e
   if [[ "${docker_status[0]}" -ne 0 ]]; then

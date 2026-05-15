@@ -45,7 +45,8 @@ unset AWS_SESSION_TOKEN AWS_PROFILE
 
 echo ">> Attempting cargo publish for fn0-wasmtime"
 PUBLISH_LOG="$(mktemp)"
-trap 'rm -f "$PUBLISH_LOG"' EXIT
+BUILD_CTX="$(mktemp -d)"
+trap 'rm -f "$PUBLISH_LOG"; rm -rf "$BUILD_CTX"' EXIT
 
 if (cd "${REPO_ROOT}" && cargo publish -p fn0-wasmtime) 2>&1 | tee "$PUBLISH_LOG"; then
   echo "   published."
@@ -77,6 +78,10 @@ ECR_REGISTRY="${CWASM_ECR%%/*}"
 aws ecr get-login-password --region "$CWASM_REGION" \
   | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
+echo ">> Building fn0-wasmtime binary"
+"${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$BUILD_CTX"
+cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$BUILD_CTX/"
+
 echo ">> Building & pushing image"
 docker buildx build \
   --platform linux/arm64 \
@@ -85,12 +90,12 @@ docker buildx build \
   --file "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
   --tag "$IMAGE_URI" \
   --push \
-  "$REPO_ROOT"
+  "$BUILD_CTX"
 
 ENV_VARS="Variables={BUCKET=${CWASM_BUCKET},XDG_CACHE_HOME=/tmp,HOME=/tmp,R2_ENDPOINT=${R2_ENDPOINT},R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID},R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}}"
 
 CREATE_LOG="$(mktemp)"
-trap 'rm -f "$PUBLISH_LOG" "$CREATE_LOG"' EXIT
+trap 'rm -f "$PUBLISH_LOG" "$CREATE_LOG"; rm -rf "$BUILD_CTX"' EXIT
 
 if aws lambda get-function --region "$CWASM_REGION" --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then
   echo ">> Lambda exists; updating code + config"
