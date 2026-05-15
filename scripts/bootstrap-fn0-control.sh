@@ -35,8 +35,6 @@ export REPO_ROOT
 
 # shellcheck source=lib/pulumi-outputs.sh
 source "${REPO_ROOT}/scripts/lib/pulumi-outputs.sh"
-# shellcheck source=lib/control-admin.sh
-source "${REPO_ROOT}/scripts/lib/control-admin.sh"
 # shellcheck source=lib/cwasm-compiler.sh
 source "${REPO_ROOT}/scripts/lib/cwasm-compiler.sh"
 # shellcheck source=lib/worker-image.sh
@@ -158,13 +156,10 @@ fi
 control_db_url="https://${CONTROL_PROJECT_ID}${forte_host_suffix}"
 ensure_docs_table "$control_db_url" "$forte_group_token"
 owner_github_id="$(pulumi_pick controlOwnerGithubId)"
-owner_github_login="$(pulumi_pick controlOwnerGithubLogin)"
-if [[ -z "$owner_github_id" || -z "$owner_github_login" ]]; then
-  echo "missing pulumi output: controlOwnerGithubId / controlOwnerGithubLogin" >&2
+if [[ -z "$owner_github_id" ]]; then
+  echo "missing pulumi output: controlOwnerGithubId" >&2
   exit 1
 fi
-seed_user_doc "$control_db_url" "$forte_group_token" \
-  "$owner_github_id" "$owner_github_login" "$CONTROL_PROJECT_ID"
 seed_project_doc "$control_db_url" "$forte_group_token" \
   "$CONTROL_PROJECT_ID" "$owner_github_id" "$CONTROL_PROJECT_ID"
 seed_fn0_wasmtime_version "$control_db_url" "$forte_group_token" "$target_wasmtime"
