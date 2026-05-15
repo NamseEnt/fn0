@@ -22,7 +22,7 @@ pub use execute::{build_linker, spawn_epoch_ticker};
 use futures::FutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::UnsyncBoxBody;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
@@ -158,6 +158,8 @@ impl<C: BundleCache> ExecutionContext<C> {
 struct JsSlot {
     instance: std::rc::Rc<ski::SkiInstance>,
     bundle: Arc<Bundle>,
+    poisoned: std::rc::Rc<Cell<bool>>,
+    driver: tokio::task::JoinHandle<()>,
 }
 
 struct WasmSlot {
@@ -282,36 +284,75 @@ impl<C: BundleCache> CodeExecutor<C> {
             tracing::error!(project_id, "x-fn0-next=js requested but bundle has no js");
             return Ok(internal_error());
         }
-        let ski = self.get_or_spawn_js_instance(project_id, bundle).await?;
+        // body is buffered up-front: a retry rebuilds the js request from it.
+        let wasm_body_bytes = wasm_resp.into_body().collect().await?.to_bytes();
 
-        let js_entry_req = hyper::Request::builder()
-            .method("POST")
-            .uri(uri)
-            .header(hyper::header::CONTENT_TYPE, "application/json");
-        let js_entry_req = external_headers.iter().fold(js_entry_req, |b, (k, v)| {
-            if k == hyper::header::CONTENT_TYPE {
-                b
-            } else {
-                b.header(k, v)
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            let (ski, poisoned) = self.get_or_spawn_js_instance(project_id, bundle).await?;
+
+            let js_entry_req = hyper::Request::builder()
+                .method("POST")
+                .uri(uri.clone())
+                .header(hyper::header::CONTENT_TYPE, "application/json");
+            let js_entry_req = external_headers.iter().fold(js_entry_req, |b, (k, v)| {
+                if k == hyper::header::CONTENT_TYPE {
+                    b
+                } else {
+                    b.header(k, v)
+                }
+            });
+            let body: Body = UnsyncBoxBody::new(
+                http_body_util::Full::new(wasm_body_bytes.clone())
+                    .map_err(|e: std::convert::Infallible| anyhow!(e)),
+            );
+            let js_entry_req = js_entry_req.body(body)?;
+
+            // ski.call() enters v8 synchronously before returning its future, so
+            // the call itself goes inside the catch_unwind block — not
+            // AssertUnwindSafe(ski.call(..)).
+            let outcome = AssertUnwindSafe(async { ski.call(js_entry_req).await })
+                .catch_unwind()
+                .await;
+            match outcome {
+                Ok(result) => return result,
+                Err(panic) => {
+                    poisoned.set(true);
+                    telemetry::panicked(project_id);
+                    let msg = panic_util::panic_payload_string(&panic);
+                    tracing::error!(project_id, attempt, "js instance panicked: {msg}");
+                    if attempt >= 2 {
+                        return Ok(internal_error());
+                    }
+                }
             }
-        });
-        let js_entry_req = js_entry_req.body(wasm_resp.into_body())?;
-
-        ski.call(js_entry_req).await
+        }
     }
 
+    // Returns the cached js instance and its poison flag, evicting+respawning a
+    // poisoned one. This body has no `.await`, so on the single-threaded worker
+    // runtime it runs atomically — concurrent requests after a panic respawn
+    // exactly once. Do not add an `.await` here.
     async fn get_or_spawn_js_instance(
         &self,
         project_id: &str,
         bundle: &Arc<Bundle>,
-    ) -> Result<std::rc::Rc<ski::SkiInstance>> {
+    ) -> Result<(std::rc::Rc<ski::SkiInstance>, std::rc::Rc<Cell<bool>>)> {
         {
             let mut js_instances = self.js_instances.borrow_mut();
             if let Some(slot) = js_instances.get(project_id) {
-                if Arc::ptr_eq(&slot.bundle, bundle) {
-                    return Ok(slot.instance.clone());
+                let same_bundle = Arc::ptr_eq(&slot.bundle, bundle);
+                let poisoned = slot.poisoned.get();
+                if same_bundle && !poisoned {
+                    return Ok((slot.instance.clone(), slot.poisoned.clone()));
                 }
-                js_instances.remove(project_id);
+                if same_bundle && poisoned {
+                    tracing::warn!(project_id, "js instance poisoned; respawning");
+                }
+                if let Some(removed) = js_instances.remove(project_id) {
+                    removed.driver.abort();
+                }
             }
         }
 
@@ -329,20 +370,24 @@ impl<C: BundleCache> CodeExecutor<C> {
             "/entry.js",
             Some(fetch_handler),
         )?);
+        let poisoned = std::rc::Rc::new(Cell::new(false));
+
+        let driver_instance = instance.clone();
+        let driver = tokio::task::spawn_local(async move {
+            driver_instance.drive_forever().await;
+        });
+
         self.js_instances.borrow_mut().insert(
             project_id.to_string(),
             JsSlot {
                 instance: instance.clone(),
                 bundle: bundle.clone(),
+                poisoned: poisoned.clone(),
+                driver,
             },
         );
 
-        let driver_instance = instance.clone();
-        tokio::task::spawn_local(async move {
-            driver_instance.drive_forever().await;
-        });
-
-        Ok(instance)
+        Ok((instance, poisoned))
     }
 
     fn wasm_instance_sender(

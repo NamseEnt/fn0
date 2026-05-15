@@ -76,10 +76,12 @@ promq() {
 }
 echo "  stage_duration_seconds avg per stage:"
 promq "sum by (stage,code_id)(rate(stage_duration_seconds_sum[${WINDOW}s])) / sum by (stage,code_id)(rate(stage_duration_seconds_count[${WINDOW}s]))" \
- | python3 -c "import sys,json;
+ | python3 -c "import sys,json,math
 try:
   r=json.load(sys.stdin)['data']['result']
-  [print(f\"    {x['metric'].get('stage','?'):22s} {x['metric'].get('code_id','?'):20s} {float(x['value'][1])*1000:8.1f} ms\") for x in sorted(r,key=lambda x:x['metric'].get('stage',''))]
+  for x in sorted(r,key=lambda x:x['metric'].get('stage','')):
+    v=float(x['value'][1]); s=x['metric'].get('stage','?'); c=x['metric'].get('code_id','?')
+    print(f\"    {s:22s} {c:20s} \" + ('  (sparse — too few samples)' if math.isnan(v) else f'{v*1000:8.1f} ms'))
   if not r: print('    (no stage_duration metrics yet — worker not redeployed?)')
 except Exception as e: print('    query failed:',e)"
 
