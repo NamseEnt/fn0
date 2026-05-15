@@ -36,11 +36,6 @@ new cloudflare.ZoneSetting("ssl-mode", {
   value: "strict",
 });
 
-const docDb = new fn0.TursoDocDb("doc-db", {
-  organizationSlug: config.require("tursoOrganizationSlug"),
-  location: config.require("tursoLocation"),
-});
-
 const forteDb = new fn0.ForteDb(
   "forte-db",
   {
@@ -520,9 +515,9 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   shape: "VM.Standard.A1.Flex",
   ocpus: 1,
   memoryInGbs: 6,
-  workerAgentDocDb: {
-    url: docDb.url,
-    authToken: docDb.token,
+  workerAgentForteDb: {
+    groupToken: forteDb.groupToken,
+    hostSuffix: forteDb.hostSuffix,
   },
   workerDns: {
     apiToken: dns.dnsApiToken,
@@ -608,10 +603,9 @@ export const controlAwsAccessKeyId = pulumi.secret(controlAwsAccessKey.id);
 export const controlAwsSecretAccessKey = pulumi.secret(
   controlAwsAccessKey.secret,
 );
-export const docDbUrl = docDb.url;
-export const docDbToken = pulumi.secret(docDb.token);
 export const forteDbGroupToken = pulumi.secret(forteDb.groupToken);
 export const forteDbHostSuffix = forteDb.hostSuffix;
+export const controlDbUrl = pulumi.interpolate`https://fn0-control${forteDb.hostSuffix}`;
 export const controlOwnerGithubId = config.requireNumber(
   "controlOwnerGithubId",
 );

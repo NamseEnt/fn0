@@ -32,7 +32,7 @@ use tracing::*;
 const REPORT_INTERVAL: Duration = Duration::from_secs(10);
 
 pub async fn write_initial(host_id: &str, addr: &str) -> anyhow::Result<()> {
-    let db = doc_db::turso();
+    let db = crate::db::build();
     let doc = WorkerHostStatusDoc {
         host_id: host_id.to_string(),
         addr: addr.to_string(),
@@ -50,7 +50,7 @@ pub async fn run(
     addr: String,
 ) {
     info!(%host_id, %addr, "host status reporter started");
-    let db = doc_db::turso();
+    let db = crate::db::build();
     loop {
         let active_image_ref = active_rx.borrow().clone();
         let doc = WorkerHostStatusDoc {

@@ -33,18 +33,17 @@ control_admin_invoke() {
   fi
 }
 
-# Reads Fn0WasmtimeVersionDoc directly from doc-db (control-independent).
+# Reads Fn0WasmtimeVersionDoc directly from the control DB (control-independent).
 # Echoes JSON: {"active": "...", "pending": "..."|null} or empty if not present.
 get_fn0_wasmtime_version_doc() {
-  local doc_db_url doc_db_token https_url resp_file http_code req
-  doc_db_url="$(pulumi_pick docDbUrl)"
-  doc_db_token="$(pulumi_pick docDbToken)"
-  if [[ -z "$doc_db_url" || -z "$doc_db_token" ]]; then
-    echo "docDbUrl / docDbToken missing" >&2
+  local control_db_url control_db_token resp_file http_code req
+  control_db_url="$(pulumi_pick controlDbUrl)"
+  control_db_token="$(pulumi_pick forteDbGroupToken)"
+  if [[ -z "$control_db_url" || -z "$control_db_token" ]]; then
+    echo "controlDbUrl / forteDbGroupToken missing" >&2
     return 1
   fi
-  https_url="${doc_db_url/libsql:\/\//https://}"
-  https_url="${https_url%/}"
+  control_db_url="${control_db_url%/}"
   req="$(jq -nc \
     --arg sql "SELECT data FROM docs WHERE pk = ? AND sk = ''" \
     --arg pk "Fn0WasmtimeVersionDoc" \
@@ -54,8 +53,8 @@ get_fn0_wasmtime_version_doc() {
     ]}')"
   resp_file="$(mktemp)"
   http_code="$(curl -sS -o "$resp_file" -w '%{http_code}' \
-    -X POST "${https_url}/v2/pipeline" \
-    -H "Authorization: Bearer ${doc_db_token}" \
+    -X POST "${control_db_url}/v2/pipeline" \
+    -H "Authorization: Bearer ${control_db_token}" \
     -H "Content-Type: application/json" \
     --data-raw "$req")"
   if [[ "$http_code" != "200" ]]; then

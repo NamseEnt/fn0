@@ -173,14 +173,7 @@ seed_compiled_bundle "$control_db_url" "$forte_group_token" \
 seed_worker_manifest "$control_db_url" "$forte_group_token" \
   "$CONTROL_PROJECT_ID" "$code_version" "$CONTROL_CUSTOM_DOMAIN"
 
-# Step 7 — seed the worker-agent turso DB (fn0-doc-db).
-agent_db_url="$(pulumi_pick docDbUrl)"
-agent_db_token="$(pulumi_pick docDbToken)"
-if [[ -z "$agent_db_url" || -z "$agent_db_token" ]]; then
-  echo "missing pulumi output: docDbUrl / docDbToken" >&2
-  exit 1
-fi
-ensure_docs_table "$agent_db_url" "$agent_db_token"
-seed_target_fn0_worker_config "$agent_db_url" "$agent_db_token" "$worker_image_ref"
+# Step 7 — seed the worker-agent's rollout target into the same control DB.
+seed_target_fn0_worker_config "$control_db_url" "$forte_group_token" "$worker_image_ref"
 
 echo ">> bootstrap complete: project=${CONTROL_PROJECT_ID} domain=${CONTROL_CUSTOM_DOMAIN} code_version=${code_version}"
