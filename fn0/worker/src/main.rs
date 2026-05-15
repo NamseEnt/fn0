@@ -127,7 +127,7 @@ fn install_panic_hook() {
         let backtrace = std::backtrace::Backtrace::force_capture();
         tracing::error!(
             location = %location,
-            message = %message,
+            panic = %message,
             backtrace = %backtrace,
             "panic captured"
         );
@@ -461,6 +461,7 @@ async fn handle_user_request(
         .unwrap_or("")
         .to_string();
     let host_no_port = host.split(':').next().unwrap_or("").to_string();
+    let request_path = req.uri().path().to_string();
 
     let resolve_start = std::time::Instant::now();
     let code_id = match cache.resolve_domain(&host_no_port).await {
@@ -558,7 +559,7 @@ async fn handle_user_request(
                     )))
                     .unwrap());
             }
-            tracing::error!(%err, %code_id, "Failed to run fn0");
+            tracing::error!(%err, %code_id, path = %request_path, "Failed to run fn0");
             Ok(hyper::Response::builder()
                 .status(502)
                 .body(Full::new(Bytes::from("Bad Gateway")))
