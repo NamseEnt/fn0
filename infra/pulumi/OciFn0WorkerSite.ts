@@ -1269,6 +1269,19 @@ chmod 600 /etc/fn0-alloy/config.alloy
 cat > /etc/systemd/system/fn0-alloy.service <<'EOF_ALLOY_UNIT'
 ${alloySystemdUnit}EOF_ALLOY_UNIT
 
+# OL10 ships journald in volatile mode (no /var/log/journal), so alloy's
+# bind mount of that path fails statfs and crash-loops. Switch journald to
+# persistent + cap to keep the small boot volume safe.
+mkdir -p /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/fn0.conf <<'EOF_JOURNALD'
+[Journal]
+Storage=persistent
+SystemMaxUse=512M
+EOF_JOURNALD
+mkdir -p /var/log/journal
+systemd-tmpfiles --create --prefix /var/log/journal
+systemctl restart systemd-journald
+
 # Oracle Linux ships firewalld enabled by default, which blocks 443 even
 # though the OCI SecurityList allows it. Open the port through firewalld
 # (kept in sync with the SecurityList).
