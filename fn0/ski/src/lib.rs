@@ -176,6 +176,8 @@ pub struct SkiInstance {
     deadlines: std::sync::Arc<DeadlineMap>,
     metrics: std::sync::Arc<CpuMetrics>,
     terminated: std::sync::Arc<tokio::sync::Notify>,
+    // Sole strong owner of this instance's WATCHDOG entry; dropped with the instance to unregister it.
+    _watchdog_entry: std::sync::Arc<WatchdogEntry>,
 }
 
 static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
@@ -231,10 +233,10 @@ struct WatchdogEntry {
     terminated: std::sync::Arc<tokio::sync::Notify>,
 }
 
-static WATCHDOG: std::sync::OnceLock<std::sync::Mutex<Vec<std::sync::Arc<WatchdogEntry>>>> =
+static WATCHDOG: std::sync::OnceLock<std::sync::Mutex<Vec<std::sync::Weak<WatchdogEntry>>>> =
     std::sync::OnceLock::new();
 
-fn watchdog_registry() -> &'static std::sync::Mutex<Vec<std::sync::Arc<WatchdogEntry>>> {
+fn watchdog_registry() -> &'static std::sync::Mutex<Vec<std::sync::Weak<WatchdogEntry>>> {
     WATCHDOG.get_or_init(|| {
         let mutex = std::sync::Mutex::new(Vec::new());
         std::thread::Builder::new()
@@ -249,7 +251,11 @@ fn watchdog_loop() {
     loop {
         std::thread::sleep(std::time::Duration::from_millis(1));
         let registry = WATCHDOG.get().expect("registry initialized");
-        let entries: Vec<_> = registry.lock().unwrap().clone();
+        let entries: Vec<std::sync::Arc<WatchdogEntry>> = {
+            let mut registry = registry.lock().unwrap();
+            registry.retain(|entry| entry.strong_count() > 0);
+            registry.iter().filter_map(std::sync::Weak::upgrade).collect()
+        };
         for entry in entries {
             let total = entry.metrics.current_total_nanos();
             let exceeded = {
@@ -310,16 +316,16 @@ impl SkiInstance {
         let metrics = std::sync::Arc::new(CpuMetrics::new());
         let terminated = std::sync::Arc::new(tokio::sync::Notify::new());
 
-        let registry = watchdog_registry();
-        registry
+        let watchdog_entry = std::sync::Arc::new(WatchdogEntry {
+            isolate: isolate_handle,
+            deadlines: deadlines.clone(),
+            metrics: metrics.clone(),
+            terminated: terminated.clone(),
+        });
+        watchdog_registry()
             .lock()
             .unwrap()
-            .push(std::sync::Arc::new(WatchdogEntry {
-                isolate: isolate_handle.clone(),
-                deadlines: deadlines.clone(),
-                metrics: metrics.clone(),
-                terminated: terminated.clone(),
-            }));
+            .push(std::sync::Arc::downgrade(&watchdog_entry));
 
         Ok(Self {
             runtime: Rc::new(RefCell::new(runtime)),
@@ -329,6 +335,7 @@ impl SkiInstance {
             deadlines,
             metrics,
             terminated,
+            _watchdog_entry: watchdog_entry,
         })
     }
 
