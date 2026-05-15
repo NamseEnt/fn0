@@ -1,3 +1,4 @@
+pub mod cli_login;
 pub mod credentials;
 mod admin;
 mod bundle;

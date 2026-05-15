@@ -178,16 +178,9 @@ fn is_page_path(path_str: &str) -> bool {
     if !is_mod_rs && !is_single_page_rs {
         return false;
     }
-    let path_parts: Vec<&str> = path_str.split('/').collect();
-    let Some(idx) = path_parts.iter().position(|&p| p == "pages") else {
-        return false;
-    };
-    let after_pages = if is_mod_rs {
-        &path_parts[idx + 1..path_parts.len() - 1]
-    } else {
-        &path_parts[idx + 1..path_parts.len()]
-    };
-    after_pages.len() <= 2
+    path_str
+        .split('/')
+        .any(|segment| segment == "pages")
 }
 
 fn is_hook_path(path_str: &str) -> bool {
