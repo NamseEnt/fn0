@@ -205,7 +205,11 @@ __select_doc_data() {
     return 0
   fi
   if [[ "$cell_type" == "blob" ]]; then
-    jq -r '.results[0].response.result.rows[0][0].base64' <"$resp_file" | base64 -d
+    # turso emits unpadded base64; macOS `base64 -d` silently drops trailing
+    # bytes when input length isn't a multiple of 4, so pad with '=' first.
+    jq -r '.results[0].response.result.rows[0][0].base64' <"$resp_file" \
+      | awk '{ p=(4-length($0)%4)%4; s=""; for(i=0;i<p;i++) s=s"="; print $0 s }' \
+      | base64 -d
   else
     jq -r '.results[0].response.result.rows[0][0].value' <"$resp_file"
   fi
