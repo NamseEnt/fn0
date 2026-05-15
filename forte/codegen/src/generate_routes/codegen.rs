@@ -756,7 +756,15 @@ fn generate_action_handler(actions: &[ActionInfo]) -> TokenStream {
 
             quote! {
                 #name => {
-                    let input: crate::actions::#module_ident::Input = forte_json::from_slice(body_bytes)?;
+                    let input: crate::actions::#module_ident::Input = match forte_json::from_slice(body_bytes) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            return Ok(Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body(Body::from(format!("invalid request body: {}", e)))
+                                .unwrap());
+                        }
+                    };
                     let req = ForteRequest {
                         uri_authority,
                         method,
@@ -873,7 +881,15 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
             quote! {
                 #name => {
                     let input: crate::#(#module_path)::*::Input =
-                        forte_sdk::serde_json::from_str(payload)?;
+                        match forte_sdk::serde_json::from_str(payload) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Ok(Response::builder()
+                                    .status(StatusCode::BAD_REQUEST)
+                                    .body(Body::from(format!("invalid payload for task '{}': {}", task_name, e)))
+                                    .unwrap());
+                            }
+                        };
                     crate::#(#module_path)::*::handle(input).await
                 }
             }
@@ -884,14 +900,33 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
         async fn handle_queue_task_execute(
             body_bytes: &[u8],
         ) -> Result<Response<Body>> {
-            let request: forte_sdk::serde_json::Value =
-                forte_sdk::serde_json::from_slice(body_bytes)?;
-            let task_name = request["task_name"]
-                .as_str()
-                .ok_or_else(|| forte_sdk::anyhow::Error::msg("missing task_name"))?;
-            let payload = request["payload"]
-                .as_str()
-                .ok_or_else(|| forte_sdk::anyhow::Error::msg("missing payload"))?;
+            let request: forte_sdk::serde_json::Value = match forte_sdk::serde_json::from_slice(body_bytes) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from(format!("invalid request body: {}", e)))
+                        .unwrap());
+                }
+            };
+            let task_name = match request["task_name"].as_str() {
+                Some(s) => s,
+                None => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from("missing or non-string task_name"))
+                        .unwrap());
+                }
+            };
+            let payload = match request["payload"].as_str() {
+                Some(s) => s,
+                None => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::from("missing or non-string payload"))
+                        .unwrap());
+                }
+            };
 
             let result = match task_name {
                 #(#task_matches)*
