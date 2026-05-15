@@ -26,10 +26,13 @@ fi
 IID_FILE="$(mktemp)"
 INSPECT_LOG="$(mktemp)"
 BUILD_LOG="$(mktemp)"
-cleanup() { rm -f "$IID_FILE" "$INSPECT_LOG" "$BUILD_LOG"; }
+BIN_DIR="$(mktemp -d)"
+cleanup() { rm -f "$IID_FILE" "$INSPECT_LOG" "$BUILD_LOG"; rm -rf "$BIN_DIR"; }
 trap cleanup EXIT
 
-echo ">> Building local image (host-native)"
+"${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-worker-proxy "$BIN_DIR"
+
+echo ">> docker build runtime image"
 
 DOCKER_BUILD_PIPESTATUS=0
 set +e
@@ -37,7 +40,7 @@ docker build \
   --file "${REPO_ROOT}/fn0/worker-proxy/Dockerfile" \
   --iidfile "$IID_FILE" \
   --progress=plain \
-  "$REPO_ROOT" 2>&1 | tee "$BUILD_LOG"
+  "$BIN_DIR" 2>&1 | tee "$BUILD_LOG"
 DOCKER_BUILD_PIPESTATUS=("${PIPESTATUS[@]}")
 set -e
 if [[ "${DOCKER_BUILD_PIPESTATUS[0]}" -ne 0 ]]; then

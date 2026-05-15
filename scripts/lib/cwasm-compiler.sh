@@ -48,9 +48,10 @@ ensure_cwasm_lambda() {
 
   CWASM_LAMBDA_REGION="$cwasm_region"
 
-  local work_dir
+  local work_dir build_ctx
   work_dir="$(mktemp -d)"
-  trap 'rm -rf "$work_dir"' RETURN
+  build_ctx="$(mktemp -d)"
+  trap 'rm -rf "$work_dir" "$build_ctx"' RETURN
 
   local image_uri="${cwasm_ecr}:${new_fn0_wasmtime_version_dash}"
   local function_name="$CWASM_LAMBDA_FUNCTION_NAME"
@@ -67,6 +68,9 @@ ensure_cwasm_lambda() {
     aws ecr get-login-password --region "$cwasm_region" \
       | docker login --username AWS --password-stdin "$ecr_registry"
 
+    "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$build_ctx"
+    cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$build_ctx/"
+
     docker buildx build \
       --platform linux/arm64 \
       --provenance=false \
@@ -74,7 +78,7 @@ ensure_cwasm_lambda() {
       --file "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
       --tag "$image_uri" \
       --push \
-      "$REPO_ROOT"
+      "$build_ctx"
 
     local env_vars="Variables={BUCKET=${r2_bucket},XDG_CACHE_HOME=/tmp,HOME=/tmp,R2_ENDPOINT=${r2_endpoint},R2_ACCESS_KEY_ID=${r2_ak},R2_SECRET_ACCESS_KEY=${r2_sk}}"
 
