@@ -14,7 +14,7 @@ pub struct TargetFn0WorkerConfigDoc {
 
 pub async fn run(shutdown: Shutdown, target_tx: watch::Sender<Option<String>>) {
     info!("worker target poller started");
-    let db = doc_db::turso();
+    let db = crate::db::build();
     loop {
         match (TargetFn0WorkerConfigDocGet {}).send_with(&db).await {
             Ok(Some(doc)) => {

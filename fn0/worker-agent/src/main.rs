@@ -9,6 +9,7 @@
 //! Rolling updates across hosts will be added later.
 
 mod agent_image_pull_poller;
+mod db;
 mod dns_register;
 mod host_status_reporter;
 mod podman;

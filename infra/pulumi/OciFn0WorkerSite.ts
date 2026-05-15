@@ -10,14 +10,14 @@ export interface OciFn0WorkerSiteArgs {
   shape: pulumi.Input<string>;
   ocpus: pulumi.Input<number>;
   memoryInGbs: pulumi.Input<number>;
-  workerAgentDocDb: WorkerAgentDocDbArgs;
+  workerAgentForteDb: WorkerAgentForteDbArgs;
   workerDns: WorkerDnsArgs;
   worker: WorkerArgs;
 }
 
-export interface WorkerAgentDocDbArgs {
-  url: pulumi.Input<string>;
-  authToken: pulumi.Input<string>;
+export interface WorkerAgentForteDbArgs {
+  groupToken: pulumi.Input<string>;
+  hostSuffix: pulumi.Input<string>;
 }
 
 export interface WorkerDnsArgs {
@@ -878,7 +878,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       return `${r.url}/${r.repository}-proxy:latest`;
     });
 
-    const agentEnv = buildWorkerAgentEnv(args.workerAgentDocDb, args.workerDns);
+    const agentEnv = buildWorkerAgentEnv(args.workerAgentForteDb, args.workerDns);
     const workerEnv = buildWorkerEnv(args.worker, this.cwasmBucket, this.queue);
     const alloyConfig = pulumi
       .all([
@@ -954,12 +954,12 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 }
 
 function buildWorkerAgentEnv(
-  docDb: WorkerAgentDocDbArgs,
+  forteDb: WorkerAgentForteDbArgs,
   dns: WorkerDnsArgs,
 ): pulumi.Output<{ [k: string]: string }> {
   const base: { [k: string]: pulumi.Input<string> } = {
-    TURSO_URL: docDb.url,
-    TURSO_AUTH_TOKEN: docDb.authToken,
+    TURSO_GROUP_TOKEN: forteDb.groupToken,
+    TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
     FN0_WORKER_DNS_API_TOKEN: dns.apiToken,
     FN0_WORKER_DNS_ZONE_ID: dns.zoneId,
     FN0_WORKER_DNS_HOSTNAMES: dns.hostnames,
