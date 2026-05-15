@@ -270,6 +270,43 @@ fn watchdog_loop() {
     }
 }
 
+/// Holds a `RefMut<JsRuntime>` while the underlying V8 isolate is the entered
+/// isolate for the current thread. Pairs `Isolate::enter` and `Isolate::exit`
+/// around all synchronous V8 work — see ski/README.md.
+struct EnteredRuntime<'a> {
+    rt: std::cell::RefMut<'a, JsRuntime>,
+}
+
+impl<'a> EnteredRuntime<'a> {
+    fn new(cell: &'a RefCell<JsRuntime>) -> Self {
+        let mut rt = cell.borrow_mut();
+        // SAFETY: paired exit() runs in Drop; no other code path enters or
+        // exits this isolate while the guard is alive (same-thread + RefCell).
+        unsafe { rt.v8_isolate().enter() };
+        Self { rt }
+    }
+}
+
+impl Drop for EnteredRuntime<'_> {
+    fn drop(&mut self) {
+        // SAFETY: paired with the enter() in new().
+        unsafe { self.rt.v8_isolate().exit() };
+    }
+}
+
+impl std::ops::Deref for EnteredRuntime<'_> {
+    type Target = JsRuntime;
+    fn deref(&self) -> &JsRuntime {
+        &self.rt
+    }
+}
+
+impl std::ops::DerefMut for EnteredRuntime<'_> {
+    fn deref_mut(&mut self) -> &mut JsRuntime {
+        &mut self.rt
+    }
+}
+
 impl SkiInstance {
     pub fn load(
         code: &str,
@@ -327,6 +364,13 @@ impl SkiInstance {
             .unwrap()
             .push(std::sync::Arc::downgrade(&watchdog_entry));
 
+        // SAFETY: rusty_v8 enters the isolate when `JsRuntime::new` constructs
+        // it. Per ski's spec (README.md, invariant 2), a loaded isolate must
+        // not claim the thread's V8 default — we exit here so subsequent V8
+        // work goes through enter()/exit() pairs, and other isolates on this
+        // thread are free to enter. Paired with the enter() in Drop.
+        unsafe { runtime.v8_isolate().exit() };
+
         Ok(Self {
             runtime: Rc::new(RefCell::new(runtime)),
             run_handler,
@@ -350,16 +394,16 @@ impl SkiInstance {
         let terminated = self.terminated.clone();
 
         let call_fut = {
-            let mut rt = runtime.borrow_mut();
-            register_request(&mut rt, id, request);
+            let mut entered = EnteredRuntime::new(&runtime);
+            register_request(&mut entered, id, request);
             metrics.before_v8_enter();
             let id_global: v8::Global<v8::Value> = {
-                deno_core::scope!(scope, &mut *rt);
+                deno_core::scope!(scope, &mut *entered);
                 let v = v8::Integer::new_from_unsigned(scope, id);
                 let v: v8::Local<v8::Value> = v.into();
                 v8::Global::new(scope, v)
             };
-            let f = rt.call_with_args(&run_handler, &[id_global]);
+            let f = entered.call_with_args(&run_handler, &[id_global]);
             metrics.after_v8_exit();
             f
         };
@@ -393,9 +437,9 @@ impl SkiInstance {
     }
 
     pub fn drive(&self, cx: &mut Context<'_>) -> Poll<Result<(), deno_core::error::CoreError>> {
-        let mut rt = self.runtime.borrow_mut();
+        let mut entered = EnteredRuntime::new(&self.runtime);
         self.metrics.before_v8_enter();
-        let result = rt.poll_event_loop(cx, Default::default());
+        let result = entered.poll_event_loop(cx, Default::default());
         self.metrics.after_v8_exit();
         result
     }
@@ -413,6 +457,29 @@ impl SkiInstance {
                 Poll::Pending => Poll::Pending,
             }
         }))
+    }
+}
+
+impl Drop for SkiInstance {
+    fn drop(&mut self) {
+        // Per ski spec invariant 3 (README.md): instances may be dropped in
+        // any order on the same thread. rusty_v8 OwnedIsolate::Drop calls
+        // Isolate::exit() and asserts GetCurrent() == self. Since we exit
+        // the isolate at the end of `load`, the isolate is not the current
+        // entry when SkiInstance drops — re-enter here so the automatic exit
+        // pops a balanced entry. Without this, dropping an isolate that is
+        // not the current entry would trip the LIFO assertion in rusty_v8
+        // (or otherwise corrupt the V8 enter stack on this thread).
+        //
+        // Safety preconditions:
+        //   * SkiInstance is `!Send`, so this runs on the owning thread.
+        //   * No outstanding RefMut: the driver task either was never spawned
+        //     or has been aborted (its Rc dropped) prior to this Drop running,
+        //     since SkiInstance is only dropped when its Rc count hits zero.
+        let mut rt = self.runtime.borrow_mut();
+        // SAFETY: paired with the automatic Isolate::exit() that runs from
+        // OwnedIsolate::Drop when `runtime` is dropped as a struct field.
+        unsafe { rt.v8_isolate().enter() };
     }
 }
 
