@@ -139,7 +139,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
     this.setupIdentity(compartmentSuffix, compartment);
 
-    const { vcn, internetGateway, subnet, workerSshKey } =
+    const { vcn, internetGateway, subnet, nlbSubnet, workerSshKey } =
       this.setupNetwork(compartment);
     this.sshPublicKey = workerSshKey.publicKeyOpenssh;
     this.sshPrivateKey = workerSshKey.privateKeyPem;
@@ -176,9 +176,11 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     );
     this.instanceConfigurationId = instanceConfiguration.id;
 
-    const { networkLoadBalancer, backendSet, reservedPublicIp } =
-      this.setupNetworkLoadBalancer(name, compartment, subnet);
-    this.networkLoadBalancerPublicIp = reservedPublicIp.ipAddress;
+    const { networkLoadBalancer, backendSet } =
+      this.setupNetworkLoadBalancer(name, compartment, nlbSubnet);
+    this.networkLoadBalancerPublicIp = networkLoadBalancer.ipAddresses.apply(
+      (addrs) => addrs.find((a) => a.isPublic)?.ipAddress ?? "",
+    );
 
     const instancePool = this.setupInstancePool(
       name,
@@ -257,6 +259,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     vcn: oci.core.Vcn;
     internetGateway: oci.core.InternetGateway;
     subnet: oci.core.Subnet;
+    nlbSubnet: oci.core.Subnet;
     workerSshKey: tls.PrivateKey;
   } {
     const vcn = new oci.core.Vcn(
@@ -279,6 +282,10 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
+    const nlbSubnetCidr = "10.0.1.0/24";
+
+    // Backend subnet: SSH from the world (debug convenience, see follow-up
+    // issue) + 443 only from the NLB subnet so the NLB is the only ingress.
     const securityList = new oci.core.SecurityList(
       "security-list",
       {
@@ -295,12 +302,43 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             source: "::/0",
             tcpOptions: { min: 22, max: 22 },
           },
-          // NLB lives in this VCN. With default Full NAT the source IP seen by
-          // backends is the NLB private IP, so allowing the VCN CIDR makes the
-          // NLB the only ingress path to 443 (Cloudflare can't bypass it).
           {
             protocol: "6",
-            source: "10.0.0.0/16",
+            source: nlbSubnetCidr,
+            tcpOptions: { min: 443, max: 443 },
+          },
+        ],
+        egressSecurityRules: [
+          {
+            destination: "0.0.0.0/0",
+            protocol: "all",
+          },
+          {
+            destination: "::/0",
+            protocol: "all",
+          },
+        ],
+      },
+      { parent: this },
+    );
+
+    // NLB subnet: 443 from the world (Cloudflare proxy fronts it anyway,
+    // and OCI NLB has no native NSG-on-NLB-VNIC equivalent on this resource
+    // type) so the NLB itself accepts the public traffic.
+    const nlbSecurityList = new oci.core.SecurityList(
+      "nlb-security-list",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+        ingressSecurityRules: [
+          {
+            protocol: "6",
+            source: "0.0.0.0/0",
+            tcpOptions: { min: 443, max: 443 },
+          },
+          {
+            protocol: "6",
+            source: "::/0",
             tcpOptions: { min: 443, max: 443 },
           },
         ],
@@ -365,7 +403,21 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    return { vcn, internetGateway, subnet, workerSshKey };
+    const nlbSubnet = new oci.core.Subnet(
+      "nlb-subnet",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+        ipv4cidrBlocks: [nlbSubnetCidr],
+        prohibitInternetIngress: false,
+        prohibitPublicIpOnVnic: false,
+        securityListIds: [nlbSecurityList.id],
+        routeTableId: routeTable.id,
+      },
+      { parent: this },
+    );
+
+    return { vcn, internetGateway, subnet, nlbSubnet, workerSshKey };
   }
 
   private setupImage(
@@ -812,18 +864,10 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   ): {
     networkLoadBalancer: oci.networkloadbalancer.NetworkLoadBalancer;
     backendSet: oci.networkloadbalancer.BackendSet;
-    reservedPublicIp: oci.core.PublicIp;
   } {
-    const reservedPublicIp = new oci.core.PublicIp(
-      "nlb-reserved-public-ip",
-      {
-        compartmentId: compartment.id,
-        lifetime: "RESERVED",
-        displayName: `${name}-nlb-public-ip`,
-      },
-      { parent: this },
-    );
-
+    // Ephemeral public IP: OCI allocates one for the NLB. If the NLB is ever
+    // recreated the IP changes, but Pulumi forwards the new IP into the DNS A
+    // records below so callers (Cloudflare proxy) follow automatically.
     const networkLoadBalancer = new oci.networkloadbalancer.NetworkLoadBalancer(
       "nlb",
       {
@@ -831,7 +875,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         displayName: `${name}-nlb`,
         subnetId: subnet.id,
         isPrivate: false,
-        reservedIps: [{ id: reservedPublicIp.id }],
       },
       { parent: this },
     );
@@ -845,7 +888,15 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         // so this effectively becomes source-IP affinity. Used to keep the same
         // client (= same Cloudflare edge IP from NLB's view) pinned to the same
         // worker, preserving warm WASM/JS instance caches in CodeExecutor.
+        // Hash is computed on the incoming connection, independent of
+        // isPreserveSource below.
         policy: "TWO_TUPLE",
+        // Full NAT: workers see the NLB private IP as source, so the backend
+        // SecurityList only has to allow the NLB subnet CIDR (no Cloudflare IP
+        // range maintenance). Clients' real IPs still reach workers via the
+        // Cloudflare-set HTTP headers (CF-Connecting-IP / X-Forwarded-For), so
+        // this loses nothing the application cares about.
+        isPreserveSource: false,
         healthChecker: {
           protocol: "HTTP",
           port: 443,
@@ -868,7 +919,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    return { networkLoadBalancer, backendSet, reservedPublicIp };
+    return { networkLoadBalancer, backendSet };
   }
 
   private setupInstancePool(
