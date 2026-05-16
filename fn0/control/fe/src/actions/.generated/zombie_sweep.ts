@@ -10,9 +10,7 @@ const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
     scannedInstancesCount: z.number(),
-    terminatedInstancesCount: z.number(),
-    cleanedDnsRecordsCount: z.number(),
-    orphanDnsRecordsCleanedCount: z.number(),
+    reapedDocsCount: z.number(),
   }),
     z.object({
     t: z.literal("Unauthorized"),
