@@ -107,13 +107,17 @@ Creates:
 Add a new server action (Rust handler + TypeScript client).
 
 ```sh
-forte add action user/login
-forte add action products/list
+forte add action user_login
+forte add action products_list
 ```
 
 Creates:
 - `rs/src/actions/<path>.rs` — Rust action handler
 - `fe/src/actions/<path>.ts` — TypeScript fetch wrapper
+
+> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen only scans the top-level `src/actions/` directory. That file will never be discovered. Use `forte add action user_login` instead.
+>
+> The generated code also has naming and return-type bugs that must be fixed before `forte build` will succeed. See the [actions guide](actions.md) for the correct pattern.
 
 ---
 

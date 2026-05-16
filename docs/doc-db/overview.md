@@ -49,15 +49,21 @@ db.delete("User/id=42", "profile").await?;
 Returns all documents with the given `pk`, optionally starting after `after_sk`, up to `limit` items. Results are sorted by `sk` ascending.
 
 ```rust
-let items: Vec<(String, Bytes)> = db.query("User/id=42", None::<&str>, 100).await?;
+let items: Vec<(String, Bytes)> = db.query("User/id=42", None::<&str>, 100_usize).await?;
 // items: Vec of (sk, data)
 ```
 
 ### `scan` — full table scan
 
+Scans all documents, optionally resuming after a `(pk, sk)` cursor.
+
 ```rust
+// From the beginning
 let items: Vec<(String, String, Bytes)> = db.scan(None, 100).await?;
 // items: Vec of (pk, sk, data)
+
+// Resume after a cursor
+let items = db.scan(Some(("User/id=42", "profile")), 100).await?;
 ```
 
 ### `batch` — atomic multi-operation write
@@ -88,19 +94,39 @@ Call `tx.rollback()` to abort.
 Higher-level API with conflict detection. Reads are batched upfront; writes use optimistic locking with version checks.
 
 ```rust
-use doc_db::{Trx, TrxControl};
+let result = db.trx(|trx| async move {
+    // Read — returns Option<DocHandle<User>>
+    let mut user_handle = trx
+        .get(UserGet { id: "42".to_string(), version: 1 })
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("user not found"))?;
 
-let result = db.trx(|trx: Trx| async move {
-    let handle = trx.read(UserGet { id: "42".to_string() }).await?;
+    // Modify in-place via DerefMut (marks the handle dirty automatically)
+    user_handle.name = "New Name".to_string();
 
-    let new_user = /* compute update */;
-    trx.write(handle, new_user)?;
+    // Create a new document in the same transaction
+    trx.create(AuditLog { user_id: "42".to_string(), action: "rename".to_string() })?;
 
-    Ok(TrxControl::Commit(result_value))
+    // Commit — returns Result<TrxControl<Out, Cancel>>
+    trx.commit(())
 }).await;
+
+match result {
+    doc_db::TrxResult::Committed(()) => { /* success */ }
+    doc_db::TrxResult::Cancelled(reason) => { /* trx.cancel(reason) was called */ }
+    doc_db::TrxResult::Conflict(_) => { /* retries exhausted */ }
+    doc_db::TrxResult::Err(e) => { /* handler returned Err */ }
+}
 ```
 
-On conflict, the closure is retried automatically. Return `TrxControl::Cancel(value)` to abort without retry.
+Key points:
+- `trx.get(request)` — reads one or more documents; returns `Option<DocHandle<T>>`
+- `trx.create(doc)` — inserts a new document; returns `Result<DocHandle<T>>`
+- Modify loaded documents by dereferencing the handle (`*handle = new_value` or field assignment)
+- `handle.delete()` — marks the document for deletion on commit
+- `trx.commit(value)` — commit and return `value` as `TrxResult::Committed(value)`
+- `trx.cancel(reason)` — abort without retry; returns `TrxResult::Cancelled(reason)`
+- On conflict, the closure is retried automatically; `TrxResult::Conflict` is returned only when retries are exhausted
 
 ## Batching Requests with `DbRequest`
 

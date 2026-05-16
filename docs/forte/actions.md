@@ -17,7 +17,6 @@ The codegen discovers actions by looking for files with an `Input` struct and a 
 
 ```rust
 // rs/src/actions/user_login.rs
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -33,22 +32,26 @@ pub enum Output {
     Error { message: String },
 }
 
-pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Result<Output> {
+pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Output {
     let input = &req.body;
     // validate credentials ...
-    Ok(Output::Ok {
+    Output::Ok {
         token: "...".to_string(),
-    })
+    }
 }
 ```
 
 Key conventions:
-- `Input` — the deserialized request body (JSON); **must be named exactly `Input`**
-- `Output` — the serialized response body (JSON); **must be named exactly `Output`**
+- `Input` — the deserialized request body (JSON); **must be a struct named exactly `Input`** (not an enum)
+- `Output` — the serialized response body (JSON); **must be named exactly `Output`** (struct or enum)
 - `handler` — must be `pub async fn`, takes `ForteRequest<'_, Input>`; **must be named exactly `handler`**
-- Return type: `Result<Output>` (using `anyhow::Result`)
+- Return type: `Output` directly (not `Result<Output>`). The codegen calls `forte_json::to_vec(&output)` on the return value, so it must implement `Serialize`. `anyhow::Error` does not implement `Serialize`, so `anyhow::Result<Output>` will not compile.
 
-> **Scaffold note:** `forte add action` generates starter code with different names (`LoginInput`, `LoginOutput`, `pub async fn action`). This starter code will not compile and will not be discovered by codegen. Rename the structs to `Input` / `Output` and the function to `handler` before running `forte build`.
+> **Scaffold note:** `forte add action` generates starter code with three issues to fix before the code will compile and be discovered by codegen:
+>
+> 1. **Wrong struct/function names** — generated names are `{Name}Input`, `{Name}Output`, `pub async fn action`. Rename to `Input`, `Output`, `handler`.
+> 2. **Wrong return type** — the generated function uses `Result<{Name}Output>`. Change to `Output` and remove the `Ok(...)` wrapper.
+> 3. **Nested path not discovered** — `forte add action user/login` creates `rs/src/actions/user/login.rs`, but codegen only scans the **top-level** `src/actions/` directory. Use a flat filename instead: `forte add action user_login` creates `rs/src/actions/user_login.rs` which is correctly discovered.
 
 ## TypeScript Client
 
@@ -82,7 +85,7 @@ Actions receive the full `ForteRequest` context, so you can read and write cooki
 ```rust
 use forte_sdk::cookie_sign::{sign_cookie, unsign_cookie};
 
-pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Result<Output> {
+pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Output {
     // read
     let session: Option<Session> = unsign_cookie(req.jar, "session");
 
@@ -92,7 +95,7 @@ pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Result<Output> 
     // read headers
     let auth = req.headers.get("authorization");
 
-    Ok(Output::Ok { ... })
+    Output::Ok { ... }
 }
 ```
 
