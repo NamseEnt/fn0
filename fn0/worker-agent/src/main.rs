@@ -10,7 +10,6 @@
 
 mod agent_image_pull_poller;
 mod db;
-mod dns_register;
 mod host_status_reporter;
 mod podman;
 mod proxy_target;
@@ -18,9 +17,10 @@ mod shutdown;
 mod target_config;
 mod worker_container_pool;
 
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Result, eyre};
 use shutdown::Shutdown;
 use std::net::SocketAddr;
+use std::time::Duration;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinSet;
 use tracing::*;
@@ -51,7 +51,7 @@ async fn async_main() -> Result<()> {
     let host_id = std::env::var("FN0_WORKER_AGENT_HOST_ID")
         .expect("FN0_WORKER_AGENT_HOST_ID must be set");
 
-    let public_ip = dns_register::detect_public_ipv4()
+    let public_ip = detect_public_ipv4()
         .await
         .expect("detect public ipv4 failed");
 
@@ -81,7 +81,7 @@ async fn async_main() -> Result<()> {
     tokio::select! {
         ready = worker_first_ready_rx => {
             match ready {
-                Ok(()) => info!("first worker container ready; registering DNS"),
+                Ok(()) => info!("first worker container ready"),
                 Err(_) => {
                     warn!("worker container pool exited before first ready; aborting startup");
                     shutdown.trigger();
@@ -91,7 +91,7 @@ async fn async_main() -> Result<()> {
             }
         }
         _ = shutdown::wait_for_signal() => {
-            info!("shutdown signal received before first worker ready; skipping DNS register");
+            info!("shutdown signal received before first worker ready");
             shutdown.trigger();
             while tasks.join_next().await.is_some() {}
             return Ok(());
@@ -100,10 +100,6 @@ async fn async_main() -> Result<()> {
 
     if let Err(err) = host_status_reporter::write_initial(&host_id, &public_ip).await {
         warn!(?err, "initial host status write failed; continuing anyway");
-    }
-
-    if let Err(err) = dns_register::register().await {
-        warn!(?err, "DNS register failed; continuing anyway");
     }
 
     tokio::select! {
@@ -115,13 +111,10 @@ async fn async_main() -> Result<()> {
             info!(soft, "shutdown signal received");
             if soft {
                 info!(
-                    "soft shutdown: keeping DNS A record + WorkerHostStatusDoc + worker containers for next agent to adopt"
+                    "soft shutdown: keeping WorkerHostStatusDoc + worker containers for next agent to adopt"
                 );
                 shutdown.trigger_soft();
             } else {
-                if let Err(err) = dns_register::deregister().await {
-                    warn!(?err, "DNS deregister failed");
-                }
                 shutdown.trigger();
             }
         }
@@ -138,4 +131,21 @@ async fn async_main() -> Result<()> {
 
     info!("fn0-worker-agent stopped");
     Ok(())
+}
+
+async fn detect_public_ipv4() -> Result<String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()?;
+    let body = client
+        .get("https://checkip.amazonaws.com")
+        .send()
+        .await?
+        .text()
+        .await?;
+    let ip = body.trim().to_string();
+    if ip.is_empty() {
+        return Err(eyre!("public IP probe returned empty body"));
+    }
+    Ok(ip)
 }

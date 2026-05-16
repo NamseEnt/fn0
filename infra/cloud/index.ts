@@ -519,11 +519,6 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
     groupToken: forteDb.groupToken,
     hostSuffix: forteDb.hostSuffix,
   },
-  workerDns: {
-    apiToken: dns.dnsApiToken,
-    zoneId,
-    hostnames: `*.${domain},fallback.${domain}`,
-  },
   worker: {
     tlsOrigin: {
       certPem: dns.certificate,
@@ -555,6 +550,29 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       secretAccessKey: bundleStoreR2.secretAccessKey,
     },
   },
+});
+
+// *.fn0.dev wildcard + fallback.fn0.dev → OCI NLB public IP. Cloudflare proxy
+// (orange) stays in front for TLS/edge; NLB does L4 forwarding into the worker
+// pool with health-aware backend selection. Lives here (not inside CloudflareDns)
+// because the NLB IP is an OciFn0WorkerSite output and a forward dependency
+// would create a cycle.
+new cloudflare.DnsRecord("worker-wildcard-a", {
+  zoneId,
+  name: pulumi.interpolate`*.${domain}`,
+  type: "A",
+  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
+  ttl: 1,
+  proxied: true,
+});
+
+new cloudflare.DnsRecord("worker-fallback-a", {
+  zoneId,
+  name: pulumi.interpolate`fallback.${domain}`,
+  type: "A",
+  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
+  ttl: 1,
+  proxied: true,
 });
 
 new fn0.EventBridgeCronTrigger("control-cron-trigger", {

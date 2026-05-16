@@ -4,22 +4,10 @@
 //! responsibilities on a single row keyed by `host_id`:
 //!
 //! 1. Liveness signal — `reported_at` lets the control plane's
-//!    `zombie_sweep` action detect hosts that died ungracefully and clean
-//!    up their orphaned Cloudflare DNS A record (using `addr`).
+//!    `zombie_sweep` action detect hosts that died ungracefully.
 //! 2. Rollout signal — `active_image_ref` lets the deploy script's
 //!    convergence gate confirm every live host has switched to the new
 //!    fn0-worker image before promoting cwasm-compiler pending → active.
-//!
-//! # Lifecycle invariant
-//!
-//! The doc must exist before the self-DNS A record is registered, and
-//! must be deleted only after the A record is deregistered. This
-//! guarantees `DNS A record exists ⇒ doc exists`, so the sweep can
-//! decide an A record is orphaned by looking at doc staleness alone.
-//!
-//! `main.rs` enforces this ordering by calling [`write_initial`] before
-//! `dns_register::register`, and by ensuring [`run`] only does its
-//! final `Delete` after `dns_register::deregister` has run.
 
 use crate::shutdown::Shutdown;
 use fn0_shared_schema::{

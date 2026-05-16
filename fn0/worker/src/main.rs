@@ -300,31 +300,70 @@ async fn run_user_server(
         let cache = cache.clone();
 
         tokio::spawn(async move {
-            let service = service_fn(move |req| {
-                let worker_senders = worker_senders.clone();
-                let instance_count = instance_count.clone();
-                let drain_flag = drain_flag.clone();
-                let cache = cache.clone();
-                async move {
-                    handle_user_request(req, worker_senders, instance_count, drain_flag, cache)
-                        .await
+            // Sniff first byte to multiplex TLS user traffic (Cloudflare → NLB
+            // → here, TLS ClientHello starts with 0x16) vs plain HTTP /health
+            // (OCI NLB health check on the same 443 port). peek() leaves the
+            // byte in the socket so the chosen handler can read it again.
+            let mut sniff_buf = [0u8; 1];
+            let first_byte = match tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                socket.peek(&mut sniff_buf),
+            )
+            .await
+            {
+                Ok(Ok(0)) => return,
+                Ok(Ok(_)) => sniff_buf[0],
+                Ok(Err(err)) => {
+                    tracing::warn!(%err, "peek failed");
+                    return;
                 }
-            });
-
-            let result = match tls_acceptor.accept(socket).await {
-                Ok(tls_stream) => {
-                    http1::Builder::new()
-                        .serve_connection(TokioIo::new(tls_stream), service)
-                        .await
-                }
-                Err(err) => {
-                    tracing::error!(%err, "TLS handshake failed");
+                Err(_) => {
+                    tracing::warn!("peek timeout");
                     return;
                 }
             };
 
-            if let Err(err) = result {
-                tracing::error!(%err, "Failed to serve connection");
+            if first_byte == 0x16 {
+                let service = service_fn(move |req| {
+                    let worker_senders = worker_senders.clone();
+                    let instance_count = instance_count.clone();
+                    let drain_flag = drain_flag.clone();
+                    let cache = cache.clone();
+                    async move {
+                        handle_user_request(
+                            req,
+                            worker_senders,
+                            instance_count,
+                            drain_flag,
+                            cache,
+                        )
+                        .await
+                    }
+                });
+
+                let result = match tls_acceptor.accept(socket).await {
+                    Ok(tls_stream) => {
+                        http1::Builder::new()
+                            .serve_connection(TokioIo::new(tls_stream), service)
+                            .await
+                    }
+                    Err(err) => {
+                        tracing::error!(%err, "TLS handshake failed");
+                        return;
+                    }
+                };
+
+                if let Err(err) = result {
+                    tracing::error!(%err, "Failed to serve connection");
+                }
+            } else {
+                let service = service_fn(handle_plain_health_request);
+                if let Err(err) = http1::Builder::new()
+                    .serve_connection(TokioIo::new(socket), service)
+                    .await
+                {
+                    tracing::warn!(%err, "plain HTTP serve failed");
+                }
             }
         });
     }
@@ -382,6 +421,19 @@ impl Drop for InFlightGuard {
 }
 
 type HyperResponse = hyper::Response<Full<Bytes>>;
+
+async fn handle_plain_health_request(
+    req: hyper::Request<hyper::body::Incoming>,
+) -> std::result::Result<HyperResponse, anyhow::Error> {
+    if req.method() == hyper::Method::GET && req.uri().path() == "/health" {
+        Ok(hyper::Response::new(Full::new(Bytes::from("ok"))))
+    } else {
+        Ok(hyper::Response::builder()
+            .status(404)
+            .body(Full::new(Bytes::new()))
+            .unwrap())
+    }
+}
 
 async fn handle_ops_request(
     req: hyper::Request<hyper::body::Incoming>,

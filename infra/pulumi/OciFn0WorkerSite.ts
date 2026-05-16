@@ -11,19 +11,12 @@ export interface OciFn0WorkerSiteArgs {
   ocpus: pulumi.Input<number>;
   memoryInGbs: pulumi.Input<number>;
   workerAgentForteDb: WorkerAgentForteDbArgs;
-  workerDns: WorkerDnsArgs;
   worker: WorkerArgs;
 }
 
 export interface WorkerAgentForteDbArgs {
   groupToken: pulumi.Input<string>;
   hostSuffix: pulumi.Input<string>;
-}
-
-export interface WorkerDnsArgs {
-  apiToken: pulumi.Input<string>;
-  zoneId: pulumi.Input<string>;
-  hostnames: pulumi.Input<string>;
 }
 
 export interface WorkerArgs {
@@ -109,32 +102,20 @@ export interface WorkerImageRegistry {
   repository: string;
 }
 
-export interface OciFn0WorkerSiteInfraEnvs {
-  OCI_PRIVATE_KEY_BASE64: string;
-  OCI_USER_ID: string;
-  OCI_FINGERPRINT: string;
-  OCI_TENANCY_ID: string;
-  OCI_REGION: string;
-  OCI_COMPARTMENT_ID: string;
-  OCI_INSTANCE_CONFIGURATION_ID: string;
-  OCI_AVAILABILITY_DOMAIN: string;
-}
-
 const MANAGED_BY_TAG_VALUE = "fn0-control";
 
 export class OciFn0WorkerSite extends pulumi.ComponentResource {
   public readonly compartmentId: pulumi.Output<string>;
   public readonly subnetId: pulumi.Output<string>;
   public readonly instanceConfigurationId: pulumi.Output<string>;
-  public readonly infraEnvs: pulumi.Output<OciFn0WorkerSiteInfraEnvs>;
   public readonly workerImageRegistries: pulumi.Output<WorkerImageRegistry[]>;
   public readonly osImageId: pulumi.Output<string>;
   public readonly cwasmBucket: OciCwasmBucketInfo;
   public readonly queue: OciQueueInfo;
   public readonly sshPublicKey: pulumi.Output<string>;
   public readonly sshPrivateKey: pulumi.Output<string>;
-  public readonly instanceIds: pulumi.Output<string[]>;
-  public readonly publicIps: pulumi.Output<(string | undefined)[]>;
+  public readonly instancePoolId: pulumi.Output<string>;
+  public readonly networkLoadBalancerPublicIp: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -156,10 +137,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     const compartment = this.setupCompartment(compartmentSuffix);
     this.compartmentId = compartment.id;
 
-    const { privateKey, workerManager, apiKey } = this.setupIdentity(
-      compartmentSuffix,
-      compartment,
-    );
+    this.setupIdentity(compartmentSuffix, compartment);
 
     const { vcn, internetGateway, subnet, workerSshKey } =
       this.setupNetwork(compartment);
@@ -167,20 +145,9 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     this.sshPrivateKey = workerSshKey.privateKeyPem;
     this.subnetId = subnet.id;
 
-    const { availabilityDomain, imageId, instanceConfiguration } =
+    const { availabilityDomain, imageId, customWorkerImage } =
       this.setupImage(args, compartment, vcn, internetGateway, subnet);
-    this.instanceConfigurationId = instanceConfiguration.id;
     this.osImageId = imageId;
-
-    this.infraEnvs = this.buildInfraEnvs(
-      args,
-      privateKey,
-      workerManager,
-      apiKey,
-      compartment,
-      instanceConfiguration,
-      availabilityDomain,
-    );
 
     const { workerRepo, workerImageRegistries } = this.setupContainerRegistry(
       args,
@@ -198,30 +165,49 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
     this.queue = this.setupQueue(args, compartmentSuffix, compartment);
 
-    const instances = this.setupInstances(
+    const metadata = this.buildInstanceMetadata(args);
+
+    const instanceConfiguration = this.setupInstanceConfiguration(
+      args,
+      compartment,
+      subnet,
+      imageId,
+      metadata,
+    );
+    this.instanceConfigurationId = instanceConfiguration.id;
+
+    const { networkLoadBalancer, backendSet, reservedPublicIp } =
+      this.setupNetworkLoadBalancer(name, compartment, subnet);
+    this.networkLoadBalancerPublicIp = reservedPublicIp.ipAddress;
+
+    const instancePool = this.setupInstancePool(
       name,
       args,
       compartment,
       subnet,
       availabilityDomain,
-      imageId,
+      instanceConfiguration,
+      networkLoadBalancer,
+      backendSet,
     );
-    this.instanceIds = pulumi.all(instances.map((i) => i.id));
-    this.publicIps = pulumi.all(instances.map((i) => i.publicIp));
+    this.instancePoolId = instancePool.id;
+
+    // customWorkerImage referenced to avoid unused-variable lint; imageId is
+    // already its primary output.
+    void customWorkerImage;
 
     this.registerOutputs({
       compartmentId: this.compartmentId,
       subnetId: this.subnetId,
       instanceConfigurationId: this.instanceConfigurationId,
-      infraEnvs: this.infraEnvs,
       workerImageRegistries: this.workerImageRegistries,
       osImageId: this.osImageId,
       cwasmBucket: this.cwasmBucket,
       queue: this.queue,
       sshPublicKey: this.sshPublicKey,
       sshPrivateKey: this.sshPrivateKey,
-      instanceIds: this.instanceIds,
-      publicIps: this.publicIps,
+      instancePoolId: this.instancePoolId,
+      networkLoadBalancerPublicIp: this.networkLoadBalancerPublicIp,
     });
   }
 
@@ -242,75 +228,11 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   private setupIdentity(
     compartmentSuffix: pulumi.Output<string>,
     compartment: oci.identity.Compartment,
-  ): {
-    privateKey: tls.PrivateKey;
-    workerManager: oci.identity.User;
-    apiKey: oci.identity.ApiKey;
-  } {
-    const privateKey = new tls.PrivateKey(
-      "oci-api-key-pair",
-      {
-        algorithm: "RSA",
-        rsaBits: 2048,
-      },
-      { parent: this },
-    );
-
-    const workerManager = new oci.identity.User(
-      "worker-manager",
-      {
-        description: "fn0 worker manager",
-      },
-      { parent: this },
-    );
-
-    const apiKey = new oci.identity.ApiKey(
-      "worker-api-key",
-      {
-        userId: workerManager.id,
-        keyValue: privateKey.publicKeyPem,
-      },
-      { parent: this },
-    );
-
-    const group = new oci.identity.Group(
-      "worker-manager-group",
-      {
-        description: "fn0 worker manager group",
-      },
-      { parent: this },
-    );
-
-    new oci.identity.UserGroupMembership(
-      "worker-manager-group-membership",
-      {
-        userId: workerManager.id,
-        groupId: group.id,
-      },
-      { parent: this },
-    );
-
-    new oci.identity.Policy(
-      "worker-manager-policy",
-      {
-        compartmentId: workerManager.compartmentId,
-        description: "Policy for fn0 worker manager",
-        statements: [
-          pulumi.interpolate`Allow group ${group.name} to manage instance-family in compartment id ${compartment.id}`,
-          pulumi.interpolate`Allow group ${group.name} to manage instance-configurations in compartment id ${compartment.id}`,
-          pulumi.interpolate`Allow group ${group.name} to manage compute-container-family in compartment id ${compartment.id}`,
-          pulumi.interpolate`Allow group ${group.name} to use virtual-network-family in compartment id ${compartment.id}`,
-          pulumi.interpolate`Allow group ${group.name} to read app-catalog-listing in compartment id ${compartment.id}`,
-          pulumi.interpolate`Allow group ${group.name} to use tag-namespaces in tenancy`,
-        ],
-      },
-      { parent: this },
-    );
-
+  ): void {
     const imageBuilderDynGroup = new oci.identity.DynamicGroup(
       "image-builder-dyn-group",
       {
-        compartmentId: workerManager.compartmentId,
+        compartmentId: compartment.compartmentId,
         description: "Instances that can self-terminate for image building",
         matchingRule: pulumi.interpolate`ANY {instance.compartment.id = '${compartment.id}'}`,
         name: pulumi.interpolate`fn0-image-builder-${compartmentSuffix}`,
@@ -321,7 +243,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     new oci.identity.Policy(
       "image-builder-self-terminate-policy",
       {
-        compartmentId: workerManager.compartmentId,
+        compartmentId: compartment.compartmentId,
         description: "Allow image builder instances to terminate themselves",
         statements: [
           pulumi.interpolate`Allow dynamic-group ${imageBuilderDynGroup.name} to manage instance-family in compartment id ${compartment.id}`,
@@ -329,8 +251,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       },
       { parent: this, dependsOn: [imageBuilderDynGroup] },
     );
-
-    return { privateKey, workerManager, apiKey };
   }
 
   private setupNetwork(compartment: oci.identity.Compartment): {
@@ -375,13 +295,14 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             source: "::/0",
             tcpOptions: { min: 22, max: 22 },
           },
-          ...[...cloudflareIpv4Ranges, ...cloudflareIpv6Ranges].map(
-            (source) => ({
-              protocol: "6",
-              source,
-              tcpOptions: { min: 443, max: 443 },
-            }),
-          ),
+          // NLB lives in this VCN. With default Full NAT the source IP seen by
+          // backends is the NLB private IP, so allowing the VCN CIDR makes the
+          // NLB the only ingress path to 443 (Cloudflare can't bypass it).
+          {
+            protocol: "6",
+            source: "10.0.0.0/16",
+            tcpOptions: { min: 443, max: 443 },
+          },
         ],
         egressSecurityRules: [
           {
@@ -456,8 +377,10 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   ): {
     availabilityDomain: pulumi.Output<string>;
     imageId: pulumi.Output<string>;
-    instanceConfiguration: oci.core.InstanceConfiguration;
+    customWorkerImage: CustomWorkerImage;
   } {
+    void args;
+    void subnet;
     const availabilityDomain = compartment.id.apply((compartmentId) =>
       oci.identity
         .getAvailabilityDomains({
@@ -508,13 +431,24 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
     const imageId = customWorkerImage.imageId;
 
-    const instanceConfiguration = new oci.core.InstanceConfiguration(
+    return { availabilityDomain, imageId, customWorkerImage };
+  }
+
+  private setupInstanceConfiguration(
+    args: OciFn0WorkerSiteArgs,
+    compartment: oci.identity.Compartment,
+    subnet: oci.core.Subnet,
+    imageId: pulumi.Output<string>,
+    metadata: pulumi.Output<{ [k: string]: string }>,
+  ): oci.core.InstanceConfiguration {
+    return new oci.core.InstanceConfiguration(
       "instance-configuration",
       {
         compartmentId: compartment.id,
         instanceDetails: {
           instanceType: "compute",
           launchDetails: {
+            compartmentId: compartment.id,
             shape: args.shape,
             shapeConfig: {
               ocpus: args.ocpus,
@@ -529,56 +463,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               assignIpv6ip: true,
               assignPublicIp: true,
             },
+            metadata,
+            freeformTags: {
+              managed_by: MANAGED_BY_TAG_VALUE,
+              fn0_role: "worker",
+            },
           },
         },
       },
       { parent: this },
     );
-
-    return { availabilityDomain, imageId, instanceConfiguration };
-  }
-
-  private buildInfraEnvs(
-    args: OciFn0WorkerSiteArgs,
-    privateKey: tls.PrivateKey,
-    workerManager: oci.identity.User,
-    apiKey: oci.identity.ApiKey,
-    compartment: oci.identity.Compartment,
-    instanceConfiguration: oci.core.InstanceConfiguration,
-    availabilityDomain: pulumi.Output<string>,
-  ): pulumi.Output<OciFn0WorkerSiteInfraEnvs> {
-    return pulumi
-      .all([
-        privateKey.privateKeyPemPkcs8,
-        workerManager.id,
-        workerManager.compartmentId,
-        compartment.id,
-        instanceConfiguration.id,
-        apiKey.fingerprint,
-        pulumi.output(availabilityDomain),
-        pulumi.output(args.region),
-      ])
-      .apply(
-        ([
-          privateKeyPem,
-          userId,
-          tenancyId,
-          compartmentId,
-          instanceConfigurationId,
-          fingerprint,
-          availabilityDomain,
-          region,
-        ]) => ({
-          OCI_PRIVATE_KEY_BASE64: Buffer.from(privateKeyPem).toString("base64"),
-          OCI_USER_ID: userId,
-          OCI_FINGERPRINT: fingerprint,
-          OCI_TENANCY_ID: tenancyId,
-          OCI_REGION: region,
-          OCI_COMPARTMENT_ID: compartmentId,
-          OCI_INSTANCE_CONFIGURATION_ID: instanceConfigurationId,
-          OCI_AVAILABILITY_DOMAIN: availabilityDomain,
-        }),
-      );
   }
 
   private setupContainerRegistry(
@@ -852,14 +746,9 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     };
   }
 
-  private setupInstances(
-    name: string,
+  private buildInstanceMetadata(
     args: OciFn0WorkerSiteArgs,
-    compartment: oci.identity.Compartment,
-    subnet: oci.core.Subnet,
-    availabilityDomain: pulumi.Output<string>,
-    imageId: pulumi.Output<string>,
-  ): oci.core.Instance[] {
+  ): pulumi.Output<{ [k: string]: string }> {
     // Mutable tag: agent_image_pull_poller relies on `:latest` moving to a new
     // digest to self-update.
     const agentImageRef = this.workerImageRegistries.apply((regs) => {
@@ -878,7 +767,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       return `${r.url}/${r.repository}-proxy:latest`;
     });
 
-    const agentEnv = buildWorkerAgentEnv(args.workerAgentForteDb, args.workerDns);
+    const agentEnv = buildWorkerAgentEnv(args.workerAgentForteDb);
     const workerEnv = buildWorkerEnv(args.worker, this.cwasmBucket, this.queue);
     const alloyConfig = pulumi
       .all([
@@ -907,62 +796,180 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       Buffer.from(s, "utf8").toString("base64"),
     );
 
-    const metadata = pulumi
+    return pulumi
       .all([userData, this.sshPublicKey])
       .apply(([ud, ssh]) => {
         const m: { [k: string]: string } = { user_data: ud };
         if (ssh) m["ssh_authorized_keys"] = ssh;
         return m;
       });
+  }
 
-    const instances: oci.core.Instance[] = [];
-    for (let i = 0; i < args.count; i++) {
-      instances.push(
-        new oci.core.Instance(
-          `instance-${i}`,
+  private setupNetworkLoadBalancer(
+    name: string,
+    compartment: oci.identity.Compartment,
+    subnet: oci.core.Subnet,
+  ): {
+    networkLoadBalancer: oci.networkloadbalancer.NetworkLoadBalancer;
+    backendSet: oci.networkloadbalancer.BackendSet;
+    reservedPublicIp: oci.core.PublicIp;
+  } {
+    const reservedPublicIp = new oci.core.PublicIp(
+      "nlb-reserved-public-ip",
+      {
+        compartmentId: compartment.id,
+        lifetime: "RESERVED",
+        displayName: `${name}-nlb-public-ip`,
+      },
+      { parent: this },
+    );
+
+    const networkLoadBalancer = new oci.networkloadbalancer.NetworkLoadBalancer(
+      "nlb",
+      {
+        compartmentId: compartment.id,
+        displayName: `${name}-nlb`,
+        subnetId: subnet.id,
+        isPrivate: false,
+        reservedIps: [{ id: reservedPublicIp.id }],
+      },
+      { parent: this },
+    );
+
+    const backendSet = new oci.networkloadbalancer.BackendSet(
+      "nlb-backend-set",
+      {
+        networkLoadBalancerId: networkLoadBalancer.id,
+        name: "workers",
+        // TWO_TUPLE = hash(sourceIp, destIp); destIp is the NLB public IP (fixed),
+        // so this effectively becomes source-IP affinity. Used to keep the same
+        // client (= same Cloudflare edge IP from NLB's view) pinned to the same
+        // worker, preserving warm WASM/JS instance caches in CodeExecutor.
+        policy: "TWO_TUPLE",
+        healthChecker: {
+          protocol: "HTTP",
+          port: 443,
+          urlPath: "/health",
+          returnCode: 200,
+        },
+      },
+      { parent: this },
+    );
+
+    new oci.networkloadbalancer.Listener(
+      "nlb-listener-tcp-443",
+      {
+        networkLoadBalancerId: networkLoadBalancer.id,
+        name: "tcp-443",
+        defaultBackendSetName: backendSet.name,
+        port: 443,
+        protocol: "TCP",
+      },
+      { parent: this },
+    );
+
+    return { networkLoadBalancer, backendSet, reservedPublicIp };
+  }
+
+  private setupInstancePool(
+    name: string,
+    args: OciFn0WorkerSiteArgs,
+    compartment: oci.identity.Compartment,
+    subnet: oci.core.Subnet,
+    availabilityDomain: pulumi.Output<string>,
+    instanceConfiguration: oci.core.InstanceConfiguration,
+    networkLoadBalancer: oci.networkloadbalancer.NetworkLoadBalancer,
+    backendSet: oci.networkloadbalancer.BackendSet,
+  ): oci.core.InstancePool {
+    const instancePool = new oci.core.InstancePool(
+      "instance-pool",
+      {
+        compartmentId: compartment.id,
+        instanceConfigurationId: instanceConfiguration.id,
+        displayName: name,
+        size: args.count,
+        placementConfigurations: [
           {
-            compartmentId: compartment.id,
             availabilityDomain,
-            displayName: `${name}-${i}`,
-            shape: args.shape,
-            shapeConfig: {
-              ocpus: args.ocpus,
-              memoryInGbs: args.memoryInGbs,
-            },
-            sourceDetails: {
-              sourceType: "image",
-              sourceId: imageId,
-            },
-            createVnicDetails: {
+            primaryVnicSubnets: {
               subnetId: subnet.id,
-              assignPublicIp: "true",
-              assignIpv6ip: true,
-            },
-            metadata,
-            freeformTags: {
-              managed_by: MANAGED_BY_TAG_VALUE,
-              fn0_role: "worker",
+              isAssignIpv6ip: true,
             },
           },
-          { parent: this },
-        ),
-      );
-    }
+        ],
+        loadBalancers: [
+          {
+            loadBalancerId: networkLoadBalancer.id,
+            backendSetName: backendSet.name,
+            port: 443,
+            vnicSelection: "PrimaryVnic",
+          },
+        ],
+        freeformTags: {
+          managed_by: MANAGED_BY_TAG_VALUE,
+          fn0_role: "worker",
+        },
+      },
+      { parent: this },
+    );
 
-    return instances;
+    new oci.autoscaling.AutoScalingConfiguration(
+      "instance-pool-autoscaling",
+      {
+        compartmentId: compartment.id,
+        displayName: `${name}-autoscaling`,
+        coolDownInSeconds: 300,
+        isEnabled: true,
+        autoScalingResources: {
+          id: instancePool.id,
+          type: "instancePool",
+        },
+        policies: [
+          {
+            policyType: "threshold",
+            displayName: "cpu-threshold",
+            capacity: {
+              initial: args.count,
+              min: args.count,
+              // OCI rejects max == min ("Maximum capacity must be greater than
+              // the minimum"). Headroom of +1 keeps the policy schema valid
+              // while staying within the Always Free A1 quota for now.
+              max: args.count + 1,
+            },
+            rules: [
+              {
+                displayName: "scale-out-cpu-70",
+                action: { type: "CHANGE_COUNT_BY", value: 1 },
+                metric: {
+                  metricType: "CPU_UTILIZATION",
+                  threshold: { operator: "GT", value: 70 },
+                },
+              },
+              {
+                displayName: "scale-in-cpu-30",
+                action: { type: "CHANGE_COUNT_BY", value: -1 },
+                metric: {
+                  metricType: "CPU_UTILIZATION",
+                  threshold: { operator: "LT", value: 30 },
+                },
+              },
+            ],
+          },
+        ],
+      },
+      { parent: this, dependsOn: [instancePool] },
+    );
+
+    return instancePool;
   }
 }
 
 function buildWorkerAgentEnv(
   forteDb: WorkerAgentForteDbArgs,
-  dns: WorkerDnsArgs,
 ): pulumi.Output<{ [k: string]: string }> {
   const base: { [k: string]: pulumi.Input<string> } = {
     TURSO_GROUP_TOKEN: forteDb.groupToken,
     TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
-    FN0_WORKER_DNS_API_TOKEN: dns.apiToken,
-    FN0_WORKER_DNS_ZONE_ID: dns.zoneId,
-    FN0_WORKER_DNS_HOSTNAMES: dns.hostnames,
   };
   return resolveEnvMap(base);
 }
@@ -1313,30 +1320,3 @@ function escapeEnvValue(v: string): string {
   return v.replace(/\n/g, "\\n");
 }
 
-const cloudflareIpv4Ranges = [
-  "173.245.48.0/20",
-  "103.21.244.0/22",
-  "103.22.200.0/22",
-  "103.31.4.0/22",
-  "141.101.64.0/18",
-  "108.162.192.0/18",
-  "190.93.240.0/20",
-  "188.114.96.0/20",
-  "197.234.240.0/22",
-  "198.41.128.0/17",
-  "162.158.0.0/15",
-  "104.16.0.0/13",
-  "104.24.0.0/14",
-  "172.64.0.0/13",
-  "131.0.72.0/22",
-];
-
-const cloudflareIpv6Ranges = [
-  "2400:cb00::/32",
-  "2606:4700::/32",
-  "2803:f800::/32",
-  "2405:b500::/32",
-  "2405:8100::/32",
-  "2a06:98c0::/29",
-  "2c0f:f248::/32",
-];
