@@ -377,10 +377,6 @@ const cloudflareSaasApiTokenCt = pulumi
   .all([controlDek.plaintext, dns.saasApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
-const controlDnsApiTokenCt = pulumi
-  .all([controlDek.plaintext, dns.dnsApiToken])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
 const controlEnvYamlBootstrap = pulumi
   .all([
     controlDek.ciphertext,
@@ -406,7 +402,6 @@ const controlEnvYamlBootstrap = pulumi
     pulumi.output(config.require("tursoOrganizationSlug")),
     forteDb.groupName,
     cloudflareSaasApiTokenCt,
-    controlDnsApiTokenCt,
   ])
   .apply(
     ([
@@ -433,7 +428,6 @@ const controlEnvYamlBootstrap = pulumi
       tursoOrgSlug,
       tursoGroupName,
       cfSaasApiTokenCt,
-      dnsApiTokenCt,
     ]) =>
       [
         "__dek:",
@@ -474,22 +468,9 @@ const controlEnvYamlBootstrap = pulumi
         `FN0_CLOUDFLARE_SAAS_ZONE_ID: ${cfZoneId}`,
         "FN0_CLOUDFLARE_SAAS_API_TOKEN:",
         `  secret: ${cfSaasApiTokenCt}`,
-        "FN0_WORKER_DNS_API_TOKEN:",
-        `  secret: ${dnsApiTokenCt}`,
-        `FN0_WORKER_DNS_ZONE_ID: ${cfZoneId}`,
-        `FN0_WORKER_DNS_HOSTNAMES: "*.${domain},fallback.${domain}"`,
         "",
       ].join("\n"),
   );
-
-const dnsProvider = {
-  cloudflare: {
-    zoneId,
-    asteriskDomain: `*.${domain}`,
-    saasFallbackDomain: dns.saasFallbackDomain,
-    apiToken: dns.dnsApiToken,
-  },
-};
 
 const grafanaStack = grafana.cloud.getStackOutput({
   slug: config.require("grafanaSlug"),

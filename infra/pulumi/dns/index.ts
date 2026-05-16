@@ -12,7 +12,6 @@ export interface CloudflareDnsArgs {
 export class CloudflareDns extends pulumi.ComponentResource {
   privateKeyPem: pulumi.Output<string>;
   certificate: pulumi.Output<string>;
-  dnsApiToken: pulumi.Output<string>;
   saasApiToken: pulumi.Output<string>;
   saasFallbackDomain: pulumi.Output<string>;
 
@@ -26,46 +25,9 @@ export class CloudflareDns extends pulumi.ComponentResource {
     const { accountId, domain, zoneId, suffix } = args;
 
     const PERMISSION_IDS = {
-      DNS_WRITE: "4755a26eedb94da69e1066d98aa820be",
-      WORKERS_SCRIPTS_WRITE: "e086da7e2179491d91ee5f35b3ca210a",
-      WORKERS_ROUTES_WRITE: "28f4b596e7d643029c524985477ae49a",
-      ZONE_WAF_WRITE: "fb6778dc191143babbfaa57993f1d275",
-      ZONE_SETTINGS_WRITE: "3030687196b94b638145a3953da2b699",
       SSL_AND_CERTIFICATES_WRITE: "c03055bc037c4ea9afb9a9f104b7b721",
       ZONE_READ: "c8fed203ed3043cba015a93ad1616f1f",
     };
-
-    const cloudflareApiToken = new cloudflare.AccountToken(
-      "cloudflare-api-token",
-      {
-        accountId,
-        name: pulumi.interpolate`fn0-${suffix}`,
-        policies: [
-          {
-            effect: "allow",
-            resources: JSON.stringify({
-              [`com.cloudflare.api.account.zone.${zoneId}`]: "*",
-            }),
-            permissionGroups: [
-              { id: PERMISSION_IDS.DNS_WRITE },
-              { id: PERMISSION_IDS.WORKERS_ROUTES_WRITE },
-              { id: PERMISSION_IDS.ZONE_WAF_WRITE },
-              { id: PERMISSION_IDS.ZONE_SETTINGS_WRITE },
-            ],
-          },
-          {
-            effect: "allow",
-            resources: JSON.stringify({
-              [`com.cloudflare.api.account.${accountId}`]: "*",
-            }),
-            permissionGroups: [
-              { id: PERMISSION_IDS.WORKERS_SCRIPTS_WRITE },
-            ],
-          },
-        ],
-      },
-      { parent: this }
-    );
 
     const privateKey = new tls.PrivateKey(
       "private-key",
@@ -102,7 +64,6 @@ export class CloudflareDns extends pulumi.ComponentResource {
     );
 
     this.certificate = originCaCert.certificate;
-    this.dnsApiToken = cloudflareApiToken.value;
 
     const cloudflareSaasApiToken = new cloudflare.AccountToken(
       "cloudflare-saas-api-token",
