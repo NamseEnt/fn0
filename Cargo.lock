@@ -3859,6 +3859,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-metric-repro"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "color-eyre",
+ "http",
+ "opentelemetry",
+ "opentelemetry-appender-tracing",
+ "opentelemetry-http",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "reqwest",
+ "rustls 0.23.28",
+ "tokio",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "outref"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
