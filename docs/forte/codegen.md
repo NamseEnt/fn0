@@ -42,16 +42,22 @@ Cargo reruns the build script when any of these directories change:
 
 Each handler type is discovered by statically parsing the Rust source:
 
-| Directory | Discovery rule |
-|---|---|
-| `src/pages/` | File contains `pub async fn handler` returning `Result<Props>` or `Result<Redirect>` |
-| `src/apis/` | Same as pages; route is prefixed with `/api/` |
-| `src/hooks/` | File has `struct Input`, `Output` type, and `pub async fn handler` |
-| `src/actions/` | File has `struct Input`, `Output` type, and `pub async fn handler` |
-| `src/queue_task/` | File has `struct Input` and `pub async fn handle` |
-| `src/admin/` | Same as queue tasks |
+| Directory | Discovery rule | Scan depth |
+|---|---|---|
+| `src/pages/` | File contains `pub async fn handler` returning `Result<Props>` or `Result<Redirect>` | Recursive |
+| `src/apis/` | Same as pages; route is prefixed with `/api/` | Recursive |
+| `src/hooks/` | File has `struct Input`, `Output` type (struct or enum), and `pub async fn handler` | Top-level only |
+| `src/actions/` | File has `struct Input`, `Output` type (struct or enum), and `pub async fn handler` | Top-level only |
+| `src/queue_task/` | File has `struct Input` and `pub async fn handle` | Top-level only |
+| `src/admin/` | Same as queue tasks | Top-level only |
+
+**Important:** `src/actions/`, `src/hooks/`, `src/queue_task/`, and `src/admin/` are scanned with `fs::read_dir` (non-recursive). Only `.rs` files directly inside the directory are discovered — files in subdirectories are silently ignored. Use flat filenames (`user_login.rs`, not `user/login.rs`).
+
+`src/pages/` and `src/apis/` are scanned recursively, so nested directory structures work for URL routing.
 
 Files named `mod.rs` inside these directories are skipped (they are generated).
+
+The return type check for pages and APIs matches on the string representation of the return type: the type must contain both `"Result"` and `"Props"`. Name your return type `Props` (or any type alias that includes the word `Props`) to be discovered.
 
 ### Route Mapping
 

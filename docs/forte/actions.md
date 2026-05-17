@@ -105,6 +105,12 @@ Cookie changes made in `req.jar` are written back to `Set-Cookie` response heade
 
 Hooks are similar to actions but are invoked server-to-server (via `/__self_invoke/<name>`). They live under `rs/src/hooks/` and follow the same `Input` / `Output` / `handler` convention. They are called internally via the fn0 queue or control plane, not from the browser directly.
 
+## Deserialization: `forte_json` vs `serde_json`
+
+Action inputs are deserialized with `forte_json`, which converts camelCase keys from the browser to snake_case Rust field names. A TypeScript caller sending `{"userName": "alice"}` maps to a Rust field `pub user_name: String`.
+
+Queue task and admin task inputs are deserialized with standard `serde_json` (no key conversion). Their struct field names must match the JSON keys exactly as sent by the caller — typically the generated `enqueue::*` functions (for queue tasks) or the `--input` JSON provided to `forte admin run` (for admin tasks). Use snake_case field names to match the default serde naming.
+
 ## Queue Tasks
 
 Background tasks live under `rs/src/queue_task/`. They have an `Input` struct and a `pub async fn handle` (not `handler`) function:
