@@ -13,7 +13,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
   privateKeyPem: pulumi.Output<string>;
   certificate: pulumi.Output<string>;
   saasApiToken: pulumi.Output<string>;
-  saasFallbackDomain: pulumi.Output<string>;
+  saasFallbackLbHostname: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -88,14 +88,19 @@ export class CloudflareDns extends pulumi.ComponentResource {
 
     this.saasApiToken = cloudflareSaasApiToken.value;
 
-    const fallbackDomain = pulumi.interpolate`fallback.${domain}`;
-    this.saasFallbackDomain = fallbackDomain;
+    // SaaS fallback origin points at a hostname that the wildcard A record
+    // (*.fn0.dev → NLB IP) already covers. Using a human-touched name (like
+    // fallback.fn0.dev) would lock that name's A records under CF's
+    // SaaS-fallback record protection (delete-blocked even via API). A
+    // dedicated name keeps the lock scoped to a record we never touch by hand.
+    const workerLbHostname = pulumi.interpolate`worker-lb.${domain}`;
+    this.saasFallbackLbHostname = workerLbHostname;
 
     new cloudflare.CustomHostnameFallbackOrigin(
       "saas-fallback-origin",
       {
         zoneId,
-        origin: fallbackDomain,
+        origin: workerLbHostname,
       },
       { parent: this }
     );
