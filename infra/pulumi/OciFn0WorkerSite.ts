@@ -139,14 +139,14 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
     this.setupIdentity(compartmentSuffix, compartment);
 
-    const { vcn, internetGateway, subnet, nlbSubnet, workerSshKey } =
+    const { vcn, internetGateway, workerSubnet, nlbSubnet, workerSshKey } =
       this.setupNetwork(compartment);
     this.sshPublicKey = workerSshKey.publicKeyOpenssh;
     this.sshPrivateKey = workerSshKey.privateKeyPem;
-    this.subnetId = subnet.id;
+    this.subnetId = workerSubnet.id;
 
     const { availabilityDomain, imageId, customWorkerImage } =
-      this.setupImage(args, compartment, vcn, internetGateway, subnet);
+      this.setupImage(args, compartment, vcn, internetGateway, workerSubnet);
     this.osImageId = imageId;
 
     const { workerRepo, workerImageRegistries } = this.setupContainerRegistry(
@@ -170,7 +170,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     const instanceConfiguration = this.setupInstanceConfiguration(
       args,
       compartment,
-      subnet,
+      workerSubnet,
       imageId,
       metadata,
     );
@@ -186,7 +186,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       name,
       args,
       compartment,
-      subnet,
+      workerSubnet,
       availabilityDomain,
       instanceConfiguration,
       networkLoadBalancer,
@@ -258,7 +258,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   private setupNetwork(compartment: oci.identity.Compartment): {
     vcn: oci.core.Vcn;
     internetGateway: oci.core.InternetGateway;
-    subnet: oci.core.Subnet;
+    workerSubnet: oci.core.Subnet;
     nlbSubnet: oci.core.Subnet;
     workerSshKey: tls.PrivateKey;
   } {
@@ -284,10 +284,11 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
     const nlbSubnetCidr = "10.0.1.0/24";
 
-    // Backend subnet: SSH from the world (debug convenience, see follow-up
-    // issue) + 443 only from the NLB subnet so the NLB is the only ingress.
-    const securityList = new oci.core.SecurityList(
-      "security-list",
+    // Worker (backend) subnet: SSH from the world (debug convenience, see
+    // follow-up issue) + 443 only from the NLB subnet so the NLB is the only
+    // ingress.
+    const workerSecurityList = new oci.core.SecurityList(
+      "worker-security-list",
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
@@ -386,18 +387,15 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    const subnet = new oci.core.Subnet(
-      "subnet",
+    const workerSubnet = new oci.core.Subnet(
+      "worker-subnet",
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
-        ipv4cidrBlocks: ["10.0.0.0/24"],
-        ipv6cidrBlocks: vcn.ipv6cidrBlocks.apply((x) =>
-          x.map((x) => x.replace("/56", "/64")),
-        ),
+        ipv4cidrBlocks: ["10.0.2.0/24"],
         prohibitInternetIngress: false,
         prohibitPublicIpOnVnic: false,
-        securityListIds: [securityList.id],
+        securityListIds: [workerSecurityList.id],
         routeTableId: routeTable.id,
       },
       { parent: this },
@@ -417,7 +415,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    return { vcn, internetGateway, subnet, nlbSubnet, workerSshKey };
+    return { vcn, internetGateway, workerSubnet, nlbSubnet, workerSshKey };
   }
 
   private setupImage(
@@ -425,14 +423,14 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     compartment: oci.identity.Compartment,
     vcn: oci.core.Vcn,
     internetGateway: oci.core.InternetGateway,
-    subnet: oci.core.Subnet,
+    workerSubnet: oci.core.Subnet,
   ): {
     availabilityDomain: pulumi.Output<string>;
     imageId: pulumi.Output<string>;
     customWorkerImage: CustomWorkerImage;
   } {
     void args;
-    void subnet;
+    void workerSubnet;
     const availabilityDomain = compartment.id.apply((compartmentId) =>
       oci.identity
         .getAvailabilityDomains({
@@ -489,7 +487,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   private setupInstanceConfiguration(
     args: OciFn0WorkerSiteArgs,
     compartment: oci.identity.Compartment,
-    subnet: oci.core.Subnet,
+    workerSubnet: oci.core.Subnet,
     imageId: pulumi.Output<string>,
     metadata: pulumi.Output<{ [k: string]: string }>,
   ): oci.core.InstanceConfiguration {
@@ -511,8 +509,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               imageId,
             },
             createVnicDetails: {
-              subnetId: subnet.id,
-              assignIpv6ip: true,
+              subnetId: workerSubnet.id,
               assignPublicIp: true,
             },
             metadata,
@@ -860,7 +857,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   private setupNetworkLoadBalancer(
     name: string,
     compartment: oci.identity.Compartment,
-    subnet: oci.core.Subnet,
+    nlbSubnet: oci.core.Subnet,
   ): {
     networkLoadBalancer: oci.networkloadbalancer.NetworkLoadBalancer;
     backendSet: oci.networkloadbalancer.BackendSet;
@@ -873,7 +870,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       {
         compartmentId: compartment.id,
         displayName: `${name}-nlb`,
-        subnetId: subnet.id,
+        subnetId: nlbSubnet.id,
         isPrivate: false,
       },
       { parent: this },
@@ -926,7 +923,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     name: string,
     args: OciFn0WorkerSiteArgs,
     compartment: oci.identity.Compartment,
-    subnet: oci.core.Subnet,
+    workerSubnet: oci.core.Subnet,
     availabilityDomain: pulumi.Output<string>,
     instanceConfiguration: oci.core.InstanceConfiguration,
     networkLoadBalancer: oci.networkloadbalancer.NetworkLoadBalancer,
@@ -943,8 +940,9 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           {
             availabilityDomain,
             primaryVnicSubnets: {
-              subnetId: subnet.id,
-              isAssignIpv6ip: true,
+              subnetId: workerSubnet.id,
+              isAssignIpv6ip: false,
+              ipv6addressIpv6subnetCidrPairDetails: [],
             },
           },
         ],
