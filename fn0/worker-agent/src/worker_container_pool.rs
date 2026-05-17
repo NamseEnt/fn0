@@ -53,6 +53,22 @@ pub async fn run(
             break;
         }
 
+        if let Some(active) = state.active.as_ref()
+            && matches!(podman.is_running(&active.container_name).await, Ok(false))
+        {
+            let dead = state.active.take().expect("checked Some above");
+            warn!(
+                container_name = %dead.container_name,
+                image_ref = %dead.image_ref,
+                "active worker container is no longer running; clearing and will restart on the same tick"
+            );
+            let _ = active_addr_tx.send(None);
+            let _ = active_image_tx.send(None);
+            if let Err(err) = podman.remove(&dead.container_name).await {
+                debug!(?err, container_name = %dead.container_name, "podman rm on dead container failed");
+            }
+        }
+
         let target = target_rx.borrow_and_update().clone();
         if let Some(image_ref) = target {
             let already = state
