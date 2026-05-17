@@ -533,9 +533,9 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   },
 });
 
-// *.fn0.dev wildcard + fallback.fn0.dev → OCI NLB public IP. Cloudflare proxy
-// (orange) stays in front for TLS/edge; NLB does L4 forwarding into the worker
-// pool with health-aware backend selection. Lives here (not inside CloudflareDns)
+// *.fn0.dev wildcard → OCI NLB public IP. Cloudflare proxy (orange) stays in
+// front for TLS/edge; NLB does L4 forwarding into the worker pool with
+// health-aware backend selection. Lives here (not inside CloudflareDns)
 // because the NLB IP is an OciFn0WorkerSite output and a forward dependency
 // would create a cycle.
 new cloudflare.DnsRecord("worker-wildcard-a", {
@@ -547,9 +547,14 @@ new cloudflare.DnsRecord("worker-wildcard-a", {
   proxied: true,
 });
 
-new cloudflare.DnsRecord("worker-fallback-a", {
+// worker-lb.fn0.dev is the SaaS Custom Hostname fallback origin (see
+// CloudflareDns.saasFallbackLbHostname). The wildcard above would resolve it
+// implicitly, but the SaaS fallback record protection only attaches to
+// hostnames with an explicit A record, so we keep this here to make sure the
+// lock lands on this dedicated name (not on any human-touched hostname).
+new cloudflare.DnsRecord("worker-lb-a", {
   zoneId,
-  name: pulumi.interpolate`fallback.${domain}`,
+  name: pulumi.interpolate`worker-lb.${domain}`,
   type: "A",
   content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
   ttl: 1,
