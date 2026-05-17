@@ -32,25 +32,11 @@ impl HttpClient for TokioHttpClient {
         let client = self.client.clone();
         self.handle
             .spawn(async move {
-                let uri = request.uri().to_string();
                 let request = request.try_into()?;
                 let mut response = client.execute(request).await?.error_for_status()?;
                 let headers = std::mem::take(response.headers_mut());
                 let status = response.status();
                 let body = response.bytes().await?;
-                let body_hex: String = body
-                    .iter()
-                    .take(512)
-                    .map(|b| format!("{:02x}", b))
-                    .collect();
-                tracing::info!(
-                    target: "otlp_wire",
-                    uri = %uri,
-                    status = status.as_u16(),
-                    body_len = body.len(),
-                    body_hex = %body_hex,
-                    "otlp response"
-                );
                 let mut http_response = http::Response::builder().status(status).body(body)?;
                 *http_response.headers_mut() = headers;
                 Ok::<_, HttpError>(http_response)
@@ -105,10 +91,7 @@ pub fn setup(
 
     let tracer = tracer_provider.tracer("fn0-worker-tracer");
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new(
-            "info,hyper=warn,hyper_util=warn,reqwest=warn,h2=warn,tower=warn,\
-             opentelemetry=debug,opentelemetry_sdk=debug,opentelemetry-otlp=debug",
-        )
+        EnvFilter::new("info,hyper=warn,hyper_util=warn,reqwest=warn,h2=warn,tower=warn")
     });
     tracing_subscriber::registry()
         .with(env_filter)

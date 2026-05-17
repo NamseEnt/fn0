@@ -2014,7 +2014,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.38"
+version = "0.3.40"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3856,27 +3856,6 @@ checksum = "49203cdcae0030493bad186b28da2fa25645fa276a51b6fec8010d281e02ef79"
 dependencies = [
  "dlv-list",
  "hashbrown 0.14.5",
-]
-
-[[package]]
-name = "otel-metric-repro"
-version = "0.0.0"
-dependencies = [
- "async-trait",
- "bytes",
- "color-eyre",
- "http",
- "opentelemetry",
- "opentelemetry-appender-tracing",
- "opentelemetry-http",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "reqwest",
- "rustls 0.23.28",
- "tokio",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
 ]
 
 [[package]]
