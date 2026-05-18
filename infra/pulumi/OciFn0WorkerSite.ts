@@ -23,7 +23,8 @@ export interface WorkerArgs {
   tlsOrigin: WorkerTlsOriginArgs;
   envEncryptionKeyBase64: pulumi.Input<string>;
   forteDb: WorkerForteDbArgs;
-  controlInvokeAllowedSubdomain: pulumi.Input<string>;
+  crossProjectEnqueueAllowedCallerProjectId: pulumi.Input<string>;
+  crossProjectInvokeAllowedCallerProjectId: pulumi.Input<string>;
   vault: WorkerVaultArgs;
   otlp: WorkerOtlpArgs;
   hostObservability: WorkerHostObservabilityArgs;
@@ -1072,14 +1073,17 @@ function buildWorkerEnv(
     FN0_QUEUE_OCI_FINGERPRINT: queue.ociFingerprint,
     FN0_QUEUE_OCI_PRIVATE_KEY_BASE64: queue.ociPrivateKeyBase64,
 
-    FN0_CONTROL_INVOKE_QUEUE_OCID: queue.ocid,
-    FN0_CONTROL_INVOKE_QUEUE_MESSAGES_ENDPOINT: queue.messagesEndpoint,
-    FN0_CONTROL_INVOKE_QUEUE_OCI_USER_ID: queue.ociUserId,
-    FN0_CONTROL_INVOKE_QUEUE_OCI_TENANCY_ID: queue.ociTenancyId,
-    FN0_CONTROL_INVOKE_QUEUE_OCI_FINGERPRINT: queue.ociFingerprint,
-    FN0_CONTROL_INVOKE_QUEUE_OCI_PRIVATE_KEY_BASE64: queue.ociPrivateKeyBase64,
-    FN0_CONTROL_INVOKE_QUEUE_ALLOWED_SUBDOMAIN:
-      worker.controlInvokeAllowedSubdomain,
+    FN0_CROSS_PROJECT_ENQUEUE_OCID: queue.ocid,
+    FN0_CROSS_PROJECT_ENQUEUE_MESSAGES_ENDPOINT: queue.messagesEndpoint,
+    FN0_CROSS_PROJECT_ENQUEUE_OCI_USER_ID: queue.ociUserId,
+    FN0_CROSS_PROJECT_ENQUEUE_OCI_TENANCY_ID: queue.ociTenancyId,
+    FN0_CROSS_PROJECT_ENQUEUE_OCI_FINGERPRINT: queue.ociFingerprint,
+    FN0_CROSS_PROJECT_ENQUEUE_OCI_PRIVATE_KEY_BASE64: queue.ociPrivateKeyBase64,
+    FN0_CROSS_PROJECT_ENQUEUE_ALLOWED_CALLER_PROJECT_ID:
+      worker.crossProjectEnqueueAllowedCallerProjectId,
+
+    FN0_CROSS_PROJECT_INVOKE_ALLOWED_CALLER_PROJECT_ID:
+      worker.crossProjectInvokeAllowedCallerProjectId,
 
     FN0_VAULT_CRYPTO_ENDPOINT: worker.vault.cryptoEndpoint,
     FN0_VAULT_KEY_OCID: worker.vault.keyOcid,

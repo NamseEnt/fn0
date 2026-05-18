@@ -74,11 +74,11 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotDeployed;
     }
 
-    let placeholder_url = match std::env::var("FN0_CONTROL_INVOKE_DIRECT_URL") {
+    let placeholder_url = match std::env::var("FN0_CROSS_PROJECT_INVOKE_URL") {
         Ok(u) => u,
         Err(_) => {
             return Output::InternalError {
-                reason: "FN0_CONTROL_INVOKE_DIRECT_URL not set".to_string(),
+                reason: "FN0_CROSS_PROJECT_INVOKE_URL not set".to_string(),
             };
         }
     };

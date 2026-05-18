@@ -39,11 +39,11 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
     let epoch_minute: i64 = scheduled / 60;
 
-    let invoke_queue_url = match std::env::var("FN0_CONTROL_INVOKE_QUEUE_URL") {
+    let invoke_queue_url = match std::env::var("FN0_CROSS_PROJECT_ENQUEUE_URL") {
         Ok(u) => u,
         Err(_) => {
             return Output::Error {
-                message: "FN0_CONTROL_INVOKE_QUEUE_URL not set".to_string(),
+                message: "FN0_CROSS_PROJECT_ENQUEUE_URL not set".to_string(),
             };
         }
     };

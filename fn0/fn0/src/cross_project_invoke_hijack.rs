@@ -1,14 +1,14 @@
-//! Direct sync invocation hijack: control wasm → another project's wasm.
+//! Sync cross-project invocation hijack.
 //!
-//! When the allowed caller (control) makes an HTTP request to
+//! When the allowed caller (e.g. fn0-control) makes an HTTP request to
 //! `placeholder_host`, the hijack catches it and dispatches into the
-//! worker pool via an injected `DirectDispatcher`. The Host header's
-//! first subdomain selects the target project_id, reusing the worker
-//! pool's existing routing. The response is returned to the caller wasm
-//! unmodified.
+//! worker pool via an injected `CrossProjectInvokeDispatcher`. The Host
+//! header's first subdomain selects the target project_id, reusing the
+//! worker pool's existing routing. The response is returned to the
+//! caller wasm unmodified.
 //!
-//! In contrast to `ControlInvokeQueueHijack` (fire-and-forget, queue),
-//! this hijack is sync: the caller awaits the upstream response.
+//! In contrast to [`crate::CrossProjectEnqueueHijack`] (fire-and-forget,
+//! queue), this hijack is sync: the caller awaits the upstream response.
 
 use crate::{Request, Response};
 use anyhow::Result;
@@ -23,7 +23,7 @@ use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 /// Bridge from the hijack (defined in the runtime crate) to the worker
 /// pool (defined in the binary crate). Worker provides a concrete impl
 /// after `spawn_workers`, then installs it via `set_dispatcher`.
-pub trait DirectDispatcher: Send + Sync {
+pub trait CrossProjectInvokeDispatcher: Send + Sync {
     fn dispatch(
         &self,
         target_project_id: String,
@@ -32,13 +32,13 @@ pub trait DirectDispatcher: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct ControlInvokeDirectHijack {
+pub struct CrossProjectInvokeHijack {
     pub placeholder_host: String,
     allowed_caller_project_id: String,
-    dispatcher: Arc<OnceLock<Arc<dyn DirectDispatcher>>>,
+    dispatcher: Arc<OnceLock<Arc<dyn CrossProjectInvokeDispatcher>>>,
 }
 
-impl ControlInvokeDirectHijack {
+impl CrossProjectInvokeHijack {
     pub fn new(placeholder_host: String, allowed_caller_project_id: String) -> Self {
         Self {
             placeholder_host,
@@ -48,12 +48,16 @@ impl ControlInvokeDirectHijack {
     }
 
     pub fn from_env() -> Result<Self> {
-        let placeholder_host = std::env::var("FN0_CONTROL_INVOKE_DIRECT_PLACEHOLDER_HOST")
-            .unwrap_or_else(|_| "fn0-control-invoke-direct.fn0.dev".to_string());
+        let placeholder_host = std::env::var("FN0_CROSS_PROJECT_INVOKE_PLACEHOLDER_HOST")
+            .unwrap_or_else(|_| "fn0-cross-project-invoke.fn0.dev".to_string());
         let allowed_caller_project_id =
-            std::env::var("FN0_CONTROL_INVOKE_DIRECT_ALLOWED_SUBDOMAIN").map_err(|_| {
-                anyhow::anyhow!("FN0_CONTROL_INVOKE_DIRECT_ALLOWED_SUBDOMAIN is required")
-            })?;
+            std::env::var("FN0_CROSS_PROJECT_INVOKE_ALLOWED_CALLER_PROJECT_ID").map_err(
+                |_| {
+                    anyhow::anyhow!(
+                        "FN0_CROSS_PROJECT_INVOKE_ALLOWED_CALLER_PROJECT_ID is required"
+                    )
+                },
+            )?;
         Ok(Self::new(placeholder_host, allowed_caller_project_id))
     }
 
@@ -67,9 +71,9 @@ impl ControlInvokeDirectHijack {
 
     /// Install the dispatcher used to route caught requests into the worker
     /// pool. Must be called exactly once after the worker pool is built.
-    pub fn set_dispatcher(&self, dispatcher: Arc<dyn DirectDispatcher>) {
+    pub fn set_dispatcher(&self, dispatcher: Arc<dyn CrossProjectInvokeDispatcher>) {
         if self.dispatcher.set(dispatcher).is_err() {
-            panic!("ControlInvokeDirectHijack dispatcher already set");
+            panic!("CrossProjectInvokeHijack dispatcher already set");
         }
     }
 
@@ -85,14 +89,14 @@ impl ControlInvokeDirectHijack {
         if caller_project_id != self.allowed_caller_project_id {
             return Ok(synth_response(
                 403,
-                Bytes::from_static(b"control invoke direct forbidden"),
+                Bytes::from_static(b"cross project invoke forbidden"),
             ));
         }
 
         let Some(dispatcher) = self.dispatcher.get() else {
             return Ok(synth_response(
                 503,
-                Bytes::from_static(b"control invoke direct dispatcher not installed"),
+                Bytes::from_static(b"cross project invoke dispatcher not installed"),
             ));
         };
 

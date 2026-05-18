@@ -510,7 +510,8 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       groupToken: forteDb.groupToken,
       hostSuffix: forteDb.hostSuffix,
     },
-    controlInvokeAllowedSubdomain: "fn0-control",
+    crossProjectEnqueueAllowedCallerProjectId: "fn0-control",
+    crossProjectInvokeAllowedCallerProjectId: "fn0-control",
     vault: {
       cryptoEndpoint: ociGlobalVault.cryptoEndpoint,
       keyOcid: ociGlobalVault.keyOcid,

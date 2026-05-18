@@ -122,8 +122,8 @@ pub(crate) fn build_store<C>(
     hooks: SelfInvokeHooks,
     turso_hijack: Option<&TursoHijack>,
     queue_hijack: Option<&crate::QueueHijack>,
-    control_invoke_queue_hijack: Option<&crate::ControlInvokeQueueHijack>,
-    control_invoke_direct_hijack: Option<&crate::ControlInvokeDirectHijack>,
+    cross_project_enqueue_hijack: Option<&crate::CrossProjectEnqueueHijack>,
+    cross_project_invoke_hijack: Option<&crate::CrossProjectInvokeHijack>,
     vault_hijack: Option<&crate::VaultHijack>,
 ) -> Store<ClientState<C>>
 where
@@ -140,10 +140,10 @@ where
             if queue_hijack.is_some() && key == "FN0_QUEUE_URL" {
                 continue;
             }
-            if control_invoke_queue_hijack.is_some() && key == "FN0_CONTROL_INVOKE_QUEUE_URL" {
+            if cross_project_enqueue_hijack.is_some() && key == "FN0_CROSS_PROJECT_ENQUEUE_URL" {
                 continue;
             }
-            if control_invoke_direct_hijack.is_some() && key == "FN0_CONTROL_INVOKE_DIRECT_URL" {
+            if cross_project_invoke_hijack.is_some() && key == "FN0_CROSS_PROJECT_INVOKE_URL" {
                 continue;
             }
             if vault_hijack.is_some() && key == "FN0_VAULT_URL" {
@@ -158,15 +158,15 @@ where
         if let Some(hijack) = queue_hijack {
             builder.env("FN0_QUEUE_URL", hijack.placeholder_url());
         }
-        if let Some(hijack) = control_invoke_queue_hijack
+        if let Some(hijack) = cross_project_enqueue_hijack
             && project_id == hijack.allowed_caller_project_id()
         {
-            builder.env("FN0_CONTROL_INVOKE_QUEUE_URL", hijack.placeholder_url());
+            builder.env("FN0_CROSS_PROJECT_ENQUEUE_URL", hijack.placeholder_url());
         }
-        if let Some(hijack) = control_invoke_direct_hijack
+        if let Some(hijack) = cross_project_invoke_hijack
             && project_id == hijack.allowed_caller_project_id()
         {
-            builder.env("FN0_CONTROL_INVOKE_DIRECT_URL", hijack.placeholder_url());
+            builder.env("FN0_CROSS_PROJECT_INVOKE_URL", hijack.placeholder_url());
         }
         if let Some(hijack) = vault_hijack {
             builder.env("FN0_VAULT_URL", hijack.placeholder_url());
@@ -215,8 +215,8 @@ pub async fn run_wasm_instance_loop(
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<crate::OtlpHijack>>,
     queue_hijack: Option<Arc<crate::QueueHijack>>,
-    control_invoke_queue_hijack: Option<Arc<crate::ControlInvokeQueueHijack>>,
-    control_invoke_direct_hijack: Option<Arc<crate::ControlInvokeDirectHijack>>,
+    cross_project_enqueue_hijack: Option<Arc<crate::CrossProjectEnqueueHijack>>,
+    cross_project_invoke_hijack: Option<Arc<crate::CrossProjectInvokeHijack>>,
     vault_hijack: Option<Arc<crate::VaultHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
@@ -234,14 +234,14 @@ pub async fn run_wasm_instance_loop(
             turso_hijack.clone(),
             otlp_hijack.clone(),
             queue_hijack.clone(),
-            control_invoke_queue_hijack.clone(),
-            control_invoke_direct_hijack.clone(),
+            cross_project_enqueue_hijack.clone(),
+            cross_project_invoke_hijack.clone(),
             vault_hijack.clone(),
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
-        control_invoke_queue_hijack.as_deref(),
-        control_invoke_direct_hijack.as_deref(),
+        cross_project_enqueue_hijack.as_deref(),
+        cross_project_invoke_hijack.as_deref(),
         vault_hijack.as_deref(),
     );
 

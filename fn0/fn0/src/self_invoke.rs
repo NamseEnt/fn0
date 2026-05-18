@@ -1,5 +1,5 @@
-use crate::control_invoke_direct_hijack::ControlInvokeDirectHijack;
-use crate::control_invoke_queue_hijack::ControlInvokeQueueHijack;
+use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
+use crate::cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::otlp_hijack::OtlpHijack;
@@ -80,8 +80,8 @@ pub(crate) struct SelfInvokeHooks {
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<OtlpHijack>>,
     queue_hijack: Option<Arc<QueueHijack>>,
-    control_invoke_queue_hijack: Option<Arc<ControlInvokeQueueHijack>>,
-    control_invoke_direct_hijack: Option<Arc<ControlInvokeDirectHijack>>,
+    cross_project_enqueue_hijack: Option<Arc<CrossProjectEnqueueHijack>>,
+    cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
     vault_hijack: Option<Arc<VaultHijack>>,
 }
 
@@ -93,8 +93,8 @@ impl SelfInvokeHooks {
         turso_hijack: Option<Arc<TursoHijack>>,
         otlp_hijack: Option<Arc<OtlpHijack>>,
         queue_hijack: Option<Arc<QueueHijack>>,
-        control_invoke_queue_hijack: Option<Arc<ControlInvokeQueueHijack>>,
-        control_invoke_direct_hijack: Option<Arc<ControlInvokeDirectHijack>>,
+        cross_project_enqueue_hijack: Option<Arc<CrossProjectEnqueueHijack>>,
+        cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
         vault_hijack: Option<Arc<VaultHijack>>,
     ) -> Self {
         Self {
@@ -103,8 +103,8 @@ impl SelfInvokeHooks {
             turso_hijack,
             otlp_hijack,
             queue_hijack,
-            control_invoke_queue_hijack,
-            control_invoke_direct_hijack,
+            cross_project_enqueue_hijack,
+            cross_project_invoke_hijack,
             vault_hijack,
         }
     }
@@ -139,16 +139,16 @@ impl WasiHttpHooks for SelfInvokeHooks {
             return queue_send(hijack, self.project_id.clone(), request, options);
         }
 
-        if let Some(hijack) = self.control_invoke_queue_hijack.clone()
+        if let Some(hijack) = self.cross_project_enqueue_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return control_invoke_queue_send(hijack, self.project_id.clone(), request, options);
+            return cross_project_enqueue_send(hijack, self.project_id.clone(), request, options);
         }
 
-        if let Some(hijack) = self.control_invoke_direct_hijack.clone()
+        if let Some(hijack) = self.cross_project_invoke_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return control_invoke_direct_send(hijack, self.project_id.clone(), request);
+            return cross_project_invoke_send(hijack, self.project_id.clone(), request);
         }
 
         if let Some(hijack) = self.vault_hijack.clone()
@@ -251,8 +251,8 @@ fn queue_send(
     })
 }
 
-fn control_invoke_queue_send(
-    hijack: Arc<ControlInvokeQueueHijack>,
+fn cross_project_enqueue_send(
+    hijack: Arc<CrossProjectEnqueueHijack>,
     project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
@@ -264,17 +264,17 @@ fn control_invoke_queue_send(
             Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
         };
 
-        let action = match hijack.handle_invoke(&project_id, &body_bytes) {
+        let action = match hijack.handle_enqueue(&project_id, &body_bytes) {
             Ok(a) => a,
             Err(ec) => return Err(ec.into()),
         };
 
         match action {
-            crate::control_invoke_queue_hijack::HijackAction::Forward(signed) => {
+            crate::cross_project_enqueue_hijack::HijackAction::Forward(signed) => {
                 let send_start = std::time::Instant::now();
                 let (res, io) = default_send_request(signed, options).await?;
                 telemetry::stage_duration(
-                    "hijack_control_invoke",
+                    "hijack_cross_project_enqueue",
                     &project_id,
                     send_start.elapsed(),
                 );
@@ -283,7 +283,7 @@ fn control_invoke_queue_send(
                     Box::new(io);
                 Ok((res, io))
             }
-            crate::control_invoke_queue_hijack::HijackAction::Synthesized(resp) => {
+            crate::cross_project_enqueue_hijack::HijackAction::Synthesized(resp) => {
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
                     Box::new(async { Ok(()) });
                 Ok((resp, io))
@@ -292,8 +292,8 @@ fn control_invoke_queue_send(
     })
 }
 
-fn control_invoke_direct_send(
-    hijack: Arc<ControlInvokeDirectHijack>,
+fn cross_project_invoke_send(
+    hijack: Arc<CrossProjectInvokeHijack>,
     caller_project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
@@ -304,7 +304,7 @@ fn control_invoke_direct_send(
             Err(ec) => return Err(ec.into()),
         };
         telemetry::stage_duration(
-            "hijack_control_invoke_direct",
+            "hijack_cross_project_invoke",
             &caller_project_id,
             send_start.elapsed(),
         );

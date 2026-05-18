@@ -12,7 +12,7 @@ use bytes::Bytes;
 use cache::S3BundleCache;
 use color_eyre::eyre::Result;
 use fn0::{
-    ControlInvokeDirectHijack, ControlInvokeQueueHijack, DirectDispatcher, ExecutionContext,
+    CrossProjectInvokeHijack, CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, ExecutionContext,
     OtlpHijack, QueueHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
@@ -67,23 +67,23 @@ fn build_queue_hijack() -> Arc<QueueHijack> {
     Arc::new(QueueHijack::from_env().expect("queue hijack init failed"))
 }
 
-fn build_control_invoke_queue_hijack() -> Arc<ControlInvokeQueueHijack> {
+fn build_cross_project_enqueue_hijack() -> Arc<CrossProjectEnqueueHijack> {
     Arc::new(
-        ControlInvokeQueueHijack::from_env().expect("control invoke queue hijack init failed"),
+        CrossProjectEnqueueHijack::from_env().expect("control invoke queue hijack init failed"),
     )
 }
 
-fn build_control_invoke_direct_hijack() -> Arc<ControlInvokeDirectHijack> {
+fn build_cross_project_invoke_hijack() -> Arc<CrossProjectInvokeHijack> {
     Arc::new(
-        ControlInvokeDirectHijack::from_env().expect("control invoke direct hijack init failed"),
+        CrossProjectInvokeHijack::from_env().expect("control invoke direct hijack init failed"),
     )
 }
 
-struct WorkerDirectDispatcher {
+struct WorkerCrossProjectInvokeDispatcher {
     senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
 }
 
-impl DirectDispatcher for WorkerDirectDispatcher {
+impl CrossProjectInvokeDispatcher for WorkerCrossProjectInvokeDispatcher {
     fn dispatch(
         &self,
         target_project_id: String,
@@ -217,14 +217,14 @@ async fn run() -> Result<()> {
         cache_size_bytes,
     );
 
-    let direct_hijack = build_control_invoke_direct_hijack();
+    let direct_hijack = build_cross_project_invoke_hijack();
 
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
             .with_turso_hijack(build_turso_hijack())
             .with_queue_hijack(build_queue_hijack())
-            .with_control_invoke_queue_hijack(build_control_invoke_queue_hijack())
-            .with_control_invoke_direct_hijack(direct_hijack.clone())
+            .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
+            .with_cross_project_invoke_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
             .with_otlp_hijack(build_otlp_hijack()),
     );
@@ -240,7 +240,7 @@ async fn run() -> Result<()> {
     ));
     tracing::info!(threads = num_workers, "worker threads started");
 
-    direct_hijack.set_dispatcher(Arc::new(WorkerDirectDispatcher {
+    direct_hijack.set_dispatcher(Arc::new(WorkerCrossProjectInvokeDispatcher {
         senders: worker_senders.clone(),
     }));
 

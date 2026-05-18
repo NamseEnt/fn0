@@ -1,6 +1,6 @@
 pub mod cache;
-pub mod control_invoke_direct_hijack;
-pub mod control_invoke_queue_hijack;
+pub mod cross_project_invoke_hijack;
+pub mod cross_project_enqueue_hijack;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
@@ -32,8 +32,8 @@ use wasmtime::Engine;
 use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
 
-pub use control_invoke_direct_hijack::{ControlInvokeDirectHijack, DirectDispatcher};
-pub use control_invoke_queue_hijack::ControlInvokeQueueHijack;
+pub use cross_project_invoke_hijack::{CrossProjectInvokeHijack, CrossProjectInvokeDispatcher};
+pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 pub use otlp_hijack::OtlpHijack;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
@@ -78,8 +78,8 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
     pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
     pub(crate) queue_hijack: Option<Arc<QueueHijack>>,
-    pub(crate) control_invoke_queue_hijack: Option<Arc<ControlInvokeQueueHijack>>,
-    pub(crate) control_invoke_direct_hijack: Option<Arc<ControlInvokeDirectHijack>>,
+    pub(crate) cross_project_enqueue_hijack: Option<Arc<CrossProjectEnqueueHijack>>,
+    pub(crate) cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
 }
 
@@ -92,8 +92,8 @@ impl<C: BundleCache> ExecutionContext<C> {
             turso_hijack: None,
             otlp_hijack: None,
             queue_hijack: None,
-            control_invoke_queue_hijack: None,
-            control_invoke_direct_hijack: None,
+            cross_project_enqueue_hijack: None,
+            cross_project_invoke_hijack: None,
             vault_hijack: None,
         }
     }
@@ -113,19 +113,19 @@ impl<C: BundleCache> ExecutionContext<C> {
         self
     }
 
-    pub fn with_control_invoke_queue_hijack(
+    pub fn with_cross_project_enqueue_hijack(
         mut self,
-        hijack: Arc<ControlInvokeQueueHijack>,
+        hijack: Arc<CrossProjectEnqueueHijack>,
     ) -> Self {
-        self.control_invoke_queue_hijack = Some(hijack);
+        self.cross_project_enqueue_hijack = Some(hijack);
         self
     }
 
-    pub fn with_control_invoke_direct_hijack(
+    pub fn with_cross_project_invoke_hijack(
         mut self,
-        hijack: Arc<ControlInvokeDirectHijack>,
+        hijack: Arc<CrossProjectInvokeHijack>,
     ) -> Self {
-        self.control_invoke_direct_hijack = Some(hijack);
+        self.cross_project_invoke_hijack = Some(hijack);
         self
     }
 
@@ -158,12 +158,12 @@ impl<C: BundleCache> ExecutionContext<C> {
         self.queue_hijack.as_ref()
     }
 
-    pub fn control_invoke_queue_hijack(&self) -> Option<&Arc<ControlInvokeQueueHijack>> {
-        self.control_invoke_queue_hijack.as_ref()
+    pub fn cross_project_enqueue_hijack(&self) -> Option<&Arc<CrossProjectEnqueueHijack>> {
+        self.cross_project_enqueue_hijack.as_ref()
     }
 
-    pub fn control_invoke_direct_hijack(&self) -> Option<&Arc<ControlInvokeDirectHijack>> {
-        self.control_invoke_direct_hijack.as_ref()
+    pub fn cross_project_invoke_hijack(&self) -> Option<&Arc<CrossProjectInvokeHijack>> {
+        self.cross_project_invoke_hijack.as_ref()
     }
 
     pub fn vault_hijack(&self) -> Option<&Arc<VaultHijack>> {
@@ -442,8 +442,8 @@ impl<C: BundleCache> CodeExecutor<C> {
         let turso_hijack = ctx.turso_hijack.clone();
         let otlp_hijack = ctx.otlp_hijack.clone();
         let queue_hijack = ctx.queue_hijack.clone();
-        let control_invoke_queue_hijack = ctx.control_invoke_queue_hijack.clone();
-        let control_invoke_direct_hijack = ctx.control_invoke_direct_hijack.clone();
+        let cross_project_enqueue_hijack = ctx.cross_project_enqueue_hijack.clone();
+        let cross_project_invoke_hijack = ctx.cross_project_invoke_hijack.clone();
         let vault_hijack = ctx.vault_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
@@ -457,8 +457,8 @@ impl<C: BundleCache> CodeExecutor<C> {
                 turso_hijack,
                 otlp_hijack,
                 queue_hijack,
-                control_invoke_queue_hijack,
-                control_invoke_direct_hijack,
+                cross_project_enqueue_hijack,
+                cross_project_invoke_hijack,
                 vault_hijack,
             ))
             .catch_unwind()
