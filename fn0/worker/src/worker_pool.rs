@@ -16,7 +16,7 @@ pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
 
 pub struct RequestEnvelope {
-    pub code_id: String,
+    pub project_id: String,
     pub req: Request,
     pub resp_tx: oneshot::Sender<Result<Response>>,
     pub enqueued_at: std::time::Instant,
@@ -56,7 +56,7 @@ pub fn dispatch(
     senders: &[mpsc::Sender<RequestEnvelope>],
     env: RequestEnvelope,
 ) -> Result<(), DispatchError> {
-    let idx = pick_worker(&env.code_id, senders.len());
+    let idx = pick_worker(&env.project_id, senders.len());
     match senders[idx].try_send(env) {
         Ok(()) => Ok(()),
         Err(mpsc::error::TrySendError::Full(_)) => Err(DispatchError::Full),
@@ -64,9 +64,9 @@ pub fn dispatch(
     }
 }
 
-fn pick_worker(code_id: &str, n: usize) -> usize {
+fn pick_worker(project_id: &str, n: usize) -> usize {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    hasher.write(code_id.as_bytes());
+    hasher.write(project_id.as_bytes());
     (hasher.finish() as usize) % n
 }
 
@@ -84,30 +84,30 @@ where
     rt.block_on(local.run_until(async move {
         let executor = Rc::new(CodeExecutor::new(ctx));
         while let Some(env) = rx.recv().await {
-            fn0::telemetry::stage_duration("queue_wait", &env.code_id, env.enqueued_at.elapsed());
+            fn0::telemetry::stage_duration("queue_wait", &env.project_id, env.enqueued_at.elapsed());
             let executor = executor.clone();
             tokio::task::spawn_local(async move {
                 let RequestEnvelope {
-                    code_id,
+                    project_id,
                     req,
                     resp_tx,
                     enqueued_at: _,
                 } = env;
                 let outcome =
-                    AssertUnwindSafe(executor.run(&code_id, "/", req, None))
+                    AssertUnwindSafe(executor.run(&project_id, "/", req, None))
                         .catch_unwind()
                         .await;
                 match outcome {
                     Ok(result) => {
                         if resp_tx.send(result).is_err() {
-                            fn0::telemetry::oneshot_drop_before_response(&code_id);
+                            fn0::telemetry::oneshot_drop_before_response(&project_id);
                         }
                     }
                     Err(panic) => {
                         let panic_msg = panic_payload_string(&panic);
-                        fn0::telemetry::panicked(&code_id);
+                        fn0::telemetry::panicked(&project_id);
                         tracing::error!(
-                            %code_id,
+                            %project_id,
                             panic = %panic_msg,
                             "executor panicked; response channel dropped"
                         );

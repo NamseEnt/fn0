@@ -123,6 +123,7 @@ pub(crate) fn build_store<C>(
     turso_hijack: Option<&TursoHijack>,
     queue_hijack: Option<&crate::QueueHijack>,
     control_invoke_queue_hijack: Option<&crate::ControlInvokeQueueHijack>,
+    control_invoke_direct_hijack: Option<&crate::ControlInvokeDirectHijack>,
     vault_hijack: Option<&crate::VaultHijack>,
 ) -> Store<ClientState<C>>
 where
@@ -142,6 +143,9 @@ where
             if control_invoke_queue_hijack.is_some() && key == "FN0_CONTROL_INVOKE_QUEUE_URL" {
                 continue;
             }
+            if control_invoke_direct_hijack.is_some() && key == "FN0_CONTROL_INVOKE_DIRECT_URL" {
+                continue;
+            }
             if vault_hijack.is_some() && key == "FN0_VAULT_URL" {
                 continue;
             }
@@ -158,6 +162,11 @@ where
             && project_id == hijack.allowed_caller_project_id()
         {
             builder.env("FN0_CONTROL_INVOKE_QUEUE_URL", hijack.placeholder_url());
+        }
+        if let Some(hijack) = control_invoke_direct_hijack
+            && project_id == hijack.allowed_caller_project_id()
+        {
+            builder.env("FN0_CONTROL_INVOKE_DIRECT_URL", hijack.placeholder_url());
         }
         if let Some(hijack) = vault_hijack {
             builder.env("FN0_VAULT_URL", hijack.placeholder_url());
@@ -207,6 +216,7 @@ pub async fn run_wasm_instance_loop(
     otlp_hijack: Option<Arc<crate::OtlpHijack>>,
     queue_hijack: Option<Arc<crate::QueueHijack>>,
     control_invoke_queue_hijack: Option<Arc<crate::ControlInvokeQueueHijack>>,
+    control_invoke_direct_hijack: Option<Arc<crate::ControlInvokeDirectHijack>>,
     vault_hijack: Option<Arc<crate::VaultHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
@@ -225,11 +235,13 @@ pub async fn run_wasm_instance_loop(
             otlp_hijack.clone(),
             queue_hijack.clone(),
             control_invoke_queue_hijack.clone(),
+            control_invoke_direct_hijack.clone(),
             vault_hijack.clone(),
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
         control_invoke_queue_hijack.as_deref(),
+        control_invoke_direct_hijack.as_deref(),
         vault_hijack.as_deref(),
     );
 

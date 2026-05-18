@@ -1,3 +1,4 @@
+use crate::control_invoke_direct_hijack::ControlInvokeDirectHijack;
 use crate::control_invoke_queue_hijack::ControlInvokeQueueHijack;
 use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
@@ -80,10 +81,12 @@ pub(crate) struct SelfInvokeHooks {
     otlp_hijack: Option<Arc<OtlpHijack>>,
     queue_hijack: Option<Arc<QueueHijack>>,
     control_invoke_queue_hijack: Option<Arc<ControlInvokeQueueHijack>>,
+    control_invoke_direct_hijack: Option<Arc<ControlInvokeDirectHijack>>,
     vault_hijack: Option<Arc<VaultHijack>>,
 }
 
 impl SelfInvokeHooks {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         project_id: String,
         self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
@@ -91,6 +94,7 @@ impl SelfInvokeHooks {
         otlp_hijack: Option<Arc<OtlpHijack>>,
         queue_hijack: Option<Arc<QueueHijack>>,
         control_invoke_queue_hijack: Option<Arc<ControlInvokeQueueHijack>>,
+        control_invoke_direct_hijack: Option<Arc<ControlInvokeDirectHijack>>,
         vault_hijack: Option<Arc<VaultHijack>>,
     ) -> Self {
         Self {
@@ -100,6 +104,7 @@ impl SelfInvokeHooks {
             otlp_hijack,
             queue_hijack,
             control_invoke_queue_hijack,
+            control_invoke_direct_hijack,
             vault_hijack,
         }
     }
@@ -138,6 +143,12 @@ impl WasiHttpHooks for SelfInvokeHooks {
             && hijack.matches(request.uri())
         {
             return control_invoke_queue_send(hijack, self.project_id.clone(), request, options);
+        }
+
+        if let Some(hijack) = self.control_invoke_direct_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return control_invoke_direct_send(hijack, self.project_id.clone(), request);
         }
 
         if let Some(hijack) = self.vault_hijack.clone()
@@ -278,6 +289,28 @@ fn control_invoke_queue_send(
                 Ok((resp, io))
             }
         }
+    })
+}
+
+fn control_invoke_direct_send(
+    hijack: Arc<ControlInvokeDirectHijack>,
+    caller_project_id: String,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let send_start = std::time::Instant::now();
+        let resp = match hijack.handle_invoke(&caller_project_id, request).await {
+            Ok(r) => r,
+            Err(ec) => return Err(ec.into()),
+        };
+        telemetry::stage_duration(
+            "hijack_control_invoke_direct",
+            &caller_project_id,
+            send_start.elapsed(),
+        );
+        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+            Box::new(async { Ok(()) });
+        Ok((resp, io))
     })
 }
 

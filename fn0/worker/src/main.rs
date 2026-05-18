@@ -12,7 +12,8 @@ use bytes::Bytes;
 use cache::S3BundleCache;
 use color_eyre::eyre::Result;
 use fn0::{
-    ControlInvokeQueueHijack, ExecutionContext, OtlpHijack, QueueHijack, TursoHijack, VaultHijack,
+    ControlInvokeDirectHijack, ControlInvokeQueueHijack, DirectDispatcher, ExecutionContext,
+    OtlpHijack, QueueHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -70,6 +71,37 @@ fn build_control_invoke_queue_hijack() -> Arc<ControlInvokeQueueHijack> {
     Arc::new(
         ControlInvokeQueueHijack::from_env().expect("control invoke queue hijack init failed"),
     )
+}
+
+fn build_control_invoke_direct_hijack() -> Arc<ControlInvokeDirectHijack> {
+    Arc::new(
+        ControlInvokeDirectHijack::from_env().expect("control invoke direct hijack init failed"),
+    )
+}
+
+struct WorkerDirectDispatcher {
+    senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
+}
+
+impl DirectDispatcher for WorkerDirectDispatcher {
+    fn dispatch(
+        &self,
+        target_project_id: String,
+        req: fn0::Request,
+    ) -> anyhow::Result<oneshot::Receiver<anyhow::Result<fn0::Response>>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let envelope = RequestEnvelope {
+            project_id: target_project_id,
+            req,
+            resp_tx,
+            enqueued_at: std::time::Instant::now(),
+        };
+        worker_pool::dispatch(&self.senders, envelope).map_err(|e| match e {
+            DispatchError::Full => anyhow::anyhow!("worker pool full"),
+            DispatchError::Closed => anyhow::anyhow!("worker pool closed"),
+        })?;
+        Ok(resp_rx)
+    }
 }
 
 fn build_vault_hijack() -> Arc<VaultHijack> {
@@ -185,11 +217,14 @@ async fn run() -> Result<()> {
         cache_size_bytes,
     );
 
+    let direct_hijack = build_control_invoke_direct_hijack();
+
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
             .with_turso_hijack(build_turso_hijack())
             .with_queue_hijack(build_queue_hijack())
             .with_control_invoke_queue_hijack(build_control_invoke_queue_hijack())
+            .with_control_invoke_direct_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
             .with_otlp_hijack(build_otlp_hijack()),
     );
@@ -204,6 +239,10 @@ async fn run() -> Result<()> {
         num_workers,
     ));
     tracing::info!(threads = num_workers, "worker threads started");
+
+    direct_hijack.set_dispatcher(Arc::new(WorkerDirectDispatcher {
+        senders: worker_senders.clone(),
+    }));
 
     let manifest_db = manifest_poller::build_database_from_env()
         .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
@@ -516,7 +555,7 @@ async fn handle_user_request(
     let request_path = req.uri().path().to_string();
 
     let resolve_start = std::time::Instant::now();
-    let code_id = match cache.resolve_domain(&host_no_port).await {
+    let project_id = match cache.resolve_domain(&host_no_port).await {
         Some(sub) => sub,
         None => host_no_port
             .split('.')
@@ -524,7 +563,7 @@ async fn handle_user_request(
             .unwrap_or("unknown")
             .to_string(),
     };
-    fn0::telemetry::stage_duration("resolve_domain", &code_id, resolve_start.elapsed());
+    fn0::telemetry::stage_duration("resolve_domain", &project_id, resolve_start.elapsed());
 
     let mapped_req = req.map(|body| {
         UnsyncBoxBody::new(body)
@@ -534,7 +573,7 @@ async fn handle_user_request(
 
     let (resp_tx, resp_rx) = oneshot::channel();
     let envelope = RequestEnvelope {
-        code_id: code_id.clone(),
+        project_id: project_id.clone(),
         req: mapped_req,
         resp_tx,
         enqueued_at: std::time::Instant::now(),
@@ -543,14 +582,14 @@ async fn handle_user_request(
     if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
         match err {
             DispatchError::Full => {
-                tracing::warn!(%code_id, "worker queue full");
+                tracing::warn!(%project_id, "worker queue full");
                 return Ok(hyper::Response::builder()
                     .status(503)
                     .body(Full::new(Bytes::from("Service Unavailable")))
                     .unwrap());
             }
             DispatchError::Closed => {
-                tracing::error!(%code_id, "worker queue closed");
+                tracing::error!(%project_id, "worker queue closed");
                 return Ok(hyper::Response::builder()
                     .status(500)
                     .body(Full::new(Bytes::from("Internal Server Error")))
@@ -562,15 +601,15 @@ async fn handle_user_request(
     let run_result = match tokio::time::timeout(REQUEST_DEADLINE, resp_rx).await {
         Ok(Ok(r)) => r,
         Ok(Err(_)) => {
-            tracing::error!(%code_id, "worker dropped response channel");
+            tracing::error!(%project_id, "worker dropped response channel");
             return Ok(hyper::Response::builder()
                 .status(500)
                 .body(Full::new(Bytes::from("Internal Server Error")))
                 .unwrap());
         }
         Err(_) => {
-            fn0::telemetry::request_deadline_exceeded(&code_id);
-            tracing::error!(%code_id, "request exceeded deadline");
+            fn0::telemetry::request_deadline_exceeded(&project_id);
+            tracing::error!(%project_id, "request exceeded deadline");
             return Ok(hyper::Response::builder()
                 .status(504)
                 .header("connection", "close")
@@ -585,11 +624,11 @@ async fn handle_user_request(
             let collect_start = std::time::Instant::now();
             let collected: std::result::Result<http_body_util::Collected<Bytes>, anyhow::Error> =
                 body.collect().await;
-            fn0::telemetry::stage_duration("body_collect", &code_id, collect_start.elapsed());
+            fn0::telemetry::stage_duration("body_collect", &project_id, collect_start.elapsed());
             let body_bytes = match collected {
                 Ok(c) => c.to_bytes(),
                 Err(err) => {
-                    tracing::error!(%err, %code_id, "response body collect failed");
+                    tracing::error!(%err, %project_id, "response body collect failed");
                     return Ok(hyper::Response::builder()
                         .status(502)
                         .body(Full::new(Bytes::from("Bad Gateway")))
@@ -611,7 +650,7 @@ async fn handle_user_request(
                     )))
                     .unwrap());
             }
-            tracing::error!(%err, %code_id, path = %request_path, "Failed to run fn0");
+            tracing::error!(%err, %project_id, path = %request_path, "Failed to run fn0");
             Ok(hyper::Response::builder()
                 .status(502)
                 .body(Full::new(Bytes::from("Bad Gateway")))

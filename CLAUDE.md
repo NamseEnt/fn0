@@ -1,4 +1,5 @@
 - This project uses English everywhere (code, comments, docs, commit messages).
+- Do not modify `spec.md` without explicit user authorization.
 - Comments: write only what code and history tools cannot carry. Run every comment through 3 filters, drop it if it fails any:
   1. Can it be expressed in code? (renaming, types, structure) → fix the code, not add a comment.
   2. Does Git (commit/blame) or the issue tracker already record it? → leave it there. No `// fixed issue #1425`, no change logs, no commented-out code.

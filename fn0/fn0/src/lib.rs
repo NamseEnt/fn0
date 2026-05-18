@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod control_invoke_direct_hijack;
 pub mod control_invoke_queue_hijack;
 pub mod execute;
 mod js;
@@ -31,6 +32,7 @@ use wasmtime::Engine;
 use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
 
+pub use control_invoke_direct_hijack::{ControlInvokeDirectHijack, DirectDispatcher};
 pub use control_invoke_queue_hijack::ControlInvokeQueueHijack;
 pub use otlp_hijack::OtlpHijack;
 pub use queue_hijack::QueueHijack;
@@ -77,6 +79,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
     pub(crate) queue_hijack: Option<Arc<QueueHijack>>,
     pub(crate) control_invoke_queue_hijack: Option<Arc<ControlInvokeQueueHijack>>,
+    pub(crate) control_invoke_direct_hijack: Option<Arc<ControlInvokeDirectHijack>>,
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
 }
 
@@ -90,6 +93,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             otlp_hijack: None,
             queue_hijack: None,
             control_invoke_queue_hijack: None,
+            control_invoke_direct_hijack: None,
             vault_hijack: None,
         }
     }
@@ -114,6 +118,14 @@ impl<C: BundleCache> ExecutionContext<C> {
         hijack: Arc<ControlInvokeQueueHijack>,
     ) -> Self {
         self.control_invoke_queue_hijack = Some(hijack);
+        self
+    }
+
+    pub fn with_control_invoke_direct_hijack(
+        mut self,
+        hijack: Arc<ControlInvokeDirectHijack>,
+    ) -> Self {
+        self.control_invoke_direct_hijack = Some(hijack);
         self
     }
 
@@ -148,6 +160,10 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn control_invoke_queue_hijack(&self) -> Option<&Arc<ControlInvokeQueueHijack>> {
         self.control_invoke_queue_hijack.as_ref()
+    }
+
+    pub fn control_invoke_direct_hijack(&self) -> Option<&Arc<ControlInvokeDirectHijack>> {
+        self.control_invoke_direct_hijack.as_ref()
     }
 
     pub fn vault_hijack(&self) -> Option<&Arc<VaultHijack>> {
@@ -427,6 +443,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let otlp_hijack = ctx.otlp_hijack.clone();
         let queue_hijack = ctx.queue_hijack.clone();
         let control_invoke_queue_hijack = ctx.control_invoke_queue_hijack.clone();
+        let control_invoke_direct_hijack = ctx.control_invoke_direct_hijack.clone();
         let vault_hijack = ctx.vault_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
@@ -441,6 +458,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 otlp_hijack,
                 queue_hijack,
                 control_invoke_queue_hijack,
+                control_invoke_direct_hijack,
                 vault_hijack,
             ))
             .catch_unwind()

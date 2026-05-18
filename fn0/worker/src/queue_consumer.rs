@@ -270,7 +270,7 @@ impl Consumer {
 
         let (resp_tx, resp_rx) = oneshot::channel();
         let envelope = RequestEnvelope {
-            code_id: wrapped.project_id.clone(),
+            project_id: wrapped.project_id.clone(),
             req,
             resp_tx,
             enqueued_at: std::time::Instant::now(),
