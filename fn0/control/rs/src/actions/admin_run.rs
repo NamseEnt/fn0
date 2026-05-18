@@ -83,10 +83,27 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
+    let placeholder_uri: http::Uri = match placeholder_url.parse() {
+        Ok(u) => u,
+        Err(e) => {
+            return Output::InternalError {
+                reason: format!("FN0_CROSS_PROJECT_INVOKE_URL parse: {e}"),
+            };
+        }
+    };
+    let scheme = placeholder_uri.scheme_str().unwrap_or("http");
+    let Some(placeholder_host) = placeholder_uri.host() else {
+        return Output::InternalError {
+            reason: "FN0_CROSS_PROJECT_INVOKE_URL has no host".to_string(),
+        };
+    };
+
     let target_url = format!(
-        "{}/__forte_admin/{}",
-        placeholder_url.trim_end_matches('/'),
-        req.body.task
+        "{scheme}://{project_id}.{placeholder_host}/__forte_admin/{task}",
+        scheme = scheme,
+        project_id = req.body.project_id,
+        placeholder_host = placeholder_host,
+        task = req.body.task,
     );
 
     let body_bytes = match serde_json::to_vec(&req.body.input) {
@@ -98,12 +115,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    let host_header = format!("{}.placeholder", req.body.project_id);
-
     let request = match http::Request::builder()
         .method("POST")
         .uri(&target_url)
-        .header("host", &host_header)
         .header("x-fn0-admin", "true")
         .header("content-type", "application/json")
         .body(body_bytes)

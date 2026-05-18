@@ -78,7 +78,9 @@ impl CrossProjectInvokeHijack {
     }
 
     pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
-        uri.host() == Some(self.placeholder_host.as_str())
+        let Some(host) = uri.host() else { return false };
+        let suffix = format!(".{}", self.placeholder_host);
+        host.ends_with(&suffix) && host.len() > suffix.len()
     }
 
     pub(crate) async fn handle_invoke(
@@ -100,8 +102,13 @@ impl CrossProjectInvokeHijack {
             ));
         };
 
-        let target_project_id = extract_first_subdomain(request.headers())
-            .ok_or_else(|| ErrorCode::InternalError(Some("missing Host header".into())))?;
+        let target_project_id = request
+            .uri()
+            .host()
+            .and_then(|h| h.split('.').next())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| ErrorCode::InternalError(Some("missing target subdomain".into())))?
+            .to_string();
 
         let req: Request = request.map(|body| {
             body.map_err(|ec: ErrorCode| anyhow::anyhow!("error_code: {ec:?}"))
@@ -141,13 +148,3 @@ fn synth_response(status: u16, body: Bytes) -> hyper::Response<UnsyncBoxBody<Byt
         .expect("static synth response builds")
 }
 
-fn extract_first_subdomain(headers: &hyper::HeaderMap) -> Option<String> {
-    let host = headers.get("host")?.to_str().ok()?;
-    let host_no_port = host.split(':').next().unwrap_or(host);
-    let first = host_no_port.split('.').next().unwrap_or(host_no_port);
-    if first.is_empty() {
-        None
-    } else {
-        Some(first.to_string())
-    }
-}
