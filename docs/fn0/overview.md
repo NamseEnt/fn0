@@ -53,11 +53,12 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.2.35 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
-| `fn0-cli` | 0.1.1 | Local development CLI |
-| `fn0-worker` | 0.3.38 | Worker binary (distributed execution node) |
+| `fn0` | 0.2.38 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0-cli` | 0.1.4 | Local development CLI |
+| `fn0-worker` | 0.3.42 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.5 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
-| `fn0-deploy` | 0.1.8 | fn0 Cloud deployment client |
+| `fn0-worker-proxy` | 0.1.0 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
+| `fn0-deploy` | 0.1.10 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.1.3 | Wasmtime wrapper with fn0-specific config |
 | `fn0-ski` | 0.1.6 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | Compiler utilities (internal) |
@@ -126,12 +127,15 @@ fn0 uses "hijack" components to inject platform services into the WASM execution
 | `otlp_hijack` | Injects OpenTelemetry OTLP endpoint |
 | `queue_hijack` | Intercepts outgoing queue requests |
 | `vault_hijack` | Injects secrets (Vault integration) |
-| `control_invoke_queue_hijack` | Routes control-plane queue invocations |
+| `cross_project_enqueue_hijack` | Routes cross-project queue enqueue calls |
+| `cross_project_invoke_hijack` | Routes cross-project direct invocations |
 
 These are configured on `ExecutionContext` via builder methods:
 
 ```rust
 let ctx = ExecutionContext::new(engine, linker, bundle_cache)
     .with_turso_hijack(turso_config)
-    .with_otlp_hijack(otlp_config);
+    .with_otlp_hijack(otlp_config)
+    .with_cross_project_enqueue_hijack(enqueue_config)
+    .with_cross_project_invoke_hijack(invoke_config);
 ```

@@ -59,10 +59,12 @@ cargo test -p doc-db
 | Binary | Cargo target | Notes |
 |---|---|---|
 | Forte backend | `wasm32-wasip2` | Set via `rs/.cargo/config.toml` |
-| fn0-worker | Native (aarch64/x86_64) | Via `scripts/build-fn0-worker.sh` |
-| fn0-worker-agent | Native | Via `scripts/build-fn0-worker-agent.sh` |
-| fn0-worker-proxy | Native | Via `scripts/build-fn0-worker-proxy.sh` |
+| fn0-worker | Native linux/arm64 | Built inside `deploy-fn0-worker.sh` via `build-rust-linux-arm64-bin.sh fn0-worker` |
+| fn0-worker-agent | Native linux/arm64 | Via `scripts/build-fn0-worker-agent.sh` |
+| fn0-worker-proxy | Native linux/arm64 | Via `scripts/build-fn0-worker-proxy.sh` |
 | cwasm-compiler | Node.js | Via `scripts/build-cwasm-compiler.sh` |
+
+All native Linux binaries are compiled using `scripts/build-rust-linux-arm64-bin.sh <package> <out_dir>`, which runs `cargo build --release` inside a `rust:bookworm` container. The repo is bind-mounted and `target/` + cargo-registry live on persistent named Docker volumes (`fn0-build-target`, `fn0-build-cargo-registry`) to keep incremental compilation fast across runs. Do not replace this with a `COPY`-into-`docker build` flow — that would rebuild the full dependency graph on every source change.
 
 ## Workspace Layout
 
