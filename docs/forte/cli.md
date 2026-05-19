@@ -9,14 +9,19 @@ The `forte` CLI is the primary developer tool for creating, running, building, a
 Scaffold a new project in a new directory named `<name>`.
 
 Creates:
-- `Forte.toml`, `Cargo.toml` (workspace), `.gitignore`
-- `rs/` — Rust backend with an index page handler
+- `Forte.toml`, `.gitignore`
+- `rs/` — Rust backend with an index page handler (`rs/Cargo.toml` is a standalone crate, not a workspace)
 - `fe/` — React/TypeScript frontend with Vite
 - Runs `npm install` for frontend dependencies
+
+| Flag | Description |
+|---|---|
+| `--dev` | Use `path = "..."` deps pointing at the local fn0 monorepo instead of crates.io versions. For in-monorepo development only. |
 
 ```sh
 forte init my-app
 cd my-app
+forte init --dev my-app   # monorepo development
 ```
 
 ---
@@ -104,7 +109,7 @@ Creates:
 
 ### `forte add action <path>`
 
-Add a new server action (Rust handler + TypeScript client).
+Add a new server action (Rust handler only).
 
 ```sh
 forte add action user_login
@@ -112,8 +117,11 @@ forte add action products_list
 ```
 
 Creates:
-- `rs/src/actions/<path>.rs` — Rust action handler
-- `fe/src/actions/<path>.ts` — TypeScript fetch wrapper
+- `rs/src/actions/<path>.rs` — Rust action handler with correct `Input` / `Output` / `handler` names
+
+The TypeScript client is generated automatically by `forte-rs-to-ts` on the next `forte build` or `forte dev`. Import from `fe/src/actions/.generated/<name>.ts`.
+
+> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen's flat-file scan for the generated `mod.rs` module declarations requires top-level `.rs` files. Use `forte add action user_login` instead (or use the directory-module layout `user_login/mod.rs` manually if you need to split the file).
 
 > **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen only scans the top-level `src/actions/` directory. That file will never be discovered. Use `forte add action user_login` instead.
 >

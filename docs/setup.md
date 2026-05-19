@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Rust** (2024 edition) with the `wasm32-wasip2` target
+- **Rust ≥ 1.84** (2024 edition) with the `wasm32-wasip2` target. Stable 1.84+ ships a `wasm-component-ld` that links `wit-bindgen 0.50` output; older versions do not.
 - **Node.js** and **npm** (for frontend builds)
 - **Docker** (optional, for local Turso/libSQL database)
 
