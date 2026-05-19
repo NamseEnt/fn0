@@ -1,6 +1,8 @@
+mod cloudflare;
+
+use cloudflare::CloudflareClient;
 use crate::common::auth;
 use crate::common::aws_sign;
-use crate::common::cloudflare::CloudflareClient;
 use crate::docs::*;
 use crate::quota;
 use forte_sdk::*;
