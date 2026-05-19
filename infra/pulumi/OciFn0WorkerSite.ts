@@ -1135,10 +1135,21 @@ function renderAlloyConfig(args: {
   otlpUrl: string;
   otlpUser: string;
 }): string {
+  // Each scrape target gets an instance=<ocid> label via discovery.relabel
+  // because Prometheus external_labels do not override labels a target
+  // already carries (the exporters set instance=<hostname:port> by default).
   return `prometheus.exporter.self "default" {}
 
+discovery.relabel "self" {
+  targets = prometheus.exporter.self.default.targets
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("FN0_HOST_OCID")
+  }
+}
+
 prometheus.scrape "self" {
-  targets    = prometheus.exporter.self.default.targets
+  targets    = discovery.relabel.self.output
   forward_to = [prometheus.remote_write.default.receiver]
 }
 
@@ -1149,8 +1160,16 @@ prometheus.exporter.unix "node" {
   sysfs_path      = "/host/sys"
 }
 
+discovery.relabel "node" {
+  targets = prometheus.exporter.unix.node.targets
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("FN0_HOST_OCID")
+  }
+}
+
 prometheus.scrape "node" {
-  targets    = prometheus.exporter.unix.node.targets
+  targets    = discovery.relabel.node.output
   forward_to = [prometheus.remote_write.default.receiver]
 }
 
@@ -1158,8 +1177,16 @@ prometheus.exporter.cadvisor "default" {
   storage_duration = "5m"
 }
 
+discovery.relabel "cadvisor" {
+  targets = prometheus.exporter.cadvisor.default.targets
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("FN0_HOST_OCID")
+  }
+}
+
 prometheus.scrape "cadvisor" {
-  targets    = prometheus.exporter.cadvisor.default.targets
+  targets    = discovery.relabel.cadvisor.output
   forward_to = [prometheus.remote_write.default.receiver]
 }
 
@@ -1173,7 +1200,6 @@ prometheus.remote_write "default" {
   }
   external_labels = {
     fn0_role = "worker",
-    instance = sys.env("FN0_HOST_OCID"),
   }
 }
 
