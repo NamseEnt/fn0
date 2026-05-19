@@ -44,7 +44,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y patchelf
 
       - name: Build forte-rs-to-ts
-        working-directory: forte/forte-rs-to-ts
+        working-directory: forte/rs-to-ts
         run: cargo build --profile dist
 
       - name: Package with toolchain
@@ -60,7 +60,7 @@ jobs:
           mkdir -p "${ARCHIVE_DIR}/lib/rustlib/${TARGET}/lib"
           mkdir -p "${ARCHIVE_DIR}/lib/rustlib/wasm32-wasip2/lib"
 
-          cp "forte/forte-rs-to-ts/target/dist/forte-rs-to-ts" "${ARCHIVE_DIR}/"
+          cp "forte/rs-to-ts/target/dist/forte-rs-to-ts" "${ARCHIVE_DIR}/"
 
           cp "${SYSROOT}/bin/rustc" "${ARCHIVE_DIR}/bin/"
 
