@@ -1444,6 +1444,7 @@ EOF_JOURNALD
 mkdir -p /var/log/journal
 systemd-tmpfiles --create --prefix /var/log/journal
 systemctl restart systemd-journald
+journalctl --flush
 
 # Oracle Linux ships firewalld enabled by default, which blocks 443 even
 # though the OCI SecurityList allows it. Open the port through firewalld
