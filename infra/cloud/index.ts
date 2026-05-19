@@ -487,6 +487,8 @@ const workerHostObservability = {
   prometheusUserId: grafanaStack.prometheusUserId.apply((id) => id.toString()),
   lokiUrl: grafanaStack.logsUrl,
   lokiUserId: grafanaStack.logsUserId.apply((id) => id.toString()),
+  otlpUrl: workerOtlpEndpoint,
+  otlpUserId: grafanaStack.id.apply((id) => id.toString()),
   basicAuthPassword: grafanaCloudAccessPolicyToken,
 };
 

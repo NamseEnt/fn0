@@ -49,6 +49,8 @@ export interface WorkerHostObservabilityArgs {
   prometheusUserId: pulumi.Input<string>;
   lokiUrl: pulumi.Input<string>;
   lokiUserId: pulumi.Input<string>;
+  otlpUrl: pulumi.Input<string>;
+  otlpUserId: pulumi.Input<string>;
   basicAuthPassword: pulumi.Input<string>;
 }
 
@@ -825,21 +827,28 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         args.worker.hostObservability.prometheusUserId,
         args.worker.hostObservability.lokiUrl,
         args.worker.hostObservability.lokiUserId,
-        args.worker.hostObservability.basicAuthPassword,
+        args.worker.hostObservability.otlpUrl,
+        args.worker.hostObservability.otlpUserId,
       ])
-      .apply(([promUrl, promUser, lokiUrl, lokiUser, password]) =>
-        renderAlloyConfig({ promUrl, promUser, lokiUrl, lokiUser, password }),
+      .apply(([promUrl, promUser, lokiUrl, lokiUser, otlpUrl, otlpUser]) =>
+        renderAlloyConfig({ promUrl, promUser, lokiUrl, lokiUser, otlpUrl, otlpUser }),
+      );
+    const alloyEnvFile = pulumi
+      .output(args.worker.hostObservability.basicAuthPassword)
+      .apply((password) =>
+        renderEnvFile({ FN0_GRAFANA_PASSWORD: password }),
       );
 
     const cloudInit = pulumi
-      .all([agentImageRef, proxyImageRef, agentEnv, workerEnv, alloyConfig])
-      .apply(([agentImageRef, proxyImageRef, agentEnv, workerEnv, alloyConfig]) =>
+      .all([agentImageRef, proxyImageRef, agentEnv, workerEnv, alloyConfig, alloyEnvFile])
+      .apply(([agentImageRef, proxyImageRef, agentEnv, workerEnv, alloyConfig, alloyEnvFile]) =>
         renderCloudInit(
           agentImageRef,
           proxyImageRef,
           agentEnv,
           workerEnv,
           alloyConfig,
+          alloyEnvFile,
         ),
       );
     const userData = cloudInit.apply((s) =>
@@ -1090,7 +1099,7 @@ function buildWorkerEnv(
     FN0_VAULT_REGION: worker.vault.region,
     FN0_VAULT_ALLOWED_SUBDOMAIN: worker.vault.allowedSubdomain,
 
-    OTLP_ENDPOINT: worker.otlp.endpoint,
+    OTLP_ENDPOINT: "http://127.0.0.1:4318",
     OTLP_BASIC_AUTH: worker.otlp.basicAuth,
     FN0_OTLP_TARGET_HOST: otlpParsed.targetHost,
     FN0_OTLP_TARGET_PATH_PREFIX: otlpParsed.targetPathPrefix,
@@ -1123,9 +1132,17 @@ function renderAlloyConfig(args: {
   promUser: string;
   lokiUrl: string;
   lokiUser: string;
-  password: string;
+  otlpUrl: string;
+  otlpUser: string;
 }): string {
-  return `prometheus.exporter.unix "node" {
+  return `prometheus.exporter.self "default" {}
+
+prometheus.scrape "self" {
+  targets    = prometheus.exporter.self.default.targets
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.exporter.unix "node" {
   set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "netstat", "vmstat", "uname", "time"]
   rootfs_path     = "/host/root"
   procfs_path     = "/host/proc"
@@ -1137,23 +1154,36 @@ prometheus.scrape "node" {
   forward_to = [prometheus.remote_write.default.receiver]
 }
 
+prometheus.exporter.cadvisor "default" {
+  storage_duration = "5m"
+}
+
+prometheus.scrape "cadvisor" {
+  targets    = prometheus.exporter.cadvisor.default.targets
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
 prometheus.remote_write "default" {
   endpoint {
     url = "${args.promUrl}"
     basic_auth {
       username = "${args.promUser}"
-      password = "${args.password}"
+      password = sys.env("FN0_GRAFANA_PASSWORD")
     }
   }
   external_labels = {
     fn0_role = "worker",
+    instance = sys.env("FN0_HOST_OCID"),
   }
 }
 
 loki.source.journal "default" {
   forward_to    = [loki.write.default.receiver]
   relabel_rules = loki.relabel.journal.rules
-  labels        = { fn0_role = "worker" }
+  labels        = {
+    fn0_role = "worker",
+    instance = sys.env("FN0_HOST_OCID"),
+  }
   path          = "/host/var/log/journal"
 }
 
@@ -1174,9 +1204,43 @@ loki.write "default" {
     url = "${args.lokiUrl}/loki/api/v1/push"
     basic_auth {
       username = "${args.lokiUser}"
-      password = "${args.password}"
+      password = sys.env("FN0_GRAFANA_PASSWORD")
     }
   }
+}
+
+otelcol.receiver.otlp "default" {
+  http {
+    endpoint = "127.0.0.1:4318"
+  }
+  grpc {
+    endpoint = "127.0.0.1:4317"
+  }
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.default.input]
+    logs    = [otelcol.exporter.otlphttp.default.input]
+    traces  = [otelcol.exporter.otlphttp.default.input]
+  }
+}
+
+otelcol.exporter.otlphttp "default" {
+  client {
+    endpoint = "${args.otlpUrl}"
+    auth     = otelcol.auth.basic.grafana.handler
+  }
+}
+
+otelcol.auth.basic "grafana" {
+  username = "${args.otlpUser}"
+  password = sys.env("FN0_GRAFANA_PASSWORD")
 }
 `;
 }
@@ -1187,6 +1251,7 @@ function renderCloudInit(
   agentEnv: { [k: string]: string },
   workerEnv: { [k: string]: string },
   alloyConfig: string,
+  alloyEnvFile: string,
 ): string {
   const agentEnvFile = renderEnvFile({
     ...agentEnv,
@@ -1248,6 +1313,8 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 `;
+  // --security-opt label=disable: OL SELinux enforcing otherwise blocks the
+  // alloy container from reading host /var/log/journal, /sys/fs/cgroup, etc.
   const alloySystemdUnit = `[Unit]
 Description=fn0 alloy host observability
 After=network-online.target
@@ -1257,14 +1324,19 @@ Wants=network-online.target
 Type=simple
 Restart=on-failure
 RestartSec=5
+EnvironmentFile=/etc/fn0-alloy/env
 ExecStartPre=-/usr/bin/podman rm -f fn0-alloy
 ExecStartPre=/usr/bin/podman pull ${ALLOY_IMAGE_REF}
 ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
+  --security-opt label=disable \\
   --network host \\
   --pid host \\
+  --env FN0_HOST_OCID \\
+  --env FN0_GRAFANA_PASSWORD \\
   -v /:/host/root:ro,rslave \\
   -v /proc:/host/proc:ro \\
   -v /sys:/host/sys:ro \\
+  -v /sys/fs/cgroup:/sys/fs/cgroup:ro \\
   -v /var/log/journal:/host/var/log/journal:ro \\
   -v /etc/machine-id:/etc/machine-id:ro \\
   -v /etc/fn0-alloy:/etc/fn0-alloy:ro \\
@@ -1325,6 +1397,11 @@ mkdir -p /etc/fn0-alloy
 cat > /etc/fn0-alloy/config.alloy <<'EOF_ALLOY_CFG'
 ${alloyConfig}EOF_ALLOY_CFG
 chmod 600 /etc/fn0-alloy/config.alloy
+
+cat > /etc/fn0-alloy/env <<'EOF_ALLOY_ENV'
+${alloyEnvFile}EOF_ALLOY_ENV
+echo "FN0_HOST_OCID=$HOST_ID" >> /etc/fn0-alloy/env
+chmod 600 /etc/fn0-alloy/env
 
 cat > /etc/systemd/system/fn0-alloy.service <<'EOF_ALLOY_UNIT'
 ${alloySystemdUnit}EOF_ALLOY_UNIT
