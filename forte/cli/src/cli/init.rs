@@ -1,152 +1,107 @@
 use anyhow::{Context, Result};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub fn run(name: &str) -> Result<()> {
+const FORTE_JSON_VERSION: &str = env!("FORTE_JSON_VERSION");
+const FORTE_SDK_VERSION: &str = env!("FORTE_SDK_VERSION");
+const FORTE_CODEGEN_VERSION: &str = env!("FORTE_CODEGEN_VERSION");
+const FN0_DOC_DB_VERSION: &str = env!("FN0_DOC_DB_VERSION");
+
+pub fn run(name: &str, dev: bool) -> Result<()> {
     let project_dir = Path::new(name);
 
     if project_dir.exists() {
         anyhow::bail!("Directory '{}' already exists", name);
     }
 
-    fs::create_dir_all(project_dir.join("rs/src/pages/index"))?;
     fs::create_dir_all(project_dir.join("rs/.cargo"))?;
-    fs::create_dir_all(project_dir.join("fe/src/pages/index"))?;
+    fs::create_dir_all(project_dir.join("rs/src/pages/index"))?;
     fs::create_dir_all(project_dir.join("fe/public"))?;
+    fs::create_dir_all(project_dir.join("fe/src/pages/index"))?;
 
-    fs::write(project_dir.join("Forte.toml"), generate_forte_toml())?;
-    fs::write(project_dir.join(".gitignore"), generate_root_gitignore())?;
-    fs::write(
-        project_dir.join("Cargo.toml"),
-        generate_workspace_cargo_toml(),
-    )?;
+    fs::write(project_dir.join(".gitignore"), ROOT_GITIGNORE)?;
+    fs::write(project_dir.join("Forte.toml"), "")?;
 
-    fs::write(project_dir.join("rs/.gitignore"), generate_rs_gitignore())?;
-    fs::write(project_dir.join("rs/Cargo.toml"), generate_cargo_toml())?;
-
-    fs::write(
-        project_dir.join("rs/.cargo/config.toml"),
-        generate_cargo_config(),
-    )?;
-
-    fs::write(project_dir.join("rs/src/lib.rs"), generate_lib_rs())?;
-
+    fs::write(project_dir.join("rs/.gitignore"), RS_GITIGNORE)?;
+    fs::write(project_dir.join("rs/.cargo/config.toml"), RS_CARGO_CONFIG)?;
+    fs::write(project_dir.join("rs/Cargo.toml"), rs_cargo_toml(name, dev))?;
+    fs::write(project_dir.join("rs/build.rs"), RS_BUILD_RS)?;
+    fs::write(project_dir.join("rs/src/lib.rs"), RS_LIB_RS)?;
     fs::write(
         project_dir.join("rs/src/pages/index/mod.rs"),
-        generate_index_mod_rs(),
+        RS_INDEX_MOD_RS,
     )?;
 
-    fs::write(project_dir.join("rs/build.rs"), generate_build_rs())?;
-
-    fs::write(project_dir.join("fe/.gitignore"), generate_fe_gitignore())?;
-    fs::write(
-        project_dir.join("fe/package.json"),
-        generate_package_json(name),
-    )?;
-
-    fs::write(project_dir.join("fe/tsconfig.json"), generate_tsconfig())?;
-
-    fs::write(project_dir.join("fe/src/app.tsx"), generate_app_tsx())?;
-
+    fs::write(project_dir.join("fe/.gitignore"), FE_GITIGNORE)?;
+    fs::write(project_dir.join("fe/package.json"), fe_package_json(name))?;
+    fs::write(project_dir.join("fe/tsconfig.json"), FE_TSCONFIG)?;
+    fs::write(project_dir.join("fe/public/robots.txt"), ROBOTS_TXT)?;
+    fs::write(project_dir.join("fe/src/app.tsx"), FE_APP_TSX)?;
     fs::write(
         project_dir.join("fe/src/pages/index/page.tsx"),
-        generate_index_page_tsx(),
+        FE_INDEX_PAGE_TSX,
     )?;
 
-    fs::write(
-        project_dir.join("fe/public/robots.txt"),
-        generate_robots_txt(),
-    )?;
+    npm_install(&project_dir.join("fe"))?;
 
-    install_npm_packages(project_dir)?;
-
-    println!("Created project '{}'", name);
+    println!("Created project '{name}'");
     println!();
     println!("Next steps:");
-    println!("  cd {}", name);
+    println!("  cd {name}");
     println!("  forte dev");
 
     Ok(())
 }
 
-fn install_npm_packages(project_dir: &Path) -> Result<()> {
-    let fe_dir = project_dir.join("fe");
-
+fn npm_install(fe_dir: &Path) -> Result<()> {
     println!("Installing npm packages...");
-
-    let deps = ["react", "react-dom", "zod"];
     let status = Command::new("npm")
         .arg("install")
-        .args(deps)
-        .current_dir(&fe_dir)
+        .current_dir(fe_dir)
         .status()
         .context("Failed to run npm install")?;
-
     if !status.success() {
         anyhow::bail!("npm install failed");
     }
-
-    let dev_deps = [
-        "@types/react",
-        "@types/react-dom",
-        "@vitejs/plugin-react",
-        "typescript",
-        "vite",
-    ];
-    let status = Command::new("npm")
-        .arg("install")
-        .arg("-D")
-        .args(dev_deps)
-        .current_dir(&fe_dir)
-        .status()
-        .context("Failed to run npm install -D")?;
-
-    if !status.success() {
-        anyhow::bail!("npm install -D failed");
-    }
-
     Ok(())
 }
 
-fn generate_forte_toml() -> &'static str {
-    ""
-}
-
-fn generate_root_gitignore() -> &'static str {
-    "/target\n"
-}
-
-fn generate_workspace_cargo_toml() -> &'static str {
-    r#"[workspace]
-resolver = "3"
-members = ["rs"]
-"#
-}
-
-fn generate_rs_gitignore() -> &'static str {
-    "/target\n"
-}
-
-fn generate_fe_gitignore() -> &'static str {
-    "/node_modules\n/dist\n/.forte\n"
-}
-
-fn generate_cargo_toml() -> String {
-    let forte_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("Failed to get parent of CARGO_MANIFEST_DIR");
-    let workspace_root = forte_dir
-        .parent()
-        .expect("Failed to get workspace root from forte dir");
-    let forte_json_path = forte_dir.join("json");
-    let forte_sdk_path = forte_dir.join("sdk");
-    let doc_db_path = workspace_root.join("doc-db");
-    let forte_codegen_path = forte_dir.join("codegen");
+fn rs_cargo_toml(name: &str, dev: bool) -> String {
+    let (forte_json_dep, forte_sdk_dep, doc_db_dep, forte_codegen_dep) = if dev {
+        let workspace_root = workspace_root_path();
+        (
+            format!(
+                r#"{{ path = "{}" }}"#,
+                workspace_root.join("forte/json").display()
+            ),
+            format!(
+                r#"{{ path = "{}" }}"#,
+                workspace_root.join("forte/sdk").display()
+            ),
+            format!(
+                r#"{{ package = "fn0-doc-db", path = "{}" }}"#,
+                workspace_root.join("doc-db").display()
+            ),
+            format!(
+                r#"{{ path = "{}" }}"#,
+                workspace_root.join("forte/codegen").display()
+            ),
+        )
+    } else {
+        (
+            format!(r#""={FORTE_JSON_VERSION}""#),
+            format!(r#""={FORTE_SDK_VERSION}""#),
+            format!(r#"{{ package = "fn0-doc-db", version = "={FN0_DOC_DB_VERSION}" }}"#),
+            format!(r#""={FORTE_CODEGEN_VERSION}""#),
+        )
+    };
 
     format!(
-        r#"[package]
-name = "backend"
+        r#"[workspace]
+
+[package]
+name = "{name}"
 version = "0.1.0"
 edition = "2024"
 
@@ -159,36 +114,59 @@ cookie = "0.18"
 serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
 http = "1"
-forte-json = {{ path = "{forte_json}" }}
-forte-sdk = {{ path = "{forte_sdk}" }}
-doc-db = {{ path = "{doc_db}" }}
+tracing = "0.1"
+forte-json = {forte_json_dep}
+forte-sdk = {forte_sdk_dep}
+doc-db = {doc_db_dep}
 
 [build-dependencies]
-forte-codegen = {{ path = "{forte_codegen}" }}
-"#,
-        forte_json = forte_json_path.display(),
-        forte_sdk = forte_sdk_path.display(),
-        doc_db = doc_db_path.display(),
-        forte_codegen = forte_codegen_path.display(),
+forte-codegen = {forte_codegen_dep}
+"#
     )
 }
 
-fn generate_cargo_config() -> &'static str {
-    r#"[build]
-target = "wasm32-wasip2"
-"#
+fn workspace_root_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("workspace root from forte/cli manifest dir")
+        .to_path_buf()
 }
 
-fn generate_lib_rs() -> &'static str {
-    r#"// === FORTE-MANAGED START ===
-// Auto-managed by `forte build`. Do not edit between the START/END markers.
-mod route_generated;
-// === FORTE-MANAGED END ===
+fn fe_package_json(name: &str) -> String {
+    format!(
+        r#"{{
+  "name": "{name}-frontend",
+  "private": true,
+  "type": "module",
+  "dependencies": {{
+    "react": "^19.2",
+    "react-dom": "^19.2",
+    "zod": "^4"
+  }},
+  "devDependencies": {{
+    "@types/react": "^19.2",
+    "@types/react-dom": "^19.2",
+    "@vitejs/plugin-react": "^6",
+    "typescript": "^5.9",
+    "vite": "^8"
+  }}
+}}
 "#
+    )
 }
 
-fn generate_index_mod_rs() -> &'static str {
-    r#"use anyhow::Result;
+const ROOT_GITIGNORE: &str = "/target\n/dist\n/.forte\n";
+const RS_GITIGNORE: &str = "/target\n";
+const FE_GITIGNORE: &str = "/node_modules\n/dist\n/.forte\n";
+
+const RS_CARGO_CONFIG: &str = "[build]\ntarget = \"wasm32-wasip2\"\n";
+
+const RS_BUILD_RS: &str = "fn main() {\n    forte_codegen::generate_routes();\n}\n";
+
+const RS_LIB_RS: &str = "// === FORTE-MANAGED START ===\n// Auto-managed by `forte build`. Do not edit between the START/END markers.\nmod route_generated;\n// === FORTE-MANAGED END ===\n";
+
+const RS_INDEX_MOD_RS: &str = r#"use anyhow::Result;
 use forte_sdk::ForteRequest;
 use serde::Serialize;
 
@@ -202,29 +180,9 @@ pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
         message: "Hello from Forte!".to_string(),
     })
 }
-"#
-}
+"#;
 
-fn generate_build_rs() -> &'static str {
-    r#"fn main() {
-    forte_codegen::generate_routes();
-}
-"#
-}
-
-fn generate_package_json(name: &str) -> String {
-    format!(
-        r#"{{
-  "name": "{name}-frontend",
-  "private": true,
-  "type": "module"
-}}
-"#
-    )
-}
-
-fn generate_tsconfig() -> &'static str {
-    r#"{
+const FE_TSCONFIG: &str = r#"{
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -233,15 +191,15 @@ fn generate_tsconfig() -> &'static str {
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "dist"
+    "noEmit": true
   },
-  "include": ["src/**/*"]
+  "include": ["src", ".forte"]
 }
-"#
-}
+"#;
 
-fn generate_app_tsx() -> &'static str {
-    r#"export function Head() {
+const ROBOTS_TXT: &str = "User-agent: *\nAllow: /\n";
+
+const FE_APP_TSX: &str = r#"export function Head() {
     return (
         <>
             <meta charSet="utf-8" />
@@ -250,11 +208,9 @@ fn generate_app_tsx() -> &'static str {
         </>
     );
 }
-"#
-}
+"#;
 
-fn generate_index_page_tsx() -> &'static str {
-    r#"import type { Props } from "./.props";
+const FE_INDEX_PAGE_TSX: &str = r#"import type { Props } from "./.props";
 
 export default function IndexPage(props: Props) {
     if (props.t !== "Ok") {
@@ -264,15 +220,8 @@ export default function IndexPage(props: Props) {
     return (
         <div>
             <h1>Welcome to Forte</h1>
-            <p>{props.v.message}</p>
+            <p>{props.message}</p>
         </div>
     );
 }
-"#
-}
-
-fn generate_robots_txt() -> &'static str {
-    r#"User-agent: *
-Allow: /
-"#
-}
+"#;

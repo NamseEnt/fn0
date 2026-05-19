@@ -30,6 +30,8 @@ pub enum Commands {
     },
     Init {
         name: String,
+        #[arg(long)]
+        dev: bool,
     },
     Login {
         #[arg(long)]

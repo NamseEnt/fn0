@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
@@ -40,5 +40,80 @@ fn main() {
         );
     }
 
+    let workspace_root = PathBuf::from(&manifest_dir)
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("workspace root from forte/cli manifest dir")
+        .to_path_buf();
+
+    let targets: &[(&str, &str, &str)] = &[
+        ("FORTE_JSON_VERSION", "forte/json/Cargo.toml", "forte-json"),
+        ("FORTE_SDK_VERSION", "forte/sdk/Cargo.toml", "forte-sdk"),
+        (
+            "FORTE_CODEGEN_VERSION",
+            "forte/codegen/Cargo.toml",
+            "forte-codegen",
+        ),
+        ("FN0_DOC_DB_VERSION", "doc-db/Cargo.toml", "fn0-doc-db"),
+    ];
+
+    for (env_var, rel_path, expected_name) in targets {
+        let manifest = workspace_root.join(rel_path);
+        let version = read_package_version(&manifest, expected_name);
+        println!("cargo:rustc-env={env_var}={version}");
+        println!("cargo:rerun-if-changed={}", manifest.display());
+    }
+
     println!("cargo:rerun-if-env-changed=PROFILE");
+}
+
+fn read_package_version(path: &Path, expected_name: &str) -> String {
+    let content = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+
+    let mut in_package = false;
+    let mut found_name: Option<String> = None;
+    let mut found_version: Option<String> = None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(section) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            in_package = section == "package";
+            continue;
+        }
+        if !in_package {
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("name") {
+            found_name = Some(extract_string_value(rest));
+        } else if let Some(rest) = trimmed.strip_prefix("version") {
+            found_version = Some(extract_string_value(rest));
+        }
+        if found_name.is_some() && found_version.is_some() {
+            break;
+        }
+    }
+
+    let name = found_name.unwrap_or_else(|| {
+        panic!("no [package].name in {}", path.display());
+    });
+    assert_eq!(
+        name,
+        expected_name,
+        "{} has [package].name = {name:?}, expected {expected_name:?}",
+        path.display()
+    );
+
+    found_version.unwrap_or_else(|| panic!("no [package].version in {}", path.display()))
+}
+
+fn extract_string_value(rest: &str) -> String {
+    let after_eq = rest
+        .trim_start()
+        .strip_prefix('=')
+        .expect("expected `=` after key")
+        .trim();
+    after_eq
+        .trim_matches('"')
+        .to_string()
 }

@@ -29,8 +29,8 @@ async fn async_main() -> Result<()> {
             cli::dev::run(options).await?;
         }
 
-        Commands::Init { name } => {
-            cli::init::run(&name)?;
+        Commands::Init { name, dev } => {
+            cli::init::run(&name, dev)?;
         }
 
         Commands::Login { token } => {
