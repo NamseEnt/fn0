@@ -74,8 +74,7 @@ fn generate_backend_page(page_path: &str) -> String {
 
     if params.is_empty() {
         r#"use anyhow::Result;
-use cookie::CookieJar;
-use http::HeaderMap;
+use forte_sdk::ForteRequest;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -83,7 +82,7 @@ pub enum Props {
     Ok { message: String },
 }
 
-pub async fn handler(_headers: HeaderMap, _jar: CookieJar) -> Result<Props> {
+pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
     Ok(Props::Ok {
         message: "Hello from Forte!".to_string(),
     })
@@ -99,12 +98,11 @@ pub async fn handler(_headers: HeaderMap, _jar: CookieJar) -> Result<Props> {
 
         format!(
             r#"use anyhow::Result;
-use cookie::CookieJar;
-use http::HeaderMap;
+use forte_sdk::ForteRequest;
 use serde::{{Deserialize, Serialize}};
 
 #[derive(Deserialize)]
-pub struct Params {{
+pub struct PathParams {{
 {param_fields}
 }}
 
@@ -113,9 +111,9 @@ pub enum Props {{
     Ok {{ message: String }},
 }}
 
-pub async fn handler(_headers: HeaderMap, _jar: CookieJar, params: Params) -> Result<Props> {{
+pub async fn handler(_req: ForteRequest<'_>, _path_params: PathParams) -> Result<Props> {{
     Ok(Props::Ok {{
-        message: format!("Hello from Forte!"),
+        message: "Hello from Forte!".to_string(),
     }})
 }}
 "#
@@ -135,7 +133,7 @@ export default function {component_name}(props: Props) {{
     return (
         <div>
             <h1>{component_name}</h1>
-            <p>{{props.v.message}}</p>
+            <p>{{props.message}}</p>
         </div>
     );
 }}
@@ -211,29 +209,28 @@ fn path_to_action_name(path: &str) -> String {
     result
 }
 
-fn generate_backend_action(action_name: &str) -> String {
-    format!(
-        r#"use anyhow::Result;
-use serde::{{Deserialize, Serialize}};
+fn generate_backend_action(_action_name: &str) -> String {
+    r#"use forte_sdk::ForteRequest;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
-pub struct {action_name}Input {{
+pub struct Input {
     pub message: String,
-}}
+}
 
 #[derive(Serialize)]
-pub enum {action_name}Output {{
-    Ok {{ result: String }},
-    Error {{ message: String }},
-}}
+pub enum Output {
+    Ok { result: String },
+    Error { message: String },
+}
 
-pub async fn action(input: {action_name}Input) -> Result<{action_name}Output> {{
-    Ok({action_name}Output::Ok {{
-        result: format!("Received: {{}}", input.message),
-    }})
-}}
+pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
+    Output::Ok {
+        result: format!("Received: {}", req.body.message),
+    }
+}
 "#
-    )
+    .to_string()
 }
 
 fn generate_frontend_action(action_name: &str, action_path: &str) -> String {
@@ -242,7 +239,7 @@ fn generate_frontend_action(action_name: &str, action_path: &str) -> String {
         r#"import type {{ {action_name}Input, {action_name}Output }} from "./{action_path}.types";
 
 export async function {fn_name}(input: {action_name}Input): Promise<{action_name}Output> {{
-    const response = await fetch("/_action/{action_path}", {{
+    const response = await fetch("/__forte_action/{action_path}", {{
         method: "POST",
         headers: {{ "Content-Type": "application/json" }},
         body: JSON.stringify(input),
