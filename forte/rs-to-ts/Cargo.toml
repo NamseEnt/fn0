@@ -9,4 +9,11 @@ repository = "https://github.com/NamseEnt/fn0"
 [package.metadata.rust-analyzer]
 rustc_private = true
 
+[profile.release]
+debug = true
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
 [dependencies]
