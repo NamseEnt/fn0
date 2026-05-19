@@ -7,10 +7,8 @@ fn main() {
     let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
 
-    let target_binary = PathBuf::from(&manifest_dir)
-        .join("target")
-        .join(&profile)
-        .join("forte");
+    let target_dir = resolve_target_dir(Path::new(&manifest_dir));
+    let target_binary = target_dir.join(&profile).join("forte");
 
     let home = env::var("HOME").expect("HOME not set");
     let cargo_bin = PathBuf::from(&home).join(".cargo").join("bin");
@@ -65,6 +63,25 @@ fn main() {
     }
 
     println!("cargo:rerun-if-env-changed=PROFILE");
+    println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
+}
+
+fn resolve_target_dir(manifest_dir: &Path) -> PathBuf {
+    if let Ok(t) = env::var("CARGO_TARGET_DIR") {
+        return PathBuf::from(t);
+    }
+    let mut dir = manifest_dir.parent();
+    while let Some(d) = dir {
+        let manifest = d.join("Cargo.toml");
+        if manifest.exists() {
+            let content = fs::read_to_string(&manifest).unwrap_or_default();
+            if content.contains("[workspace]") {
+                return d.join("target");
+            }
+        }
+        dir = d.parent();
+    }
+    manifest_dir.join("target")
 }
 
 fn read_package_version(path: &Path, expected_name: &str) -> String {
