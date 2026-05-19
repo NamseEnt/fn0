@@ -443,13 +443,13 @@ Three problems in `forte/cli/src/cli/add.rs`, all fixed together:
 
 2. **Action backend template**: was `pub async fn action(input: <Name>Input) -> Result<<Name>Output>`. `forte-codegen::discover_actions` requires the names `Input`, `Output`, and `handler`. Fixed to `pub async fn handler(req: ForteRequest<'_, Input>) -> Output` with the canonical type names.
 
-3. **Action frontend wrapper URL**: was `/_action/<path>`. The dispatcher routes on `/__forte_action/<path>`. Fixed.
+3. **Action frontend wrapper removed entirely**: `forte-rs-to-ts` already emits a fully-typed Zod + `callAction()` wrapper at `fe/src/actions/.generated/<name>.ts` (both running apps consume actions exclusively via that path — `import { submit } from "../../actions/.generated/submit"`). The hand-rolled wrapper that `forte add action` used to write to `fe/src/actions/<name>.ts` was redundant, used stale type names (`<Name>Input`/`<Name>Output`), and imported from a path (`./{action_path}.types`) that does not exist. `forte add action` now writes only the backend `.rs` file and prints the import path the user should use.
 
-The frontend wrapper's *type import path* (`./{action_path}.types`) is also stale — `forte-rs-to-ts` writes its generated TS into `fe/src/actions/.generated/`, not next to the user wrapper. This is left as a separate follow-up; the current wrapper compiles (TS file is not statically imported by any page) and the action route itself works end-to-end (`POST /__forte_action/submit` returns `{"t":"Ok","result":"Received: ..."}`).
+4. **Action frontend wrapper URL**: the now-removed wrapper had `/_action/<path>` instead of `/__forte_action/<path>`. Moot post-removal, but worth flagging for anyone restoring the wrapper.
 
-### 8.9 Default-mode (version-deps) build is blocked on `fn0-doc-db 0.4.3` publish ⚠️ Known gap
+### 8.9 Default-mode (version-deps) build needed `fn0-doc-db 0.4.3` publish ✅ Resolved
 
-E2E proved that `forte init demo` (default — no `--dev`) generates a correct `rs/Cargo.toml` but the subsequent `forte build` fails to resolve dependencies:
+The published `fn0-doc-db 0.4.2` on crates.io pinned `forte-sdk = "=0.3.4"` while the workspace had moved to `forte-sdk 0.3.5`. Default-mode `forte init` produced a project whose first `forte build` failed dependency resolution:
 
 ```
 error: failed to select a version for `forte-sdk`.
@@ -458,9 +458,11 @@ versions that meet the requirements `=0.3.4` are: 0.3.4
 previously selected package `forte-sdk v0.3.5`
 ```
 
-The published `fn0-doc-db 0.4.2` on crates.io pins `forte-sdk = "=0.3.4"`, but the workspace source has already moved to `forte-sdk 0.3.5`. The monorepo dev path works because path-deps ignore version requirements; crates.io consumers do not have that escape hatch.
+Resolved by bumping `doc-db/Cargo.toml` 0.4.2 → 0.4.3 and `cargo publish -p fn0-doc-db`. The 0.4.3 release on crates.io now carries `forte-sdk = "=0.3.5"`. E2E confirmed: `forte init demo` (default mode) followed by `forte build` now resolves cleanly from crates.io.
 
-**Action (separate from this PR): publish `fn0-doc-db 0.4.3` with `forte-sdk = "=0.3.5"` in its Cargo.toml.** Until that happens, `forte init` (default mode) produces a project whose first `forte build` will fail. Document this in the README's "Requirements" section. The `--dev` flag remains the working path for in-repo development.
+### 8.10 `forte` symlink targeted the wrong target directory ✅ Resolved
+
+`forte/cli/build.rs` previously synthesized the symlink target as `<manifest_dir>/target/<profile>/forte`, which only existed when forte/cli was built standalone. Workspace builds (the default) put the binary at `<workspace_root>/target/<profile>/forte`, so the symlink pointed at a stale path. Fixed: `build.rs` now walks up from `CARGO_MANIFEST_DIR` to find the nearest `Cargo.toml` containing `[workspace]` and uses that root's `target/` (honors `CARGO_TARGET_DIR` if set).
 
 ### 8.8 Relationship to `PLAN.md` / `PROGRESS.md` ✅ Decided
 
