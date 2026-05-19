@@ -1,0 +1,10 @@
+[package]
+name = "forte-wit"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "WASI wit definitions used by Forte sdk and codegen; provides extract_wit for build scripts"
+
+[dependencies]
+include_dir = { workspace = true }
