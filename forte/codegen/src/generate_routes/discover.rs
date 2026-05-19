@@ -109,6 +109,16 @@ pub(super) fn discover_actions(actions_dir: &Path) -> Vec<ActionInfo> {
             if has_action_handler(&content) {
                 actions.push(ActionInfo { name: file_name });
             }
+        } else if path.is_dir() {
+            let dir_name = path.file_name().unwrap().to_string_lossy().to_string();
+            let mod_rs = path.join("mod.rs");
+            let Some(content) = fs::read_to_string(&mod_rs).ok() else {
+                continue;
+            };
+
+            if has_action_handler(&content) {
+                actions.push(ActionInfo { name: dir_name });
+            }
         }
     }
 
