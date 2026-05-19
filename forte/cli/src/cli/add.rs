@@ -157,30 +157,25 @@ pub fn add_action(path: &str) -> Result<()> {
 
     let action_path = normalize_action_path(path);
     let rs_action_file = project_dir.join(format!("rs/src/actions/{}.rs", action_path));
-    let fe_action_file = project_dir.join(format!("fe/src/actions/{}.ts", action_path));
 
-    if rs_action_file.exists() || fe_action_file.exists() {
+    if rs_action_file.exists() {
         anyhow::bail!("Action '{}' already exists", path);
     }
 
     if let Some(parent) = rs_action_file.parent() {
         fs::create_dir_all(parent)?;
     }
-    if let Some(parent) = fe_action_file.parent() {
-        fs::create_dir_all(parent)?;
-    }
 
     let action_name = path_to_action_name(&action_path);
 
     fs::write(&rs_action_file, generate_backend_action(&action_name))?;
-    fs::write(
-        &fe_action_file,
-        generate_frontend_action(&action_name, &action_path),
-    )?;
 
     println!("Created action '{}'", path);
     println!("  - rs/src/actions/{}.rs", action_path);
-    println!("  - fe/src/actions/{}.ts", action_path);
+    println!(
+        "  - import from fe/src/actions/.generated/{}.ts (auto-generated on next forte build/dev)",
+        action_path
+    );
 
     Ok(())
 }
@@ -233,33 +228,3 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     .to_string()
 }
 
-fn generate_frontend_action(action_name: &str, action_path: &str) -> String {
-    let fn_name = to_camel_case(action_name);
-    format!(
-        r#"import type {{ {action_name}Input, {action_name}Output }} from "./{action_path}.types";
-
-export async function {fn_name}(input: {action_name}Input): Promise<{action_name}Output> {{
-    const response = await fetch("/__forte_action/{action_path}", {{
-        method: "POST",
-        headers: {{ "Content-Type": "application/json" }},
-        body: JSON.stringify(input),
-    }});
-    return response.json();
-}}
-"#
-    )
-}
-
-fn to_camel_case(name: &str) -> String {
-    let mut result = String::new();
-    let mut first = true;
-    for c in name.chars() {
-        if first {
-            result.push(c.to_ascii_lowercase());
-            first = false;
-        } else {
-            result.push(c);
-        }
-    }
-    result
-}
