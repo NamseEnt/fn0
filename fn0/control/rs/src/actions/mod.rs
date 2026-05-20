@@ -3,6 +3,7 @@
 pub mod admin_run;
 pub mod approve_cli_authorization;
 pub mod bundle_compiled;
+pub mod bundle_gc;
 pub mod bundle_uploaded;
 pub mod cron_on_tick;
 pub mod deploy;

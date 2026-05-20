@@ -1,3 +1,4 @@
+use crate::actions::bundle_gc;
 use crate::actions::zombie_sweep;
 use crate::common::admin;
 use crate::docs::*;
@@ -124,6 +125,17 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     if let Err(err) = zombie_sweep::run_sweep().await {
         tracing::error!(?err, "zombie_sweep within cron_on_tick failed");
+    }
+
+    if epoch_minute % 60 == 0 {
+        match bundle_gc::run_gc().await {
+            Ok(stats) => tracing::info!(
+                deleted_versions_count = stats.deleted_versions,
+                deleted_orphans_count = stats.deleted_orphans,
+                "bundle_gc completed",
+            ),
+            Err(err) => tracing::error!(?err, "bundle_gc within cron_on_tick failed"),
+        }
     }
 
     Output::Ok {
