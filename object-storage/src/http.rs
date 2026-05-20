@@ -5,6 +5,7 @@
 use crate::runtime::{self, Request, Response};
 use crate::{Error, ListEntry, ObjectList, ObjectMetadata, Result};
 use bytes::Bytes;
+use std::time::Duration;
 
 #[derive(Clone)]
 pub(crate) struct HttpBucket {
@@ -112,6 +113,37 @@ impl HttpBucket {
             return Err(unexpected(&response));
         }
         parse_list_xml(&response.body)
+    }
+
+    /// Asks the object-storage hijack to mint a presigned URL. The request is
+    /// an ordinary `GET` to the placeholder endpoint carrying a marker header;
+    /// the hijack signs the URL out of band and returns it as the body.
+    pub(crate) async fn presigned_url(
+        &self,
+        key: &str,
+        method: &str,
+        expires: Duration,
+    ) -> Result<String> {
+        let header = match method {
+            "GET" => "x-fn0-presign-get",
+            "PUT" => "x-fn0-presign-put",
+            other => {
+                return Err(Error::Transport(format!(
+                    "unsupported presign method: {other}"
+                )));
+            }
+        };
+        let response = runtime::send(Request {
+            method: "GET",
+            url: self.object_url(key),
+            headers: vec![(header.to_string(), expires.as_secs().to_string())],
+            body: None,
+        })
+        .await?;
+        if response.status != 200 {
+            return Err(unexpected(&response));
+        }
+        String::from_utf8(response.body.to_vec()).map_err(|e| Error::Parse(e.to_string()))
     }
 }
 

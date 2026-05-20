@@ -1798,7 +1798,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.39"
+version = "0.2.40"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1972,7 +1972,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-object-storage"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "forte-sdk",
@@ -2026,7 +2026,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.43"
+version = "0.3.44"
 dependencies = [
  "aes-gcm",
  "anyhow",

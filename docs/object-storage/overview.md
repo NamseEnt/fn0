@@ -92,6 +92,34 @@ Every operation returns `object_storage::Result<T>`. `object_storage::Error`
 is a concrete enum: `Transport`, `UnexpectedStatus { status, message }`,
 `Parse`.
 
+## Presigned URLs
+
+`presigned_get_url` / `presigned_put_url` return a time-limited URL that a
+browser (or any HTTP client) can use to download from or upload to an object
+directly, without routing through the app.
+
+```rust
+use std::time::Duration;
+
+let download = bucket
+    .presigned_get_url("avatars/42.png", Duration::from_secs(3600))
+    .await?;
+// hand `download` to a browser <img src> or fetch()
+
+let upload = bucket
+    .presigned_put_url("uploads/new.bin", Duration::from_secs(900))
+    .await?;
+// browser: fetch(upload, { method: "PUT", body: file })
+```
+
+The URL is signed by the worker's object-storage hijack — application code
+never holds credentials. The SigV4 signature, expiry, R2 endpoint, account id
+and bucket name appear in the URL; the secret access key never does. `expires`
+is capped at 7 days.
+
+In `forte dev` the URL points at the dev server's local object route
+(`/__fn0_object_storage/…`) and does not expire.
+
 ## Local development
 
 `forte dev` serves object storage from the local filesystem under

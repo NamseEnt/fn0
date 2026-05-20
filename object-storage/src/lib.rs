@@ -15,6 +15,7 @@ mod runtime;
 use bytes::Bytes;
 use http::HttpBucket;
 use memory::MemoryBucket;
+use std::time::Duration;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -138,6 +139,26 @@ impl Bucket {
             BucketInner::Memory(b) => b.list(prefix, after, limit).await,
         }
     }
+
+    /// Returns a URL for downloading `key` directly, without routing through
+    /// the app — e.g. handed to a browser. Valid for `expires` (the storage
+    /// backend caps this at 7 days).
+    pub async fn presigned_get_url(&self, key: &str, expires: Duration) -> Result<String> {
+        match &self.inner {
+            BucketInner::Http(b) => b.presigned_url(key, "GET", expires).await,
+            BucketInner::Memory(b) => b.presigned_url(key, "GET", expires).await,
+        }
+    }
+
+    /// Returns a URL for uploading directly to `key`, without routing through
+    /// the app — e.g. a browser `PUT`. Valid for `expires` (the storage backend
+    /// caps this at 7 days).
+    pub async fn presigned_put_url(&self, key: &str, expires: Duration) -> Result<String> {
+        match &self.inner {
+            BucketInner::Http(b) => b.presigned_url(key, "PUT", expires).await,
+            BucketInner::Memory(b) => b.presigned_url(key, "PUT", expires).await,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -199,5 +220,24 @@ mod tests {
             ["img/3"]
         );
         assert_eq!(page.next_cursor, None);
+    }
+
+    #[forte_sdk::test]
+    async fn memory_presigned_urls() {
+        let bucket = memory();
+        assert_eq!(
+            bucket
+                .presigned_get_url("a/b.png", Duration::from_secs(60))
+                .await
+                .unwrap(),
+            "memory://get/a/b.png"
+        );
+        assert_eq!(
+            bucket
+                .presigned_put_url("a/b.png", Duration::from_secs(60))
+                .await
+                .unwrap(),
+            "memory://put/a/b.png"
+        );
     }
 }

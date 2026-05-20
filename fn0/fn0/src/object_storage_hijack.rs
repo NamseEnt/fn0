@@ -43,7 +43,18 @@ enum Backend {
     },
     LocalFs {
         root: PathBuf,
+        dev_base_url: String,
     },
+}
+
+/// Result of [`ObjectStorageHijack::dev_read`].
+pub enum DevReadResult {
+    Found {
+        data: Vec<u8>,
+        content_type: Option<String>,
+    },
+    NotFound,
+    NotLocal,
 }
 
 impl ObjectStorageHijack {
@@ -65,10 +76,10 @@ impl ObjectStorageHijack {
         }
     }
 
-    pub fn new_local(placeholder_host: String, root: PathBuf) -> Self {
+    pub fn new_local(placeholder_host: String, root: PathBuf, dev_base_url: String) -> Self {
         Self {
             placeholder_host,
-            backend: Backend::LocalFs { root },
+            backend: Backend::LocalFs { root, dev_base_url },
         }
     }
 
@@ -197,7 +208,7 @@ impl ObjectStorageHijack {
         &self,
         req: HijackRequest,
     ) -> Result<HijackResponse, ErrorCode> {
-        let Backend::LocalFs { root } = &self.backend else {
+        let Backend::LocalFs { root, .. } = &self.backend else {
             return Err(ErrorCode::InternalError(Some(
                 "serve_local called on R2 backend".to_string(),
             )));
@@ -216,10 +227,7 @@ impl ObjectStorageHijack {
         let Some(blob_path) = safe_path(root, &key) else {
             return synth(400, None, Bytes::from_static(b"invalid key"));
         };
-        let meta_path = blob_path.with_file_name(format!(
-            "{}{SIDECAR_SUFFIX}",
-            blob_path.file_name().and_then(|n| n.to_str()).unwrap_or("")
-        ));
+        let meta_path = sidecar_path(&blob_path);
 
         match method {
             hyper::Method::GET => match std::fs::read(&blob_path) {
@@ -278,6 +286,117 @@ impl ObjectStorageHijack {
             }
             _ => synth(405, None, Bytes::new()),
         }
+    }
+
+    /// Mints a presigned URL for the object at the request path, without
+    /// sending anything upstream. R2 returns a SigV4 query-signed URL; the
+    /// local backend returns a `forte dev` server URL.
+    pub(crate) fn presign(
+        &self,
+        req: &HijackRequest,
+        project_id: &str,
+        method: &str,
+        expires_secs: u64,
+    ) -> Result<String, ErrorCode> {
+        let raw_path = req.uri().path();
+        match &self.backend {
+            Backend::LocalFs { dev_base_url, .. } => Ok(format!(
+                "{}/__fn0_object_storage{raw_path}",
+                dev_base_url.trim_end_matches('/')
+            )),
+            Backend::R2 {
+                endpoint_host,
+                region,
+                access_key_id,
+                secret_access_key,
+            } => {
+                let bucket = format!("{BUCKET_PREFIX}{project_id}");
+                let canonical_uri = if raw_path == "/" {
+                    format!("/{bucket}")
+                } else {
+                    format!("/{bucket}{raw_path}")
+                };
+                let expires = expires_secs.clamp(1, 604800);
+                let now = Utc::now();
+                let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
+                let date = now.format("%Y%m%d").to_string();
+                let credential_scope = format!("{date}/{region}/s3/aws4_request");
+                let credential = format!("{access_key_id}/{credential_scope}");
+
+                let mut params = [
+                    ("X-Amz-Algorithm".to_string(), "AWS4-HMAC-SHA256".to_string()),
+                    ("X-Amz-Credential".to_string(), uri_encode_query(&credential)),
+                    ("X-Amz-Date".to_string(), amz_date.clone()),
+                    ("X-Amz-Expires".to_string(), expires.to_string()),
+                    ("X-Amz-SignedHeaders".to_string(), "host".to_string()),
+                ];
+                params.sort();
+                let canonical_query = params
+                    .iter()
+                    .map(|(key, value)| format!("{key}={value}"))
+                    .collect::<Vec<_>>()
+                    .join("&");
+
+                let canonical_request = format!(
+                    "{method}\n{canonical_uri}\n{canonical_query}\nhost:{endpoint_host}\n\nhost\nUNSIGNED-PAYLOAD"
+                );
+                let string_to_sign = format!(
+                    "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
+                    sha256_hex(canonical_request.as_bytes())
+                );
+                let key = signing_key(secret_access_key, &date, region, "s3");
+                let signature = hex_encode(&hmac_sha256(&key, string_to_sign.as_bytes()));
+                Ok(format!(
+                    "https://{endpoint_host}{canonical_uri}?{canonical_query}&X-Amz-Signature={signature}"
+                ))
+            }
+        }
+    }
+
+    /// dev-only: reads an object from the local store. The `forte dev` server
+    /// calls this to serve presigned-URL downloads.
+    pub fn dev_read(&self, key: &str) -> DevReadResult {
+        let Backend::LocalFs { root, .. } = &self.backend else {
+            return DevReadResult::NotLocal;
+        };
+        let Some(blob_path) = safe_path(root, key) else {
+            return DevReadResult::NotFound;
+        };
+        match std::fs::read(&blob_path) {
+            Ok(data) => DevReadResult::Found {
+                content_type: std::fs::read_to_string(sidecar_path(&blob_path)).ok(),
+                data,
+            },
+            Err(_) => DevReadResult::NotFound,
+        }
+    }
+
+    /// dev-only: writes an object to the local store. The `forte dev` server
+    /// calls this to accept presigned-URL uploads.
+    pub fn dev_write(
+        &self,
+        key: &str,
+        data: &[u8],
+        content_type: Option<&str>,
+    ) -> Result<(), String> {
+        let Backend::LocalFs { root, .. } = &self.backend else {
+            return Err("dev_write called on non-local backend".to_string());
+        };
+        let blob_path = safe_path(root, key).ok_or_else(|| "invalid key".to_string())?;
+        if let Some(parent) = blob_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&blob_path, data).map_err(|e| e.to_string())?;
+        let meta_path = sidecar_path(&blob_path);
+        match content_type {
+            Some(content_type) => {
+                std::fs::write(&meta_path, content_type).map_err(|e| e.to_string())?;
+            }
+            None => {
+                let _ = std::fs::remove_file(&meta_path);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -458,6 +577,27 @@ fn hex_encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
         out.push_str(&format!("{byte:02x}"));
+    }
+    out
+}
+
+fn sidecar_path(blob_path: &Path) -> PathBuf {
+    blob_path.with_file_name(format!(
+        "{}{SIDECAR_SUFFIX}",
+        blob_path.file_name().and_then(|n| n.to_str()).unwrap_or("")
+    ))
+}
+
+/// Percent-encodes a value for an S3 canonical query string (RFC 3986
+/// unreserved set; `/` is encoded).
+fn uri_encode_query(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for &byte in s.as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            out.push(byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
     }
     out
 }

@@ -416,6 +416,22 @@ fn object_storage_send(
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(async { Ok(()) });
 
+        if let Some((method, expires)) = presign_request(&request) {
+            let url = match hijack.presign(&request, &project_id, method, expires) {
+                Ok(url) => url,
+                Err(ec) => return Err(ec.into()),
+            };
+            let resp = http::Response::builder()
+                .status(200)
+                .body(
+                    http_body_util::Full::new(Bytes::from(url))
+                        .map_err(|never: std::convert::Infallible| match never {})
+                        .boxed_unsync(),
+                )
+                .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
+            return Ok((resp, io));
+        }
+
         if hijack.is_local() {
             let resp = match hijack.serve_local(request).await {
                 Ok(resp) => resp,
@@ -436,6 +452,19 @@ fn object_storage_send(
             Box::new(send_io);
         Ok((res, send_io))
     })
+}
+
+fn presign_request(
+    request: &http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+) -> Option<(&'static str, u64)> {
+    let headers = request.headers();
+    if let Some(value) = headers.get("x-fn0-presign-get") {
+        return Some(("GET", value.to_str().ok()?.parse().ok()?));
+    }
+    if let Some(value) = headers.get("x-fn0-presign-put") {
+        return Some(("PUT", value.to_str().ok()?.parse().ok()?));
+    }
+    None
 }
 
 fn default_send(

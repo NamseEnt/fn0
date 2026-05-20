@@ -351,6 +351,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let object_storage_hijack = Arc::new(fn0::ObjectStorageHijack::new_local(
         object_storage_placeholder.clone(),
         project_dir.join(".forte/data/objects"),
+        format!("http://localhost:{port}"),
     ));
     if !env_vars.iter().any(|(k, _)| k == "FN0_OBJECT_STORAGE_URL") {
         env_vars.push((

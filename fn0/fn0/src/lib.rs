@@ -35,7 +35,7 @@ use wasmtime_wasi_http::p3::bindings::ServicePre;
 
 pub use cross_project_invoke_hijack::{CrossProjectInvokeHijack, CrossProjectInvokeDispatcher};
 pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
-pub use object_storage_hijack::ObjectStorageHijack;
+pub use object_storage_hijack::{DevReadResult, ObjectStorageHijack};
 pub use otlp_hijack::OtlpHijack;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};

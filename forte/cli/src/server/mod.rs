@@ -7,7 +7,7 @@ use fn0::{CodeExecutor, ExecutionContext, ObjectStorageHijack, QueueHijack};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use hyper::{Request, Response, StatusCode};
+use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -150,6 +150,11 @@ async fn handle_request(
             .unwrap());
     }
 
+    if let Some(encoded_key) = path.strip_prefix("/__fn0_object_storage/") {
+        let encoded_key = encoded_key.to_string();
+        return serve_object_storage(req, &encoded_key, &executor).await;
+    }
+
     {
         let headers = req.headers_mut();
         headers.remove("x-fn0-admin");
@@ -288,6 +293,83 @@ async fn handle_request(
             Err(anyhow::anyhow!("Request error: {:?}", e))
         }
     }
+}
+
+/// Serves the `forte dev` object-storage route that presigned URLs point at.
+/// Reads/writes the local store via the object-storage hijack.
+async fn serve_object_storage(
+    req: Request<hyper::body::Incoming>,
+    encoded_key: &str,
+    executor: &CodeExecutor<SimpleCache>,
+) -> Result<fn0::Response> {
+    let key = percent_decode(encoded_key);
+    let Some(hijack) = executor.context().object_storage_hijack().cloned() else {
+        return Ok(text_response(
+            StatusCode::NOT_FOUND,
+            "object storage not configured",
+        ));
+    };
+    match *req.method() {
+        Method::GET | Method::HEAD => match hijack.dev_read(&key) {
+            fn0::DevReadResult::Found { data, content_type } => {
+                let mut builder = Response::builder().status(StatusCode::OK);
+                if let Some(content_type) = content_type {
+                    builder = builder.header(http::header::CONTENT_TYPE, content_type);
+                }
+                Ok(builder
+                    .body(
+                        Full::new(bytes::Bytes::from(data))
+                            .map_err(|e| anyhow::anyhow!("{e}"))
+                            .boxed_unsync(),
+                    )
+                    .unwrap())
+            }
+            _ => Ok(text_response(StatusCode::NOT_FOUND, "Not Found")),
+        },
+        Method::PUT => {
+            let content_type = req
+                .headers()
+                .get(http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let data = req.into_body().collect().await?.to_bytes();
+            match hijack.dev_write(&key, &data, content_type.as_deref()) {
+                Ok(()) => Ok(text_response(StatusCode::OK, "")),
+                Err(e) => Ok(text_response(StatusCode::BAD_REQUEST, &e)),
+            }
+        }
+        _ => Ok(text_response(StatusCode::METHOD_NOT_ALLOWED, "")),
+    }
+}
+
+fn text_response(status: StatusCode, body: &str) -> fn0::Response {
+    Response::builder()
+        .status(status)
+        .body(
+            Full::new(bytes::Bytes::from(body.to_string()))
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .boxed_unsync(),
+        )
+        .unwrap()
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 3 <= bytes.len()
+            && let Ok(byte) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+        {
+            out.push(byte);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 async fn try_serve_static(public_dir: &PathBuf, path: &str) -> Option<fn0::Response> {

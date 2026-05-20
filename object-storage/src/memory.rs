@@ -5,6 +5,7 @@ use crate::{ListEntry, ObjectList, ObjectMetadata, Result};
 use bytes::Bytes;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[derive(Clone)]
 struct StoredObject {
@@ -99,5 +100,14 @@ impl MemoryBucket {
             entries,
             next_cursor: None,
         })
+    }
+
+    pub(crate) async fn presigned_url(
+        &self,
+        key: &str,
+        method: &str,
+        _expires: Duration,
+    ) -> Result<String> {
+        Ok(format!("memory://{}/{key}", method.to_ascii_lowercase()))
     }
 }
