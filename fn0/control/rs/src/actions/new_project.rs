@@ -18,7 +18,7 @@ pub enum Output {
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
-    let Some(user) = auth::current_user(req.jar).await else {
+    let Some(user) = auth::bearer_user(req.headers).await else {
         return Output::NotLoggedIn;
     };
 
