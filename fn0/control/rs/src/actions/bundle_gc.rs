@@ -1,0 +1,299 @@
+//! Periodic GC for compiled bundles.
+//!
+//! Two passes, both driven from `cron_on_tick`:
+//! - superseded versions: for each project, delete `CompiledBundleDoc` rows and
+//!   their R2 objects whose `code_version` is below the one the worker fleet
+//!   currently serves.
+//! - abandoned uploads: delete `original/*` R2 objects that never produced a
+//!   `CompiledBundleDoc` (compile never finished) once they are old enough.
+
+use crate::common::admin;
+use crate::common::aws_sign;
+use crate::docs::*;
+use forte_sdk::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+
+// Worker `manifest_poller` polls `WorkerManifestDoc` every 1s. A superseded
+// `code_version` is only safe to delete once every worker has moved off the
+// stale registry; gating on the *current latest* row's age by 60x the poll
+// interval makes that window unreachable.
+pub const STALE_REGISTRY_GRACE_SECS: i64 = 60;
+
+// An `original/*` upload with no `CompiledBundleDoc` is only abandoned if the
+// compile is not merely slow. The cwasm-compiler Lambda is bounded far below
+// this; 24h is a conservative floor that no in-flight compile reaches.
+pub const ABANDONED_UPLOAD_TTL_SECS: i64 = 24 * 60 * 60;
+
+const QUERY_PAGE_LIMIT: usize = 256;
+const R2_REGION: &str = "auto";
+
+#[derive(Deserialize)]
+pub struct Input {}
+
+#[derive(Serialize)]
+pub enum Output {
+    Ok {
+        deleted_versions_count: u64,
+        deleted_orphans_count: u64,
+    },
+    Unauthorized,
+    Error {
+        message: String,
+    },
+}
+
+pub struct GcStats {
+    pub deleted_versions: u64,
+    pub deleted_orphans: u64,
+}
+
+struct BundleStore {
+    account_id: String,
+    bucket: String,
+    access_key_id: String,
+    secret_access_key: String,
+}
+
+impl BundleStore {
+    fn from_env() -> anyhow::Result<Self> {
+        Ok(Self {
+            account_id: std::env::var("FN0_BUNDLE_STORE_ACCOUNT_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_ACCOUNT_ID not set"))?,
+            bucket: std::env::var("FN0_BUNDLE_STORE_BUCKET")
+                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_BUCKET not set"))?,
+            access_key_id: std::env::var("FN0_BUNDLE_STORE_ACCESS_KEY_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_ACCESS_KEY_ID not set"))?,
+            secret_access_key: std::env::var("FN0_BUNDLE_STORE_SECRET_ACCESS_KEY")
+                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_SECRET_ACCESS_KEY not set"))?,
+        })
+    }
+
+    async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
+        aws_sign::r2_delete_object(aws_sign::R2ObjectRef {
+            account_id: &self.account_id,
+            bucket: &self.bucket,
+            region: R2_REGION,
+            key,
+            access_key_id: &self.access_key_id,
+            secret_access_key: &self.secret_access_key,
+            now,
+        })
+        .await
+    }
+
+    async fn list_all(
+        &self,
+        prefix: &str,
+        now: DateTime,
+    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
+        let mut objects = Vec::new();
+        let mut continuation_token: Option<String> = None;
+        loop {
+            let page = aws_sign::r2_list_objects(aws_sign::R2ListArgs {
+                account_id: &self.account_id,
+                bucket: &self.bucket,
+                region: R2_REGION,
+                prefix,
+                continuation_token: continuation_token.as_deref(),
+                access_key_id: &self.access_key_id,
+                secret_access_key: &self.secret_access_key,
+                now,
+            })
+            .await?;
+            objects.extend(page.objects);
+            match page.next_continuation_token {
+                Some(token) => continuation_token = Some(token),
+                None => break,
+            }
+        }
+        Ok(objects)
+    }
+}
+
+pub async fn run_gc() -> anyhow::Result<GcStats> {
+    let db = doc_db::turso();
+    let store = BundleStore::from_env()?;
+    let now = forte_sdk::now();
+
+    let pending_fn0_wasmtime_version = (Fn0WasmtimeVersionDocGet {})
+        .send_with(&db)
+        .await?
+        .and_then(|doc| doc.pending);
+
+    let deleted_versions = gc_superseded_versions(
+        &db,
+        &store,
+        now,
+        pending_fn0_wasmtime_version.as_deref(),
+    )
+    .await?;
+    let deleted_orphans = gc_abandoned_uploads(&db, &store, now).await?;
+
+    Ok(GcStats {
+        deleted_versions,
+        deleted_orphans,
+    })
+}
+
+async fn gc_superseded_versions(
+    db: &doc_db::Database,
+    store: &BundleStore,
+    now: DateTime,
+    pending_fn0_wasmtime_version: Option<&str>,
+) -> anyhow::Result<u64> {
+    let Some(manifest) = (WorkerManifestDocGet {}).send_with(db).await? else {
+        return Ok(0);
+    };
+
+    let mut deleted: u64 = 0;
+    for (project_id, project_manifest) in &manifest.project_manifests {
+        let latest = project_manifest.code_version;
+        let docs = query_compiled_bundles(db, project_id).await?;
+
+        let Some(latest_doc) = docs.iter().find(|doc| doc.code_version == latest) else {
+            // The fleet serves a code_version with no CompiledBundleDoc. Without
+            // the latest row's created_at there is no grace anchor, so skip the
+            // whole project rather than risk deleting inside the stale window.
+            continue;
+        };
+        if (now - latest_doc.created_at).num_seconds() < STALE_REGISTRY_GRACE_SECS {
+            continue;
+        }
+
+        for doc in &docs {
+            if doc.code_version >= latest {
+                continue;
+            }
+            if let Some(pending) = pending_fn0_wasmtime_version
+                && doc.fn0_wasmtime_versions.iter().any(|v| v == pending)
+            {
+                continue;
+            }
+            for fn0_wasmtime_version in &doc.fn0_wasmtime_versions {
+                let key = format!(
+                    "compiled/{fn0_wasmtime_version}/{project_id}/{}.tar.zst",
+                    doc.code_version
+                );
+                store.delete(&key, now).await?;
+            }
+            store
+                .delete(
+                    &format!("original/{project_id}/{}.tar", doc.code_version),
+                    now,
+                )
+                .await?;
+            (CompiledBundleDocDelete {
+                project_id: project_id.as_str(),
+                code_version: doc.code_version,
+            })
+            .send_with(db)
+            .await?;
+            deleted += 1;
+        }
+    }
+    Ok(deleted)
+}
+
+async fn gc_abandoned_uploads(
+    db: &doc_db::Database,
+    store: &BundleStore,
+    now: DateTime,
+) -> anyhow::Result<u64> {
+    let originals = store.list_all("original/", now).await?;
+    let compiled_pairs: HashSet<(String, u64)> = store
+        .list_all("compiled/", now)
+        .await?
+        .iter()
+        .filter_map(|object| parse_compiled_key(&object.key))
+        .collect();
+
+    let mut deleted: u64 = 0;
+    for object in &originals {
+        let Some((project_id, code_version)) = parse_original_key(&object.key) else {
+            continue;
+        };
+        if (now - object.last_modified).num_seconds() < ABANDONED_UPLOAD_TTL_SECS {
+            continue;
+        }
+        let doc = (CompiledBundleDocGet {
+            project_id: project_id.as_str(),
+            code_version,
+        })
+        .send_with(db)
+        .await?;
+        if doc.is_some() {
+            continue;
+        }
+        if compiled_pairs.contains(&(project_id.clone(), code_version)) {
+            // A compiled object exists but no CompiledBundleDoc: the
+            // bundle_compiled callback was lost. The upload is recoverable by
+            // re-running the callback, so it is not abandoned — keep it.
+            tracing::warn!(
+                %project_id,
+                code_version,
+                "bundle_gc: compiled object without CompiledBundleDoc, skipping",
+            );
+            continue;
+        }
+        store.delete(&object.key, now).await?;
+        deleted += 1;
+    }
+    Ok(deleted)
+}
+
+async fn query_compiled_bundles(
+    db: &doc_db::Database,
+    project_id: &str,
+) -> anyhow::Result<Vec<CompiledBundleDoc>> {
+    let mut all = Vec::new();
+    let mut after: Option<u64> = None;
+    loop {
+        let page: Vec<CompiledBundleDoc> = (CompiledBundleDocQuery {
+            project_id,
+            code_version: after,
+            limit: Some(QUERY_PAGE_LIMIT),
+        })
+        .send_with(db)
+        .await?;
+        let page_len = page.len();
+        if let Some(last) = page.last() {
+            after = Some(last.code_version);
+        }
+        all.extend(page);
+        if page_len < QUERY_PAGE_LIMIT {
+            break;
+        }
+    }
+    Ok(all)
+}
+
+fn parse_original_key(key: &str) -> Option<(String, u64)> {
+    let rest = key.strip_prefix("original/")?.strip_suffix(".tar")?;
+    let (project_id, code_version) = rest.split_once('/')?;
+    Some((project_id.to_string(), code_version.parse().ok()?))
+}
+
+fn parse_compiled_key(key: &str) -> Option<(String, u64)> {
+    let rest = key.strip_prefix("compiled/")?.strip_suffix(".tar.zst")?;
+    let mut segments = rest.rsplitn(3, '/');
+    let code_version: u64 = segments.next()?.parse().ok()?;
+    let project_id = segments.next()?.to_string();
+    segments.next()?;
+    Some((project_id, code_version))
+}
+
+pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
+    if !admin::verify(req.headers) {
+        return Output::Unauthorized;
+    }
+    match run_gc().await {
+        Ok(stats) => Output::Ok {
+            deleted_versions_count: stats.deleted_versions,
+            deleted_orphans_count: stats.deleted_orphans,
+        },
+        Err(e) => Output::Error {
+            message: e.to_string(),
+        },
+    }
+}

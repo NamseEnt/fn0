@@ -26,6 +26,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let project_id = req.body.project_id.clone();
     let code_version = req.body.code_version;
     let fn0_wasmtime_version = req.body.fn0_wasmtime_version.clone();
+    let now = forte_sdk::now();
 
     let result = doc_db::turso()
         .trx(|trx| {
@@ -54,6 +55,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                         trx.create(CompiledBundleDoc {
                             project_id: project_id.clone(),
                             code_version,
+                            created_at: now,
                             fn0_wasmtime_versions: vec![fn0_wasmtime_version.clone()],
                         })?;
                         true

@@ -50,8 +50,9 @@ pub struct ProjectDoc {
 pub struct CompiledBundleDoc {
     #[pk]
     pub project_id: String,
-    #[pk]
+    #[sk]
     pub code_version: u64,
+    pub created_at: DateTime,
     pub fn0_wasmtime_versions: Vec<String>,
 }
 
