@@ -1223,6 +1223,10 @@ loki.relabel "journal" {
     source_labels = ["__journal__hostname"]
     target_label  = "host"
   }
+  rule {
+    source_labels = ["__journal__container_name"]
+    target_label  = "container"
+  }
 }
 
 loki.write "default" {
@@ -1300,7 +1304,6 @@ ExecStartPre=/usr/bin/podman pull ${agentImageRef}
 ExecStart=/usr/bin/podman run --name fn0-agent --rm \\
   --security-opt label=disable \\
   --network host \\
-  --log-driver passthrough \\
   -e FN0_WORKER_AGENT_PODMAN_REMOTE_URL=unix:///run/podman/podman.sock \\
   -e FN0_WORKER_AGENT_SOFT_SHUTDOWN_ON_SIGTERM=1 \\
   -e FN0_WORKER_AGENT_IMAGE_REF=${agentImageRef} \\
@@ -1330,7 +1333,6 @@ ExecStartPre=/usr/bin/podman pull ${proxyImageRef}
 ExecStart=/usr/bin/podman run --name fn0-proxy --rm \\
   --security-opt label=disable \\
   --network host \\
-  --log-driver passthrough \\
   -e FN0_WORKER_PROXY_TARGET_FILE=/etc/fn0-worker-proxy/target \\
   -v /etc/fn0-worker-proxy:/etc/fn0-worker-proxy:ro \\
   ${proxyImageRef}
