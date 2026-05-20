@@ -4,6 +4,7 @@ pub mod cross_project_enqueue_hijack;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
+pub mod object_storage_hijack;
 pub mod otlp_hijack;
 mod panic_util;
 pub mod queue_hijack;
@@ -34,6 +35,7 @@ use wasmtime_wasi_http::p3::bindings::ServicePre;
 
 pub use cross_project_invoke_hijack::{CrossProjectInvokeHijack, CrossProjectInvokeDispatcher};
 pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
+pub use object_storage_hijack::ObjectStorageHijack;
 pub use otlp_hijack::OtlpHijack;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
@@ -81,6 +83,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) cross_project_enqueue_hijack: Option<Arc<CrossProjectEnqueueHijack>>,
     pub(crate) cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
+    pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -95,6 +98,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             cross_project_enqueue_hijack: None,
             cross_project_invoke_hijack: None,
             vault_hijack: None,
+            object_storage_hijack: None,
         }
     }
 
@@ -134,6 +138,14 @@ impl<C: BundleCache> ExecutionContext<C> {
         self
     }
 
+    pub fn with_object_storage_hijack(
+        mut self,
+        object_storage_hijack: Arc<ObjectStorageHijack>,
+    ) -> Self {
+        self.object_storage_hijack = Some(object_storage_hijack);
+        self
+    }
+
     pub fn bundle_cache(&self) -> &C {
         &self.bundle_cache
     }
@@ -168,6 +180,10 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn vault_hijack(&self) -> Option<&Arc<VaultHijack>> {
         self.vault_hijack.as_ref()
+    }
+
+    pub fn object_storage_hijack(&self) -> Option<&Arc<ObjectStorageHijack>> {
+        self.object_storage_hijack.as_ref()
     }
 }
 
@@ -445,6 +461,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let cross_project_enqueue_hijack = ctx.cross_project_enqueue_hijack.clone();
         let cross_project_invoke_hijack = ctx.cross_project_invoke_hijack.clone();
         let vault_hijack = ctx.vault_hijack.clone();
+        let object_storage_hijack = ctx.object_storage_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
         tokio::task::spawn_local(async move {
@@ -460,6 +477,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 cross_project_enqueue_hijack,
                 cross_project_invoke_hijack,
                 vault_hijack,
+                object_storage_hijack,
             ))
             .catch_unwind()
             .await;

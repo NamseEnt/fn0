@@ -3,7 +3,7 @@ pub mod vite_dev;
 
 use anyhow::Result;
 pub use cache::SimpleCache;
-use fn0::{CodeExecutor, ExecutionContext, QueueHijack};
+use fn0::{CodeExecutor, ExecutionContext, ObjectStorageHijack, QueueHijack};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -25,6 +25,7 @@ pub struct ServerConfig {
     pub vite_socket_path: Option<PathBuf>,
     pub env_vars: Vec<(String, String)>,
     pub queue_hijack: Option<Arc<QueueHijack>>,
+    pub object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
 }
 
 pub struct ServerHandle {
@@ -74,6 +75,9 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let mut ctx = ExecutionContext::new(engine, linker, cache);
     if let Some(hijack) = config.queue_hijack {
         ctx = ctx.with_queue_hijack(hijack);
+    }
+    if let Some(hijack) = config.object_storage_hijack {
+        ctx = ctx.with_object_storage_hijack(hijack);
     }
     let ctx = Arc::new(ctx);
     let executor = std::rc::Rc::new(CodeExecutor::new(ctx.clone()));

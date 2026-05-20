@@ -1,5 +1,6 @@
 use crate::cache::Bundle;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
+use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::self_invoke::{self, SELF_HOST, SelfInvokeHooks, call_service};
 use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
@@ -125,6 +126,7 @@ pub(crate) fn build_store<C>(
     cross_project_enqueue_hijack: Option<&crate::CrossProjectEnqueueHijack>,
     cross_project_invoke_hijack: Option<&crate::CrossProjectInvokeHijack>,
     vault_hijack: Option<&crate::VaultHijack>,
+    object_storage_hijack: Option<&ObjectStorageHijack>,
 ) -> Store<ClientState<C>>
 where
     C: Clock,
@@ -149,6 +151,9 @@ where
             if vault_hijack.is_some() && key == "FN0_VAULT_URL" {
                 continue;
             }
+            if object_storage_hijack.is_some() && key == "FN0_OBJECT_STORAGE_URL" {
+                continue;
+            }
             builder.env(key, value);
         }
         if let Some(hijack) = turso_hijack {
@@ -170,6 +175,9 @@ where
         }
         if let Some(hijack) = vault_hijack {
             builder.env("FN0_VAULT_URL", hijack.placeholder_url());
+        }
+        if let Some(hijack) = object_storage_hijack {
+            builder.env("FN0_OBJECT_STORAGE_URL", hijack.placeholder_url());
         }
         builder.build()
     };
@@ -218,6 +226,7 @@ pub async fn run_wasm_instance_loop(
     cross_project_enqueue_hijack: Option<Arc<crate::CrossProjectEnqueueHijack>>,
     cross_project_invoke_hijack: Option<Arc<crate::CrossProjectInvokeHijack>>,
     vault_hijack: Option<Arc<crate::VaultHijack>>,
+    object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -237,12 +246,14 @@ pub async fn run_wasm_instance_loop(
             cross_project_enqueue_hijack.clone(),
             cross_project_invoke_hijack.clone(),
             vault_hijack.clone(),
+            object_storage_hijack.clone(),
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
         cross_project_enqueue_hijack.as_deref(),
         cross_project_invoke_hijack.as_deref(),
         vault_hijack.as_deref(),
+        object_storage_hijack.as_deref(),
     );
 
     let instantiate_start = std::time::Instant::now();

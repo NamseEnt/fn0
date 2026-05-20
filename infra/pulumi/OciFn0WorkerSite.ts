@@ -29,12 +29,19 @@ export interface WorkerArgs {
   otlp: WorkerOtlpArgs;
   hostObservability: WorkerHostObservabilityArgs;
   bundleStorage: WorkerBundleStorageArgs;
+  objectStorage: WorkerObjectStorageArgs;
 }
 
 export interface WorkerBundleStorageArgs {
   bucketName: pulumi.Input<string>;
   endpoint: pulumi.Input<string>;
   region: pulumi.Input<string>;
+  accessKeyId: pulumi.Input<string>;
+  secretAccessKey: pulumi.Input<string>;
+}
+
+export interface WorkerObjectStorageArgs {
+  accountId: pulumi.Input<string>;
   accessKeyId: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
 }
@@ -1061,6 +1068,10 @@ function buildWorkerEnv(
     S3_REGION: worker.bundleStorage.region,
     AWS_ACCESS_KEY_ID: worker.bundleStorage.accessKeyId,
     AWS_SECRET_ACCESS_KEY: worker.bundleStorage.secretAccessKey,
+
+    FN0_OBJECT_STORAGE_ACCOUNT_ID: worker.objectStorage.accountId,
+    FN0_OBJECT_STORAGE_ACCESS_KEY_ID: worker.objectStorage.accessKeyId,
+    FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY: worker.objectStorage.secretAccessKey,
 
     ORIGIN_CERT_PEM_BASE64: pulumi
       .output(worker.tlsOrigin.certPem)

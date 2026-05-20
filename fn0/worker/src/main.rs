@@ -13,7 +13,7 @@ use cache::S3BundleCache;
 use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectInvokeHijack, CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, ExecutionContext,
-    OtlpHijack, QueueHijack, TursoHijack, VaultHijack,
+    ObjectStorageHijack, OtlpHijack, QueueHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -122,6 +122,10 @@ fn build_turso_hijack() -> Arc<TursoHijack> {
     })
 }
 
+fn build_object_storage_hijack() -> Arc<ObjectStorageHijack> {
+    Arc::new(ObjectStorageHijack::from_env().expect("object storage hijack init failed"))
+}
+
 fn main() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     color_eyre::install()?;
@@ -226,7 +230,8 @@ async fn run() -> Result<()> {
             .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
             .with_cross_project_invoke_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
-            .with_otlp_hijack(build_otlp_hijack()),
+            .with_otlp_hijack(build_otlp_hijack())
+            .with_object_storage_hijack(build_object_storage_hijack()),
     );
 
     let manifest_loaded = Arc::new(AtomicBool::new(false));

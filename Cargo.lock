@@ -1798,7 +1798,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.38"
+version = "0.2.39"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1810,6 +1810,7 @@ dependencies = [
  "fn0-wasmtime",
  "futures",
  "h2",
+ "hmac",
  "http-body-util",
  "hyper",
  "hyper-rustls",
@@ -1824,6 +1825,7 @@ dependencies = [
  "rustls-pki-types",
  "serde",
  "serde_json",
+ "sha2",
  "socket2 0.6.1",
  "sonic-rs",
  "struson",
@@ -1969,6 +1971,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fn0-object-storage"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "forte-sdk",
+ "reqwest",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "fn0-shared-schema"
 version = "0.1.1"
 dependencies = [
@@ -2014,7 +2026,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.42"
+version = "0.3.43"
 dependencies = [
  "aes-gcm",
  "anyhow",

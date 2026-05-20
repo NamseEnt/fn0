@@ -7,6 +7,7 @@ const FORTE_JSON_VERSION: &str = env!("FORTE_JSON_VERSION");
 const FORTE_SDK_VERSION: &str = env!("FORTE_SDK_VERSION");
 const FORTE_CODEGEN_VERSION: &str = env!("FORTE_CODEGEN_VERSION");
 const FN0_DOC_DB_VERSION: &str = env!("FN0_DOC_DB_VERSION");
+const FN0_OBJECT_STORAGE_VERSION: &str = env!("FN0_OBJECT_STORAGE_VERSION");
 
 pub fn run(name: &str, dev: bool) -> Result<()> {
     let project_dir = Path::new(name);
@@ -68,7 +69,8 @@ fn npm_install(fe_dir: &Path) -> Result<()> {
 }
 
 fn rs_cargo_toml(name: &str, dev: bool) -> String {
-    let (forte_json_dep, forte_sdk_dep, doc_db_dep, forte_codegen_dep) = if dev {
+    let (forte_json_dep, forte_sdk_dep, doc_db_dep, object_storage_dep, forte_codegen_dep) = if dev
+    {
         let workspace_root = workspace_root_path();
         (
             format!(
@@ -84,6 +86,10 @@ fn rs_cargo_toml(name: &str, dev: bool) -> String {
                 workspace_root.join("doc-db").display()
             ),
             format!(
+                r#"{{ package = "fn0-object-storage", path = "{}" }}"#,
+                workspace_root.join("object-storage").display()
+            ),
+            format!(
                 r#"{{ path = "{}" }}"#,
                 workspace_root.join("forte/codegen").display()
             ),
@@ -93,6 +99,9 @@ fn rs_cargo_toml(name: &str, dev: bool) -> String {
             format!(r#""={FORTE_JSON_VERSION}""#),
             format!(r#""={FORTE_SDK_VERSION}""#),
             format!(r#"{{ package = "fn0-doc-db", version = "={FN0_DOC_DB_VERSION}" }}"#),
+            format!(
+                r#"{{ package = "fn0-object-storage", version = "={FN0_OBJECT_STORAGE_VERSION}" }}"#
+            ),
             format!(r#""={FORTE_CODEGEN_VERSION}""#),
         )
     };
@@ -118,6 +127,7 @@ tracing = "0.1"
 forte-json = {forte_json_dep}
 forte-sdk = {forte_sdk_dep}
 doc-db = {doc_db_dep}
+object-storage = {object_storage_dep}
 
 [build-dependencies]
 forte-codegen = {forte_codegen_dep}

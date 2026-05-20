@@ -21,6 +21,10 @@ Forte is the full-stack web framework built on fn0.
 
 - [Overview](doc-db/overview.md) — Document database API, transactions, `#[forte_doc]` macro
 
+## object-storage
+
+- [Overview](object-storage/overview.md) — Per-project S3-style object store, hooks-only credential model
+
 ## fn0 Platform
 
 - [Overview](fn0/overview.md) — FaaS runtime, execution model, limits, cluster architecture

@@ -347,6 +347,18 @@ pub async fn run(options: DevOptions) -> Result<()> {
         ));
     }
 
+    let object_storage_placeholder = "fn0-object-storage.fn0.dev".to_string();
+    let object_storage_hijack = Arc::new(fn0::ObjectStorageHijack::new_local(
+        object_storage_placeholder.clone(),
+        project_dir.join(".forte/data/objects"),
+    ));
+    if !env_vars.iter().any(|(k, _)| k == "FN0_OBJECT_STORAGE_URL") {
+        env_vars.push((
+            "FN0_OBJECT_STORAGE_URL".to_string(),
+            format!("http://{object_storage_placeholder}"),
+        ));
+    }
+
     let config = ServerConfig {
         port,
         wasm_path,
@@ -355,6 +367,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
         vite_socket_path: Some(vite.socket_path.clone()),
         env_vars,
         queue_hijack: Some(queue_hijack),
+        object_storage_hijack: Some(object_storage_hijack),
     };
 
     let handle = server::run(config).await?;

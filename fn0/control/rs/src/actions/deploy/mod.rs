@@ -273,6 +273,16 @@ async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
     cf.register_r2_custom_domain(&bucket, &custom_domain, &zone_id)
         .await?;
     ensure_turso_database(project_id).await?;
+    ensure_object_storage_bucket(&cf, project_id).await?;
+    Ok(())
+}
+
+async fn ensure_object_storage_bucket(
+    cf: &CloudflareClient,
+    project_id: &str,
+) -> anyhow::Result<()> {
+    let bucket = format!("fn0-object-storage-{project_id}");
+    cf.create_r2_bucket(&bucket, "apac").await?;
     Ok(())
 }
 

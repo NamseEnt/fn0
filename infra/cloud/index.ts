@@ -297,6 +297,15 @@ const staticAssetStorage = new fn0.StaticAssetStorage(
   {},
 );
 
+const objectStorageStorage = new fn0.ObjectStorageStorage(
+  "object-storage-storage",
+  {
+    accountId,
+    cloudflareUserApiToken: config.requireSecret("cloudflareUserApiToken"),
+  },
+  {},
+);
+
 const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
   "bundle-store-r2-worker",
   {
@@ -533,6 +542,11 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       accessKeyId: bundleStoreR2.accessKeyId,
       secretAccessKey: bundleStoreR2.secretAccessKey,
     },
+    objectStorage: {
+      accountId: objectStorageStorage.accountId,
+      accessKeyId: objectStorageStorage.accessKeyId,
+      secretAccessKey: objectStorageStorage.secretAccessKey,
+    },
   },
 });
 
@@ -644,4 +658,11 @@ export const staticAssetPresignSecretAccessKey = pulumi.secret(
 );
 export const staticAssetCloudflareApiToken = pulumi.secret(
   staticAssetStorage.cloudflareApiToken,
+);
+export const objectStorageAccountId = objectStorageStorage.accountId;
+export const objectStorageAccessKeyId = pulumi.secret(
+  objectStorageStorage.accessKeyId,
+);
+export const objectStorageSecretAccessKey = pulumi.secret(
+  objectStorageStorage.secretAccessKey,
 );

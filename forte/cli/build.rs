@@ -53,6 +53,11 @@ fn main() {
             "forte-codegen",
         ),
         ("FN0_DOC_DB_VERSION", "doc-db/Cargo.toml", "fn0-doc-db"),
+        (
+            "FN0_OBJECT_STORAGE_VERSION",
+            "object-storage/Cargo.toml",
+            "fn0-object-storage",
+        ),
     ];
 
     for (env_var, rel_path, expected_name) in targets {
