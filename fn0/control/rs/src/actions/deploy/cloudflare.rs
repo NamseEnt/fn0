@@ -69,7 +69,9 @@ impl CloudflareClient {
     pub async fn put_r2_bucket_cors(
         &self,
         bucket_name: &str,
+        methods: &[&str],
         allow_origin: &str,
+        expose_headers: &[&str],
     ) -> anyhow::Result<()> {
         #[derive(Serialize)]
         struct Body<'a> {
@@ -78,6 +80,8 @@ impl CloudflareClient {
         #[derive(Serialize)]
         struct Rule<'a> {
             allowed: Allowed<'a>,
+            #[serde(rename = "exposeHeaders")]
+            expose_headers: Vec<&'a str>,
             #[serde(rename = "maxAgeSeconds")]
             max_age_seconds: u32,
         }
@@ -90,10 +94,11 @@ impl CloudflareClient {
         let payload = serde_json::to_vec(&Body {
             rules: vec![Rule {
                 allowed: Allowed {
-                    methods: vec!["GET", "HEAD"],
+                    methods: methods.to_vec(),
                     origins: vec![allow_origin],
                     headers: vec!["*"],
                 },
+                expose_headers: expose_headers.to_vec(),
                 max_age_seconds: 86400,
             }],
         })?;
