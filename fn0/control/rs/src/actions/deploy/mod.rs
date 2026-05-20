@@ -269,7 +269,8 @@ async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
     let custom_domain = format!("{project_id}.{public_base_domain}");
 
     cf.create_r2_bucket(&bucket, "apac").await?;
-    cf.put_r2_bucket_cors(&bucket, "*").await?;
+    cf.put_r2_bucket_cors(&bucket, &["GET", "HEAD"], "*", &[])
+        .await?;
     cf.register_r2_custom_domain(&bucket, &custom_domain, &zone_id)
         .await?;
     ensure_turso_database(project_id).await?;
@@ -283,6 +284,8 @@ async fn ensure_object_storage_bucket(
 ) -> anyhow::Result<()> {
     let bucket = format!("fn0-object-storage-{project_id}");
     cf.create_r2_bucket(&bucket, "apac").await?;
+    cf.put_r2_bucket_cors(&bucket, &["GET", "PUT", "HEAD"], "*", &["ETag"])
+        .await?;
     Ok(())
 }
 
