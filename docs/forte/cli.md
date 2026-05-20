@@ -121,11 +121,7 @@ Creates:
 
 The TypeScript client is generated automatically by `forte-rs-to-ts` on the next `forte build` or `forte dev`. Import from `fe/src/actions/.generated/<name>.ts`.
 
-> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen's flat-file scan for the generated `mod.rs` module declarations requires top-level `.rs` files. Use `forte add action user_login` instead (or use the directory-module layout `user_login/mod.rs` manually if you need to split the file).
-
-> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen only scans the top-level `src/actions/` directory. That file will never be discovered. Use `forte add action user_login` instead.
->
-> The generated code also has naming and return-type bugs that must be fixed before `forte build` will succeed. See the [actions guide](actions.md) for the correct pattern.
+> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen only scans the top-level `src/actions/` directory. That file will never be discovered. Use `forte add action user_login` instead (or the directory-module layout `user_login/mod.rs` if you need to split the file).
 
 ---
 
