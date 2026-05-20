@@ -483,3 +483,15 @@ The `init.rs` rewrite is complete when, in a clean directory with no prior `fort
 7. `forte init --dev demo-dev` writes path-dep variants of the four `forte-*`/`doc-db` lines in `rs/Cargo.toml` and is buildable inside the fn0 monorepo without further edits.
 
 Each criterion must be reproduced once and recorded in the PR description.
+
+## 10. Verification log
+
+All seven §9 criteria reproduced and passing as of 2026-05-20:
+
+1. ✅ `forte init --dev demo-dev` produced exactly the §3 tree plus `fe/node_modules/` + `fe/package-lock.json`; `npm install` ran once.
+2. ✅ `forte dev` served `http://localhost:3000/` and `/about` with HTTP 200 and the expected hello-world content.
+3. ✅ `forte build` exited 0; `dist/` contained `backend.wasm` (1.6 MB) + `server.js`.
+4. ✅ `forte deploy --name demo-test` succeeded end-to-end, wrote `project_id = "7d4eez0e"` into `Forte.toml`, uploaded 4 static assets + the bundle tar; the deployed site is live at `https://7d4eez0e.fn0.dev/`.
+5. ✅ `forte add page about` + `forte add action submit` + `forte build` passed; `POST /__forte_action/submit` returned `{"t":"Ok","result":"Received: hi"}`.
+6. ✅ `cargo clippy --release --target wasm32-wasip2` in `rs/` exited 0 with zero warnings (after the first build).
+7. ✅ `forte init --dev demo-dev` emitted path-deps and built inside the monorepo; default-mode `forte init demo` emitted version-deps and built cleanly from crates.io after `fn0-doc-db 0.4.3` was published (§8.9).
