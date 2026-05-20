@@ -330,6 +330,9 @@ pub async fn run(options: DevOptions) -> Result<()> {
             format!("http://127.0.0.1:{}", sqld_port),
         ));
     }
+    if !env_vars.iter().any(|(k, _)| k == "TURSO_AUTH_TOKEN") {
+        env_vars.push(("TURSO_AUTH_TOKEN".to_string(), String::new()));
+    }
 
     let (queue_tx, queue_rx) =
         tokio::sync::mpsc::unbounded_channel::<fn0::queue_hijack::LoopbackMessage>();
