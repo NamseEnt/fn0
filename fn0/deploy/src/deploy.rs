@@ -35,6 +35,9 @@ enum Deploy {
     QuotaExceeded {
         reason: String,
     },
+    BadCodeVersion {
+        reason: String,
+    },
     NotLoggedIn,
     NotFound,
     InternalError,
@@ -215,6 +218,9 @@ async fn request_deploy(
             static_uploads,
         }),
         Deploy::QuotaExceeded { reason } => Err(anyhow!("deploy quota exceeded: {reason}")),
+        Deploy::BadCodeVersion { reason } => {
+            Err(anyhow!("deploy rejected code_version: {reason}"))
+        }
         Deploy::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
         Deploy::NotFound => Err(anyhow!("project '{project_id}' not found or not owned by you.")),
         Deploy::InternalError => Err(anyhow!("deploy: server error; check fn0-control logs")),
