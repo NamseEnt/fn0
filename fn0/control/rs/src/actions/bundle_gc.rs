@@ -217,6 +217,22 @@ pub async fn run_gc() -> anyhow::Result<GcStats> {
     )
     .await?;
     gc_abandoned_uploads(&db, &bundle_store, &static_store, now, &mut stats).await?;
+
+    let deleted = metrics::meter().u64_counter("fn0.gc.deleted").build();
+    for (kind, count) in [
+        ("compiled_versions", stats.deleted_versions),
+        ("abandoned_uploads", stats.deleted_orphans),
+        ("static_prefixes", stats.deleted_static_prefixes),
+    ] {
+        deleted.add(
+            count,
+            &[
+                metrics::KeyValue::new("gc", "bundle_gc"),
+                metrics::KeyValue::new("kind", kind),
+            ],
+        );
+    }
+
     Ok(stats)
 }
 

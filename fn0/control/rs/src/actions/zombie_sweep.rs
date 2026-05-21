@@ -66,6 +66,14 @@ pub async fn run_sweep() -> anyhow::Result<SweepStats> {
         );
     }
 
+    metrics::meter().u64_counter("fn0.gc.deleted").build().add(
+        reaped_docs,
+        &[
+            metrics::KeyValue::new("gc", "zombie_sweep"),
+            metrics::KeyValue::new("kind", "reaped_docs"),
+        ],
+    );
+
     Ok(SweepStats {
         scanned_instances,
         reaped_docs,
