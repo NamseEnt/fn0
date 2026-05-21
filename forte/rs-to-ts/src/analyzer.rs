@@ -190,9 +190,23 @@ fn is_hook_path(path_str: &str) -> bool {
 }
 
 fn is_action_path(path_str: &str) -> bool {
-    path_str.contains("src/actions/")
-        && path_str.ends_with(".rs")
-        && !path_str.ends_with("mod.rs")
+    let Some(after) = path_str.split("src/actions/").nth(1) else {
+        return false;
+    };
+    match after.rsplit_once('/') {
+        Some((dir, "mod.rs")) => !dir.contains('/'),
+        Some(_) => false,
+        None => after.ends_with(".rs") && after != "mod.rs",
+    }
+}
+
+fn action_name_from_path(path: &str) -> &str {
+    let mut segments = path.rsplit('/');
+    match segments.next() {
+        Some("mod.rs") => segments.next().unwrap_or("unknown"),
+        Some(file) => file.trim_end_matches(".rs"),
+        None => "unknown",
+    }
 }
 
 fn scan_io_module<'tcx>(
@@ -554,11 +568,7 @@ impl Analyzer {
                 None => continue,
             };
 
-            let action_name = rust_source_path
-                .rsplit('/')
-                .next()
-                .unwrap_or("unknown")
-                .trim_end_matches(".rs");
+            let action_name = action_name_from_path(&rust_source_path);
 
             action_names.push(action_name.to_string());
 
