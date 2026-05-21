@@ -1,4 +1,4 @@
-// Auto-generated from src/actions/deploy.rs
+// Auto-generated from src/actions/deploy/mod.rs
 
 import { z } from "zod";
 import { callAction } from "@forte/react";
@@ -20,7 +20,7 @@ const StaticUploadSchema = z.object({
 
 const InputSchema = z.object({
     projectId: z.string(),
-    buildId: z.string(),
+    codeVersion: z.number(),
     files: z.array(FileEntrySchema),
     jobs: z.array(CronJobSchema),
     cronUpdatedAt: z.coerce.date(),
@@ -32,10 +32,13 @@ const OutputSchema = z.discriminatedUnion("t", [
     presignedPutUrl: z.string(),
     objectKey: z.string(),
     staticUploads: z.array(StaticUploadSchema),
-    codeVersion: z.number(),
   }),
     z.object({
     t: z.literal("QuotaExceeded"),
+    reason: z.string(),
+  }),
+    z.object({
+    t: z.literal("BadCodeVersion"),
     reason: z.string(),
   }),
     z.object({

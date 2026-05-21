@@ -6,7 +6,7 @@ use std::path::Path;
 #[derive(Serialize)]
 struct DeployInput<'a> {
     project_id: &'a str,
-    build_id: &'a str,
+    code_version: u64,
     files: Vec<DeployFile>,
     jobs: &'a [CronJob],
     cron_updated_at: &'a str,
@@ -31,7 +31,6 @@ enum Deploy {
         presigned_put_url: String,
         object_key: String,
         static_uploads: Vec<StaticUpload>,
-        code_version: u64,
     },
     QuotaExceeded {
         reason: String,
@@ -80,7 +79,7 @@ pub async fn deploy_wasm(
     control_url: &str,
     token: &str,
     project_id: &str,
-    build_id: &str,
+    code_version: u64,
     bundle_tar_path: &Path,
     jobs: &[CronJob],
     cron_updated_at: &str,
@@ -92,13 +91,12 @@ pub async fn deploy_wasm(
         presigned_put_url,
         object_key,
         static_uploads: _,
-        code_version,
     } = request_deploy(
         &client,
         control_url,
         token,
         project_id,
-        build_id,
+        code_version,
         Vec::new(),
         jobs,
         cron_updated_at,
@@ -106,7 +104,7 @@ pub async fn deploy_wasm(
     .await?;
 
     println!("uploading bundle to {object_key} (code_version={code_version})...");
-    upload_bundle(&client, &presigned_put_url, bundle_tar_path, code_version).await?;
+    upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
 
     poll_deploy_status(&client, control_url, token, project_id, code_version).await?;
     println!("Deploy complete!");
@@ -117,7 +115,6 @@ struct DeployOk {
     presigned_put_url: String,
     object_key: String,
     static_uploads: Vec<StaticUpload>,
-    code_version: u64,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -125,7 +122,7 @@ pub async fn deploy_forte(
     control_url: &str,
     token: &str,
     project_id: &str,
-    build_id: &str,
+    code_version: u64,
     fe_dist_dir: &Path,
     bundle_tar_path: &Path,
     jobs: &[CronJob],
@@ -151,13 +148,12 @@ pub async fn deploy_forte(
         presigned_put_url,
         object_key,
         static_uploads,
-        code_version,
     } = request_deploy(
         &client,
         control_url,
         token,
         project_id,
-        build_id,
+        code_version,
         deploy_files,
         jobs,
         cron_updated_at,
@@ -170,7 +166,7 @@ pub async fn deploy_forte(
     }
 
     println!("uploading bundle to {object_key} (code_version={code_version})...");
-    upload_bundle(&client, &presigned_put_url, bundle_tar_path, code_version).await?;
+    upload_bundle(&client, &presigned_put_url, bundle_tar_path).await?;
 
     poll_deploy_status(&client, control_url, token, project_id, code_version).await?;
     println!("Deploy complete!");
@@ -183,7 +179,7 @@ async fn request_deploy(
     control_url: &str,
     token: &str,
     project_id: &str,
-    build_id: &str,
+    code_version: u64,
     files: Vec<DeployFile>,
     jobs: &[CronJob],
     cron_updated_at: &str,
@@ -197,7 +193,7 @@ async fn request_deploy(
         .bearer_auth(token)
         .json(&DeployInput {
             project_id,
-            build_id,
+            code_version,
             files,
             jobs,
             cron_updated_at,
@@ -213,12 +209,10 @@ async fn request_deploy(
             presigned_put_url,
             object_key,
             static_uploads,
-            code_version,
         } => Ok(DeployOk {
             presigned_put_url,
             object_key,
             static_uploads,
-            code_version,
         }),
         Deploy::QuotaExceeded { reason } => Err(anyhow!("deploy quota exceeded: {reason}")),
         Deploy::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
@@ -231,11 +225,9 @@ async fn upload_bundle(
     client: &reqwest::Client,
     presigned_put_url: &str,
     bundle_tar_path: &Path,
-    code_version: u64,
 ) -> Result<()> {
     let bundle_bytes = std::fs::read(bundle_tar_path)
         .map_err(|e| anyhow!("Failed to read {}: {}", bundle_tar_path.display(), e))?;
-    let _ = code_version;
     client
         .put(presigned_put_url)
         .body(bundle_bytes)

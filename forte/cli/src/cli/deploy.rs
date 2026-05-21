@@ -1,7 +1,6 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use uuid::Uuid;
 
 use super::build::{BuildOptions, run_build};
 use super::cron;
@@ -58,12 +57,15 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
         }
     };
 
-    let build_id = Uuid::new_v4().to_string();
+    let code_version: u64 = chrono::Utc::now()
+        .timestamp_millis()
+        .try_into()
+        .expect("system clock returns positive timestamp");
     let static_base_domain = std::env::var("FORTE_STATIC_BASE_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_STATIC_BASE_DOMAIN.to_string());
-    let static_base_url = format!("https://{project_id}.{static_base_domain}/{build_id}/");
+    let static_base_url = format!("https://{project_id}.{static_base_domain}/{code_version}/");
     println!("project_id: {project_id}");
-    println!("build_id:   {build_id}");
+    println!("code_version: {code_version}");
     println!("static base URL: {static_base_url}");
 
     run_build(BuildOptions {
@@ -85,7 +87,7 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
         &creds.control_url,
         &creds.token,
         &project_id,
-        &build_id,
+        code_version,
         &fe_dist,
         &bundle_path,
         &jobs,

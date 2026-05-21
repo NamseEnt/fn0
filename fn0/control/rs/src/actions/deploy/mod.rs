@@ -8,10 +8,17 @@ use crate::quota;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
+// code_version is minted client-side (it is baked into the static asset URL at
+// build time, before this action is reached). A far-future value would win
+// every `code_version >` promotion check forever and freeze the project, so
+// the action only accepts values close to server time.
+const CODE_VERSION_FUTURE_SKEW_MILLIS: u64 = 5 * 60 * 1000;
+const CODE_VERSION_PAST_WINDOW_MILLIS: u64 = 24 * 60 * 60 * 1000;
+
 #[derive(Deserialize)]
 pub struct Input {
     pub project_id: String,
-    pub build_id: String,
+    pub code_version: u64,
     pub files: Vec<FileEntry>,
     #[serde(default)]
     pub jobs: Vec<CronJob>,
@@ -30,9 +37,11 @@ pub enum Output {
         presigned_put_url: String,
         object_key: String,
         static_uploads: Vec<StaticUpload>,
-        code_version: u64,
     },
     QuotaExceeded {
+        reason: String,
+    },
+    BadCodeVersion {
         reason: String,
     },
     NotLoggedIn,
@@ -70,6 +79,19 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotFound;
     }
 
+    let code_version = req.body.code_version;
+    let now_millis: u64 = u64::try_from(forte_sdk::now().timestamp_millis())
+        .expect("system clock returns positive timestamp");
+    if code_version > now_millis.saturating_add(CODE_VERSION_FUTURE_SKEW_MILLIS)
+        || code_version < now_millis.saturating_sub(CODE_VERSION_PAST_WINDOW_MILLIS)
+    {
+        return Output::BadCodeVersion {
+            reason: format!(
+                "code_version {code_version} is outside the accepted window of server time {now_millis}"
+            ),
+        };
+    }
+
     if req.body.files.len() > quota::MAX_FILES_PER_BUILD {
         return Output::QuotaExceeded {
             reason: format!(
@@ -102,8 +124,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             return Output::InternalError;
         }
     };
-    let code_version: u64 = u64::try_from(forte_sdk::now().timestamp())
-        .expect("system clock returns positive timestamp");
     let object_key = format!("original/{}/{}.tar", project.project_id, code_version);
     let presigned_put_url = aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
         account_id: &bundle_env.account_id,
@@ -132,7 +152,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             .files
             .iter()
             .map(|f| {
-                let key = format!("{}/{}", req.body.build_id, f.path);
+                let key = format!("{}/{}", code_version, f.path);
                 let url = aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
                     account_id: &static_env.account_id,
                     bucket: &static_bucket,
@@ -167,7 +187,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         presigned_put_url,
         object_key,
         static_uploads,
-        code_version,
     }
 }
 

@@ -6,6 +6,7 @@ export { bundleCompiled } from "./bundle_compiled";
 export { bundleGc } from "./bundle_gc";
 export { bundleUploaded } from "./bundle_uploaded";
 export { cronOnTick } from "./cron_on_tick";
+export { deploy } from "./deploy";
 export { deployStatus } from "./deploy_status";
 export { domainAdd } from "./domain_add";
 export { domainRemove } from "./domain_remove";
