@@ -3,6 +3,7 @@
 export { adminRun } from "./admin_run";
 export { approveCliAuthorization } from "./approve_cli_authorization";
 export { bundleCompiled } from "./bundle_compiled";
+export { bundleGc } from "./bundle_gc";
 export { bundleUploaded } from "./bundle_uploaded";
 export { cronOnTick } from "./cron_on_tick";
 export { deployStatus } from "./deploy_status";

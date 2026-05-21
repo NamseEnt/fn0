@@ -90,7 +90,7 @@ mod proxy {
         { inline :
         "package forte:user; world service-export { import wasi:http/types@0.3.0-rc-2026-03-15; export wasi:http/handler@0.3.0-rc-2026-03-15; }",
         path :
-        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/debug/build/fn0-control-f810d8d543155061/out",
+        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/release/build/fn0-control-63ee2ad7178d8adb/out",
         world : "service-export", default_bindings_module :
         "crate::route_generated::proxy", pub_export_macro : true, async : true, features
         : ["clocks-timezone"], with : { "wasi:http/handler@0.3.0-rc-2026-03-15" :
