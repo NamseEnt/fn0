@@ -67,11 +67,13 @@ where
         Ok(r) => r,
         Err(e) => {
             tracing::error!(error = ?e, "dispatch failed");
+            crate::metrics::flush();
             return Err(p3::ErrorCode::InternalError(Some(format!("{e:#?}"))));
         }
     };
 
     span.record("http.response.status_code", http_resp.status().as_u16());
+    crate::metrics::flush();
 
     http_response_to_p3(http_resp)
         .await
