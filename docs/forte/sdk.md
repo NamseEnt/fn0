@@ -165,6 +165,36 @@ OpenTelemetry is initialized once per instance on the first request via `otel::i
 
 The service name defaults to `"forte-app"` and can be overridden with the `OTEL_SERVICE_NAME` environment variable.
 
+## Metrics
+
+`forte_sdk::metrics` provides an OTLP metrics pipeline. Instruments created from the shared `Meter` are aggregated with **delta temporality** and flushed at the end of each request — the same path as traces. No background exporter is needed because a forte component only holds CPU during a request.
+
+```rust
+use forte_sdk::metrics::{meter, Counter, KeyValue};
+
+// Create a counter once (e.g. at module level with LazyLock)
+let requests: Counter<u64> = meter().u64_counter("requests").build();
+
+// Record a measurement inside a handler
+requests.add(1, &[KeyValue::new("route", "/api/users")]);
+```
+
+Instrument types re-exported from `forte_sdk::metrics`:
+
+| Type | Description |
+|---|---|
+| `Counter<T>` | Monotonically increasing sum |
+| `UpDownCounter<T>` | Sum that can increase and decrease |
+| `Gauge<T>` | Last-value point-in-time measurement |
+| `Histogram<T>` | Bucketed distribution |
+| `KeyValue` | Attribute key/value pair for labels |
+
+Get the shared `Meter` with `forte_sdk::metrics::meter()`. Instruments survive across the process lifetime (module-level `LazyLock` is fine).
+
+Metrics are exported to `http://fn0-otel.fn0.dev/v1/metrics` (the fn0 Cloud collector). The service name defaults to `"forte-app"` and can be overridden with `OTEL_SERVICE_NAME`.
+
+If no instrument has been created during a request the flush is a no-op; there is no overhead for apps that don't use metrics.
+
 ## `forte_json` — Serialization Format
 
 `forte-json` is a custom JSON serializer/deserializer used for all handler I/O. It differs from `serde_json` in two ways:
@@ -222,6 +252,7 @@ All re-exported at the crate root and usable via `forte_sdk::`:
 | `tracing` | `tracing` |
 | `Uuid` | `uuid` |
 | `wit_bindgen` | `wit-bindgen` |
+| `metrics::{meter, Counter, Gauge, Histogram, UpDownCounter, KeyValue}` | `forte-sdk` (OTLP metrics) |
 
 ## Runtime Utilities
 
