@@ -132,6 +132,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             Ok(stats) => tracing::info!(
                 deleted_versions_count = stats.deleted_versions,
                 deleted_orphans_count = stats.deleted_orphans,
+                deleted_static_prefixes_count = stats.deleted_static_prefixes,
                 "bundle_gc completed",
             ),
             Err(err) => tracing::error!(?err, "bundle_gc within cron_on_tick failed"),

@@ -1,17 +1,20 @@
-//! Periodic GC for compiled bundles.
+//! Periodic GC for deploy artifacts.
 //!
-//! Two passes, both driven from `cron_on_tick`:
+//! Driven from `cron_on_tick`:
 //! - superseded versions: for each project, delete `CompiledBundleDoc` rows and
-//!   their R2 objects whose `code_version` is below the one the worker fleet
-//!   currently serves.
-//! - abandoned uploads: delete `original/*` R2 objects that never produced a
-//!   `CompiledBundleDoc` (compile never finished) once they are old enough.
+//!   their compiled/original R2 objects whose `code_version` is below the one
+//!   the worker fleet currently serves, and delete the matching
+//!   `{code_version}/` prefixes in the project's static asset bucket.
+//! - abandoned uploads: delete `original/*` objects that never produced a
+//!   `CompiledBundleDoc` once they are old enough, along with their static
+//!   asset prefixes.
 
 use crate::common::admin;
 use crate::common::aws_sign;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 // Worker `manifest_poller` polls `WorkerManifestDoc` every 1s. A superseded
@@ -19,6 +22,12 @@ use std::collections::HashSet;
 // stale registry; gating on the *current latest* row's age by 60x the poll
 // interval makes that window unreachable.
 pub const STALE_REGISTRY_GRACE_SECS: i64 = 60;
+
+// A superseded `{code_version}/` static prefix can still be fetched by a page
+// that was served before the newer version went live and baked that prefix
+// into its asset URLs (an open browser tab, cached HTML). Retaining the prefix
+// for 24h after the newer version became latest outlasts any such page.
+pub const STATIC_ASSET_GRACE_SECS: i64 = 24 * 60 * 60;
 
 // An `original/*` upload with no `CompiledBundleDoc` is only abandoned if the
 // compile is not merely slow. The cwasm-compiler Lambda is bounded far below
@@ -36,6 +45,7 @@ pub enum Output {
     Ok {
         deleted_versions_count: u64,
         deleted_orphans_count: u64,
+        deleted_static_prefixes_count: u64,
     },
     Unauthorized,
     Error {
@@ -43,9 +53,42 @@ pub enum Output {
     },
 }
 
+#[derive(Default)]
 pub struct GcStats {
     pub deleted_versions: u64,
     pub deleted_orphans: u64,
+    pub deleted_static_prefixes: u64,
+}
+
+async fn r2_list_all(
+    account_id: &str,
+    bucket: &str,
+    access_key_id: &str,
+    secret_access_key: &str,
+    prefix: &str,
+    now: DateTime,
+) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
+    let mut objects = Vec::new();
+    let mut continuation_token: Option<String> = None;
+    loop {
+        let page = aws_sign::r2_list_objects(aws_sign::R2ListArgs {
+            account_id,
+            bucket,
+            region: R2_REGION,
+            prefix,
+            continuation_token: continuation_token.as_deref(),
+            access_key_id,
+            secret_access_key,
+            now,
+        })
+        .await?;
+        objects.extend(page.objects);
+        match page.next_continuation_token {
+            Some(token) => continuation_token = Some(token),
+            None => break,
+        }
+    }
+    Ok(objects)
 }
 
 struct BundleStore {
@@ -87,33 +130,75 @@ impl BundleStore {
         prefix: &str,
         now: DateTime,
     ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
-        let mut objects = Vec::new();
-        let mut continuation_token: Option<String> = None;
-        loop {
-            let page = aws_sign::r2_list_objects(aws_sign::R2ListArgs {
-                account_id: &self.account_id,
-                bucket: &self.bucket,
-                region: R2_REGION,
-                prefix,
-                continuation_token: continuation_token.as_deref(),
-                access_key_id: &self.access_key_id,
-                secret_access_key: &self.secret_access_key,
-                now,
-            })
-            .await?;
-            objects.extend(page.objects);
-            match page.next_continuation_token {
-                Some(token) => continuation_token = Some(token),
-                None => break,
-            }
-        }
-        Ok(objects)
+        r2_list_all(
+            &self.account_id,
+            &self.bucket,
+            &self.access_key_id,
+            &self.secret_access_key,
+            prefix,
+            now,
+        )
+        .await
+    }
+}
+
+struct StaticAssetStore {
+    account_id: String,
+    access_key_id: String,
+    secret_access_key: String,
+}
+
+impl StaticAssetStore {
+    fn from_env() -> anyhow::Result<Self> {
+        Ok(Self {
+            account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
+            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"))?,
+            secret_access_key: std::env::var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY not set"))?,
+        })
+    }
+
+    fn bucket(project_id: &str) -> String {
+        format!("fn0-static-asset-{project_id}")
+    }
+
+    async fn list_all(
+        &self,
+        project_id: &str,
+        prefix: &str,
+        now: DateTime,
+    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
+        r2_list_all(
+            &self.account_id,
+            &Self::bucket(project_id),
+            &self.access_key_id,
+            &self.secret_access_key,
+            prefix,
+            now,
+        )
+        .await
+    }
+
+    async fn delete(&self, project_id: &str, key: &str, now: DateTime) -> anyhow::Result<()> {
+        aws_sign::r2_delete_object(aws_sign::R2ObjectRef {
+            account_id: &self.account_id,
+            bucket: &Self::bucket(project_id),
+            region: R2_REGION,
+            key,
+            access_key_id: &self.access_key_id,
+            secret_access_key: &self.secret_access_key,
+            now,
+        })
+        .await
     }
 }
 
 pub async fn run_gc() -> anyhow::Result<GcStats> {
     let db = doc_db::turso();
-    let store = BundleStore::from_env()?;
+    let bundle_store = BundleStore::from_env()?;
+    let static_store = StaticAssetStore::from_env()?;
     let now = forte_sdk::now();
 
     let pending_fn0_wasmtime_version = (Fn0WasmtimeVersionDocGet {})
@@ -121,32 +206,32 @@ pub async fn run_gc() -> anyhow::Result<GcStats> {
         .await?
         .and_then(|doc| doc.pending);
 
-    let deleted_versions = gc_superseded_versions(
+    let mut stats = GcStats::default();
+    gc_superseded_versions(
         &db,
-        &store,
+        &bundle_store,
+        &static_store,
         now,
         pending_fn0_wasmtime_version.as_deref(),
+        &mut stats,
     )
     .await?;
-    let deleted_orphans = gc_abandoned_uploads(&db, &store, now).await?;
-
-    Ok(GcStats {
-        deleted_versions,
-        deleted_orphans,
-    })
+    gc_abandoned_uploads(&db, &bundle_store, &static_store, now, &mut stats).await?;
+    Ok(stats)
 }
 
 async fn gc_superseded_versions(
     db: &doc_db::Database,
-    store: &BundleStore,
+    bundle_store: &BundleStore,
+    static_store: &StaticAssetStore,
     now: DateTime,
     pending_fn0_wasmtime_version: Option<&str>,
-) -> anyhow::Result<u64> {
+    stats: &mut GcStats,
+) -> anyhow::Result<()> {
     let Some(manifest) = (WorkerManifestDocGet {}).send_with(db).await? else {
-        return Ok(0);
+        return Ok(());
     };
 
-    let mut deleted: u64 = 0;
     for (project_id, project_manifest) in &manifest.project_manifests {
         let latest = project_manifest.code_version;
         let docs = query_compiled_bundles(db, project_id).await?;
@@ -157,58 +242,93 @@ async fn gc_superseded_versions(
             // whole project rather than risk deleting inside the stale window.
             continue;
         };
-        if (now - latest_doc.created_at).num_seconds() < STALE_REGISTRY_GRACE_SECS {
-            continue;
+        let latest_age_secs = (now - latest_doc.created_at).num_seconds();
+
+        if latest_age_secs >= STALE_REGISTRY_GRACE_SECS {
+            for doc in &docs {
+                if doc.code_version >= latest {
+                    continue;
+                }
+                if let Some(pending) = pending_fn0_wasmtime_version
+                    && doc.fn0_wasmtime_versions.iter().any(|v| v == pending)
+                {
+                    continue;
+                }
+                for fn0_wasmtime_version in &doc.fn0_wasmtime_versions {
+                    let key = format!(
+                        "compiled/{fn0_wasmtime_version}/{project_id}/{}.tar.zst",
+                        doc.code_version
+                    );
+                    bundle_store.delete(&key, now).await?;
+                }
+                bundle_store
+                    .delete(
+                        &format!("original/{project_id}/{}.tar", doc.code_version),
+                        now,
+                    )
+                    .await?;
+                (CompiledBundleDocDelete {
+                    project_id: project_id.as_str(),
+                    code_version: doc.code_version,
+                })
+                .send_with(db)
+                .await?;
+                stats.deleted_versions += 1;
+            }
         }
 
-        for doc in &docs {
-            if doc.code_version >= latest {
-                continue;
-            }
-            if let Some(pending) = pending_fn0_wasmtime_version
-                && doc.fn0_wasmtime_versions.iter().any(|v| v == pending)
-            {
-                continue;
-            }
-            for fn0_wasmtime_version in &doc.fn0_wasmtime_versions {
-                let key = format!(
-                    "compiled/{fn0_wasmtime_version}/{project_id}/{}.tar.zst",
-                    doc.code_version
-                );
-                store.delete(&key, now).await?;
-            }
-            store
-                .delete(
-                    &format!("original/{project_id}/{}.tar", doc.code_version),
-                    now,
-                )
-                .await?;
-            (CompiledBundleDocDelete {
-                project_id: project_id.as_str(),
-                code_version: doc.code_version,
-            })
-            .send_with(db)
-            .await?;
-            deleted += 1;
+        if latest_age_secs >= STATIC_ASSET_GRACE_SECS {
+            gc_superseded_static_prefixes(static_store, project_id, latest, now, stats).await?;
         }
     }
-    Ok(deleted)
+    Ok(())
+}
+
+async fn gc_superseded_static_prefixes(
+    static_store: &StaticAssetStore,
+    project_id: &str,
+    latest: u64,
+    now: DateTime,
+    stats: &mut GcStats,
+) -> anyhow::Result<()> {
+    let objects = static_store.list_all(project_id, "", now).await?;
+    let mut keys_by_code_version: HashMap<u64, Vec<String>> = HashMap::new();
+    for object in objects {
+        let Some(code_version) = parse_static_key(&object.key) else {
+            continue;
+        };
+        keys_by_code_version
+            .entry(code_version)
+            .or_default()
+            .push(object.key);
+    }
+    for (code_version, keys) in keys_by_code_version {
+        if code_version >= latest {
+            continue;
+        }
+        for key in keys {
+            static_store.delete(project_id, &key, now).await?;
+        }
+        stats.deleted_static_prefixes += 1;
+    }
+    Ok(())
 }
 
 async fn gc_abandoned_uploads(
     db: &doc_db::Database,
-    store: &BundleStore,
+    bundle_store: &BundleStore,
+    static_store: &StaticAssetStore,
     now: DateTime,
-) -> anyhow::Result<u64> {
-    let originals = store.list_all("original/", now).await?;
-    let compiled_pairs: HashSet<(String, u64)> = store
+    stats: &mut GcStats,
+) -> anyhow::Result<()> {
+    let originals = bundle_store.list_all("original/", now).await?;
+    let compiled_pairs: HashSet<(String, u64)> = bundle_store
         .list_all("compiled/", now)
         .await?
         .iter()
         .filter_map(|object| parse_compiled_key(&object.key))
         .collect();
 
-    let mut deleted: u64 = 0;
     for object in &originals {
         let Some((project_id, code_version)) = parse_original_key(&object.key) else {
             continue;
@@ -236,10 +356,31 @@ async fn gc_abandoned_uploads(
             );
             continue;
         }
-        store.delete(&object.key, now).await?;
-        deleted += 1;
+        bundle_store.delete(&object.key, now).await?;
+        stats.deleted_orphans += 1;
+        gc_abandoned_static_prefix(static_store, &project_id, code_version, now, stats).await?;
     }
-    Ok(deleted)
+    Ok(())
+}
+
+async fn gc_abandoned_static_prefix(
+    static_store: &StaticAssetStore,
+    project_id: &str,
+    code_version: u64,
+    now: DateTime,
+    stats: &mut GcStats,
+) -> anyhow::Result<()> {
+    let objects = static_store
+        .list_all(project_id, &format!("{code_version}/"), now)
+        .await?;
+    if objects.is_empty() {
+        return Ok(());
+    }
+    for object in objects {
+        static_store.delete(project_id, &object.key, now).await?;
+    }
+    stats.deleted_static_prefixes += 1;
+    Ok(())
 }
 
 async fn query_compiled_bundles(
@@ -283,6 +424,10 @@ fn parse_compiled_key(key: &str) -> Option<(String, u64)> {
     Some((project_id, code_version))
 }
 
+fn parse_static_key(key: &str) -> Option<u64> {
+    key.split_once('/')?.0.parse().ok()
+}
+
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     if !admin::verify(req.headers) {
         return Output::Unauthorized;
@@ -291,6 +436,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         Ok(stats) => Output::Ok {
             deleted_versions_count: stats.deleted_versions,
             deleted_orphans_count: stats.deleted_orphans,
+            deleted_static_prefixes_count: stats.deleted_static_prefixes,
         },
         Err(e) => Output::Error {
             message: e.to_string(),
