@@ -11,7 +11,7 @@ name = "forte"
 path = "src/main.rs"
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-url = "{ repo }/releases/download/release/{ name }-v{ version }/{ name }-{ target }{ archive-suffix }"
 bin-dir = "{ name }-{ target }/{ bin }{ binary-ext }"
 pkg-fmt = "txz"
 

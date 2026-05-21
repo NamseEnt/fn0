@@ -4,6 +4,7 @@ members = ["cargo:forte/cli", "cargo:fn0/cli"]
 [dist]
 cargo-dist-version = "0.31.0"
 ci = ["github"]
+tag-namespace = "release"
 precise-builds = true
 targets = [
     "aarch64-apple-darwin",
