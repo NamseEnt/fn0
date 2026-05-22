@@ -64,4 +64,11 @@ forte dev
 
 `forte init` scaffolds the project, installs npm packages, and prints next steps.
 
+To deploy, authenticate first:
+
+```sh
+forte login          # opens browser, saves token to ~/.config/fn0/credentials
+forte deploy
+```
+
 See [forte/overview.md](forte/overview.md) for project layout and [forte/cli.md](forte/cli.md) for all CLI commands.

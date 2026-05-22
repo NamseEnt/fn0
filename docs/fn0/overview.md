@@ -115,7 +115,16 @@ fn0 has built-in OpenTelemetry support:
 
 For Forte apps running on fn0 Cloud, traces are exported to `http://fn0-otel.fn0.dev/v1/traces`. The service name is controlled via the `OTEL_SERVICE_NAME` environment variable (defaults to `"forte-app"`).
 
-For self-hosted fn0 worker deployments, OTLP endpoint configuration is Unknown from repository — check `fn0/fn0/src/otlp_hijack.rs` and `fn0/worker/src/telemetry.rs`.
+For self-hosted fn0 worker deployments, configure the OTLP endpoint via environment variables on the worker binary:
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname (e.g. your Grafana Cloud OTLP host) |
+| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth credentials (`user:token`) |
+| `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every OTLP request path |
+| `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname used inside WASM apps |
+
+The worker intercepts outgoing OTLP requests that target `FN0_OTLP_PLACEHOLDER_HOST` and rewrites them to `FN0_OTLP_TARGET_HOST` with the configured auth header.
 
 ## Hijack Architecture
 
