@@ -1184,23 +1184,6 @@ prometheus.scrape "node" {
   forward_to = [prometheus.remote_write.default.receiver]
 }
 
-prometheus.exporter.cadvisor "default" {
-  storage_duration = "5m"
-}
-
-discovery.relabel "cadvisor" {
-  targets = prometheus.exporter.cadvisor.default.targets
-  rule {
-    target_label = "instance"
-    replacement  = sys.env("FN0_HOST_OCID")
-  }
-}
-
-prometheus.scrape "cadvisor" {
-  targets    = discovery.relabel.cadvisor.output
-  forward_to = [prometheus.remote_write.default.receiver]
-}
-
 prometheus.remote_write "default" {
   endpoint {
     url = "${args.promUrl}"
@@ -1355,7 +1338,7 @@ RestartSec=5
 WantedBy=multi-user.target
 `;
   // --security-opt label=disable: OL SELinux enforcing otherwise blocks the
-  // alloy container from reading host /var/log/journal, /sys/fs/cgroup, etc.
+  // alloy container from reading host /var/log/journal, /sys, etc.
   const alloySystemdUnit = `[Unit]
 Description=fn0 alloy host observability
 After=network-online.target
@@ -1371,13 +1354,11 @@ ExecStartPre=/usr/bin/podman pull ${ALLOY_IMAGE_REF}
 ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
   --security-opt label=disable \\
   --network host \\
-  --pid host \\
   --env FN0_HOST_OCID \\
   --env FN0_GRAFANA_PASSWORD \\
   -v /:/host/root:ro,rslave \\
   -v /proc:/host/proc:ro \\
   -v /sys:/host/sys:ro \\
-  -v /sys/fs/cgroup:/sys/fs/cgroup:ro \\
   -v /var/log/journal:/host/var/log/journal:ro \\
   -v /etc/machine-id:/etc/machine-id:ro \\
   -v /etc/fn0-alloy:/etc/fn0-alloy:ro \\
