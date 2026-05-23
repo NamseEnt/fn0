@@ -1149,22 +1149,7 @@ function renderAlloyConfig(args: {
   // Each scrape target gets an instance=<ocid> label via discovery.relabel
   // because Prometheus external_labels do not override labels a target
   // already carries (the exporters set instance=<hostname:port> by default).
-  return `prometheus.exporter.self "default" {}
-
-discovery.relabel "self" {
-  targets = prometheus.exporter.self.default.targets
-  rule {
-    target_label = "instance"
-    replacement  = sys.env("FN0_HOST_OCID")
-  }
-}
-
-prometheus.scrape "self" {
-  targets    = discovery.relabel.self.output
-  forward_to = [prometheus.remote_write.default.receiver]
-}
-
-prometheus.exporter.unix "node" {
+  return `prometheus.exporter.unix "node" {
   set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "netstat", "vmstat", "uname", "time"]
   rootfs_path     = "/host/root"
   procfs_path     = "/host/proc"

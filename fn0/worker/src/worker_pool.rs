@@ -84,7 +84,7 @@ where
     rt.block_on(local.run_until(async move {
         let executor = Rc::new(CodeExecutor::new(ctx));
         while let Some(env) = rx.recv().await {
-            fn0::telemetry::stage_duration("queue_wait", &env.project_id, env.enqueued_at.elapsed());
+            fn0::telemetry::stage_duration("queue_wait", env.enqueued_at.elapsed());
             let executor = executor.clone();
             tokio::task::spawn_local(async move {
                 let RequestEnvelope {
@@ -100,12 +100,12 @@ where
                 match outcome {
                     Ok(result) => {
                         if resp_tx.send(result).is_err() {
-                            fn0::telemetry::oneshot_drop_before_response(&project_id);
+                            fn0::telemetry::oneshot_drop_before_response();
                         }
                     }
                     Err(panic) => {
                         let panic_msg = panic_payload_string(&panic);
-                        fn0::telemetry::panicked(&project_id);
+                        fn0::telemetry::panicked();
                         tracing::error!(
                             %project_id,
                             panic = %panic_msg,

@@ -228,9 +228,9 @@ impl<C: BundleCache> CodeExecutor<C> {
     ) -> Result<Response> {
         let bundle_start = std::time::Instant::now();
         let bundle = self.ctx.bundle_cache.get(project_id).await?;
-        telemetry::stage_duration("bundle_get", project_id, bundle_start.elapsed());
+        telemetry::stage_duration("bundle_get", bundle_start.elapsed());
 
-        telemetry::function_invocation(project_id);
+        telemetry::function_invocation();
         let start = std::time::Instant::now();
 
         let result = self.run_with_next(project_id, bundle, request).await;
@@ -242,7 +242,7 @@ impl<C: BundleCache> CodeExecutor<C> {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("unknown")
             .to_string();
-        telemetry::execution_time(project_id, &key, start.elapsed());
+        telemetry::execution_time(&key, start.elapsed());
         result.map(strip_fn0_headers)
     }
 
@@ -351,7 +351,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 Ok(result) => return result,
                 Err(panic) => {
                     poisoned.set(true);
-                    telemetry::panicked(project_id);
+                    telemetry::panicked();
                     let msg = panic_util::panic_payload_string(&panic);
                     tracing::error!(project_id, attempt, "js instance panicked: {msg}");
                     if attempt >= 2 {
@@ -443,7 +443,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
-        telemetry::create_instance(project_id);
+        telemetry::create_instance();
         self.instances.borrow_mut().insert(
             project_id.to_string(),
             WasmSlot {
@@ -488,7 +488,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 }
                 Err(panic) => {
                     let panic_msg = panic_util::panic_payload_string(&panic);
-                    telemetry::panicked(&project_id_for_log);
+                    telemetry::panicked();
                     tracing::error!(
                         project_id = %project_id_for_log,
                         panic = %panic_msg,

@@ -215,7 +215,7 @@ fn turso_send(
 
         let send_start = std::time::Instant::now();
         let (res, io) = default_send_request(request, options).await?;
-        telemetry::stage_duration("hijack_turso", &project_id, send_start.elapsed());
+        telemetry::stage_duration("hijack_turso", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))
@@ -246,7 +246,7 @@ fn queue_send(
             crate::queue_hijack::HijackAction::Forward(signed) => {
                 let send_start = std::time::Instant::now();
                 let (res, io) = default_send_request(signed, options).await?;
-                telemetry::stage_duration("hijack_queue", &project_id, send_start.elapsed());
+                telemetry::stage_duration("hijack_queue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
                     Box::new(io);
@@ -283,11 +283,7 @@ fn cross_project_enqueue_send(
             crate::cross_project_enqueue_hijack::HijackAction::Forward(signed) => {
                 let send_start = std::time::Instant::now();
                 let (res, io) = default_send_request(signed, options).await?;
-                telemetry::stage_duration(
-                    "hijack_cross_project_enqueue",
-                    &project_id,
-                    send_start.elapsed(),
-                );
+                telemetry::stage_duration("hijack_cross_project_enqueue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
                     Box::new(io);
@@ -313,11 +309,7 @@ fn cross_project_invoke_send(
             Ok(r) => r,
             Err(ec) => return Err(ec.into()),
         };
-        telemetry::stage_duration(
-            "hijack_cross_project_invoke",
-            &caller_project_id,
-            send_start.elapsed(),
-        );
+        telemetry::stage_duration("hijack_cross_project_invoke", send_start.elapsed());
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(async { Ok(()) });
         Ok((resp, io))
@@ -351,7 +343,7 @@ fn vault_send(
 
         let send_start = std::time::Instant::now();
         let (res, io) = default_send_request(signed, options).await?;
-        telemetry::stage_duration("hijack_vault", &project_id, send_start.elapsed());
+        telemetry::stage_duration("hijack_vault", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))
@@ -384,7 +376,7 @@ fn otlp_send(
             match default_send_request(forward_request, options).await {
                 Ok((_resp, io)) => {
                     let _ = io.await;
-                    telemetry::stage_duration("hijack_otlp", &project_id, send_start.elapsed());
+                    telemetry::stage_duration("hijack_otlp", send_start.elapsed());
                 }
                 Err(err) => {
                     tracing::warn!(?err, "otlp forward failed");
@@ -446,7 +438,7 @@ fn object_storage_send(
         }
         let send_start = std::time::Instant::now();
         let (res, send_io) = default_send_request(request, options).await?;
-        telemetry::stage_duration("hijack_object_storage", &project_id, send_start.elapsed());
+        telemetry::stage_duration("hijack_object_storage", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(send_io);
@@ -475,7 +467,7 @@ fn default_send(
     Box::new(async move {
         let send_start = std::time::Instant::now();
         let (res, io) = default_send_request(request, options).await?;
-        telemetry::stage_duration("outbound_fetch", &project_id, send_start.elapsed());
+        telemetry::stage_duration("outbound_fetch", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))
@@ -499,7 +491,7 @@ pub(crate) async fn call_service<C: Clock>(
             let http_resp = accessor
                 .with(|mut access| resp.into_http(access.as_context_mut(), req_io))
                 .map_err(|error| {
-                    telemetry::wasmtime_error("response_into_http", project_id, &format!("{error:?}"));
+                    telemetry::wasmtime_error("response_into_http", &format!("{error:?}"));
                     anyhow!("response into_http failed: {error:?}")
                 })?;
             Ok(http_resp.map(|body| {
@@ -508,7 +500,7 @@ pub(crate) async fn call_service<C: Clock>(
             }))
         }
         Ok(Err(ec)) => {
-            telemetry::proxy_returns_error_code(project_id, &format!("{ec:?}"));
+            telemetry::proxy_returns_error_code(&format!("{ec:?}"));
             Err(anyhow!("proxy returned error code: {ec:?}"))
         }
         Err(error) => Err(classify_wasm_error(error, project_id, is_timeout)),
@@ -522,7 +514,7 @@ pub(crate) fn classify_wasm_error(
 ) -> anyhow::Error {
     match error.downcast::<wasmtime::Trap>() {
         Ok(trap) => {
-            telemetry::trapped(project_id, &format!("{trap:?}"));
+            telemetry::trapped(&format!("{trap:?}"));
             if is_timeout.load(Ordering::Relaxed) {
                 anyhow!("CPU time limit exceeded (trapped: {trap:?})")
             } else {
@@ -530,7 +522,7 @@ pub(crate) fn classify_wasm_error(
             }
         }
         Err(error) => {
-            telemetry::canceled_unexpectedly(project_id, &format!("{error:?}"));
+            telemetry::canceled_unexpectedly(&format!("{error:?}"));
             anyhow!("wasm error: {error:?}")
         }
     }

@@ -201,7 +201,7 @@ where
         let state = context.data();
         let cpu_time = state.time_tracker.duration();
         if cpu_time > Duration::from_millis(1000) {
-            telemetry::cpu_timeout(&state.project_id, cpu_time);
+            telemetry::cpu_timeout(cpu_time);
             state.is_timeout.store(true, Ordering::Relaxed);
             return Ok(wasmtime::UpdateDeadline::Interrupt);
         }
@@ -262,10 +262,10 @@ pub async fn run_wasm_instance_loop(
         .instantiate_async(&mut store)
         .await
         .map_err(|error| {
-            telemetry::wasmtime_error("instantiate_async", &project_id, &format!("{error:?}"));
+            telemetry::wasmtime_error("instantiate_async", &format!("{error:?}"));
             anyhow!("instantiate_async failed: {error:?}")
         })?;
-    telemetry::stage_duration("instantiate", &project_id, instantiate_start.elapsed());
+    telemetry::stage_duration("instantiate", instantiate_start.elapsed());
 
     let project_id_for_closure = project_id.clone();
     let run_result = store
@@ -283,7 +283,6 @@ pub async fn run_wasm_instance_loop(
                                     .unwrap_or_default();
                                 let service_ref = &service;
                                 let project_id = project_id_for_closure.clone();
-                                let project_id_for_metric = project_id_for_closure.clone();
                                 let time_tracker = time_tracker.clone();
                                 let is_timeout = is_timeout.clone();
                                 pending.push(Box::pin(async move {
@@ -309,15 +308,9 @@ pub async fn run_wasm_instance_loop(
                                             .await
                                         })
                                         .await;
-                                    telemetry::stage_duration(
-                                        "wasm_call",
-                                        &project_id_for_metric,
-                                        call_start.elapsed(),
-                                    );
+                                    telemetry::stage_duration("wasm_call", call_start.elapsed());
                                     if resp_tx.send(result).is_err() {
-                                        telemetry::oneshot_drop_before_response(
-                                            &project_id_for_metric,
-                                        );
+                                        telemetry::oneshot_drop_before_response();
                                     }
                                 }));
                             }
@@ -331,7 +324,7 @@ pub async fn run_wasm_instance_loop(
                 }
             }
 
-            telemetry::cpu_time(&project_id_for_closure, time_tracker.duration());
+            telemetry::cpu_time(time_tracker.duration());
             Ok(())
         })
         .await;
@@ -339,7 +332,7 @@ pub async fn run_wasm_instance_loop(
     match run_result {
         Ok(inner) => inner,
         Err(error) => {
-            telemetry::wasmtime_error("run_concurrent", &project_id, &format!("{error:?}"));
+            telemetry::wasmtime_error("run_concurrent", &format!("{error:?}"));
             Err(anyhow!("run_concurrent failed: {error:?}"))
         }
     }

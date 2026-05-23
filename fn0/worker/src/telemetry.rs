@@ -109,7 +109,7 @@ pub fn setup(
         .build()?;
 
     let reader = PeriodicReader::builder(metric_exporter)
-        .with_interval(Duration::from_secs(10))
+        .with_interval(Duration::from_secs(60))
         .build();
 
     let meter_provider = SdkMeterProvider::builder()

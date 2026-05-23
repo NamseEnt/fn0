@@ -568,7 +568,7 @@ async fn handle_user_request(
             .unwrap_or("unknown")
             .to_string(),
     };
-    fn0::telemetry::stage_duration("resolve_domain", &project_id, resolve_start.elapsed());
+    fn0::telemetry::stage_duration("resolve_domain", resolve_start.elapsed());
 
     let mapped_req = req.map(|body| {
         UnsyncBoxBody::new(body)
@@ -613,7 +613,7 @@ async fn handle_user_request(
                 .unwrap());
         }
         Err(_) => {
-            fn0::telemetry::request_deadline_exceeded(&project_id);
+            fn0::telemetry::request_deadline_exceeded();
             tracing::error!(%project_id, "request exceeded deadline");
             return Ok(hyper::Response::builder()
                 .status(504)
@@ -629,7 +629,7 @@ async fn handle_user_request(
             let collect_start = std::time::Instant::now();
             let collected: std::result::Result<http_body_util::Collected<Bytes>, anyhow::Error> =
                 body.collect().await;
-            fn0::telemetry::stage_duration("body_collect", &project_id, collect_start.elapsed());
+            fn0::telemetry::stage_duration("body_collect", collect_start.elapsed());
             let body_bytes = match collected {
                 Ok(c) => c.to_bytes(),
                 Err(err) => {
