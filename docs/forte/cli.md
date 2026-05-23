@@ -127,13 +127,19 @@ The TypeScript client is generated automatically by `forte-rs-to-ts` on the next
 
 ### `forte login`
 
-Authenticate with fn0 Cloud. Opens a browser to the fn0 tokens page, prompts you to paste an API token, and saves credentials locally (shared with the `fn0` CLI).
+Authenticate with fn0 Cloud using a PKCE OAuth flow and saves credentials locally (shared with the `fn0` CLI).
 
 | Flag | Default | Description |
 |---|---|---|
 | `--token <token>` | — | Provide token directly (skips interactive flow) |
 
-Tokens must start with `fn0_`. Credentials are saved to a local file (path printed on success).
+Default interactive flow:
+1. A loopback TCP listener is started on a random port.
+2. A PKCE authorization URL is printed and the browser is opened automatically (falls back to manual URL if auto-open fails).
+3. After you approve in the browser, the callback redirects to `http://127.0.0.1:<port>/callback`.
+4. The CLI exchanges the authorization code for a token and saves it locally.
+
+With `--token`, the interactive flow is skipped — the token is validated (must start with `fn0_`) and saved directly. Credentials are saved to a local file (path printed on success).
 
 ```sh
 forte login

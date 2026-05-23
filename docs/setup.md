@@ -67,7 +67,7 @@ forte dev
 To deploy, authenticate first:
 
 ```sh
-forte login          # opens browser, saves token to ~/.config/fn0/credentials
+forte login          # PKCE flow: opens browser, exchanges code for token, saves credentials
 forte deploy
 ```
 

@@ -132,7 +132,7 @@ To use the generated module, add `mod env_generated;` to your `lib.rs` and call 
 
 A standalone binary (`forte-rs-to-ts`) that reads the Rust source tree and generates TypeScript type files. Run automatically during `forte build`.
 
-> **Implementation note:** `forte-rs-to-ts` uses private Rust compiler APIs (`rustc_driver`, `rustc_hir`, `rustc_middle`, etc.) to resolve and analyze types accurately. Because these APIs are unstable and tied to a specific nightly compiler build, the binary is distributed as a pre-built release artifact bundled with a matching sysroot — it cannot be compiled from source with an ordinary `cargo install`. The CLI downloads the correct version automatically on first use; the cached binary lives under the project's `.forte/` directory.
+> **Implementation note:** `forte-rs-to-ts` uses private Rust compiler APIs (`rustc_driver`, `rustc_hir`, `rustc_middle`, etc.) to resolve and analyze types accurately. Because these APIs are unstable and tied to a specific nightly compiler build, the binary is distributed as a pre-built release artifact bundled with a matching sysroot — it cannot be compiled from source with an ordinary `cargo install`. The CLI downloads the correct version automatically on first use; the cached binary lives at `~/.forte/bin/forte-rs-to-ts-<version>` (shared across all projects on the machine).
 
 For each page handler (`rs/src/pages/<path>/mod.rs`), it generates:
 - `fe/src/pages/<path>/.props.ts` — the `Props` type as a TypeScript discriminated union

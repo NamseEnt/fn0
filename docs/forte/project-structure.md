@@ -99,14 +99,13 @@ Add `mod env_generated;` to `lib.rs` to use these. Values are read from the real
 
 ## Forte.toml
 
-Minimal project config:
+`forte init` writes an empty `Forte.toml` as a project marker. After the first `forte deploy`, the control-plane-assigned project ID is written back:
 
 ```toml
-[project]
-name = "my-app"
+project_id = "some-unique-id"
 ```
 
-The name determines the fn0 Cloud subdomain when deployed.
+The `project_id` field is the only recognized key. The project's display name is chosen interactively during the first `forte deploy` (or via `--name`) and stored in the control plane, not in `Forte.toml`.
 
 ## cron.yaml (optional)
 

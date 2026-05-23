@@ -29,11 +29,11 @@ pub fn read_and_validate(project_dir: &Path) -> Result<Vec<CronJob>> {
             );
         }
         let task_path = project_dir
-            .join("src/queue_task")
+            .join("rs/src/queue_task")
             .join(format!("{}.rs", entry.function));
         if !task_path.exists() {
             bail!(
-                "cron.yaml: function '{}' has no src/queue_task/{}.rs",
+                "cron.yaml: function '{}' has no rs/src/queue_task/{}.rs",
                 entry.function,
                 entry.function
             );
