@@ -72,12 +72,8 @@ The Cargo workspace root (`/Cargo.toml`) includes:
 
 ```toml
 [workspace]
-members = [
-    "fn0/*",
-    "forte/*",
-    "doc-db",
-]
-# Excluded: vendor/*, forte/rs-to-ts, fn0/control
+members = ["fn0/*", "forte/*", "doc-db", "object-storage"]
+exclude = ["vendor/*", "forte/rs-to-ts", "fn0/control"]
 ```
 
 `forte/rs-to-ts` and `fn0/control` are excluded from the workspace and must be built separately.
@@ -116,14 +112,4 @@ Scaling configuration: `scripts/scale-config.sh`
 
 ## Local Database
 
-For local development with `doc-db`, start the libSQL server:
-
-```sh
-docker-compose up -d   # libsql on port 8080
-```
-
-Environment variables (set in shell or `.env`):
-```
-TURSO_URL=http://127.0.0.1:8080
-TURSO_AUTH_TOKEN=
-```
+`forte dev` downloads and starts sqld automatically — no manual setup needed for Forte projects. For running `doc-db` tests directly, see [setup.md](setup.md#local-database-turlibsql).

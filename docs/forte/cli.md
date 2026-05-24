@@ -36,9 +36,13 @@ Start the development server with hot reload.
 | `-p, --project <dir>` | `.` | Project directory |
 
 Behavior:
+- Downloads and starts a local sqld (libSQL) server automatically; data persists in `.forte/data/`
 - Starts a Vite dev server for the frontend (HMR)
-- Serves the Rust backend by rebuilding on change
+- Rebuilds the Rust backend on `.rs` file changes
 - Handles SSR requests
+- Routes queue task messages locally (loopback; no external queue needed)
+- Serves object storage from `.forte/data/objects/` (no cloud credentials needed)
+- Fires cron jobs from `cron.yaml` at the appropriate minute boundaries
 
 ```sh
 forte dev
@@ -221,7 +225,7 @@ Place a `cron.yaml` file in the project root to schedule queue tasks. The file i
 ```
 
 Each entry:
-- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must be a unit struct (no fields).
+- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must take no arguments: either a unit struct (`pub struct Input;` or `pub struct Input {}`) or a type alias (`pub type Input = ();`).
 - `every_minutes` — run interval (must be ≥ 1).
 
-Cron jobs are not supported in local development (`forte dev`).
+Cron jobs run locally during `forte dev`: the CLI ticks at each minute boundary, reads `cron.yaml`, and enqueues matching tasks through the loopback queue.

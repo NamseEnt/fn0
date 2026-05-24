@@ -30,13 +30,18 @@ cargo install --path fn0/cli
 
 ## Local Database (Turso/libSQL)
 
-The `doc-db` crate connects to Turso/libSQL. A local development server is provided via Docker Compose:
+The `doc-db` crate connects to Turso/libSQL.
+
+**Forte projects:** `forte dev` downloads and starts sqld automatically — no manual setup needed. The database file is stored in `.forte/data/` inside your project directory. `TURSO_URL` and `TURSO_AUTH_TOKEN` are injected automatically and do not need to be set for local development.
+
+**Running `doc-db` tests directly** (outside of `forte dev`) requires a separately running libSQL server:
 
 ```sh
 docker-compose up -d   # starts libsql on port 8080
+cargo test -p doc-db
 ```
 
-Environment variables used by `doc-db`:
+Environment variables for direct `doc-db` usage:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -50,9 +55,10 @@ For production, set these to your Turso cloud credentials.
 | Variable | Required | Description |
 |---|---|---|
 | `COOKIE_SECRET` | Yes (if using `cookie_sign`) | HMAC secret for signed cookies |
-| `TURSO_URL` | No | Database URL (defaults to localhost) |
-| `TURSO_AUTH_TOKEN` | No | Database auth token |
-| `FN0_QUEUE_URL` | Only for queue tasks | Endpoint for enqueuing tasks |
+| `TURSO_URL` | No | Database URL; injected automatically by `forte dev` |
+| `TURSO_AUTH_TOKEN` | No | Database auth token; injected automatically by `forte dev` |
+| `FN0_QUEUE_URL` | No | Queue endpoint; injected automatically by `forte dev`; required in production if using queue tasks |
+| `FN0_OBJECT_STORAGE_URL` | No | Object storage endpoint; injected automatically by `forte dev`; required in production if using object storage |
 
 ## Creating a Forte Project
 
