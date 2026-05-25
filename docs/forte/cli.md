@@ -193,6 +193,9 @@ Same as `run` but targets a locally-running `forte dev` server.
 | Flag | Default | Description |
 |---|---|---|
 | `-P, --port <port>` | 3000 | Local dev server port |
+| `--input-file <file>` | — | Read input JSON from file |
+| `--input <json>` | — | Input JSON as string |
+| `--timeout-seconds <n>` | 300 | Timeout |
 
 ---
 

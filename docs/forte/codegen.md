@@ -55,9 +55,15 @@ Each handler type is discovered by statically parsing the Rust source:
 
 `src/pages/` and `src/apis/` are scanned recursively, so nested directory structures work for URL routing.
 
-Files named `mod.rs` inside these directories are skipped (they are generated).
+**`mod.rs` behavior differs by directory type:**
 
-The return type check for pages and APIs matches on the string representation of the return type: the type must contain both `"Result"` and `"Props"`. Name your return type `Props` (or any type alias that includes the word `Props`) to be discovered.
+- `src/pages/` and `src/apis/`: `mod.rs` at any subdirectory level is the handler for that directory (e.g., `pages/about/mod.rs` handles `/about`). It is **not** skipped.
+- `src/hooks/`, `src/queue_task/`, and `src/admin/`: the auto-generated `mod.rs` at the directory root is excluded from discovery.
+- `src/actions/`: the top-level `mod.rs` is excluded, but `<name>/mod.rs` inside a named subdirectory is a supported layout.
+
+Flat `.rs` files are also supported for pages and APIs. `pages/about.rs` is equivalent to `pages/about/mod.rs` and maps to `/about`.
+
+The return type check for pages and APIs matches on the string representation of the return type: the type must contain both `"Result"` and `"Props"`, or both `"Result"` and `"Redirect"`. Name your return type `Props` (or any type alias that includes the word `Props`) to be discovered.
 
 ### Route Mapping
 

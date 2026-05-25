@@ -8,10 +8,12 @@ Place page handlers under `rs/src/pages/`. The directory structure maps directly
 
 | File path | URL |
 |---|---|
-| `rs/src/pages/index/mod.rs` | `/` |
-| `rs/src/pages/about/mod.rs` | `/about` |
+| `rs/src/pages/index/mod.rs` or `rs/src/pages/index.rs` | `/` |
+| `rs/src/pages/about/mod.rs` or `rs/src/pages/about.rs` | `/about` |
 | `rs/src/pages/product/[id]/mod.rs` | `/product/:id` |
 | `rs/src/pages/blog/[year]/[slug]/mod.rs` | `/blog/:year/:slug` |
+
+Both directory modules (`about/mod.rs`) and flat files (`about.rs`) are supported. The directory layout is preferred for pages that need companion files.
 
 A page is discovered when its file contains `pub async fn handler`.
 

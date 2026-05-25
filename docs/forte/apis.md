@@ -116,7 +116,7 @@ pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
 
 Codegen discovers API endpoints by scanning `rs/src/apis/` recursively (including subdirectories). A file is included if it contains `pub async fn handler` with a return type containing both `"Result"` and `"Props"`.
 
-Files named `mod.rs` at the top of the `apis/` root are skipped.
+`mod.rs` at any subdirectory level maps to the handler for that directory (e.g., `apis/orders/mod.rs` → `/api/orders`). There is no generated `mod.rs` in the `apis/` directory.
 
 ## Differences from Page Handlers
 
