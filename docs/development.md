@@ -112,4 +112,4 @@ Scaling configuration: `scripts/scale-config.sh`
 
 ## Local Database
 
-`forte dev` downloads and starts sqld automatically — no manual setup needed for Forte projects. For running `doc-db` tests directly, see [setup.md](setup.md#local-database-turlibsql).
+`forte dev` downloads and starts sqld automatically — no manual setup needed for Forte projects. For running `doc-db` tests directly, see [setup.md](setup.md#local-database-tursolibsql).

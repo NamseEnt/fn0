@@ -221,17 +221,16 @@ Same as `run` but targets a locally-running `forte dev` server.
 
 ## Secrets
 
-The `forte` CLI has no `secrets` command. Manage secrets for deployed Forte apps using the `fn0` CLI:
+Use `forte env set <key> <value> --secret` to encrypt a value and write it to `env.yaml`. To list or remove entries, use the `fn0` CLI from the project directory:
 
 ```sh
-fn0 secrets set COOKIE_SECRET my-secret-value
-fn0 secrets list
-fn0 secrets unset COOKIE_SECRET
+fn0 env list
+fn0 env unset COOKIE_SECRET
 ```
 
-Secrets are injected as environment variables at runtime via `vault_hijack`. They are not available in `forte dev`; use a `.env` file for local development instead.
+Secrets are encrypted via fn0 Cloud's vault and decrypted in-worker at runtime. They are not available in `forte dev`; use a `.env` file for local development instead.
 
-See [fn0 CLI Reference](../fn0/overview.md#fn0-cli-commands) for full documentation.
+See [forte env](#forte-env-subcommand) above and [fn0 CLI Reference](../fn0/overview.md#fn0-cli-commands) for full `fn0 env` documentation.
 
 ---
 
