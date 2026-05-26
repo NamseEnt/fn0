@@ -1362,7 +1362,7 @@ ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
   -v /var/log/journal:/host/var/log/journal:ro \\
   -v /etc/machine-id:/etc/machine-id:ro \\
   -v /etc/fn0-alloy:/etc/fn0-alloy:ro \\
-  ${ALLOY_IMAGE_REF} run --server.http.listen-addr=127.0.0.1:12345 /etc/fn0-alloy/config.alloy
+  ${ALLOY_IMAGE_REF} run --stability.level=experimental --server.http.listen-addr=127.0.0.1:12345 /etc/fn0-alloy/config.alloy
 ExecStop=/usr/bin/podman stop fn0-alloy
 
 [Install]
