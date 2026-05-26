@@ -6,7 +6,7 @@ mod prompts;
 mod utils;
 
 use clap::Parser;
-use cli::{AdminCommands, Cli, Commands, DomainCommands, SecretsCommands};
+use cli::{AdminCommands, Cli, Commands, DomainCommands, EnvCommands};
 use color_eyre::Result;
 
 fn main() -> Result<()> {
@@ -67,15 +67,15 @@ async fn async_main() -> Result<()> {
                 commands::domain::status().await?;
             }
         },
-        Commands::Secrets { command } => match command {
-            SecretsCommands::Set { key, value } => {
-                commands::secrets::set(key, value).await?;
+        Commands::Env { command } => match command {
+            EnvCommands::Set { key, value, secret } => {
+                commands::env::set(key, value, secret).await?;
             }
-            SecretsCommands::List => {
-                commands::secrets::list().await?;
+            EnvCommands::List => {
+                commands::env::list().await?;
             }
-            SecretsCommands::Unset { key } => {
-                commands::secrets::unset(key).await?;
+            EnvCommands::Unset { key } => {
+                commands::env::unset(key).await?;
             }
         },
     }

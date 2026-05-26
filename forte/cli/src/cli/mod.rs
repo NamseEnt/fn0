@@ -5,6 +5,7 @@ pub mod cron;
 pub mod deploy;
 pub mod dev;
 pub mod domain;
+pub mod env;
 pub mod fe_runtime;
 pub mod init;
 pub mod login;
@@ -59,6 +60,23 @@ pub enum Commands {
         #[command(subcommand)]
         command: DomainCommands,
     },
+    Env {
+        #[command(subcommand)]
+        command: EnvCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum EnvCommands {
+    /// Set an env entry (plain by default, encrypted when --secret)
+    Set {
+        key: String,
+        value: String,
+        #[arg(long)]
+        secret: bool,
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -107,10 +125,6 @@ pub enum AdminCommands {
 
 #[derive(Subcommand)]
 pub enum AddCommands {
-    Page {
-        path: String,
-    },
-    Action {
-        path: String,
-    },
+    Page { path: String },
+    Action { path: String },
 }

@@ -5,8 +5,7 @@ mod tools;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AddCommands, AdminCommands, Cli, Commands, DomainCommands};
-
+use cli::{AddCommands, AdminCommands, Cli, Commands, DomainCommands, EnvCommands};
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -94,6 +93,18 @@ async fn async_main() -> Result<()> {
             DomainCommands::Status { project } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
                 cli::domain::status(project_dir).await?;
+            }
+        },
+
+        Commands::Env { command } => match command {
+            EnvCommands::Set {
+                key,
+                value,
+                secret,
+                project,
+            } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::env::set(&project_dir, key, value, secret).await?;
             }
         },
     }

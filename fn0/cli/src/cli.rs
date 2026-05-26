@@ -35,17 +35,24 @@ pub enum Commands {
         #[command(subcommand)]
         command: DomainCommands,
     },
-    Secrets {
+    Env {
         #[command(subcommand)]
-        command: SecretsCommands,
+        command: EnvCommands,
     },
 }
 
 #[derive(Subcommand)]
-pub enum SecretsCommands {
-    Set { key: String, value: String },
+pub enum EnvCommands {
+    Set {
+        key: String,
+        value: String,
+        #[arg(long)]
+        secret: bool,
+    },
     List,
-    Unset { key: String },
+    Unset {
+        key: String,
+    },
 }
 
 #[derive(Subcommand)]

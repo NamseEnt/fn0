@@ -80,9 +80,9 @@ The fn0 CLI (`fn0/cli`) provides tooling for projects deployed directly to fn0 w
 | `fn0 domain add <domain>` | Attach a custom domain (CNAME) |
 | `fn0 domain remove` | Detach the custom domain |
 | `fn0 domain status` | Show custom domain status |
-| `fn0 secrets set <key> <value>` | Set a secret (injected via vault_hijack at runtime) |
-| `fn0 secrets list` | List secret keys |
-| `fn0 secrets unset <key>` | Remove a secret |
+| `fn0 env set <key> <value> [--secret]` | Set an env entry (plain by default; `--secret` encrypts via vault and injects through vault_hijack at runtime) |
+| `fn0 env list` | List env entries with their kind (plain / secret) |
+| `fn0 env unset <key>` | Remove an env entry |
 
 > **Note:** Most Forte developers use `forte` CLI instead of `fn0` CLI. `fn0` CLI is for projects that use fn0 as a raw FaaS platform (e.g., Hono-based TypeScript apps).
 

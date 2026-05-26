@@ -170,6 +170,26 @@ forte domain remove
 
 ---
 
+### `forte env <subcommand>`
+
+Manage `env.yaml` entries for the project. Entries are bundled into the deploy and exposed as environment variables at runtime. Secret entries are encrypted via fn0 Cloud's vault and decrypted in-worker.
+
+| Subcommand | Description |
+|---|---|
+| `set <key> <value> [--secret]` | Set an env entry. Plain by default; `--secret` encrypts the value via the control vault (requires `forte login`). Silently overwrites an existing key. |
+
+| Flag | Default | Description |
+|---|---|---|
+| `--secret` | `false` | Encrypt the value as a secret entry |
+| `-p, --project <dir>` | `.` | Project directory |
+
+```sh
+forte env set PUBLIC_API_URL https://api.example.com
+forte env set DATABASE_PASSWORD hunter2 --secret
+```
+
+---
+
 ### `forte admin run <task> [options]`
 
 Run an admin task against the deployed app.

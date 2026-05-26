@@ -1,9 +1,10 @@
-pub mod cli_login;
-pub mod credentials;
 mod admin;
 mod bundle;
+pub mod cli_login;
+pub mod credentials;
 mod deploy;
 mod domain;
+pub mod env;
 mod name;
 mod project;
 mod static_files;
