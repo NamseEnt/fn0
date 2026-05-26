@@ -38,11 +38,8 @@ fn main() {
         );
     }
 
-    let workspace_root = PathBuf::from(&manifest_dir)
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("workspace root from forte/cli manifest dir")
-        .to_path_buf();
+    let workspace_root = resolve_workspace_root(Path::new(&manifest_dir))
+        .expect("workspace root from forte/cli manifest dir");
 
     let targets: &[(&str, &str, &str)] = &[
         ("FORTE_JSON_VERSION", "forte/json/Cargo.toml", "forte-json"),
@@ -75,18 +72,24 @@ fn resolve_target_dir(manifest_dir: &Path) -> PathBuf {
     if let Ok(t) = env::var("CARGO_TARGET_DIR") {
         return PathBuf::from(t);
     }
+    resolve_workspace_root(manifest_dir)
+        .map(|root| root.join("target"))
+        .unwrap_or_else(|| manifest_dir.join("target"))
+}
+
+fn resolve_workspace_root(manifest_dir: &Path) -> Option<PathBuf> {
     let mut dir = manifest_dir.parent();
     while let Some(d) = dir {
         let manifest = d.join("Cargo.toml");
         if manifest.exists() {
             let content = fs::read_to_string(&manifest).unwrap_or_default();
             if content.contains("[workspace]") {
-                return d.join("target");
+                return Some(d.to_path_buf());
             }
         }
         dir = d.parent();
     }
-    manifest_dir.join("target")
+    None
 }
 
 fn read_package_version(path: &Path, expected_name: &str) -> String {
