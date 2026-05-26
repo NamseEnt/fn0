@@ -164,7 +164,7 @@ impl WasiHttpHooks for SelfInvokeHooks {
         if let Some(hijack) = self.otlp_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return otlp_send(hijack, request, options);
+            return otlp_send(hijack, self.project_id.clone(), request, options);
         }
 
         if let Some(hijack) = self.object_storage_hijack.clone()
@@ -352,6 +352,7 @@ fn vault_send(
 
 fn otlp_send(
     hijack: Arc<OtlpHijack>,
+    project_id: String,
     mut request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
