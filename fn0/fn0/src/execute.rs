@@ -189,7 +189,6 @@ where
             wasi,
             http: WasiHttpCtx::new(),
             time_tracker,
-            project_id: project_id.to_string(),
             is_timeout,
             hooks,
         },
@@ -267,7 +266,6 @@ pub async fn run_wasm_instance_loop(
         })?;
     telemetry::stage_duration("instantiate", instantiate_start.elapsed());
 
-    let project_id_for_closure = project_id.clone();
     let run_result = store
         .run_concurrent(async move |accessor| -> Result<()> {
             let mut pending: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>> =
@@ -282,7 +280,6 @@ pub async fn run_wasm_instance_loop(
                                 let self_host = self_invoke::extract_host(req.headers())
                                     .unwrap_or_default();
                                 let service_ref = &service;
-                                let project_id = project_id_for_closure.clone();
                                 let time_tracker = time_tracker.clone();
                                 let is_timeout = is_timeout.clone();
                                 pending.push(Box::pin(async move {
@@ -301,7 +298,6 @@ pub async fn run_wasm_instance_loop(
                                                 service_ref,
                                                 p3_req,
                                                 req_io,
-                                                &project_id,
                                                 time_tracker,
                                                 &is_timeout,
                                             )
@@ -343,7 +339,6 @@ pub struct ClientState<C: Clock> {
     http: WasiHttpCtx,
     table: ResourceTable,
     pub(crate) time_tracker: TimeTracker<C>,
-    pub(crate) project_id: String,
     pub(crate) is_timeout: Arc<AtomicBool>,
     hooks: SelfInvokeHooks,
 }

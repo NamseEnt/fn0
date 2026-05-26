@@ -164,7 +164,7 @@ impl WasiHttpHooks for SelfInvokeHooks {
         if let Some(hijack) = self.otlp_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return otlp_send(hijack, self.project_id.clone(), request, options);
+            return otlp_send(hijack, request, options);
         }
 
         if let Some(hijack) = self.object_storage_hijack.clone()
@@ -173,7 +173,7 @@ impl WasiHttpHooks for SelfInvokeHooks {
             return object_storage_send(hijack, self.project_id.clone(), request, options);
         }
 
-        default_send(self.project_id.clone(), request, options)
+        default_send(request, options)
     }
 }
 
@@ -352,7 +352,6 @@ fn vault_send(
 
 fn otlp_send(
     hijack: Arc<OtlpHijack>,
-    project_id: String,
     mut request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
@@ -460,7 +459,6 @@ fn presign_request(
 }
 
 fn default_send(
-    project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
@@ -479,7 +477,6 @@ pub(crate) async fn call_service<C: Clock>(
     service: &Service,
     p3_req: P3Request,
     req_io: impl Future<Output = std::result::Result<(), ErrorCode>> + Send + 'static,
-    project_id: &str,
     time_tracker: TimeTracker<C>,
     is_timeout: &Arc<AtomicBool>,
 ) -> Result<Response> {
@@ -503,13 +500,12 @@ pub(crate) async fn call_service<C: Clock>(
             telemetry::proxy_returns_error_code(&format!("{ec:?}"));
             Err(anyhow!("proxy returned error code: {ec:?}"))
         }
-        Err(error) => Err(classify_wasm_error(error, project_id, is_timeout)),
+        Err(error) => Err(classify_wasm_error(error, is_timeout)),
     }
 }
 
 pub(crate) fn classify_wasm_error(
     error: wasmtime::Error,
-    project_id: &str,
     is_timeout: &Arc<AtomicBool>,
 ) -> anyhow::Error {
     match error.downcast::<wasmtime::Trap>() {
