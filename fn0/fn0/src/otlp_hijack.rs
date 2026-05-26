@@ -1,15 +1,18 @@
 use bytes::Bytes;
 use http_body_util::combinators::UnsyncBoxBody;
-use hyper::header::{AUTHORIZATION, HOST, HeaderValue};
+use hyper::header::{AUTHORIZATION, HOST, HeaderName, HeaderValue};
 use hyper::http::uri::Scheme;
 use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
+
+const PROJECT_ID_HEADER: HeaderName = HeaderName::from_static("x-fn0-project-id");
 
 #[derive(Clone, Debug)]
 pub struct OtlpHijack {
     pub placeholder_host: String,
+    pub target_scheme: Scheme,
     pub target_host: String,
     pub target_path_prefix: String,
-    pub auth: String,
+    pub auth: Option<String>,
 }
 
 impl OtlpHijack {
@@ -20,6 +23,7 @@ impl OtlpHijack {
     pub(crate) fn rewrite(
         &self,
         req: &mut hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+        caller_project_id: &str,
     ) -> Result<(), ErrorCode> {
         let original_path = req
             .uri()
@@ -29,7 +33,7 @@ impl OtlpHijack {
         let new_path = format!("{}{}", self.target_path_prefix, original_path);
 
         let new_uri = hyper::Uri::builder()
-            .scheme(Scheme::HTTPS)
+            .scheme(self.target_scheme.clone())
             .authority(self.target_host.as_str())
             .path_and_query(new_path.as_str())
             .build()
@@ -45,10 +49,20 @@ impl OtlpHijack {
                 .map_err(|_| ErrorCode::HttpRequestUriInvalid)?,
         );
 
-        let auth_value = format!("Basic {}", self.auth);
+        if let Some(auth) = &self.auth {
+            let auth_value = format!("Basic {auth}");
+            headers.insert(
+                AUTHORIZATION,
+                HeaderValue::from_str(&auth_value).map_err(|_| ErrorCode::HttpRequestDenied)?,
+            );
+        } else {
+            headers.remove(AUTHORIZATION);
+        }
+
         headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(&auth_value).map_err(|_| ErrorCode::HttpRequestDenied)?,
+            PROJECT_ID_HEADER,
+            HeaderValue::from_str(caller_project_id)
+                .map_err(|_| ErrorCode::HttpRequestDenied)?,
         );
 
         Ok(())

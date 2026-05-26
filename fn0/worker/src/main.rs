@@ -50,13 +50,23 @@ pub fn read_pem_env(name: &str) -> Option<String> {
 fn build_otlp_hijack() -> Arc<OtlpHijack> {
     let target_host =
         std::env::var("FN0_OTLP_TARGET_HOST").expect("FN0_OTLP_TARGET_HOST must be set");
-    let auth = std::env::var("FN0_OTLP_AUTH").expect("FN0_OTLP_AUTH must be set");
+    let target_scheme: hyper::http::uri::Scheme = std::env::var("FN0_OTLP_TARGET_SCHEME")
+        .expect("FN0_OTLP_TARGET_SCHEME must be set")
+        .parse()
+        .expect("FN0_OTLP_TARGET_SCHEME must be 'http' or 'https'");
+    let auth_raw = std::env::var("FN0_OTLP_AUTH").expect("FN0_OTLP_AUTH must be set");
+    let auth = if auth_raw.is_empty() {
+        None
+    } else {
+        Some(auth_raw)
+    };
     let target_path_prefix =
         std::env::var("FN0_OTLP_TARGET_PATH_PREFIX").unwrap_or_else(|_| "".to_string());
     let placeholder_host = std::env::var("FN0_OTLP_PLACEHOLDER_HOST")
         .unwrap_or_else(|_| "fn0-otel.fn0.dev".to_string());
     Arc::new(OtlpHijack {
         placeholder_host,
+        target_scheme,
         target_host,
         target_path_prefix,
         auth,

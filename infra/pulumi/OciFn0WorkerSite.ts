@@ -1045,14 +1045,6 @@ function buildWorkerEnv(
   cwasmBucket: OciCwasmBucketInfo,
   queue: OciQueueInfo,
 ): pulumi.Output<{ [k: string]: string }> {
-  const otlpParsed = pulumi.output(worker.otlp.endpoint).apply((u) => {
-    const url = new URL(u);
-    return {
-      targetHost: url.host,
-      targetPathPrefix: url.pathname.replace(/\/$/, ""),
-    };
-  });
-
   const vaultCredsEnv = pulumi
     .output(worker.vault.workerCredentials)
     .apply((c): { [k: string]: string } => ({
@@ -1112,9 +1104,10 @@ function buildWorkerEnv(
 
     OTLP_ENDPOINT: "http://127.0.0.1:4318",
     OTLP_BASIC_AUTH: worker.otlp.basicAuth,
-    FN0_OTLP_TARGET_HOST: otlpParsed.targetHost,
-    FN0_OTLP_TARGET_PATH_PREFIX: otlpParsed.targetPathPrefix,
-    FN0_OTLP_AUTH: worker.otlp.basicAuth,
+    FN0_OTLP_TARGET_HOST: "127.0.0.1:4318",
+    FN0_OTLP_TARGET_SCHEME: "http",
+    FN0_OTLP_TARGET_PATH_PREFIX: "",
+    FN0_OTLP_AUTH: "",
   };
 
   return pulumi
@@ -1220,15 +1213,37 @@ loki.write "default" {
 
 otelcol.receiver.otlp "default" {
   http {
-    endpoint = "127.0.0.1:4318"
+    endpoint         = "127.0.0.1:4318"
+    include_metadata = true
   }
   grpc {
-    endpoint = "127.0.0.1:4317"
+    endpoint         = "127.0.0.1:4317"
+    include_metadata = true
   }
   output {
-    metrics = [otelcol.processor.batch.default.input]
+    metrics = [otelcol.processor.attributes.fn0_stamping.input]
+    logs    = [otelcol.processor.attributes.fn0_stamping.input]
+    traces  = [otelcol.processor.attributes.fn0_stamping.input]
+  }
+}
+
+otelcol.processor.attributes "fn0_stamping" {
+  action {
+    key          = "fn0.project_id"
+    action       = "upsert"
+    from_context = "X-Fn0-Project-Id"
+  }
+  output {
+    metrics = [otelcol.processor.deltatocumulative.default.input]
     logs    = [otelcol.processor.batch.default.input]
     traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.deltatocumulative "default" {
+  max_stale = "5m"
+  output {
+    metrics = [otelcol.processor.batch.default.input]
   }
 }
 

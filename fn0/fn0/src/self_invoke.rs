@@ -356,7 +356,7 @@ fn otlp_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        if let Err(e) = hijack.rewrite(&mut request) {
+        if let Err(e) = hijack.rewrite(&mut request, &project_id) {
             return Err(e.into());
         }
 
