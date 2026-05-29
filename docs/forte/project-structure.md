@@ -7,7 +7,8 @@ A Forte project created by `forte init <name>` has the following layout:
 ├── Forte.toml                 # Project config (name, etc.)
 ├── Cargo.toml                 # Workspace root (members = ["rs"])
 ├── cron.yaml                  # (optional) Scheduled cron job definitions
-├── .env                       # (optional) Local env vars; drives env_generated.rs
+├── env.yaml                   # (optional) Production env vars; managed via `forte env set`
+├── .env                       # (optional) Local dev env vars; drives env_generated.rs (not bundled)
 ├── .gitignore
 │
 ├── rs/                        # Rust backend (compiles to WASM)
@@ -102,6 +103,30 @@ pub fn turso_url() -> &'static str { ... }
 ```
 
 Add `mod env_generated;` to `lib.rs` to use these. Values are read from the real environment at runtime; the `.env` file only determines which functions exist. See [codegen.md](codegen.md#generate_env-buildrs) for details.
+
+The `.env` file is for **local development only**. It is read by `forte dev` and by the build script, but it is not bundled during deploy. Use `env.yaml` for production environment variables.
+
+### `env.yaml` — Production Environment Variables (optional)
+
+`env.yaml` stores environment variables bundled into the deploy and injected at runtime. Entries can be plain strings or encrypted secrets:
+
+```yaml
+# env.yaml
+PUBLIC_API_URL: https://api.example.com
+DATABASE_PASSWORD:
+  secret: <ciphertext>          # written by `forte env set --secret`
+```
+
+Manage entries with:
+
+| Command | Description |
+|---|---|
+| `forte env set <key> <value>` | Add or overwrite a plain entry |
+| `forte env set <key> <value> --secret` | Add an encrypted secret (requires `forte login`) |
+| `fn0 env list` | List all entries with their kind |
+| `fn0 env unset <key>` | Remove an entry |
+
+`env.yaml` entries are **not** available in `forte dev`. For local development, put variables in `.env` instead.
 
 ## Forte.toml
 

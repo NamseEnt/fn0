@@ -62,12 +62,7 @@ import { submit } from "../../actions/.generated/submit";
 const result = await submit({ message: "hello" });
 ```
 
-The generated file exports:
-- `InputSchema` / `Input` — Zod schema and TypeScript type for the action input
-- `OutputSchema` / `Output` — Zod schema and TypeScript type for the action output
-- A `callAction` helper (or equivalent typed fetch function)
-
-Do not hand-write a TypeScript wrapper for actions — use the generated file.
+The generated file exports a named function in camelCase (`userLogin` for `user_login`, `submit` for `submit`) that calls the action and validates the response with Zod. Import it directly — do not hand-write a TypeScript wrapper.
 
 ## Accessing Cookies and Headers
 
@@ -92,13 +87,72 @@ pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Output {
 
 Cookie changes made in `req.jar` are written back to `Set-Cookie` response headers automatically.
 
-## Hooks (Self-Invoke)
+## Hooks
 
-Hooks are similar to actions but are invoked server-to-server (via `/__self_invoke/<name>`). They live under `rs/src/hooks/` and follow the same `Input` / `Output` / `handler` convention. They are called internally via the fn0 queue or control plane, not from the browser directly.
+Hooks are server-side data-fetching handlers. They live under `rs/src/hooks/` and follow the same `Input` / `Output` / `pub async fn handler` signature as actions. Unlike actions (which are called by user-triggered browser fetches), hooks are called during SSR: the JS SSR runtime posts to `/__self_invoke/<name>` to fetch data needed to render a page, and the results are embedded in the HTML and rehydrated on the client.
+
+### Rust handler
+
+```rust
+// rs/src/hooks/user_session.rs
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+pub struct Input {
+    pub session_token: String,
+}
+
+#[derive(Serialize)]
+pub enum Output {
+    Ok { user_id: String, name: String },
+    Unauthorized,
+}
+
+pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Output {
+    // validate session_token ...
+    Output::Ok {
+        user_id: "42".to_string(),
+        name: "Alice".to_string(),
+    }
+}
+```
+
+Key rules — same as actions:
+- `Input` must be a struct named exactly `Input`
+- `Output` must be a struct or enum named exactly `Output`
+- `handler` must be `pub async fn`, takes `ForteRequest<'_, Input>`
+- Codegen scans `src/hooks/` non-recursively; only flat `.rs` files (no subdirectory modules)
+
+### TypeScript client
+
+On the next `forte build` or `forte dev`, `forte-rs-to-ts` generates `fe/src/hooks/.generated/<CamelName>.ts` with a React Suspense hook:
+
+```ts
+// fe/src/hooks/.generated/UserSession.ts (auto-generated)
+export function useUserSession(input: Input): Output {
+  return useForteHook("user_session", input, OutputSchema);
+}
+```
+
+Use it in a React component (requires a `<Suspense>` boundary):
+
+```tsx
+import { useUserSession } from "../hooks/.generated/UserSession";
+
+function ProfileCard() {
+  const session = useUserSession({ sessionToken: getCookie("session") });
+  if (session.t === "Unauthorized") return null;
+  return <div>{session.name}</div>;
+}
+```
+
+During SSR the hook calls the WASM component server-side and embeds the result in `__FORTE_HOOK_CACHE__` in the HTML. On the client the cached value is read synchronously — no additional network request unless there is a cache miss.
+
+Hook inputs follow the same camelCase→snake_case conversion as actions (`sessionToken` in TypeScript → `session_token` in Rust).
 
 ## Deserialization: `forte_json` vs `serde_json`
 
-Action inputs are deserialized with `forte_json`, which converts camelCase keys from the browser to snake_case Rust field names. A TypeScript caller sending `{"userName": "alice"}` maps to a Rust field `pub user_name: String`.
+Action and hook inputs are deserialized with `forte_json`, which converts camelCase keys to snake_case Rust field names. A TypeScript caller sending `{"userName": "alice"}` maps to a Rust field `pub user_name: String`.
 
 Queue task and admin task inputs are deserialized with standard `serde_json` (no key conversion). Their struct field names must match the JSON keys exactly as sent by the caller — typically the generated `enqueue::*` functions (for queue tasks) or the `--input` JSON provided to `forte admin run` (for admin tasks). Use snake_case field names to match the default serde naming.
 
