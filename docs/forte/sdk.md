@@ -124,6 +124,29 @@ let t: DateTime = now(); // current UTC time
 
 Also re-exports the `time` crate for use with cookie max-age.
 
+## Async Sleep and Monotonic Time (`time_wasi`)
+
+`forte_sdk::time_wasi` provides WASI-backed async sleep and monotonic time measurement. Use these instead of `std::thread::sleep` (which blocks) or `tokio::time::sleep` (which is not available in WASM components).
+
+```rust
+use forte_sdk::time_wasi;
+
+// Async sleep
+time_wasi::sleep(time_wasi::Duration::from_secs(1)).await;
+
+// Measure elapsed time
+let start = time_wasi::Instant::now().await;
+// ... do work ...
+let elapsed: time_wasi::Duration = start.elapsed().await;
+```
+
+API:
+- `time_wasi::sleep(duration: Duration)` — suspend the current task for `duration`
+- `time_wasi::Instant::now() -> Instant` — current monotonic time (async)
+- `time_wasi::Instant::duration_since(&self, earlier: Instant) -> Duration` — time between two instants
+- `time_wasi::Instant::elapsed(&self) -> Duration` — time since this instant was recorded (async)
+- `time_wasi::Duration` — re-exported `std::time::Duration`
+
 ## UUID
 
 ```rust

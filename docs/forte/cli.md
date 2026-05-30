@@ -129,6 +129,18 @@ The TypeScript client is generated automatically by `forte-rs-to-ts` on the next
 
 ---
 
+### Adding hooks, queue tasks, and admin tasks
+
+There are no `forte add hook`, `forte add queue-task`, or `forte add admin` commands. Create these files manually:
+
+- Hooks: `rs/src/hooks/<name>.rs` — follow the `Input` / `Output` / `pub async fn handler` pattern (see [actions.md](actions.md#hooks))
+- Queue tasks: `rs/src/queue_task/<name>.rs` — follow the `Input` / `pub async fn handle` pattern
+- Admin tasks: `rs/src/admin/<name>.rs` — follow the `Input` / `pub async fn handle` pattern
+
+Codegen picks them up automatically on the next build; no `mod` declaration needed in `lib.rs`.
+
+---
+
 ### `forte login`
 
 Authenticate with fn0 Cloud using a PKCE OAuth flow and saves credentials locally (shared with the `fn0` CLI).
