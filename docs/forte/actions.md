@@ -123,6 +123,8 @@ Key rules — same as actions:
 - `handler` must be `pub async fn`, takes `ForteRequest<'_, Input>`
 - Codegen scans `src/hooks/` non-recursively; only flat `.rs` files (no subdirectory modules)
 
+> **There is no `forte add hook` command.** Create hook files manually. There is also no need to add a `mod` declaration in `lib.rs` — codegen adds it automatically via the generated `route_generated.rs`.
+
 ### TypeScript client
 
 On the next `forte build` or `forte dev`, `forte-rs-to-ts` generates `fe/src/hooks/.generated/<CamelName>.ts` with a React Suspense hook:
