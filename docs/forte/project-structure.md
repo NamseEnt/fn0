@@ -138,6 +138,30 @@ Manage entries with:
 
 `env.yaml` entries are **not** available in `forte dev`. For local development, put variables in `.env` instead.
 
+## fe/src/app.tsx — Head Component
+
+`app.tsx` exports a named `Head` function (no default export, no props) whose return value is rendered as the `<head>` content for every page. The SSR runtime calls `<Head />` once per request before writing the HTML stream.
+
+`forte init` generates:
+
+```tsx
+// fe/src/app.tsx
+export function Head() {
+    return (
+        <>
+            <meta charSet="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>My App</title>
+        </>
+    );
+}
+```
+
+Rules:
+- Must be a named export `Head` (not a default export)
+- Must take no props
+- The return value is inserted inside `<head>…</head>` — do not return a `<head>` element itself
+
 ## fe/forte.config.ts (optional)
 
 If `fe/forte.config.ts` exists, its default export is merged over the generated `fe/.forte/vite.config.ts` via Vite's `mergeConfig`. Use this to add Vite plugins, aliases, or other build settings without editing generated files:

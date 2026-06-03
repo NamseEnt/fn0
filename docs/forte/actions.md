@@ -152,6 +152,23 @@ During SSR the hook calls the WASM component server-side and embeds the result i
 
 Hook inputs follow the same camelCase→snake_case conversion as actions (`sessionToken` in TypeScript → `session_token` in Rust).
 
+### Invalidating hook cache
+
+After a mutation (e.g., a successful action), call `clearHookCache` from `@forte/react` to evict cached results so the next render re-fetches from the server:
+
+```tsx
+import { clearHookCache } from "@forte/react";
+
+async function handleSubmit() {
+  await submitAction({ message: "hello" });
+  clearHookCache("user_session"); // evict one hook by name
+  // clearHookCache();            // evict all hooks
+  // re-render to trigger Suspense re-fetch
+}
+```
+
+`clearHookCache(hookName?)` removes entries whose cache key starts with `hookName`. Call it with no argument to evict all cached hooks.
+
 ## Deserialization: `forte_json` vs `serde_json`
 
 Action and hook inputs are deserialized with `forte_json`, which converts camelCase keys to snake_case Rust field names. A TypeScript caller sending `{"userName": "alice"}` maps to a Rust field `pub user_name: String`.

@@ -67,6 +67,9 @@ let req = Request::builder()
 let resp = client.send(req).await?;
 let status = resp.status();
 let body = resp.into_body().bytes().await;
+
+// Or deserialize the JSON response body directly:
+let data: MyType = resp.into_body().json::<MyType>().await?;
 ```
 
 Limitations:
