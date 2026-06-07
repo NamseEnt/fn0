@@ -42,7 +42,7 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 | Package | Version | Crate | Purpose |
 |---|---|---|---|
 | `forte-sdk` | 0.3.6 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
-| `forte-cli` | 0.3.35 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
+| `forte-cli` | 0.3.37 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
 | `forte-macros` | 0.5.2 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
 | `forte-json` | 0.1.1 | `forte/json` | Streaming JSON serializer used for Props serialization |
 | `forte-codegen` | 0.1.3 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
@@ -51,6 +51,16 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 ## Project Structure
 
 See [project-structure.md](project-structure.md) for the full layout.
+
+## Runtime Constraints
+
+Forte backends run inside a single WASM instance that is reused across many concurrent requests (Cloudflare Workers model):
+
+- **No multi-threading.** Use `async`/`await` for concurrency. `std::thread::spawn` and `tokio` are not available in `wasm32-wasip2`.
+- **Stateless handlers.** Module-level mutable state must not carry information between requests — another request may be interleaved at any `await` point. Module-level initialization runs once; per-request state belongs inside the handler.
+- **No `std::thread::sleep`.** Use `forte_sdk::time_wasi::sleep` instead.
+
+fn0 does not enforce statefulness — violating the stateless constraint causes request-level data leakage.
 
 ## Workflow Overview
 
