@@ -180,6 +180,8 @@ Manage custom domains for the deployed project.
 | `remove` | Detach the custom domain |
 | `status` | Show custom domain status |
 
+All subcommands accept `-p, --project <dir>` (default: `.`) to specify the project directory.
+
 ```sh
 forte domain add www.example.com
 forte domain status
@@ -230,6 +232,7 @@ Same as `run` but targets a locally-running `forte dev` server.
 
 | Flag | Default | Description |
 |---|---|---|
+| `task` | — | Task name (matches `rs/src/admin/<name>.rs`) |
 | `-P, --port <port>` | 3000 | Local dev server port |
 | `--input-file <file>` | — | Read input JSON from file |
 | `--input <json>` | — | Input JSON as string |
