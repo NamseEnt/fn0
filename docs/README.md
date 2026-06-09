@@ -16,6 +16,7 @@ Forte is the full-stack web framework built on fn0.
 - [Actions & Tasks](forte/actions.md) — Server actions, hooks, queue tasks, admin tasks
 - [SDK Reference](forte/sdk.md) — `ForteRequest`, HTTP client, cookies, re-exported crates
 - [Code Generation](forte/codegen.md) — How `forte-codegen` and `forte-rs-to-ts` work
+- [Testing](forte/testing.md) — `#[forte_sdk::test]`, in-memory DB/storage, testing handlers
 
 ## doc-db
 

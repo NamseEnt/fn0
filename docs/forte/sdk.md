@@ -152,9 +152,11 @@ API:
 
 ## UUID
 
+forte-sdk enables the uuid `v7` feature. Use `now_v7()` to generate a time-ordered UUID:
+
 ```rust
 use forte_sdk::Uuid;
-let id = Uuid::new_v4();
+let id = Uuid::now_v7();
 ```
 
 ## Randomness

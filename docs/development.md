@@ -47,12 +47,28 @@ This macro uses `forte_sdk::runtime::block_on` which is compatible with the WASI
 
 ### doc-db integration tests
 
-Require a running libSQL server:
+`doc-db` and `object-storage` compile to `wasm32-wasip2` for tests (configured in their `.cargo/config.toml`). Two prerequisites:
+
+1. **`forte-test-runner` in PATH** — the configured WASM test runner. Install from the monorepo:
+
+```sh
+cargo install --path forte/test-runner
+```
+
+2. **Running libSQL server**:
 
 ```sh
 docker-compose up -d
-cargo test -p doc-db
 ```
+
+Then run the tests:
+
+```sh
+cargo test -p fn0-doc-db
+cargo test -p fn0-object-storage
+```
+
+`forte-sdk` and other non-WASM crates do not require the test runner and run with the default host target.
 
 ## Build Targets
 
