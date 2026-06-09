@@ -131,7 +131,7 @@ Creates:
 
 The TypeScript client is generated automatically by `forte-rs-to-ts` on the next `forte build` or `forte dev`. Import from `fe/src/actions/.generated/<name>.ts`.
 
-> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen only scans the top-level `src/actions/` directory. That file will never be discovered. Use `forte add action user_login` instead (or the directory-module layout `user_login/mod.rs` if you need to split the file).
+> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs`, but codegen only discovers handlers at `actions/<name>.rs` (flat file) or `actions/<name>/mod.rs` (directory module) — nested files like `actions/user/login.rs` are never discovered. Use `forte add action user_login` instead (or create `actions/user_login/mod.rs` manually if you need to split the file across multiple modules).
 
 ---
 
@@ -281,7 +281,7 @@ Place a `cron.yaml` file in the project root to schedule queue tasks. The file i
 ```
 
 Each entry:
-- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must take no arguments: either a unit struct (`pub struct Input;` or `pub struct Input {}`) or a type alias (`pub type Input = ();`).
+- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must be a unit struct with no fields (`pub struct Input;` or `pub struct Input {}`).
 - `every_minutes` — run interval (must be ≥ 1).
 
 Cron jobs run locally during `forte dev`: the CLI ticks at each minute boundary, reads `cron.yaml`, and enqueues matching tasks through the loopback queue.
