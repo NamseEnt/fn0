@@ -142,7 +142,7 @@ runner = "forte-test-runner"
 Then install the runner and run:
 
 ```sh
-cargo install --path <monorepo>/forte/test-runner   # or cargo binstall if published
+cargo install --path <monorepo>/forte/test-runner
 cargo test
 ```
 
