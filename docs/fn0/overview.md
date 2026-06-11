@@ -53,12 +53,12 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.2.41 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
-| `fn0-cli` | 0.1.4 | Local development CLI |
-| `fn0-worker` | 0.3.45 | Worker binary (distributed execution node) |
+| `fn0` | 0.2.42 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0-cli` | 0.1.5 | Local development CLI |
+| `fn0-worker` | 0.3.46 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.5 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.0 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
-| `fn0-deploy` | 0.1.10 | fn0 Cloud deployment client |
+| `fn0-deploy` | 0.1.12 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.1.3 | Wasmtime wrapper with fn0-specific config |
 | `fn0-ski` | 0.1.6 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | Compiler utilities (internal) |
@@ -119,8 +119,9 @@ For self-hosted fn0 worker deployments, configure the OTLP endpoint via environm
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname (e.g. your Grafana Cloud OTLP host) |
-| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth credentials (`user:token`) |
+| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname (e.g. your Alloy or Grafana Cloud OTLP host) |
+| `FN0_OTLP_TARGET_SCHEME` | Yes | — | URL scheme for the OTLP collector: `http` or `https` |
+| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth credentials (`user:token`); use empty string for unauthenticated |
 | `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every OTLP request path |
 | `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname used inside WASM apps |
 

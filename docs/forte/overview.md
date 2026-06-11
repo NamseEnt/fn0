@@ -42,7 +42,7 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 | Package | Version | Crate | Purpose |
 |---|---|---|---|
 | `forte-sdk` | 0.3.6 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
-| `forte-cli` | 0.3.35 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
+| `forte-cli` | 0.3.37 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
 | `forte-macros` | 0.5.2 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
 | `forte-json` | 0.1.1 | `forte/json` | Streaming JSON serializer used for Props serialization |
 | `forte-codegen` | 0.1.3 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
@@ -51,6 +51,29 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 ## Project Structure
 
 See [project-structure.md](project-structure.md) for the full layout.
+
+## Runtime Constraints
+
+Forte backends run inside a single WASM instance that is reused across many concurrent requests (Cloudflare Workers model):
+
+- **No multi-threading.** Use `async`/`await` for concurrency. `std::thread::spawn` and `tokio` are not available in `wasm32-wasip2`.
+- **Stateless handlers.** Module-level mutable state must not carry information between requests — another request may be interleaved at any `await` point. Module-level initialization runs once; per-request state belongs inside the handler.
+- **No `std::thread::sleep`.** Use `forte_sdk::time_wasi::sleep` instead.
+
+fn0 does not enforce statefulness — violating the stateless constraint causes request-level data leakage.
+
+## Handler Types Quick Reference
+
+| Type | Location | Route | When to use |
+|---|---|---|---|
+| Page | `rs/src/pages/` | `GET /<path>` | Server-renders a React component; returns `Props` to the SSR step |
+| API | `rs/src/apis/` | `GET /api/<path>` | Returns JSON directly; no React rendering |
+| Action | `rs/src/actions/` | `POST /__forte_action/<name>` | Mutation or query called from the browser via the generated typed client |
+| Hook | `rs/src/hooks/` | `POST /__self_invoke/<name>` | Data fetch called during SSR; result is embedded in the HTML and rehydrated on the client |
+| Queue task | `rs/src/queue_task/` | internal | Background job enqueued with `enqueue::<name>(input)` |
+| Admin task | `rs/src/admin/` | internal | One-off operation run via `forte admin run <name>` |
+
+See the full handler docs: [Pages](pages.md), [API Endpoints](apis.md), [Actions & Tasks](actions.md).
 
 ## Workflow Overview
 

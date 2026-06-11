@@ -162,6 +162,8 @@ pub struct User {
 }
 ```
 
+`#[forte_doc]` automatically adds `#[derive(serde::Serialize, serde::Deserialize, Clone)]` to the struct. Do not add those derives manually — it will fail to compile.
+
 This generates:
 - `UserPut(User)` — implements `DbRequest<Output = ()>` to put the document
 - `UserGet` — struct with PK/SK fields; implements `DbRequest<Output = Option<User>>`
@@ -171,7 +173,20 @@ This generates:
 
 ### Key Formatting
 
-Keys are formatted as `TypeName/pk_field=value&…`. Integer fields are zero-padded to preserve lexicographic sort order (e.g. `u32` → 10 digits). Signed integers are offset-encoded (added `|T::MIN|`) before padding.
+Keys are formatted as `TypeName/pk_field=value&…`. Integer fields are zero-padded to preserve lexicographic sort order so that string comparison matches numeric order. Signed integers are offset-encoded (shifted by `|T::MIN|`) before padding.
+
+| Type | Width | Example (`42`) |
+|---|---|---|
+| `u8` | 3 | `042` |
+| `u16` | 5 | `00042` |
+| `u32` | 10 | `0000000042` |
+| `u64` / `usize` | 20 | `00000000000000000042` |
+| `i8` | 3 (offset +128) | `170` |
+| `i16` | 5 (offset +32768) | `32810` |
+| `i32` | 10 (offset +2147483648) | `2147483690` |
+| `i64` / `isize` | 20 (offset +2^63) | `09223372036854775850` |
+
+`String` and `&str` fields are used as-is (no padding).
 
 Example PK for `User { id: "alice" }` → `"User/id=alice"`.
 
