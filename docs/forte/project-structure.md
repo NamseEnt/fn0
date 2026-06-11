@@ -195,7 +195,7 @@ Place this file in the project root to schedule queue tasks on fn0 Cloud. Regist
   every_minutes: 60
 ```
 
-Each `function` must match a `rs/src/queue_task/<name>.rs` file whose `Input` is a unit struct. See [forte/cli.md#cron-jobs](cli.md#cron-jobs).
+Each `function` must match a `rs/src/queue_task/<name>.rs` file whose `Input` is empty (unit struct or `pub type Input = ();`). See [forte/cli.md#cron-jobs](cli.md#cron-jobs).
 
 ## rs/Cargo.toml
 

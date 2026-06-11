@@ -86,6 +86,12 @@ Build and upload the project to fn0 Cloud.
 
 If a `cron.yaml` file exists in the project root, its scheduled jobs are registered during deploy. See [Cron Jobs](#cron-jobs) below.
 
+Deploy steps (in addition to `forte build`):
+1. **Registers project** — on first deploy, prompts for a display name and saves the assigned `project_id` to `Forte.toml`.
+2. **Uploads static assets** — `fe/dist/` (client JS/CSS/assets) is uploaded to the fn0 Cloud CDN at `https://<project_id>.static.fn0.dev/<code_version>/`. The `VITE_PUBLIC_URL` env var is set to this URL during the Vite client build so asset references resolve correctly.
+3. **Uploads backend bundle** — packages `dist/backend.wasm`, `dist/server.js`, and `env.yaml` into `dist/bundle.raw.tar` and uploads it to the fn0 Cloud control plane.
+4. **Registers cron jobs** — if `cron.yaml` exists, schedules are synced.
+
 ```sh
 forte deploy
 forte deploy --name "My App"
@@ -125,7 +131,7 @@ Creates:
 
 The TypeScript client is generated automatically by `forte-rs-to-ts` on the next `forte build` or `forte dev`. Import from `fe/src/actions/.generated/<name>.ts`.
 
-> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs` (a subdirectory), but codegen only scans the top-level `src/actions/` directory. That file will never be discovered. Use `forte add action user_login` instead (or the directory-module layout `user_login/mod.rs` if you need to split the file).
+> **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs`, but codegen only discovers handlers at `actions/<name>.rs` (flat file) or `actions/<name>/mod.rs` (directory module) — nested files like `actions/user/login.rs` are never discovered. Use `forte add action user_login` instead (or create `actions/user_login/mod.rs` manually if you need to split the file across multiple modules).
 
 ---
 
@@ -173,6 +179,8 @@ Manage custom domains for the deployed project.
 | `add <domain>` | Attach a custom domain (CNAME-based) |
 | `remove` | Detach the custom domain |
 | `status` | Show custom domain status |
+
+All subcommands accept `-p, --project <dir>` (default: `.`) to specify the project directory.
 
 ```sh
 forte domain add www.example.com
@@ -224,6 +232,7 @@ Same as `run` but targets a locally-running `forte dev` server.
 
 | Flag | Default | Description |
 |---|---|---|
+| `task` | — | Task name (matches `rs/src/admin/<name>.rs`) |
 | `-P, --port <port>` | 3000 | Local dev server port |
 | `--input-file <file>` | — | Read input JSON from file |
 | `--input <json>` | — | Input JSON as string |
@@ -242,6 +251,19 @@ fn0 env unset COOKIE_SECRET
 
 Secrets are encrypted via fn0 Cloud's vault and decrypted in-worker at runtime. They are not available in `forte dev`; use a `.env` file for local development instead.
 
+### env.yaml format
+
+`forte env set` manages `env.yaml` for you. The file is a YAML mapping of key → value, where plain values are strings and secret values are a nested mapping with a `secret` key:
+
+```yaml
+# env.yaml — managed by `forte env set`
+PUBLIC_API_URL: https://api.example.com
+STRIPE_SECRET_KEY:
+  secret: <ciphertext written by forte env set --secret>
+```
+
+Do not edit the `__dek` key (auto-managed data-encryption-key entry). Plain values are available as environment variables in the deployed app; secret values are decrypted at runtime by the worker.
+
 See [forte env](#forte-env-subcommand) above and [fn0 CLI Reference](../fn0/overview.md#fn0-cli-commands) for full `fn0 env` documentation.
 
 ---
@@ -259,7 +281,7 @@ Place a `cron.yaml` file in the project root to schedule queue tasks. The file i
 ```
 
 Each entry:
-- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must take no arguments: either a unit struct (`pub struct Input;` or `pub struct Input {}`) or a type alias (`pub type Input = ();`).
+- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must be empty — either a unit struct (`pub struct Input;` or `pub struct Input {}`) or the type alias `pub type Input = ();`.
 - `every_minutes` — run interval (must be ≥ 1).
 
 Cron jobs run locally during `forte dev`: the CLI ticks at each minute boundary, reads `cron.yaml`, and enqueues matching tasks through the loopback queue.
