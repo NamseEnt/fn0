@@ -132,7 +132,7 @@ Codegen discovers API endpoints by scanning `rs/src/apis/` recursively (includin
 
 When the handler returns `Err(e)`:
 - If `e` downcasts to `Redirect`, the response is HTTP 302 with a `Location` header.
-- Otherwise, the response is HTTP 500 with the error debug string in the body. The error is also printed to stderr.
+- Otherwise, the error is printed to stderr via `eprintln!` and the client receives HTTP 500 with body `"Internal Server Error"` (the error detail is not sent to the client).
 
 ## `paths.generated.ts`
 

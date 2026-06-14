@@ -143,6 +143,20 @@ pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
 
 `Redirect` is a generated enum with one variant per page. `Redirect::External { url }` redirects to an arbitrary URL.
 
+## Error Handling
+
+If a handler returns `Err` and the error is not a `Redirect`, the error is logged to stderr and the client receives HTTP 500 "Internal Server Error". The error message does not reach the client. Use structured logging (`tracing::error!`) to capture errors with span context, since `eprintln!` output only goes to the worker's stderr.
+
+```rust
+pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
+    let data = fetch_data().await.map_err(|e| {
+        tracing::error!(error = ?e, "fetch_data failed");
+        e   // Err propagates to HTTP 500
+    })?;
+    Ok(Props::Ok { data })
+}
+```
+
 ## Cookies
 
 Read and write cookies via `req.jar`:
