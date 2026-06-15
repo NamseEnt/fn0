@@ -39,6 +39,7 @@ Behavior:
 - Downloads and starts a local sqld (libSQL) server automatically; data persists in `.forte/data/`
 - Starts a Vite dev server for the frontend (HMR)
 - Rebuilds the Rust backend on `.rs` file changes
+- Hot-reloads `.env` on change — updated variable values take effect on the next request without a Rust rebuild (adding a new variable still requires `cargo build` if using `generate_env()`)
 - Handles SSR requests
 - Routes queue task messages locally (loopback; no external queue needed)
 - Serves object storage from `.forte/data/objects/` (no cloud credentials needed)

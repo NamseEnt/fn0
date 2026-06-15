@@ -29,7 +29,7 @@ cargo test
 
 # Single crate
 cargo test -p forte-sdk
-cargo test -p doc-db
+cargo test -p fn0-doc-db
 ```
 
 ### Async tests in forte-sdk / backend crates
