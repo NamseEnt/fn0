@@ -148,6 +148,18 @@ Codegen picks them up automatically on the next build; no `mod` declaration need
 
 ---
 
+### Adding hooks, queue tasks, and admin tasks
+
+There are no `forte add hook`, `forte add queue-task`, or `forte add admin` commands. Create these files manually:
+
+- Hooks: `rs/src/hooks/<name>.rs` — follow the `Input` / `Output` / `pub async fn handler` pattern (see [actions.md](actions.md#hooks))
+- Queue tasks: `rs/src/queue_task/<name>.rs` — follow the `Input` / `pub async fn handle` pattern
+- Admin tasks: `rs/src/admin/<name>.rs` — follow the `Input` / `pub async fn handle` pattern
+
+Codegen picks them up automatically on the next build; no `mod` declaration needed in `lib.rs`.
+
+---
+
 ### `forte login`
 
 Authenticate with fn0 Cloud using a PKCE OAuth flow and saves credentials locally (shared with the `fn0` CLI).
@@ -252,6 +264,7 @@ fn0 env unset COOKIE_SECRET
 
 Secrets are encrypted via fn0 Cloud's vault and decrypted in-worker at runtime. They are not available in `forte dev`; use a `.env` file for local development instead.
 
+
 ### env.yaml format
 
 `forte env set` manages `env.yaml` for you. The file is a YAML mapping of key → value, where plain values are strings and secret values are a nested mapping with a `secret` key:
@@ -264,6 +277,7 @@ STRIPE_SECRET_KEY:
 ```
 
 Do not edit the `__dek` key (auto-managed data-encryption-key entry). Plain values are available as environment variables in the deployed app; secret values are decrypted at runtime by the worker.
+
 
 See [forte env](#forte-env-subcommand) above and [fn0 CLI Reference](../fn0/overview.md#fn0-cli-commands) for full `fn0 env` documentation.
 
