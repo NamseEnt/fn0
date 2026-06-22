@@ -62,6 +62,20 @@ Forte backends run inside a single WASM instance that is reused across many conc
 
 fn0 does not enforce statefulness — violating the stateless constraint causes request-level data leakage.
 
+## Handler Types Quick Reference
+
+| Type | Location | Route | When to use |
+|---|---|---|---|
+| Page | `rs/src/pages/` | `GET /<path>` | Server-renders a React component; returns `Props` to the SSR step |
+| API | `rs/src/apis/` | `/api/<path>` | Returns JSON directly; no React rendering; any HTTP method |
+| Action | `rs/src/actions/` | `POST /__forte_action/<name>` | Mutation or query called from the browser via the generated typed client |
+| Hook | `rs/src/hooks/` | `POST /__self_invoke/<name>` | Data fetch called during SSR; result is embedded in the HTML and rehydrated on the client |
+| Queue task | `rs/src/queue_task/` | internal | Background job enqueued with `enqueue::<name>(input)` |
+| Admin task | `rs/src/admin/` | internal | One-off operation run via `forte admin run <name>` |
+
+See the full handler docs: [Pages](pages.md), [API Endpoints](apis.md), [Actions & Tasks](actions.md).
+
+
 ## Workflow Overview
 
 1. `forte init <name>` — scaffold a new project

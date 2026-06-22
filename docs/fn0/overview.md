@@ -145,8 +145,11 @@ These are configured on `ExecutionContext` via builder methods:
 
 ```rust
 let ctx = ExecutionContext::new(engine, linker, bundle_cache)
-    .with_turso_hijack(turso_config)
-    .with_otlp_hijack(otlp_config)
-    .with_cross_project_enqueue_hijack(enqueue_config)
-    .with_cross_project_invoke_hijack(invoke_config);
+    .with_turso_hijack(turso_hijack)
+    .with_otlp_hijack(otlp_hijack)
+    .with_queue_hijack(queue_hijack)
+    .with_cross_project_enqueue_hijack(enqueue_hijack)
+    .with_cross_project_invoke_hijack(invoke_hijack)
+    .with_vault_hijack(vault_hijack)
+    .with_object_storage_hijack(object_storage_hijack);
 ```

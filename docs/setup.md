@@ -14,17 +14,25 @@ rustup target add wasm32-wasip2
 
 ### Install forte CLI
 
-Build from source (the CLI is in the `forte/cli` crate):
+Option A — `cargo binstall` (downloads a pre-built binary):
+
+```sh
+cargo binstall forte-cli
+```
+
+Option B — build from source (requires the monorepo):
 
 ```sh
 cargo install --path forte/cli
 ```
 
-Or download a pre-built binary from the GitHub releases if available.
+Pre-built binaries for `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`, and `aarch64-unknown-linux-gnu` are published to GitHub Releases on every version tag and picked up automatically by `cargo binstall`.
 
-### Install fn0 CLI (optional, for running fn0 locally)
+### Install fn0 CLI (optional, for raw fn0 projects without Forte)
 
 ```sh
+cargo binstall fn0-cli
+# or from source:
 cargo install --path fn0/cli
 ```
 

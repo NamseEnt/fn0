@@ -8,9 +8,11 @@ Files in `rs/src/apis/` map to routes prefixed with `/api/`. Discovery is recurs
 
 | File path | Route |
 |---|---|
-| `rs/src/apis/users.rs` | `GET /api/users` |
-| `rs/src/apis/products.rs` | `GET /api/products` |
-| `rs/src/apis/orders/[id]/mod.rs` | `GET /api/orders/:id` |
+| `rs/src/apis/users.rs` | `/api/users` |
+| `rs/src/apis/products.rs` | `/api/products` |
+| `rs/src/apis/orders/[id]/mod.rs` | `/api/orders/:id` |
+
+The generated router does not constrain HTTP methods for API routes — the handler receives the request for any verb. Check `req.method` inside the handler if you need to distinguish `GET` vs `POST`, etc.
 
 There is no `forte add api` command. Create files manually.
 
@@ -132,7 +134,7 @@ Codegen discovers API endpoints by scanning `rs/src/apis/` recursively (includin
 
 When the handler returns `Err(e)`:
 - If `e` downcasts to `Redirect`, the response is HTTP 302 with a `Location` header.
-- Otherwise, the response is HTTP 500 with the error debug string in the body. The error is also printed to stderr.
+- Otherwise, the error is printed to stderr via `eprintln!` and the client receives HTTP 500 with body `"Internal Server Error"` (the error detail is not sent to the client).
 
 ## `paths.generated.ts`
 
