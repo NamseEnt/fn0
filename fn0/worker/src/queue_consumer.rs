@@ -7,7 +7,7 @@ use oci_rust_sdk::auth::{RequestSigner, SimpleAuthProvider, SimpleAuthProviderRe
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{Semaphore, mpsc, oneshot};
 
 use crate::worker_pool::{self, DispatchError, RequestEnvelope};
 
@@ -15,6 +15,7 @@ const PUT_MESSAGES_API_VERSION: &str = "20210201";
 const LONG_POLL_TIMEOUT_SECS: u32 = 30;
 const VISIBILITY_SECS: u32 = 60;
 const MAX_MESSAGES_PER_FETCH: u32 = 8;
+const MAX_CONCURRENT_DISPATCH: usize = 32;
 
 pub struct QueueConsumerConfig {
     pub queue_ocid: String,
@@ -87,23 +88,32 @@ pub async fn run(
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
 ) {
     let consumer = match Consumer::new(config) {
-        Ok(c) => c,
+        Ok(c) => Arc::new(c),
         Err(err) => {
             tracing::error!(?err, "queue consumer init failed; consumer disabled");
             return;
         }
     };
+    let dispatch_limit = Arc::new(Semaphore::new(MAX_CONCURRENT_DISPATCH));
 
     loop {
         match consumer.fetch_messages().await {
             Ok(messages) if messages.is_empty() => {}
             Ok(messages) => {
                 for msg in messages {
-                    let consumer = &consumer;
+                    let permit = dispatch_limit
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .expect("dispatch semaphore closed");
+                    let consumer = consumer.clone();
                     let worker_senders = worker_senders.clone();
-                    if let Err(err) = consumer.dispatch_one(msg, worker_senders).await {
-                        tracing::warn!(?err, "queue dispatch failed; leaving for redelivery");
-                    }
+                    tokio::spawn(async move {
+                        let _permit = permit;
+                        if let Err(err) = consumer.dispatch_one(msg, worker_senders).await {
+                            tracing::warn!(?err, "queue dispatch failed; leaving for redelivery");
+                        }
+                    });
                 }
             }
             Err(err) => {

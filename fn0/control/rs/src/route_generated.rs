@@ -90,7 +90,7 @@ mod proxy {
         { inline :
         "package forte:user; world service-export { import wasi:http/types@0.3.0-rc-2026-03-15; export wasi:http/handler@0.3.0-rc-2026-03-15; }",
         path :
-        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/release/build/fn0-control-63ee2ad7178d8adb/out",
+        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/debug/build/fn0-control-f810d8d543155061/out",
         world : "service-export", default_bindings_module :
         "crate::route_generated::proxy", pub_export_macro : true, async : true, features
         : ["clocks-timezone"], with : { "wasi:http/handler@0.3.0-rc-2026-03-15" :
@@ -1168,19 +1168,11 @@ async fn handle_queue_task_execute(body_bytes: &[u8]) -> Result<Response<Body>> 
                 .unwrap());
         }
     };
-    let payload = match request["payload"].as_str() {
-        Some(s) => s,
-        None => {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("missing or non-string payload"))
-                .unwrap());
-        }
-    };
+    let payload = &request["payload"];
     let result = match task_name {
         "cloudflare_register" => {
             let input: crate::queue_task::cloudflare_register::Input =
-                match forte_sdk::serde_json::from_str(payload) {
+                match forte_sdk::serde_json::from_value(payload.clone()) {
                     Ok(v) => v,
                     Err(e) => {
                         return Ok(Response::builder()
@@ -1196,7 +1188,7 @@ async fn handle_queue_task_execute(body_bytes: &[u8]) -> Result<Response<Body>> 
         }
         "cloudflare_unregister" => {
             let input: crate::queue_task::cloudflare_unregister::Input =
-                match forte_sdk::serde_json::from_str(payload) {
+                match forte_sdk::serde_json::from_value(payload.clone()) {
                     Ok(v) => v,
                     Err(e) => {
                         return Ok(Response::builder()

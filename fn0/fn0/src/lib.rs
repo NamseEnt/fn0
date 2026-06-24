@@ -197,6 +197,7 @@ struct JsSlot {
 struct WasmSlot {
     sender: mpsc::UnboundedSender<execute::WasmInjectEnvelope>,
     bundle: Arc<Bundle>,
+    driver: tokio::task::JoinHandle<()>,
 }
 
 pub struct CodeExecutor<C: BundleCache> {
@@ -438,21 +439,17 @@ impl<C: BundleCache> CodeExecutor<C> {
                 if same_bundle && !alive {
                     tracing::warn!(project_id, "wasm instance dead; respawning");
                 }
-                instances.remove(project_id);
+                if let Some(removed) = instances.remove(project_id) {
+                    removed.driver.abort();
+                }
             }
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
         telemetry::create_instance();
-        self.instances.borrow_mut().insert(
-            project_id.to_string(),
-            WasmSlot {
-                sender: tx.clone(),
-                bundle: bundle.clone(),
-            },
-        );
 
         let ctx = self.ctx.clone();
+        let slot_bundle = bundle.clone();
         let bundle = bundle.clone();
         let project_id_owned = project_id.to_string();
         let turso_hijack = ctx.turso_hijack.clone();
@@ -464,7 +461,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let object_storage_hijack = ctx.object_storage_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
-        tokio::task::spawn_local(async move {
+        let driver = tokio::task::spawn_local(async move {
             let outcome = AssertUnwindSafe(execute::run_wasm_instance_loop(
                 &ctx.engine,
                 bundle,
@@ -497,6 +494,15 @@ impl<C: BundleCache> CodeExecutor<C> {
                 }
             }
         });
+
+        self.instances.borrow_mut().insert(
+            project_id.to_string(),
+            WasmSlot {
+                sender: tx.clone(),
+                bundle: slot_bundle,
+                driver,
+            },
+        );
 
         tx
     }

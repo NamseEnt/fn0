@@ -881,7 +881,7 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
             quote! {
                 #name => {
                     let input: crate::#(#module_path)::*::Input =
-                        match forte_sdk::serde_json::from_str(payload) {
+                        match forte_sdk::serde_json::from_value(payload.clone()) {
                             Ok(v) => v,
                             Err(e) => {
                                 return Ok(Response::builder()
@@ -918,15 +918,7 @@ fn generate_queue_task_execute_handler(queue_tasks: &[QueueTaskInfo]) -> TokenSt
                         .unwrap());
                 }
             };
-            let payload = match request["payload"].as_str() {
-                Some(s) => s,
-                None => {
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(Body::from("missing or non-string payload"))
-                        .unwrap());
-                }
-            };
+            let payload = &request["payload"];
 
             let result = match task_name {
                 #(#task_matches)*
