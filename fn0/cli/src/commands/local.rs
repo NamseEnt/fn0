@@ -140,4 +140,8 @@ impl BundleCache for LocalCache {
     }
 
     async fn invalidate(&self, _project_id: &str) {}
+
+    async fn registered_project_ids(&self) -> std::collections::HashSet<String> {
+        std::collections::HashSet::from(["local".to_string()])
+    }
 }

@@ -247,6 +247,36 @@ impl<C: BundleCache> CodeExecutor<C> {
         result.map(strip_fn0_headers)
     }
 
+    pub async fn sweep_unregistered(&self) {
+        let registered = self.ctx.bundle_cache.registered_project_ids().await;
+
+        let dead: Vec<String> = self
+            .instances
+            .borrow()
+            .keys()
+            .filter(|project_id| !registered.contains(*project_id))
+            .cloned()
+            .collect();
+        for project_id in &dead {
+            if let Some(slot) = self.instances.borrow_mut().remove(project_id) {
+                slot.driver.abort();
+            }
+        }
+
+        let dead_js: Vec<String> = self
+            .js_instances
+            .borrow()
+            .keys()
+            .filter(|project_id| !registered.contains(*project_id))
+            .cloned()
+            .collect();
+        for project_id in &dead_js {
+            if let Some(slot) = self.js_instances.borrow_mut().remove(project_id) {
+                slot.driver.abort();
+            }
+        }
+    }
+
     #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     pub async fn run_backend_only(&self, project_id: &str, request: Request) -> Result<Response> {
         let bundle = self.ctx.bundle_cache.get(project_id).await?;

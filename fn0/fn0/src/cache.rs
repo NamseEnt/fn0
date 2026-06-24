@@ -16,6 +16,8 @@ pub trait BundleCache: Send + Sync + 'static {
     async fn get(&self, project_id: &str) -> Result<Arc<Bundle>, Error>;
 
     async fn invalidate(&self, project_id: &str);
+
+    async fn registered_project_ids(&self) -> std::collections::HashSet<String>;
 }
 
 #[derive(Debug)]

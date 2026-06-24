@@ -279,4 +279,8 @@ impl BundleCache for S3BundleCache {
             inner.current_bytes = inner.current_bytes.saturating_sub(removed.size_bytes);
         }
     }
+
+    async fn registered_project_ids(&self) -> std::collections::HashSet<String> {
+        self.inner.lock().await.registry.keys().cloned().collect()
+    }
 }

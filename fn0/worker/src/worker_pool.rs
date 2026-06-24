@@ -28,6 +28,7 @@ pub enum DispatchError {
 }
 
 const QUEUE_CAPACITY: usize = 256;
+const SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
 pub fn spawn_workers<C>(
     ctx: Arc<ExecutionContext<C>>,
@@ -83,6 +84,17 @@ where
 
     rt.block_on(local.run_until(async move {
         let executor = Rc::new(CodeExecutor::new(ctx));
+
+        let sweep_executor = executor.clone();
+        tokio::task::spawn_local(async move {
+            let mut interval = tokio::time::interval(SWEEP_INTERVAL);
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                sweep_executor.sweep_unregistered().await;
+            }
+        });
+
         while let Some(env) = rx.recv().await {
             fn0::telemetry::stage_duration("queue_wait", env.enqueued_at.elapsed());
             let executor = executor.clone();
