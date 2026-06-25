@@ -97,4 +97,8 @@ impl BundleCache for SimpleCache {
         let mut state = self.state.lock().await;
         state.bundle = None;
     }
+
+    async fn registered_project_ids(&self) -> std::collections::HashSet<String> {
+        std::collections::HashSet::from([super::DEV_CODE_ID.to_string()])
+    }
 }
