@@ -144,7 +144,7 @@ ${viteDevBlock}
   }
   const cookie = request.headers.get("cookie");
   const { stream, cookies } = await renderStream(request.url, rawProps, cookie);
-  const headers = new Headers({ "Content-Type": "text/html" });
+  const headers = new Headers({ "Content-Type": "text/html", "Cache-Control": "no-store" });
   for (const c of cookies) headers.append("Set-Cookie", c);
   return new Response(stream, { headers });
 };
