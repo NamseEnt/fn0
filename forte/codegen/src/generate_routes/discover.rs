@@ -247,6 +247,11 @@ fn has_queue_task_handler(content: &str) -> bool {
                     has_input = true;
                 }
             }
+            syn::Item::Type(item_type) => {
+                if item_type.ident == "Input" {
+                    has_input = true;
+                }
+            }
             syn::Item::Fn(func) => {
                 let is_pub = matches!(func.vis, syn::Visibility::Public(_));
                 let is_async = func.sig.asyncness.is_some();
