@@ -1957,7 +1957,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-doc-db"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1973,7 +1973,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-object-storage"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "forte-sdk",
