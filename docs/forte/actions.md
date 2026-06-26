@@ -65,6 +65,8 @@ const result = await submit({ message: "hello" });
 
 The generated file exports a named function in camelCase (`userLogin` for `user_login`, `submit` for `submit`) that calls the action and validates the response with Zod. Import it directly — do not hand-write a TypeScript wrapper.
 
+If you need to call an action without the generated client (for example, before running `forte build`), use `callAction` from `@forte/react` directly. See [frontend.md](frontend.md#callaction) for details.
+
 ## Accessing Cookies and Headers
 
 Actions receive the full `ForteRequest` context, so you can read and write cookies:
