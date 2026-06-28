@@ -154,6 +154,12 @@ pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
 
 `Redirect::External { url }` redirects to an arbitrary URL. Both patterns emit HTTP 302.
 
+## Response Headers
+
+SSR page responses always include `Cache-Control: no-store`. This prevents CDNs and browser caches from storing the rendered HTML, which is intentional: every page response embeds request-specific data (hook results, cookie-derived state) that must not be reused across requests.
+
+API endpoints (`src/apis/`) and actions do not include `Cache-Control: no-store` — they control their own headers via the response.
+
 ## Error Handling
 
 If a handler returns `Err` and the error is not a `Redirect`, the error is logged to stderr and the client receives HTTP 500 "Internal Server Error". The error message does not reach the client. Use structured logging (`tracing::error!`) to capture errors with span context, since `eprintln!` output only goes to the worker's stderr.
