@@ -288,3 +288,23 @@ Each entry:
 - `every_minutes` — run interval (must be ≥ 1).
 
 Cron jobs run locally during `forte dev`: the CLI ticks at each minute boundary, reads `cron.yaml`, and enqueues matching tasks through the loopback queue.
+
+---
+
+## Local Tool Cache
+
+`forte dev` and `forte build` download external tools on first use and cache them in `~/.forte/bin/`. You do not need to manage these manually; downloads happen automatically.
+
+| Tool | Cache path | Source |
+|---|---|---|
+| `sqld` (libSQL server) | `~/.forte/bin/sqld-<version>` | tursodatabase/libsql GitHub Releases |
+| `forte-rs-to-ts` | `~/.forte/bin/forte-rs-to-ts-<version>/forte-rs-to-ts` | NamseEnt/fn0 GitHub Releases |
+
+To force a fresh download (e.g., after a corrupted download), delete the relevant entry:
+
+```sh
+rm -rf ~/.forte/bin/sqld-*
+rm -rf ~/.forte/bin/forte-rs-to-ts-*
+```
+
+The next `forte dev` or `forte build` will re-download the tools.

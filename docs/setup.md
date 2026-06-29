@@ -78,6 +78,13 @@ forte dev
 
 `forte init` scaffolds the project, installs npm packages, and prints next steps.
 
+On the first `forte dev` run, two tools are downloaded automatically and cached in `~/.forte/bin/`:
+
+- **sqld** (libSQL server) — for the local database
+- **forte-rs-to-ts** — Rust→TypeScript type generator
+
+Subsequent runs use the cached binaries. See [forte/cli.md#local-tool-cache](forte/cli.md#local-tool-cache) for cache paths and how to clear them.
+
 To deploy, authenticate first:
 
 ```sh
