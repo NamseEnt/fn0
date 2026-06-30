@@ -254,10 +254,18 @@ pub struct Input {
 The API:
 ```rust
 use forte_sdk::forte_json;
+use futures::StreamExt;
 
+// Serialize
 let bytes: Vec<u8> = forte_json::to_vec(&my_value);
+let stream = forte_json::to_stream(&my_value); // Stream<Item = Bytes>; yields chunks
+
+// Deserialize
 let value: MyType = forte_json::from_slice(&bytes)?;
+let value: MyType = forte_json::from_str(json_str)?;
 ```
+
+`to_stream` returns a lazy `Stream<Item = Bytes>` that emits up to 8 KiB chunks. Use it when building a streaming HTTP response body rather than buffering the whole payload in memory first (`to_vec` always buffers).
 
 ## Re-exported Crates
 
