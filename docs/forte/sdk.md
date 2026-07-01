@@ -229,6 +229,7 @@ If no instrument has been created during a request the flush is a no-op; there i
 
 **Serialization (Rust → JSON):**
 - Struct field names are converted to camelCase (`user_name` → `"userName"`)
+- **`Option::None` struct fields are omitted entirely** — they do not appear in the JSON output at all (not serialized as `null`). This differs from `serde_json` default behavior.
 - Enum variants use a `t` discriminant field:
 
 | Variant kind | Rust | JSON |
@@ -238,6 +239,8 @@ If no instrument has been created during a request the flush is a no-op; there i
 | Struct | `Ok { message: String }` | `{"t":"Ok","message":"..."}` |
 
 For struct variants the fields are spread flat alongside `t`; there is no `v` wrapper.
+
+`Option::None` omission applies to struct and struct-variant fields only — a top-level `None` serializes as `null`. Generated TypeScript types use `fieldName?: T` (optional property) rather than `fieldName: T | null`.
 
 **Deserialization (JSON → Rust):**
 - All object keys are converted to snake_case before deserializing (`"userName"` → `"user_name"`)

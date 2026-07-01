@@ -176,6 +176,8 @@ async function handleSubmit() {
 
 Action and hook inputs are deserialized with `forte_json`, which converts camelCase keys to snake_case Rust field names. A TypeScript caller sending `{"userName": "alice"}` maps to a Rust field `pub user_name: String`.
 
+`forte_json` **serialization** (for action and hook outputs) also differs from `serde_json`: `Option::None` struct fields are omitted from the JSON output entirely rather than serialized as `null`. The generated TypeScript types reflect this — optional Rust fields become optional TypeScript properties (`fieldName?: T`) rather than nullable ones (`fieldName: T | null`).
+
 Queue task and admin task inputs are deserialized with standard `serde_json` (no key conversion). Their struct field names must match the JSON keys exactly as sent by the caller — typically the generated `enqueue::*` functions (for queue tasks) or the `--input` JSON provided to `forte admin run` (for admin tasks). Use snake_case field names to match the default serde naming.
 
 ## Queue Tasks
