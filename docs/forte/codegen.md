@@ -128,6 +128,8 @@ pub fn turso_url() -> &'static str { ... }       // for TURSO_URL=...
 
 Values are loaded from the real environment at first use via `std::sync::LazyLock`. This means the function always returns the runtime value of the variable, not the value in `.env`; `.env` is only used to determine which accessor functions to generate.
 
+> **Warning:** Each accessor panics if the corresponding environment variable is not set at runtime. Ensure every variable listed in `.env` is also present in `env.yaml` (via `forte env set`) before deploying.
+
 `cargo:rerun-if-changed=../.env` is emitted automatically so the file is regenerated when `.env` changes.
 
 To use the generated module, add `mod env_generated;` to your `lib.rs` and call `env_generated::cookie_secret()` etc.
