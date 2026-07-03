@@ -48,7 +48,7 @@ Each handler type is discovered by statically parsing the Rust source:
 | `src/apis/` | Same as pages; route is prefixed with `/api/` | Recursive |
 | `src/hooks/` | File has `struct Input`, `Output` type (struct or enum), and `pub async fn handler` | Top-level only (`.rs` files) |
 | `src/actions/` | `.rs` file OR `<name>/mod.rs` directory module; both must have `struct Input`, `Output`, and `pub async fn handler` | Top-level only |
-| `src/queue_task/` | File has `struct Input` and `pub async fn handle` | Top-level only (`.rs` files) |
+| `src/queue_task/` | File has `struct Input` or `type Input = ()` and `pub async fn handle` | Top-level only (`.rs` files) |
 | `src/admin/` | Same as queue tasks | Top-level only (`.rs` files) |
 
 **Important:** `src/actions/` supports two layouts: flat `.rs` files (`user_login.rs`) or directory modules (`user_login/mod.rs`). Only the top level of `src/actions/` is scanned; nested paths like `user/login.rs` are not discovered. All other handler directories (`hooks/`, `queue_task/`, `admin/`) support only flat `.rs` files.
