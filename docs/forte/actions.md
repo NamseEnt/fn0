@@ -247,3 +247,5 @@ Run it:
 ```sh
 forte admin run seed_database --input '{"count": 10}'
 ```
+
+**Serialization note:** Admin task input is deserialized with standard `serde_json` (no camelCase→snake_case conversion). The `Output` is also serialized with standard `serde_json` — field names appear as snake_case in the JSON output printed to the terminal. This differs from actions and hooks, whose output goes through `forte_json` (camelCase field names).
