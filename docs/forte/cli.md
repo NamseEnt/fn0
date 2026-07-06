@@ -134,6 +134,8 @@ The TypeScript client is generated automatically by `forte-rs-to-ts` on the next
 
 > **Important:** Use underscores, not slashes, in action paths. `forte add action user/login` creates `rs/src/actions/user/login.rs`, but codegen only discovers handlers at `actions/<name>.rs` (flat file) or `actions/<name>/mod.rs` (directory module) — nested files like `actions/user/login.rs` are never discovered. Use `forte add action user_login` instead (or create `actions/user_login/mod.rs` manually if you need to split the file across multiple modules).
 
+Dashes in the path are automatically converted to underscores: `forte add action user-login` creates `rs/src/actions/user_login.rs`.
+
 ---
 
 ### Adding hooks, queue tasks, and admin tasks
