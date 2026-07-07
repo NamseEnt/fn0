@@ -121,6 +121,25 @@ pub async fn handler(
 use crate::route_generated::Redirect;
 ```
 
+### Variant naming
+
+Variant names are derived from the page's route segments:
+
+| Page file | Route | `Redirect` variant |
+|---|---|---|
+| `pages/index/mod.rs` | `/` | `Redirect::Index` |
+| `pages/about/mod.rs` | `/about` | `Redirect::About` |
+| `pages/login/mod.rs` | `/login` | `Redirect::Login` |
+| `pages/product/[id]/mod.rs` | `/product/:id` | `Redirect::Product_id_ { id: String }` |
+| `pages/blog/[year]/[slug]/mod.rs` | `/blog/:year/:slug` | `Redirect::Blog_year__slug_ { year: String, slug: String }` |
+
+Rules:
+- Static segments are title-cased and concatenated (`/product/detail` → `ProductDetail`).
+- Dynamic segments (`[param]`) become `_param_` (underscore-wrapped, lowercase).
+- Pages with dynamic segments have struct-like variants whose fields match the `PathParams` field names and types.
+
+The unconditional external redirect variant is always `Redirect::External { url: String }`.
+
 ### Redirect-only page
 
 When a page only ever redirects (never renders), declare `pub type Props = Redirect` and return `Ok(Redirect::...)`:

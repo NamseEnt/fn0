@@ -84,7 +84,7 @@ Variables in `.env` are for local development only. They are not bundled during 
 
 1. Check that `forte build` or `forte dev` completed without errors.
 2. Verify the Rust handler compiles successfully (`cargo build` in `rs/`).
-3. Check that the platform is supported: `aarch64-apple-darwin`, `x86_64-apple-darwin`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`. Windows is not supported.
+3. Check that the platform is supported: `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`. Windows is not supported.
 
 To force a fresh download of the tool:
 

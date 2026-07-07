@@ -48,7 +48,7 @@ Each handler type is discovered by statically parsing the Rust source:
 | `src/apis/` | Same as pages; route is prefixed with `/api/` | Recursive |
 | `src/hooks/` | File has `struct Input`, `Output` type (struct or enum), and `pub async fn handler` | Top-level only (`.rs` files) |
 | `src/actions/` | `.rs` file OR `<name>/mod.rs` directory module; both must have `struct Input`, `Output`, and `pub async fn handler` | Top-level only |
-| `src/queue_task/` | File has `struct Input` and `pub async fn handle` | Top-level only (`.rs` files) |
+| `src/queue_task/` | File has `struct Input` or `type Input = ()` and `pub async fn handle` | Top-level only (`.rs` files) |
 | `src/admin/` | Same as queue tasks | Top-level only (`.rs` files) |
 
 **Important:** `src/actions/` supports two layouts: flat `.rs` files (`user_login.rs`) or directory modules (`user_login/mod.rs`). Only the top level of `src/actions/` is scanned; nested paths like `user/login.rs` are not discovered. All other handler directories (`hooks/`, `queue_task/`, `admin/`) support only flat `.rs` files.
@@ -128,6 +128,8 @@ pub fn turso_url() -> &'static str { ... }       // for TURSO_URL=...
 
 Values are loaded from the real environment at first use via `std::sync::LazyLock`. This means the function always returns the runtime value of the variable, not the value in `.env`; `.env` is only used to determine which accessor functions to generate.
 
+> **Warning:** Each accessor panics if the corresponding environment variable is not set at runtime. Ensure every variable listed in `.env` is also present in `env.yaml` (via `forte env set`) before deploying.
+
 `cargo:rerun-if-changed=../.env` is emitted automatically so the file is regenerated when `.env` changes.
 
 To use the generated module, add `mod env_generated;` to your `lib.rs` and call `env_generated::cookie_secret()` etc.
@@ -138,7 +140,7 @@ To use the generated module, add `mod env_generated;` to your `lib.rs` and call 
 
 A standalone binary (`forte-rs-to-ts`) that reads the Rust source tree and generates TypeScript type files. Run automatically during `forte build`.
 
-> **Implementation note:** `forte-rs-to-ts` uses private Rust compiler APIs (`rustc_driver`, `rustc_hir`, `rustc_middle`, etc.) to resolve and analyze types accurately. Because these APIs are unstable and tied to a specific nightly compiler build, the binary is distributed as a pre-built release artifact bundled with a matching sysroot — it cannot be compiled from source with an ordinary `cargo install`. The CLI downloads the correct version automatically on first use; the binary is cached in `~/.forte/bin/forte-rs-to-ts-<version>/forte-rs-to-ts` (shared across all projects on the machine). Supported platforms: `aarch64-apple-darwin`, `x86_64-apple-darwin`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`.
+> **Implementation note:** `forte-rs-to-ts` uses private Rust compiler APIs (`rustc_driver`, `rustc_hir`, `rustc_middle`, etc.) to resolve and analyze types accurately. Because these APIs are unstable and tied to a specific nightly compiler build, the binary is distributed as a pre-built release artifact bundled with a matching sysroot — it cannot be compiled from source with an ordinary `cargo install`. The CLI downloads the correct version automatically on first use; the binary is cached in `~/.forte/bin/forte-rs-to-ts-<version>/forte-rs-to-ts` (shared across all projects on the machine). Supported platforms: `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`.
 
 For each page handler (`rs/src/pages/<path>/mod.rs`), it generates:
 - `fe/src/pages/<path>/.props.ts` — the `Props` type as a TypeScript discriminated union

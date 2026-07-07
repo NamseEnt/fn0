@@ -176,11 +176,13 @@ async function handleSubmit() {
 
 Action and hook inputs are deserialized with `forte_json`, which converts camelCase keys to snake_case Rust field names. A TypeScript caller sending `{"userName": "alice"}` maps to a Rust field `pub user_name: String`.
 
+`forte_json` **serialization** (for action and hook outputs) also differs from `serde_json`: `Option::None` struct fields are omitted from the JSON output entirely rather than serialized as `null`. The generated TypeScript types reflect this — optional Rust fields become optional TypeScript properties (`fieldName?: T`) rather than nullable ones (`fieldName: T | null`).
+
 Queue task and admin task inputs are deserialized with standard `serde_json` (no key conversion). Their struct field names must match the JSON keys exactly as sent by the caller — typically the generated `enqueue::*` functions (for queue tasks) or the `--input` JSON provided to `forte admin run` (for admin tasks). Use snake_case field names to match the default serde naming.
 
 ## Queue Tasks
 
-Background tasks live under `rs/src/queue_task/`. They have an `Input` struct and a `pub async fn handle` (not `handler`) function:
+Background tasks live under `rs/src/queue_task/`. They have an `Input` type and a `pub async fn handle` (not `handler`) function. `Input` can be a struct (when the task takes arguments) or a type alias `pub type Input = ()` (for tasks that take no input, such as cron jobs):
 
 ```rust
 // rs/src/queue_task/send_email.rs
@@ -245,3 +247,5 @@ Run it:
 ```sh
 forte admin run seed_database --input '{"count": 10}'
 ```
+
+**Serialization note:** Admin task input is deserialized with standard `serde_json` (no camelCase→snake_case conversion). The `Output` is also serialized with standard `serde_json` — field names appear as snake_case in the JSON output printed to the terminal. This differs from actions and hooks, whose output goes through `forte_json` (camelCase field names).

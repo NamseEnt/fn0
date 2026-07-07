@@ -229,6 +229,7 @@ If no instrument has been created during a request the flush is a no-op; there i
 
 **Serialization (Rust → JSON):**
 - Struct field names are converted to camelCase (`user_name` → `"userName"`)
+- **`Option::None` struct fields are omitted entirely** — they do not appear in the JSON output at all (not serialized as `null`). This differs from `serde_json` default behavior.
 - Enum variants use a `t` discriminant field:
 
 | Variant kind | Rust | JSON |
@@ -238,6 +239,8 @@ If no instrument has been created during a request the flush is a no-op; there i
 | Struct | `Ok { message: String }` | `{"t":"Ok","message":"..."}` |
 
 For struct variants the fields are spread flat alongside `t`; there is no `v` wrapper.
+
+`Option::None` omission applies to struct and struct-variant fields only — a top-level `None` serializes as `null`. Generated TypeScript types use `fieldName?: T` (optional property) rather than `fieldName: T | null`.
 
 **Deserialization (JSON → Rust):**
 - All object keys are converted to snake_case before deserializing (`"userName"` → `"user_name"`)
@@ -254,10 +257,18 @@ pub struct Input {
 The API:
 ```rust
 use forte_sdk::forte_json;
+use futures::StreamExt;
 
+// Serialize
 let bytes: Vec<u8> = forte_json::to_vec(&my_value);
+let stream = forte_json::to_stream(&my_value); // Stream<Item = Bytes>; yields chunks
+
+// Deserialize
 let value: MyType = forte_json::from_slice(&bytes)?;
+let value: MyType = forte_json::from_str(json_str)?;
 ```
+
+`to_stream` returns a lazy `Stream<Item = Bytes>` that emits up to 8 KiB chunks. Use it when building a streaming HTTP response body rather than buffering the whole payload in memory first (`to_vec` always buffers).
 
 ## Re-exported Crates
 
