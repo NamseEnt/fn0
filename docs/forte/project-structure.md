@@ -152,12 +152,14 @@ DATABASE_PASSWORD:
 
 Manage entries with:
 
-| Command | Description |
-|---|---|
-| `forte env set <key> <value>` | Add or overwrite a plain entry |
-| `forte env set <key> <value> --secret` | Add an encrypted secret (requires `forte login`) |
-| `fn0 env list` | List all entries with their kind |
-| `fn0 env unset <key>` | Remove an entry |
+| Command | CLI | Description |
+|---|---|---|
+| `forte env set <key> <value>` | `forte` | Add or overwrite a plain entry |
+| `forte env set <key> <value> --secret` | `forte` | Add an encrypted secret (requires `forte login`) |
+| `fn0 env list` | `fn0` | List all entries with their kind |
+| `fn0 env unset <key>` | `fn0` | Remove an entry |
+
+`forte env` only implements `set`. To list or remove entries, use the `fn0` CLI (`cargo binstall fn0-cli`). Both CLIs operate on the same `env.yaml` file.
 
 `env.yaml` entries are **not** available in `forte dev`. For local development, put variables in `.env` instead.
 
