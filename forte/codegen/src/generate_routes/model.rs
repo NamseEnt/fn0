@@ -51,6 +51,13 @@ pub(super) struct AdminTaskInfo {
     pub(super) name: String,
 }
 
+#[derive(Debug)]
+pub(super) struct StaticFileInfo {
+    pub(super) route_path: String,
+    pub(super) include_path: String,
+    pub(super) content_type: String,
+}
+
 pub(super) enum HandlerType {
     None,
     Props,

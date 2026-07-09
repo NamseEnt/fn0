@@ -386,6 +386,66 @@ fn extract_type_info(ty: &syn::Type) -> (bool, String) {
     (false, quote!(#ty).to_string())
 }
 
+pub(super) fn discover_public(public_dir: &Path) -> Vec<StaticFileInfo> {
+    let mut files = Vec::new();
+    if !public_dir.exists() {
+        return files;
+    }
+    collect_public_files(public_dir, public_dir, &mut files);
+    files.sort_by(|a, b| a.route_path.cmp(&b.route_path));
+    files
+}
+
+fn collect_public_files(base_dir: &Path, current_dir: &Path, files: &mut Vec<StaticFileInfo>) {
+    let Ok(entries) = fs::read_dir(current_dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_dir() {
+            collect_public_files(base_dir, &path, files);
+            continue;
+        }
+
+        let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+        if file_name == ".DS_Store" {
+            continue;
+        }
+
+        let relative = path
+            .strip_prefix(base_dir)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        files.push(StaticFileInfo {
+            route_path: format!("/{}", relative),
+            include_path: format!("../public/{}", relative),
+            content_type: content_type_for(&path).to_string(),
+        });
+    }
+}
+
+fn content_type_for(path: &Path) -> &'static str {
+    if path.file_name().and_then(|n| n.to_str()) == Some("apple-app-site-association") {
+        return "application/json";
+    }
+
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("txt") => "text/plain; charset=utf-8",
+        Some("json") => "application/json",
+        Some("xml") => "application/xml",
+        Some("html") => "text/html; charset=utf-8",
+        Some("webmanifest") => "application/manifest+json",
+        Some("ico") => "image/x-icon",
+        Some("png") => "image/png",
+        Some("svg") => "image/svg+xml",
+        _ => "application/octet-stream",
+    }
+}
+
 pub(super) fn discover_pages(pages_dir: &Path) -> Vec<PageInfo> {
     let mut pages = Vec::new();
     if !pages_dir.exists() {

@@ -8,6 +8,7 @@ pub(super) fn generate_code(
     actions: &[ActionInfo],
     queue_tasks: &[QueueTaskInfo],
     admin_tasks: &[AdminTaskInfo],
+    static_files: &[StaticFileInfo],
     wit_dir: &str,
 ) -> TokenStream {
     let mut all_module_decls: Vec<(String, TokenStream)> = Vec::new();
@@ -33,6 +34,27 @@ pub(super) fn generate_code(
     let queue_task_execute_handler = generate_queue_task_execute_handler(queue_tasks);
     let admin_task_handler = generate_admin_task_handler(admin_tasks);
     let classify_route_fn = generate_classify_route(pages);
+
+    let static_file_chain = {
+        let matches: Vec<TokenStream> = static_files
+            .iter()
+            .map(|f| {
+                let route_path = &f.route_path;
+                let content_type = &f.content_type;
+                let include_path = &f.include_path;
+                quote! {
+                    if path == #route_path {
+                        return Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header("content-type", #content_type)
+                            .body(Body::from(include_bytes!(#include_path).to_vec()))
+                            .unwrap());
+                    }
+                }
+            })
+            .collect();
+        quote! { #(#matches)* }
+    };
 
     let route_chain = if route_matches.is_empty() {
         quote! {
@@ -166,6 +188,8 @@ pub(super) fn generate_code(
             if let Some(task_name) = path.strip_prefix("/__forte_admin/") {
                 return handle_admin_task(task_name, &headers, &body_bytes).await;
             }
+
+            #static_file_chain
 
             #route_chain
         }

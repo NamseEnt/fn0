@@ -9,7 +9,7 @@ use codegen::{
 };
 use discover::{
     discover_actions, discover_admin_tasks, discover_apis, discover_hooks, discover_pages,
-    discover_queue_tasks,
+    discover_public, discover_queue_tasks,
 };
 
 pub fn generate_routes() {
@@ -27,6 +27,7 @@ pub fn generate_routes() {
     let actions_dir = Path::new(&manifest_dir).join("src/actions");
     let queue_task_dir = Path::new(&manifest_dir).join("src/queue_task");
     let admin_dir = Path::new(&manifest_dir).join("src/admin");
+    let public_dir = Path::new(&manifest_dir).join("public");
     let output_path = Path::new(&manifest_dir).join("src/route_generated.rs");
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
@@ -36,6 +37,7 @@ pub fn generate_routes() {
     println!("cargo:rerun-if-changed=src/actions");
     println!("cargo:rerun-if-changed=src/queue_task");
     println!("cargo:rerun-if-changed=src/admin");
+    println!("cargo:rerun-if-changed=public");
     // Also rerun when dependency versions change (e.g. forte-sdk bump),
     // because once any rerun-if-changed is declared Cargo stops doing
     // default change detection across the rest of the crate.
@@ -47,12 +49,14 @@ pub fn generate_routes() {
     let actions = discover_actions(&actions_dir);
     let queue_tasks = discover_queue_tasks(&queue_task_dir);
     let admin_tasks = discover_admin_tasks(&admin_dir);
+    let static_files = discover_public(&public_dir);
     let tokens = generate_code(
         &pages,
         &hooks,
         &actions,
         &queue_tasks,
         &admin_tasks,
+        &static_files,
         &wit_dir_str,
     );
 
