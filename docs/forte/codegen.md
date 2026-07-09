@@ -36,6 +36,7 @@ Cargo reruns the build script when any of these directories change:
 - `src/actions`
 - `src/queue_task`
 - `src/admin`
+- `public`
 - `Cargo.lock` (ensures the build script re-runs after dependency version changes, since declaring any `rerun-if-changed` disables Cargo's default file-based detection)
 
 ### Discovery Rules
@@ -50,6 +51,7 @@ Each handler type is discovered by statically parsing the Rust source:
 | `src/actions/` | `.rs` file OR `<name>/mod.rs` directory module; both must have `struct Input`, `Output`, and `pub async fn handler` | Top-level only |
 | `src/queue_task/` | File has `struct Input` or `type Input = ()` and `pub async fn handle` | Top-level only (`.rs` files) |
 | `src/admin/` | Same as queue tasks | Top-level only (`.rs` files) |
+| `public/` | Every file (recursively); served verbatim at the file's relative path | Recursive (all files) |
 
 **Important:** `src/actions/` supports two layouts: flat `.rs` files (`user_login.rs`) or directory modules (`user_login/mod.rs`). Only the top level of `src/actions/` is scanned; nested paths like `user/login.rs` are not discovered. All other handler directories (`hooks/`, `queue_task/`, `admin/`) support only flat `.rs` files.
 
@@ -75,6 +77,12 @@ The return type check for pages and APIs matches on the string representation of
 | `apis/users.rs` | `/api/users` |
 
 Dynamic segments are `[param]` in the directory name, mapped to `:param` in the route.
+
+### Static Files (`public/`)
+
+Files in `rs/public/` are discovered recursively and embedded in the generated code via `include_bytes!`. Each file gets a match arm in the router that returns its bytes with the appropriate `Content-Type`. Static file routes are checked before page/API routes, so they always win on path conflicts.
+
+See [project-structure.md](project-structure.md#rspublic--embedded-static-files-optional) for the content-type mapping and usage notes.
 
 ### Generated Router Internals (`route_generated.rs`)
 

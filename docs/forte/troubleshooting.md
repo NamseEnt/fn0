@@ -31,6 +31,7 @@ Codegen uses static analysis (not Rust compilation) to discover handlers. Make s
 | Hook | `struct Input`, `Output` type, `pub async fn handler` | `src/hooks/` (flat `.rs` only) |
 | Queue task | `struct Input` or `type Input`, `pub async fn handle` | `src/queue_task/` (flat `.rs` only) |
 | Admin task | `struct Input` or `type Input`, `pub async fn handle` | `src/admin/` (flat `.rs` only) |
+| Static file | any file | `public/` (recursive) |
 
 For pages/APIs the return type string must contain both `"Result"` and `"Props"`. Naming the type `Props` is the simplest way to satisfy this.
 
