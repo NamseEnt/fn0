@@ -82,6 +82,7 @@ See the full handler docs: [Pages](pages.md), [API Endpoints](apis.md), [Actions
 2. `forte dev` — run dev server with hot reload
 3. `forte add page <path>` / `forte add action <path>` — add handlers
 4. `forte build` — compile backend (WASM) + frontend (Vite)
-5. `forte deploy` — upload to fn0 Cloud
+5. `forte login` — authenticate with fn0 Cloud (required before first deploy)
+6. `forte deploy` — upload to fn0 Cloud
 
 See [cli.md](cli.md) for all commands.

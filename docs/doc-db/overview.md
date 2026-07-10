@@ -190,6 +190,33 @@ Keys are formatted as `TypeName/pk_field=value&…`. Integer fields are zero-pad
 
 Example PK for `User { id: "alice" }` → `"User/id=alice"`.
 
+Multiple `#[pk]` or `#[sk]` fields are joined with `&`:
+
+```rust
+#[forte_doc]
+pub struct Post {
+    #[pk]
+    pub user_id: String,
+    #[pk]
+    pub category: String,
+    #[sk]
+    pub created_at: u64,
+    #[sk]
+    pub post_id: String,
+    pub title: String,
+}
+// pk → "Post/user_id=alice&category=news"
+// sk → "created_at=00000000001234567890&post_id=abc"
+```
+
+#### No `#[pk]` or `#[sk]` fields
+
+- **No `#[pk]` fields** → pk = `TypeName` (a singleton-per-type stored at one row)
+- **No `#[sk]` fields** → sk = `""` (empty string)
+- **Only `#[sk]` fields** → pk = `TypeName`, sk = `field=value&…`
+
+These patterns are used for singleton config documents (e.g., a single document per deployment storing global state). A struct with no pk or sk fields is stored at `pk=TypeName, sk=""`.
+
 ### Usage
 
 ```rust

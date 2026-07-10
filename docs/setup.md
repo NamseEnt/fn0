@@ -67,6 +67,7 @@ For production, set these to your Turso cloud credentials.
 | `TURSO_AUTH_TOKEN` | No | Database auth token; injected automatically by `forte dev` |
 | `FN0_QUEUE_URL` | No | Queue endpoint; injected automatically by `forte dev`; required in production if using queue tasks |
 | `FN0_OBJECT_STORAGE_URL` | No | Object storage endpoint; injected automatically by `forte dev`; required in production if using object storage |
+| `OTEL_SERVICE_NAME` | No | Service name in OpenTelemetry traces and metrics (defaults to `"forte-app"`) |
 
 ## Creating a Forte Project
 
