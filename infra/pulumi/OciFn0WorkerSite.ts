@@ -455,26 +455,8 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         }),
     );
 
-    const baseImageId = compartment.id.apply((compartmentId) =>
-      oci.core
-        .getImages({
-          compartmentId,
-          operatingSystem: "Oracle Linux",
-          operatingSystemVersion: "10",
-          sortOrder: "DESC",
-        })
-        .then((x) => {
-          const imageId = x.images.find(
-            (x) => x.createImageAllowed && x.displayName.includes("-aarch64-"),
-          )?.id;
-
-          if (!imageId) {
-            throw new Error("can not find image");
-          }
-
-          return imageId;
-        }),
-    );
+    const baseImageId =
+      "ocid1.image.oc1.ap-osaka-1.aaaaaaaa3gpxiv2x5tradmcp4mbzhkh75otz4fqi5qsebxyhcjg2jzlmicna";
 
     const customWorkerImage = new CustomWorkerImage(
       "custom-worker-image",
