@@ -423,11 +423,9 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    // Not yet attached to the worker subnet — the subnet moves from the IGW
-    // route table to this one only after the Bastion access path is verified
-    // (issue #42 phase 2). No ::/0 rule: NAT is IPv4-only and worker VNICs
-    // don't get IPv6 addresses (isAssignIpv6ip: false).
-    new oci.core.RouteTable(
+    // No ::/0 rule: NAT is IPv4-only and worker VNICs don't get IPv6
+    // addresses (isAssignIpv6ip: false).
+    const workerNatRouteTable = new oci.core.RouteTable(
       "worker-nat-route-table",
       {
         compartmentId: compartment.id,
@@ -452,7 +450,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         prohibitInternetIngress: false,
         prohibitPublicIpOnVnic: false,
         securityListIds: [workerSecurityList.id],
-        routeTableId: routeTable.id,
+        routeTableId: workerNatRouteTable.id,
       },
       { parent: this },
     );
