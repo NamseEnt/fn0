@@ -8,6 +8,7 @@
 
 Forte is the full-stack web framework built on fn0.
 
+- [**Quick Reference**](forte/quick-reference.md) — Cheat sheet: all handler patterns, naming rules, common snippets
 - [Overview](forte/overview.md) — Architecture and key packages
 - [Project Structure](forte/project-structure.md) — Directory layout and conventions
 - [CLI Reference](forte/cli.md) — All `forte` commands (including login and cron jobs)
