@@ -304,27 +304,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     const nlbSubnetCidr = "10.0.1.0/24";
     const workerSubnetCidr = "10.0.2.0/24";
 
-    // Worker (backend) subnet: SSH from the world (debug convenience, being
-    // replaced by the Bastion path below, see issue #42) + 443 only from the
-    // NLB subnet so the NLB is the only ingress. The worker-subnet-CIDR 22
-    // rule is for the Bastion: its private endpoint lives in the worker
-    // subnet, so bastion sessions reach sshd from that CIDR.
+    // Worker (backend) subnet: 443 only from the NLB subnet so the NLB is
+    // the only external ingress. The worker-subnet-CIDR 22 rule is for the
+    // Bastion: its private endpoint lives in the worker subnet, so bastion
+    // sessions reach sshd from that CIDR.
     const workerSecurityList = new oci.core.SecurityList(
       "worker-security-list",
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
         ingressSecurityRules: [
-          {
-            protocol: "6",
-            source: "0.0.0.0/0",
-            tcpOptions: { min: 22, max: 22 },
-          },
-          {
-            protocol: "6",
-            source: "::/0",
-            tcpOptions: { min: 22, max: 22 },
-          },
           {
             protocol: "6",
             source: workerSubnetCidr,
@@ -570,7 +559,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             },
             createVnicDetails: {
               subnetId: workerSubnet.id,
-              assignPublicIp: true,
+              assignPublicIp: false,
             },
             metadata,
             freeformTags: {
