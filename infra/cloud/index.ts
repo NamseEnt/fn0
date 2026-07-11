@@ -589,7 +589,7 @@ new cloudflare.CustomHostname("control-custom-hostname", {
   zoneId,
   hostname: pulumi.interpolate`fn0-control.${domain}`,
   ssl: {
-    method: "txt",
+    method: "http",
     type: "dv",
     settings: { minTlsVersion: "1.2" },
   },
