@@ -647,6 +647,7 @@ export const bundleStoreR2SecretAccessKey = pulumi.secret(
 export const bundleStoreR2QueueId = bundleStoreR2.queueId;
 export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
 export const workerCompartmentId = ociFn0WorkerSite.compartmentId;
+export const workerBastionId = ociFn0WorkerSite.bastionId;
 export const staticAssetAccountId = staticAssetStorage.accountId;
 export const staticAssetPublicBaseDomain = staticAssetStorage.publicBaseDomain;
 export const staticAssetZoneId = staticAssetStorage.zoneId;

@@ -126,6 +126,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
   public readonly sshPrivateKey: pulumi.Output<string>;
   public readonly instancePoolId: pulumi.Output<string>;
   public readonly networkLoadBalancerPublicIp: pulumi.Output<string>;
+  public readonly bastionId: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -154,6 +155,13 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     this.sshPublicKey = workerSshKey.publicKeyOpenssh;
     this.sshPrivateKey = workerSshKey.privateKeyPem;
     this.subnetId = workerSubnet.id;
+
+    const bastion = this.setupBastion(
+      compartmentSuffix,
+      compartment,
+      workerSubnet,
+    );
+    this.bastionId = bastion.id;
 
     const { availabilityDomain, imageId, customWorkerImage } =
       this.setupImage(args, compartment, vcn, internetGateway, workerSubnet);
@@ -220,6 +228,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       sshPrivateKey: this.sshPrivateKey,
       instancePoolId: this.instancePoolId,
       networkLoadBalancerPublicIp: this.networkLoadBalancerPublicIp,
+      bastionId: this.bastionId,
     });
   }
 
@@ -293,10 +302,13 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     );
 
     const nlbSubnetCidr = "10.0.1.0/24";
+    const workerSubnetCidr = "10.0.2.0/24";
 
-    // Worker (backend) subnet: SSH from the world (debug convenience, see
-    // follow-up issue) + 443 only from the NLB subnet so the NLB is the only
-    // ingress.
+    // Worker (backend) subnet: SSH from the world (debug convenience, being
+    // replaced by the Bastion path below, see issue #42) + 443 only from the
+    // NLB subnet so the NLB is the only ingress. The worker-subnet-CIDR 22
+    // rule is for the Bastion: its private endpoint lives in the worker
+    // subnet, so bastion sessions reach sshd from that CIDR.
     const workerSecurityList = new oci.core.SecurityList(
       "worker-security-list",
       {
@@ -311,6 +323,11 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           {
             protocol: "6",
             source: "::/0",
+            tcpOptions: { min: 22, max: 22 },
+          },
+          {
+            protocol: "6",
+            source: workerSubnetCidr,
             tcpOptions: { min: 22, max: 22 },
           },
           {
@@ -397,12 +414,41 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
+    const natGateway = new oci.core.NatGateway(
+      "nat-gateway",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+      },
+      { parent: this },
+    );
+
+    // Not yet attached to the worker subnet — the subnet moves from the IGW
+    // route table to this one only after the Bastion access path is verified
+    // (issue #42 phase 2). No ::/0 rule: NAT is IPv4-only and worker VNICs
+    // don't get IPv6 addresses (isAssignIpv6ip: false).
+    new oci.core.RouteTable(
+      "worker-nat-route-table",
+      {
+        compartmentId: compartment.id,
+        vcnId: vcn.id,
+        routeRules: [
+          {
+            destination: "0.0.0.0/0",
+            destinationType: "CIDR_BLOCK",
+            networkEntityId: natGateway.id,
+          },
+        ],
+      },
+      { parent: this },
+    );
+
     const workerSubnet = new oci.core.Subnet(
       "worker-subnet",
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
-        ipv4cidrBlocks: ["10.0.2.0/24"],
+        ipv4cidrBlocks: [workerSubnetCidr],
         prohibitInternetIngress: false,
         prohibitPublicIpOnVnic: false,
         securityListIds: [workerSecurityList.id],
@@ -426,6 +472,30 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     );
 
     return { vcn, internetGateway, workerSubnet, nlbSubnet, workerSshKey };
+  }
+
+  // Debug SSH path replacing the workers' public-IP + world-open port 22
+  // (issue #42): sessions are created on demand via IAM (max TTL 3h) and
+  // tunnel to the workers' private IPs, so nothing stays publicly reachable.
+  private setupBastion(
+    compartmentSuffix: pulumi.Output<string>,
+    compartment: oci.identity.Compartment,
+    workerSubnet: oci.core.Subnet,
+  ): oci.bastion.Bastion {
+    return new oci.bastion.Bastion(
+      "worker-bastion",
+      {
+        bastionType: "STANDARD",
+        // OCI bastion names reject hyphens, so pulumi auto-naming can't be
+        // used here.
+        name: pulumi.interpolate`fn0worker${compartmentSuffix}`,
+        compartmentId: compartment.id,
+        targetSubnetId: workerSubnet.id,
+        clientCidrBlockAllowLists: ["0.0.0.0/0"],
+        maxSessionTtlInSeconds: 10800,
+      },
+      { parent: this },
+    );
   }
 
   private setupImage(
