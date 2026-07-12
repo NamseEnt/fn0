@@ -4,6 +4,7 @@
 
 - **No explanatory comments in code.** TODO comments are allowed.
 - **Rust edition:** 2024
+- **Rust file layout:** `mod` declarations go at the very top of the file, then `use` statements below them. No blank lines between consecutive `mod` declarations, nor between consecutive `use` statements.
 - Run `cargo clippy` and fix all warnings before committing.
 - Run `cargo fmt` before committing.
 - Tests must pass.
