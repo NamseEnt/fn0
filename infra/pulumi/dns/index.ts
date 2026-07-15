@@ -52,15 +52,19 @@ export class CloudflareDns extends pulumi.ComponentResource {
       { parent: this }
     );
 
+    // Changing hostnames replaces this cert. Under Full (strict), revoking the
+    // old cert while a worker still presents it makes Cloudflare reject the
+    // origin (526) for every subdomain. retainOnDelete keeps the old cert valid
+    // through the worker roll; revoke the orphan manually once no worker uses it.
     const originCaCert = new cloudflare.OriginCaCertificate(
       "origin-ca-cert",
       {
         csr: csr.certRequestPem,
         requestType: "origin-ecc",
-        hostnames: [pulumi.interpolate`*.${domain}`],
+        hostnames: [pulumi.interpolate`*.${domain}`, domain],
         requestedValidity: 5475,
       },
-      { parent: this }
+      { parent: this, retainOnDelete: true }
     );
 
     this.certificate = originCaCert.certificate;

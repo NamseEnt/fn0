@@ -30,6 +30,12 @@ export interface WorkerArgs {
   hostObservability: WorkerHostObservabilityArgs;
   bundleStorage: WorkerBundleStorageArgs;
   objectStorage: WorkerObjectStorageArgs;
+  apex: WorkerApexArgs;
+}
+
+export interface WorkerApexArgs {
+  domain: pulumi.Input<string>;
+  projectId: pulumi.Input<string>;
 }
 
 export interface WorkerBundleStorageArgs {
@@ -1103,6 +1109,9 @@ function buildWorkerEnv(
     FN0_OBJECT_STORAGE_ACCOUNT_ID: worker.objectStorage.accountId,
     FN0_OBJECT_STORAGE_ACCESS_KEY_ID: worker.objectStorage.accessKeyId,
     FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY: worker.objectStorage.secretAccessKey,
+
+    FN0_APEX_DOMAIN: worker.apex.domain,
+    FN0_APEX_PROJECT_ID: worker.apex.projectId,
 
     ORIGIN_CERT_PEM_BASE64: pulumi
       .output(worker.tlsOrigin.certPem)

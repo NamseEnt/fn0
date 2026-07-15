@@ -278,14 +278,23 @@ async fn run() -> Result<()> {
         })
     };
 
+    let apex_route = apex_route_from_env();
+
     let user_handle = tokio::spawn({
         let worker_senders = worker_senders.clone();
         let instance_count = instance_count.clone();
         let cache = cache.clone();
         let drain_flag = drain_flag.clone();
         async move {
-            if let Err(err) =
-                run_user_server(user_port, worker_senders, instance_count, drain_flag, cache).await
+            if let Err(err) = run_user_server(
+                user_port,
+                worker_senders,
+                instance_count,
+                drain_flag,
+                cache,
+                apex_route,
+            )
+            .await
             {
                 tracing::error!(%err, "user server error");
             }
@@ -318,12 +327,28 @@ async fn run() -> Result<()> {
     Ok(())
 }
 
+struct ApexRoute {
+    domain: String,
+    project_id: String,
+}
+
+fn apex_route_from_env() -> Option<Arc<ApexRoute>> {
+    match (
+        std::env::var("FN0_APEX_DOMAIN"),
+        std::env::var("FN0_APEX_PROJECT_ID"),
+    ) {
+        (Ok(domain), Ok(project_id)) => Some(Arc::new(ApexRoute { domain, project_id })),
+        _ => None,
+    }
+}
+
 async fn run_user_server(
     port: u16,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     instance_count: Arc<AtomicU64>,
     drain_flag: Arc<AtomicBool>,
     cache: S3BundleCache,
+    apex_route: Option<Arc<ApexRoute>>,
 ) -> Result<()> {
     let tls_acceptor = {
         let cert_pem = read_pem_env("ORIGIN_CERT_PEM")
@@ -352,6 +377,7 @@ async fn run_user_server(
         let drain_flag = drain_flag.clone();
         let tls_acceptor = tls_acceptor.clone();
         let cache = cache.clone();
+        let apex_route = apex_route.clone();
 
         tokio::spawn(async move {
             // Sniff first byte to multiplex TLS user traffic (Cloudflare → NLB
@@ -383,6 +409,7 @@ async fn run_user_server(
                     let instance_count = instance_count.clone();
                     let drain_flag = drain_flag.clone();
                     let cache = cache.clone();
+                    let apex_route = apex_route.clone();
                     async move {
                         handle_user_request(
                             req,
@@ -390,6 +417,7 @@ async fn run_user_server(
                             instance_count,
                             drain_flag,
                             cache,
+                            apex_route,
                         )
                         .await
                     }
@@ -542,6 +570,7 @@ async fn handle_user_request(
     instance_count: Arc<AtomicU64>,
     drain_flag: Arc<AtomicBool>,
     cache: S3BundleCache,
+    apex_route: Option<Arc<ApexRoute>>,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     if req.uri().path().starts_with("/__fn0_queue_task/") {
         return Ok(hyper::Response::builder()
@@ -570,13 +599,16 @@ async fn handle_user_request(
     let request_path = req.uri().path().to_string();
 
     let resolve_start = std::time::Instant::now();
-    let project_id = match cache.resolve_domain(&host_no_port).await {
-        Some(sub) => sub,
-        None => host_no_port
-            .split('.')
-            .next()
-            .unwrap_or("unknown")
-            .to_string(),
+    let project_id = match apex_route.as_deref() {
+        Some(apex) if apex.domain == host_no_port => apex.project_id.clone(),
+        _ => match cache.resolve_domain(&host_no_port).await {
+            Some(sub) => sub,
+            None => host_no_port
+                .split('.')
+                .next()
+                .unwrap_or("unknown")
+                .to_string(),
+        },
     };
     fn0::telemetry::stage_duration("resolve_domain", resolve_start.elapsed());
 

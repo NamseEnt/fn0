@@ -547,6 +547,10 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       accessKeyId: objectStorageStorage.accessKeyId,
       secretAccessKey: objectStorageStorage.secretAccessKey,
     },
+    apex: {
+      domain,
+      projectId: "fn0-control",
+    },
   },
 });
 
@@ -558,6 +562,18 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
 new cloudflare.DnsRecord("worker-wildcard-a", {
   zoneId,
   name: pulumi.interpolate`*.${domain}`,
+  type: "A",
+  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
+  ttl: 1,
+  proxied: true,
+});
+
+// Apex fn0.dev → same worker NLB. The wildcard above never matches the bare
+// apex, so it needs its own record; the worker routes apex to the fn0-control
+// project via FN0_APEX_DOMAIN/FN0_APEX_PROJECT_ID.
+new cloudflare.DnsRecord("worker-apex-a", {
+  zoneId,
+  name: domain,
   type: "A",
   content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
   ttl: 1,
