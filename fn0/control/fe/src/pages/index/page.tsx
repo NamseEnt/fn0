@@ -181,16 +181,16 @@ pub async fn handler(
                     </div>
                 </section>
 
-                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16">
+                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16 text-center">
                     <Eyebrow>fn0 cloud</Eyebrow>
                     <h2 className="mt-3 text-3xl font-semibold tracking-tight">
                         fn0 Cloud is coming
                     </h2>
-                    <p className="mt-4 max-w-lg leading-relaxed text-ink-400">
+                    <p className="mx-auto mt-4 max-w-lg leading-relaxed text-ink-400">
                         A managed fn0 — you deploy, we run it. Two plans are in the
                         works. Join the waitlist and we'll email you when it opens.
                     </p>
-                    <div className="mt-8 grid max-w-2xl gap-5 sm:grid-cols-2">
+                    <div className="mx-auto mt-8 grid max-w-2xl gap-5 text-left sm:grid-cols-2">
                         <div className="rounded-xl border border-ink-700 bg-ink-900 p-6">
                             <div className="flex items-baseline justify-between">
                                 <span className="font-mono text-sm text-ink-400">free</span>
@@ -224,21 +224,23 @@ pub async fn handler(
                             </p>
                         </div>
                     </div>
-                    <div className="mt-8 max-w-2xl">
+                    <div className="mx-auto mt-8 max-w-2xl text-left">
                         <WaitlistForm />
                     </div>
                 </section>
 
-                <section className="mx-auto max-w-6xl px-5 py-16 pb-24">
-                    <Eyebrow>limits</Eyebrow>
-                    <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-                        fn0 Cloud limits
-                    </h2>
-                    <p className="mt-4 max-w-lg leading-relaxed text-ink-400">
-                        Per request, on fn0 Cloud. Run fn0 yourself and these limits are
-                        yours to change.
-                    </p>
-                    <div className="mt-8 max-w-2xl overflow-x-auto rounded-xl border border-ink-700">
+                <section className="mx-auto grid max-w-6xl items-start gap-10 px-5 py-16 pb-24 lg:grid-cols-2">
+                    <div>
+                        <Eyebrow>limits</Eyebrow>
+                        <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                            fn0 Cloud limits
+                        </h2>
+                        <p className="mt-4 max-w-lg leading-relaxed text-ink-400">
+                            Per request, on fn0 Cloud. Run fn0 yourself and these limits
+                            are yours to change.
+                        </p>
+                    </div>
+                    <div className="overflow-x-auto rounded-xl border border-ink-700">
                         <table className="w-full text-sm">
                             <tbody>
                                 {limits.map(([name, value]) => (
