@@ -134,6 +134,29 @@ See [development.md](../development.md) for full prerequisites.
 
 ---
 
+## `forte dev` local data
+
+### Reset local database
+
+The local libSQL database is stored in `.forte/data/` inside your project directory. To wipe it and start fresh:
+
+```sh
+rm -rf .forte/data/
+forte dev
+```
+
+`forte dev` recreates the directory on next start.
+
+### Reset local object storage
+
+Local object storage files are stored in `.forte/data/objects/`. To clear all objects without dropping the database:
+
+```sh
+rm -rf .forte/data/objects/
+```
+
+---
+
 ## Deployment
 
 ### `forte deploy` fails on first run
