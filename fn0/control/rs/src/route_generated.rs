@@ -217,6 +217,13 @@ async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
     if let Some(task_name) = path.strip_prefix("/__forte_admin/") {
         return handle_admin_task(task_name, &headers, &body_bytes).await;
     }
+    if path == "/ads.txt" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "text/plain; charset=utf-8")
+            .body(Body::from(include_bytes!("../public/ads.txt").to_vec()))
+            .unwrap());
+    }
     if path == "/app-ads.txt" {
         return Ok(Response::builder()
             .status(StatusCode::OK)
