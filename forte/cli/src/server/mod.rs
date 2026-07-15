@@ -248,6 +248,7 @@ async fn handle_request(
 
         if path.starts_with("/__self_invoke/")
             || path.starts_with("/__forte_action/")
+            || path.starts_with("/__forte_admin/")
             || path.starts_with("/api/")
         {
             return Ok(backend_response);
