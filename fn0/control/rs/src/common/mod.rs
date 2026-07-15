@@ -3,6 +3,7 @@ pub mod auth;
 pub mod aws_sign;
 pub mod cloudflare;
 pub mod cloudflare_saas;
+pub mod docs_site;
 pub mod github;
 pub mod project_name;
 pub mod r2_store;

@@ -16,6 +16,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 http = "1"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 forte-json = { path = "../../../forte/json" }
 forte-sdk = { path = "../../../forte/sdk" }
 doc-db = { package = "fn0-doc-db", path = "../../../doc-db" }

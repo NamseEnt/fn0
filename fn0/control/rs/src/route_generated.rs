@@ -1,3 +1,13 @@
+#[path = "pages/docs/mod.rs"]
+mod pages_docs;
+#[allow(non_snake_case)]
+#[path = "pages/docs/[page]/mod.rs"]
+mod pages_docs__page_;
+#[allow(non_snake_case)]
+#[path = "pages/docs/[section]/[page]/mod.rs"]
+mod pages_docs__section___page_;
+#[path = "pages/forte/mod.rs"]
+mod pages_forte;
 #[path = "pages/index/mod.rs"]
 mod pages_index;
 #[path = "pages/login/mod.rs"]
@@ -18,6 +28,10 @@ pub enum Redirect {
     External { url: String },
     OauthCliAuthorize,
     OauthGithubCallback,
+    Forte,
+    Docs_section__page_ { section: String, page: String },
+    Docs_page_ { page: String },
+    Docs,
     Index,
     Tokens,
     Login,
@@ -28,6 +42,17 @@ impl Redirect {
             Redirect::External { url } => url.clone(),
             Redirect::OauthCliAuthorize => "/oauth/cli/authorize".to_string(),
             Redirect::OauthGithubCallback => "/oauth/github/callback".to_string(),
+            Redirect::Forte => "/forte".to_string(),
+            Redirect::Docs_section__page_ { section, page } => {
+                format!(
+                    "/{}",
+                    ["docs".to_string(), section.to_string(), page.to_string()].join("/")
+                )
+            }
+            Redirect::Docs_page_ { page } => {
+                format!("/{}", ["docs".to_string(), page.to_string()].join("/"))
+            }
+            Redirect::Docs => "/docs".to_string(),
             Redirect::Index => "/".to_string(),
             Redirect::Tokens => "/tokens".to_string(),
             Redirect::Login => "/login".to_string(),
@@ -158,11 +183,24 @@ fn classify_route(path: &str) -> String {
     if path.strip_prefix("/__self_invoke/").is_some() {
         return "/__self_invoke/[name]".to_string();
     }
+    let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
     if path == "/oauth/cli/authorize" {
         return "/oauth/cli/authorize".to_string();
     }
     if path == "/oauth/github/callback" {
         return "/oauth/github/callback".to_string();
+    }
+    if path == "/forte" {
+        return "/forte".to_string();
+    }
+    if path_segments.len() == 3usize && path_segments[0usize] == "docs" {
+        return "/docs/[section]/[page]".to_string();
+    }
+    if path_segments.len() == 2usize && path_segments[0usize] == "docs" {
+        return "/docs/[page]".to_string();
+    }
+    if path == "/docs" {
+        return "/docs".to_string();
     }
     if path == "/" {
         return "/".to_string();
@@ -238,6 +276,7 @@ async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
             .body(Body::from(include_bytes!("../public/robots.txt").to_vec()))
             .unwrap());
     }
+    let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
     if path == "/oauth/cli/authorize" {
         use std::collections::HashMap;
         let query = parts.uri.query().unwrap_or("");
@@ -385,6 +424,171 @@ async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(Body::from("Internal Server Error"))
                     .unwrap())
+            }
+        }
+    } else if path == "/forte" {
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+        };
+        match pages_forte::handler(req).await {
+            Ok(props) => {
+                let body_bytes = forte_json::to_vec(&props);
+                Ok(build_response_with_cookies(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("x-fn0-next", "js")
+                        .body(Body::from(body_bytes))
+                        .unwrap(),
+                    &cookie_jar,
+                ))
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ))
+                } else {
+                    eprintln!("Error at {}: {:?}", path, e);
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap())
+                }
+            }
+        }
+    } else if path_segments.len() == 3usize && path_segments.first() == Some(&"docs") {
+        let section: String = path_segments[1usize].to_string();
+        let page: String = path_segments[2usize].to_string();
+        let path_params = pages_docs__section___page_::PathParams { section, page };
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+        };
+        match pages_docs__section___page_::handler(req, path_params).await {
+            Ok(props) => {
+                let body_bytes = forte_json::to_vec(&props);
+                Ok(build_response_with_cookies(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("x-fn0-next", "js")
+                        .body(Body::from(body_bytes))
+                        .unwrap(),
+                    &cookie_jar,
+                ))
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ))
+                } else {
+                    eprintln!("Error at {}: {:?}", path, e);
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap())
+                }
+            }
+        }
+    } else if path_segments.len() == 2usize && path_segments.first() == Some(&"docs") {
+        let page: String = path_segments[1usize].to_string();
+        let path_params = pages_docs__page_::PathParams { page };
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+        };
+        match pages_docs__page_::handler(req, path_params).await {
+            Ok(props) => {
+                let body_bytes = forte_json::to_vec(&props);
+                Ok(build_response_with_cookies(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("x-fn0-next", "js")
+                        .body(Body::from(body_bytes))
+                        .unwrap(),
+                    &cookie_jar,
+                ))
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ))
+                } else {
+                    eprintln!("Error at {}: {:?}", path, e);
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap())
+                }
+            }
+        }
+    } else if path == "/docs" {
+        let req = ForteRequest {
+            uri_authority,
+            method: &method,
+            headers: &headers,
+            jar: &mut cookie_jar,
+            raw_body: &body_bytes,
+            body: (),
+        };
+        match pages_docs::handler(req).await {
+            Ok(props) => {
+                let body_bytes = forte_json::to_vec(&props);
+                Ok(build_response_with_cookies(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("x-fn0-next", "js")
+                        .body(Body::from(body_bytes))
+                        .unwrap(),
+                    &cookie_jar,
+                ))
+            }
+            Err(e) => {
+                if let Some(redirect) = e.downcast_ref::<Redirect>() {
+                    Ok(build_response_with_cookies(
+                        Response::builder()
+                            .status(StatusCode::FOUND)
+                            .header(LOCATION, redirect.to_path())
+                            .body(Body::empty())
+                            .unwrap(),
+                        &cookie_jar,
+                    ))
+                } else {
+                    eprintln!("Error at {}: {:?}", path, e);
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("Internal Server Error"))
+                        .unwrap())
+                }
             }
         }
     } else if path == "/" {
@@ -786,6 +990,36 @@ async fn handle_action(
                 body: input,
             };
             let output = crate::actions::approve_cli_authorization::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "waitlist_join" => {
+            let input: crate::actions::waitlist_join::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::waitlist_join::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(build_response_with_cookies(
                 Response::builder()
@@ -1308,15 +1542,52 @@ async fn handle_queue_task_execute(body_bytes: &[u8]) -> Result<Response<Body>> 
             .unwrap()),
     }
 }
+#[forte_sdk::tracing::instrument(
+    name = "handle_admin_task",
+    skip_all,
+    fields(task = task_name),
+)]
 async fn handle_admin_task(
-    _task_name: &str,
-    _headers: &HeaderMap,
-    _body_bytes: &[u8],
+    task_name: &str,
+    headers: &HeaderMap,
+    body_bytes: &[u8],
 ) -> Result<Response<Body>> {
-    Ok(Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::from("No admin tasks defined"))
-        .unwrap())
+    let is_admin = headers
+        .get("x-fn0-admin")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v == "true")
+        .unwrap_or(false);
+    if !is_admin {
+        return Ok(Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::from("Unauthorized"))
+            .unwrap());
+    }
+    match task_name {
+        "waitlist_list" => {
+            let input: crate::admin::waitlist_list::Input =
+                forte_sdk::serde_json::from_slice(body_bytes)?;
+            let output = crate::admin::waitlist_list::handle(input).await;
+            match output {
+                Ok(value) => {
+                    let json = forte_sdk::serde_json::to_vec(&value)?;
+                    Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header("content-type", "application/json")
+                        .body(Body::from(json))
+                        .unwrap())
+                }
+                Err(e) => Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::from(format!("{:?}", e)))
+                    .unwrap()),
+            }
+        }
+        _ => Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from(format!("Admin task '{}' not found", task_name)))
+            .unwrap()),
+    }
 }
 fn make_cookie_jar(headers: &HeaderMap) -> cookie::CookieJar {
     let mut jar = cookie::CookieJar::new();

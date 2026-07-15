@@ -77,6 +77,14 @@ pub struct CronConfigDoc {
 }
 
 #[forte_doc]
+pub struct WaitlistDoc {
+    #[sk]
+    pub email: String,
+    pub tier_interest: String,
+    pub created_at: DateTime,
+}
+
+#[forte_doc]
 pub struct CliAuthorizationCodeDoc {
     #[pk]
     pub code: String,

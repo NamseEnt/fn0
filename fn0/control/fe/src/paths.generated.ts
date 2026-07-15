@@ -3,6 +3,10 @@
 export const paths = {
   "/oauth/cli/authorize": () => "/oauth/cli/authorize",
   "/oauth/github/callback": () => "/oauth/github/callback",
+  "/forte": () => "/forte",
+  "/docs/:section/:page": ({section, page}: {section: string; page: string}) => `/docs/${section}/${page}`,
+  "/docs/:page": ({page}: {page: string}) => `/docs/${page}`,
+  "/docs": () => "/docs",
   "/": () => "/",
   "/tokens": () => "/tokens",
   "/login": () => "/login",

@@ -1,0 +1,346 @@
+@import "tailwindcss";
+
+@theme {
+    --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+        monospace;
+
+    --color-ink-950: #0b0b11;
+    --color-ink-900: #121219;
+    --color-ink-800: #1a1a24;
+    --color-ink-700: #262633;
+    --color-ink-500: #75778e;
+    --color-ink-400: #9c9eb4;
+    --color-ink-100: #e9e9f1;
+
+    --color-brand-600: #654ff0;
+    --color-brand-500: #7463f5;
+    --color-brand-400: #8f82ff;
+    --color-brand-300: #b4abff;
+}
+
+/* Fallback element styles for internal console pages (tokens, oauth) that
+   rely on browser defaults which the Tailwind preflight resets. */
+body:not(:has(.site)) h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 1.2rem 0 0.8rem;
+}
+
+body:not(:has(.site)) h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 1.2rem 0 0.6rem;
+}
+
+body:not(:has(.site)) button {
+    border: 1px solid #999;
+    background-color: #f5f5f5;
+    padding: 2px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+body:not(:has(.site)) input {
+    border: 1px solid #999;
+    border-radius: 4px;
+}
+
+.site {
+    background-color: var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+.site ::selection {
+    background-color: var(--color-brand-600);
+    color: #fff;
+}
+
+.site :focus-visible {
+    outline: 2px solid var(--color-brand-400);
+    outline-offset: 2px;
+}
+
+/* Terminal window */
+
+.terminal {
+    background-color: #0a0a10;
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.75rem;
+    box-shadow: 0 24px 60px -24px rgb(101 79 240 / 0.25);
+    overflow: hidden;
+}
+
+.terminal-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--color-ink-800);
+}
+
+.terminal-dot {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 9999px;
+    background-color: var(--color-ink-700);
+}
+
+.terminal-title {
+    margin-left: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-ink-500);
+}
+
+.terminal-body {
+    padding: 1.1rem 1.25rem 1.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.9;
+    white-space: pre-wrap;
+}
+
+.term-line {
+    opacity: 0;
+    animation: term-show 0.01s both;
+    animation-delay: var(--d, 0s);
+}
+
+@keyframes term-show {
+    to {
+        opacity: 1;
+    }
+}
+
+.term-cmd-text {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    vertical-align: bottom;
+    width: 0;
+    animation: term-type var(--dur, 1s) steps(var(--steps, 20), end) both;
+    animation-delay: var(--d, 0s);
+}
+
+@keyframes term-type {
+    to {
+        width: calc(var(--steps) * 1ch);
+    }
+}
+
+.term-cursor {
+    display: inline-block;
+    width: 0.55em;
+    height: 1.05em;
+    vertical-align: text-bottom;
+    background-color: var(--color-brand-600);
+    animation: blink 1.1s step-end infinite;
+    animation-delay: var(--d, 0s);
+}
+
+.logo-cursor {
+    display: inline-block;
+    width: 0.5em;
+    height: 0.95em;
+    transform: translateY(0.12em);
+    background-color: var(--color-brand-600);
+    animation: blink 1.1s step-end infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .term-line,
+    .term-cmd-text {
+        animation-duration: 0.01s;
+        animation-delay: 0s;
+    }
+    .term-cursor,
+    .logo-cursor {
+        animation: none;
+    }
+}
+
+/* Code snippet cards */
+
+.code-card {
+    background-color: #0a0a10;
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.code-card-title {
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--color-ink-800);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--color-ink-500);
+}
+
+.code-card pre {
+    padding: 1rem 1.1rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--color-ink-100);
+    overflow-x: auto;
+}
+
+/* Docs prose (rendered markdown) */
+
+.doc-prose {
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: var(--color-ink-100);
+}
+
+.doc-prose h1 {
+    font-size: 2rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin-bottom: 1.25rem;
+}
+
+.doc-prose h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-top: 2.5rem;
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-ink-800);
+}
+
+.doc-prose h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.6rem;
+}
+
+.doc-prose h4 {
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.doc-prose h1,
+.doc-prose h2,
+.doc-prose h3,
+.doc-prose h4 {
+    scroll-margin-top: 2rem;
+}
+
+.doc-prose p {
+    margin-bottom: 1rem;
+}
+
+.doc-prose a {
+    color: var(--color-brand-400);
+    text-decoration: none;
+}
+
+.doc-prose a:hover {
+    text-decoration: underline;
+}
+
+.doc-prose ul,
+.doc-prose ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+}
+
+.doc-prose ul {
+    list-style: disc;
+}
+
+.doc-prose ol {
+    list-style: decimal;
+}
+
+.doc-prose li {
+    margin-bottom: 0.3rem;
+}
+
+.doc-prose li > ul,
+.doc-prose li > ol {
+    margin-top: 0.3rem;
+    margin-bottom: 0;
+}
+
+.doc-prose code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background-color: var(--color-ink-800);
+    border-radius: 0.3rem;
+    padding: 0.12em 0.35em;
+}
+
+.doc-prose pre {
+    background-color: #0a0a10;
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.6rem;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    line-height: 1.65;
+}
+
+.doc-prose pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.82rem;
+}
+
+.doc-prose blockquote {
+    border-left: 3px solid var(--color-brand-600);
+    padding-left: 1rem;
+    margin-bottom: 1rem;
+    color: var(--color-ink-400);
+}
+
+.doc-prose blockquote p {
+    margin-bottom: 0.5rem;
+}
+
+.doc-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+    display: block;
+    overflow-x: auto;
+}
+
+.doc-prose th,
+.doc-prose td {
+    border: 1px solid var(--color-ink-700);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.doc-prose th {
+    background-color: var(--color-ink-900);
+    font-weight: 600;
+}
+
+.doc-prose hr {
+    border: none;
+    border-top: 1px solid var(--color-ink-800);
+    margin: 2rem 0;
+}
+
+.doc-prose img {
+    max-width: 100%;
+}

@@ -1,4 +1,4 @@
-// Auto-generated from src/pages/index/mod.rs
+// Auto-generated from src/pages/forte/mod.rs
 
 import { z } from "zod";
 
