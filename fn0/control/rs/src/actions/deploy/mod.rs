@@ -146,16 +146,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 return Output::InternalError;
             }
         };
-        let static_bucket = format!("fn0-static-asset-{}", project.project_id);
         let now_dt = forte_sdk::now();
         req.body
             .files
             .iter()
             .map(|f| {
-                let key = format!("{}/{}", code_version, f.path);
+                let key = format!("{}/{}/{}", project.project_id, code_version, f.path);
                 let url = aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
                     account_id: &static_env.account_id,
-                    bucket: &static_bucket,
+                    bucket: &static_env.bucket,
                     region: "auto",
                     key: &key,
                     access_key_id: &static_env.access_key_id,
@@ -257,6 +256,7 @@ impl BundleEnv {
 
 struct StaticEnv {
     account_id: String,
+    bucket: String,
     access_key_id: String,
     secret_access_key: String,
 }
@@ -266,6 +266,8 @@ impl StaticEnv {
         Ok(Self {
             account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
+            bucket: std::env::var("FN0_STATIC_ASSET_STORAGE_BUCKET")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_BUCKET not set"))?,
             access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID").map_err(
                 |_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"),
             )?,
@@ -279,19 +281,6 @@ impl StaticEnv {
 
 async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
     let cf = CloudflareClient::from_env()?;
-    let public_base_domain = std::env::var("FN0_STATIC_ASSET_STORAGE_PUBLIC_BASE_DOMAIN")
-        .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_PUBLIC_BASE_DOMAIN not set"))?;
-    let zone_id = std::env::var("FN0_CLOUDFLARE_ZONE_ID")
-        .map_err(|_| anyhow::anyhow!("FN0_CLOUDFLARE_ZONE_ID not set"))?;
-
-    let bucket = format!("fn0-static-asset-{project_id}");
-    let custom_domain = format!("{project_id}.{public_base_domain}");
-
-    cf.create_r2_bucket(&bucket, "apac").await?;
-    cf.put_r2_bucket_cors(&bucket, &["GET", "HEAD"], "*", &[])
-        .await?;
-    cf.register_r2_custom_domain(&bucket, &custom_domain, &zone_id)
-        .await?;
     ensure_turso_database(project_id).await?;
     ensure_object_storage_bucket(&cf, project_id).await?;
     Ok(())
