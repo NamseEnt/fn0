@@ -231,6 +231,13 @@ async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
             .body(Body::from(include_bytes!("../public/app-ads.txt").to_vec()))
             .unwrap());
     }
+    if path == "/robots.txt" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "text/plain; charset=utf-8")
+            .body(Body::from(include_bytes!("../public/robots.txt").to_vec()))
+            .unwrap());
+    }
     if path == "/oauth/cli/authorize" {
         use std::collections::HashMap;
         let query = parts.uri.query().unwrap_or("");
