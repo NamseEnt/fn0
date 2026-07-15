@@ -4,7 +4,7 @@
 //! - superseded versions: for each project, delete `CompiledBundleDoc` rows and
 //!   their compiled/original R2 objects whose `code_version` is below the one
 //!   the worker fleet currently serves, and delete the matching
-//!   `{code_version}/` prefixes in the project's static asset bucket.
+//!   `{project_id}/{code_version}/` prefixes in the shared static asset bucket.
 //! - abandoned uploads: delete `original/*` objects that never produced a
 //!   `CompiledBundleDoc` once they are old enough, along with their static
 //!   asset prefixes.
@@ -144,6 +144,7 @@ impl BundleStore {
 
 struct StaticAssetStore {
     account_id: String,
+    bucket: String,
     access_key_id: String,
     secret_access_key: String,
 }
@@ -153,6 +154,8 @@ impl StaticAssetStore {
         Ok(Self {
             account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
+            bucket: std::env::var("FN0_STATIC_ASSET_STORAGE_BUCKET")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_BUCKET not set"))?,
             access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"))?,
             secret_access_key: std::env::var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")
@@ -160,19 +163,14 @@ impl StaticAssetStore {
         })
     }
 
-    fn bucket(project_id: &str) -> String {
-        format!("fn0-static-asset-{project_id}")
-    }
-
     async fn list_all(
         &self,
-        project_id: &str,
         prefix: &str,
         now: DateTime,
     ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
         r2_list_all(
             &self.account_id,
-            &Self::bucket(project_id),
+            &self.bucket,
             &self.access_key_id,
             &self.secret_access_key,
             prefix,
@@ -181,10 +179,10 @@ impl StaticAssetStore {
         .await
     }
 
-    async fn delete(&self, project_id: &str, key: &str, now: DateTime) -> anyhow::Result<()> {
+    async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
         aws_sign::r2_delete_object(aws_sign::R2ObjectRef {
             account_id: &self.account_id,
-            bucket: &Self::bucket(project_id),
+            bucket: &self.bucket,
             region: R2_REGION,
             key,
             access_key_id: &self.access_key_id,
@@ -307,10 +305,12 @@ async fn gc_superseded_static_prefixes(
     now: DateTime,
     stats: &mut GcStats,
 ) -> anyhow::Result<()> {
-    let objects = static_store.list_all(project_id, "", now).await?;
+    let objects = static_store
+        .list_all(&format!("{project_id}/"), now)
+        .await?;
     let mut keys_by_code_version: HashMap<u64, Vec<String>> = HashMap::new();
     for object in objects {
-        let Some(code_version) = parse_static_key(&object.key) else {
+        let Some(code_version) = parse_static_key(project_id, &object.key) else {
             continue;
         };
         keys_by_code_version
@@ -323,7 +323,7 @@ async fn gc_superseded_static_prefixes(
             continue;
         }
         for key in keys {
-            static_store.delete(project_id, &key, now).await?;
+            static_store.delete(&key, now).await?;
         }
         stats.deleted_static_prefixes += 1;
     }
@@ -387,13 +387,13 @@ async fn gc_abandoned_static_prefix(
     stats: &mut GcStats,
 ) -> anyhow::Result<()> {
     let objects = static_store
-        .list_all(project_id, &format!("{code_version}/"), now)
+        .list_all(&format!("{project_id}/{code_version}/"), now)
         .await?;
     if objects.is_empty() {
         return Ok(());
     }
     for object in objects {
-        static_store.delete(project_id, &object.key, now).await?;
+        static_store.delete(&object.key, now).await?;
     }
     stats.deleted_static_prefixes += 1;
     Ok(())
@@ -440,8 +440,9 @@ fn parse_compiled_key(key: &str) -> Option<(String, u64)> {
     Some((project_id, code_version))
 }
 
-fn parse_static_key(key: &str) -> Option<u64> {
-    key.split_once('/')?.0.parse().ok()
+fn parse_static_key(project_id: &str, key: &str) -> Option<u64> {
+    let rest = key.strip_prefix(project_id)?.strip_prefix('/')?;
+    rest.split_once('/')?.0.parse().ok()
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {

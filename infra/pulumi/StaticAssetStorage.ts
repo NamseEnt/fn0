@@ -7,6 +7,7 @@ export interface StaticAssetStorageArgs {
   accountId: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
   publicBaseDomain: pulumi.Input<string>;
+  bucketName: pulumi.Input<string>;
   cloudflareUserApiToken: pulumi.Input<string>;
 }
 
@@ -14,6 +15,7 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
   public readonly accountId: pulumi.Output<string>;
   public readonly zoneId: pulumi.Output<string>;
   public readonly publicBaseDomain: pulumi.Output<string>;
+  public readonly bucketName: pulumi.Output<string>;
   public readonly presignAccessKeyId: pulumi.Output<string>;
   public readonly presignSecretAccessKey: pulumi.Output<string>;
   public readonly cloudflareApiToken: pulumi.Output<string>;
@@ -25,7 +27,54 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
   ) {
     super("pkg:index:static-asset-storage", name, args, opts);
 
-    const { accountId, zoneId, publicBaseDomain } = args;
+    const { accountId, zoneId, publicBaseDomain, bucketName } = args;
+
+    // Every project's static assets share this one bucket under a
+    // `{project_id}/` key prefix, served by a single custom domain. This keeps
+    // the fn0.dev zone at exactly one DNS record for static assets regardless
+    // of project count (the per-project custom-domain approach hit the zone's
+    // DNS-record limit).
+    const bucket = new cloudflare.R2Bucket(
+      "bucket",
+      {
+        accountId,
+        name: bucketName,
+        location: "apac",
+      },
+      { parent: this },
+    );
+
+    new cloudflare.R2BucketCors(
+      "cors",
+      {
+        accountId,
+        bucketName: bucket.name,
+        rules: [
+          {
+            allowed: {
+              methods: ["GET", "HEAD"],
+              origins: ["*"],
+              headers: ["*"],
+            },
+            maxAgeSeconds: 86400,
+          },
+        ],
+      },
+      { parent: this, dependsOn: [bucket] },
+    );
+
+    new cloudflare.R2CustomDomain(
+      "custom-domain",
+      {
+        accountId,
+        bucketName: bucket.name,
+        domain: publicBaseDomain,
+        zoneId,
+        enabled: true,
+        minTls: "1.2",
+      },
+      { parent: this, dependsOn: [bucket] },
+    );
 
     const r2ItemReadId = "6a018a9f2fc74eb6b293b0c548f38b39";
     const r2ItemWriteId = "2efd5506f9c8494dacb1fa10a3e7d5b6";
@@ -79,6 +128,7 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
     this.accountId = pulumi.output(accountId);
     this.zoneId = pulumi.output(zoneId);
     this.publicBaseDomain = pulumi.output(publicBaseDomain);
+    this.bucketName = bucket.name;
     this.presignAccessKeyId = presignToken.id;
     this.presignSecretAccessKey = pulumi.secret(
       presignToken.value.apply((v) =>

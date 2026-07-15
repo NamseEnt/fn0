@@ -63,7 +63,7 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
         .expect("system clock returns positive timestamp");
     let static_base_domain = std::env::var("FORTE_STATIC_BASE_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_STATIC_BASE_DOMAIN.to_string());
-    let static_base_url = format!("https://{project_id}.{static_base_domain}/{code_version}/");
+    let static_base_url = format!("https://{static_base_domain}/{project_id}/{code_version}/");
     println!("project_id: {project_id}");
     println!("code_version: {code_version}");
     println!("static base URL: {static_base_url}");

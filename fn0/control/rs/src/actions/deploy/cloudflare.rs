@@ -116,57 +116,6 @@ impl CloudflareClient {
         );
     }
 
-    pub async fn register_r2_custom_domain(
-        &self,
-        bucket_name: &str,
-        domain: &str,
-        zone_id: &str,
-    ) -> anyhow::Result<()> {
-        #[derive(Serialize)]
-        struct CreateBody<'a> {
-            domain: &'a str,
-            #[serde(rename = "zoneId")]
-            zone_id: &'a str,
-            enabled: bool,
-            #[serde(rename = "minTLS")]
-            min_tls: &'a str,
-        }
-        let create_payload = serde_json::to_vec(&CreateBody {
-            domain,
-            zone_id,
-            enabled: true,
-            min_tls: "1.2",
-        })?;
-        let create_path = format!(
-            "/accounts/{}/r2/buckets/{}/domains/custom",
-            self.account_id, bucket_name
-        );
-        let (status, body) = self.call("POST", &create_path, create_payload).await?;
-        if !(200..300).contains(&status) && !response_indicates_already_exists(&body) {
-            anyhow::bail!(
-                "register_r2_custom_domain {domain} failed (status={status}): {}",
-                String::from_utf8_lossy(&body)
-            );
-        }
-
-        #[derive(Serialize)]
-        struct EditBody {
-            enabled: bool,
-        }
-        let edit_payload = serde_json::to_vec(&EditBody { enabled: true })?;
-        let edit_path = format!(
-            "/accounts/{}/r2/buckets/{}/domains/custom/{}",
-            self.account_id, bucket_name, domain
-        );
-        let (status, body) = self.call("PUT", &edit_path, edit_payload).await?;
-        if (200..300).contains(&status) {
-            return Ok(());
-        }
-        anyhow::bail!(
-            "enable_r2_custom_domain {domain} failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
 }
 
 #[derive(Deserialize)]
