@@ -41,6 +41,27 @@ impl std::fmt::Display for Redirect {
 }
 impl std::error::Error for Redirect {}
 pub mod enqueue {
+    pub async fn project_teardown(
+        input: crate::queue_task::project_teardown::Input,
+    ) -> forte_sdk::anyhow::Result<()> {
+        let payload = forte_sdk::serde_json::to_value(&input)?;
+        let body = forte_sdk::serde_json::to_vec(&forte_sdk::serde_json::json!(
+            { "task_name" : "project_teardown", "payload" : payload, }
+        ))?;
+        let url = std::env::var("FN0_QUEUE_URL")
+            .map_err(|_| forte_sdk::anyhow::anyhow!("FN0_QUEUE_URL is not set"))?;
+        let request = forte_sdk::http::Request::post(&url)
+            .header("Content-Type", "application/json")
+            .body(body)?;
+        let response = forte_sdk::http::Client::new().send(request).await?;
+        if !response.status().is_success() {
+            return Err(forte_sdk::anyhow::anyhow!(
+                "enqueue failed with status {}",
+                response.status()
+            ));
+        }
+        Ok(())
+    }
     pub async fn cloudflare_register(
         input: crate::queue_task::cloudflare_register::Input,
     ) -> forte_sdk::anyhow::Result<()> {
@@ -90,7 +111,7 @@ mod proxy {
         { inline :
         "package forte:user; world service-export { import wasi:http/types@0.3.0-rc-2026-03-15; export wasi:http/handler@0.3.0-rc-2026-03-15; }",
         path :
-        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/debug/build/fn0-control-f810d8d543155061/out",
+        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/debug/build/fn0-control-a2ee08aec1ad37b8/out",
         world : "service-export", default_bindings_module :
         "crate::route_generated::proxy", pub_export_macro : true, async : true, features
         : ["clocks-timezone"], with : { "wasi:http/handler@0.3.0-rc-2026-03-15" :
@@ -195,6 +216,13 @@ async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
     }
     if let Some(task_name) = path.strip_prefix("/__forte_admin/") {
         return handle_admin_task(task_name, &headers, &body_bytes).await;
+    }
+    if path == "/app-ads.txt" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "text/plain; charset=utf-8")
+            .body(Body::from(include_bytes!("../public/app-ads.txt").to_vec()))
+            .unwrap());
     }
     if path == "/oauth/cli/authorize" {
         use std::collections::HashMap;
@@ -873,6 +901,36 @@ async fn handle_action(
                 cookie_jar,
             ))
         }
+        "delete_project" => {
+            let input: crate::actions::delete_project::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::delete_project::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
         "secrets_encrypt" => {
             let input: crate::actions::secrets_encrypt::Input =
                 match forte_json::from_slice(body_bytes) {
@@ -1170,6 +1228,22 @@ async fn handle_queue_task_execute(body_bytes: &[u8]) -> Result<Response<Body>> 
     };
     let payload = &request["payload"];
     let result = match task_name {
+        "project_teardown" => {
+            let input: crate::queue_task::project_teardown::Input =
+                match forte_sdk::serde_json::from_value(payload.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!(
+                                "invalid payload for task '{}': {}",
+                                task_name, e
+                            )))
+                            .unwrap());
+                    }
+                };
+            crate::queue_task::project_teardown::handle(input).await
+        }
         "cloudflare_register" => {
             let input: crate::queue_task::cloudflare_register::Input =
                 match forte_sdk::serde_json::from_value(payload.clone()) {

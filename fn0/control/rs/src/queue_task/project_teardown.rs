@@ -1,0 +1,230 @@
+//! Full teardown of one project, enqueued by the `delete_project` action.
+//!
+//! The queue is at-least-once with redelivery on failure, so every step
+//! tolerates already-deleted resources and the identity docs (`ProjectDoc`,
+//! the owner's `UserDoc.projects` entry) are removed last: a redelivered
+//! message re-runs the whole sequence and converges.
+//!
+//! Known race: the owner can re-deploy the project while teardown is in
+//! flight and resurrect some resources. That is the owner racing their own
+//! destroy, so it is accepted rather than locked against.
+
+use crate::common::cloudflare::CloudflareClient;
+use crate::common::cloudflare_saas::CloudflareSaasClient;
+use crate::common::r2_store::{
+    BundleStore, ObjectStorageStore, StaticAssetStore, parse_compiled_key,
+};
+use crate::docs::*;
+use forte_sdk::*;
+use serde::{Deserialize, Serialize};
+
+const QUERY_PAGE_LIMIT: usize = 256;
+
+#[derive(Serialize, Deserialize)]
+pub struct Input {
+    pub project_id: String,
+}
+
+pub async fn handle(input: Input) -> anyhow::Result<()> {
+    let project_id = input.project_id;
+    let db = doc_db::turso();
+    let now = forte_sdk::now();
+
+    delete_custom_domain(&db, &project_id).await?;
+    remove_routing_and_cron(&db, &project_id).await?;
+    delete_bundle_store_objects(&project_id, now).await?;
+    delete_static_assets(&project_id, now).await?;
+    delete_object_storage_bucket(&project_id, now).await?;
+    delete_turso_database(&project_id).await?;
+    delete_compiled_bundle_docs(&db, &project_id).await?;
+    delete_identity_docs(&db, &project_id).await?;
+
+    tracing::info!(%project_id, "project_teardown complete");
+    Ok(())
+}
+
+// The SaaS custom hostname must go before the manifest entry: the domain name
+// only lives in the manifest, so deleting the entry first would strand the
+// hostname on a redelivered message.
+async fn delete_custom_domain(db: &doc_db::Database, project_id: &str) -> anyhow::Result<()> {
+    let Some(manifest) = (WorkerManifestDocGet {}).send_with(db).await? else {
+        return Ok(());
+    };
+    let Some(domain) = manifest
+        .project_manifests
+        .get(project_id)
+        .and_then(|entry| entry.custom_domain.clone())
+    else {
+        return Ok(());
+    };
+    CloudflareSaasClient::from_env()?
+        .delete_by_name(&domain)
+        .await?;
+    tracing::info!(%project_id, %domain, "project_teardown: custom domain deleted");
+    Ok(())
+}
+
+async fn remove_routing_and_cron(db: &doc_db::Database, project_id: &str) -> anyhow::Result<()> {
+    let result = db
+        .trx(|trx| {
+            let project_id = project_id.to_string();
+            async move {
+                if let Some(mut manifest) = trx.get(WorkerManifestDocGet {}).await?
+                    && manifest.project_manifests.contains_key(&project_id)
+                {
+                    manifest.project_manifests.remove(&project_id);
+                    manifest.manifest_version += 1;
+                }
+                if let Some(cron) = trx
+                    .get(CronConfigDocGet {
+                        project_id: &project_id,
+                    })
+                    .await?
+                {
+                    cron.delete();
+                }
+                trx.commit::<_, std::convert::Infallible>(())
+            }
+        })
+        .await;
+    match result {
+        doc_db::TrxResult::Committed(()) => Ok(()),
+        doc_db::TrxResult::Cancelled(cancel) => match cancel {},
+        doc_db::TrxResult::Conflict(d) => {
+            anyhow::bail!("remove_routing_and_cron trx conflict: {d:?}")
+        }
+        doc_db::TrxResult::Err(e) => Err(e),
+    }
+}
+
+async fn delete_bundle_store_objects(project_id: &str, now: DateTime) -> anyhow::Result<()> {
+    let store = BundleStore::from_env()?;
+    for object in store
+        .list_all(&format!("original/{project_id}/"), now)
+        .await?
+    {
+        store.delete(&object.key, now).await?;
+    }
+    for object in store.list_all("compiled/", now).await? {
+        let Some((key_project_id, _)) = parse_compiled_key(&object.key) else {
+            continue;
+        };
+        if key_project_id == project_id {
+            store.delete(&object.key, now).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn delete_static_assets(project_id: &str, now: DateTime) -> anyhow::Result<()> {
+    let store = StaticAssetStore::from_env()?;
+    for object in store.list_all(&format!("{project_id}/"), now).await? {
+        store.delete(&object.key, now).await?;
+    }
+    Ok(())
+}
+
+async fn delete_object_storage_bucket(project_id: &str, now: DateTime) -> anyhow::Result<()> {
+    let store = ObjectStorageStore::from_env(project_id)?;
+    let cloudflare = CloudflareClient::from_env()?;
+    // S3 ListObjectsV2 errors on a missing bucket instead of returning an
+    // empty page, so existence is checked up front to keep this step
+    // re-runnable.
+    if !cloudflare.r2_bucket_exists(store.bucket()).await? {
+        return Ok(());
+    }
+    for object in store.list_all("", now).await? {
+        store.delete(&object.key, now).await?;
+    }
+    cloudflare.delete_r2_bucket(store.bucket()).await?;
+    tracing::info!(%project_id, bucket = store.bucket(), "project_teardown: object storage bucket deleted");
+    Ok(())
+}
+
+async fn delete_turso_database(project_id: &str) -> anyhow::Result<()> {
+    let api_token = std::env::var("FN0_TURSO_API_TOKEN")
+        .map_err(|_| anyhow::anyhow!("FN0_TURSO_API_TOKEN not set"))?;
+    let org_slug = std::env::var("FN0_TURSO_ORG_SLUG")
+        .map_err(|_| anyhow::anyhow!("FN0_TURSO_ORG_SLUG not set"))?;
+
+    let url = format!("https://api.turso.tech/v1/organizations/{org_slug}/databases/{project_id}");
+    let req = http::Request::builder()
+        .uri(url)
+        .method("DELETE")
+        .header("Authorization", format!("Bearer {api_token}"))
+        .body(Vec::new())?;
+    let resp = http::Client::new().send(req).await?;
+    let status = resp.status().as_u16();
+    if (200..300).contains(&status) || status == 404 {
+        return Ok(());
+    }
+    let body_bytes = resp.into_body().bytes().await.to_vec();
+    anyhow::bail!(
+        "turso delete_database {project_id} failed (status={status}): {}",
+        String::from_utf8_lossy(&body_bytes)
+    );
+}
+
+async fn delete_compiled_bundle_docs(
+    db: &doc_db::Database,
+    project_id: &str,
+) -> anyhow::Result<()> {
+    loop {
+        let page: Vec<CompiledBundleDoc> = (CompiledBundleDocQuery {
+            project_id,
+            code_version: None,
+            limit: Some(QUERY_PAGE_LIMIT),
+        })
+        .send_with(db)
+        .await?;
+        if page.is_empty() {
+            return Ok(());
+        }
+        for doc in &page {
+            (CompiledBundleDocDelete {
+                project_id,
+                code_version: doc.code_version,
+            })
+            .send_with(db)
+            .await?;
+        }
+    }
+}
+
+async fn delete_identity_docs(db: &doc_db::Database, project_id: &str) -> anyhow::Result<()> {
+    let result = db
+        .trx(|trx| {
+            let project_id = project_id.to_string();
+            async move {
+                let owner_github_id = match trx
+                    .get(ProjectDocGet {
+                        project_id: &project_id,
+                    })
+                    .await?
+                {
+                    Some(project) => {
+                        let github_id = project.owner_github_id;
+                        project.delete();
+                        Some(github_id)
+                    }
+                    None => None,
+                };
+                if let Some(github_id) = owner_github_id
+                    && let Some(mut user) = trx.get(UserDocGet { github_id }).await?
+                    && user.projects.iter().any(|e| e.project_id == project_id)
+                {
+                    user.projects.retain(|e| e.project_id != project_id);
+                }
+                trx.commit::<_, std::convert::Infallible>(())
+            }
+        })
+        .await;
+    match result {
+        doc_db::TrxResult::Committed(()) => Ok(()),
+        doc_db::TrxResult::Cancelled(cancel) => match cancel {},
+        doc_db::TrxResult::Conflict(d) => {
+            anyhow::bail!("delete_identity_docs trx conflict: {d:?}")
+        }
+        doc_db::TrxResult::Err(e) => Err(e),
+    }
+}

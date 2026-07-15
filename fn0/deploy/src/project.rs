@@ -75,6 +75,49 @@ enum RenameProject {
     InternalError,
 }
 
+#[derive(Serialize)]
+struct DeleteProjectInput<'a> {
+    project_id: &'a str,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "t", rename_all_fields = "camelCase")]
+enum DeleteProject {
+    Ok,
+    NotLoggedIn,
+    NotFound,
+    InternalError,
+}
+
+pub async fn delete_project(project_id: &str) -> Result<()> {
+    let creds = crate::credentials::require()?;
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/__forte_action/delete_project",
+        creds.control_url.trim_end_matches('/')
+    );
+    let resp = client
+        .post(&url)
+        .bearer_auth(&creds.token)
+        .json(&DeleteProjectInput { project_id })
+        .send()
+        .await?
+        .error_for_status()?;
+    let raw: DeleteProject = resp.json().await?;
+    match raw {
+        DeleteProject::Ok => Ok(()),
+        DeleteProject::NotLoggedIn => {
+            Err(anyhow!("control rejected token; run `fn0 login` again."))
+        }
+        DeleteProject::NotFound => Err(anyhow!(
+            "project '{project_id}' not found or not owned by you."
+        )),
+        DeleteProject::InternalError => Err(anyhow!(
+            "delete_project: server error; check fn0-control logs"
+        )),
+    }
+}
+
 pub async fn rename_project(project_id: &str, new_name: &str) -> Result<()> {
     let creds = crate::credentials::require()?;
     let client = reqwest::Client::new();

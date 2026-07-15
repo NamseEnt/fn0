@@ -33,8 +33,8 @@ async fn async_main() -> Result<()> {
         Commands::Deploy => {
             commands::deploy::execute().await?;
         }
-        Commands::Destroy => {
-            commands::destroy::execute().await?;
+        Commands::Destroy { project_id, yes } => {
+            commands::destroy::execute(project_id, yes).await?;
         }
         Commands::Rename { new_name } => {
             commands::rename::execute(&new_name).await?;

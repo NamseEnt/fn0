@@ -1,8 +1,6 @@
-mod cloudflare;
-
-use cloudflare::CloudflareClient;
 use crate::common::auth;
 use crate::common::aws_sign;
+use crate::common::cloudflare::CloudflareClient;
 use crate::docs::*;
 use crate::quota;
 use forte_sdk::*;
@@ -290,7 +288,10 @@ async fn ensure_object_storage_bucket(
     cf: &CloudflareClient,
     project_id: &str,
 ) -> anyhow::Result<()> {
-    let bucket = format!("fn0-object-storage-{project_id}");
+    let bucket = format!(
+        "{}{project_id}",
+        crate::common::r2_store::OBJECT_STORAGE_BUCKET_PREFIX
+    );
     cf.create_r2_bucket(&bucket, "apac").await?;
     cf.put_r2_bucket_cors(&bucket, &["GET", "PUT", "HEAD"], "*", &["ETag"])
         .await?;

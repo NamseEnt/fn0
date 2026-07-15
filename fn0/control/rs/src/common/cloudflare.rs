@@ -66,6 +66,33 @@ impl CloudflareClient {
         );
     }
 
+    pub async fn r2_bucket_exists(&self, bucket_name: &str) -> anyhow::Result<bool> {
+        let path = format!("/accounts/{}/r2/buckets/{}", self.account_id, bucket_name);
+        let (status, body) = self.call("GET", &path, Vec::new()).await?;
+        if (200..300).contains(&status) {
+            return Ok(true);
+        }
+        if status == 404 {
+            return Ok(false);
+        }
+        anyhow::bail!(
+            "r2_bucket_exists {bucket_name} failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
+    pub async fn delete_r2_bucket(&self, bucket_name: &str) -> anyhow::Result<()> {
+        let path = format!("/accounts/{}/r2/buckets/{}", self.account_id, bucket_name);
+        let (status, body) = self.call("DELETE", &path, Vec::new()).await?;
+        if (200..300).contains(&status) || status == 404 {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "delete_r2_bucket {bucket_name} failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
     pub async fn put_r2_bucket_cors(
         &self,
         bucket_name: &str,

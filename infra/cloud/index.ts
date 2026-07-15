@@ -379,6 +379,14 @@ const cloudflareApiTokenCt = pulumi
   .all([controlDek.plaintext, staticAssetStorage.cloudflareApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
+const controlObjectStorageAccessKeyIdCt = pulumi
+  .all([controlDek.plaintext, objectStorageStorage.accessKeyId])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const controlObjectStorageSecretAccessKeyCt = pulumi
+  .all([controlDek.plaintext, objectStorageStorage.secretAccessKey])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const controlTursoApiTokenCt = pulumi
   .all([controlDek.plaintext, tursoApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
@@ -412,6 +420,9 @@ const controlEnvYamlBootstrap = pulumi
     pulumi.output(config.require("tursoOrganizationSlug")),
     forteDb.groupName,
     cloudflareSaasApiTokenCt,
+    objectStorageStorage.accountId,
+    controlObjectStorageAccessKeyIdCt,
+    controlObjectStorageSecretAccessKeyCt,
   ])
   .apply(
     ([
@@ -438,6 +449,9 @@ const controlEnvYamlBootstrap = pulumi
       tursoOrgSlug,
       tursoGroupName,
       cfSaasApiTokenCt,
+      objectStorageAccountId,
+      objectStorageAccessKeyIdCt,
+      objectStorageSecretAccessKeyCt,
     ]) =>
       [
         "__dek:",
@@ -477,6 +491,11 @@ const controlEnvYamlBootstrap = pulumi
         `FN0_CLOUDFLARE_SAAS_ZONE_ID: ${cfZoneId}`,
         "FN0_CLOUDFLARE_SAAS_API_TOKEN:",
         `  secret: ${cfSaasApiTokenCt}`,
+        `FN0_OBJECT_STORAGE_ACCOUNT_ID: ${objectStorageAccountId}`,
+        "FN0_OBJECT_STORAGE_ACCESS_KEY_ID:",
+        `  secret: ${objectStorageAccessKeyIdCt}`,
+        "FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY:",
+        `  secret: ${objectStorageSecretAccessKeyCt}`,
         "",
       ].join("\n"),
   );

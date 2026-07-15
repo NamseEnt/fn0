@@ -6,6 +6,7 @@ pub mod bundle_compiled;
 pub mod bundle_gc;
 pub mod bundle_uploaded;
 pub mod cron_on_tick;
+pub mod delete_project;
 pub mod deploy;
 pub mod deploy_status;
 pub mod domain_add;

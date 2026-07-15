@@ -10,7 +10,7 @@
 //!   asset prefixes.
 
 use crate::common::admin;
-use crate::common::aws_sign;
+use crate::common::r2_store::{BundleStore, StaticAssetStore, parse_compiled_key};
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,6 @@ pub const STATIC_ASSET_GRACE_SECS: i64 = 24 * 60 * 60;
 pub const ABANDONED_UPLOAD_TTL_SECS: i64 = 24 * 60 * 60;
 
 const QUERY_PAGE_LIMIT: usize = 256;
-const R2_REGION: &str = "auto";
 
 #[derive(Deserialize)]
 pub struct Input {}
@@ -58,139 +57,6 @@ pub struct GcStats {
     pub deleted_versions: u64,
     pub deleted_orphans: u64,
     pub deleted_static_prefixes: u64,
-}
-
-async fn r2_list_all(
-    account_id: &str,
-    bucket: &str,
-    access_key_id: &str,
-    secret_access_key: &str,
-    prefix: &str,
-    now: DateTime,
-) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
-    let mut objects = Vec::new();
-    let mut continuation_token: Option<String> = None;
-    loop {
-        let page = aws_sign::r2_list_objects(aws_sign::R2ListArgs {
-            account_id,
-            bucket,
-            region: R2_REGION,
-            prefix,
-            continuation_token: continuation_token.as_deref(),
-            access_key_id,
-            secret_access_key,
-            now,
-        })
-        .await?;
-        objects.extend(page.objects);
-        match page.next_continuation_token {
-            Some(token) => continuation_token = Some(token),
-            None => break,
-        }
-    }
-    Ok(objects)
-}
-
-struct BundleStore {
-    account_id: String,
-    bucket: String,
-    access_key_id: String,
-    secret_access_key: String,
-}
-
-impl BundleStore {
-    fn from_env() -> anyhow::Result<Self> {
-        Ok(Self {
-            account_id: std::env::var("FN0_BUNDLE_STORE_ACCOUNT_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_ACCOUNT_ID not set"))?,
-            bucket: std::env::var("FN0_BUNDLE_STORE_BUCKET")
-                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_BUCKET not set"))?,
-            access_key_id: std::env::var("FN0_BUNDLE_STORE_ACCESS_KEY_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_ACCESS_KEY_ID not set"))?,
-            secret_access_key: std::env::var("FN0_BUNDLE_STORE_SECRET_ACCESS_KEY")
-                .map_err(|_| anyhow::anyhow!("FN0_BUNDLE_STORE_SECRET_ACCESS_KEY not set"))?,
-        })
-    }
-
-    async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
-        aws_sign::r2_delete_object(aws_sign::R2ObjectRef {
-            account_id: &self.account_id,
-            bucket: &self.bucket,
-            region: R2_REGION,
-            key,
-            access_key_id: &self.access_key_id,
-            secret_access_key: &self.secret_access_key,
-            now,
-        })
-        .await
-    }
-
-    async fn list_all(
-        &self,
-        prefix: &str,
-        now: DateTime,
-    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
-        r2_list_all(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            prefix,
-            now,
-        )
-        .await
-    }
-}
-
-struct StaticAssetStore {
-    account_id: String,
-    bucket: String,
-    access_key_id: String,
-    secret_access_key: String,
-}
-
-impl StaticAssetStore {
-    fn from_env() -> anyhow::Result<Self> {
-        Ok(Self {
-            account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
-            bucket: std::env::var("FN0_STATIC_ASSET_STORAGE_BUCKET")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_BUCKET not set"))?,
-            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"))?,
-            secret_access_key: std::env::var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY not set"))?,
-        })
-    }
-
-    async fn list_all(
-        &self,
-        prefix: &str,
-        now: DateTime,
-    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
-        r2_list_all(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            prefix,
-            now,
-        )
-        .await
-    }
-
-    async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
-        aws_sign::r2_delete_object(aws_sign::R2ObjectRef {
-            account_id: &self.account_id,
-            bucket: &self.bucket,
-            region: R2_REGION,
-            key,
-            access_key_id: &self.access_key_id,
-            secret_access_key: &self.secret_access_key,
-            now,
-        })
-        .await
-    }
 }
 
 pub async fn run_gc() -> anyhow::Result<GcStats> {
@@ -429,15 +295,6 @@ fn parse_original_key(key: &str) -> Option<(String, u64)> {
     let rest = key.strip_prefix("original/")?.strip_suffix(".tar")?;
     let (project_id, code_version) = rest.split_once('/')?;
     Some((project_id.to_string(), code_version.parse().ok()?))
-}
-
-fn parse_compiled_key(key: &str) -> Option<(String, u64)> {
-    let rest = key.strip_prefix("compiled/")?.strip_suffix(".tar.zst")?;
-    let mut segments = rest.rsplitn(3, '/');
-    let code_version: u64 = segments.next()?.parse().ok()?;
-    let project_id = segments.next()?.to_string();
-    segments.next()?;
-    Some((project_id, code_version))
 }
 
 fn parse_static_key(project_id: &str, key: &str) -> Option<u64> {

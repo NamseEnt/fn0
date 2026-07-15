@@ -16,7 +16,12 @@ pub enum Commands {
     },
     Build,
     Deploy,
-    Destroy,
+    Destroy {
+        #[arg(long)]
+        project_id: Option<String>,
+        #[arg(long)]
+        yes: bool,
+    },
     Rename {
         new_name: String,
     },
