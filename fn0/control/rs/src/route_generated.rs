@@ -269,6 +269,13 @@ async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
             .body(Body::from(include_bytes!("../public/app-ads.txt").to_vec()))
             .unwrap());
     }
+    if path == "/og.png" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "image/png")
+            .body(Body::from(include_bytes!("../public/og.png").to_vec()))
+            .unwrap());
+    }
     if path == "/robots.txt" {
         return Ok(Response::builder()
             .status(StatusCode::OK)

@@ -14,6 +14,21 @@ export function Head() {
                 name="description"
                 content="fn0 is an open-source FaaS platform powered by WebAssembly. Build with Rust or TypeScript, deploy in one command — a reasonable alternative to Cloudflare Workers."
             />
+            <meta
+                property="og:title"
+                content="fn0 — the batteries-included FaaS platform"
+            />
+            <meta
+                property="og:description"
+                content="fn0 is an open-source FaaS platform powered by WebAssembly. Build with Rust or TypeScript, deploy in one command — a reasonable alternative to Cloudflare Workers."
+            />
+            <meta property="og:url" content="https://fn0.dev" />
+            <meta property="og:type" content="website" />
+            <meta property="og:site_name" content="fn0" />
+            <meta property="og:image" content="https://fn0.dev/og.png" />
+            <meta property="og:image:width" content="1200" />
+            <meta property="og:image:height" content="630" />
+            <meta name="twitter:card" content="summary_large_image" />
             <link rel="icon" href={favicon} />
             <link rel="preconnect" href="https://fonts.googleapis.com" />
             <link

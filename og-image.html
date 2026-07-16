@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>fn0 OG Image (1200x630)</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            background: #1a1a1a;
+            font-family: 'Roboto Mono', monospace;
+            color: #ccc;
+        }
+        canvas {
+            max-width: 90vw;
+            height: auto;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+        }
+        button {
+            font-family: inherit;
+            font-size: 16px;
+            padding: 12px 28px;
+            background: #654FF0;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:hover { background: #7a66f5; }
+        p { font-size: 13px; color: #888; }
+    </style>
+</head>
+<body>
+    <canvas id="og" width="1200" height="630"></canvas>
+    <button id="download">Download og.png</button>
+    <p>Save to control/rs/public/og.png</p>
+    <script>
+        const canvas = document.getElementById("og");
+        const ctx = canvas.getContext("2d");
+        const purple = "#654FF0";
+        const font = '400 240px "Roboto Mono", monospace';
+
+        function roundedRect(x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        }
+
+        function draw() {
+            ctx.fillStyle = "#1a1a1a";
+            ctx.fillRect(0, 0, 1200, 630);
+
+            const margin = 24;
+            roundedRect(margin, margin, 1200 - margin * 2, 630 - margin * 2, 32);
+            ctx.fillStyle = "#000";
+            ctx.fill();
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            ctx.font = font;
+            ctx.textBaseline = "middle";
+
+            const promptGap = 40;
+            const cursorGap = 20;
+            const cursorWidth = 60;
+            const cursorHeight = 200;
+            const promptWidth = ctx.measureText(">").width;
+            const textWidth = ctx.measureText("fn0").width;
+            const totalWidth =
+                promptWidth + promptGap + textWidth + cursorGap + cursorWidth;
+
+            const startX = (1200 - totalWidth) / 2;
+            const centerY = 630 / 2;
+
+            ctx.fillStyle = purple;
+            ctx.fillText(">", startX, centerY);
+
+            ctx.fillStyle = "#fff";
+            ctx.fillText("fn0", startX + promptWidth + promptGap, centerY);
+
+            ctx.fillStyle = purple;
+            ctx.fillRect(
+                startX + promptWidth + promptGap + textWidth + cursorGap,
+                centerY - cursorHeight / 2,
+                cursorWidth,
+                cursorHeight,
+            );
+        }
+
+        const fontLink = document.createElement("link");
+        fontLink.rel = "stylesheet";
+        fontLink.href =
+            "https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap";
+        document.head.appendChild(fontLink);
+
+        document.fonts.load(font).then(() => document.fonts.ready).then(draw);
+        draw();
+
+        document.getElementById("download").addEventListener("click", () => {
+            const a = document.createElement("a");
+            a.download = "og.png";
+            a.href = canvas.toDataURL("image/png");
+            a.click();
+        });
+    </script>
+</body>
+</html>
