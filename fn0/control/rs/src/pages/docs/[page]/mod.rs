@@ -22,7 +22,7 @@ pub async fn handler(_req: ForteRequest<'_>, params: PathParams) -> anyhow::Resu
     Ok(match docs_site::find(&params.page) {
         Some(doc) => Props::Ok {
             title: doc.title.to_string(),
-            html: docs_site::render_html(doc),
+            html: doc.html.to_string(),
             nav: docs_site::nav(),
         },
         None => Props::NotFound {

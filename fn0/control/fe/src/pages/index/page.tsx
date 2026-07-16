@@ -2,6 +2,7 @@ import { SiteFooter } from "../../components/SiteFooter";
 import { GITHUB_URL, SiteHeader } from "../../components/SiteHeader";
 import { Terminal, type TerminalLine } from "../../components/Terminal";
 import { WaitlistForm } from "../../components/WaitlistForm";
+import type { Props } from "./.props";
 
 const heroLines: TerminalLine[] = [
     { kind: "cmd", text: "fn0 init my-app", delay: 0.3, duration: 1.0 },
@@ -83,7 +84,7 @@ const limits = [
     ["Subrequests", "50 per request"],
 ];
 
-export default function IndexPage() {
+export default function IndexPage(props: Props) {
     return (
         <div className="site min-h-screen">
             <SiteHeader />
@@ -165,18 +166,11 @@ export default function IndexPage() {
                         </div>
                         <div className="code-card">
                             <div className="code-card-title">rs/src/pages/hello/mod.rs</div>
-                            <pre>{`#[derive(Serialize)]
-pub struct Props {
-    pub message: String,
-}
-
-pub async fn handler(
-    _req: ForteRequest<'_>,
-) -> Result<Props> {
-    Ok(Props {
-        message: "typed, server-rendered".into(),
-    })
-}`}</pre>
+                            <pre
+                                dangerouslySetInnerHTML={{
+                                    __html: props.forteSnippetHtml,
+                                }}
+                            />
                         </div>
                     </div>
                 </section>

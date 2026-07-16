@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { SiteFooter } from "../../components/SiteFooter";
 import { GITHUB_URL, SiteHeader } from "../../components/SiteHeader";
 import { Terminal, type TerminalLine } from "../../components/Terminal";
+import type { Props } from "./.props";
 
 const gettingStartedLines: TerminalLine[] = [
     { kind: "cmd", text: "cargo binstall forte-cli", delay: 0.3, duration: 1.2 },
@@ -48,7 +49,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
     );
 }
 
-export default function FortePage() {
+export default function FortePage(props: Props) {
     useEffect(() => {
         document.title = "Forte — the full-stack framework built on fn0";
     }, []);
@@ -95,29 +96,21 @@ export default function FortePage() {
                     <div className="mt-8 grid gap-5 lg:grid-cols-2">
                         <div className="code-card">
                             <div className="code-card-title">rs/src/pages/hello/mod.rs</div>
-                            <pre>{`#[derive(Serialize)]
-pub struct Props {
-    pub message: String,
-}
-
-pub async fn handler(
-    _req: ForteRequest<'_>,
-) -> Result<Props> {
-    Ok(Props {
-        message: "hello from Rust".into(),
-    })
-}`}</pre>
+                            <pre
+                                dangerouslySetInnerHTML={{
+                                    __html: props.rustSnippetHtml,
+                                }}
+                            />
                         </div>
                         <div className="code-card">
                             <div className="code-card-title">
                                 fe/src/pages/hello/page.tsx
                             </div>
-                            <pre>{`import type { Props } from "./.props";
-// ^ generated from the Rust Props type
-
-export default function Hello(props: Props) {
-    return <h1>{props.message}</h1>;
-}`}</pre>
+                            <pre
+                                dangerouslySetInnerHTML={{
+                                    __html: props.tsxSnippetHtml,
+                                }}
+                            />
                         </div>
                     </div>
                 </section>

@@ -13,7 +13,7 @@ pub async fn handler(_req: ForteRequest<'_>) -> anyhow::Result<Props> {
     let doc = docs_site::find("").expect("docs index must exist");
     Ok(Props {
         title: doc.title.to_string(),
-        html: docs_site::render_html(doc),
+        html: doc.html.to_string(),
         nav: docs_site::nav(),
     })
 }
