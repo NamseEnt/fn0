@@ -357,7 +357,7 @@ export default function IndexPage(props: Props) {
                     </div>
                 </section>
 
-                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16">
+                <section id="plans" className="mx-auto max-w-6xl px-5 py-16">
                     <div className="mx-auto max-w-3xl">
                         <div className="text-center">
                             <Eyebrow>fn0 cloud</Eyebrow>
@@ -366,8 +366,7 @@ export default function IndexPage(props: Props) {
                             </h2>
                             <p className="mx-auto mt-4 max-w-lg leading-relaxed text-ink-400">
                                 A managed fn0 — you deploy, we run it. Two plans are in
-                                the works. Join the waitlist and we'll email you when it
-                                opens.
+                                the works.
                             </p>
                         </div>
 
@@ -441,6 +440,21 @@ export default function IndexPage(props: Props) {
                             </ul>
                         </div>
 
+                    </div>
+                </section>
+
+                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16">
+                    <div className="mx-auto max-w-2xl">
+                        <div className="text-center">
+                            <Eyebrow>waitlist</Eyebrow>
+                            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                                Join the waitlist
+                            </h2>
+                            <p className="mx-auto mt-4 max-w-lg leading-relaxed text-ink-400">
+                                fn0 Cloud isn't open yet. Leave your email and we'll let
+                                you know the moment it is.
+                            </p>
+                        </div>
                         <div className="mt-8">
                             <WaitlistForm />
                         </div>
