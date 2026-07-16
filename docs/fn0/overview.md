@@ -35,7 +35,7 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 | Response headers | 128 KB |
 | Response body | Unlimited |
 | Memory | 128 MB |
-| CPU time | 10 ms |
+| CPU time | 50 ms |
 | Max duration | 15 seconds |
 | Subrequests (external HTTP) | 50 per request |
 
