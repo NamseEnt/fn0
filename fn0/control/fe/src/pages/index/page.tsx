@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { SiteFooter } from "../../components/SiteFooter";
 import { GITHUB_URL, SiteHeader } from "../../components/SiteHeader";
 import { Terminal, type TerminalLine } from "../../components/Terminal";
@@ -79,10 +80,191 @@ const limits = [
     ["Response headers", "128 KB"],
     ["Response body", "Unlimited"],
     ["Memory", "128 MB"],
-    ["CPU time", "10 ms"],
+    ["CPU time", "50 ms"],
     ["Max duration", "15 seconds"],
     ["Subrequests", "50 per request"],
 ];
+
+type QuotaRow = {
+    name: string;
+    value: string;
+    note?: string;
+};
+
+type QuotaGroup = {
+    title?: string;
+    rows: QuotaRow[];
+};
+
+const dollarQuotaGroups: QuotaGroup[] = [
+    {
+        title: "Projects & domains",
+        rows: [
+            { name: "Projects", value: "1" },
+            {
+                name: "Custom domains",
+                value: "1",
+                note: "Automatic TLS — point a CNAME and you're done.",
+            },
+            { name: "fn0.dev subdomain", value: "Included" },
+        ],
+    },
+    {
+        title: "Compute",
+        rows: [
+            {
+                name: "CPU pool",
+                value: "500 min / mo",
+                note: "≈ 2M server-rendered pages at ~15 ms each. Pooled monthly, not daily — a launch-day spike won't hit a wall.",
+            },
+            {
+                name: "CPU per request",
+                value: "50 ms",
+                note: "Only your code counts. Waiting on a database or an LLM API costs nothing.",
+            },
+        ],
+    },
+    {
+        title: "Network",
+        rows: [
+            {
+                name: "Compute egress",
+                value: "20 GB / mo",
+                note: "SSR pages and API responses leaving your handlers.",
+            },
+            {
+                name: "Object storage downloads",
+                value: "Unlimited",
+                note: "Served through the CDN cache — never metered, never counted as egress.",
+            },
+        ],
+    },
+    {
+        title: "Document database",
+        rows: [
+            { name: "Active databases", value: "1" },
+            { name: "Storage", value: "500 MB" },
+            { name: "Row reads", value: "150M / mo" },
+            {
+                name: "Row writes",
+                value: "1M / mo",
+                note: "A busy community site writes ~300k a month.",
+            },
+        ],
+    },
+    {
+        title: "Object storage",
+        rows: [
+            { name: "Storage", value: "10 GB" },
+            { name: "Uploads", value: "100k / mo" },
+            {
+                name: "Downloads",
+                value: "Unlimited",
+                note: "Served through the CDN cache.",
+            },
+        ],
+    },
+    {
+        title: "Queues & cron",
+        rows: [
+            {
+                name: "Queue tasks & cron runs",
+                value: "Shared CPU pool",
+                note: "They spend the same CPU minutes as requests — nothing extra to buy.",
+            },
+            {
+                name: "Cron jobs",
+                value: "10 / project",
+                note: "1 minute minimum interval.",
+            },
+            { name: "Queue message size", value: "128 KB" },
+            { name: "Queue backlog", value: "100k messages" },
+        ],
+    },
+];
+
+const freeQuotaGroups: QuotaGroup[] = [
+    {
+        rows: [
+            { name: "Projects", value: "1" },
+            { name: "fn0.dev subdomain", value: "Included" },
+            { name: "Custom domains", value: "—" },
+            {
+                name: "Monthly quotas",
+                value: "TBA",
+                note: "Sized for trying things out and development traffic.",
+            },
+        ],
+    },
+];
+
+const roadmap = [
+    {
+        name: "Monitoring & logs",
+        note: "See what your service is doing without leaving fn0.",
+    },
+    {
+        name: "Pay-as-you-go overage",
+        note: "Keep growing past the included quotas without hitting a wall.",
+    },
+    {
+        name: "Bring your own R2 / Turso",
+        note: "Connect your own bucket or database — your resources, your limits.",
+    },
+    {
+        name: "A higher tier",
+        note: "For services that outgrow a dollar.",
+    },
+];
+
+function QuotaTable({ groups }: { groups: QuotaGroup[] }) {
+    return (
+        <div className="overflow-x-auto rounded-xl border border-ink-700">
+            <table className="w-full text-sm">
+                <tbody>
+                    {groups.map((group, groupIndex) => (
+                        <Fragment key={groupIndex}>
+                            {group.title && (
+                                <tr className="border-b border-ink-800">
+                                    <td
+                                        colSpan={3}
+                                        className="px-5 pt-5 pb-2 font-mono text-xs tracking-widest text-brand-400 uppercase"
+                                    >
+                                        {group.title}
+                                    </td>
+                                </tr>
+                            )}
+                            {group.rows.map((row) => (
+                                <tr
+                                    key={row.name}
+                                    className="border-b border-ink-800 last:border-b-0"
+                                >
+                                    <td className="w-0 px-5 py-3 align-top whitespace-nowrap text-ink-400">
+                                        {row.name}
+                                    </td>
+                                    <td className="w-0 py-3 pr-6 pl-1 align-top font-mono whitespace-nowrap text-ink-100">
+                                        {row.value}
+                                    </td>
+                                    <td className="min-w-56 px-5 py-3 align-top leading-relaxed text-ink-400">
+                                        {row.note}
+                                    </td>
+                                </tr>
+                            ))}
+                        </Fragment>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function PlannedBadge() {
+    return (
+        <span className="rounded-full border border-ink-700 px-2.5 py-0.5 font-mono text-xs text-ink-500">
+            planned
+        </span>
+    );
+}
 
 export default function IndexPage(props: Props) {
     return (
@@ -175,36 +357,40 @@ export default function IndexPage(props: Props) {
                     </div>
                 </section>
 
-                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16 text-center">
-                    <Eyebrow>fn0 cloud</Eyebrow>
-                    <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-                        fn0 Cloud is coming
-                    </h2>
-                    <p className="mx-auto mt-4 max-w-lg leading-relaxed text-ink-400">
-                        A managed fn0 — you deploy, we run it. Two plans are in the
-                        works. Join the waitlist and we'll email you when it opens.
-                    </p>
-                    <div className="mx-auto mt-8 grid max-w-2xl gap-5 text-left sm:grid-cols-2">
-                        <div className="rounded-xl border border-ink-700 bg-ink-900 p-6">
+                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16">
+                    <div className="mx-auto max-w-3xl">
+                        <div className="text-center">
+                            <Eyebrow>fn0 cloud</Eyebrow>
+                            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                                fn0 Cloud is coming
+                            </h2>
+                            <p className="mx-auto mt-4 max-w-lg leading-relaxed text-ink-400">
+                                A managed fn0 — you deploy, we run it. Two plans are in
+                                the works. Join the waitlist and we'll email you when it
+                                opens.
+                            </p>
+                        </div>
+
+                        <div className="mt-10 rounded-2xl border border-ink-700 bg-ink-900 p-6 sm:p-8">
                             <div className="flex items-baseline justify-between">
                                 <span className="font-mono text-sm text-ink-400">free</span>
-                                <span className="rounded-full border border-ink-700 px-2.5 py-0.5 font-mono text-xs text-ink-500">
-                                    planned
-                                </span>
+                                <PlannedBadge />
                             </div>
                             <p className="mt-3 text-3xl font-semibold">$0</p>
                             <p className="mt-2 text-sm leading-relaxed text-ink-400">
                                 For hobby projects and trying things out.
                             </p>
+                            <div className="mt-5">
+                                <QuotaTable groups={freeQuotaGroups} />
+                            </div>
                         </div>
-                        <div className="rounded-xl border border-brand-600/40 bg-ink-900 p-6">
+
+                        <div className="mt-6 rounded-2xl border border-brand-600/40 bg-ink-900 p-6 sm:p-8">
                             <div className="flex items-baseline justify-between">
                                 <span className="font-mono text-sm text-brand-400">
                                     one dollar
                                 </span>
-                                <span className="rounded-full border border-ink-700 px-2.5 py-0.5 font-mono text-xs text-ink-500">
-                                    planned
-                                </span>
+                                <PlannedBadge />
                             </div>
                             <p className="mt-3 text-3xl font-semibold">
                                 $1
@@ -213,13 +399,51 @@ export default function IndexPage(props: Props) {
                                     / month
                                 </span>
                             </p>
+                            <p className="mt-1 font-mono text-brand-300">
+                                ≈ 2,000,000 server-rendered requests, every month
+                            </p>
                             <p className="mt-2 text-sm leading-relaxed text-ink-400">
-                                For small production services.
+                                For small production services — a real domain, a
+                                database, storage, queues, and cron behind one deploy
+                                command.
+                            </p>
+                            <div className="mt-6">
+                                <QuotaTable groups={dollarQuotaGroups} />
+                            </div>
+                            <p className="mt-4 text-sm">
+                                <a
+                                    href="/docs/fn0/limits"
+                                    className="font-medium text-brand-400 hover:text-brand-300"
+                                >
+                                    Full limits &amp; quotas in the docs →
+                                </a>
                             </p>
                         </div>
-                    </div>
-                    <div className="mx-auto mt-8 max-w-2xl text-left">
-                        <WaitlistForm />
+
+                        <div className="mt-6 rounded-2xl border border-ink-700 bg-ink-900 p-6 sm:p-8">
+                            <div className="flex items-baseline justify-between">
+                                <span className="font-mono text-sm text-ink-400">
+                                    on the roadmap
+                                </span>
+                                <PlannedBadge />
+                            </div>
+                            <ul className="mt-5 grid gap-5 sm:grid-cols-2">
+                                {roadmap.map((item) => (
+                                    <li key={item.name}>
+                                        <p className="font-medium text-ink-100">
+                                            {item.name}
+                                        </p>
+                                        <p className="mt-1 text-sm leading-relaxed text-ink-400">
+                                            {item.note}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div className="mt-8">
+                            <WaitlistForm />
+                        </div>
                     </div>
                 </section>
 
@@ -227,12 +451,18 @@ export default function IndexPage(props: Props) {
                     <div>
                         <Eyebrow>limits</Eyebrow>
                         <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-                            fn0 Cloud limits
+                            Per-request limits
                         </h2>
                         <p className="mt-4 max-w-lg leading-relaxed text-ink-400">
-                            Per request, on fn0 Cloud. Run fn0 yourself and these limits
-                            are yours to change.
+                            Applied to every invocation on fn0 Cloud, on every plan.
+                            Run fn0 yourself and these limits are yours to change.
                         </p>
+                        <a
+                            href="/docs/fn0/limits"
+                            className="mt-4 inline-block font-medium text-brand-400 hover:text-brand-300"
+                        >
+                            All limits &amp; quotas →
+                        </a>
                     </div>
                     <div className="overflow-x-auto rounded-xl border border-ink-700">
                         <table className="w-full text-sm">

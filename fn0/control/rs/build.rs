@@ -121,6 +121,11 @@ const SECTIONS: &[SectionSource] = &[
                 path: "fn0/overview.md",
             },
             DocSource {
+                route: "fn0/limits",
+                title: "Limits & Quotas",
+                path: "fn0/limits.md",
+            },
+            DocSource {
                 route: "doc-db/overview",
                 title: "doc-db",
                 path: "doc-db/overview.md",
