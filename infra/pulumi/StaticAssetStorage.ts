@@ -80,6 +80,7 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
     const r2ItemWriteId = "2efd5506f9c8494dacb1fa10a3e7d5b6";
     const r2EditId = "bf7481a1826f439697cb59a20b22293e";
     const dnsWriteId = "4755a26eedb94da69e1066d98aa820be";
+    const accountAnalyticsReadId = "b89a480218d04ceb98b4fe57ca29dc1f";
 
     // The presign token must grant Workers R2 Storage Bucket Item Read/Write
     // against ALL buckets in the account, because control creates per-project
@@ -109,7 +110,13 @@ export class StaticAssetStorage extends pulumi.ComponentResource {
                 [`com.cloudflare.api.account.${acct}`]: "*",
               }),
             ),
-            permissionGroups: [{ id: r2EditId }],
+            permissionGroups: [
+              { id: r2EditId },
+              // Account Analytics Read: control's usage metering polls the
+              // GraphQL Analytics API (r2OperationsAdaptiveGroups) with this
+              // token.
+              { id: accountAnalyticsReadId },
+            ],
           },
           {
             effect: "allow",

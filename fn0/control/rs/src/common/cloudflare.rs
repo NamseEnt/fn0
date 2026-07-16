@@ -143,6 +143,61 @@ impl CloudflareClient {
         );
     }
 
+    pub async fn list_r2_bucket_names(&self, name_contains: &str) -> anyhow::Result<Vec<String>> {
+        #[derive(Deserialize)]
+        struct Envelope {
+            result: Option<ListResult>,
+            #[serde(default)]
+            result_info: Option<ListResultInfo>,
+        }
+        #[derive(Deserialize)]
+        struct ListResult {
+            buckets: Vec<Bucket>,
+        }
+        #[derive(Deserialize)]
+        struct Bucket {
+            name: String,
+        }
+        #[derive(Deserialize)]
+        struct ListResultInfo {
+            cursor: Option<String>,
+        }
+
+        const PER_PAGE: usize = 1000;
+        let mut names = Vec::new();
+        let mut cursor: Option<String> = None;
+        loop {
+            let mut path = format!(
+                "/accounts/{}/r2/buckets?name_contains={name_contains}&per_page={PER_PAGE}",
+                self.account_id
+            );
+            if let Some(cursor) = &cursor {
+                path.push_str(&format!("&cursor={cursor}"));
+            }
+            let (status, body) = self.call("GET", &path, Vec::new()).await?;
+            if !(200..300).contains(&status) {
+                anyhow::bail!(
+                    "list_r2_bucket_names failed (status={status}): {}",
+                    String::from_utf8_lossy(&body)
+                );
+            }
+            let envelope: Envelope = serde_json::from_slice(&body)?;
+            let buckets = envelope
+                .result
+                .ok_or_else(|| anyhow::anyhow!("list_r2_bucket_names: missing result"))?
+                .buckets;
+            let page_len = buckets.len();
+            names.extend(buckets.into_iter().map(|b| b.name));
+            if page_len < PER_PAGE {
+                break;
+            }
+            match envelope.result_info.and_then(|i| i.cursor) {
+                Some(next) => cursor = Some(next),
+                None => break,
+            }
+        }
+        Ok(names)
+    }
 }
 
 #[derive(Deserialize)]

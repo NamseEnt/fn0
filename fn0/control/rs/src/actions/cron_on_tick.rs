@@ -1,4 +1,5 @@
 use crate::actions::bundle_gc;
+use crate::actions::usage_metering;
 use crate::actions::zombie_sweep;
 use crate::common::admin;
 use crate::docs::*;
@@ -136,6 +137,16 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 "bundle_gc completed",
             ),
             Err(err) => tracing::error!(?err, "bundle_gc within cron_on_tick failed"),
+        }
+
+        match usage_metering::run_metering().await {
+            Ok(stats) => tracing::info!(
+                projects_count = stats.projects,
+                operations_docs_count = stats.operations_docs,
+                snapshot_docs_count = stats.snapshot_docs,
+                "usage_metering completed",
+            ),
+            Err(err) => tracing::error!(?err, "usage_metering within cron_on_tick failed"),
         }
     }
 

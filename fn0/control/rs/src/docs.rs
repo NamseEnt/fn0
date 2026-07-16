@@ -84,6 +84,40 @@ pub struct WaitlistDoc {
     pub created_at: DateTime,
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
+pub struct SampledOperationCount {
+    pub estimate: u64,
+    pub lower_bound: u64,
+    pub upper_bound: u64,
+    pub is_valid: bool,
+}
+
+#[forte_doc]
+pub struct ProjectOperationsUsageDoc {
+    #[pk]
+    pub project_id: String,
+    #[sk]
+    pub window_start_epoch_hour: i64,
+    pub static_asset_reads: SampledOperationCount,
+    pub static_asset_writes: SampledOperationCount,
+    pub object_storage_reads: SampledOperationCount,
+    pub object_storage_writes: SampledOperationCount,
+    pub polled_at: DateTime,
+}
+
+#[forte_doc]
+pub struct ProjectStorageSnapshotDoc {
+    #[pk]
+    pub project_id: String,
+    #[sk]
+    pub snapshot_epoch_hour: i64,
+    pub static_asset_bytes: u64,
+    pub static_asset_object_count: u64,
+    pub object_storage_bytes: u64,
+    pub object_storage_object_count: u64,
+    pub taken_at: DateTime,
+}
+
 #[forte_doc]
 pub struct CliAuthorizationCodeDoc {
     #[pk]
@@ -94,4 +128,3 @@ pub struct CliAuthorizationCodeDoc {
     pub label: String,
     pub expires_at: DateTime,
 }
-

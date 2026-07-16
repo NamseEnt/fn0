@@ -120,15 +120,18 @@ pub struct StaticAssetStore {
 }
 
 impl StaticAssetStore {
+    pub fn bucket(&self) -> &str {
+        &self.bucket
+    }
+
     pub fn from_env() -> anyhow::Result<Self> {
         Ok(Self {
             account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
             bucket: std::env::var("FN0_STATIC_ASSET_STORAGE_BUCKET")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_BUCKET not set"))?,
-            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID").map_err(
-                |_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"),
-            )?,
+            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"))?,
             secret_access_key: std::env::var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")
                 .map_err(|_| {
                     anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY not set")

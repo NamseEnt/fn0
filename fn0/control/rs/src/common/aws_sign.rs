@@ -117,9 +117,8 @@ pub async fn lambda_invoke_async(args: LambdaInvokeArgs<'_>) -> anyhow::Result<(
         "host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\nx-amz-invocation-type:Event\n",
     );
     let signed_headers = "host;x-amz-content-sha256;x-amz-date;x-amz-invocation-type";
-    let canonical_request = format!(
-        "POST\n{path}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}",
-    );
+    let canonical_request =
+        format!("POST\n{path}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}",);
     let string_to_sign = format!(
         "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
         sha256_hex(canonical_request.as_bytes()),
@@ -152,8 +151,7 @@ pub async fn lambda_invoke_async(args: LambdaInvokeArgs<'_>) -> anyhow::Result<(
     Ok(())
 }
 
-const EMPTY_PAYLOAD_HASH: &str =
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+const EMPTY_PAYLOAD_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 fn r2_host(bucket: &str, account_id: &str) -> String {
     format!("{bucket}.{account_id}.r2.cloudflarestorage.com")
@@ -224,6 +222,7 @@ pub struct R2ListArgs<'a> {
 
 pub struct R2ListedObject {
     pub key: String,
+    pub size: u64,
     pub last_modified: DateTime,
 }
 
@@ -299,14 +298,22 @@ fn parse_list_objects_xml(xml: &str) -> anyhow::Result<R2ListPage> {
         let last_modified = chrono::DateTime::parse_from_rfc3339(&last_modified_raw)
             .map_err(|e| anyhow::anyhow!("LastModified parse: {e}"))?
             .with_timezone(&chrono::Utc);
-        objects.push(R2ListedObject { key, last_modified });
+        let size: u64 = extract_xml_tag(&contents, "Size")
+            .ok_or_else(|| anyhow::anyhow!("ListObjectsV2 Contents missing Size"))?
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Size parse: {e}"))?;
+        objects.push(R2ListedObject {
+            key,
+            size,
+            last_modified,
+        });
     }
-    let next_continuation_token =
-        if extract_xml_tag(xml, "IsTruncated").as_deref() == Some("true") {
-            extract_xml_tag(xml, "NextContinuationToken")
-        } else {
-            None
-        };
+    let next_continuation_token = if extract_xml_tag(xml, "IsTruncated").as_deref() == Some("true")
+    {
+        extract_xml_tag(xml, "NextContinuationToken")
+    } else {
+        None
+    };
     Ok(R2ListPage {
         objects,
         next_continuation_token,
@@ -336,4 +343,3 @@ fn extract_xml_blocks(xml: &str, tag: &str) -> Vec<String> {
     }
     blocks
 }
-

@@ -136,7 +136,7 @@ mod proxy {
         { inline :
         "package forte:user; world service-export { import wasi:http/types@0.3.0-rc-2026-03-15; export wasi:http/handler@0.3.0-rc-2026-03-15; }",
         path :
-        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/release/build/fn0-control-38fac5b83ad361a5/out",
+        "/Users/namse/fn0/fn0/control/rs/target/wasm32-wasip2/debug/build/fn0-control-7ee81396d7f54f71/out",
         world : "service-export", default_bindings_module :
         "crate::route_generated::proxy", pub_export_macro : true, async : true, features
         : ["clocks-timezone"], with : { "wasi:http/handler@0.3.0-rc-2026-03-15" :
@@ -1235,6 +1235,36 @@ async fn handle_action(
                 body: input,
             };
             let output = crate::actions::admin_run::handler(req).await;
+            let json = forte_json::to_vec(&output);
+            Ok(build_response_with_cookies(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json))
+                    .unwrap(),
+                cookie_jar,
+            ))
+        }
+        "usage_metering" => {
+            let input: crate::actions::usage_metering::Input =
+                match forte_json::from_slice(body_bytes) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok(Response::builder()
+                            .status(StatusCode::BAD_REQUEST)
+                            .body(Body::from(format!("invalid request body: {}", e)))
+                            .unwrap());
+                    }
+                };
+            let req = ForteRequest {
+                uri_authority,
+                method,
+                headers,
+                jar: cookie_jar,
+                raw_body: body_bytes,
+                body: input,
+            };
+            let output = crate::actions::usage_metering::handler(req).await;
             let json = forte_json::to_vec(&output);
             Ok(build_response_with_cookies(
                 Response::builder()
