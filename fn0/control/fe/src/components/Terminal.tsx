@@ -68,7 +68,7 @@ function TerminalLineView({ line }: { line: TerminalLine }) {
             );
         case "out":
             return (
-                <div className="term-line text-ink-500" style={delay}>
+                <div className="term-line text-ink-400" style={delay}>
                     {"  "}
                     {line.text}
                 </div>

@@ -139,10 +139,52 @@ const SECTIONS: &[SectionSource] = &[
     },
 ];
 
-const SNIPPETS: &[(&str, &str, &str)] = &[
-    ("SNIPPET_HOME_HELLO_RS_HTML", "home_hello.rs", "rust"),
-    ("SNIPPET_FORTE_HELLO_RS_HTML", "forte_hello.rs", "rust"),
-    ("SNIPPET_FORTE_HELLO_TSX_HTML", "forte_hello.tsx", "tsx"),
+struct SnippetSource {
+    constant_name: &'static str,
+    file: &'static str,
+    lang: &'static str,
+    // wraps this term in <span class="trace-hl"> so the page can visually
+    // trace one field across related snippets
+    trace_term: Option<&'static str>,
+}
+
+const SNIPPETS: &[SnippetSource] = &[
+    SnippetSource {
+        constant_name: "SNIPPET_HOME_HELLO_RS_HTML",
+        file: "home_hello.rs",
+        lang: "rust",
+        trace_term: None,
+    },
+    SnippetSource {
+        constant_name: "SNIPPET_FORTE_HELLO_RS_HTML",
+        file: "forte_hello.rs",
+        lang: "rust",
+        trace_term: Some("message"),
+    },
+    SnippetSource {
+        constant_name: "SNIPPET_FORTE_PROPS_JSON_HTML",
+        file: "forte_props.json",
+        lang: "json",
+        trace_term: Some("message"),
+    },
+    SnippetSource {
+        constant_name: "SNIPPET_FORTE_HELLO_TSX_HTML",
+        file: "forte_hello.tsx",
+        lang: "tsx",
+        trace_term: Some("message"),
+    },
+    SnippetSource {
+        constant_name: "SNIPPET_FORTE_DOC_DB_RS_HTML",
+        file: "forte_doc_db.rs",
+        lang: "rust",
+        trace_term: None,
+    },
+    SnippetSource {
+        constant_name: "SNIPPET_FORTE_OBJECT_STORAGE_RS_HTML",
+        file: "forte_object_storage.rs",
+        lang: "rust",
+        trace_term: None,
+    },
 ];
 
 fn main() {
@@ -178,12 +220,20 @@ fn generate_docs() {
     }
     out.push_str("];\n");
 
-    for (name, file, lang) in SNIPPETS {
-        let path = Path::new(SNIPPETS_DIR).join(file);
+    for snippet in SNIPPETS {
+        let path = Path::new(SNIPPETS_DIR).join(snippet.file);
         let code = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-        let html = highlight_code(code.trim_end(), lang, &syntax_set, &theme);
-        writeln!(out, "pub static {name}: &str = {html:?};").unwrap();
+        let mut html = highlight_code(code.trim_end(), snippet.lang, &syntax_set, &theme);
+        if let Some(term) = snippet.trace_term {
+            html = wrap_trace_term(&html, term);
+        }
+        writeln!(
+            out,
+            "pub static {}: &str = {html:?};",
+            snippet.constant_name
+        )
+        .unwrap();
     }
 
     let out_path = Path::new(&std::env::var("OUT_DIR").unwrap()).join("docs_generated.rs");
@@ -308,6 +358,22 @@ fn highlight_code(code: &str, lang: &str, syntax_set: &SyntaxSet, theme: &Theme)
                 .expect("style line to html"),
         );
     }
+    out
+}
+
+fn wrap_trace_term(html: &str, term: &str) -> String {
+    let replacement = format!("<span class=\"trace-hl\">{term}</span>");
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    // replace only in text content, never inside tags
+    while let Some(tag_start) = rest.find('<') {
+        let (text, after) = rest.split_at(tag_start);
+        out.push_str(&text.replace(term, &replacement));
+        let tag_end = after.find('>').map(|i| i + 1).unwrap_or(after.len());
+        out.push_str(&after[..tag_end]);
+        rest = &after[tag_end..];
+    }
+    out.push_str(&rest.replace(term, &replacement));
     out
 }
 
