@@ -220,7 +220,7 @@ const roadmap = [
 function QuotaTable({ groups }: { groups: QuotaGroup[] }) {
     return (
         <div className="overflow-x-auto rounded-xl border border-ink-700">
-            <table className="w-full text-sm">
+            <table className="w-full text-[15px]">
                 <tbody>
                     {groups.map((group, groupIndex) => (
                         <Fragment key={groupIndex}>
@@ -284,23 +284,20 @@ export default function IndexPage(props: Props) {
                             by WebAssembly — a reasonable alternative to Cloudflare
                             Workers.
                         </p>
-                        <div className="mt-8 flex flex-wrap items-center gap-4">
-                            <a
-                                href="#waitlist"
-                                className="rounded-md bg-brand-600 px-5 py-3 font-medium text-white transition-colors hover:bg-brand-500"
-                            >
-                                Join the cloud waitlist
-                            </a>
+                        <div className="mt-8 max-w-lg">
+                            <WaitlistForm compact />
+                        </div>
+                        <div className="mt-5 flex flex-wrap items-center gap-5">
                             <a
                                 href={GITHUB_URL}
-                                className="rounded-md border border-ink-700 px-5 py-3 font-medium text-ink-100 transition-colors hover:border-ink-500"
+                                className="font-medium text-brand-400 transition-colors hover:text-brand-300"
                             >
                                 GitHub →
                             </a>
+                            <p className="font-mono text-sm text-ink-500">
+                                cargo binstall fn0-cli
+                            </p>
                         </div>
-                        <p className="mt-5 font-mono text-sm text-ink-500">
-                            cargo binstall fn0-cli
-                        </p>
                     </div>
                     <Terminal title="~/my-app" lines={heroLines} cursorDelay={5.1} />
                 </section>
@@ -332,12 +329,15 @@ export default function IndexPage(props: Props) {
                         <div>
                             <Eyebrow>full-stack</Eyebrow>
                             <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-                                Forte — the full-stack framework built on fn0
+                                Full-stack web apps on fn0
                             </h2>
                             <p className="mt-4 leading-relaxed text-ink-400">
-                                Server-rendered React pages, typed server actions, a
-                                document database, and object storage — one repo, one
-                                deploy command. This page is served by Forte on fn0.
+                                fn0 runs anything that compiles to Wasm — bring your
+                                own stack. And when you're building a server-rendered
+                                web app, Forte makes it easier: React pages rendered on
+                                the server, typed server actions, a document database,
+                                and object storage — one repo, one deploy command. This
+                                page is served this way.
                             </p>
                             <a
                                 href="/forte"
@@ -443,25 +443,7 @@ export default function IndexPage(props: Props) {
                     </div>
                 </section>
 
-                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16">
-                    <div className="mx-auto max-w-2xl">
-                        <div className="text-center">
-                            <Eyebrow>waitlist</Eyebrow>
-                            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
-                                Join the waitlist
-                            </h2>
-                            <p className="mx-auto mt-4 max-w-lg leading-relaxed text-ink-400">
-                                fn0 Cloud isn't open yet. Leave your email and we'll let
-                                you know the moment it is.
-                            </p>
-                        </div>
-                        <div className="mt-8">
-                            <WaitlistForm />
-                        </div>
-                    </div>
-                </section>
-
-                <section className="mx-auto grid max-w-6xl items-start gap-10 px-5 py-16 pb-24 lg:grid-cols-2">
+                <section className="mx-auto grid max-w-6xl items-start gap-10 px-5 py-16 lg:grid-cols-2">
                     <div>
                         <Eyebrow>limits</Eyebrow>
                         <h2 className="mt-3 text-3xl font-semibold tracking-tight">
@@ -496,6 +478,25 @@ export default function IndexPage(props: Props) {
                         </table>
                     </div>
                 </section>
+
+                <section id="waitlist" className="mx-auto max-w-6xl px-5 py-16 pb-24">
+                    <div className="mx-auto max-w-2xl">
+                        <div className="text-center">
+                            <Eyebrow>waitlist</Eyebrow>
+                            <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                                Join the waitlist
+                            </h2>
+                            <p className="mx-auto mt-4 max-w-lg leading-relaxed text-ink-400">
+                                fn0 Cloud isn't open yet. Leave your email and we'll let
+                                you know the moment it is.
+                            </p>
+                        </div>
+                        <div className="mt-8">
+                            <WaitlistForm />
+                        </div>
+                    </div>
+                </section>
+
             </main>
             <SiteFooter />
         </div>

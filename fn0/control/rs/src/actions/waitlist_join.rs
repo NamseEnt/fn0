@@ -2,7 +2,7 @@ use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
-const TIERS: &[&str] = &["free", "one_dollar"];
+const TIERS: &[&str] = &["free", "one_dollar", "undecided"];
 const EMAIL_MAX_LEN: usize = 254;
 
 #[derive(Deserialize)]

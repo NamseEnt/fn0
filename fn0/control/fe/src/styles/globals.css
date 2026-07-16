@@ -10,8 +10,8 @@
     --color-ink-900: #121219;
     --color-ink-800: #1a1a24;
     --color-ink-700: #262633;
-    --color-ink-500: #75778e;
-    --color-ink-400: #9c9eb4;
+    --color-ink-500: #9092a9;
+    --color-ink-400: #b6b8cc;
     --color-ink-100: #e9e9f1;
 
     --color-brand-600: #654ff0;
@@ -45,6 +45,10 @@ body:not(:has(.site)) button {
 body:not(:has(.site)) input {
     border: 1px solid #999;
     border-radius: 4px;
+}
+
+html {
+    scroll-behavior: smooth;
 }
 
 .site {
