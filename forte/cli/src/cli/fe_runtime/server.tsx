@@ -11,12 +11,6 @@ import {
   renderHeadDescriptors,
   type HeadDescriptor,
 } from "./forte-react";
-import * as app from "../src/app";
-
-const Head = app.Head;
-const appHeadDescriptors: HeadDescriptor[] =
-  (app as { head?: HeadDescriptor[] }).head ?? [];
-
 const isDev = (import.meta as any).env?.DEV ?? false;
 
 declare const __FORTE_BASE_URL__: string;
@@ -84,6 +78,11 @@ async function renderStream(
   clearHookCache();
   clearCollectedCookies();
   setRequestCookie(cookie ?? null);
+
+  const appModule = await import("../src/app");
+  const Head = appModule.Head;
+  const appHeadDescriptors: HeadDescriptor[] =
+    (appModule as { head?: HeadDescriptor[] }).head ?? [];
 
   const [pageModule, schemaModule] = await Promise.all([
     matched.route.component(),
