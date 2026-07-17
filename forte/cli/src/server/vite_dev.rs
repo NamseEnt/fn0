@@ -140,7 +140,13 @@ pub fn spawn_vite(
     std::fs::create_dir_all(&dev_dir)?;
 
     let session_id = Uuid::new_v4();
-    let socket_path = dev_dir.join(format!("vite-{}.sock", session_id));
+    // The socket lives in the OS temp dir, not next to the project: sun_path is
+    // capped at 104 bytes on macOS, so a socket inside a nested project dir
+    // silently binds to a truncated path and fails with EADDRINUSE.
+    let socket_path = std::env::temp_dir().join(format!(
+        "forte-vite-{}.sock",
+        &session_id.simple().to_string()[..8]
+    ));
 
     let script_path = dev_dir.join(format!("vite-ssr-server-{}.mjs", session_id));
     let script_content = generate_vite_server_script(&socket_path, config_file, ssr_module_path);
