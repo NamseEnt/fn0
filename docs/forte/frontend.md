@@ -55,7 +55,7 @@ The type of entries in `head` exports (app-wide defaults in `fe/src/app.tsx`, pe
 import type { HeadDescriptor } from "@forte/react";
 ```
 
-See [pages.md](pages.md#per-page-head) for the descriptor shapes and merge semantics.
+See [head.md](head.md) for the descriptor shapes and merge semantics.
 
 ### `useForteHook`
 
@@ -93,7 +93,7 @@ Understanding the lifecycle helps when debugging SSR issues or writing code that
 5. The SSR bundle:
    - Calls any hooks needed to render the page (via `/__self_invoke/<name>`).
    - Runs `renderToReadableStream` with the page's React component and Props.
-   - Assembles `<head>` from the app `Head` component plus the merged app/page `head` descriptors (see [pages.md](pages.md#per-page-head)).
+   - Assembles `<head>` from the app `Head` component plus the merged app/page `head` descriptors (see [head.md](head.md)).
    - Streams the HTML to the client, appending:
      - `window.__FORTE_PROPS__` — the serialized Props.
      - `window.__FORTE_HOOK_CACHE__` — all hook results fetched during SSR.

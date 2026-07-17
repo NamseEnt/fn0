@@ -76,6 +76,11 @@ const SECTIONS: &[SectionSource] = &[
                 path: "forte/pages.md",
             },
             DocSource {
+                route: "forte/head",
+                title: "Per-page Head",
+                path: "forte/head.md",
+            },
+            DocSource {
                 route: "forte/apis",
                 title: "API Endpoints",
                 path: "forte/apis.md",
