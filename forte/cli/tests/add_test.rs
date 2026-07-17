@@ -86,7 +86,7 @@ fn test_add_page_dynamic_route() {
 
     let backend_content =
         std::fs::read_to_string(project_dir.join("rs/src/pages/product/[id]/mod.rs")).unwrap();
-    assert!(backend_content.contains("pub struct Params"));
+    assert!(backend_content.contains("pub struct PathParams"));
     assert!(backend_content.contains("pub id: String"));
 }
 
@@ -136,18 +136,16 @@ fn test_add_action_creates_files() {
         .stdout(predicate::str::contains("Created action 'user/login'"));
 
     assert!(project_dir.join("rs/src/actions/user/login.rs").exists());
-    assert!(project_dir.join("fe/src/actions/user/login.ts").exists());
+    assert!(
+        !project_dir.join("fe/src/actions/user/login.ts").exists(),
+        "forte add action must not write a frontend wrapper; codegen generates it"
+    );
 
     let backend_content =
         std::fs::read_to_string(project_dir.join("rs/src/actions/user/login.rs")).unwrap();
-    assert!(backend_content.contains("pub async fn action"));
-    assert!(backend_content.contains("LoginInput"));
-    assert!(backend_content.contains("LoginOutput"));
-
-    let frontend_content =
-        std::fs::read_to_string(project_dir.join("fe/src/actions/user/login.ts")).unwrap();
-    assert!(frontend_content.contains("export async function login"));
-    assert!(frontend_content.contains("/_action/user/login"));
+    assert!(backend_content.contains("pub async fn handler"));
+    assert!(backend_content.contains("pub struct Input"));
+    assert!(backend_content.contains("pub enum Output"));
 }
 
 #[test]
@@ -162,12 +160,12 @@ fn test_add_action_simple_path() {
         .success();
 
     assert!(project_dir.join("rs/src/actions/subscribe.rs").exists());
-    assert!(project_dir.join("fe/src/actions/subscribe.ts").exists());
+    assert!(!project_dir.join("fe/src/actions/subscribe.ts").exists());
 
     let backend_content =
         std::fs::read_to_string(project_dir.join("rs/src/actions/subscribe.rs")).unwrap();
-    assert!(backend_content.contains("SubscribeInput"));
-    assert!(backend_content.contains("SubscribeOutput"));
+    assert!(backend_content.contains("pub struct Input"));
+    assert!(backend_content.contains("pub enum Output"));
 }
 
 #[test]

@@ -15,22 +15,24 @@ fn test_init_creates_project_structure() {
 
     assert!(project_dir.join("Forte.toml").exists());
     assert!(project_dir.join(".gitignore").exists());
-    assert!(project_dir.join("Cargo.toml").exists());
 
     assert!(project_dir.join("rs/.gitignore").exists());
     assert!(project_dir.join("rs/Cargo.toml").exists());
     assert!(project_dir.join("rs/.cargo/config.toml").exists());
+    assert!(project_dir.join("rs/build.rs").exists());
     assert!(project_dir.join("rs/src/lib.rs").exists());
     assert!(project_dir.join("rs/src/pages/index/mod.rs").exists());
 
     assert!(project_dir.join("fe/.gitignore").exists());
     assert!(project_dir.join("fe/package.json").exists());
     assert!(project_dir.join("fe/tsconfig.json").exists());
-    assert!(project_dir.join("fe/vite.config.ts").exists());
-    assert!(project_dir.join("fe/src/server.tsx").exists());
-    assert!(project_dir.join("fe/src/client.tsx").exists());
+    assert!(project_dir.join("fe/src/app.tsx").exists());
     assert!(project_dir.join("fe/src/pages/index/page.tsx").exists());
     assert!(project_dir.join("fe/public/robots.txt").exists());
+
+    let app_tsx = std::fs::read_to_string(project_dir.join("fe/src/app.tsx")).unwrap();
+    assert!(app_tsx.contains("export const head"));
+    assert!(app_tsx.contains("export function Head"));
 }
 
 #[test]
