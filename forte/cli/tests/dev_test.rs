@@ -1,6 +1,5 @@
 use assert_cmd::cargo;
 use std::io::{BufRead, BufReader};
-use std::net::TcpStream;
 use std::process::{Child, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -12,7 +11,6 @@ fn get_forte_bin_path() -> std::path::PathBuf {
 struct DevServer {
     child: Child,
     port: u16,
-    vite_ssr_port: Option<u16>,
     _stdout_thread: std::thread::JoinHandle<()>,
 }
 
@@ -29,45 +27,34 @@ impl DevServer {
             .expect("Failed to start forte dev");
 
         let stdout = child.stdout.take().expect("Failed to get stdout");
-        let (tx, rx) = mpsc::channel::<(u16, Option<u16>)>();
+        let (tx, rx) = mpsc::channel::<u16>();
 
         let stdout_thread = std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
-            let mut forte_port: Option<u16> = None;
-            let mut vite_ssr_port: Option<u16> = None;
             let mut sent = false;
 
             for line in reader.lines() {
                 let Ok(line) = line else { break };
                 eprintln!("[dev server] {}", line);
 
-                if line.contains("[vite-ssr] Vite SSR adapter ready on port")
-                    && let Some(port_str) = line.split_whitespace().last()
-                {
-                    vite_ssr_port = port_str.parse().ok();
-                }
-
-                if line.contains("listening on")
+                if !sent
+                    && line.contains("Listening on")
                     && let Some(port_str) = line.split(':').next_back()
+                    && let Ok(forte_port) = port_str.trim().parse()
                 {
-                    forte_port = port_str.trim().parse().ok();
-                }
-
-                if !sent && let Some(forte_port) = forte_port {
-                    let _ = tx.send((forte_port, vite_ssr_port));
+                    let _ = tx.send(forte_port);
                     sent = true;
                 }
             }
         });
 
-        let (port, vite_ssr_port) = rx
+        let port = rx
             .recv_timeout(Duration::from_secs(120))
             .expect("Timeout waiting for server to start");
 
         Self {
             child,
             port,
-            vite_ssr_port,
             _stdout_thread: stdout_thread,
         }
     }
@@ -111,6 +98,16 @@ fn test_dev_server_starts_and_responds() {
 
     install_npm_deps(&project_dir);
 
+    let index_page_path = project_dir.join("fe/src/pages/index/page.tsx");
+    let index_page = std::fs::read_to_string(&index_page_path).unwrap();
+    std::fs::write(
+        &index_page_path,
+        format!(
+            "{index_page}\nexport function head(_props: Props) {{\n    return [\n        {{ title: \"Index Head Title\" }},\n        {{ name: \"description\", content: \"index description\" }},\n    ];\n}}\n"
+        ),
+    )
+    .unwrap();
+
     let server = DevServer::start(&project_dir);
 
     std::thread::sleep(Duration::from_secs(1));
@@ -126,6 +123,22 @@ fn test_dev_server_starts_and_responds() {
             );
             let body = resp.text().unwrap();
             assert!(body.contains("html"), "Expected HTML response");
+            assert!(
+                body.contains("<title>Index Head Title</title>"),
+                "Expected page head title, got: {body}"
+            );
+            assert!(
+                !body.contains("<title>Forte App</title>"),
+                "App default title must be overridden by the page head, got: {body}"
+            );
+            assert!(
+                body.contains("name=\"viewport\""),
+                "App head defaults without page overrides must be kept, got: {body}"
+            );
+            assert!(
+                body.contains("name=\"description\" content=\"index description\""),
+                "Expected page head meta, got: {body}"
+            );
         }
         Err(e) => {
             panic!("Failed to connect to dev server: {}", e);
@@ -140,7 +153,7 @@ fn test_dev_auto_selects_port_if_busy() {
 
     install_npm_deps(&project_dir);
 
-    let _listener = std::net::TcpListener::bind("127.0.0.1:3000").unwrap();
+    let _listener = std::net::TcpListener::bind("0.0.0.0:3000").unwrap();
 
     let server = DevServer::start(&project_dir);
 
@@ -152,10 +165,14 @@ fn test_dev_auto_selects_port_if_busy() {
     assert!(response.is_ok(), "Server should respond on alternate port");
 }
 
-fn is_port_open(port: u16) -> bool {
-    use std::net::SocketAddr;
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    TcpStream::connect_timeout(&addr, Duration::from_millis(100)).is_ok()
+fn vite_ssr_server_running(project_dir: &std::path::Path) -> bool {
+    let pattern = project_dir.join("fe/.forte/dev/vite-ssr-server-");
+    std::process::Command::new("pgrep")
+        .args(["-f", &pattern.to_string_lossy()])
+        .output()
+        .expect("Failed to run pgrep")
+        .status
+        .success()
 }
 
 #[test]
@@ -169,14 +186,9 @@ fn test_vite_ssr_exits_when_forte_dies() {
 
     std::thread::sleep(Duration::from_secs(1));
 
-    let vite_ssr_port = server
-        .vite_ssr_port
-        .expect("Vite SSR port should be captured from logs");
-
     assert!(
-        is_port_open(vite_ssr_port),
-        "Vite SSR adapter should be running on port {}",
-        vite_ssr_port
+        vite_ssr_server_running(&project_dir),
+        "Vite SSR adapter process should be running"
     );
 
     server.child.kill().expect("Failed to kill forte");
@@ -185,7 +197,7 @@ fn test_vite_ssr_exits_when_forte_dies() {
     let mut vite_ssr_closed = false;
     for _ in 0..30 {
         std::thread::sleep(Duration::from_millis(100));
-        if !is_port_open(vite_ssr_port) {
+        if !vite_ssr_server_running(&project_dir) {
             vite_ssr_closed = true;
             break;
         }
@@ -193,7 +205,6 @@ fn test_vite_ssr_exits_when_forte_dies() {
 
     assert!(
         vite_ssr_closed,
-        "Vite SSR adapter should have exited after forte died (port {} still open)",
-        vite_ssr_port
+        "Vite SSR adapter should have exited after forte died"
     );
 }

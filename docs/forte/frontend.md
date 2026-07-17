@@ -47,6 +47,16 @@ Input fields follow camelCase → snake_case conversion on the server (see [sdk.
 
 `callAction` throws if the server returns a non-2xx status.
 
+### `HeadDescriptor`
+
+The type of entries in `head` exports (app-wide defaults in `fe/src/app.tsx`, per-page overrides in page modules):
+
+```ts
+import type { HeadDescriptor } from "@forte/react";
+```
+
+See [pages.md](pages.md#per-page-head) for the descriptor shapes and merge semantics.
+
 ### `useForteHook`
 
 Internal function called by generated hooks in `fe/src/hooks/.generated/`. Do not call it directly — use the generated `use<HookName>` hook instead.
@@ -83,6 +93,7 @@ Understanding the lifecycle helps when debugging SSR issues or writing code that
 5. The SSR bundle:
    - Calls any hooks needed to render the page (via `/__self_invoke/<name>`).
    - Runs `renderToReadableStream` with the page's React component and Props.
+   - Assembles `<head>` from the app `Head` component plus the merged app/page `head` descriptors (see [pages.md](pages.md#per-page-head)).
    - Streams the HTML to the client, appending:
      - `window.__FORTE_PROPS__` — the serialized Props.
      - `window.__FORTE_HOOK_CACHE__` — all hook results fetched during SSR.

@@ -1,8 +1,23 @@
+import type { HeadDescriptor } from "@forte/react";
 import { useEffect } from "react";
 import { SiteFooter } from "../../components/SiteFooter";
 import { GITHUB_URL, SiteHeader } from "../../components/SiteHeader";
 import { Terminal, type TerminalLine } from "../../components/Terminal";
 import type { Props } from "./.props";
+
+const forteTitle = "Forte — the full-stack framework built on fn0";
+const forteDescription =
+    "Every request hits Rust first: your handler returns Props as JSON, React server-renders them into HTML and hydrates on the client. One repo, one deploy command.";
+
+export function head(_props: Props): HeadDescriptor[] {
+    return [
+        { title: forteTitle },
+        { name: "description", content: forteDescription },
+        { property: "og:title", content: forteTitle },
+        { property: "og:description", content: forteDescription },
+        { property: "og:url", content: "https://fn0.dev/forte" },
+    ];
+}
 
 const addPageLines: TerminalLine[] = [
     { kind: "cmd", text: "forte add page blog/[slug]", delay: 0.3, duration: 1.2 },

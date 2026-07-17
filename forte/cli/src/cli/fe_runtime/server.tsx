@@ -7,8 +7,15 @@ import {
   getCollectedCookies,
   clearCollectedCookies,
   setRequestCookie,
+  mergeHeadDescriptors,
+  renderHeadDescriptors,
+  type HeadDescriptor,
 } from "./forte-react";
-import { Head } from "../src/app";
+import * as app from "../src/app";
+
+const Head = app.Head;
+const appHeadDescriptors: HeadDescriptor[] =
+  (app as { head?: HeadDescriptor[] }).head ?? [];
 
 const isDev = (import.meta as any).env?.DEV ?? false;
 
@@ -93,6 +100,23 @@ async function renderStream(
   await reactStream.allReady;
 
   const headHtml = renderToString(<Head />);
+  const pageHeadDescriptors: HeadDescriptor[] =
+    pageModule.head?.(allProps) ?? [];
+  const headDescriptors = mergeHeadDescriptors(
+    appHeadDescriptors,
+    pageHeadDescriptors
+  );
+  if (
+    isDev &&
+    headDescriptors.some((descriptor) => "title" in descriptor) &&
+    headHtml.includes("<title")
+  ) {
+    console.warn(
+      "[forte] Both the app Head component and head descriptors define a <title>. " +
+        "Move the app default <title> into `export const head` in src/app to avoid duplicate titles."
+    );
+  }
+  const headDescriptorsHtml = renderHeadDescriptors(headDescriptors);
   const hookCacheJson = serializeHookCache();
   const cookies = getCollectedCookies();
 
@@ -100,6 +124,7 @@ async function renderStream(
 <html>
 <head>
 ${headHtml}
+${headDescriptorsHtml}
 ${viteDevBlock}
 </head>
 <body>

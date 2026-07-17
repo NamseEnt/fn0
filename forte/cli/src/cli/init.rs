@@ -209,14 +209,13 @@ const FE_TSCONFIG: &str = r#"{
 
 const ROBOTS_TXT: &str = "User-agent: *\nAllow: /\n";
 
-const FE_APP_TSX: &str = r#"export function Head() {
-    return (
-        <>
-            <meta charSet="utf-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>Forte App</title>
-        </>
-    );
+const FE_APP_TSX: &str = r#"export const head = [
+    { title: "Forte App" },
+    { name: "viewport", content: "width=device-width, initial-scale=1.0" },
+];
+
+export function Head() {
+    return <meta charSet="utf-8" />;
 }
 "#;
 

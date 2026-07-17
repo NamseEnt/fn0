@@ -93,8 +93,8 @@ fn resolve_workspace_root(manifest_dir: &Path) -> Option<PathBuf> {
 }
 
 fn read_package_version(path: &Path, expected_name: &str) -> String {
-    let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let content =
+        fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
 
     let mut in_package = false;
     let mut found_name: Option<String> = None;
@@ -138,7 +138,5 @@ fn extract_string_value(rest: &str) -> String {
         .strip_prefix('=')
         .expect("expected `=` after key")
         .trim();
-    after_eq
-        .trim_matches('"')
-        .to_string()
+    after_eq.trim_matches('"').to_string()
 }

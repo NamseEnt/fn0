@@ -227,4 +227,3 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 "#
     .to_string()
 }
-

@@ -1,5 +1,61 @@
 import { z } from "zod";
 
+export type HeadDescriptor =
+  | { title: string }
+  | { name: string; content: string }
+  | { property: string; content: string }
+  | ({ tagName: "link" | "meta" } & Record<string, string>);
+
+function headDescriptorKey(descriptor: HeadDescriptor): string | null {
+  if ("tagName" in descriptor) return null;
+  if ("title" in descriptor) return "title";
+  if ("name" in descriptor) return `name:${descriptor.name}`;
+  return `property:${(descriptor as { property: string }).property}`;
+}
+
+export function mergeHeadDescriptors(
+  base: HeadDescriptor[],
+  overrides: HeadDescriptor[]
+): HeadDescriptor[] {
+  const overrideKeys = new Set(
+    overrides.map(headDescriptorKey).filter((key) => key !== null)
+  );
+  const kept = base.filter((descriptor) => {
+    const key = headDescriptorKey(descriptor);
+    return key === null || !overrideKeys.has(key);
+  });
+  return [...kept, ...overrides];
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function renderHeadDescriptors(descriptors: HeadDescriptor[]): string {
+  return descriptors
+    .map((descriptor) => {
+      if ("tagName" in descriptor) {
+        const { tagName, ...attrs } = descriptor;
+        const attrHtml = Object.entries(attrs)
+          .map(([key, value]) => ` ${key}="${escapeHtml(value)}"`)
+          .join("");
+        return `<${tagName}${attrHtml}/>`;
+      }
+      if ("title" in descriptor) {
+        return `<title>${escapeHtml(descriptor.title)}</title>`;
+      }
+      if ("name" in descriptor) {
+        return `<meta name="${escapeHtml(descriptor.name)}" content="${escapeHtml(descriptor.content)}"/>`;
+      }
+      return `<meta property="${escapeHtml(descriptor.property)}" content="${escapeHtml(descriptor.content)}"/>`;
+    })
+    .join("\n");
+}
+
 type CacheEntry<T> = {
   promise?: Promise<T>;
   result?: T;
