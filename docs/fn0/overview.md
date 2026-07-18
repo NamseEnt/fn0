@@ -53,14 +53,14 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.2.44 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0` | 0.2.45 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
 | `fn0-cli` | 0.1.5 | Local development CLI |
-| `fn0-worker` | 0.3.49 | Worker binary (distributed execution node) |
+| `fn0-worker` | 0.3.50 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.5 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.0 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
 | `fn0-deploy` | 0.1.12 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.1.3 | Wasmtime wrapper with fn0-specific config |
-| `fn0-ski` | 0.1.6 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
+| `fn0-ski` | 0.1.7 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | Compiler utilities (internal) |
 
 ## fn0-cli Commands
