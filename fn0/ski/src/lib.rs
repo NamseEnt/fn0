@@ -427,7 +427,26 @@ impl SkiInstance {
             match outcome {
                 Some(r) => {
                     r.map_err(|e| anyhow!("js handler failed: {e:?}"))?;
-                    take_response(&runtime, id)
+                    let response = take_response(&runtime, id)?;
+                    // Drain the deno stream-backed body here, on the isolate's
+                    // thread, so callers receive a body that is safe to poll
+                    // from any thread (see IsolateThreadGuardBody).
+                    let (parts, body) = response.into_parts();
+                    let collected = tokio::select! {
+                        c = body.collect() => {
+                            c.map_err(|e| anyhow!("response body drain failed: {e:?}"))?
+                        }
+                        _ = terminated.notified() => {
+                            return Err(anyhow!(
+                                "ski runtime terminated while draining response body"
+                            ));
+                        }
+                    };
+                    let body = BodyExt::boxed_unsync(
+                        http_body_util::Full::new(collected.to_bytes())
+                            .map_err(|never| match never {}),
+                    );
+                    Ok(hyper::Response::from_parts(parts, body))
                 }
                 None => Err(anyhow!(
                     "ski runtime terminated (cpu budget exceeded or driver crashed)"
@@ -521,6 +540,51 @@ fn register_request(runtime: &mut JsRuntime, id: u32, req: Request) {
     );
 }
 
+struct IsolateThreadGuardBody<B> {
+    inner: B,
+    home_thread: std::thread::ThreadId,
+}
+
+impl<B> IsolateThreadGuardBody<B> {
+    fn new(inner: B) -> Self {
+        Self {
+            inner,
+            home_thread: std::thread::current().id(),
+        }
+    }
+}
+
+impl<B> hyper::body::Body for IsolateThreadGuardBody<B>
+where
+    B: hyper::body::Body + Unpin,
+{
+    type Data = B::Data;
+    type Error = B::Error;
+
+    fn poll_frame(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<std::result::Result<hyper::body::Frame<Self::Data>, Self::Error>>> {
+        let this = self.get_mut();
+        assert_eq!(
+            std::thread::current().id(),
+            this.home_thread,
+            "deno stream-backed response body polled outside its isolate thread; \
+             the underlying channel is Rc<RefCell>-based and polling it from \
+             another thread is a data race"
+        );
+        Pin::new(&mut this.inner).poll_frame(cx)
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    fn size_hint(&self) -> hyper::body::SizeHint {
+        self.inner.size_hint()
+    }
+}
+
 fn take_response(runtime: &Rc<RefCell<JsRuntime>>, id: u32) -> Result<Response> {
     let rt = runtime.borrow();
     let op_state = rt.op_state();
@@ -554,7 +618,9 @@ fn take_response(runtime: &Rc<RefCell<JsRuntime>>, id: u32) -> Result<Response> 
         .get_any(rid)
         .map_err(|_| anyhow!("Response body resource not found"))?;
     let body_adapter = deno_fetch::ResourceToBodyAdapter::new(resource);
-    let body = BodyExt::boxed_unsync(body_adapter.map_err(|e| anyhow::anyhow!(e)));
+    let body = BodyExt::boxed_unsync(IsolateThreadGuardBody::new(
+        body_adapter.map_err(|e| anyhow::anyhow!(e)),
+    ));
     Ok(builder.body(body)?)
 }
 
