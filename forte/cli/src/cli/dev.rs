@@ -278,8 +278,16 @@ fn collect_file_mtimes(dir: &Path, extensions: &[&str]) -> HashMap<PathBuf, Syst
     mtimes
 }
 
+fn env_mtimes(paths: &[PathBuf]) -> Vec<Option<SystemTime>> {
+    paths
+        .iter()
+        .map(|path| fs::metadata(path).ok().and_then(|m| m.modified().ok()))
+        .collect()
+}
+
 pub async fn run(options: DevOptions) -> Result<()> {
     let project_dir = options.project_dir.canonicalize()?;
+    super::env::reject_unmigrated_dotenv(&project_dir)?;
 
     let port = match options.port {
         Some(p) => {
@@ -323,17 +331,6 @@ pub async fn run(options: DevOptions) -> Result<()> {
     let js_path = String::new();
     let public_dir = project_dir.join("fe/public");
 
-    let mut env_vars = server::load_env_file(&project_dir);
-    if !env_vars.iter().any(|(k, _)| k == "TURSO_URL") {
-        env_vars.push((
-            "TURSO_URL".to_string(),
-            format!("http://127.0.0.1:{}", sqld_port),
-        ));
-    }
-    if !env_vars.iter().any(|(k, _)| k == "TURSO_AUTH_TOKEN") {
-        env_vars.push(("TURSO_AUTH_TOKEN".to_string(), String::new()));
-    }
-
     let (queue_tx, queue_rx) =
         tokio::sync::mpsc::unbounded_channel::<fn0::queue_hijack::LoopbackMessage>();
     let queue_placeholder = "fn0-queue.fn0.dev".to_string();
@@ -343,25 +340,30 @@ pub async fn run(options: DevOptions) -> Result<()> {
         queue_tx,
     ));
 
-    if !env_vars.iter().any(|(k, _)| k == "FN0_QUEUE_URL") {
-        env_vars.push((
-            "FN0_QUEUE_URL".to_string(),
-            format!("http://{queue_placeholder}"),
-        ));
-    }
-
     let object_storage_placeholder = "fn0-object-storage.fn0.dev".to_string();
     let object_storage_hijack = Arc::new(fn0::ObjectStorageHijack::new_local(
         object_storage_placeholder.clone(),
         project_dir.join(".forte/data/objects"),
         format!("http://localhost:{port}"),
     ));
-    if !env_vars.iter().any(|(k, _)| k == "FN0_OBJECT_STORAGE_URL") {
-        env_vars.push((
+
+    let local_service_env = vec![
+        (
+            "TURSO_URL".to_string(),
+            format!("http://127.0.0.1:{sqld_port}"),
+        ),
+        ("TURSO_AUTH_TOKEN".to_string(), String::new()),
+        (
+            "FN0_QUEUE_URL".to_string(),
+            format!("http://{queue_placeholder}"),
+        ),
+        (
             "FN0_OBJECT_STORAGE_URL".to_string(),
             format!("http://{object_storage_placeholder}"),
-        ));
-    }
+        ),
+    ];
+
+    let env_vars = resolve_dev_env(&project_dir, &local_service_env)?;
 
     let config = ServerConfig {
         port,
@@ -422,7 +424,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
     });
 
     let mut vite = vite;
-    let result = run_watch_loop(&project_dir, handle).await;
+    let result = run_watch_loop(&project_dir, handle, local_service_env).await;
 
     let _ = vite.child.kill();
     _sqld.kill();
@@ -430,7 +432,34 @@ pub async fn run(options: DevOptions) -> Result<()> {
     result
 }
 
-async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> {
+/// `env.yaml` + `env.local.yaml`, with the loopback URLs of the services
+/// `forte dev` runs locally filling in whatever the project did not set.
+fn resolve_dev_env(
+    project_dir: &Path,
+    local_service_env: &[(String, String)],
+) -> Result<Vec<(String, String)>> {
+    let dev_env = fn0_deploy::env::load_dev_env(project_dir)?;
+    if !dev_env.unresolved_secrets.is_empty() {
+        println!(
+            "[env] unset in dev (encrypted in env.yaml): {}. Add plaintext values to env.local.yaml to use them.",
+            dev_env.unresolved_secrets.join(", ")
+        );
+    }
+
+    let mut env_vars = dev_env.vars;
+    for (key, value) in local_service_env {
+        if !env_vars.iter().any(|(k, _)| k == key) {
+            env_vars.push((key.clone(), value.clone()));
+        }
+    }
+    Ok(env_vars)
+}
+
+async fn run_watch_loop(
+    project_dir: &Path,
+    handle: ServerHandle,
+    local_service_env: Vec<(String, String)>,
+) -> Result<()> {
     let (tx, mut rx) = unbounded_channel();
 
     let mut debouncer = new_debouncer(Duration::from_millis(100), move |evt| {
@@ -438,19 +467,23 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
     })?;
 
     let rs_dir = project_dir.join("rs/src");
-    let env_file = project_dir.join(".env");
+    let env_files = [
+        fn0_deploy::env::env_yaml_path(project_dir),
+        fn0_deploy::env::env_local_yaml_path(project_dir),
+    ];
 
     debouncer
         .watcher()
         .watch(&rs_dir, RecursiveMode::Recursive)?;
-    if env_file.exists() {
-        debouncer
-            .watcher()
-            .watch(&env_file, RecursiveMode::NonRecursive)?;
-    }
+    // Watching the directory rather than the files themselves picks up env
+    // files created after startup, and survives the delete+rename that editors
+    // use to save.
+    debouncer
+        .watcher()
+        .watch(project_dir, RecursiveMode::NonRecursive)?;
 
     let mut known_rs_mtimes = collect_file_mtimes(&rs_dir, &["rs"]);
-    let mut known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
+    let mut known_env_mtimes = env_mtimes(&env_files);
 
     while let Some(evt_result) = rx.recv().await {
         match evt_result {
@@ -473,20 +506,18 @@ async fn run_watch_loop(project_dir: &Path, handle: ServerHandle) -> Result<()> 
                     })
                     .collect();
 
-                let env_changed = events.iter().any(|e| e.path == env_file) && {
-                    let current_mtime =
-                        fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
-                    match (current_mtime, known_env_mtime) {
-                        (Some(current), Some(known)) => current > known,
-                        (Some(_), None) => true,
-                        _ => false,
-                    }
+                let env_changed = events.iter().any(|e| env_files.contains(&e.path)) && {
+                    let current_mtimes = env_mtimes(&env_files);
+                    let changed = current_mtimes != known_env_mtimes;
+                    known_env_mtimes = current_mtimes;
+                    changed
                 };
 
                 if env_changed {
-                    known_env_mtime = fs::metadata(&env_file).ok().and_then(|m| m.modified().ok());
-                    let new_vars = server::load_env_file(project_dir);
-                    handle.ctx.bundle_cache().set_env(new_vars).await;
+                    match resolve_dev_env(project_dir, &local_service_env) {
+                        Ok(new_vars) => handle.ctx.bundle_cache().set_env(new_vars).await,
+                        Err(e) => eprintln!("[watch] env reload failed: {e}"),
+                    }
                 }
 
                 if !rs_changes.is_empty() {

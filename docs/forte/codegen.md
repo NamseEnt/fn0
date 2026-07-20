@@ -118,31 +118,29 @@ Rust types are mapped to TypeScript: `String`/`&str` → `string`, integer types
 
 ## `generate_env` (build.rs)
 
-`forte-codegen` also exports a second build-script function:
+`forte-codegen` also exports a second build-script function, called by default in the `forte init` template:
 
 ```rust
 fn main() {
     forte_codegen::generate_routes();
-    forte_codegen::generate_env(); // optional, call after generate_routes
+    forte_codegen::generate_env();
 }
 ```
 
-When called, `generate_env` reads the project's `.env` file (located one directory above `rs/`, i.e. `<project>/.env`) and writes `rs/src/env_generated.rs`. For each `KEY=value` line it generates a zero-cost accessor:
+`generate_env` reads the project's env files — `<project>/env.yaml` and `<project>/env.local.yaml` — and writes `rs/src/env_generated.rs`. For the union of their keys it generates a zero-cost accessor each:
 
 ```rust
-pub fn cookie_secret() -> &'static str { ... }  // for COOKIE_SECRET=...
-pub fn turso_url() -> &'static str { ... }       // for TURSO_URL=...
+pub fn cookie_secret() -> &'static str { ... }  // for COOKIE_SECRET
+pub fn turso_url() -> &'static str { ... }       // for TURSO_URL
 ```
 
-Values are loaded from the real environment at first use via `std::sync::LazyLock`. This means the function always returns the runtime value of the variable, not the value in `.env`; `.env` is only used to determine which accessor functions to generate.
+Values are loaded from the real environment at first use via `std::sync::LazyLock`. The env files only determine which accessor functions exist; the returned value is always the runtime value of the variable. Encrypted (`secret:`) entries generate an accessor exactly like plain ones — the ciphertext is never read at build time.
 
-> **Warning:** Each accessor panics if the corresponding environment variable is not set at runtime. Ensure every variable listed in `.env` is also present in `env.yaml` (via `forte env set`) before deploying.
+Because the accessors are derived from `env.yaml` itself, an accessor exists for everything you deploy. Each one panics if the variable is unset at runtime, which is what you get in `forte dev` for a `secret:` entry with no `env.local.yaml` override — `forte dev` lists those keys on startup.
 
-`cargo:rerun-if-changed=../.env` is emitted automatically so the file is regenerated when `.env` changes.
+`cargo:rerun-if-changed` is emitted for both files, so the module is regenerated when either changes.
 
-To use the generated module, add `mod env_generated;` to your `lib.rs` and call `env_generated::cookie_secret()` etc.
-
-> **Note:** `generate_env` is not called by default. You must add it to `build.rs` explicitly.
+To use the generated module, add `mod env_generated;` to your `lib.rs` (outside the FORTE-MANAGED block) and call `env_generated::cookie_secret()` etc.
 
 ## `forte-rs-to-ts`
 

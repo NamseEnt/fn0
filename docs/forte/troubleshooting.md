@@ -69,11 +69,11 @@ Then re-run `forte build`.
 
 ### Environment variable changes don't take effect
 
-`forte dev` hot-reloads `.env` on file change — updated values for **existing** variables take effect on the next request without a Rust rebuild.
+`forte dev` hot-reloads `env.yaml` and `env.local.yaml` on file change — updated values for **existing** variables take effect on the next request without a Rust rebuild.
 
-Adding a **new** variable still requires a `cargo build` if you use `generate_env()` in `build.rs`, because that function generates new accessor functions at build time.
+Adding a **new** variable still requires a `cargo build`, because `generate_env()` emits its accessor function at build time.
 
-Variables in `.env` are for local development only. They are not bundled during deploy — use `env.yaml` for production.
+`env.local.yaml` is local-only: it is gitignored and never bundled into a deploy. `env.yaml` is the one that ships.
 
 ---
 
@@ -170,7 +170,7 @@ forte deploy
 
 ### Environment variables not available in production
 
-Secrets and env vars set via `forte env set` are stored in `env.yaml` and bundled during `forte deploy`. They are **not** available in `forte dev` — use `.env` for local development.
+Secrets and env vars set via `forte env set` are stored in `env.yaml` and bundled during `forte deploy`. Plain entries are also read by `forte dev`; encrypted ones are not, since decrypting needs the vault — override those in `env.local.yaml` for local runs.
 
 ### Cron jobs not firing
 

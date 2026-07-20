@@ -166,15 +166,16 @@ fn fe_package_json(name: &str) -> String {
     )
 }
 
-const ROOT_GITIGNORE: &str = "/target\n/dist\n/.forte\n";
+const ROOT_GITIGNORE: &str = "/target\n/dist\n/.forte\n/env.local.yaml\n";
 const RS_GITIGNORE: &str = "/target\n";
 const FE_GITIGNORE: &str = "/node_modules\n/dist\n/.forte\n";
 
 const RS_CARGO_CONFIG: &str = "[build]\ntarget = \"wasm32-wasip2\"\n";
 
-const RS_BUILD_RS: &str = "fn main() {\n    forte_codegen::generate_routes();\n}\n";
+const RS_BUILD_RS: &str =
+    "fn main() {\n    forte_codegen::generate_routes();\n    forte_codegen::generate_env();\n}\n";
 
-const RS_LIB_RS: &str = "// === FORTE-MANAGED START ===\n// Auto-managed by `forte build`. Do not edit between the START/END markers.\nmod route_generated;\n// === FORTE-MANAGED END ===\n";
+const RS_LIB_RS: &str = "// === FORTE-MANAGED START ===\n// Auto-managed by `forte build`. Do not edit between the START/END markers.\nmod route_generated;\n// === FORTE-MANAGED END ===\n\nmod env_generated;\n";
 
 const RS_INDEX_MOD_RS: &str = r#"use anyhow::Result;
 use forte_sdk::ForteRequest;

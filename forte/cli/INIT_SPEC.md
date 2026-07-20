@@ -9,11 +9,9 @@ Note on related documents:
 
 Ground truth for the spec is the union of:
 - Hard requirements deduced by reading every CLI subcommand and `forte-codegen` (see §6 *Why each file is required*).
-- The two running applications:
-  - `~/fn0/fn0/control/` (Forte project for the fn0 control plane).
-  - `~/amgi/web/` (Forte project for mottomite).
+- The in-repo reference application: `fn0/control/` (the Forte project behind the fn0 control plane).
 
-Where the two apps disagree, this spec takes the most minimal layout that still satisfies the CLI's hard requirements. Project-specific extensions (Tailwind, custom Vite config, env codegen, etc.) are explicitly out of init's scope.
+Where a reference app and the hard requirements disagree, this spec takes the most minimal layout that still satisfies the CLI's hard requirements. Project-specific extensions (Tailwind, custom Vite config, env codegen, etc.) are explicitly out of init's scope.
 
 ---
 
@@ -104,9 +102,10 @@ All file contents below are normative. They are derived from the requirements of
 /target
 /dist
 /.forte
+/env.local.yaml
 ```
 
-Rationale: `/target` covers the case where the user runs `cargo` at the root; `/dist` is written by `forte build`; `/.forte` is written by `forte-rs-to-ts` (`<project>/.forte/rs-to-ts-target/`).
+Rationale: `/target` covers the case where the user runs `cargo` at the root; `/dist` is written by `forte build`; `/.forte` is written by `forte-rs-to-ts` (`<project>/.forte/rs-to-ts-target/`); `/env.local.yaml` holds plaintext local secrets and must never be committed. Note that `env.yaml` is deliberately NOT ignored — its secrets are encrypted and it is meant to be shared.
 
 ### 4.2 `<name>/Forte.toml`
 
@@ -128,7 +127,7 @@ Rationale: `/target` covers the case where the user runs `cargo` at the root; `/
 target = "wasm32-wasip2"
 ```
 
-Rationale: `forte build` and `forte dev` both pass `--target wasm32-wasip2` explicitly when invoking cargo (see invariant table §6), so this file is not strictly required by the CLI itself. It IS required for the common case of a user running `cargo check` / `cargo clippy` / `cargo build` directly inside `rs/` without thinking about targets. Both running apps either ship this file (fn0/control) or fail those direct-cargo commands (amgi/web has no `.cargo/config.toml` and direct `cargo build` in `rs/` would attempt the host triple, which `forte-sdk` does not support). We pick the explicit version.
+Rationale: `forte build` and `forte dev` both pass `--target wasm32-wasip2` explicitly when invoking cargo (see invariant table §6), so this file is not strictly required by the CLI itself. It IS required for the common case of a user running `cargo check` / `cargo clippy` / `cargo build` directly inside `rs/` without thinking about targets. Without it, a direct `cargo build` in `rs/` attempts the host triple, which `forte-sdk` does not support. We pick the explicit version.
 
 ### 4.5 `<name>/rs/Cargo.toml`
 
@@ -178,12 +177,13 @@ NOT included in the template:
 ```rust
 fn main() {
     forte_codegen::generate_routes();
+    forte_codegen::generate_env();
 }
 ```
 
 Hard requirement: `forte-codegen::generate_routes()` writes `rs/src/route_generated.rs` and rewrites the FORTE-MANAGED block in `rs/src/lib.rs`. Without this call, the project will not compile after init.
 
-NOT included: `forte_codegen::generate_env()`. It is opt-in (requires a `<name>/.env` file). amgi/web uses it; fn0/control does not. Users who want `.env`-derived constants add the call themselves.
+`generate_env()` writes `rs/src/env_generated.rs` from `env.yaml` + `env.local.yaml`. It is included unconditionally: with no env files it emits an empty module, which compiles, so there is no case where the template needs editing to make it work. Leaving it out meant every project that later added env vars had to hand-edit both `build.rs` and `lib.rs`.
 
 ### 4.7 `<name>/rs/src/lib.rs`
 
@@ -192,7 +192,11 @@ NOT included: `forte_codegen::generate_env()`. It is opt-in (requires a `<name>/
 // Auto-managed by `forte build`. Do not edit between the START/END markers.
 mod route_generated;
 // === FORTE-MANAGED END ===
+
+mod env_generated;
 ```
+
+`mod env_generated;` MUST sit outside the marker block: `render_managed_block()` in `forte/codegen/src/generate_routes.rs` rebuilds the block from scratch on every build and does not emit that line, so anything placed inside is dropped on the next build.
 
 Hard requirements:
 - The two literal marker comments are matched by string in `forte/codegen/src/generate_routes.rs:101-107`. **`generate_routes()` PANICS if either marker is missing.**
@@ -267,8 +271,8 @@ Hard requirements:
 Init MUST write `package.json` first, then run `npm install` **once** in `<name>/fe/`. A single invocation is sufficient because `package.json` already lists every package; the current `init.rs:73-110` runs two separate `npm install` commands without `package.json` listing them up front, and that pattern goes away.
 
 Version pins:
-- fn0/control: `typescript ^6.0.3`. amgi/web: `typescript ^5.9.3`. We pin to `^5.9` for stability (TS 6.0 is recent and breaks some downstream tooling); revisit in a follow-up.
-- React 19.2.x is consistent across both apps and is the lowest version that ships the new SSR API used by `fe_runtime/server.tsx`.
+- `typescript` is pinned to `^5.9` for stability (TS 6.0 is recent and breaks some downstream tooling); revisit in a follow-up.
+- React 19.2.x is the lowest version that ships the new SSR API used by `fe_runtime/server.tsx`.
 
 ### 4.11 `<name>/fe/tsconfig.json`
 
@@ -289,7 +293,7 @@ Version pins:
 ```
 
 Differences from current `init.rs`:
-- `"noEmit": true` — Vite handles emit, `tsc` is for type-checking only. amgi/web ships this; fn0/control uses `"outDir": "dist"` which conflicts with Vite's output directory.
+- `"noEmit": true` — Vite handles emit, `tsc` is for type-checking only. An `"outDir": "dist"` would conflict with Vite's output directory.
 - `"include": ["src", ".forte"]` — the runtime files in `fe/.forte/` are TS and need type checking once generated. The `.forte/` directory is absent right after init; this is harmless (tsc treats missing globs as empty).
 
 ### 4.12 `<name>/fe/public/robots.txt`
@@ -349,7 +353,7 @@ Hard requirements:
 These files appear in fresh projects after the first `forte dev` or `forte build`, NOT in the init output:
 
 - `<name>/rs/src/route_generated.rs` — written by `forte-codegen::generate_routes()`.
-- `<name>/rs/src/env_generated.rs` — written by `forte-codegen::generate_env()` if used.
+- `<name>/rs/src/env_generated.rs` — written by `forte-codegen::generate_env()` (empty when the project has no env files).
 - `<name>/rs/src/{actions,admin,queue_task}/mod.rs` — written by codegen when corresponding directories have at least one item.
 - `<name>/fe/src/paths.generated.ts` — written by codegen.
 - `<name>/fe/src/pages/**/.props.ts` and `.input.ts` etc. — written by `forte-rs-to-ts`.
@@ -431,9 +435,9 @@ The Forte CLI invokes `cargo build --target wasm32-wasip2` and relies on cargo's
 
 **Decision: no.** Users who want git run `git init` themselves. Init stays minimal.
 
-### 8.6 Should init create `<name>/env.yaml` and `<name>/.env`? ✅ Decided
+### 8.6 Should init create `<name>/env.yaml` and `<name>/env.local.yaml`? ✅ Decided
 
-**Decision: no.** Empty optional files are noise. Document them in `forte deploy`'s help output and in the README.
+**Decision: no.** Empty optional files are noise. `generate_env()` handles their absence by emitting an empty module, and `.gitignore` already lists `env.local.yaml` so it is protected the moment it is created. Document both in `forte deploy`'s help output and in the README.
 
 ### 8.7 `forte add` templates are stale ✅ Decided (fixed in the init rewrite PR)
 

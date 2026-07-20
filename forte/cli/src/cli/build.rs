@@ -17,6 +17,7 @@ pub async fn run_build(options: BuildOptions) -> Result<()> {
     if !project_dir.join("Forte.toml").exists() {
         anyhow::bail!("Not a Forte project (Forte.toml not found)");
     }
+    super::env::reject_unmigrated_dotenv(&project_dir)?;
 
     println!("Building Forte project for production...");
     println!("Project directory: {}", project_dir.display());

@@ -39,7 +39,7 @@ Behavior:
 - Downloads and starts a local sqld (libSQL) server automatically; data persists in `.forte/data/`
 - Starts a Vite dev server for the frontend (HMR)
 - Rebuilds the Rust backend on `.rs` file changes
-- Hot-reloads `.env` on change — updated variable values take effect on the next request without a Rust rebuild (adding a new variable still requires `cargo build` if using `generate_env()`)
+- Hot-reloads `env.yaml` / `env.local.yaml` on change — updated variable values take effect on the next request without a Rust rebuild (adding a new variable still requires `cargo build`, since `generate_env()` emits its accessor at build time)
 - Handles SSR requests
 - Routes queue task messages locally (loopback; no external queue needed)
 - Serves object storage from `.forte/data/objects/` (no cloud credentials needed)
@@ -200,6 +200,7 @@ Manage `env.yaml` entries for the project. Entries are bundled into the deploy a
 | Subcommand | Description |
 |---|---|
 | `set <key> <value> [--secret]` | Set an env entry. Plain by default; `--secret` encrypts the value via the control vault (requires `forte login`). Silently overwrites an existing key. |
+| `migrate` | Convert a legacy `.env` file into `env.local.yaml`. Refuses to run if `env.local.yaml` already exists, and leaves `.env` on disk for you to delete. |
 
 | Flag | Default | Description |
 |---|---|---|
@@ -252,7 +253,7 @@ fn0 env list
 fn0 env unset COOKIE_SECRET
 ```
 
-Secrets are encrypted via fn0 Cloud's vault and decrypted in-worker at runtime. They are not available in `forte dev`; use a `.env` file for local development instead.
+Secrets are encrypted via fn0 Cloud's vault and decrypted in-worker at runtime. Decryption needs the vault, so `forte dev` cannot open them; give any secret you need locally a plaintext value in `env.local.yaml`.
 
 
 ### env.yaml format

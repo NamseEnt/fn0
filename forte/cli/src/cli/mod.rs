@@ -77,6 +77,11 @@ pub enum EnvCommands {
         #[arg(short, long)]
         project: Option<PathBuf>,
     },
+    /// Convert a legacy .env file into env.local.yaml
+    Migrate {
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]

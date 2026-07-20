@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 const ENV_YAML_FILENAME: &str = "env.yaml";
+const ENV_LOCAL_YAML_FILENAME: &str = "env.local.yaml";
 const DEK_KEY: &str = "__dek";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,16 +13,91 @@ pub enum EntryKind {
     Secret,
 }
 
+/// Environment for `forte dev`, resolved without network or credentials:
+/// plain `env.yaml` entries overlaid with `env.local.yaml`.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct DevEnv {
+    pub vars: Vec<(String, String)>,
+    /// `env.yaml` secrets with no `env.local.yaml` override. Their ciphertext
+    /// can only be opened by the worker's vault, so dev leaves them unset.
+    pub unresolved_secrets: Vec<String>,
+}
+
 pub fn set_plain(project_dir: &Path, key: &str, value: &str) -> Result<()> {
+    set_plain_at(&env_yaml_path(project_dir), key, value)
+}
+
+pub fn set_plain_local(project_dir: &Path, key: &str, value: &str) -> Result<()> {
+    set_plain_at(&env_local_yaml_path(project_dir), key, value)
+}
+
+fn set_plain_at(env_path: &Path, key: &str, value: &str) -> Result<()> {
     reject_reserved(key)?;
-    let env_path = env_yaml_path(project_dir);
-    let mut mapping = load_mapping(&env_path)?;
+    let mut mapping = load_mapping(env_path)?;
     mapping.insert(
         serde_yaml::Value::String(key.to_string()),
         serde_yaml::Value::String(value.to_string()),
     );
-    save_mapping(&env_path, &mapping)?;
+    save_mapping(env_path, &mapping)?;
     Ok(())
+}
+
+pub fn load_dev_env(project_dir: &Path) -> Result<DevEnv> {
+    let mut dev_env = DevEnv::default();
+
+    let shared_path = env_yaml_path(project_dir);
+    for (key, value) in load_mapping(&shared_path)? {
+        let key = entry_key(&shared_path, &key)?;
+        if key == DEK_KEY {
+            continue;
+        }
+        match value {
+            serde_yaml::Value::Mapping(m) if m.contains_key("secret") => {
+                dev_env.unresolved_secrets.push(key.to_string());
+            }
+            value => dev_env
+                .vars
+                .push((key.to_string(), plain_value(&shared_path, key, &value)?)),
+        }
+    }
+
+    let local_path = env_local_yaml_path(project_dir);
+    for (key, value) in load_mapping(&local_path)? {
+        let key = entry_key(&local_path, &key)?;
+        reject_reserved(key)?;
+        if matches!(&value, serde_yaml::Value::Mapping(m) if m.contains_key("secret")) {
+            return Err(anyhow!(
+                "{}: {key} uses `secret:`, but {ENV_LOCAL_YAML_FILENAME} is plaintext and gitignored — write the value directly",
+                local_path.display()
+            ));
+        }
+        let value = plain_value(&local_path, key, &value)?;
+        dev_env.unresolved_secrets.retain(|k| k != key);
+        match dev_env.vars.iter_mut().find(|(k, _)| k == key) {
+            Some(existing) => existing.1 = value,
+            None => dev_env.vars.push((key.to_string(), value)),
+        }
+    }
+
+    Ok(dev_env)
+}
+
+fn entry_key<'a>(path: &Path, key: &'a serde_yaml::Value) -> Result<&'a str> {
+    key.as_str()
+        .ok_or_else(|| anyhow!("{}: key is not a string", path.display()))
+}
+
+// Mirrors the worker's stricter parse (fn0/worker/src/env_yaml.rs): a bare
+// `PORT: 8080` is a YAML number and must fail here too, not silently work in
+// dev and then break the deploy.
+fn plain_value(path: &Path, key: &str, value: &serde_yaml::Value) -> Result<String> {
+    match value {
+        serde_yaml::Value::String(s) => Ok(s.clone()),
+        _ => Err(anyhow!(
+            "{}: {key} must be a quoted string or a `secret:` mapping",
+            path.display()
+        )),
+    }
 }
 
 pub async fn set_secret(
@@ -94,6 +170,10 @@ pub fn unset(project_dir: &Path, key: &str) -> Result<()> {
 
 pub fn env_yaml_path(project_dir: &Path) -> PathBuf {
     project_dir.join(ENV_YAML_FILENAME)
+}
+
+pub fn env_local_yaml_path(project_dir: &Path) -> PathBuf {
+    project_dir.join(ENV_LOCAL_YAML_FILENAME)
 }
 
 fn reject_reserved(key: &str) -> Result<()> {
@@ -285,5 +365,70 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let err = set_plain(dir.path(), DEK_KEY, "x").unwrap_err();
         assert!(err.to_string().contains("reserved"));
+    }
+
+    #[test]
+    fn dev_env_is_empty_without_files() {
+        let dir = TempDir::new().unwrap();
+        assert_eq!(load_dev_env(dir.path()).unwrap(), DevEnv::default());
+    }
+
+    #[test]
+    fn dev_env_takes_plain_shared_entries_and_defers_secrets() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            env_yaml_path(dir.path()),
+            "__dek:\n  encrypted: ct\nSHARED: from_shared\nAPI_KEY:\n  secret: ct\n",
+        )
+        .unwrap();
+
+        let dev_env = load_dev_env(dir.path()).unwrap();
+        assert_eq!(
+            dev_env.vars,
+            vec![("SHARED".to_string(), "from_shared".to_string())]
+        );
+        assert_eq!(dev_env.unresolved_secrets, vec!["API_KEY".to_string()]);
+    }
+
+    #[test]
+    fn local_overrides_shared_and_resolves_secret() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            env_yaml_path(dir.path()),
+            "SHARED: from_shared\nAPI_KEY:\n  secret: ct\n",
+        )
+        .unwrap();
+        std::fs::write(
+            env_local_yaml_path(dir.path()),
+            "SHARED: from_local\nAPI_KEY: dev_key\nLOCAL_ONLY: x\n",
+        )
+        .unwrap();
+
+        let dev_env = load_dev_env(dir.path()).unwrap();
+        assert_eq!(
+            dev_env.vars,
+            vec![
+                ("SHARED".to_string(), "from_local".to_string()),
+                ("API_KEY".to_string(), "dev_key".to_string()),
+                ("LOCAL_ONLY".to_string(), "x".to_string()),
+            ]
+        );
+        assert!(dev_env.unresolved_secrets.is_empty());
+    }
+
+    #[test]
+    fn local_secret_entry_is_rejected() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(env_local_yaml_path(dir.path()), "API_KEY:\n  secret: ct\n").unwrap();
+        let err = load_dev_env(dir.path()).unwrap_err();
+        assert!(err.to_string().contains("plaintext and gitignored"));
+    }
+
+    #[test]
+    fn non_string_plain_value_is_rejected() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(env_yaml_path(dir.path()), "PORT: 8080\n").unwrap();
+        let err = load_dev_env(dir.path()).unwrap_err();
+        assert!(err.to_string().contains("must be a quoted string"));
     }
 }

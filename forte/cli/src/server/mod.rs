@@ -35,28 +35,6 @@ pub struct ServerHandle {
 
 pub const DEV_CODE_ID: &str = "app";
 
-pub fn load_env_file(project_root: &Path) -> Vec<(String, String)> {
-    let env_path = project_root.join(".env");
-    let mut vars = Vec::new();
-
-    let Ok(content) = std::fs::read_to_string(&env_path) else {
-        return vars;
-    };
-
-    for line in content.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-
-        if let Some((key, value)) = line.split_once('=') {
-            vars.push((key.trim().to_string(), value.trim().to_string()));
-        }
-    }
-
-    vars
-}
-
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let engine = fn0::build_engine()?;
     fn0::spawn_epoch_ticker(engine.clone());

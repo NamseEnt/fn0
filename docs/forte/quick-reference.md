@@ -305,7 +305,7 @@ The page `head` merges over the app defaults — same `name`/`property` keys rep
 |---|---|---|
 | `rs/src/route_generated.rs` | `forte-codegen` (build.rs) | every `cargo build` |
 | `rs/src/actions/mod.rs`, `admin/mod.rs`, `queue_task/mod.rs` | same | same |
-| `rs/src/env_generated.rs` | `generate_env()` in build.rs | when `.env` changes |
+| `rs/src/env_generated.rs` | `generate_env()` in build.rs | when `env.yaml` / `env.local.yaml` changes |
 | `fe/src/pages/<path>/.props.ts` | `forte-rs-to-ts` | `forte build`/`forte dev` |
 | `fe/src/actions/.generated/<name>.ts` | same | same |
 | `fe/src/hooks/.generated/<Name>.ts` | same | same |

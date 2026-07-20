@@ -106,6 +106,10 @@ async fn async_main() -> Result<()> {
                 let project_dir = project.unwrap_or_else(|| ".".into());
                 cli::env::set(&project_dir, key, value, secret).await?;
             }
+            EnvCommands::Migrate { project } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::env::migrate(&project_dir)?;
+            }
         },
     }
 
