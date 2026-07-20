@@ -8,6 +8,7 @@
 //! never buffered — signing uses `UNSIGNED-PAYLOAD`, so large uploads stream
 //! straight through.
 
+use crate::presign_gate::PresignGate;
 use bytes::Bytes;
 use chrono::Utc;
 use hmac::{Hmac, Mac};
@@ -18,6 +19,7 @@ use hyper::http::uri::Scheme;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -27,10 +29,15 @@ type HijackResponse = hyper::Response<UnsyncBoxBody<Bytes, ErrorCode>>;
 const BUCKET_PREFIX: &str = "fn0-object-storage-";
 const SIDECAR_SUFFIX: &str = ".__fn0meta";
 
+// Expiry is the only revocation mechanism for a minted URL: once minting is
+// blocked, exposure ends when outstanding URLs age out. Keep this in minutes.
+pub const PRESIGN_MAX_EXPIRES_SECS: u64 = 300;
+
 #[derive(Clone)]
 pub struct ObjectStorageHijack {
     pub placeholder_host: String,
     backend: Backend,
+    presign_gate: Option<Arc<PresignGate>>,
 }
 
 #[derive(Clone)]
@@ -73,6 +80,7 @@ impl ObjectStorageHijack {
                 access_key_id,
                 secret_access_key,
             },
+            presign_gate: None,
         }
     }
 
@@ -80,7 +88,17 @@ impl ObjectStorageHijack {
         Self {
             placeholder_host,
             backend: Backend::LocalFs { root, dev_base_url },
+            presign_gate: None,
         }
+    }
+
+    pub fn with_presign_gate(mut self, gate: Arc<PresignGate>) -> Self {
+        self.presign_gate = Some(gate);
+        self
+    }
+
+    pub(crate) fn presign_gate(&self) -> Option<&Arc<PresignGate>> {
+        self.presign_gate.as_ref()
     }
 
     /// Builds the production R2 hijack from worker environment variables.
@@ -316,7 +334,7 @@ impl ObjectStorageHijack {
                 } else {
                     format!("/{bucket}{raw_path}")
                 };
-                let expires = expires_secs.clamp(1, 604800);
+                let expires = expires_secs.clamp(1, PRESIGN_MAX_EXPIRES_SECS);
                 let now = Utc::now();
                 let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
                 let date = now.format("%Y%m%d").to_string();

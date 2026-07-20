@@ -24,3 +24,20 @@ pub struct WorkerHostStatusDoc {
     pub active_image_ref: Option<String>,
     pub reported_at: i64,
 }
+
+#[forte_doc]
+pub struct PresignBlockedDoc {
+    pub updated_epoch_hour: i64,
+    pub blocked_project_ids: Vec<String>,
+}
+
+#[forte_doc]
+pub struct PresignMintCountDoc {
+    #[pk]
+    pub project_id: String,
+    #[sk]
+    pub window_epoch_hour: i64,
+    #[sk]
+    pub writer_id: String,
+    pub minted: u64,
+}

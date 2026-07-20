@@ -75,13 +75,15 @@ side-project usage):
 | Custom domains | 1 | $0.10 | $0.10 |
 | CPU pool | 500 CPU-minutes (≈ 2M typical SSR requests @ ~15 ms) | $0.115 | ~$0.005 |
 | Compute egress | 20 GB | $0.17 | ~$0 |
-| Object storage downloads | unlimited (served via CDN cache; R2 egress is free, origin ops only on cache miss) | cache-miss bounded | ~$0.01 |
+| Static asset downloads | unlimited (served via CDN cache; R2 egress is free, origin ops only on cache miss) | cache-miss bounded | ~$0.01 |
+| Object GET (Class B) | 100k (+5k/hour burst cap) | $0.036 | ~$0 |
+| Presigned URLs minted | 100k (+1k/hour burst cap), 5 min max expiry | $0 (local signing) | $0 |
 | Active DBs | 1 | $0.01 | $0.01 |
 | DB storage | 500 MB | $0.25 | ~$0.005 |
 | DB row reads | 150M | $0.12 | ~$0 |
 | DB row writes | 1M | $0.80 | ~$0.01 |
 | Object storage | 10 GB | $0.15 | ~$0.01 |
-| Object PUT (Class A) | 100k | $0.45 | ~$0 |
+| Object PUT (Class A) | 100k (+2k/hour burst cap) | $0.45 | ~$0 |
 
 Totals: worst ≈ $2.2/user, expected ≈ $0.05–0.15/user against a $0.35–0.80
 budget. Holds as long as cap-maxing users stay a small minority.
@@ -95,13 +97,23 @@ target audience.
 
 "Egress" in the plan means **compute egress**: bytes leaving the runtime
 (SSR responses, API responses, subrequest downloads billed to the requester).
-Downloads from object storage are **not metered** — they are served through
-the CDN cache and R2 charges no egress. Public copy must say this explicitly
-("object storage downloads are unlimited") or the 20 GB number reads as a
-gallery-killer.
+**Static asset** downloads are not metered — they are served through the CDN
+cache and R2 charges no egress. Public copy must scope the unlimited promise
+to static assets, or the 20 GB number reads as a gallery-killer.
 
-Abuse guard for unmetered downloads: cache aggressively, normalize cache
-keys (ignore query strings on asset routes), rate-limit origin fetches.
+**Object storage** downloads are metered: presigned URLs work only on the S3
+API endpoint, which bypasses the CDN cache entirely, so every GET is a
+billed Class B op ($0.36/M). Hence the Class B / mint quotas above. The
+hourly caps are early abuse cut-off, not cost control; only the monthly
+(rolling 30-day) caps bound cost. Enforcement is presign refusal (worker
+mint gate driven by hourly metering), auto-released when usage drops back
+under the caps — see `presigned-url-abuse.md` for the full defense ladder.
+
+Sizing rationale: reaching 100k presigned downloads/month legitimately means
+a private-content UGC app with thousands of DAU — beyond this plan's
+side-project target. Such apps are the paid add-on's market ("contact us",
+served cached via the Stage 2/3 path in `presigned-url-abuse.md`), not a
+quota-sizing problem.
 
 ### Queue and cron
 
@@ -131,6 +143,10 @@ Planned (public copy uses the existing "planned" badge tone):
 - Monitoring and logs
 - Pay-as-you-go overage beyond the included quotas
 - A higher tier (~$5) so cap-hitting users have somewhere to go
+- High-volume presigned downloads add-on: served cached through our zone
+  (Stage 2 Worker at $5/mo Workers Paid, then Stage 3 Pro WAF HMAC — see
+  `presigned-url-abuse.md`). Priced per customer; the zone-level cost is
+  shared across every add-on customer.
 - Bring-your-own R2 bucket / Turso database: quotas for that resource become
   the user's own. Doubles as the open-source/no-lock-in story and moves the
   heaviest users out of our cost structure.
@@ -166,5 +182,8 @@ zero semantic change. Decision deferred until real usage data exists.
 - Annual-only vs monthly billing (only matters under the standard rate).
 - Free plan quotas (must be small enough that $1 is an upgrade; free tier
   without a card needs a much tighter CPU cap against wasm cryptomining).
+  Decided for the object-storage/presign lines (2026-07-20): 1/10 of the $1
+  plan caps, worst-case ~$0.12/free project. Applies once plan tiers exist;
+  until then every project runs on the $1-plan defaults in `quota.rs`.
 - Queue/cron abuse ceilings vs implementation reality.
 - Whether enqueue operations map to DB writes in billing.

@@ -1,6 +1,15 @@
 # Presigned URL Abuse Defense
 
-Decision record, 2026-07-20. fn0 cloud currently runs **GET Stage 1** below.
+Decision record, 2026-07-20. fn0 cloud currently runs **GET Stage 1** below,
+with the #11 quota enforcement implemented on top of it (see "Interaction
+with quota enforcement" at the bottom).
+
+Business decision (2026-07-20): default presign quotas are deliberately
+small (100k mints and 100k Class B reads per rolling 30 days, per project —
+see `dollar-plan.md`). Apps that legitimately need more are asked to contact
+us; that demand funds the Stage 2/3 upgrade as a **paid add-on**, and the
+zone-level fixed cost ($5 Workers Paid, later $20–25 Pro) is shared across
+every add-on customer.
 
 Tenant apps mint presigned URLs through the object-storage hijack and hand
 them to untrusted end users, so the URLs are an open attack surface for the
@@ -39,6 +48,7 @@ and cache can never see this traffic — and that is acceptable, because:
 | `is_timed_hmac_valid_v0()` requires Pro+ | [Rules functions](https://developers.cloudflare.com/ruleset-engine/rules-language/functions/) |
 | Workers Free: 100k req/day **per account**, then fail open (Worker bypassed) or fail closed (error 1027) | [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) |
 | Workers Paid: $5/mo, 10M requests included, +$0.30/M | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) |
+| Custom cache keys (Pro+) can ignore query strings, so differently-tokenized URLs for one object share a cache entry — required for Stage 3 cache hits | [Cache keys](https://developers.cloudflare.com/cache/how-to/cache-keys/) |
 
 ## PUT: direct presigned, hardened mint gate
 
@@ -47,16 +57,18 @@ already capped by R2 itself (1 write/s per key ⇒ a 10-minute URL yields at
 most ~600 billable Class A ops ≈ $0.003). Required hardening in the hijack
 (`fn0/fn0/src/object_storage_hijack.rs`):
 
-1. **Cap expiry per plan.** The current clamp is the SigV4 maximum (7 days);
-   it must come down to minutes. Expiry is the only revocation mechanism —
+1. **Cap expiry per plan.** DONE (#11): clamped to 5 minutes
+   (`PRESIGN_MAX_EXPIRES_SECS`). Expiry is the only revocation mechanism —
    once minting stops, exposure ends when outstanding URLs expire.
 2. **Sign `content-length`.** The SDK presign API takes the intended size and
    the header joins `SignedHeaders`, bounding the upload size per URL.
    Today only `host` is signed, so one leaked URL can upload objects of any
-   size.
+   size. Still open — blocked on the curl verifications below.
 3. **Per-project mint rate limit**, with mint counts recorded in usage
-   metering. Minting is a pure local signing operation (free), but the mint
-   rate is the coefficient in the damage formula above.
+   metering. DONE (#11): worker-local 1k/hour gate + `PresignMintCountDoc`
+   reporting + 100k rolling-30-day cap enforced control-side. Minting is a
+   pure local signing operation (free), but the mint rate is the coefficient
+   in the damage formula above.
 
 Open verifications before relying on this (test with curl against a real
 bucket):
@@ -111,17 +123,27 @@ roughly **60–77M requests/month** (Pro $20–25 vs Workers $5, difference
   Valid-URL replays are served by cache. The Worker route is removed (or
   kept solely as the metering path).
 
-## Interaction with quota enforcement (#11)
+## Interaction with quota enforcement (#11) — implemented
 
-- Detection already exists: #48 shipped `usage_metering` (hourly per-bucket
-  ops from GraphQL Analytics + exact storage snapshots via ListObjectsV2).
-- Enforcement levers under Stage 1 are fn0-side only: block deploys and set
-  the per-project mint-gate flag. There is no per-project Cloudflare-side
-  lever — #31 consolidated static assets onto one shared custom domain, so
-  the per-project `R2CustomDomain.enabled` toggle from the original #11 text
-  no longer exists.
-- `dollar-plan.md` states object-storage downloads are "served via CDN
-  cache"; that is Stage 2+ behavior. Under Stage 1 every download is an
-  uncached Class B op — still cheap enough that the "unlimited downloads"
-  stance holds, but the cache claim should not be repeated in public copy
-  until Stage 2 ships.
+The sensor→actuator loop shipped with #11:
+
+- **Sensor**: #48's `usage_metering` (hourly per-bucket/per-prefix ops from
+  GraphQL Analytics) plus worker-reported `PresignMintCountDoc` rows.
+- **Decision**: `presign_quota::run_enforcement` in fn0-control, hourly after
+  metering. Compares object-storage Class A/B and mint counts against
+  `quota.rs` defaults (or `ProjectQuotaOverridesDoc`), both per latest hourly
+  window and per rolling 30 days, and publishes breaches in
+  `PresignBlockedDoc`.
+- **Actuator**: workers poll `PresignBlockedDoc` (1 s) into the fn0
+  `PresignGate`; the object-storage hijack refuses minting (`429`) for
+  blocked projects. Already-minted URLs age out within 5 minutes. Release is
+  automatic: the next hourly evaluation unlists a project once usage is back
+  under the caps.
+- There is still no per-project Cloudflare-side lever — #31 consolidated
+  static assets onto one shared custom domain, so the per-project
+  `R2CustomDomain.enabled` toggle from the original #11 text no longer
+  exists. Deploys are not blocked by this quota; the mint gate is the single
+  lever.
+- The public "unlimited downloads" claim is now scoped to static assets;
+  object-storage reads carry explicit quotas (`docs/fn0/limits.md`). The
+  cached-download story returns as the paid Stage 2/3 add-on.

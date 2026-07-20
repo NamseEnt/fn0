@@ -49,7 +49,11 @@ month's budget instead of hitting a daily wall.
 | Quota | Value | Notes |
 | --- | --- | --- |
 | Compute egress | 20 GB / month | Bytes leaving your handlers: SSR pages, API responses |
-| Object storage downloads | Unlimited | Served through the CDN cache — never metered, never counted as egress |
+| Static asset downloads | Unlimited | Served through the CDN cache — never metered, never counted as egress |
+
+Static assets (your deployed build's files) are the unlimited-download path.
+Object storage downloads go directly to the storage endpoint, are not
+cached, and carry the quotas below.
 
 ### Document database
 
@@ -65,8 +69,20 @@ month's budget instead of hitting a daily wall.
 | Quota | Value | Notes |
 | --- | --- | --- |
 | Storage | 10 GB | |
-| Uploads | 100k / month | |
-| Downloads | Unlimited | Served through the CDN cache |
+| Write operations | 100k / month, 2k / hour | Uploads, copies, lists — from your handlers or presigned PUT |
+| Read operations | 100k / month, 5k / hour | Downloads and HEADs — from your handlers or presigned GET |
+| Presigned URLs minted | 100k / month, 1k / hour | |
+| Presigned URL expiry | 5 minutes maximum | Longer requested expiries are clamped, not rejected |
+
+Treat presigned URLs as opaque, short-lived strings: mint one right before
+use, and never store one or parse its structure — the URL format may change.
+
+Going over quota blocks **presigned URL minting only** (requests get `429`);
+your deployed app keeps serving and already-minted URLs stay valid until
+they expire. The block lifts automatically once usage falls back under the
+hourly and rolling 30-day limits — no action needed. If your app legitimately
+needs high-volume presigned downloads, contact us: a paid add-on serving
+them through the CDN cache is planned.
 
 ### Queues & cron
 

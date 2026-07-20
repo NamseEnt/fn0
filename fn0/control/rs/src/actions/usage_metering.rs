@@ -10,10 +10,9 @@
 //!   object-storage bucket.
 //!
 //! Cloudflare retains analytics for 31 days; these docs are the durable
-//! record that outlives it. Reads have no user-facing quota (downloads are
-//! documented as unlimited) — read counts are recorded for platform cost
-//! monitoring and abuse detection, which is the only sensor available for
-//! presigned-URL traffic that never touches fn0 infrastructure.
+//! record that outlives it. They are also the sensor for presign quota
+//! enforcement (`presign_quota`) — the only visibility into presigned-URL
+//! traffic, which never touches fn0 infrastructure.
 
 use crate::common::admin;
 use crate::common::cloudflare::CloudflareClient;
@@ -49,6 +48,7 @@ pub struct MeteringStats {
     pub projects: u64,
     pub operations_docs: u64,
     pub snapshot_docs: u64,
+    pub project_ids: BTreeSet<String>,
 }
 
 pub async fn run_metering() -> anyhow::Result<MeteringStats> {
@@ -77,6 +77,7 @@ pub async fn run_metering() -> anyhow::Result<MeteringStats> {
 
     let mut stats = MeteringStats {
         projects: project_ids.len() as u64,
+        project_ids: project_ids.clone(),
         ..Default::default()
     };
 

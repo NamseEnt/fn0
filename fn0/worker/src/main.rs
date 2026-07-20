@@ -2,6 +2,7 @@ mod cache;
 mod env_crypto;
 mod env_yaml;
 mod manifest_poller;
+mod presign_sync;
 mod queue_consumer;
 mod telemetry;
 mod vault_client;
@@ -13,7 +14,7 @@ use cache::S3BundleCache;
 use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectInvokeHijack, CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, ExecutionContext,
-    ObjectStorageHijack, OtlpHijack, QueueHijack, TursoHijack, VaultHijack,
+    ObjectStorageHijack, OtlpHijack, PresignGate, QueueHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -132,8 +133,12 @@ fn build_turso_hijack() -> Arc<TursoHijack> {
     })
 }
 
-fn build_object_storage_hijack() -> Arc<ObjectStorageHijack> {
-    Arc::new(ObjectStorageHijack::from_env().expect("object storage hijack init failed"))
+fn build_object_storage_hijack(presign_gate: Arc<PresignGate>) -> Arc<ObjectStorageHijack> {
+    Arc::new(
+        ObjectStorageHijack::from_env()
+            .expect("object storage hijack init failed")
+            .with_presign_gate(presign_gate),
+    )
 }
 
 fn main() -> Result<()> {
@@ -232,6 +237,7 @@ async fn run() -> Result<()> {
     );
 
     let direct_hijack = build_cross_project_invoke_hijack();
+    let presign_gate = Arc::new(PresignGate::new());
 
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
@@ -241,7 +247,7 @@ async fn run() -> Result<()> {
             .with_cross_project_invoke_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
             .with_otlp_hijack(build_otlp_hijack())
-            .with_object_storage_hijack(build_object_storage_hijack()),
+            .with_object_storage_hijack(build_object_storage_hijack(presign_gate.clone())),
     );
 
     let manifest_loaded = Arc::new(AtomicBool::new(false));
@@ -268,6 +274,10 @@ async fn run() -> Result<()> {
             manifest_poller::run(manifest_db, cache, manifest_loaded).await;
         }
     });
+
+    let presign_db = manifest_poller::build_database_from_env()
+        .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+    let presign_handle = tokio::spawn(presign_sync::run(presign_db, presign_gate.clone()));
 
     let queue_consumer_handle = {
         let config = queue_consumer::QueueConsumerConfig::from_env()
@@ -316,6 +326,7 @@ async fn run() -> Result<()> {
 
     tokio::select! {
         _ = manifest_handle => {},
+        _ = presign_handle => {},
         _ = user_handle => {},
         _ = ops_handle => {},
         _ = queue_consumer_handle => {},

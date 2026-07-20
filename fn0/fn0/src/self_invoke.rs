@@ -4,6 +4,7 @@ use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::otlp_hijack::OtlpHijack;
+use crate::presign_gate::PresignDenied;
 use crate::queue_hijack::QueueHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::vault_hijack::VaultHijack;
@@ -409,6 +410,28 @@ fn object_storage_send(
             Box::new(async { Ok(()) });
 
         if let Some((method, expires)) = presign_request(&request) {
+            if let Some(gate) = hijack.presign_gate() {
+                let epoch_hour = chrono::Utc::now().timestamp() / 3600;
+                if let Err(denied) = gate.try_mint(&project_id, epoch_hour) {
+                    let message = match denied {
+                        PresignDenied::ProjectBlocked => {
+                            "presign refused: project over storage quota"
+                        }
+                        PresignDenied::RateLimited => {
+                            "presign refused: hourly mint limit reached"
+                        }
+                    };
+                    let resp = http::Response::builder()
+                        .status(429)
+                        .body(
+                            http_body_util::Full::new(Bytes::from_static(message.as_bytes()))
+                                .map_err(|never: std::convert::Infallible| match never {})
+                                .boxed_unsync(),
+                        )
+                        .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
+                    return Ok((resp, io));
+                }
+            }
             let url = match hijack.presign(&request, &project_id, method, expires) {
                 Ok(url) => url,
                 Err(ec) => return Err(ec.into()),

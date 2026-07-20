@@ -7,6 +7,7 @@ pub mod measure_cpu_time;
 pub mod object_storage_hijack;
 pub mod otlp_hijack;
 mod panic_util;
+pub mod presign_gate;
 pub mod queue_hijack;
 mod self_invoke;
 pub mod telemetry;
@@ -37,6 +38,7 @@ pub use cross_project_invoke_hijack::{CrossProjectInvokeHijack, CrossProjectInvo
 pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 pub use object_storage_hijack::{DevReadResult, ObjectStorageHijack};
 pub use otlp_hijack::OtlpHijack;
+pub use presign_gate::PresignGate;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
 pub use turso_hijack::TursoHijack;

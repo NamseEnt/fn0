@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 
 pub use doc_db::DbRequest;
 pub use fn0_shared_schema::{
-    WorkerManifestDoc, WorkerManifestDocGet, WorkerManifestDocPut, WorkerManifestDocQuery,
-    WorkerProjectManifest,
+    PresignBlockedDoc, PresignBlockedDocGet, PresignBlockedDocPut, PresignMintCountDoc,
+    PresignMintCountDocQuery, WorkerManifestDoc, WorkerManifestDocGet, WorkerManifestDocPut,
+    WorkerManifestDocQuery, WorkerProjectManifest,
 };
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -116,6 +117,20 @@ pub struct ProjectStorageSnapshotDoc {
     pub object_storage_bytes: u64,
     pub object_storage_object_count: u64,
     pub taken_at: DateTime,
+}
+
+// `None` fields fall back to the `quota.rs` defaults. Raising these is the
+// operator action behind the "contact us for higher presigned-URL volume"
+// offer; the doc is written by hand (admin), never by user-facing actions.
+#[forte_doc]
+pub struct ProjectQuotaOverridesDoc {
+    #[pk]
+    pub project_id: String,
+    pub presign_mint_per_month: Option<u64>,
+    pub object_storage_class_a_per_hour: Option<u64>,
+    pub object_storage_class_a_per_month: Option<u64>,
+    pub object_storage_class_b_per_hour: Option<u64>,
+    pub object_storage_class_b_per_month: Option<u64>,
 }
 
 #[forte_doc]
