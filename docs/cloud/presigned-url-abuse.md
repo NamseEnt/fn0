@@ -63,7 +63,7 @@ most ~600 billable Class A ops ≈ $0.003). Required hardening in the hijack
 2. **Sign `content-length`.** The SDK presign API takes the intended size and
    the header joins `SignedHeaders`, bounding the upload size per URL.
    Today only `host` is signed, so one leaked URL can upload objects of any
-   size. Still open — blocked on the curl verifications below.
+   size. Tracked as **#53**, blocked on the curl verifications below.
 3. **Per-project mint rate limit**, with mint counts recorded in usage
    metering. DONE (#11): worker-local 1k/hour gate + `PresignMintCountDoc`
    reporting + 100k rolling-30-day cap enforced control-side. Minting is a
@@ -71,7 +71,7 @@ most ~600 billable Class A ops ≈ $0.003). Required hardening in the hijack
    in the damage formula above.
 
 Open verifications before relying on this (test with curl against a real
-bucket):
+bucket; tracked in #53):
 
 - Are 429-rejected writes billed as Class A? The pricing FAQ only exempts
   401. If they bill at full rate, a PUT-replay botnet costs $4.50/M despite
