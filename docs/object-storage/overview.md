@@ -114,8 +114,15 @@ let upload = bucket
 
 The URL is signed by the worker's object-storage hijack — application code
 never holds credentials. The SigV4 signature, expiry, R2 endpoint, account id
-and bucket name appear in the URL; the secret access key never does. `expires`
-is capped at 7 days.
+and bucket name appear in the URL; the secret access key never does. On fn0
+Cloud, `expires` is capped at 5 minutes (`PRESIGN_MAX_EXPIRES_SECS = 300`);
+longer requested durations are clamped, not rejected. Self-hosted deployments
+have no cap.
+
+Presigned URL minting counts against per-project quotas (100k/month,
+1k/hour on the one-dollar plan). Exceeding the quota blocks minting with
+HTTP 429 until the window resets; already-minted URLs stay valid until they
+expire. See [limits.md](../fn0/limits.md) for full quota values.
 
 In `forte dev` the URL points at the dev server's local object route
 (`/__fn0_object_storage/…`) and does not expire.
