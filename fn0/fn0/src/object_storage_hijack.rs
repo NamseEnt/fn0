@@ -315,6 +315,7 @@ impl ObjectStorageHijack {
         project_id: &str,
         method: &str,
         expires_secs: u64,
+        content_length: Option<u64>,
     ) -> Result<String, ErrorCode> {
         let raw_path = req.uri().path();
         match &self.backend {
@@ -341,6 +342,14 @@ impl ObjectStorageHijack {
                 let credential_scope = format!("{date}/{region}/s3/aws4_request");
                 let credential = format!("{access_key_id}/{credential_scope}");
 
+                let (signed_headers, canonical_headers) = match content_length {
+                    Some(content_length) => (
+                        "content-length;host".to_string(),
+                        format!("content-length:{content_length}\nhost:{endpoint_host}\n"),
+                    ),
+                    None => ("host".to_string(), format!("host:{endpoint_host}\n")),
+                };
+
                 let mut params = [
                     (
                         "X-Amz-Algorithm".to_string(),
@@ -352,7 +361,10 @@ impl ObjectStorageHijack {
                     ),
                     ("X-Amz-Date".to_string(), amz_date.clone()),
                     ("X-Amz-Expires".to_string(), expires.to_string()),
-                    ("X-Amz-SignedHeaders".to_string(), "host".to_string()),
+                    (
+                        "X-Amz-SignedHeaders".to_string(),
+                        uri_encode_query(&signed_headers),
+                    ),
                 ];
                 params.sort();
                 let canonical_query = params
@@ -362,7 +374,7 @@ impl ObjectStorageHijack {
                     .join("&");
 
                 let canonical_request = format!(
-                    "{method}\n{canonical_uri}\n{canonical_query}\nhost:{endpoint_host}\n\nhost\nUNSIGNED-PAYLOAD"
+                    "{method}\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\nUNSIGNED-PAYLOAD"
                 );
                 let string_to_sign = format!(
                     "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
@@ -625,3 +637,5 @@ fn uri_encode_query(s: &str) -> String {
     }
     out
 }
+
+

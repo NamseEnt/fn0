@@ -407,7 +407,7 @@ fn object_storage_send(
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(async { Ok(()) });
 
-        if let Some((method, expires)) = presign_request(&request) {
+        if let Some(presign) = presign_request(&request) {
             if let Some(gate) = hijack.presign_gate() {
                 let epoch_hour = chrono::Utc::now().timestamp() / 3600;
                 if let Err(denied) = gate.try_mint(&project_id, epoch_hour) {
@@ -428,7 +428,13 @@ fn object_storage_send(
                     return Ok((resp, io));
                 }
             }
-            let url = match hijack.presign(&request, &project_id, method, expires) {
+            let url = match hijack.presign(
+                &request,
+                &project_id,
+                presign.method,
+                presign.expires_secs,
+                presign.content_length,
+            ) {
                 Ok(url) => url,
                 Err(ec) => return Err(ec.into()),
             };
@@ -465,17 +471,29 @@ fn object_storage_send(
     })
 }
 
+struct PresignRequest {
+    method: &'static str,
+    expires_secs: u64,
+    content_length: Option<u64>,
+}
+
 fn presign_request(
     request: &http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
-) -> Option<(&'static str, u64)> {
+) -> Option<PresignRequest> {
     let headers = request.headers();
-    if let Some(value) = headers.get("x-fn0-presign-get") {
-        return Some(("GET", value.to_str().ok()?.parse().ok()?));
-    }
-    if let Some(value) = headers.get("x-fn0-presign-put") {
-        return Some(("PUT", value.to_str().ok()?.parse().ok()?));
-    }
-    None
+    let (method, expires) = match headers.get("x-fn0-presign-get") {
+        Some(value) => ("GET", value),
+        None => ("PUT", headers.get("x-fn0-presign-put")?),
+    };
+    let content_length = match headers.get("x-fn0-presign-content-length") {
+        Some(value) => Some(value.to_str().ok()?.parse().ok()?),
+        None => None,
+    };
+    Some(PresignRequest {
+        method,
+        expires_secs: expires.to_str().ok()?.parse().ok()?,
+        content_length,
+    })
 }
 
 fn default_send(

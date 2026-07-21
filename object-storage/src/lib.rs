@@ -141,22 +141,30 @@ impl Bucket {
     }
 
     /// Returns a URL for downloading `key` directly, without routing through
-    /// the app — e.g. handed to a browser. Valid for `expires` (the storage
-    /// backend caps this at 7 days).
+    /// the app — e.g. handed to a browser. Valid for `expires`; fn0 Cloud
+    /// clamps longer durations to 5 minutes.
     pub async fn presigned_get_url(&self, key: &str, expires: Duration) -> Result<String> {
         match &self.inner {
-            BucketInner::Http(b) => b.presigned_url(key, "GET", expires).await,
-            BucketInner::Memory(b) => b.presigned_url(key, "GET", expires).await,
+            BucketInner::Http(b) => b.presigned_url(key, "GET", expires, None).await,
+            BucketInner::Memory(b) => b.presigned_url(key, "GET", expires, None).await,
         }
     }
 
     /// Returns a URL for uploading directly to `key`, without routing through
-    /// the app — e.g. a browser `PUT`. Valid for `expires` (the storage backend
-    /// caps this at 7 days).
-    pub async fn presigned_put_url(&self, key: &str, expires: Duration) -> Result<String> {
+    /// the app — e.g. a browser `PUT`. Valid for `expires`; fn0 Cloud clamps
+    /// longer durations to 5 minutes.
+    ///
+    /// `content_length` binds the URL to an upload of exactly that many bytes;
+    /// `None` accepts any size.
+    pub async fn presigned_put_url(
+        &self,
+        key: &str,
+        content_length: Option<u64>,
+        expires: Duration,
+    ) -> Result<String> {
         match &self.inner {
-            BucketInner::Http(b) => b.presigned_url(key, "PUT", expires).await,
-            BucketInner::Memory(b) => b.presigned_url(key, "PUT", expires).await,
+            BucketInner::Http(b) => b.presigned_url(key, "PUT", expires, content_length).await,
+            BucketInner::Memory(b) => b.presigned_url(key, "PUT", expires, content_length).await,
         }
     }
 }
@@ -234,7 +242,14 @@ mod tests {
         );
         assert_eq!(
             bucket
-                .presigned_put_url("a/b.png", Duration::from_secs(60))
+                .presigned_put_url("a/b.png", None, Duration::from_secs(60))
+                .await
+                .unwrap(),
+            "memory://put/a/b.png"
+        );
+        assert_eq!(
+            bucket
+                .presigned_put_url("a/b.png", Some(1024), Duration::from_secs(60))
                 .await
                 .unwrap(),
             "memory://put/a/b.png"

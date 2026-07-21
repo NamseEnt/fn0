@@ -107,6 +107,7 @@ impl MemoryBucket {
         key: &str,
         method: &str,
         _expires: Duration,
+        _content_length: Option<u64>,
     ) -> Result<String> {
         Ok(format!("memory://{}/{key}", method.to_ascii_lowercase()))
     }

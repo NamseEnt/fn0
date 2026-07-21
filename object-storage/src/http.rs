@@ -123,6 +123,7 @@ impl HttpBucket {
         key: &str,
         method: &str,
         expires: Duration,
+        content_length: Option<u64>,
     ) -> Result<String> {
         let header = match method {
             "GET" => "x-fn0-presign-get",
@@ -133,10 +134,17 @@ impl HttpBucket {
                 )));
             }
         };
+        let mut headers = vec![(header.to_string(), expires.as_secs().to_string())];
+        if let Some(content_length) = content_length {
+            headers.push((
+                "x-fn0-presign-content-length".to_string(),
+                content_length.to_string(),
+            ));
+        }
         let response = runtime::send(Request {
             method: "GET",
             url: self.object_url(key),
-            headers: vec![(header.to_string(), expires.as_secs().to_string())],
+            headers,
             body: None,
         })
         .await?;

@@ -107,10 +107,22 @@ let download = bucket
 // hand `download` to a browser <img src> or fetch()
 
 let upload = bucket
-    .presigned_put_url("uploads/new.bin", Duration::from_secs(900))
+    .presigned_put_url("uploads/new.bin", None, Duration::from_secs(900))
     .await?;
 // browser: fetch(upload, { method: "PUT", body: file })
+
+// bound to an upload of exactly 1 MiB — anything else is rejected
+let bounded = bucket
+    .presigned_put_url("uploads/new.bin", Some(1024 * 1024), Duration::from_secs(900))
+    .await?;
 ```
+
+`content_length` binds the URL to an upload of exactly that many bytes; `None`
+accepts any size. Use it when handing an upload URL to an untrusted end user —
+otherwise a leaked URL can store an object of any size against your project's
+storage quota. The bound is exact rather than a maximum because SigV4 cannot
+express a size range, so callers that do not know the size up front must read
+it first (a browser's `File.size`) and mint the URL per upload.
 
 The URL is signed by the worker's object-storage hijack — application code
 never holds credentials. The SigV4 signature, expiry, R2 endpoint, account id
