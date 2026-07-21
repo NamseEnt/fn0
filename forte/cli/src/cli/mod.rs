@@ -3,6 +3,7 @@ pub mod admin;
 pub mod build;
 pub mod cron;
 pub mod deploy;
+pub mod destroy;
 pub mod dev;
 pub mod domain;
 pub mod env;
@@ -53,6 +54,11 @@ pub enum Commands {
         project: Option<PathBuf>,
         #[arg(long)]
         name: Option<String>,
+    },
+    /// Delete the deployed project and all of its resources
+    Destroy {
+        #[arg(long)]
+        yes: bool,
     },
     /// Print the deployed app URL and open it in the browser
     Open {

@@ -102,6 +102,25 @@ The app URL is printed when the deploy finishes.
 
 ---
 
+### `forte destroy`
+
+Delete the deployed project and all of its resources: routing, custom domain, deployed bundles, static assets, object storage, and its database.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--yes` | off | Skip the interactive confirmation |
+
+Runs against the project in the current directory only — the `project_id` is read from `Forte.toml`, and there is no flag to target another directory or another project id. Without `--yes`, you must type the project id to confirm.
+
+On success the `project_id` key is removed from `Forte.toml` (all other keys and formatting are preserved), so the next `forte deploy` registers a new project. Teardown is enqueued on the control plane and runs asynchronously.
+
+```sh
+forte destroy
+forte destroy --yes
+```
+
+---
+
 ### `forte open [options]`
 
 Print the deployed app's URL and open it in the default browser.

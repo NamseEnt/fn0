@@ -217,6 +217,8 @@ project_id = "some-unique-id"
 
 The `project_id` field is the only recognized key. The project's display name is chosen interactively during the first `forte deploy` (or via `--name`) and stored in the control plane, not in `Forte.toml`.
 
+`forte deploy` and `forte destroy` edit only the `project_id` key in place — unrecognized keys, tables, and formatting are left untouched. `forte destroy` removes the key so the next `forte deploy` registers a new project.
+
 ## cron.yaml (optional)
 
 Place this file in the project root to schedule queue tasks on fn0 Cloud. Registered during `forte deploy`.

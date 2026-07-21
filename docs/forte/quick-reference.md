@@ -17,6 +17,7 @@ forte build           # verify production build
 forte login           # authenticate with fn0 Cloud
 forte deploy          # build + upload to fn0 Cloud
 forte open            # open the deployed app in the browser
+forte destroy         # delete the deployed project and all its resources
 ```
 
 ## Handler Types at a Glance
