@@ -1846,7 +1846,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-cli"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1934,7 +1934,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-deploy"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2128,7 +2128,7 @@ dependencies = [
 
 [[package]]
 name = "forte-cli"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
