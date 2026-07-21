@@ -34,6 +34,7 @@ hyper-util = { workspace = true, features = [
 inquire = { workspace = true }
 notify = { workspace = true }
 notify-debouncer-mini = { workspace = true }
+open = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

@@ -95,6 +95,12 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
     )
     .await?;
 
+    let resolved = fn0_deploy::resolve_app_url(&project_id).await?;
+    if let Some(note) = &resolved.note {
+        eprintln!("note: {note}");
+    }
+    println!("app URL: {}", resolved.url);
+
     Ok(())
 }
 

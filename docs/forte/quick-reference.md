@@ -16,6 +16,7 @@ forte add action user_login   # add server action
 forte build           # verify production build
 forte login           # authenticate with fn0 Cloud
 forte deploy          # build + upload to fn0 Cloud
+forte open            # open the deployed app in the browser
 ```
 
 ## Handler Types at a Glance

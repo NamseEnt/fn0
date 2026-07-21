@@ -55,7 +55,9 @@ pub async fn domain_add(project_id: &str, domain: &str) -> Result<()> {
         DomainAdd::AlreadyHasDomain { current_domain } => Err(anyhow!(
             "project '{project_id}' already has domain '{current_domain}'; remove it first"
         )),
-        DomainAdd::InternalError => Err(anyhow!("domain_add: server error; check fn0-control logs")),
+        DomainAdd::InternalError => {
+            Err(anyhow!("domain_add: server error; check fn0-control logs"))
+        }
     }
 }
 
@@ -110,7 +112,7 @@ pub async fn domain_remove(project_id: &str) -> Result<()> {
 
 #[derive(Deserialize)]
 #[serde(tag = "t", rename_all_fields = "camelCase")]
-enum DomainStatus {
+pub enum DomainStatus {
     NotConfigured,
     Configured {
         domain: String,
@@ -123,15 +125,17 @@ enum DomainStatus {
 
 #[derive(Deserialize)]
 #[serde(tag = "t", rename_all_fields = "camelCase")]
-enum CloudflareStatus {
+pub enum CloudflareStatus {
     Active,
     Pending,
     Missing,
     Other { value: String },
 }
 
-pub async fn domain_status(project_id: &str) -> Result<()> {
-    let creds = crate::credentials::require()?;
+pub async fn fetch_domain_status(
+    creds: &crate::credentials::Credentials,
+    project_id: &str,
+) -> Result<DomainStatus> {
     let client = reqwest::Client::new();
     let url = format!(
         "{}/__forte_action/domain_status",
@@ -144,8 +148,12 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
         .send()
         .await?
         .error_for_status()?;
-    let raw: DomainStatus = resp.json().await?;
-    match raw {
+    Ok(resp.json().await?)
+}
+
+pub async fn domain_status(project_id: &str) -> Result<()> {
+    let creds = crate::credentials::require()?;
+    match fetch_domain_status(&creds, project_id).await? {
         DomainStatus::NotConfigured => {
             println!("project '{project_id}' has no custom domain configured.");
             Ok(())
@@ -171,7 +179,7 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
     }
 }
 
-fn format_cloudflare_status(status: &CloudflareStatus) -> String {
+pub(crate) fn format_cloudflare_status(status: &CloudflareStatus) -> String {
     match status {
         CloudflareStatus::Active => "active".to_string(),
         CloudflareStatus::Pending => "pending (waiting for DV verification)".to_string(),

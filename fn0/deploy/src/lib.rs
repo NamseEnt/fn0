@@ -1,4 +1,5 @@
 mod admin;
+mod app_url;
 mod bundle;
 pub mod cli_login;
 pub mod credentials;
@@ -10,6 +11,7 @@ mod project;
 mod static_files;
 
 pub use admin::*;
+pub use app_url::*;
 pub use bundle::*;
 pub use deploy::*;
 pub use domain::*;

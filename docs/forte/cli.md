@@ -98,6 +98,28 @@ forte deploy
 forte deploy --name "My App"
 ```
 
+The app URL is printed when the deploy finishes.
+
+---
+
+### `forte open [options]`
+
+Print the deployed app's URL and open it in the default browser.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-p, --project <dir>` | `.` | Project directory |
+| `--print` | off | Print the URL only, do not open a browser |
+
+The project is always reachable at `https://<project_id>.fn0.dev`. If a custom domain is attached and active, that domain is used instead. When the custom domain is not serving yet, or the lookup cannot be made, the default subdomain is used and the reason is printed to stderr.
+
+```sh
+forte open
+forte open --print
+```
+
+Requires `project_id` in `Forte.toml`, which `forte deploy` writes on first deploy.
+
 ---
 
 ### `forte add page <path>`

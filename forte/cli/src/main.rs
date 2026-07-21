@@ -59,6 +59,11 @@ async fn async_main() -> Result<()> {
             cli::deploy::run(project_dir, name).await?;
         }
 
+        Commands::Open { project, print } => {
+            let project_dir = project.unwrap_or_else(|| ".".into());
+            cli::open::run(project_dir, print).await?;
+        }
+
         Commands::Admin { command } => match command {
             AdminCommands::Run {
                 task,

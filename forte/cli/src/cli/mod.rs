@@ -9,6 +9,8 @@ pub mod env;
 pub mod fe_runtime;
 pub mod init;
 pub mod login;
+pub mod open;
+pub mod project_config;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -51,6 +53,14 @@ pub enum Commands {
         project: Option<PathBuf>,
         #[arg(long)]
         name: Option<String>,
+    },
+    /// Print the deployed app URL and open it in the browser
+    Open {
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+        /// Print the URL without opening a browser
+        #[arg(long)]
+        print: bool,
     },
     Admin {
         #[command(subcommand)]
