@@ -7,6 +7,7 @@ use std::path::Path;
 struct DeployInput<'a> {
     project_id: &'a str,
     code_version: u64,
+    bundle_size: u64,
     files: Vec<DeployFile>,
     jobs: &'a [CronJob],
     cron_updated_at: &'a str,
@@ -90,6 +91,8 @@ pub async fn deploy_wasm(
     let client = reqwest::Client::new();
     println!("project_id: {project_id}");
 
+    let bundle_size = bundle_size(bundle_tar_path)?;
+
     let DeployOk {
         presigned_put_url,
         object_key,
@@ -101,6 +104,7 @@ pub async fn deploy_wasm(
         project_id,
         code_version,
         Vec::new(),
+        bundle_size,
         jobs,
         cron_updated_at,
     )
@@ -147,6 +151,8 @@ pub async fn deploy_forte(
         deploy_files.len()
     );
 
+    let bundle_size = bundle_size(bundle_tar_path)?;
+
     let DeployOk {
         presigned_put_url,
         object_key,
@@ -158,6 +164,7 @@ pub async fn deploy_forte(
         project_id,
         code_version,
         deploy_files,
+        bundle_size,
         jobs,
         cron_updated_at,
     )
@@ -184,6 +191,7 @@ async fn request_deploy(
     project_id: &str,
     code_version: u64,
     files: Vec<DeployFile>,
+    bundle_size: u64,
     jobs: &[CronJob],
     cron_updated_at: &str,
 ) -> Result<DeployOk> {
@@ -197,6 +205,7 @@ async fn request_deploy(
         .json(&DeployInput {
             project_id,
             code_version,
+            bundle_size,
             files,
             jobs,
             cron_updated_at,
@@ -225,6 +234,12 @@ async fn request_deploy(
         )),
         Deploy::InternalError => Err(anyhow!("deploy: server error; check fn0-control logs")),
     }
+}
+
+fn bundle_size(bundle_tar_path: &Path) -> Result<u64> {
+    std::fs::metadata(bundle_tar_path)
+        .map(|metadata| metadata.len())
+        .map_err(|e| anyhow!("Failed to stat {}: {}", bundle_tar_path.display(), e))
 }
 
 async fn upload_bundle(
@@ -388,5 +403,34 @@ fn log_status_line(
     if last_state.as_deref() != Some(&state) {
         println!("  {state}");
         *last_state = Some(state);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn bundle_size_reads_file_length() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        file.write_all(&[0u8; 1234]).unwrap();
+        assert_eq!(bundle_size(file.path()).unwrap(), 1234);
+    }
+
+    // control's deploy action requires `bundle_size` (it signs the bound into
+    // the bundle's presigned PUT), so the wire payload must always carry it.
+    #[test]
+    fn deploy_input_carries_bundle_size() {
+        let input = DeployInput {
+            project_id: "proj",
+            code_version: 42,
+            bundle_size: 999,
+            files: Vec::new(),
+            jobs: &[],
+            cron_updated_at: "2026-07-21T00:00:00Z",
+        };
+        let value = serde_json::to_value(&input).unwrap();
+        assert_eq!(value["bundle_size"], serde_json::json!(999));
     }
 }

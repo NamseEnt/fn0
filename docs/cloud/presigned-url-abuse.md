@@ -175,10 +175,14 @@ could declare a kilobyte per file and upload a gigabyte to each. Control now
 signs `content_length: Some(f.size)`, which makes the declaration binding
 and the existing quota real.
 
-Still open:
+The bundle tar gets the same treatment (#55): the deploy request carries a
+required `bundle_size`, and control signs `content_length:
+Some(bundle_size)` into the bundle's presigned PUT. Required, not defaulted
+— an older CLI that omits it is rejected at deserialization (400) rather
+than minting an unbounded URL.
 
-- **Per-file ceiling (#56).** The 1 GB total is the only size limit; one
-  file may be all of it.
-- **Bundle tar is unbounded (#55).** The deploy request carries no bundle
-  size, so control has nothing to sign. Bounding it needs a protocol change
-  plus a decision about older CLIs that do not send the field.
+The 1 GB total remains the only size ceiling (#56). A per-file ceiling was
+considered and dropped: static storage costs $0.015/GB-mo against free
+CDN-cached egress, so the cap is insurance, not a cost lever
+(`dollar-plan.md`), and the now-binding 1 GB total already bounds the stock.
+An asset that large belongs in object storage, which is metered and quota'd.

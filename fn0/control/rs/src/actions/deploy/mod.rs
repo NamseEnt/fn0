@@ -17,6 +17,10 @@ const CODE_VERSION_PAST_WINDOW_MILLIS: u64 = 24 * 60 * 60 * 1000;
 pub struct Input {
     pub project_id: String,
     pub code_version: u64,
+    // Required, not defaulted: a deploy that omits it (an older CLI) is
+    // rejected at deserialization (400) so the bundle's presigned PUT can
+    // never fall back to an unbounded size. See #55.
+    pub bundle_size: u64,
     pub files: Vec<FileEntry>,
     #[serde(default)]
     pub jobs: Vec<CronJob>,
@@ -132,7 +136,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         secret_access_key: &bundle_env.secret_access_key,
         expires_seconds: 600,
         now: forte_sdk::now(),
-        content_length: None,
+        content_length: Some(req.body.bundle_size),
     });
 
     let static_uploads = if req.body.files.is_empty() {
@@ -268,9 +272,8 @@ impl StaticEnv {
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
             bucket: std::env::var("FN0_STATIC_ASSET_STORAGE_BUCKET")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_BUCKET not set"))?,
-            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID").map_err(
-                |_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"),
-            )?,
+            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"))?,
             secret_access_key: std::env::var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")
                 .map_err(|_| {
                     anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY not set")
@@ -330,4 +333,3 @@ async fn ensure_turso_database(project_id: &str) -> anyhow::Result<()> {
         String::from_utf8_lossy(&body_bytes)
     );
 }
-
