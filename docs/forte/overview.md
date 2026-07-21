@@ -42,10 +42,10 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 | Package | Version | Crate | Purpose |
 |---|---|---|---|
 | `forte-sdk` | 0.3.6 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
-| `forte-cli` | 0.4.2 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
+| `forte-cli` | 0.4.3 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
 | `forte-macros` | 0.5.2 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
 | `forte-json` | 0.1.1 | `forte/json` | Streaming JSON serializer used for Props serialization |
-| `forte-codegen` | 0.1.6 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
+| `forte-codegen` | 0.2.0 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
 | `forte-rs-to-ts` | 0.1.9 | `forte/rs-to-ts` | Standalone binary: Rust → TypeScript type generator (uses private rustc APIs; downloaded automatically) |
 
 ## Project Structure
