@@ -21,6 +21,7 @@ const StaticUploadSchema = z.object({
 const InputSchema = z.object({
     projectId: z.string(),
     codeVersion: z.number(),
+    bundleSize: z.number(),
     files: z.array(FileEntrySchema),
     jobs: z.array(CronJobSchema),
     cronUpdatedAt: z.coerce.date(),
