@@ -166,7 +166,8 @@ fn fe_package_json(name: &str) -> String {
     )
 }
 
-const ROOT_GITIGNORE: &str = "/target\n/dist\n/.forte\n/env.local.yaml\n";
+const ROOT_GITIGNORE: &str =
+    "/target\n/dist\n/.forte\n/env.local.yaml\n/rs/src/route_generated.rs\n";
 const RS_GITIGNORE: &str = "/target\n";
 const FE_GITIGNORE: &str = "/node_modules\n/dist\n/.forte\n";
 
