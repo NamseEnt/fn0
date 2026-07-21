@@ -1,3 +1,4 @@
 /target
 /dist
 /.forte
+/env.local.yaml
