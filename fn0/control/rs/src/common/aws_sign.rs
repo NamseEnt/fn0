@@ -48,6 +48,7 @@ pub struct R2PresignArgs<'a> {
     pub secret_access_key: &'a str,
     pub expires_seconds: u32,
     pub now: DateTime,
+    pub content_length: Option<u64>,
 }
 
 pub fn r2_presign_put(args: R2PresignArgs<'_>) -> String {
@@ -61,12 +62,20 @@ pub fn r2_presign_put(args: R2PresignArgs<'_>) -> String {
     let credential = format!("{}/{credential_scope}", args.access_key_id);
     let canonical_uri = format!("/{}", uri_encode(args.key, false));
 
+    let (signed_headers, canonical_headers) = match args.content_length {
+        Some(content_length) => (
+            "content-length;host".to_string(),
+            format!("content-length:{content_length}\nhost:{host}\n"),
+        ),
+        None => ("host".to_string(), format!("host:{host}\n")),
+    };
+
     let mut query: Vec<(String, String)> = vec![
         ("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()),
         ("X-Amz-Credential".into(), credential),
         ("X-Amz-Date".into(), amz_date.clone()),
         ("X-Amz-Expires".into(), args.expires_seconds.to_string()),
-        ("X-Amz-SignedHeaders".into(), "host".into()),
+        ("X-Amz-SignedHeaders".into(), signed_headers.clone()),
     ];
     query.sort_by(|a, b| a.0.cmp(&b.0));
     let canonical_query = query
@@ -75,8 +84,6 @@ pub fn r2_presign_put(args: R2PresignArgs<'_>) -> String {
         .collect::<Vec<_>>()
         .join("&");
 
-    let canonical_headers = format!("host:{host}\n");
-    let signed_headers = "host";
     let payload_hash = "UNSIGNED-PAYLOAD";
     let canonical_request = format!(
         "PUT\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}",

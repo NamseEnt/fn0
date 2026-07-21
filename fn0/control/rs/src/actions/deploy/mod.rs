@@ -132,6 +132,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         secret_access_key: &bundle_env.secret_access_key,
         expires_seconds: 600,
         now: forte_sdk::now(),
+        content_length: None,
     });
 
     let static_uploads = if req.body.files.is_empty() {
@@ -159,6 +160,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     secret_access_key: &static_env.secret_access_key,
                     expires_seconds: 600,
                     now: now_dt,
+                    content_length: Some(f.size),
                 });
                 StaticUpload {
                     path: f.path.clone(),
