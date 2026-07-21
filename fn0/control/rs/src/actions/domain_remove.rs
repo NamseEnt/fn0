@@ -79,12 +79,11 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    if let Err(e) = crate::enqueue::cloudflare_unregister(
-        crate::queue_task::cloudflare_unregister::Input {
+    if let Err(e) =
+        crate::enqueue::cloudflare_unregister(crate::queue_task::cloudflare_unregister::Input {
             domain: removed_domain.clone(),
-        },
-    )
-    .await
+        })
+        .await
     {
         tracing::error!("domain_remove enqueue cloudflare_unregister: {e}");
         return Output::InternalError;

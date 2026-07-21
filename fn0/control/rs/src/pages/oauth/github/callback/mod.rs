@@ -11,10 +11,7 @@ pub struct SearchParams {
 
 pub type Props = Redirect;
 
-pub async fn handler(
-    req: ForteRequest<'_>,
-    search_params: SearchParams,
-) -> anyhow::Result<Props> {
+pub async fn handler(req: ForteRequest<'_>, search_params: SearchParams) -> anyhow::Result<Props> {
     if !auth::verify_oauth_state(req.jar, &search_params.state) {
         return Ok(Redirect::Login);
     }

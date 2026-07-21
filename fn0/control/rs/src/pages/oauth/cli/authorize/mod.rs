@@ -21,10 +21,7 @@ pub struct Props {
     pub default_label: String,
 }
 
-pub async fn handler(
-    req: ForteRequest<'_>,
-    search_params: SearchParams,
-) -> anyhow::Result<Props> {
+pub async fn handler(req: ForteRequest<'_>, search_params: SearchParams) -> anyhow::Result<Props> {
     if search_params.code_challenge_method != "S256" {
         anyhow::bail!("code_challenge_method must be S256");
     }
@@ -42,7 +39,10 @@ pub async fn handler(
         let query = form_urlencoded::Serializer::new(String::new())
             .append_pair("redirect_uri", &search_params.redirect_uri)
             .append_pair("code_challenge", &search_params.code_challenge)
-            .append_pair("code_challenge_method", &search_params.code_challenge_method)
+            .append_pair(
+                "code_challenge_method",
+                &search_params.code_challenge_method,
+            )
             .append_pair("state", &search_params.state)
             .append_pair("label", &search_params.label)
             .finish();

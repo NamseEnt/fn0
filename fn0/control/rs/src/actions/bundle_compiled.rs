@@ -67,8 +67,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                         .get(Fn0WasmtimeVersionDocGet {})
                         .await?
                         .map(|v| v.active.clone());
-                    if active_fn0_wasmtime_version.as_deref()
-                        == Some(fn0_wasmtime_version.as_str())
+                    if active_fn0_wasmtime_version.as_deref() == Some(fn0_wasmtime_version.as_str())
                     {
                         match trx.get(WorkerManifestDocGet {}).await? {
                             Some(mut manifest) => {

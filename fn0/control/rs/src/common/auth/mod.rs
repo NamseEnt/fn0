@@ -134,8 +134,8 @@ pub fn mint_cli_token(github_id: i64, token_id: &Uuid) -> anyhow::Result<String>
     payload.extend_from_slice(&github_id.to_be_bytes());
     payload.extend_from_slice(token_id.as_bytes());
 
-    let mut mac = HmacSha256::new_from_slice(key.as_bytes())
-        .map_err(|e| anyhow::anyhow!("hmac key: {e}"))?;
+    let mut mac =
+        HmacSha256::new_from_slice(key.as_bytes()).map_err(|e| anyhow::anyhow!("hmac key: {e}"))?;
     mac.update(&payload);
     let signature = mac.finalize().into_bytes();
 
@@ -165,10 +165,7 @@ pub async fn verify_cli_token(token: &str) -> Option<UserDoc> {
     let token_id = Uuid::from_bytes(token_uuid_bytes).to_string();
 
     let db = doc_db::turso();
-    let user = (UserDocGet { github_id })
-        .send_with(&db)
-        .await
-        .ok()??;
+    let user = (UserDocGet { github_id }).send_with(&db).await.ok()??;
     if user.cli_tokens.iter().any(|t| t.id == token_id) {
         Some(user)
     } else {

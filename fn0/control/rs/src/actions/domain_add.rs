@@ -132,12 +132,11 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     }
 
-    if let Err(e) = crate::enqueue::cloudflare_register(
-        crate::queue_task::cloudflare_register::Input {
+    if let Err(e) =
+        crate::enqueue::cloudflare_register(crate::queue_task::cloudflare_register::Input {
             domain: domain.clone(),
-        },
-    )
-    .await
+        })
+        .await
     {
         tracing::error!("domain_add enqueue cloudflare_register: {e}");
         return Output::InternalError;

@@ -125,10 +125,15 @@ impl CloudflareSaasClient {
                 String::from_utf8_lossy(&response_bytes)
             ));
         }
-        Ok(parsed.result.unwrap_or_default().into_iter().next().map(|r| Hostname {
-            id: r.id,
-            status: HostnameStatus::from_str(&r.status),
-        }))
+        Ok(parsed
+            .result
+            .unwrap_or_default()
+            .into_iter()
+            .next()
+            .map(|r| Hostname {
+                id: r.id,
+                status: HostnameStatus::from_str(&r.status),
+            }))
     }
 
     pub async fn delete_by_name(&self, hostname: &str) -> anyhow::Result<()> {
@@ -183,7 +188,12 @@ fn has_error_code(bytes: &[u8], code: i64) -> bool {
     }
     serde_json::from_slice::<Errs>(bytes)
         .ok()
-        .map(|e| e.errors.into_iter().filter_map(|e| e.code).any(|c| c == code))
+        .map(|e| {
+            e.errors
+                .into_iter()
+                .filter_map(|e| e.code)
+                .any(|c| c == code)
+        })
         .unwrap_or(false)
 }
 

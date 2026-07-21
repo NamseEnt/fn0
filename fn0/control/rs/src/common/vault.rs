@@ -19,15 +19,11 @@ struct GenerateDekResponse {
 }
 
 fn vault_url() -> anyhow::Result<String> {
-    std::env::var("FN0_VAULT_URL")
-        .map_err(|_| anyhow::anyhow!("FN0_VAULT_URL not set"))
+    std::env::var("FN0_VAULT_URL").map_err(|_| anyhow::anyhow!("FN0_VAULT_URL not set"))
 }
 
 pub async fn generate_data_encryption_key() -> anyhow::Result<String> {
-    let url = format!(
-        "{}/generate-dek",
-        vault_url()?.trim_end_matches('/')
-    );
+    let url = format!("{}/generate-dek", vault_url()?.trim_end_matches('/'));
     let resp = http::Client::new()
         .send(
             http::Request::builder()
