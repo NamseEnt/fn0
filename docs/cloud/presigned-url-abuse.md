@@ -32,8 +32,12 @@ and cache can never see this traffic — and that is acceptable, because:
 
   ```text
   max damage ≈ mint-rate cap × expiry cap × op unit cost
-               (+ size cap × storage price for PUT)
   ```
+
+  There is no size term. Storage is a stock, not a flow: however large and
+  however many PUT URLs a project mints, its stored bytes cannot exceed the
+  per-project storage quota, which usage metering already enforces. A
+  per-URL size cap would be a second, cruder copy of that quota.
 
 ## Verified facts (Cloudflare docs, checked 2026-07-20)
 
@@ -60,23 +64,34 @@ most ~600 billable Class A ops ≈ $0.003). Required hardening in the hijack
 1. **Cap expiry per plan.** DONE (#11): clamped to 5 minutes
    (`PRESIGN_MAX_EXPIRES_SECS`). Expiry is the only revocation mechanism —
    once minting stops, exposure ends when outstanding URLs expire.
-2. **Sign `content-length`.** The SDK presign API takes the intended size and
-   the header joins `SignedHeaders`, bounding the upload size per URL.
-   Today only `host` is signed, so one leaked URL can upload objects of any
-   size. Tracked as **#53**, blocked on the curl verifications below.
+2. **Sign `content-length`.** DONE (#53), but it is an *app-facing tool, not
+   a platform control*. `presigned_put_url` takes `content_length:
+   Option<u64>`; when set, the header joins `SignedHeaders` and R2 rejects a
+   mismatched upload with 403 (verified: over, under, and chunked all 403;
+   matching size 200). `None` stays unbounded.
+
+   It is deliberately not enforced. The size is the app's own number spent
+   against the app's own storage quota, so requiring it would defend nothing
+   — a hostile project would just declare a large size. What it does buy is
+   the app's ability to bound what *its* untrusted end users can upload, so
+   a leaked URL cannot store more than the app intended.
+
+   The bound is exact, not a maximum: SigV4 cannot express a size range, and
+   R2 does not implement presigned POST (verified: 501 NotImplemented),
+   which is the only S3 mechanism offering `content-length-range`.
 3. **Per-project mint rate limit**, with mint counts recorded in usage
    metering. DONE (#11): worker-local 1k/hour gate + `PresignMintCountDoc`
    reporting + 100k rolling-30-day cap enforced control-side. Minting is a
    pure local signing operation (free), but the mint rate is the coefficient
    in the damage formula above.
 
-Open verifications before relying on this (test with curl against a real
-bucket; tracked in #53):
-
-- Are 429-rejected writes billed as Class A? The pricing FAQ only exempts
-  401. If they bill at full rate, a PUT-replay botnet costs $4.50/M despite
-  the 1/s success cap, and PUT needs the Stage 2 treatment below.
-- Does R2 actually enforce a signed `content-length` mismatch with a 403?
+Open verification (tracked in **#54**): are 429-rejected writes billed as
+Class A? The pricing FAQ only exempts 401. If they bill at full rate, a
+PUT-replay botnet costs $4.50/M despite the 1/s success cap, and PUT needs
+the Stage 2 treatment below. Note that AWS classifies the same condition as
+a 5xx (`503 SlowDown`) and does not bill it, while R2 returns a 4xx — so
+the analogy points the wrong way. Measured: 429s are recorded as
+`actionStatus: userError`, but analytics recording is not billing.
 
 ## GET: staged plan
 
@@ -147,3 +162,23 @@ The sensor→actuator loop shipped with #11:
 - The public "unlimited downloads" claim is now scoped to static assets;
   object-storage reads carry explicit quotas (`docs/fn0/limits.md`). The
   cached-download story returns as the paid Stage 2/3 add-on.
+
+## The other presigned-PUT surface: static asset deploys
+
+`actions/deploy` mints presigned PUTs of its own, and there the size *is* a
+platform control, because control picks the number rather than the app.
+
+The deploy request declares `FileEntry { path, size }` per file; control
+checks the declared total against `MAX_TOTAL_SIZE_PER_BUILD` (1 GB). Until
+the fix that check was decorative — the URLs signed only `host`, so a client
+could declare a kilobyte per file and upload a gigabyte to each. Control now
+signs `content_length: Some(f.size)`, which makes the declaration binding
+and the existing quota real.
+
+Still open:
+
+- **Per-file ceiling (#56).** The 1 GB total is the only size limit; one
+  file may be all of it.
+- **Bundle tar is unbounded (#55).** The deploy request carries no bundle
+  size, so control has nothing to sign. Bounding it needs a protocol change
+  plus a decision about older CLIs that do not send the field.
