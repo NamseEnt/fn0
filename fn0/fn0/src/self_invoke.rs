@@ -2,6 +2,7 @@ use crate::cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
 use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
+use crate::metric_gate;
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::otlp_hijack::OtlpHijack;
 use crate::presign_gate::PresignDenied;
@@ -364,6 +365,12 @@ fn otlp_send(
         let body_bytes = match body.collect().await {
             Ok(c) => c.to_bytes(),
             Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        };
+        let body_bytes = match hijack.metric_gate() {
+            Some(gate) if parts.uri.path().ends_with("/v1/metrics") => {
+                metric_gate::enforce_request_bytes(gate, &project_id, body_bytes)
+            }
+            _ => body_bytes,
         };
         let forward_body = http_body_util::Full::new(body_bytes)
             .map_err(|never: std::convert::Infallible| match never {})

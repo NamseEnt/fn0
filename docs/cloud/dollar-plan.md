@@ -45,6 +45,7 @@ per-user caps by dividing pools.
 | DB overage | $0.80/B row reads, $0.80/M row writes, $0.50/GB-mo storage | turso.tech/pricing |
 | Object storage (R2) | $0.015/GB-mo; Class A $4.50/M; Class B $0.36/M; egress free | CF R2 pricing |
 | Custom hostname (CF for SaaS) | $0.10/mo, first 100 free | CF for SaaS plans |
+| Metrics (Grafana Cloud) | 10k active series included, then $6.50/1k series-mo | grafana.com/pricing |
 
 R2 chosen over OCI Object Storage ($0.0255/GB-mo) for price and free egress.
 
@@ -84,6 +85,7 @@ side-project usage):
 | DB row writes | 1M | $0.80 | ~$0.01 |
 | Object storage | 10 GB | $0.15 | ~$0.01 |
 | Object PUT (Class A) | 100k (+2k/hour burst cap) | $0.45 | ~$0 |
+| Metric active series | 1,000 (100 names, 100 label values/key) | $0.0065 | ~$0.0003 |
 
 Totals: worst ≈ $2.2/user, expected ≈ $0.05–0.15/user against a $0.35–0.80
 budget. Holds as long as cap-maxing users stay a small minority.
@@ -115,6 +117,46 @@ side-project target. Such apps are the paid add-on's market ("contact us",
 served cached via the Stage 2/3 path in `presigned-url-abuse.md`), not a
 quota-sizing problem.
 
+### Metrics cardinality
+
+The metrics line is the one quota that is not sized against its own cost. At
+$6.50/1k series-mo a project maxing 1,000 series costs $0.0065/month — an
+order of magnitude below the smallest other line — and while the platform
+total stays under the 10k included in the plan, the marginal cost is exactly
+zero. Dividing a budget by that price would produce a meaningless number.
+
+What the cap protects is the **shared pool**: Grafana bills one account-wide
+active-series total, so a single project putting an unbounded value in a label
+(user ID, request ID, raw path) can exhaust the allowance for every project at
+once, including the platform's own `fn0-control` telemetry. This is the
+aggregate-pool case from "Cost model" above — oversubscribed on purpose,
+protected per-project so one tenant cannot take the whole pool, monitored in
+aggregate rather than divided up front.
+
+Enforcement is inline in the worker's OTLP hijack (`fn0/fn0/src/metric_gate.rs`),
+the same trust boundary that stamps `fn0.project_id`. Semantics are keep
+existing / drop new, so a project at its cap keeps every series it already had
+and loses only newly appearing ones; the drop count rides back on the
+project's own payload as `fn0.metrics.dropped` so the owner sees the
+throttling. Series idle for 5 minutes free their slot, matching Alloy's
+`deltatocumulative.max_stale`, so the count tracks active series the way
+Grafana bills them.
+
+Caps are per worker node (each node sees only the slice of a project it
+serves), which is loose by design: the true ceiling is Grafana's own limit,
+and the per-project cap only has to stop one tenant from monopolising the
+pool. Operators watch `fn0.metric.active_series` against the 10k allowance;
+raising the caps is a constant change in `metric_gate.rs`, deliberately cheap
+because the cost of being wrong on the low side (a paying user's legitimate
+instrumentation silently truncated) is worse than being wrong on the high side.
+
+Sizing rationale: a well-instrumented SSR app with ~20 route templates emitting
+RED metrics lands around 400–600 series, so 1,000 leaves roughly 2x headroom
+while the 100-values-per-key cap still catches unbounded labels early. These
+are starting values, to be tuned against real usage once user-facing metrics
+ship — the same "design targets, not commitments" stance as the rest of this
+document.
+
 ### Queue and cron
 
 Queues and cron jobs are already part of the runtime (queue hijack,
@@ -140,7 +182,8 @@ queues, cron, custom domain with automatic TLS.
 
 Planned (public copy uses the existing "planned" badge tone):
 
-- Monitoring and logs
+- Monitoring and logs (the metrics pipeline and its cardinality caps are
+  implemented; what remains is per-project dashboards and query scoping)
 - Pay-as-you-go overage beyond the included quotas
 - A higher tier (~$5) so cap-hitting users have somewhere to go
 - High-volume presigned downloads add-on: served cached through our zone
@@ -185,5 +228,7 @@ zero semantic change. Decision deferred until real usage data exists.
   Decided for the object-storage/presign lines (2026-07-20): 1/10 of the $1
   plan caps, worst-case ~$0.12/free project. Applies once plan tiers exist;
   until then every project runs on the $1-plan defaults in `quota.rs`.
+  The metrics caps follow the same 1/10 shape when tiers land, as product
+  tiering rather than cost recovery — both tiers cost effectively nothing.
 - Queue/cron abuse ceilings vs implementation reality.
 - Whether enqueue operations map to DB writes in billing.

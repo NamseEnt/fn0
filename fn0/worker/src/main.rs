@@ -14,8 +14,8 @@ use cache::S3BundleCache;
 use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
-    ExecutionContext, ObjectStorageHijack, OtlpHijack, PresignGate, QueueHijack, TursoHijack,
-    VaultHijack,
+    ExecutionContext, MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, PresignGate,
+    QueueHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -49,7 +49,7 @@ pub fn read_pem_env(name: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
-fn build_otlp_hijack() -> Arc<OtlpHijack> {
+fn build_otlp_hijack(metric_gate: Arc<MetricCardinalityGate>) -> Arc<OtlpHijack> {
     let target_host =
         std::env::var("FN0_OTLP_TARGET_HOST").expect("FN0_OTLP_TARGET_HOST must be set");
     let target_scheme: hyper::http::uri::Scheme = std::env::var("FN0_OTLP_TARGET_SCHEME")
@@ -72,6 +72,7 @@ fn build_otlp_hijack() -> Arc<OtlpHijack> {
         target_host,
         target_path_prefix,
         auth,
+        metric_gate: Some(metric_gate),
     })
 }
 
@@ -238,6 +239,7 @@ async fn run() -> Result<()> {
 
     let direct_hijack = build_cross_project_invoke_hijack();
     let presign_gate = Arc::new(PresignGate::new());
+    let metric_gate = Arc::new(MetricCardinalityGate::new());
 
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
@@ -246,9 +248,31 @@ async fn run() -> Result<()> {
             .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
             .with_cross_project_invoke_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
-            .with_otlp_hijack(build_otlp_hijack())
+            .with_otlp_hijack(build_otlp_hijack(metric_gate.clone()))
             .with_object_storage_hijack(build_object_storage_hijack(presign_gate.clone())),
     );
+
+    // Recorded on the worker's own meter rather than stamped into guest
+    // payloads: this is operator-facing capacity data against the shared
+    // Grafana pool, not a project's own telemetry.
+    let active_series_gate = metric_gate.clone();
+    let _active_series_gauge = opentelemetry::global::meter("fn0-worker")
+        .u64_observable_gauge("fn0.metric.active_series")
+        .with_unit("1")
+        .with_description("Active metric series the cardinality gate tracks, per project")
+        .with_callback(move |observer| {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as i64)
+                .unwrap_or(0);
+            for (project_id, count) in active_series_gate.snapshot(now) {
+                observer.observe(
+                    count as u64,
+                    &[opentelemetry::KeyValue::new("project_id", project_id)],
+                );
+            }
+        })
+        .build();
 
     let manifest_loaded = Arc::new(AtomicBool::new(false));
     let instance_count = Arc::new(AtomicU64::new(0));

@@ -84,6 +84,30 @@ hourly and rolling 30-day limits — no action needed. If your app legitimately
 needs high-volume presigned downloads, contact us: a paid add-on serving
 them through the CDN cache is planned.
 
+### Metrics
+
+Metrics your app records through the SDK are exported as OpenTelemetry series.
+A *series* is one metric name plus one distinct combination of label values —
+`http_requests{route="/posts",status="200"}` and
+`http_requests{route="/posts",status="404"}` are two series.
+
+| Limit | Value | Notes |
+| --- | --- | --- |
+| Active series | 1,000 per project | A series counts as active while it keeps reporting |
+| Metric names | 100 per project | |
+| Label values | 100 per label key | The usual cause of an explosion — see below |
+
+A series that stops reporting for 5 minutes goes inactive and frees its slot.
+
+Over the limit, existing series keep reporting and only **new** series are
+dropped, so a running app never loses the series it already had. Drops are
+reported back to you as `fn0.metrics.dropped`.
+
+Nearly every cardinality explosion comes from putting an unbounded value in a
+label: a user ID, a request ID, a raw URL path. Label with values you could
+list in advance — route templates, status codes, regions — and 1,000 series is
+a comfortable ceiling. If your app legitimately needs more, contact us.
+
 ### Queues & cron
 
 Queue task execution and cron runs consume the shared monthly CPU pool —

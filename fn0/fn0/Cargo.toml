@@ -28,6 +28,8 @@ opentelemetry-otlp = { workspace = true, features = [
     "metrics",
     "logs",
 ] }
+opentelemetry-proto = { workspace = true, features = ["gen-tonic-messages", "metrics"] }
+prost = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = ["rt-tokio"] }
 reqwest = { workspace = true, features = ["http2"] }
 serde = { workspace = true, features = ["derive"] }

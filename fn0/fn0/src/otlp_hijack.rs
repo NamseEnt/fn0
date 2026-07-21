@@ -2,7 +2,10 @@ use bytes::Bytes;
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::header::{AUTHORIZATION, HOST, HeaderName, HeaderValue};
 use hyper::http::uri::Scheme;
+use std::sync::Arc;
 use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
+
+use crate::metric_gate::MetricCardinalityGate;
 
 const PROJECT_ID_HEADER: HeaderName = HeaderName::from_static("x-fn0-project-id");
 
@@ -13,11 +16,21 @@ pub struct OtlpHijack {
     pub target_host: String,
     pub target_path_prefix: String,
     pub auth: Option<String>,
+    pub metric_gate: Option<Arc<MetricCardinalityGate>>,
 }
 
 impl OtlpHijack {
     pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
         uri.host() == Some(self.placeholder_host.as_str())
+    }
+
+    pub fn with_metric_gate(mut self, gate: Arc<MetricCardinalityGate>) -> Self {
+        self.metric_gate = Some(gate);
+        self
+    }
+
+    pub(crate) fn metric_gate(&self) -> Option<&Arc<MetricCardinalityGate>> {
+        self.metric_gate.as_ref()
     }
 
     pub(crate) fn rewrite(

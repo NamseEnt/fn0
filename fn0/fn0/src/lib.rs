@@ -4,6 +4,7 @@ pub mod cross_project_invoke_hijack;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
+pub mod metric_gate;
 pub mod object_storage_hijack;
 pub mod otlp_hijack;
 mod panic_util;
@@ -36,6 +37,7 @@ use wasmtime_wasi_http::p3::bindings::ServicePre;
 
 pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 pub use cross_project_invoke_hijack::{CrossProjectInvokeDispatcher, CrossProjectInvokeHijack};
+pub use metric_gate::MetricCardinalityGate;
 pub use object_storage_hijack::{DevReadResult, ObjectStorageHijack};
 pub use otlp_hijack::OtlpHijack;
 pub use presign_gate::PresignGate;
