@@ -342,8 +342,14 @@ impl ObjectStorageHijack {
                 let credential = format!("{access_key_id}/{credential_scope}");
 
                 let mut params = [
-                    ("X-Amz-Algorithm".to_string(), "AWS4-HMAC-SHA256".to_string()),
-                    ("X-Amz-Credential".to_string(), uri_encode_query(&credential)),
+                    (
+                        "X-Amz-Algorithm".to_string(),
+                        "AWS4-HMAC-SHA256".to_string(),
+                    ),
+                    (
+                        "X-Amz-Credential".to_string(),
+                        uri_encode_query(&credential),
+                    ),
                     ("X-Amz-Date".to_string(), amz_date.clone()),
                     ("X-Amz-Expires".to_string(), expires.to_string()),
                     ("X-Amz-SignedHeaders".to_string(), "host".to_string()),

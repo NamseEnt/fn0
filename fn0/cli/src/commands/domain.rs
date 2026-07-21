@@ -10,7 +10,9 @@ fn project_id() -> Result<String> {
 
 pub async fn add(domain: &str) -> Result<()> {
     let id = project_id()?;
-    fn0_deploy::domain_add(&id, domain).await.map_err(|e| eyre!(e))
+    fn0_deploy::domain_add(&id, domain)
+        .await
+        .map_err(|e| eyre!(e))
 }
 
 pub async fn remove() -> Result<()> {

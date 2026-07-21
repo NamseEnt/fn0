@@ -276,9 +276,7 @@ fn j_many_isolates_call_interleave() {
         let mut instances: Vec<Rc<SkiInstance>> = Vec::with_capacity(N);
         let mut drivers: Vec<tokio::task::JoinHandle<()>> = Vec::with_capacity(N);
         for i in 0..N {
-            let inst = Rc::new(
-                SkiInstance::load(USER_JS, &format!("/inst-{i}.js"), None).unwrap(),
-            );
+            let inst = Rc::new(SkiInstance::load(USER_JS, &format!("/inst-{i}.js"), None).unwrap());
             let driver = tokio::task::spawn_local({
                 let inst = inst.clone();
                 async move {
@@ -290,9 +288,10 @@ fn j_many_isolates_call_interleave() {
         }
 
         say("[j] join N calls");
-        let calls = instances.iter().enumerate().map(|(i, inst)| {
-            inst.call(empty_request(&format!("http://localhost/{i}")))
-        });
+        let calls = instances
+            .iter()
+            .enumerate()
+            .map(|(i, inst)| inst.call(empty_request(&format!("http://localhost/{i}"))));
         let results = futures::future::join_all(calls).await;
         for (i, r) in results.into_iter().enumerate() {
             assert_eq!(r.unwrap().status(), 200, "isolate {i}");
@@ -387,10 +386,7 @@ fn d_load_drop_load_strict_serial() {
         });
 
         eprintln!("[repro/d] step 2: call A");
-        let _ = a
-            .call(empty_request("http://localhost/a"))
-            .await
-            .unwrap();
+        let _ = a.call(empty_request("http://localhost/a")).await.unwrap();
 
         eprintln!("[repro/d] step 3: abort A driver, drop A, drain task queue");
         a_driver.abort();
@@ -407,10 +403,7 @@ fn d_load_drop_load_strict_serial() {
         });
 
         eprintln!("[repro/d] step 5: call B");
-        let _ = b
-            .call(empty_request("http://localhost/b"))
-            .await
-            .unwrap();
+        let _ = b.call(empty_request("http://localhost/b")).await.unwrap();
 
         b_driver.abort();
         drop(b);

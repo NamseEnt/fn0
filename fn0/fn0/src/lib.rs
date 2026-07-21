@@ -1,6 +1,6 @@
 pub mod cache;
-pub mod cross_project_invoke_hijack;
 pub mod cross_project_enqueue_hijack;
+pub mod cross_project_invoke_hijack;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
@@ -34,8 +34,8 @@ use wasmtime::Engine;
 use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
 
-pub use cross_project_invoke_hijack::{CrossProjectInvokeHijack, CrossProjectInvokeDispatcher};
 pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
+pub use cross_project_invoke_hijack::{CrossProjectInvokeDispatcher, CrossProjectInvokeHijack};
 pub use object_storage_hijack::{DevReadResult, ObjectStorageHijack};
 pub use otlp_hijack::OtlpHijack;
 pub use presign_gate::PresignGate;

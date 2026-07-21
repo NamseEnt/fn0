@@ -254,7 +254,10 @@ fn watchdog_loop() {
         let entries: Vec<std::sync::Arc<WatchdogEntry>> = {
             let mut registry = registry.lock().unwrap();
             registry.retain(|entry| entry.strong_count() > 0);
-            registry.iter().filter_map(std::sync::Weak::upgrade).collect()
+            registry
+                .iter()
+                .filter_map(std::sync::Weak::upgrade)
+                .collect()
         };
         for entry in entries {
             let total = entry.metrics.current_total_nanos();

@@ -129,32 +129,28 @@ impl CrossProjectEnqueueHijack {
     }
 
     pub fn from_env() -> Result<Self> {
-        let messages_endpoint =
-            std::env::var("FN0_CROSS_PROJECT_ENQUEUE_MESSAGES_ENDPOINT").map_err(|_| {
+        let messages_endpoint = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_MESSAGES_ENDPOINT")
+            .map_err(|_| {
                 anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_MESSAGES_ENDPOINT is required")
             })?;
         let placeholder_host = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-cross-project-enqueue.fn0.dev".to_string());
         let allowed_caller_project_id =
-            std::env::var("FN0_CROSS_PROJECT_ENQUEUE_ALLOWED_CALLER_PROJECT_ID").map_err(
-                |_| {
-                    anyhow::anyhow!(
-                        "FN0_CROSS_PROJECT_ENQUEUE_ALLOWED_CALLER_PROJECT_ID is required"
-                    )
-                },
-            )?;
+            std::env::var("FN0_CROSS_PROJECT_ENQUEUE_ALLOWED_CALLER_PROJECT_ID").map_err(|_| {
+                anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_ALLOWED_CALLER_PROJECT_ID is required")
+            })?;
         let queue_ocid = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCID")
             .map_err(|_| anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_OCID is required"))?;
-        let tenancy = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCI_TENANCY_ID").map_err(|_| {
-            anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_OCI_TENANCY_ID is required")
-        })?;
+        let tenancy = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCI_TENANCY_ID")
+            .map_err(|_| anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_OCI_TENANCY_ID is required"))?;
         let user = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCI_USER_ID")
             .map_err(|_| anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_OCI_USER_ID is required"))?;
-        let fingerprint = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCI_FINGERPRINT").map_err(
-            |_| anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_OCI_FINGERPRINT is required"),
-        )?;
-        let private_key_b64 =
-            std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCI_PRIVATE_KEY_BASE64").map_err(|_| {
+        let fingerprint =
+            std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCI_FINGERPRINT").map_err(|_| {
+                anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_OCI_FINGERPRINT is required")
+            })?;
+        let private_key_b64 = std::env::var("FN0_CROSS_PROJECT_ENQUEUE_OCI_PRIVATE_KEY_BASE64")
+            .map_err(|_| {
                 anyhow::anyhow!("FN0_CROSS_PROJECT_ENQUEUE_OCI_PRIVATE_KEY_BASE64 is required")
             })?;
         let private_key_pem = base64::engine::general_purpose::STANDARD

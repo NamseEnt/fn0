@@ -16,16 +16,12 @@ pub async fn run(shutdown: Shutdown) {
     let image_ref = match std::env::var("FN0_WORKER_AGENT_IMAGE_REF") {
         Ok(v) if !v.is_empty() => v,
         _ => {
-            warn!(
-                "FN0_WORKER_AGENT_IMAGE_REF not set; agent image pull poller disabled"
-            );
+            warn!("FN0_WORKER_AGENT_IMAGE_REF not set; agent image pull poller disabled");
             return;
         }
     };
-    let interval = duration_from_env_secs(
-        "FN0_WORKER_AGENT_PULL_INTERVAL_SECS",
-        POLL_INTERVAL_DEFAULT,
-    );
+    let interval =
+        duration_from_env_secs("FN0_WORKER_AGENT_PULL_INTERVAL_SECS", POLL_INTERVAL_DEFAULT);
     let podman = Podman::from_env();
 
     let boot_digest = match podman.image_digest(&image_ref).await {

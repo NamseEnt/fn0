@@ -9,17 +9,15 @@ pub async fn serve(listener: TcpListener, target_rx: watch::Receiver<Option<Sock
     info!("public forwarder listening");
     loop {
         match listener.accept().await {
-            Ok((conn, peer)) => {
-                match *target_rx.borrow() {
-                    Some(addr) => {
-                        tokio::spawn(forward(conn, addr, peer));
-                    }
-                    None => {
-                        debug!(%peer, "no target set; dropping connection");
-                        drop(conn);
-                    }
+            Ok((conn, peer)) => match *target_rx.borrow() {
+                Some(addr) => {
+                    tokio::spawn(forward(conn, addr, peer));
                 }
-            }
+                None => {
+                    debug!(%peer, "no target set; dropping connection");
+                    drop(conn);
+                }
+            },
             Err(err) => {
                 warn!(?err, "accept failed; backing off briefly");
                 tokio::time::sleep(Duration::from_millis(50)).await;

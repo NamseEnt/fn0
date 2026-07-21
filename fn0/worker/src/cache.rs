@@ -72,9 +72,7 @@ impl S3BundleCache {
     #[tracing::instrument(skip_all, fields(project_id = %project_id, code_version))]
     pub async fn register(&self, project_id: &str, code_version: u64) {
         let mut inner = self.inner.lock().await;
-        let prev = inner
-            .registry
-            .insert(project_id.to_string(), code_version);
+        let prev = inner.registry.insert(project_id.to_string(), code_version);
         if prev != Some(code_version)
             && let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id)
         {

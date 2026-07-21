@@ -14,11 +14,13 @@ impl InitPrompts {
             trimmed.to_string()
         } else {
             inquire::Text::new("What is your project name?")
-                .with_validator(|input: &str| match fn0_deploy::validate_project_name(
-                    input.trim(),
-                ) {
-                    Ok(()) => Ok(inquire::validator::Validation::Valid),
-                    Err(e) => Ok(inquire::validator::Validation::Invalid(e.to_string().into())),
+                .with_validator(|input: &str| {
+                    match fn0_deploy::validate_project_name(input.trim()) {
+                        Ok(()) => Ok(inquire::validator::Validation::Valid),
+                        Err(e) => Ok(inquire::validator::Validation::Invalid(
+                            e.to_string().into(),
+                        )),
+                    }
                 })
                 .prompt()?
                 .trim()

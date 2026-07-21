@@ -2,7 +2,6 @@ mod codegen;
 mod discover;
 mod model;
 
-use std::{env, fs, path::Path};
 use codegen::{
     generate_actions_mod, generate_admin_mod, generate_code, generate_fe_paths,
     generate_queue_task_mod,
@@ -11,6 +10,7 @@ use discover::{
     discover_actions, discover_admin_tasks, discover_apis, discover_hooks, discover_pages,
     discover_public, discover_queue_tasks,
 };
+use std::{env, fs, path::Path};
 
 pub fn generate_routes() {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();

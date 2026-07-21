@@ -11,10 +11,9 @@ impl std::fmt::Display for NameError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NameError::Empty => write!(f, "name cannot be empty"),
-            NameError::TooLong { len } => write!(
-                f,
-                "name too long: {len} chars (max {MAX_PROJECT_NAME_LEN})"
-            ),
+            NameError::TooLong { len } => {
+                write!(f, "name too long: {len} chars (max {MAX_PROJECT_NAME_LEN})")
+            }
             NameError::InvalidChar { ch } => write!(
                 f,
                 "name contains invalid character {ch:?}; allowed: letters, digits, '.', '_', '-'"

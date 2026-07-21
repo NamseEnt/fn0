@@ -13,10 +13,7 @@ use std::time::Duration;
 const PKCE_TIMEOUT_SECS: u64 = 300;
 
 pub async fn login_pkce(control_url: &str) -> Result<String> {
-    let listener = TcpListener::bind(SocketAddr::V4(SocketAddrV4::new(
-        Ipv4Addr::LOCALHOST,
-        0,
-    )))?;
+    let listener = TcpListener::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)))?;
     let local_addr = listener.local_addr()?;
     let port = local_addr.port();
     listener.set_nonblocking(false)?;
@@ -64,16 +61,15 @@ pub async fn login_pkce(control_url: &str) -> Result<String> {
         Ok(params)
     });
 
-    let callback = tokio::time::timeout(
-        Duration::from_secs(PKCE_TIMEOUT_SECS),
-        callback,
-    )
-    .await
-    .map_err(|_| anyhow!("timed out waiting for browser callback"))?
-    .map_err(|e| anyhow!("callback task panicked: {e}"))??;
+    let callback = tokio::time::timeout(Duration::from_secs(PKCE_TIMEOUT_SECS), callback)
+        .await
+        .map_err(|_| anyhow!("timed out waiting for browser callback"))?
+        .map_err(|e| anyhow!("callback task panicked: {e}"))??;
 
     if callback.state != state {
-        return Err(anyhow!("state mismatch in browser callback (possible CSRF)"));
+        return Err(anyhow!(
+            "state mismatch in browser callback (possible CSRF)"
+        ));
     }
 
     let exchange_url = format!("{trimmed_control}/__forte_action/oauth_cli_exchange");
@@ -88,17 +84,12 @@ pub async fn login_pkce(control_url: &str) -> Result<String> {
         .send()
         .await?;
     if !resp.status().is_success() {
-        return Err(anyhow!(
-            "exchange failed with status {}",
-            resp.status()
-        ));
+        return Err(anyhow!("exchange failed with status {}", resp.status()));
     }
     let parsed: ExchangeOutput = resp.json().await?;
     match parsed {
         ExchangeOutput::Ok { token } => Ok(token),
-        ExchangeOutput::InvalidGrant { message } => {
-            Err(anyhow!("invalid_grant: {message}"))
-        }
+        ExchangeOutput::InvalidGrant { message } => Err(anyhow!("invalid_grant: {message}")),
         ExchangeOutput::Error { message } => Err(anyhow!("exchange error: {message}")),
     }
 }
@@ -135,8 +126,8 @@ fn read_callback_params(stream: &mut TcpStream) -> Result<CallbackParams> {
     if n == 0 {
         return Err(anyhow!("empty callback request"));
     }
-    let request_text = std::str::from_utf8(&buf[..n])
-        .map_err(|_| anyhow!("non-utf8 callback request"))?;
+    let request_text =
+        std::str::from_utf8(&buf[..n]).map_err(|_| anyhow!("non-utf8 callback request"))?;
     let request_line = request_text
         .lines()
         .next()

@@ -57,8 +57,7 @@ fn response_body_collects_on_foreign_thread() {
                 .unwrap();
             let local = LocalSet::new();
             local.block_on(&rt, async move {
-                let instance =
-                    Rc::new(SkiInstance::load(&user_js(), "/entry.js", None).unwrap());
+                let instance = Rc::new(SkiInstance::load(&user_js(), "/entry.js", None).unwrap());
                 let driver_inst = instance.clone();
                 let driver = tokio::task::spawn_local(async move {
                     driver_inst.drive_forever().await;

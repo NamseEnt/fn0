@@ -50,9 +50,7 @@ pub async fn ensure_project_id(
             ));
         }
         NewProject::InternalError => {
-            return Err(anyhow!(
-                "new_project: server error; check fn0-control logs"
-            ));
+            return Err(anyhow!("new_project: server error; check fn0-control logs"));
         }
     };
     *project_id = Some(id.clone());
@@ -138,7 +136,9 @@ pub async fn rename_project(project_id: &str, new_name: &str) -> Result<()> {
     let raw: RenameProject = resp.json().await?;
     match raw {
         RenameProject::Ok => Ok(()),
-        RenameProject::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
+        RenameProject::NotLoggedIn => {
+            Err(anyhow!("control rejected token; run `fn0 login` again."))
+        }
         RenameProject::NotFound => Err(anyhow!(
             "project '{project_id}' not found or not owned by you."
         )),

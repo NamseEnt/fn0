@@ -118,13 +118,7 @@ impl Podman {
     pub async fn image_digest(&self, image_ref: &str) -> Result<String, PodmanError> {
         let output = self
             .cmd()
-            .args([
-                "image",
-                "inspect",
-                image_ref,
-                "--format",
-                "{{.Digest}}",
-            ])
+            .args(["image", "inspect", image_ref, "--format", "{{.Digest}}"])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -149,12 +143,7 @@ impl Podman {
     pub async fn is_running(&self, container_name: &str) -> Result<bool, PodmanError> {
         let output = self
             .cmd()
-            .args([
-                "inspect",
-                "--format",
-                "{{.State.Running}}",
-                container_name,
-            ])
+            .args(["inspect", "--format", "{{.State.Running}}", container_name])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -199,10 +188,7 @@ pub enum PodmanError {
     #[error("failed to spawn podman: {0}")]
     Spawn(std::io::Error),
     #[error("podman exited with code {code:?}: {stderr}")]
-    NonZeroExit {
-        code: Option<i32>,
-        stderr: String,
-    },
+    NonZeroExit { code: Option<i32>, stderr: String },
     #[error("parse: {0}")]
     Parse(String),
 }

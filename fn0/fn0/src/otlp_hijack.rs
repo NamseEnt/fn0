@@ -61,8 +61,7 @@ impl OtlpHijack {
 
         headers.insert(
             PROJECT_ID_HEADER,
-            HeaderValue::from_str(caller_project_id)
-                .map_err(|_| ErrorCode::HttpRequestDenied)?,
+            HeaderValue::from_str(caller_project_id).map_err(|_| ErrorCode::HttpRequestDenied)?,
         );
 
         Ok(())

@@ -51,13 +51,9 @@ impl CrossProjectInvokeHijack {
         let placeholder_host = std::env::var("FN0_CROSS_PROJECT_INVOKE_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-cross-project-invoke.fn0.dev".to_string());
         let allowed_caller_project_id =
-            std::env::var("FN0_CROSS_PROJECT_INVOKE_ALLOWED_CALLER_PROJECT_ID").map_err(
-                |_| {
-                    anyhow::anyhow!(
-                        "FN0_CROSS_PROJECT_INVOKE_ALLOWED_CALLER_PROJECT_ID is required"
-                    )
-                },
-            )?;
+            std::env::var("FN0_CROSS_PROJECT_INVOKE_ALLOWED_CALLER_PROJECT_ID").map_err(|_| {
+                anyhow::anyhow!("FN0_CROSS_PROJECT_INVOKE_ALLOWED_CALLER_PROJECT_ID is required")
+            })?;
         Ok(Self::new(placeholder_host, allowed_caller_project_id))
     }
 
@@ -147,4 +143,3 @@ fn synth_response(status: u16, body: Bytes) -> hyper::Response<UnsyncBoxBody<Byt
         .body(body)
         .expect("static synth response builds")
 }
-

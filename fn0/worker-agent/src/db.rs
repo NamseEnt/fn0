@@ -12,8 +12,7 @@ use doc_db::Database;
 const CONTROL_PROJECT_ID: &str = "fn0-control";
 
 pub fn build() -> Database {
-    let group_token =
-        std::env::var("TURSO_GROUP_TOKEN").expect("TURSO_GROUP_TOKEN must be set");
+    let group_token = std::env::var("TURSO_GROUP_TOKEN").expect("TURSO_GROUP_TOKEN must be set");
     let host_suffix =
         std::env::var("TURSO_DB_HOST_SUFFIX").expect("TURSO_DB_HOST_SUFFIX must be set");
     let url = format!("https://{CONTROL_PROJECT_ID}{host_suffix}");

@@ -105,10 +105,9 @@ where
                     resp_tx,
                     enqueued_at: _,
                 } = env;
-                let outcome =
-                    AssertUnwindSafe(executor.run(&project_id, "/", req, None))
-                        .catch_unwind()
-                        .await;
+                let outcome = AssertUnwindSafe(executor.run(&project_id, "/", req, None))
+                    .catch_unwind()
+                    .await;
                 match outcome {
                     Ok(result) => {
                         if resp_tx.send(result).is_err() {

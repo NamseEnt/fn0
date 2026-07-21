@@ -1,5 +1,5 @@
 use crate::cache::S3BundleCache;
-use doc_db::{DbRequest, Database};
+use doc_db::{Database, DbRequest};
 use fn0_shared_schema::WorkerManifestDocGet;
 use std::collections::HashMap;
 use std::sync::Arc;

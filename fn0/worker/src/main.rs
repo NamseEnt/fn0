@@ -13,8 +13,9 @@ use bytes::Bytes;
 use cache::S3BundleCache;
 use color_eyre::eyre::Result;
 use fn0::{
-    CrossProjectInvokeHijack, CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, ExecutionContext,
-    ObjectStorageHijack, OtlpHijack, PresignGate, QueueHijack, TursoHijack, VaultHijack,
+    CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
+    ExecutionContext, ObjectStorageHijack, OtlpHijack, PresignGate, QueueHijack, TursoHijack,
+    VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -120,8 +121,7 @@ fn build_vault_hijack() -> Arc<VaultHijack> {
 }
 
 fn build_turso_hijack() -> Arc<TursoHijack> {
-    let group_token =
-        std::env::var("TURSO_GROUP_TOKEN").expect("TURSO_GROUP_TOKEN must be set");
+    let group_token = std::env::var("TURSO_GROUP_TOKEN").expect("TURSO_GROUP_TOKEN must be set");
     let target_host_suffix =
         std::env::var("TURSO_DB_HOST_SUFFIX").expect("TURSO_DB_HOST_SUFFIX must be set");
     let placeholder_host =
@@ -146,8 +146,7 @@ fn main() -> Result<()> {
     color_eyre::install()?;
 
     let otlp_endpoint = std::env::var("OTLP_ENDPOINT").expect("OTLP_ENDPOINT must be set");
-    let otlp_basic_auth =
-        std::env::var("OTLP_BASIC_AUTH").expect("OTLP_BASIC_AUTH must be set");
+    let otlp_basic_auth = std::env::var("OTLP_BASIC_AUTH").expect("OTLP_BASIC_AUTH must be set");
 
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
@@ -204,7 +203,8 @@ async fn run() -> Result<()> {
         .unwrap_or(DEFAULT_OPS_PORT);
 
     let vault_client = Arc::new(
-        VaultClient::from_env().map_err(|err| color_eyre::eyre::eyre!("vault client init: {err}"))?,
+        VaultClient::from_env()
+            .map_err(|err| color_eyre::eyre::eyre!("vault client init: {err}"))?,
     );
 
     let cache_size_bytes = std::env::var("FN0_BUNDLE_CACHE_SIZE_BYTES")
@@ -265,8 +265,8 @@ async fn run() -> Result<()> {
         senders: worker_senders.clone(),
     }));
 
-    let manifest_db = manifest_poller::build_database_from_env()
-        .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+    let manifest_db =
+        manifest_poller::build_database_from_env().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
     let manifest_handle = tokio::spawn({
         let cache = cache.clone();
         let manifest_loaded = manifest_loaded.clone();
@@ -275,8 +275,8 @@ async fn run() -> Result<()> {
         }
     });
 
-    let presign_db = manifest_poller::build_database_from_env()
-        .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+    let presign_db =
+        manifest_poller::build_database_from_env().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
     let presign_handle = tokio::spawn(presign_sync::run(presign_db, presign_gate.clone()));
 
     let queue_consumer_handle = {
@@ -362,10 +362,10 @@ async fn run_user_server(
     apex_route: Option<Arc<ApexRoute>>,
 ) -> Result<()> {
     let tls_acceptor = {
-        let cert_pem = read_pem_env("ORIGIN_CERT_PEM")
-            .expect("ORIGIN_CERT_PEM (or _BASE64) must be set");
-        let key_pem = read_pem_env("ORIGIN_KEY_PEM")
-            .expect("ORIGIN_KEY_PEM (or _BASE64) must be set");
+        let cert_pem =
+            read_pem_env("ORIGIN_CERT_PEM").expect("ORIGIN_CERT_PEM (or _BASE64) must be set");
+        let key_pem =
+            read_pem_env("ORIGIN_KEY_PEM").expect("ORIGIN_KEY_PEM (or _BASE64) must be set");
         let certs: Vec<_> = rustls_pemfile::certs(&mut cert_pem.as_bytes())
             .collect::<std::result::Result<_, _>>()?;
         let key = rustls_pemfile::private_key(&mut key_pem.as_bytes())?
@@ -483,9 +483,7 @@ async fn run_ops_server(
                 let manifest_loaded = manifest_loaded.clone();
                 let instance_count = instance_count.clone();
                 let drain_flag = drain_flag.clone();
-                async move {
-                    handle_ops_request(req, manifest_loaded, instance_count, drain_flag).await
-                }
+                async move { handle_ops_request(req, manifest_loaded, instance_count, drain_flag).await }
             });
 
             if let Err(err) = http1::Builder::new()

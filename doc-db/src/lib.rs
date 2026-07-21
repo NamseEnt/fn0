@@ -69,8 +69,7 @@ pub struct ConflictInfo {
 
 pub fn turso() -> Database {
     let url = std::env::var("TURSO_URL").expect("TURSO_URL must be set");
-    let auth_token =
-        std::env::var("TURSO_AUTH_TOKEN").expect("TURSO_AUTH_TOKEN must be set");
+    let auth_token = std::env::var("TURSO_AUTH_TOKEN").expect("TURSO_AUTH_TOKEN must be set");
     turso_with_config(url, auth_token)
 }
 

@@ -127,7 +127,10 @@ pub async fn run(
                     container_name = %d.container.container_name,
                     "drain complete; stopping container"
                 );
-                if let Err(err) = podman.stop(&d.container.container_name, STOP_GRACE_SECS).await {
+                if let Err(err) = podman
+                    .stop(&d.container.container_name, STOP_GRACE_SECS)
+                    .await
+                {
                     warn!(?err, container_name = %d.container.container_name, "podman stop failed");
                 }
                 if let Err(err) = podman.remove(&d.container.container_name).await {
@@ -266,8 +269,11 @@ async fn wait_until_ready(
 
 async fn tcp_probe(addr: &SocketAddr) -> bool {
     matches!(
-        tokio::time::timeout(Duration::from_millis(500), tokio::net::TcpStream::connect(addr))
-            .await,
+        tokio::time::timeout(
+            Duration::from_millis(500),
+            tokio::net::TcpStream::connect(addr)
+        )
+        .await,
         Ok(Ok(_))
     )
 }
@@ -496,7 +502,8 @@ fn pick_highest_port(
 }
 
 fn parse_port_from_container_name(name: &str) -> Option<u16> {
-    name.rsplit_once('-').and_then(|(_, p)| p.parse::<u16>().ok())
+    name.rsplit_once('-')
+        .and_then(|(_, p)| p.parse::<u16>().ok())
 }
 
 fn duration_from_env_secs(name: &str, default: Duration) -> Duration {

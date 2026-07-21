@@ -48,8 +48,8 @@ async fn async_main() -> Result<()> {
 
     let shutdown = Shutdown::new();
 
-    let host_id = std::env::var("FN0_WORKER_AGENT_HOST_ID")
-        .expect("FN0_WORKER_AGENT_HOST_ID must be set");
+    let host_id =
+        std::env::var("FN0_WORKER_AGENT_HOST_ID").expect("FN0_WORKER_AGENT_HOST_ID must be set");
 
     let public_ip = detect_public_ipv4()
         .await

@@ -3,10 +3,10 @@ mod map_key;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::stream::Stream;
+use map_key::MapKeySerializer;
 use serde::de::DeserializeOwned;
 use serde::ser::{self, Serialize, SerializeSeq};
 use serde_json::Value;
-use map_key::MapKeySerializer;
 
 fn to_camel_case(s: &str) -> String {
     let mut result = String::with_capacity(s.len());

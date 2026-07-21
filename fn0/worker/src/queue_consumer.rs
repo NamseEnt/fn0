@@ -235,19 +235,18 @@ impl Consumer {
         msg: IncomingMessage,
         worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     ) -> Result<()> {
-        let content_bytes = match base64::engine::general_purpose::STANDARD
-            .decode(msg.content.as_bytes())
-        {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                tracing::warn!(
-                    receipt = %msg.receipt,
-                    error = %e,
-                    "queue content base64 unrecoverable; acking malformed message"
-                );
-                return self.delete_message(&msg.receipt).await;
-            }
-        };
+        let content_bytes =
+            match base64::engine::general_purpose::STANDARD.decode(msg.content.as_bytes()) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    tracing::warn!(
+                        receipt = %msg.receipt,
+                        error = %e,
+                        "queue content base64 unrecoverable; acking malformed message"
+                    );
+                    return self.delete_message(&msg.receipt).await;
+                }
+            };
         let wrapped: WrappedMessage = match serde_json::from_slice(&content_bytes) {
             Ok(w) => w,
             Err(e) => {
@@ -288,9 +287,7 @@ impl Consumer {
 
         if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
             return match err {
-                DispatchError::Full => {
-                    Err(anyhow!("worker queue full for {}", wrapped.project_id))
-                }
+                DispatchError::Full => Err(anyhow!("worker queue full for {}", wrapped.project_id)),
                 DispatchError::Closed => Err(anyhow!("worker pool closed")),
             };
         }

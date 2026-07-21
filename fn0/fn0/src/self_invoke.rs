@@ -1,5 +1,5 @@
-use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
 use crate::cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
+use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
 use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::object_storage_hijack::ObjectStorageHijack;
@@ -192,10 +192,8 @@ fn self_invoke_send(
             Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
         };
         let http_resp = resp.map(|body| {
-            body.map_err(|err: anyhow::Error| {
-                ErrorCode::InternalError(Some(err.to_string()))
-            })
-            .boxed_unsync()
+            body.map_err(|err: anyhow::Error| ErrorCode::InternalError(Some(err.to_string())))
+                .boxed_unsync()
         });
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(async { Ok(()) });
@@ -417,9 +415,7 @@ fn object_storage_send(
                         PresignDenied::ProjectBlocked => {
                             "presign refused: project over storage quota"
                         }
-                        PresignDenied::RateLimited => {
-                            "presign refused: hourly mint limit reached"
-                        }
+                        PresignDenied::RateLimited => "presign refused: hourly mint limit reached",
                     };
                     let resp = http::Response::builder()
                         .status(429)
