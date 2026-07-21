@@ -50,7 +50,9 @@ jobs:
             local local_ver=$(grep '^version' "$dir/Cargo.toml" | head -1 | sed 's/version = "\(.*\)"/\1/')
             local tag="${tag_prefix}-v${local_ver}"
 
-            if git ls-remote --tags origin | grep -q "refs/tags/${tag}$"; then
+            # ls-remote --exit-code avoids piping into `grep -q`, which SIGPIPEs
+            # under `set -o pipefail` and so misdetects an existing tag.
+            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
               return
             fi
 
