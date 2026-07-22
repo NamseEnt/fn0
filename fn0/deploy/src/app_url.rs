@@ -1,8 +1,9 @@
 //! Resolves the public URL a deployed project is served at.
 //!
-//! A project is always reachable at `{project_id}.{control host}`, because the
-//! worker routes on the first host label. A custom domain, when attached and
-//! active, is preferred over that default subdomain.
+//! A project is always reachable at `{project_id}.{apex domain}`, because the
+//! worker routes on the first host label and the wildcard TLS certificate
+//! only covers that single level. A custom domain, when attached and active,
+//! is preferred over that default subdomain.
 
 use anyhow::{Result, anyhow};
 
@@ -15,13 +16,23 @@ pub struct ResolvedAppUrl {
     pub note: Option<String>,
 }
 
+/// The control plane is itself a deployed project, so `control_url` may be its
+/// own app subdomain (`fn0-control.{apex}`) rather than the bare apex. That
+/// label must be stripped before appending `project_id`, or the resulting
+/// host is two levels deep and falls outside the `*.{apex}` wildcard
+/// certificate, breaking TLS.
+const CONTROL_PROJECT_ID: &str = "fn0-control";
+
 pub fn default_app_url(control_url: &str, project_id: &str) -> Result<String> {
     let mut url = reqwest::Url::parse(control_url)
         .map_err(|e| anyhow!("control URL '{control_url}' is not a valid URL: {e}"))?;
     let host = url
         .host_str()
         .ok_or_else(|| anyhow!("control URL '{control_url}' has no host"))?;
-    let app_host = format!("{project_id}.{host}");
+    let apex_host = host
+        .strip_prefix(&format!("{CONTROL_PROJECT_ID}."))
+        .unwrap_or(host);
+    let app_host = format!("{project_id}.{apex_host}");
     url.set_host(Some(&app_host))
         .map_err(|e| anyhow!("could not build app host '{app_host}': {e}"))?;
     url.set_path("");
@@ -106,6 +117,14 @@ mod tests {
     fn drops_a_trailing_path_on_the_control_url() {
         assert_eq!(
             default_app_url("https://fn0.dev/", "abc123").unwrap(),
+            "https://abc123.fn0.dev"
+        );
+    }
+
+    #[test]
+    fn strips_the_control_projects_own_subdomain_to_reach_the_apex() {
+        assert_eq!(
+            default_app_url("https://fn0-control.fn0.dev", "abc123").unwrap(),
             "https://abc123.fn0.dev"
         );
     }
