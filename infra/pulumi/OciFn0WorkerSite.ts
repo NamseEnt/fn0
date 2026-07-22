@@ -195,6 +195,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       args,
       compartment,
       workerSubnet,
+      availabilityDomain,
       imageId,
       metadata,
     );
@@ -543,6 +544,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     args: OciFn0WorkerSiteArgs,
     compartment: oci.identity.Compartment,
     workerSubnet: oci.core.Subnet,
+    availabilityDomain: pulumi.Output<string>,
     imageId: pulumi.Output<string>,
     metadata: pulumi.Output<{ [k: string]: string }>,
   ): oci.core.InstanceConfiguration {
@@ -573,6 +575,29 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               fn0_role: "worker",
             },
           },
+          // Sized so that two instances stay inside the 200 GB Always Free
+          // block storage allowance: a roll runs the pool at size 2, and each
+          // instance carries its own ~47 GB boot volume plus this volume.
+          blockVolumes: [
+            {
+              createDetails: {
+                availabilityDomain,
+                compartmentId: compartment.id,
+                sizeInGbs: `${ALLOY_QUEUE_VOLUME_SIZE_IN_GBS}`,
+                vpusPerGb: "10",
+                displayName: "fn0-worker-alloy-queue",
+                freeformTags: {
+                  managed_by: MANAGED_BY_TAG_VALUE,
+                  fn0_role: "worker",
+                },
+              },
+              attachDetails: {
+                type: "paravirtualized",
+                device: ALLOY_QUEUE_DEVICE,
+                displayName: "fn0-worker-alloy-queue",
+              },
+            },
+          ],
         },
       },
       { parent: this },
@@ -1178,6 +1203,14 @@ function resolveEnvMap(m: {
 }
 
 const ALLOY_IMAGE_REF = "docker.io/grafana/alloy:latest";
+const ALLOY_QUEUE_VOLUME_SIZE_IN_GBS = 50;
+const ALLOY_QUEUE_DEVICE = "/dev/oracleoci/oraclevdb";
+const ALLOY_STORAGE_PATH = "/var/lib/alloy";
+const ALLOY_OTLP_QUEUE_SIZE_IN_BYTES = 32 * 1024 * 1024 * 1024;
+// A sample is dropped from the WAL once it is this old even if it was never
+// delivered. This, not the volume size, is what bounds how long a metrics
+// backend outage the host metrics can survive; upstream defaults it to 8h.
+const ALLOY_PROMETHEUS_WAL_MAX_KEEPALIVE = "168h";
 
 function renderAlloyConfig(args: {
   promUrl: string;
@@ -1220,6 +1253,9 @@ prometheus.remote_write "default" {
   }
   external_labels = {
     fn0_role = "worker",
+  }
+  wal {
+    max_keepalive_time = "${ALLOY_PROMETHEUS_WAL_MAX_KEEPALIVE}"
   }
 }
 
@@ -1303,10 +1339,19 @@ otelcol.processor.batch "default" {
   }
 }
 
+otelcol.storage.file "queue" {
+  directory = "${ALLOY_STORAGE_PATH}/otlp-queue"
+}
+
 otelcol.exporter.otlphttp "default" {
   client {
     endpoint = "${args.otlpUrl}"
     auth     = otelcol.auth.basic.grafana.handler
+  }
+  sending_queue {
+    storage    = otelcol.storage.file.queue.handler
+    sizer      = "bytes"
+    queue_size = ${ALLOY_OTLP_QUEUE_SIZE_IN_BYTES}
   }
 }
 
@@ -1391,6 +1436,7 @@ WantedBy=multi-user.target
 Description=fn0 alloy host observability
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=${ALLOY_STORAGE_PATH}
 
 [Service]
 Type=simple
@@ -1410,7 +1456,8 @@ ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
   -v /var/log/journal:/host/var/log/journal:ro \\
   -v /etc/machine-id:/etc/machine-id:ro \\
   -v /etc/fn0-alloy:/etc/fn0-alloy:ro \\
-  ${ALLOY_IMAGE_REF} run --stability.level=experimental --server.http.listen-addr=127.0.0.1:12345 /etc/fn0-alloy/config.alloy
+  -v ${ALLOY_STORAGE_PATH}:${ALLOY_STORAGE_PATH} \\
+  ${ALLOY_IMAGE_REF} run --stability.level=experimental --server.http.listen-addr=127.0.0.1:12345 --storage.path=${ALLOY_STORAGE_PATH} /etc/fn0-alloy/config.alloy
 ExecStop=/usr/bin/podman stop fn0-alloy
 
 [Install]
@@ -1462,6 +1509,25 @@ ${agentSystemdUnit}EOF_AGENT_UNIT
 
 cat > /etc/systemd/system/fn0-worker-proxy.service <<'EOF_PROXY_UNIT'
 ${proxySystemdUnit}EOF_PROXY_UNIT
+
+# Kept non-fatal: without the mount alloy refuses to start (RequiresMountsFor)
+# and the host loses observability, but the worker itself must still serve.
+{
+  for _ in $(seq 1 60); do
+    if [ -b "${ALLOY_QUEUE_DEVICE}" ]; then break; fi
+    sleep 2
+  done
+  if ! blkid "${ALLOY_QUEUE_DEVICE}" >/dev/null 2>&1; then
+    mkfs.xfs "${ALLOY_QUEUE_DEVICE}"
+  fi
+  mkdir -p ${ALLOY_STORAGE_PATH}
+  alloy_queue_uuid="$(blkid -s UUID -o value "${ALLOY_QUEUE_DEVICE}")"
+  if ! grep -q "$alloy_queue_uuid" /etc/fstab; then
+    echo "UUID=$alloy_queue_uuid ${ALLOY_STORAGE_PATH} xfs defaults,nofail 0 2" >> /etc/fstab
+  fi
+  systemctl daemon-reload
+  mountpoint -q ${ALLOY_STORAGE_PATH} || mount ${ALLOY_STORAGE_PATH}
+} || echo "alloy queue volume setup failed; alloy will not start" >&2
 
 mkdir -p /etc/fn0-alloy
 cat > /etc/fn0-alloy/config.alloy <<'EOF_ALLOY_CFG'
