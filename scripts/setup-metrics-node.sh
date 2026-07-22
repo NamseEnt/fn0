@@ -339,9 +339,11 @@ done
 curl -fsS -u "$vm_auth" "http://${VM_LISTEN_ADDR}/health" >/dev/null
 echo "local health: ok"
 
-unauth_code="$(curl -s -o /dev/null -w '%{http_code}' "http://${VM_LISTEN_ADDR}/health")"
+# /health and /ping are liveness probes that carry no data and stay exempt
+# from -httpAuth.*, so the auth check has to probe a data endpoint.
+unauth_code="$(curl -s -o /dev/null -w '%{http_code}' "http://${VM_LISTEN_ADDR}/api/v1/query?query=up")"
 if [[ "$unauth_code" != "401" ]]; then
-  echo "expected 401 for unauthenticated request, got ${unauth_code}" >&2
+  echo "expected 401 for unauthenticated query, got ${unauth_code}" >&2
   exit 1
 fi
 echo "unauthenticated rejection: ok"
@@ -379,9 +381,9 @@ if [[ -z "$query_ok" ]]; then
 fi
 echo "public write -> query round trip: ok"
 
-public_unauth_code="$(curl -s -o /dev/null -w '%{http_code}' "https://${public_hostname}/health")"
+public_unauth_code="$(curl -s -o /dev/null -w '%{http_code}' "https://${public_hostname}/api/v1/query?query=up")"
 if [[ "$public_unauth_code" != "401" ]]; then
-  echo "expected 401 for unauthenticated public request, got ${public_unauth_code}" >&2
+  echo "expected 401 for unauthenticated public query, got ${public_unauth_code}" >&2
   exit 1
 fi
 echo "public unauthenticated rejection: ok"
