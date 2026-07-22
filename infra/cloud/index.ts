@@ -295,6 +295,18 @@ const metricsBackupR2 = new fn0.MetricsBackupR2(
   {},
 );
 
+// The metrics node's basic-auth credential is minted here rather than on the
+// node because every worker's Alloy has to present it, so it is a shared
+// credential either way. Keeping it in the stack also means rebuilding the
+// node (fresh machine + vmrestore) does not rotate it, so the workers stay
+// untouched.
+const metricsHostname = config.require("metricsHostname");
+const metricsBasicAuthUsernameValue = "fn0";
+const metricsBasicAuthSecret = new random.RandomBytes(
+  "fn0-metrics-basic-auth-password",
+  { length: 24 },
+);
+
 const staticAssetStorage = new fn0.StaticAssetStorage(
   "static-asset-storage",
   {
@@ -703,6 +715,13 @@ export const staticAssetPresignSecretAccessKey = pulumi.secret(
 );
 export const staticAssetCloudflareApiToken = pulumi.secret(
   staticAssetStorage.cloudflareApiToken,
+);
+export const metricsWriteUrl = `https://${metricsHostname}/api/v1/write`;
+export const metricsQueryUrl = `https://${metricsHostname}`;
+export const metricsOtlpUrl = `https://${metricsHostname}/opentelemetry`;
+export const metricsBasicAuthUsername = metricsBasicAuthUsernameValue;
+export const metricsBasicAuthPassword = pulumi.secret(
+  metricsBasicAuthSecret.base64,
 );
 export const metricsBackupR2BucketName = metricsBackupR2.bucketName;
 export const metricsBackupR2Endpoint = metricsBackupR2.endpoint;

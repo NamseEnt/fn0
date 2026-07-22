@@ -41,3 +41,4 @@ config:
   fn0Cloud:ociVaultRegion: ap-osaka-1
   fn0Cloud:grafanaSlug: fn0
   fn0Cloud:grafanaRegion: prod-ap-northeast-0
+  fn0Cloud:metricsHostname: metrics.fn0.dev
