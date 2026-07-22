@@ -286,6 +286,15 @@ const bundleStoreR2 = new fn0.BundleStoreR2(
   {},
 );
 
+const metricsBackupR2 = new fn0.MetricsBackupR2(
+  "metrics-backup-r2",
+  {
+    accountId,
+    bucketName: pulumi.interpolate`fn0-metrics-backup-${suffix}`,
+  },
+  {},
+);
+
 const staticAssetStorage = new fn0.StaticAssetStorage(
   "static-asset-storage",
   {
@@ -694,6 +703,14 @@ export const staticAssetPresignSecretAccessKey = pulumi.secret(
 );
 export const staticAssetCloudflareApiToken = pulumi.secret(
   staticAssetStorage.cloudflareApiToken,
+);
+export const metricsBackupR2BucketName = metricsBackupR2.bucketName;
+export const metricsBackupR2Endpoint = metricsBackupR2.endpoint;
+export const metricsBackupR2AccessKeyId = pulumi.secret(
+  metricsBackupR2.accessKeyId,
+);
+export const metricsBackupR2SecretAccessKey = pulumi.secret(
+  metricsBackupR2.secretAccessKey,
 );
 export const objectStorageAccountId = objectStorageStorage.accountId;
 export const objectStorageAccessKeyId = pulumi.secret(
