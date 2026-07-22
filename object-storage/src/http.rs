@@ -29,9 +29,10 @@ impl HttpBucket {
         data: Bytes,
         content_type: Option<&str>,
     ) -> Result<()> {
-        let headers = content_type
-            .map(|ct| vec![("content-type".to_string(), ct.to_string())])
-            .unwrap_or_default();
+        let mut headers = vec![("content-length".to_string(), data.len().to_string())];
+        if let Some(ct) = content_type {
+            headers.push(("content-type".to_string(), ct.to_string()));
+        }
         let response = runtime::send(Request {
             method: "PUT",
             url: self.object_url(key),
