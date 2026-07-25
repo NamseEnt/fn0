@@ -51,7 +51,7 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.2.46 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0` | 0.2.47 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
 | `fn0-cli` | 0.1.7 | Local development CLI |
 | `fn0-worker` | 0.3.52 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.5 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
