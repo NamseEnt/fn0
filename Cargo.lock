@@ -2029,7 +2029,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.51"
+version = "0.3.52"
 dependencies = [
  "aes-gcm",
  "anyhow",
