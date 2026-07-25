@@ -196,11 +196,12 @@ where
     store.epoch_deadline_trap();
     store.set_epoch_deadline(1);
     store.epoch_deadline_async_yield_and_update(1);
-    store.epoch_deadline_callback(|context| {
+    let project_id_for_timeout = project_id.to_string();
+    store.epoch_deadline_callback(move |context| {
         let state = context.data();
         let cpu_time = state.time_tracker.duration();
         if cpu_time > Duration::from_millis(1000) {
-            telemetry::cpu_timeout(cpu_time);
+            telemetry::cpu_timeout(&project_id_for_timeout, cpu_time);
             state.is_timeout.store(true, Ordering::Relaxed);
             return Ok(wasmtime::UpdateDeadline::Interrupt);
         }
@@ -266,6 +267,7 @@ pub async fn run_wasm_instance_loop(
         })?;
     telemetry::stage_duration("instantiate", instantiate_start.elapsed());
 
+    let project_id_for_cpu = project_id.clone();
     let run_result = store
         .run_concurrent(async move |accessor| -> Result<()> {
             let mut pending: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send>>> =
@@ -320,7 +322,7 @@ pub async fn run_wasm_instance_loop(
                 }
             }
 
-            telemetry::cpu_time(time_tracker.duration());
+            telemetry::cpu_time(&project_id_for_cpu, time_tracker.duration());
             Ok(())
         })
         .await;

@@ -29,7 +29,7 @@ opentelemetry = { workspace = true, features = ["logs", "metrics"] }
 opentelemetry-appender-tracing = { workspace = true }
 opentelemetry-http = { workspace = true, features = ["reqwest"] }
 opentelemetry-otlp = { workspace = true, features = ["http-proto", "reqwest-client", "metrics", "logs"] }
-opentelemetry_sdk = { workspace = true, features = ["logs", "rt-tokio"] }
+opentelemetry_sdk = { workspace = true, features = ["logs", "rt-tokio", "spec_unstable_metrics_views"] }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 rustls-pemfile = { workspace = true }

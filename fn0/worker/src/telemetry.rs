@@ -5,7 +5,9 @@ use opentelemetry_http::{HttpClient, HttpError};
 use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
-use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
+use opentelemetry_sdk::metrics::{
+    Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream,
+};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -114,6 +116,22 @@ pub fn setup(
 
     let meter_provider = SdkMeterProvider::builder()
         .with_resource(Resource::builder().with_service_name("fn0-worker").build())
+        .with_view(|instrument: &Instrument| {
+            if matches!(
+                instrument.name(),
+                "execution_time_seconds" | "cpu_time_seconds"
+            ) {
+                return Stream::builder()
+                    .with_aggregation(Aggregation::Base2ExponentialHistogram {
+                        max_size: 8,
+                        max_scale: 20,
+                        record_min_max: false,
+                    })
+                    .build()
+                    .ok();
+            }
+            None
+        })
         .with_reader(reader)
         .build();
 

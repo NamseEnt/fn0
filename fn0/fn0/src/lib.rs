@@ -247,7 +247,11 @@ impl<C: BundleCache> CodeExecutor<C> {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("unknown")
             .to_string();
-        telemetry::execution_time(&key, start.elapsed());
+        let status_code = result
+            .as_ref()
+            .map(|response| response.status().as_u16())
+            .unwrap_or(500);
+        telemetry::execution_time(project_id, &key, start.elapsed(), status_code);
         result.map(strip_fn0_headers)
     }
 
@@ -352,6 +356,10 @@ impl<C: BundleCache> CodeExecutor<C> {
             return Ok(internal_error());
         }
         // body is buffered up-front: a retry rebuilds the js request from it.
+        let metric_key = wasm_resp
+            .headers()
+            .get(EXECUTION_TIME_METRIC_KEY_HEADER)
+            .cloned();
         let wasm_body_bytes = wasm_resp.into_body().collect().await?.to_bytes();
 
         let mut attempt = 0;
@@ -383,7 +391,15 @@ impl<C: BundleCache> CodeExecutor<C> {
                 .catch_unwind()
                 .await;
             match outcome {
-                Ok(result) => return result,
+                Ok(result) => {
+                    let mut response = result?;
+                    if let Some(metric_key) = &metric_key {
+                        response
+                            .headers_mut()
+                            .insert(EXECUTION_TIME_METRIC_KEY_HEADER, metric_key.clone());
+                    }
+                    return Ok(response);
+                }
                 Err(panic) => {
                     poisoned.set(true);
                     telemetry::panicked();
