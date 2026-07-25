@@ -127,7 +127,7 @@ fn main() {
 }
 ```
 
-`generate_env` reads the project's env files — `<project>/env.yaml` and `<project>/env.local.yaml` — and writes `rs/src/env_generated.rs`. For the union of their keys it generates a zero-cost accessor each:
+`generate_env` reads the project's env files — `<project>/env.yaml` and `<project>/env.local.yaml` — and writes `rs/src/env_generated.rs`. For the union of their keys (excluding the internal `__dek` key, which is auto-managed by the vault) it generates a zero-cost accessor each:
 
 ```rust
 pub fn cookie_secret() -> &'static str { ... }  // for COOKIE_SECRET

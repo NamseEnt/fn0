@@ -24,7 +24,7 @@ This limits are for fn0 Cloud. If you run fn0 on your own, you can remove these 
   - Header: 128 KB
   - Body: Unlimited
 - Memory: 128 MB
-- CPU Time: 10 ms
+- CPU Time: 50 ms
 - Duration: 15 secs
 - Subrequests: 50 requests
   - Subrequests are external internet requests.

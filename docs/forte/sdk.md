@@ -295,13 +295,19 @@ All re-exported at the crate root and usable via `forte_sdk::`:
 
 ## Runtime Utilities
 
-Spawning async tasks (via `wit_bindgen` runtime):
+All re-exported from `wit_bindgen`:
 
 ```rust
-use forte_sdk::runtime::{spawn, block_on};
+use forte_sdk::runtime::{spawn, block_on, yield_async, yield_blocking, backpressure_inc, backpressure_dec};
 ```
 
-`block_on` is used by the `#[forte_sdk::test]` macro.
+- `spawn(future)` — spawns an async task on the current WASI task pool; used internally by `serve` to write response bodies.
+- `block_on(future)` — runs an async future to completion; used by the `#[forte_sdk::test]` macro.
+- `yield_async()` — suspends the current task, allowing other pending tasks to make progress (cooperative multitasking).
+- `yield_blocking()` — similar to `yield_async` but intended for wrapping operations that block the thread.
+- `backpressure_inc()` / `backpressure_dec()` — signal to the WASI host that the component is under backpressure (increments/decrements the backpressure counter).
+
+`block_on` is used by the `#[forte_sdk::test]` macro. Most application code only needs `spawn` to fire-and-forget a future (e.g., send a metric without awaiting the response).
 
 ## Macros
 
