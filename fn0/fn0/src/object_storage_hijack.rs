@@ -638,4 +638,3 @@ fn uri_encode_query(s: &str) -> String {
     out
 }
 
-
