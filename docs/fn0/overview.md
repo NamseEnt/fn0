@@ -61,7 +61,7 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 | `fn0-deploy` | 0.1.16 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.1.3 | Wasmtime wrapper with fn0-specific config |
 | `fn0-ski` | 0.1.7 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
-| `fn0-compiler` | 0.1.0 | Compiler utilities (internal) |
+| `fn0-compiler` | 0.1.0 | CLI tool: compiles `.wasm` → `.cwasm` (Wasmtime pre-compiled native format); used internally by the platform |
 
 ## fn0-cli Commands
 

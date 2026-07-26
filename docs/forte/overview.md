@@ -46,6 +46,8 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 | `forte-macros` | 0.5.2 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
 | `forte-json` | 0.1.1 | `forte/json` | Streaming JSON serializer used for Props serialization |
 | `forte-codegen` | 0.2.0 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
+| `forte-wit` | 0.1.0 | `forte/wit` | Embeds the WASI WIT definitions (wasi:http p3 world); provides `extract_wit()` for build scripts |
+| `forte-test-runner` | 0.1.0 | `forte/test-runner` | Binary used as the `[target.wasm32-wasip2] runner` to execute WASM test binaries |
 | `forte-rs-to-ts` | 0.1.9 | `forte/rs-to-ts` | Standalone binary: Rust → TypeScript type generator (uses private rustc APIs; downloaded automatically) |
 
 ## Project Structure
