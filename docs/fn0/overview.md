@@ -42,12 +42,10 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 ### Cluster Architecture (Internal)
 
 - **Monolith architecture** — no microservices.
-- **Public ingress (OCI)**: Cloudflare (orange proxy) → OCI L4 Network Load Balancer (always-free) → worker pool. Workers run in an OCI InstancePool with AutoScaling; the NLB is the single entry. This replaces an older DNS round-robin scheme where each worker self-registered its public IP in Cloudflare DNS.
-- On startup, each instance calls the cloud provider's Instance Discovery API (AWS or OCI).
-- Request routing uses the **Power of Two Choices** algorithm: pick two warmed instances, forward to the less loaded one.
-- If the first forward is rejected, retry once. If all retries fail or no warm instances exist, attempt a cold-start (the instance may start on itself).
-- If all instances are overloaded, return HTTP 503.
-- WASM modules are cached in memory after the first download. On subsequent requests, the module's last-modified time is checked; re-download only if updated.
+- **Public ingress (OCI)**: Cloudflare (orange proxy) → OCI L4 Network Load Balancer (always-free) → worker pool. Workers run in an OCI InstancePool with AutoScaling; the NLB is the single entry.
+- **Intra-node dispatch**: Each worker node runs a pool of N OS threads (default = CPU count). Incoming requests are dispatched to a specific thread using a hash of the `project_id` modulo N, so a given project always lands on the same thread within a node. Thread queue capacity is 256 per thread; a full queue returns HTTP 503.
+- **Blue-green deploys**: `fn0-worker-agent` polls the control DB for the target worker image, starts the new container, waits for it to pass health checks, and then drains and stops the old one — all without host-to-host coordination. `fn0-worker-proxy` (a raw TCP forwarder on port 443) transparently reroutes connections to the active container address while the swap happens, so no live TCP connections are dropped.
+- WASM modules are cached in memory after the first download. On subsequent requests, the compiled bundle version is checked against the manifest; re-download only if the version changed.
 
 ## Packages
 
@@ -93,8 +91,7 @@ The fn0 CLI (`fn0/cli`) provides tooling for projects deployed directly to fn0 w
 
 ## Supported Cloud Providers
 
-- Amazon Web Services (AWS) — EC2, ECS
-- Oracle Cloud Infrastructure (OCI)
+- Oracle Cloud Infrastructure (OCI) — instance pool, NLB, vault
 
 ## Supported CDN Providers
 
