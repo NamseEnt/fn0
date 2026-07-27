@@ -33,6 +33,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             let project_id = project_id.clone();
             let fn0_wasmtime_version = fn0_wasmtime_version.clone();
             async move {
+                let mut should_enqueue = false;
                 let existing = trx
                     .get(CompiledBundleDocGet {
                         project_id: &project_id,
@@ -77,36 +78,77 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                                     .or_insert(WorkerProjectManifest {
                                         code_version: 0,
                                         custom_domain: None,
+                                        static_cache_state:
+                                            fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE.to_string(),
+                                        pending_code_version: None,
                                     });
-                                if code_version > entry.code_version {
-                                    entry.code_version = code_version;
+                                if (code_version > entry.code_version
+                                    || (code_version == entry.code_version
+                                        && entry.pending_code_version.is_none()))
+                                    && entry.pending_code_version
+                                        .is_none_or(|pending| code_version > pending)
+                                {
+                                    if entry.code_version == 0 {
+                                        entry.code_version = code_version;
+                                    }
+                                    entry.static_cache_state =
+                                        fn0_shared_schema::STATIC_CACHE_STATE_PRE_PURGE.to_string();
+                                    entry.pending_code_version = Some(code_version);
                                     manifest.manifest_version += 1;
+                                    should_enqueue = true;
                                 }
                             }
                             None => {
                                 let mut entries = HashMap::new();
                                 entries.insert(
-                                    project_id,
+                                    project_id.clone(),
                                     WorkerProjectManifest {
                                         code_version,
                                         custom_domain: None,
+                                        static_cache_state:
+                                            fn0_shared_schema::STATIC_CACHE_STATE_PRE_PURGE.to_string(),
+                                        pending_code_version: Some(code_version),
                                     },
                                 );
                                 trx.create(WorkerManifestDoc {
                                     manifest_version: 1,
                                     project_manifests: entries,
                                 })?;
+                                should_enqueue = true;
                             }
                         }
                     }
                 }
-                trx.commit::<_, ()>(())
+                if let Some(manifest) = trx.get(WorkerManifestDocGet {}).await?
+                    && let Some(entry) = manifest.project_manifests.get(&project_id)
+                    && entry.pending_code_version == Some(code_version)
+                    && entry.static_cache_state
+                        != fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
+                {
+                    should_enqueue = true;
+                }
+                trx.commit::<_, ()>(should_enqueue)
             }
         })
         .await;
 
     match result {
-        doc_db::TrxResult::Committed(()) => Output::Ok,
+        doc_db::TrxResult::Committed(true) => {
+            if let Err(error) = crate::enqueue::static_cache_purge(
+                crate::queue_task::static_cache_purge::Input {
+                    project_id,
+                    code_version,
+                },
+            )
+            .await
+            {
+                return Output::Error {
+                    message: error.to_string(),
+                };
+            }
+            Output::Ok
+        }
+        doc_db::TrxResult::Committed(false) => Output::Ok,
         doc_db::TrxResult::Cancelled(()) => unreachable!(),
         doc_db::TrxResult::Conflict(_) => Output::Error {
             message: "conflict".to_string(),

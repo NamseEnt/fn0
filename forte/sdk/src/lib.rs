@@ -13,7 +13,7 @@ pub use chrono;
 pub use cookie::{self, Cookie, CookieBuilder, CookieJar};
 pub use form_urlencoded;
 pub use forte_json;
-pub use forte_macros::{forte_doc, test};
+pub use forte_macros::{cache_static, forte_doc, test};
 pub use futures;
 pub use hex;
 pub use serde;

@@ -6,6 +6,7 @@ const CLOUDFLARE_API_BASE: &str = "https://api.cloudflare.com/client/v4";
 pub struct CloudflareClient {
     api_token: String,
     account_id: String,
+    zone_id: Option<String>,
 }
 
 impl CloudflareClient {
@@ -15,6 +16,7 @@ impl CloudflareClient {
                 .map_err(|_| anyhow::anyhow!("FN0_CLOUDFLARE_API_TOKEN not set"))?,
             account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
+            zone_id: std::env::var("FN0_CLOUDFLARE_ZONE_ID").ok(),
         })
     }
 
@@ -197,6 +199,27 @@ impl CloudflareClient {
             }
         }
         Ok(names)
+    }
+
+    pub async fn purge_cache_tags(&self, tags: &[&str]) -> anyhow::Result<()> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            tags: &'a [&'a str],
+        }
+        let payload = serde_json::to_vec(&Body { tags })?;
+        let zone_id = self
+            .zone_id
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("FN0_CLOUDFLARE_ZONE_ID not set"))?;
+        let path = format!("/zones/{zone_id}/purge_cache");
+        let (status, body) = self.call("POST", &path, payload).await?;
+        if (200..300).contains(&status) {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "purge_cache_tags failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
     }
 }
 

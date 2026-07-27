@@ -29,6 +29,7 @@ export interface WorkerArgs {
   otlp: WorkerOtlpArgs;
   hostObservability: WorkerHostObservabilityArgs;
   bundleStorage: WorkerBundleStorageArgs;
+  staticAssets: WorkerStaticAssetsArgs;
   objectStorage: WorkerObjectStorageArgs;
   apex: WorkerApexArgs;
 }
@@ -48,6 +49,14 @@ export interface WorkerBundleStorageArgs {
 
 export interface WorkerObjectStorageArgs {
   accountId: pulumi.Input<string>;
+  accessKeyId: pulumi.Input<string>;
+  secretAccessKey: pulumi.Input<string>;
+}
+
+export interface WorkerStaticAssetsArgs {
+  accountId: pulumi.Input<string>;
+  bucketName: pulumi.Input<string>;
+  endpoint: pulumi.Input<string>;
   accessKeyId: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
 }
@@ -1135,6 +1144,13 @@ function buildWorkerEnv(
     FN0_OBJECT_STORAGE_ACCESS_KEY_ID: worker.objectStorage.accessKeyId,
     FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY: worker.objectStorage.secretAccessKey,
 
+    FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID: worker.staticAssets.accountId,
+    FN0_STATIC_ASSET_STORAGE_BUCKET: worker.staticAssets.bucketName,
+    FN0_STATIC_ASSET_STORAGE_ENDPOINT: worker.staticAssets.endpoint,
+    FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID: worker.staticAssets.accessKeyId,
+    FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY:
+      worker.staticAssets.secretAccessKey,
+
     FN0_APEX_DOMAIN: worker.apex.domain,
     FN0_APEX_PROJECT_ID: worker.apex.projectId,
 
@@ -1586,4 +1602,3 @@ function renderEnvFile(env: { [k: string]: string }): string {
 function escapeEnvValue(v: string): string {
   return v.replace(/\n/g, "\\n");
 }
-

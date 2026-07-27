@@ -9,6 +9,8 @@ pub struct Bundle {
     pub service_pre: ServicePre<ClientState<SystemClock>>,
     pub js: Option<String>,
     pub env_vars: Vec<(String, String)>,
+    pub code_version: Option<u64>,
+    pub static_cache_enabled: bool,
 }
 
 #[allow(async_fn_in_trait)]

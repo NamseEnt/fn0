@@ -11,6 +11,7 @@ mod panic_util;
 pub mod presign_gate;
 pub mod queue_hijack;
 mod self_invoke;
+pub mod static_pages;
 pub mod telemetry;
 pub mod turso_hijack;
 pub mod vault_hijack;
@@ -24,11 +25,15 @@ pub use cache::{Bundle, BundleCache, build_service_pre};
 use execute::ClientState;
 pub use execute::{build_linker, spawn_epoch_ticker};
 use futures::FutureExt;
-use http_body_util::BodyExt;
 use http_body_util::combinators::UnsyncBoxBody;
+use http_body_util::{BodyExt, Empty, Full};
+use hyper::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, HOST, SET_COOKIE};
+use hyper::{HeaderMap, Method, StatusCode};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::future::Future;
 use std::panic::AssertUnwindSafe;
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use wasmtime::Engine;
@@ -52,7 +57,23 @@ pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
 
+pub trait StaticPageStorage: Send + Sync {
+    fn read<'storage>(
+        &'storage self,
+        key: &'storage str,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Bytes>>> + Send + 'storage>>;
+    fn write<'storage>(
+        &'storage self,
+        key: &'storage str,
+        body: Bytes,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'storage>>;
+}
+
 const NEXT_HEADER: &str = "x-fn0-next";
+const CACHE_POLICY_ENDPOINT: &str = "/__fn0_cache_policy";
+const CACHE_POLICY_TARGET_PATH_HEADER: &str = "x-fn0-cache-path";
+const CACHE_POLICY_RESPONSE_HEADER: &str = "x-fn0-cache-policy";
+const CACHE_POLICY_STATIC_VALUE: &str = "static";
 const EXECUTION_TIME_METRIC_KEY_HEADER: &str = "x-fn0-execution-time-metric-key";
 const FN0_HEADER_PREFIX: &str = "x-fn0-";
 
@@ -88,6 +109,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
     pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+    pub(crate) static_page_storage: Option<Arc<dyn StaticPageStorage>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -103,6 +125,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             cross_project_invoke_hijack: None,
             vault_hijack: None,
             object_storage_hijack: None,
+            static_page_storage: None,
         }
     }
 
@@ -150,6 +173,11 @@ impl<C: BundleCache> ExecutionContext<C> {
         self
     }
 
+    pub fn with_static_page_storage(mut self, storage: Arc<dyn StaticPageStorage>) -> Self {
+        self.static_page_storage = Some(storage);
+        self
+    }
+
     pub fn bundle_cache(&self) -> &C {
         &self.bundle_cache
     }
@@ -188,6 +216,10 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn object_storage_hijack(&self) -> Option<&Arc<ObjectStorageHijack>> {
         self.object_storage_hijack.as_ref()
+    }
+
+    pub fn static_page_storage(&self) -> Option<&Arc<dyn StaticPageStorage>> {
+        self.static_page_storage.as_ref()
     }
 }
 
@@ -298,13 +330,166 @@ impl<C: BundleCache> CodeExecutor<C> {
         bundle: Arc<Bundle>,
         request: Request,
     ) -> Result<Response> {
+        if let Some(candidate) = static_page_candidate(project_id, &bundle, &request)
+            && let Some(storage) = self.ctx.static_page_storage.as_ref()
+            && self
+                .static_page_preflight(project_id, &bundle, &candidate)
+                .await
+        {
+            static_pages::record_result(
+                project_id,
+                candidate.code_version,
+                &candidate.object_path,
+                "eligible",
+            );
+            match storage.read(&candidate.object_key).await {
+                Ok(Some(body)) => {
+                    static_pages::record_result(
+                        project_id,
+                        candidate.code_version,
+                        &candidate.object_path,
+                        "hit",
+                    );
+                    return Ok(static_page_response(project_id, &candidate, body, &request));
+                }
+                Ok(None) => {
+                    static_pages::record_result(
+                        project_id,
+                        candidate.code_version,
+                        &candidate.object_path,
+                        "miss",
+                    );
+                    let sanitized_request =
+                        sanitize_static_request(request, &candidate.normalized_path);
+                    let generation_start = std::time::Instant::now();
+                    let (response, used_js) = self
+                        .run_with_next_inner(project_id, bundle, sanitized_request)
+                        .await?;
+                    let result = self
+                        .finish_static_response(project_id, &candidate, response, used_js)
+                        .await;
+                    static_pages::record_generation_duration(
+                        project_id,
+                        candidate.code_version,
+                        &candidate.object_path,
+                        generation_start.elapsed(),
+                    );
+                    return result;
+                }
+                Err(error) => {
+                    static_pages::record_result(
+                        project_id,
+                        candidate.code_version,
+                        &candidate.object_path,
+                        "read_error",
+                    );
+                    tracing::warn!(
+                        %error,
+                        project_id,
+                        code_version = candidate.code_version,
+                        path_identifier = %candidate.object_path,
+                        "static page read failed; falling back to normal SSR"
+                    );
+                }
+            }
+        }
+
+        let (response, used_js) = self
+            .run_with_next_inner(project_id, bundle, request)
+            .await?;
+        if used_js {
+            return Ok(dynamic_ssr_response(response));
+        }
+        Ok(response)
+    }
+
+    async fn static_page_preflight(
+        &self,
+        project_id: &str,
+        bundle: &Arc<Bundle>,
+        candidate: &StaticPageCandidate,
+    ) -> bool {
+        let request = hyper::Request::builder()
+            .method(Method::POST)
+            .uri(CACHE_POLICY_ENDPOINT)
+            .header(CACHE_POLICY_TARGET_PATH_HEADER, &candidate.normalized_path)
+            .body(
+                Empty::<Bytes>::new()
+                    .map_err(|error: std::convert::Infallible| anyhow!(error))
+                    .boxed_unsync(),
+            );
+        let request = match request {
+            Ok(request) => request,
+            Err(error) => {
+                static_pages::record_result(
+                    project_id,
+                    candidate.code_version,
+                    &candidate.object_path,
+                    "preflight_error",
+                );
+                tracing::warn!(
+                    %error,
+                    project_id,
+                    code_version = candidate.code_version,
+                    path_identifier = %candidate.object_path,
+                    "failed to build static page preflight request"
+                );
+                return false;
+            }
+        };
+
+        match self.run_wasm(project_id, bundle, request).await {
+            Ok(response)
+                if response.status() == StatusCode::NO_CONTENT
+                    && response
+                        .headers()
+                        .get(CACHE_POLICY_RESPONSE_HEADER)
+                        .and_then(|value| value.to_str().ok())
+                        == Some(CACHE_POLICY_STATIC_VALUE) =>
+            {
+                true
+            }
+            Ok(_) => {
+                static_pages::record_result(
+                    project_id,
+                    candidate.code_version,
+                    &candidate.object_path,
+                    "preflight_miss",
+                );
+                false
+            }
+            Err(error) => {
+                static_pages::record_result(
+                    project_id,
+                    candidate.code_version,
+                    &candidate.object_path,
+                    "preflight_error",
+                );
+                tracing::warn!(
+                    %error,
+                    project_id,
+                    code_version = candidate.code_version,
+                    path_identifier = %candidate.object_path,
+                    "static page preflight failed; falling back to normal SSR"
+                );
+                false
+            }
+        }
+    }
+
+    async fn run_with_next_inner(
+        &self,
+        project_id: &str,
+        bundle: Arc<Bundle>,
+        request: Request,
+    ) -> Result<(Response, bool)> {
         let external_headers = request.headers().clone();
         let uri = request.uri().clone();
 
         let wasm_resp = self.run_wasm(project_id, &bundle, request).await?;
 
         if wasm_resp.status() != hyper::StatusCode::OK {
-            return Ok(wasm_resp);
+            return Ok((wasm_resp, false));
         }
 
         let next = wasm_resp
@@ -314,16 +499,91 @@ impl<C: BundleCache> CodeExecutor<C> {
             .map(|s| s.to_string());
 
         match next.as_deref() {
-            None | Some("") => Ok(wasm_resp),
-            Some("js") => {
+            None | Some("") => Ok((wasm_resp, false)),
+            Some("js") => Ok((
                 self.delegate_to_js(project_id, &bundle, &external_headers, uri, wasm_resp)
-                    .await
-            }
+                    .await?,
+                true,
+            )),
             Some(other) => {
                 tracing::error!(runtime = other, project_id, "unknown x-fn0-next runtime");
-                Ok(internal_error())
+                Ok((internal_error(), false))
             }
         }
+    }
+
+    async fn finish_static_response(
+        &self,
+        project_id: &str,
+        candidate: &StaticPageCandidate,
+        response: Response,
+        used_js: bool,
+    ) -> Result<Response> {
+        let (mut parts, body) = response.into_parts();
+        let body = body.collect().await?.to_bytes();
+        let content_type = parts
+            .headers
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default();
+        let safe = used_js
+            && parts.status == StatusCode::OK
+            && content_type.to_ascii_lowercase().starts_with("text/html")
+            && !parts.headers.contains_key(SET_COOKIE);
+
+        if safe {
+            if let Some(storage) = self.ctx.static_page_storage.as_ref() {
+                match storage.write(&candidate.object_key, body.clone()).await {
+                    Ok(()) => {
+                        static_pages::record_result(
+                            project_id,
+                            candidate.code_version,
+                            &candidate.object_path,
+                            "generated",
+                        );
+                        static_pages::record_result(
+                            project_id,
+                            candidate.code_version,
+                            &candidate.object_path,
+                            "cdn_cacheable",
+                        );
+                        return Ok(static_page_response_from_parts(
+                            project_id, candidate, parts, body,
+                        ));
+                    }
+                    Err(error) => {
+                        static_pages::record_result(
+                            project_id,
+                            candidate.code_version,
+                            &candidate.object_path,
+                            "write_error",
+                        );
+                        tracing::warn!(
+                            %error,
+                            project_id,
+                            code_version = candidate.code_version,
+                            path_identifier = %candidate.object_path,
+                            "static page write failed; returning private response"
+                        );
+                    }
+                }
+            }
+        } else {
+            static_pages::record_result(
+                project_id,
+                candidate.code_version,
+                &candidate.object_path,
+                "unsafe_response",
+            );
+        }
+
+        parts.headers.remove("cloudflare-cdn-cache-control");
+        parts.headers.remove("cache-tag");
+        parts.headers.insert(
+            CACHE_CONTROL,
+            hyper::header::HeaderValue::from_static("private, no-store"),
+        );
+        Ok(build_response(parts, body))
     }
 
     #[tracing::instrument(skip_all, fields(project_id = %project_id))]
@@ -360,6 +620,12 @@ impl<C: BundleCache> CodeExecutor<C> {
             .headers()
             .get(EXECUTION_TIME_METRIC_KEY_HEADER)
             .cloned();
+        let wasm_set_cookies: Vec<_> = wasm_resp
+            .headers()
+            .get_all(hyper::header::SET_COOKIE)
+            .iter()
+            .cloned()
+            .collect();
         let wasm_body_bytes = wasm_resp.into_body().collect().await?.to_bytes();
 
         let mut attempt = 0;
@@ -397,6 +663,11 @@ impl<C: BundleCache> CodeExecutor<C> {
                         response
                             .headers_mut()
                             .insert(EXECUTION_TIME_METRIC_KEY_HEADER, metric_key.clone());
+                    }
+                    for cookie in &wasm_set_cookies {
+                        response
+                            .headers_mut()
+                            .append(hyper::header::SET_COOKIE, cookie.clone());
                     }
                     return Ok(response);
                 }
@@ -556,6 +827,161 @@ impl<C: BundleCache> CodeExecutor<C> {
 
         tx
     }
+}
+
+struct StaticPageCandidate {
+    code_version: u64,
+    normalized_path: String,
+    object_path: String,
+    object_key: String,
+    method: Method,
+}
+
+fn static_page_candidate(
+    project_id: &str,
+    bundle: &Bundle,
+    request: &Request,
+) -> Option<StaticPageCandidate> {
+    if !bundle.static_cache_enabled
+        || (request.method() != Method::GET && request.method() != Method::HEAD)
+        || request.uri().query().is_some()
+    {
+        return None;
+    }
+    let code_version = bundle.code_version?;
+    let normalized_path = static_pages::normalize_path(request.uri().path()).ok()?;
+    let object_path = static_pages::object_path_for(&normalized_path);
+    Some(StaticPageCandidate {
+        code_version,
+        normalized_path,
+        object_path: object_path.clone(),
+        object_key: format!("{project_id}/{code_version}/{object_path}"),
+        method: request.method().clone(),
+    })
+}
+
+fn sanitize_static_request(request: Request, normalized_path: &str) -> Request {
+    let (mut parts, _) = request.into_parts();
+    let mut headers = HeaderMap::new();
+    if let Some(host) = parts.headers.get(HOST).cloned() {
+        headers.insert(HOST, host);
+    }
+    parts.headers = headers;
+    parts.extensions.clear();
+    parts.uri = normalized_path
+        .parse()
+        .expect("normalized static page path must be a valid URI");
+    Request::from_parts(
+        parts,
+        Empty::<Bytes>::new()
+            .map_err(|error: std::convert::Infallible| anyhow!(error))
+            .boxed_unsync(),
+    )
+}
+
+fn static_page_response(
+    project_id: &str,
+    candidate: &StaticPageCandidate,
+    body: Bytes,
+    request: &Request,
+) -> Response {
+    let (body, content_length) = if request.method() == Method::HEAD {
+        (Bytes::new(), body.len())
+    } else {
+        let content_length = body.len();
+        (body, content_length)
+    };
+    let response = hyper::Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "text/html; charset=utf-8")
+        .header(CONTENT_LENGTH, content_length)
+        .header(CACHE_CONTROL, "no-cache")
+        .header(
+            "cloudflare-cdn-cache-control",
+            format!("public, max-age={}", static_page_edge_ttl()),
+        )
+        .header("cache-tag", format!("fn0-project-{project_id}"))
+        .body(
+            Full::new(body)
+                .map_err(|error: std::convert::Infallible| anyhow!(error))
+                .boxed_unsync(),
+        )
+        .unwrap();
+    tracing::debug!(
+        project_id,
+        code_version = candidate.code_version,
+        path_identifier = %candidate.object_path,
+        "served static page"
+    );
+    response
+}
+
+fn static_page_response_from_parts(
+    project_id: &str,
+    candidate: &StaticPageCandidate,
+    mut parts: hyper::http::response::Parts,
+    body: Bytes,
+) -> Response {
+    parts.headers.remove("cloudflare-cdn-cache-control");
+    parts.headers.remove("cache-tag");
+    parts.headers.insert(
+        CONTENT_TYPE,
+        hyper::header::HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    parts.headers.insert(
+        CACHE_CONTROL,
+        hyper::header::HeaderValue::from_static("no-cache"),
+    );
+    parts.headers.insert(
+        "cloudflare-cdn-cache-control",
+        hyper::header::HeaderValue::from_str(&format!(
+            "public, max-age={}",
+            static_page_edge_ttl()
+        ))
+        .unwrap(),
+    );
+    parts.headers.insert(
+        "cache-tag",
+        hyper::header::HeaderValue::from_str(&format!("fn0-project-{project_id}")).unwrap(),
+    );
+    parts.headers.insert(
+        CONTENT_LENGTH,
+        hyper::header::HeaderValue::from_str(&body.len().to_string()).unwrap(),
+    );
+    let response_body = if candidate.method == Method::HEAD {
+        Bytes::new()
+    } else {
+        body
+    };
+    build_response(parts, response_body)
+}
+
+fn build_response(parts: hyper::http::response::Parts, body: Bytes) -> Response {
+    Response::from_parts(
+        parts,
+        Full::new(body)
+            .map_err(|error: std::convert::Infallible| anyhow!(error))
+            .boxed_unsync(),
+    )
+}
+
+fn dynamic_ssr_response(mut response: Response) -> Response {
+    response
+        .headers_mut()
+        .remove("cloudflare-cdn-cache-control");
+    response.headers_mut().remove("cache-tag");
+    response.headers_mut().insert(
+        CACHE_CONTROL,
+        hyper::header::HeaderValue::from_static("private, no-store"),
+    );
+    response
+}
+
+fn static_page_edge_ttl() -> u64 {
+    std::env::var("FN0_STATIC_PAGE_EDGE_TTL_SECONDS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(3600)
 }
 
 fn strip_fn0_headers(mut resp: Response) -> Response {

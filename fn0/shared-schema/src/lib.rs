@@ -8,6 +8,18 @@ pub use doc_db::DbRequest;
 pub struct WorkerProjectManifest {
     pub code_version: u64,
     pub custom_domain: Option<String>,
+    #[serde(default = "default_static_cache_state")]
+    pub static_cache_state: String,
+    #[serde(default)]
+    pub pending_code_version: Option<u64>,
+}
+
+pub const STATIC_CACHE_STATE_ACTIVE: &str = "active";
+pub const STATIC_CACHE_STATE_PRE_PURGE: &str = "pre_purge";
+pub const STATIC_CACHE_STATE_ACTIVATING: &str = "activating";
+
+fn default_static_cache_state() -> String {
+    STATIC_CACHE_STATE_ACTIVE.to_string()
 }
 
 #[forte_doc]

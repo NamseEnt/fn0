@@ -176,7 +176,7 @@ seed_worker_manifest() {
     --argjson cv "$code_version" \
     --arg dom "$custom_domain" \
     --argjson floor "$code_version" '
-      .project_manifests[$pid] = {code_version:$cv, custom_domain:(if $dom == "" then null else $dom end)}
+      .project_manifests[$pid] = {code_version:$cv, custom_domain:(if $dom == "" then null else $dom end), static_cache_state:"active", pending_code_version:null}
       | .manifest_version = ([(.manifest_version // 0) + 1, $floor] | max)
     ' <<<"$existing_data")"
 

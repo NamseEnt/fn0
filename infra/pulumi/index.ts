@@ -9,6 +9,7 @@ export { BundleStoreR2 } from "./BundleStoreR2";
 export { MetricsBackupR2 } from "./MetricsBackupR2";
 export { BundleStoreR2Worker } from "./BundleStoreR2Worker";
 export { StaticAssetStorage } from "./StaticAssetStorage";
+export { StaticPageStorage } from "./StaticPageStorage";
 export { ObjectStorageStorage } from "./ObjectStorageStorage";
 export * as dns from "./dns";
 export { Suffix } from "./Suffix";

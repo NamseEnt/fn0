@@ -67,6 +67,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                             WorkerProjectManifest {
                                 code_version: 0,
                                 custom_domain: Some(domain.clone()),
+                                static_cache_state:
+                                    fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE.to_string(),
+                                pending_code_version: None,
                             },
                         );
                         trx.create(WorkerManifestDoc {
@@ -94,6 +97,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     .or_insert(WorkerProjectManifest {
                         code_version: 0,
                         custom_domain: None,
+                        static_cache_state:
+                            fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE.to_string(),
+                        pending_code_version: None,
                     });
                 if let Some(current) = entry.custom_domain.clone()
                     && current != domain

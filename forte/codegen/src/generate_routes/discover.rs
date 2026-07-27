@@ -575,6 +575,7 @@ fn discover_endpoints_recursive(
 
             let search_params = parse_search_params(&content);
             let path_params = parse_path_params(&content);
+            let cache_static = has_cache_static_attribute(&content);
 
             pages.push(PageInfo {
                 module_name,
@@ -585,7 +586,28 @@ fn discover_endpoints_recursive(
                 search_params,
                 is_redirect_only,
                 is_api,
+                cache_static,
             });
         }
     }
+}
+
+fn has_cache_static_attribute(content: &str) -> bool {
+    let Ok(syntax_tree) = syn::parse_file(content) else {
+        return false;
+    };
+
+    syntax_tree.items.iter().any(|item| {
+        let syn::Item::Fn(function) = item else {
+            return false;
+        };
+        function.sig.ident == "handler"
+            && function.attrs.iter().any(|attribute| {
+                attribute
+                    .path()
+                    .segments
+                    .last()
+                    .is_some_and(|segment| segment.ident == "cache_static")
+            })
+    })
 }

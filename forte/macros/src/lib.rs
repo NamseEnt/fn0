@@ -68,6 +68,12 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
+#[proc_macro_attribute]
+pub fn cache_static(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as syn::ItemFn);
+    quote!(#input).into()
+}
+
 fn format_placeholder(ty: &syn::Type) -> String {
     if let syn::Type::Path(type_path) = ty
         && let Some(segment) = type_path.path.segments.last()

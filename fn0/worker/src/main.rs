@@ -4,6 +4,7 @@ mod env_yaml;
 mod manifest_poller;
 mod presign_sync;
 mod queue_consumer;
+mod static_pages;
 mod telemetry;
 mod vault_client;
 mod worker_pool;
@@ -236,6 +237,8 @@ async fn run() -> Result<()> {
         vault_client.clone(),
         cache_size_bytes,
     );
+    let static_page_store = static_pages::StaticPageStore::from_env()
+        .map_err(|error| color_eyre::eyre::eyre!("static page store init: {error}"))?;
 
     let direct_hijack = build_cross_project_invoke_hijack();
     let presign_gate = Arc::new(PresignGate::new());
@@ -249,7 +252,8 @@ async fn run() -> Result<()> {
             .with_cross_project_invoke_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
             .with_otlp_hijack(build_otlp_hijack(metric_gate.clone()))
-            .with_object_storage_hijack(build_object_storage_hijack(presign_gate.clone())),
+            .with_object_storage_hijack(build_object_storage_hijack(presign_gate.clone()))
+            .with_static_page_storage(Arc::new(static_page_store.clone())),
     );
 
     // Recorded on the worker's own meter rather than stamped into guest

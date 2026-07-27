@@ -1,6 +1,7 @@
 use crate::common::auth;
 use crate::docs::*;
 use forte_sdk::*;
+use fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -75,8 +76,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             .as_ref()
             .map(|p| snapshot.compiled_versions.contains(p))
             .unwrap_or(false);
+        let static_cache_active = snapshot.active_code_version == Some(req.body.code_version)
+            && snapshot.static_cache_state.as_deref() == Some(STATIC_CACHE_STATE_ACTIVE);
 
-        if active_compiled {
+        if active_compiled && static_cache_active {
             return Output::Done {
                 active_version,
                 pending_version: snapshot.pending,
@@ -102,6 +105,8 @@ struct Snapshot {
     active: Option<String>,
     pending: Option<String>,
     compiled_versions: Vec<String>,
+    active_code_version: Option<u64>,
+    static_cache_state: Option<String>,
 }
 
 async fn load_state(
@@ -109,12 +114,13 @@ async fn load_state(
     project_id: &str,
     code_version: u64,
 ) -> anyhow::Result<Snapshot> {
-    let (compiled_doc, version_doc) = (
+    let (compiled_doc, version_doc, manifest_doc) = (
         CompiledBundleDocGet {
             project_id,
             code_version,
         },
         Fn0WasmtimeVersionDocGet {},
+        WorkerManifestDocGet {},
     )
         .send_with(db)
         .await?;
@@ -127,10 +133,16 @@ async fn load_state(
         Some(v) => (Some(v.active), v.pending),
         None => (None, None),
     };
+    let (active_code_version, static_cache_state) = manifest_doc
+        .and_then(|manifest| manifest.project_manifests.get(project_id).cloned())
+        .map(|entry| (Some(entry.code_version), Some(entry.static_cache_state)))
+        .unwrap_or((None, None));
 
     Ok(Snapshot {
         active,
         pending,
         compiled_versions,
+        active_code_version,
+        static_cache_state,
     })
 }

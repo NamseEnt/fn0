@@ -28,10 +28,16 @@ struct LruEntry {
 }
 
 struct Inner {
-    registry: HashMap<String, u64>,
+    registry: HashMap<String, ProjectRuntimeState>,
     domain_to_project_id: HashMap<String, String>,
     lru: VecDeque<LruEntry>,
     current_bytes: usize,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct ProjectRuntimeState {
+    code_version: u64,
+    static_cache_enabled: bool,
 }
 
 #[derive(Clone)]
@@ -70,10 +76,14 @@ impl S3BundleCache {
     }
 
     #[tracing::instrument(skip_all, fields(project_id = %project_id, code_version))]
-    pub async fn register(&self, project_id: &str, code_version: u64) {
+    pub async fn register(&self, project_id: &str, code_version: u64, static_cache_enabled: bool) {
         let mut inner = self.inner.lock().await;
-        let prev = inner.registry.insert(project_id.to_string(), code_version);
-        if prev != Some(code_version)
+        let next = ProjectRuntimeState {
+            code_version,
+            static_cache_enabled,
+        };
+        let prev = inner.registry.insert(project_id.to_string(), next);
+        if prev != Some(next)
             && let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id)
         {
             let removed = inner.lru.remove(pos).unwrap();
@@ -107,13 +117,23 @@ impl S3BundleCache {
         inner.domain_to_project_id.get(domain).cloned()
     }
 
+    pub async fn code_version(&self, project_id: &str) -> Option<u64> {
+        self.inner
+            .lock()
+            .await
+            .registry
+            .get(project_id)
+            .map(|state| state.code_version)
+    }
+
     #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     async fn get_impl(&self, project_id: &str) -> Result<Arc<Bundle>, Error> {
-        let code_version = {
+        let (code_version, static_cache_enabled) = {
             let mut inner = self.inner.lock().await;
-            let Some(&code_version) = inner.registry.get(project_id) else {
+            let Some(&state) = inner.registry.get(project_id) else {
                 return Err(Error::NotFound);
             };
+            let code_version = state.code_version;
             if let Some(pos) = inner
                 .lru
                 .iter()
@@ -124,10 +144,12 @@ impl S3BundleCache {
                 inner.lru.push_front(entry);
                 return Ok(bundle);
             }
-            code_version
+            (code_version, state.static_cache_enabled)
         };
 
-        let (bundle, size) = self.fetch_and_build(project_id, code_version).await?;
+        let (bundle, size) = self
+            .fetch_and_build(project_id, code_version, static_cache_enabled)
+            .await?;
 
         let mut inner = self.inner.lock().await;
         if let Some(pos) = inner.lru.iter().position(|e| e.project_id == project_id) {
@@ -158,6 +180,7 @@ impl S3BundleCache {
         &self,
         project_id: &str,
         code_version: u64,
+        static_cache_enabled: bool,
     ) -> Result<(Arc<Bundle>, usize), Error> {
         let key = format!(
             "compiled/{fn0_wasmtime_version}/{project_id}/{code_version}.tar.zst",
@@ -251,6 +274,8 @@ impl S3BundleCache {
                 service_pre,
                 js,
                 env_vars,
+                code_version: Some(code_version),
+                static_cache_enabled,
             }),
             size,
         ))

@@ -34,6 +34,7 @@ pub(super) fn generate_code(
     let queue_task_execute_handler = generate_queue_task_execute_handler(queue_tasks);
     let admin_task_handler = generate_admin_task_handler(admin_tasks);
     let classify_route_fn = generate_classify_route(pages);
+    let cache_policy_handler = generate_cache_policy_handler(pages);
 
     let static_file_chain = {
         let matches: Vec<TokenStream> = static_files
@@ -157,11 +158,18 @@ pub(super) fn generate_code(
 
         #classify_route_fn
 
+        #cache_policy_handler
+
         async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
             let (parts, body_bytes) = request.into_parts();
             let headers = parts.headers;
             let path = parts.uri.path().to_string();
             let method = parts.method;
+
+            if path == "/__fn0_cache_policy" {
+                return handle_cache_policy(&method, &headers);
+            }
+
             let mut cookie_jar = make_cookie_jar(&headers);
 
             let Some(uri_authority) = parts.uri.authority() else {
@@ -1109,12 +1117,93 @@ fn generate_classify_route(pages: &[PageInfo]) -> TokenStream {
             if path == "/__fn0_queue_task/execute" {
                 return "/__fn0_queue_task/execute".to_string();
             }
+            if path == "/__fn0_cache_policy" {
+                return "/__fn0_cache_policy".to_string();
+            }
             if path.strip_prefix("/__self_invoke/").is_some() {
                 return "/__self_invoke/[name]".to_string();
             }
             #path_segments_decl
             #(#arms)*
             "unknown".to_string()
+        }
+    }
+}
+
+fn generate_cache_policy_handler(pages: &[PageInfo]) -> TokenStream {
+    let static_pages: Vec<&PageInfo> = pages.iter().filter(|page| page.cache_static).collect();
+    for page in &static_pages {
+        if has_dynamic_segments(&page.route_segments) {
+            panic!(
+                "cache_static cannot be used on dynamic route {}",
+                page.route_path
+            );
+        }
+        if page.is_api {
+            panic!(
+                "cache_static cannot be used on API route {}",
+                page.route_path
+            );
+        }
+        if page.is_redirect_only {
+            panic!(
+                "cache_static cannot be used on redirect route {}",
+                page.route_path
+            );
+        }
+    }
+
+    let path_checks: Vec<TokenStream> = static_pages
+        .iter()
+        .map(|page| {
+            let route_path = &page.route_path;
+            quote! { target_path == #route_path }
+        })
+        .collect();
+    let static_policy = if path_checks.is_empty() {
+        quote! {}
+    } else {
+        let is_static_path = quote! { #(#path_checks)||* };
+        quote! {
+            let Some(target_path) = headers
+                .get("x-fn0-cache-path")
+                .and_then(|value| value.to_str().ok())
+            else {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::empty())
+                    .unwrap());
+            };
+
+            if #is_static_path {
+                return Ok(Response::builder()
+                    .status(StatusCode::NO_CONTENT)
+                    .header("x-fn0-cache-policy", "static")
+                    .body(Body::empty())
+                    .unwrap());
+            }
+        }
+    };
+
+    quote! {
+        fn handle_cache_policy(
+            method: &forte_sdk::http::Method,
+            headers: &HeaderMap,
+        ) -> Result<Response<Body>> {
+            if method != forte_sdk::http::Method::POST {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::empty())
+                    .unwrap());
+            }
+
+            let _ = headers;
+            #static_policy
+
+            Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::empty())
+                .unwrap())
         }
     }
 }

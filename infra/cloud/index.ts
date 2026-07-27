@@ -36,6 +36,26 @@ new cloudflare.ZoneSetting("ssl-mode", {
   value: "strict",
 });
 
+new cloudflare.Ruleset("native-static-page-cache", {
+  zoneId,
+  name: "native-static-page-cache",
+  kind: "zone",
+  phase: "http_request_cache_settings",
+  rules: [
+    {
+      action: "set_cache_settings",
+      actionParameters: {
+        cache: true,
+        edgeTtl: {
+          mode: "bypass_by_default",
+        },
+      },
+      expression:
+        'http.request.method in {"GET" "HEAD"} and not starts_with(http.request.uri.path, "/__fn0_queue_task/")',
+    },
+  ],
+});
+
 const forteDb = new fn0.ForteDb(
   "forte-db",
   {
@@ -319,6 +339,15 @@ const staticAssetStorage = new fn0.StaticAssetStorage(
   {},
 );
 
+const staticPageStorage = new fn0.StaticPageStorage(
+  "static-page-storage",
+  {
+    accountId,
+    bucketName: pulumi.interpolate`fn0-static-page-${suffix}`,
+  },
+  {},
+);
+
 const objectStorageStorage = new fn0.ObjectStorageStorage(
   "object-storage-storage",
   {
@@ -503,6 +532,7 @@ const controlEnvYamlBootstrap = pulumi
         "FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY:",
         `  secret: ${sasSecretCt}`,
         `FN0_STATIC_ASSET_STORAGE_BUCKET: ${sasBucket}`,
+        `FN0_CLOUDFLARE_ZONE_ID: ${cfZoneId}`,
         "FN0_CLOUDFLARE_API_TOKEN:",
         `  secret: ${cfApiTokenCt}`,
         "FN0_TURSO_API_TOKEN:",
@@ -581,6 +611,13 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       region: "auto",
       accessKeyId: bundleStoreR2.accessKeyId,
       secretAccessKey: bundleStoreR2.secretAccessKey,
+    },
+    staticAssets: {
+      accountId: staticPageStorage.accountId,
+      bucketName: staticPageStorage.bucketName,
+      endpoint: staticPageStorage.endpoint,
+      accessKeyId: staticPageStorage.accessKeyId,
+      secretAccessKey: staticPageStorage.secretAccessKey,
     },
     objectStorage: {
       accountId: objectStorageStorage.accountId,

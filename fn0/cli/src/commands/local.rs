@@ -124,6 +124,8 @@ impl LocalCache {
             service_pre,
             js: None,
             env_vars: Vec::new(),
+            code_version: None,
+            static_cache_enabled: false,
         }))
     }
 }

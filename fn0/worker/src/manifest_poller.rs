@@ -1,6 +1,6 @@
 use crate::cache::S3BundleCache;
 use doc_db::{Database, DbRequest};
-use fn0_shared_schema::WorkerManifestDocGet;
+use fn0_shared_schema::{STATIC_CACHE_STATE_ACTIVE, WorkerManifestDocGet};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -44,7 +44,11 @@ pub async fn run(db: Database, cache: S3BundleCache, manifest_loaded: Arc<Atomic
         for (project_id, project_manifest) in &manifest.project_manifests {
             new_projects.insert(project_id.clone(), project_manifest.code_version);
             cache
-                .register(project_id, project_manifest.code_version)
+                .register(
+                    project_id,
+                    project_manifest.code_version,
+                    project_manifest.static_cache_state == STATIC_CACHE_STATE_ACTIVE,
+                )
                 .await;
             if let Some(domain) = &project_manifest.custom_domain {
                 new_domains.insert(domain.clone(), project_id.clone());

@@ -8,6 +8,7 @@ pub(super) struct PageInfo {
     pub(super) search_params: Option<Vec<SearchParamField>>,
     pub(super) is_redirect_only: bool,
     pub(super) is_api: bool,
+    pub(super) cache_static: bool,
 }
 
 #[derive(Debug, Clone)]

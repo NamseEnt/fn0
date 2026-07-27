@@ -71,6 +71,8 @@ impl SimpleCache {
             service_pre,
             js,
             env_vars,
+            code_version: None,
+            static_cache_enabled: false,
         }))
     }
 }

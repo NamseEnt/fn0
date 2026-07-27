@@ -179,6 +179,39 @@ SSR page responses always include `Cache-Control: no-store`. This prevents CDNs 
 
 API endpoints (`src/apis/`) and actions do not include `Cache-Control: no-store` — they control their own headers via the response.
 
+## Lazy Static Page Caching
+
+Mark an exact page route with `#[forte_sdk::cache_static]`. Forte codegen adds the declaration to the WASM cache-policy interface; fn0 uses that interface before creating Rust props or invoking JavaScript. The first eligible request renders the page through Rust and JavaScript, stores the HTML in a private versioned R2 bucket, and returns headers that let Cloudflare's native CDN cache the response. Later CDN hits do not reach fn0.
+
+Declare the cache policy on the route handler:
+
+```rust
+use forte_sdk::ForteRequest;
+
+#[forte_sdk::cache_static]
+pub async fn handler(_req: ForteRequest<'_>) -> anyhow::Result<Props> {
+    Ok(Props { ... })
+}
+```
+
+The annotation is optional. A route without it, or a WASM bundle without the optional fn0 cache-policy interface, remains private SSR. The cache-policy interface is part of fn0's generic WASM/HTTP contract and does not depend on Forte at runtime.
+
+The contract is a `POST /__fn0_cache_policy` request with the normalized target path in `x-fn0-cache-path`. A cacheable route returns `204 No Content` and `x-fn0-cache-policy: static`; every other result means that fn0 must continue with normal SSR.
+
+Lazy static caching has these constraints:
+
+- Paths must start with `/` and cannot contain a query string, fragment, backslash, or dot segment.
+- Every configured path must return HTTP 200 with an HTML content type.
+- Dynamic routes cannot use `cache_static`; annotate exact routes only.
+- Only exact `GET` and `HEAD` paths without query strings are eligible.
+- A response is persisted only when it is a final HTTP 200 HTML response without `Set-Cookie`.
+- Requests with query strings continue to use SSR.
+- Unannotated paths continue to use SSR.
+- R2 read or write failures return private, uncached SSR output and are recorded in telemetry.
+- Deployments purge the project cache tag before and after code-version activation. Static responses remain disabled until the purge queue completes.
+
+Only declare pages whose output is safe to share with every visitor. Request headers, authentication, cookies, and other per-user state are intentionally absent during generation.
+
 ## Error Handling
 
 If a handler returns `Err` and the error is not a `Redirect`, the error is logged to stderr and the client receives HTTP 500 "Internal Server Error". The error message does not reach the client. Use structured logging (`tracing::error!`) to capture errors with span context, since `eprintln!` output only goes to the worker's stderr.
