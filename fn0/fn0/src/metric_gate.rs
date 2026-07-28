@@ -17,10 +17,10 @@
 
 use bytes::Bytes;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
-use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue, KeyValue};
+use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value};
 use opentelemetry_proto::tonic::metrics::v1::{
-    metric, number_data_point, ExponentialHistogramDataPoint, HistogramDataPoint, Metric,
-    NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum, SummaryDataPoint,
+    ExponentialHistogramDataPoint, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics,
+    ScopeMetrics, Sum, SummaryDataPoint, metric, number_data_point,
 };
 use prost::Message;
 use std::collections::HashMap;
@@ -64,15 +64,18 @@ impl ProjectState {
             || (self.series.len() < METRIC_ACTIVE_SERIES_PER_PROJECT
                 && (self.names.contains_key(name) || self.names.len() < METRIC_NAMES_PER_PROJECT)
                 && pairs.iter().all(|(k, v)| {
-                    self.label_values
-                        .get(k)
-                        .is_none_or(|values| values.contains_key(v) || values.len() < METRIC_LABEL_VALUES_PER_KEY)
+                    self.label_values.get(k).is_none_or(|values| {
+                        values.contains_key(v) || values.len() < METRIC_LABEL_VALUES_PER_KEY
+                    })
                 }));
         if allowed {
             self.series.insert(key, now);
             self.names.insert(name.to_string(), now);
             for (k, v) in pairs {
-                self.label_values.entry(k.clone()).or_default().insert(v.clone(), now);
+                self.label_values
+                    .entry(k.clone())
+                    .or_default()
+                    .insert(v.clone(), now);
             }
         }
         allowed
@@ -146,7 +149,11 @@ fn filter_metric(state: &mut ProjectState, metric: &mut Metric, now: i64) -> (bo
     (has_data, dropped)
 }
 
-fn enforce_project(state: &mut ProjectState, request: &mut ExportMetricsServiceRequest, now: i64) -> u64 {
+fn enforce_project(
+    state: &mut ProjectState,
+    request: &mut ExportMetricsServiceRequest,
+    now: i64,
+) -> u64 {
     let mut dropped = 0;
     for resource in &mut request.resource_metrics {
         for scope in &mut resource.scope_metrics {
@@ -156,9 +163,13 @@ fn enforce_project(state: &mut ProjectState, request: &mut ExportMetricsServiceR
                 has_data
             });
         }
-        resource.scope_metrics.retain(|scope| !scope.metrics.is_empty());
+        resource
+            .scope_metrics
+            .retain(|scope| !scope.metrics.is_empty());
     }
-    request.resource_metrics.retain(|resource| !resource.scope_metrics.is_empty());
+    request
+        .resource_metrics
+        .retain(|resource| !resource.scope_metrics.is_empty());
     dropped
 }
 
@@ -199,7 +210,11 @@ fn any_value_to_key(value: &Option<AnyValue>) -> String {
 /// Appends the drop count to the project's own payload so Alloy stamps
 /// `fn0.project_id` on it from the trusted hijack header, making the
 /// throttling visible to the project owner rather than only to operators.
-pub fn inject_dropped_metric(request: &mut ExportMetricsServiceRequest, dropped: u64, now_nanos: u64) {
+pub fn inject_dropped_metric(
+    request: &mut ExportMetricsServiceRequest,
+    dropped: u64,
+    now_nanos: u64,
+) {
     let point = NumberDataPoint {
         time_unix_nano: now_nanos,
         value: Some(number_data_point::Value::AsInt(dropped as i64)),
@@ -229,7 +244,11 @@ pub fn inject_dropped_metric(request: &mut ExportMetricsServiceRequest, dropped:
 /// bytes to forward. Undecodable payloads pass through untouched rather than
 /// failing the export: the gate is a cost guard, not a validator, and the
 /// collector is entitled to reject what it cannot parse.
-pub fn enforce_request_bytes(gate: &MetricCardinalityGate, project_id: &str, bytes: Bytes) -> Bytes {
+pub fn enforce_request_bytes(
+    gate: &MetricCardinalityGate,
+    project_id: &str,
+    bytes: Bytes,
+) -> Bytes {
     let Ok(mut request) = ExportMetricsServiceRequest::decode(bytes.as_ref()) else {
         return bytes;
     };
@@ -241,7 +260,11 @@ pub fn enforce_request_bytes(gate: &MetricCardinalityGate, project_id: &str, byt
     if dropped == 0 {
         return bytes;
     }
-    tracing::warn!(project_id, dropped, "otlp metrics dropped by cardinality cap");
+    tracing::warn!(
+        project_id,
+        dropped,
+        "otlp metrics dropped by cardinality cap"
+    );
     inject_dropped_metric(
         &mut request,
         dropped,
@@ -324,7 +347,9 @@ mod tests {
                 scope_metrics: vec![ScopeMetrics {
                     metrics: vec![Metric {
                         name: name.to_string(),
-                        data: Some(metric::Data::Gauge(Gauge { data_points: points })),
+                        data: Some(metric::Data::Gauge(Gauge {
+                            data_points: points,
+                        })),
                         ..Default::default()
                     }],
                     ..Default::default()
