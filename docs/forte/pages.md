@@ -226,7 +226,7 @@ cache-tag: fn0-project-<project_id>
 
 `<edge ttl>` comes from `FN0_STATIC_PAGE_EDGE_TTL_SECONDS` on the worker and defaults to `3600`. `cache-tag` is what deploy-time purges target, so every static page of a project is invalidated together.
 
-The CDN consumes `cloudflare-cdn-cache-control` and `cache-tag` and does not forward them. It may also rewrite the browser-facing `cache-control`: on fn0 Cloud a static response reaches the client as `cache-control: max-age=14400` rather than the `no-cache` fn0 emits. Do not build on the browser-facing value — reason about freshness in terms of the deploy purge instead.
+The CDN consumes `cloudflare-cdn-cache-control` and `cache-tag` and does not forward them. `cache-control: no-cache` does reach the browser, which is what makes a deploy purge effective: the browser revalidates against the edge on every request, the edge serves the cached copy until a purge, and a purge is therefore visible to repeat visitors immediately. A CDN configured to override the browser TTL instead breaks that — purges cannot reach a browser cache, so returning visitors would keep the previous version until their local TTL expired.
 
 A dynamic SSR response carries `cache-control: private, no-store` and neither CDN header.
 
