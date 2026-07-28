@@ -39,26 +39,31 @@ pub struct PublicStorageHijack {
     access_key_id: String,
     secret_access_key: String,
     public_base_url: String,
+    control_project_id: String,
+}
+
+pub struct PublicStorageConfig {
+    pub placeholder_host: String,
+    pub account_id: String,
+    pub bucket: String,
+    pub region: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub public_base_url: String,
+    pub control_project_id: String,
 }
 
 impl PublicStorageHijack {
-    pub fn new(
-        placeholder_host: String,
-        account_id: String,
-        bucket: String,
-        region: String,
-        access_key_id: String,
-        secret_access_key: String,
-        public_base_url: String,
-    ) -> Self {
+    pub fn new(config: PublicStorageConfig) -> Self {
         Self {
-            placeholder_host,
-            endpoint_host: format!("{account_id}.r2.cloudflarestorage.com"),
-            bucket,
-            region,
-            access_key_id,
-            secret_access_key,
-            public_base_url: public_base_url.trim_end_matches('/').to_string(),
+            placeholder_host: config.placeholder_host,
+            endpoint_host: format!("{}.r2.cloudflarestorage.com", config.account_id),
+            bucket: config.bucket,
+            region: config.region,
+            access_key_id: config.access_key_id,
+            secret_access_key: config.secret_access_key,
+            public_base_url: config.public_base_url.trim_end_matches('/').to_string(),
+            control_project_id: config.control_project_id,
         }
     }
 
@@ -68,16 +73,20 @@ impl PublicStorageHijack {
         let placeholder_host = std::env::var("FN0_PUBLIC_STORAGE_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-public-storage.fn0.dev".to_string());
         let region =
-            std::env::var("FN0_STATIC_ASSET_STORAGE_REGION").unwrap_or_else(|_| "auto".to_string());
-        Ok(Self::new(
+            std::env::var("FN0_PUBLIC_STORAGE_REGION").unwrap_or_else(|_| "auto".to_string());
+        // Deliberately not the worker's `FN0_STATIC_ASSET_STORAGE_*`: those name
+        // the private `fn0-static-page-*` bucket that holds cached HTML. Public
+        // objects belong in the bucket that carries the CDN custom domain.
+        Ok(Self::new(PublicStorageConfig {
             placeholder_host,
-            var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")?,
-            var("FN0_STATIC_ASSET_STORAGE_BUCKET")?,
+            account_id: var("FN0_PUBLIC_STORAGE_ACCOUNT_ID")?,
+            bucket: var("FN0_PUBLIC_STORAGE_BUCKET")?,
             region,
-            var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")?,
-            var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")?,
-            var("FN0_STATIC_ASSET_PUBLIC_BASE_URL")?,
-        ))
+            access_key_id: var("FN0_PUBLIC_STORAGE_ACCESS_KEY_ID")?,
+            secret_access_key: var("FN0_PUBLIC_STORAGE_SECRET_ACCESS_KEY")?,
+            public_base_url: var("FN0_PUBLIC_STORAGE_CDN_ORIGIN")?,
+            control_project_id: var("FN0_CONTROL_PROJECT_ID")?,
+        }))
     }
 
     pub fn placeholder_url(&self) -> String {
@@ -87,6 +96,18 @@ impl PublicStorageHijack {
     /// The base a guest builds public URLs from, already scoped to the project.
     pub fn public_base_url_for(&self, project_id: &str) -> String {
         format!("{}/{project_id}/{KEY_PREFIX}", self.public_base_url)
+    }
+
+    /// Where a platform queue task for this write is addressed.
+    pub(crate) fn control_project_id(&self) -> &str {
+        &self.control_project_id
+    }
+
+    /// The public URL a guest request path resolves to, used to invalidate the
+    /// edge copy after a write.
+    pub(crate) fn public_url_for(&self, project_id: &str, raw_path: &str) -> String {
+        let key = raw_path.trim_start_matches('/');
+        format!("{}/{key}", self.public_base_url_for(project_id))
     }
 
     pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
@@ -204,15 +225,16 @@ mod tests {
     use http_body_util::{BodyExt, Full};
 
     fn hijack() -> PublicStorageHijack {
-        PublicStorageHijack::new(
-            "fn0-public-storage.fn0.dev".to_string(),
-            "acct".to_string(),
-            "fn0-static-asset".to_string(),
-            "auto".to_string(),
-            "key".to_string(),
-            "secret".to_string(),
-            "https://static.fn0.dev".to_string(),
-        )
+        PublicStorageHijack::new(PublicStorageConfig {
+            placeholder_host: "fn0-public-storage.fn0.dev".to_string(),
+            account_id: "acct".to_string(),
+            bucket: "fn0-static-asset".to_string(),
+            region: "auto".to_string(),
+            access_key_id: "key".to_string(),
+            secret_access_key: "secret".to_string(),
+            public_base_url: "https://static.fn0.dev".to_string(),
+            control_project_id: "fn0-control".to_string(),
+        })
     }
 
     fn request(method: hyper::Method, uri: &str) -> HijackRequest {
@@ -277,6 +299,15 @@ mod tests {
         );
         hijack().sign(&mut req, "proj1").unwrap();
         assert!(req.headers().get(CACHE_CONTROL).is_none());
+    }
+
+    #[test]
+    fn purged_url_matches_the_url_handed_to_the_app() {
+        let hijack = hijack();
+        assert_eq!(
+            hijack.public_url_for("proj1", "/clips/intro.mp4"),
+            "https://static.fn0.dev/proj1/public/clips/intro.mp4"
+        );
     }
 
     #[test]

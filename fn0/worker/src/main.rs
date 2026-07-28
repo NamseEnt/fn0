@@ -16,7 +16,7 @@ use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
     ExecutionContext, MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, PresignGate,
-    QueueHijack, TursoHijack, VaultHijack,
+    PublicStorageHijack, QueueHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -143,6 +143,10 @@ fn build_object_storage_hijack(presign_gate: Arc<PresignGate>) -> Arc<ObjectStor
     )
 }
 
+fn build_public_storage_hijack() -> Arc<PublicStorageHijack> {
+    Arc::new(PublicStorageHijack::from_env().expect("public storage hijack init failed"))
+}
+
 fn main() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     color_eyre::install()?;
@@ -253,6 +257,7 @@ async fn run() -> Result<()> {
             .with_vault_hijack(build_vault_hijack())
             .with_otlp_hijack(build_otlp_hijack(metric_gate.clone()))
             .with_object_storage_hijack(build_object_storage_hijack(presign_gate.clone()))
+            .with_public_storage_hijack(build_public_storage_hijack())
             .with_static_page_storage(Arc::new(static_page_store.clone())),
     );
 

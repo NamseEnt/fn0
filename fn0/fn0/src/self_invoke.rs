@@ -182,7 +182,13 @@ impl WasiHttpHooks for SelfInvokeHooks {
         if let Some(hijack) = self.public_storage_hijack.clone()
             && hijack.matches(request.uri())
         {
-            return public_storage_send(hijack, self.project_id.clone(), request, options);
+            return public_storage_send(
+                hijack,
+                self.queue_hijack.clone(),
+                self.project_id.clone(),
+                request,
+                options,
+            );
         }
 
         default_send(request, options)
@@ -490,23 +496,74 @@ fn object_storage_send(
 
 fn public_storage_send(
     hijack: Arc<PublicStorageHijack>,
+    queue_hijack: Option<Arc<QueueHijack>>,
     project_id: String,
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
         let mut request = request;
+        let changes_content = matches!(
+            request.method(),
+            &http::Method::PUT | &http::Method::POST | &http::Method::DELETE
+        );
+        let public_url =
+            changes_content.then(|| hijack.public_url_for(&project_id, request.uri().path()));
+
         if let Err(e) = hijack.sign(&mut request, &project_id) {
             return Err(e.into());
         }
         let send_start = std::time::Instant::now();
         let (res, send_io) = default_send_request(request, options).await?;
         telemetry::stage_duration("hijack_public_storage", send_start.elapsed());
+
+        if let Some(url) = public_url
+            && res.status().is_success()
+        {
+            enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, url).await;
+        }
+
         let res = res.map(BodyExt::boxed_unsync);
         let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(send_io);
         Ok((res, send_io))
     })
+}
+
+/// Invalidates the edge copy of a public object the app just replaced.
+///
+/// The worker holds no Cloudflare credentials by design — a zone-wide purge
+/// capability on every worker node is a wider blast radius than the control
+/// plane — so this hands the work to control, which already owns the token and
+/// is where purge batching belongs.
+///
+/// A failure here is logged rather than surfaced: the write itself succeeded,
+/// and failing the app's call would tell it to retry a `put` that already
+/// landed. The stale edge copy is the cost, bounded by the queue's own retry.
+async fn enqueue_public_object_purge(
+    queue_hijack: Option<&QueueHijack>,
+    hijack: &PublicStorageHijack,
+    url: String,
+) {
+    let Some(queue_hijack) = queue_hijack else {
+        tracing::warn!(url, "public object written with no queue to purge through");
+        return;
+    };
+    let payload = serde_json::json!({ "urls": [url] });
+    let action = queue_hijack.build_platform_enqueue(
+        hijack.control_project_id(),
+        "public_object_purge",
+        payload,
+    );
+    match action {
+        Ok(crate::queue_hijack::HijackAction::Synthesized(_)) => {}
+        Ok(crate::queue_hijack::HijackAction::Forward(request)) => {
+            if let Err(error) = default_send_request(request, None).await {
+                tracing::warn!(?error, "public object purge enqueue failed");
+            }
+        }
+        Err(error) => tracing::warn!(?error, "public object purge enqueue could not be built"),
+    }
 }
 
 struct PresignRequest {

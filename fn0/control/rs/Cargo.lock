@@ -345,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-doc-db"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "bytes",
@@ -393,7 +393,7 @@ dependencies = [
 
 [[package]]
 name = "forte-codegen"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "forte-wit",
@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "forte-macros"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -427,7 +427,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.3.6"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "bytes",

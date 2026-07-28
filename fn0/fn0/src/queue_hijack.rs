@@ -171,6 +171,46 @@ impl QueueHijack {
             .unwrap_or(0)
     }
 
+    /// Enqueues on behalf of the platform rather than a guest, for invariants
+    /// an app must not be able to skip. `project_id` is the queue task's owner,
+    /// which is the control plane rather than the calling project.
+    pub(crate) fn build_platform_enqueue(
+        &self,
+        project_id: &str,
+        task_name: &str,
+        payload: serde_json::Value,
+    ) -> Result<HijackAction, ErrorCode> {
+        let parsed = EnqueueBody {
+            task_name: task_name.to_string(),
+            payload,
+        };
+        match &self.backend {
+            Backend::Oci {
+                queue_ocid,
+                messages_host,
+                signer,
+            } => build_put_messages_request(queue_ocid, messages_host, signer, project_id, &parsed)
+                .map(HijackAction::Forward),
+            Backend::Loopback { tx } => {
+                tx.send(LoopbackMessage {
+                    project_id: project_id.to_string(),
+                    task_name: parsed.task_name,
+                    payload: parsed.payload,
+                })
+                .map_err(|_| ErrorCode::InternalError(Some("queue loopback closed".into())))?;
+                let resp = hyper::Response::builder()
+                    .status(200)
+                    .body(
+                        Full::new(Bytes::new())
+                            .map_err(|never: std::convert::Infallible| match never {})
+                            .boxed_unsync(),
+                    )
+                    .map_err(|e| ErrorCode::InternalError(Some(format!("synth resp: {e}"))))?;
+                Ok(HijackAction::Synthesized(resp))
+            }
+        }
+    }
+
     pub(crate) fn handle_enqueue(
         &self,
         project_id: &str,

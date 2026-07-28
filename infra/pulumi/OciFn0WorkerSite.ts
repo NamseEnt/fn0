@@ -30,6 +30,7 @@ export interface WorkerArgs {
   hostObservability: WorkerHostObservabilityArgs;
   bundleStorage: WorkerBundleStorageArgs;
   staticAssets: WorkerStaticAssetsArgs;
+  publicStorage: WorkerPublicStorageArgs;
   objectStorage: WorkerObjectStorageArgs;
   apex: WorkerApexArgs;
 }
@@ -51,6 +52,17 @@ export interface WorkerObjectStorageArgs {
   accountId: pulumi.Input<string>;
   accessKeyId: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
+}
+
+// The bucket behind the CDN custom domain, which is not the one
+// `staticAssets` names: that is the private bucket holding cached HTML.
+export interface WorkerPublicStorageArgs {
+  accountId: pulumi.Input<string>;
+  bucketName: pulumi.Input<string>;
+  accessKeyId: pulumi.Input<string>;
+  secretAccessKey: pulumi.Input<string>;
+  cdnOrigin: pulumi.Input<string>;
+  controlProjectId: pulumi.Input<string>;
 }
 
 export interface WorkerStaticAssetsArgs {
@@ -1150,6 +1162,13 @@ function buildWorkerEnv(
     FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID: worker.staticAssets.accessKeyId,
     FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY:
       worker.staticAssets.secretAccessKey,
+
+    FN0_PUBLIC_STORAGE_ACCOUNT_ID: worker.publicStorage.accountId,
+    FN0_PUBLIC_STORAGE_BUCKET: worker.publicStorage.bucketName,
+    FN0_PUBLIC_STORAGE_ACCESS_KEY_ID: worker.publicStorage.accessKeyId,
+    FN0_PUBLIC_STORAGE_SECRET_ACCESS_KEY: worker.publicStorage.secretAccessKey,
+    FN0_PUBLIC_STORAGE_CDN_ORIGIN: worker.publicStorage.cdnOrigin,
+    FN0_CONTROL_PROJECT_ID: worker.publicStorage.controlProjectId,
 
     FN0_APEX_DOMAIN: worker.apex.domain,
     FN0_APEX_PROJECT_ID: worker.apex.projectId,

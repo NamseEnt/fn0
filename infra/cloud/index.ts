@@ -629,6 +629,14 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       accessKeyId: staticPageStorage.accessKeyId,
       secretAccessKey: staticPageStorage.secretAccessKey,
     },
+    publicStorage: {
+      accountId: staticAssetStorage.accountId,
+      bucketName: staticAssetStorage.bucketName,
+      accessKeyId: staticAssetStorage.presignAccessKeyId,
+      secretAccessKey: staticAssetStorage.presignSecretAccessKey,
+      cdnOrigin: pulumi.interpolate`https://${staticAssetStorage.publicBaseDomain}`,
+      controlProjectId: "fn0-control",
+    },
     objectStorage: {
       accountId: objectStorageStorage.accountId,
       accessKeyId: objectStorageStorage.accessKeyId,

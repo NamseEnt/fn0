@@ -221,6 +221,33 @@ impl CloudflareClient {
             String::from_utf8_lossy(&body)
         );
     }
+
+    /// Purges by exact URL. Cloudflare accepts 100 per request against a far
+    /// larger budget than the tag path (800/s vs 5/min account-wide), so this is
+    /// the route for per-object invalidation.
+    ///
+    /// Requires the zone's Cache Rule to match `PURGE`; without it the API still
+    /// answers `success: true` while the edge keeps serving the old object.
+    pub async fn purge_cache_urls(&self, urls: &[String]) -> anyhow::Result<()> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            files: &'a [String],
+        }
+        let payload = serde_json::to_vec(&Body { files: urls })?;
+        let zone_id = self
+            .zone_id
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("FN0_CLOUDFLARE_ZONE_ID not set"))?;
+        let path = format!("/zones/{zone_id}/purge_cache");
+        let (status, body) = self.call("POST", &path, payload).await?;
+        if (200..300).contains(&status) {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "purge_cache_urls failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
 }
 
 #[derive(Deserialize)]
