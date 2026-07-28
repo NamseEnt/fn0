@@ -14,7 +14,7 @@ use crate::docs::*;
 use fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 #[derive(Serialize, Deserialize)]
 pub struct Input {
@@ -69,22 +69,32 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 }
 
 /// Keeps every code version at or above the active one, because a deploy
-/// uploads its assets before it activates, plus the newest version below it,
-/// because a page already loaded from that deploy is still fetching its
-/// assets. Keys that do not carry a parseable code version are left alone.
+/// uploads its assets before it activates, plus the newest versions below it,
+/// because a page already loaded from an earlier deploy is still fetching that
+/// deploy's assets. Keys that do not carry a parseable code version are left
+/// alone.
+///
+/// Two versions below active rather than one: a deploy that fails after
+/// uploading assets leaves a prefix that never activates, and with a single
+/// retained version that dead prefix would evict the version clients are
+/// actually still loading from.
+const RETAINED_VERSIONS_BELOW_ACTIVE: usize = 2;
+
 fn prunable_keys(
     objects: &[R2ListedObject],
     project_id: &str,
     active_code_version: u64,
 ) -> Vec<String> {
-    let previous_code_version = objects
+    let below_active: BTreeSet<u64> = objects
         .iter()
         .filter_map(|object| code_version_of(&object.key, project_id))
         .filter(|code_version| *code_version < active_code_version)
-        .max();
-    let retained: HashSet<u64> = [Some(active_code_version), previous_code_version]
-        .into_iter()
-        .flatten()
+        .collect();
+    let retained: HashSet<u64> = below_active
+        .iter()
+        .rev()
+        .take(RETAINED_VERSIONS_BELOW_ACTIVE)
+        .copied()
         .collect();
 
     objects
@@ -122,15 +132,32 @@ mod tests {
     }
 
     #[test]
-    fn keeps_active_and_previous_and_prunes_older() {
+    fn keeps_active_and_two_below_and_prunes_older() {
         let objects = vec![
             object("proj/100/client.js"),
             object("proj/200/client.js"),
             object("proj/300/client.js"),
-            object("proj/300/__forte/pages/AB.html"),
+            object("proj/400/client.js"),
+            object("proj/400/__forte/pages/AB.html"),
         ];
         assert_eq!(
-            prunable_keys(&objects, "proj", 300),
+            prunable_keys(&objects, "proj", 400),
+            vec!["proj/100/client.js".to_string()]
+        );
+    }
+
+    // The failed deploy leaves a prefix that never activates; it must not
+    // evict the version clients are still loading from.
+    #[test]
+    fn a_failed_deploy_below_active_does_not_evict_the_live_previous_version() {
+        let objects = vec![
+            object("proj/100/client.js"),
+            object("proj/200/client.js"),
+            object("proj/300/partial-upload.js"),
+            object("proj/400/client.js"),
+        ];
+        assert_eq!(
+            prunable_keys(&objects, "proj", 400),
             vec!["proj/100/client.js".to_string()]
         );
     }
