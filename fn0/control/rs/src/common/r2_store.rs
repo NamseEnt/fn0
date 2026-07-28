@@ -187,10 +187,9 @@ impl StaticPageStore {
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_BUCKET not set"))?,
             access_key_id: std::env::var("FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID")
                 .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID not set"))?,
-            secret_access_key: std::env::var("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY")
-                .map_err(|_| {
-                    anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY not set")
-                })?,
+            secret_access_key: std::env::var("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY").map_err(
+                |_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY not set"),
+            )?,
         })
     }
 

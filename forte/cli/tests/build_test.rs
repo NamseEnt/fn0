@@ -131,7 +131,9 @@ fn test_build_cache_static_on_dynamic_route_without_validator_fails() {
         .current_dir(&project_dir)
         .assert()
         .failure()
-        .stderr(predicate::str::contains("requires `pub async fn cache_static_eligible"));
+        .stderr(predicate::str::contains(
+            "requires `pub async fn cache_static_eligible",
+        ));
 }
 
 #[test]

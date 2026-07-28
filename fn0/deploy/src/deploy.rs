@@ -281,14 +281,12 @@ async fn upload_static_assets(
 
     let mut tasks = futures::stream::FuturesUnordered::new();
     for file in files {
-        let upload = upload_for_path
-            .remove(&file.relative_path)
-            .ok_or_else(|| {
-                anyhow!(
-                    "control did not return presigned URL for {}",
-                    file.relative_path
-                )
-            })?;
+        let upload = upload_for_path.remove(&file.relative_path).ok_or_else(|| {
+            anyhow!(
+                "control did not return presigned URL for {}",
+                file.relative_path
+            )
+        })?;
         let bytes = std::fs::read(&file.absolute_path)
             .map_err(|e| anyhow!("read {}: {}", file.absolute_path.display(), e))?;
         let client = client.clone();
