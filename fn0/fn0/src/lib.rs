@@ -333,7 +333,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         if let Some(candidate) = static_page_candidate(project_id, &bundle, &request)
             && let Some(storage) = self.ctx.static_page_storage.as_ref()
             && self
-                .static_page_preflight(project_id, &bundle, &candidate)
+                .static_page_preflight(project_id, &bundle, &candidate, &request)
                 .await
         {
             static_pages::record_result(
@@ -408,16 +408,23 @@ impl<C: BundleCache> CodeExecutor<C> {
         project_id: &str,
         bundle: &Arc<Bundle>,
         candidate: &StaticPageCandidate,
+        incoming: &Request,
     ) -> bool {
-        let request = hyper::Request::builder()
+        // The guest rebuilds its URI as `{scheme}://{authority}{path}`, taking the
+        // authority from Host when the p3 request carries none. Without Host the
+        // synthesized preflight parses as an invalid URI and the guest traps.
+        let mut builder = hyper::Request::builder()
             .method(Method::POST)
             .uri(CACHE_POLICY_ENDPOINT)
-            .header(CACHE_POLICY_TARGET_PATH_HEADER, &candidate.normalized_path)
-            .body(
-                Empty::<Bytes>::new()
-                    .map_err(|error: std::convert::Infallible| anyhow!(error))
-                    .boxed_unsync(),
-            );
+            .header(CACHE_POLICY_TARGET_PATH_HEADER, &candidate.normalized_path);
+        if let Some(host) = incoming.headers().get(HOST) {
+            builder = builder.header(HOST, host);
+        }
+        let request = builder.body(
+            Empty::<Bytes>::new()
+                .map_err(|error: std::convert::Infallible| anyhow!(error))
+                .boxed_unsync(),
+        );
         let request = match request {
             Ok(request) => request,
             Err(error) => {

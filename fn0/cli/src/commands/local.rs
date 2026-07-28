@@ -5,17 +5,22 @@ use fn0::execute::ClientState;
 use fn0::measure_cpu_time::SystemClock;
 use fn0::wasmtime::Engine;
 use fn0::wasmtime::component::Linker;
-use fn0::{CodeExecutor, ExecutionContext};
+use fn0::{CodeExecutor, ExecutionContext, StaticPageStorage};
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
+use std::collections::HashMap;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio::sync::OnceCell;
+
+const LOCAL_CODE_VERSION: u64 = 1;
 
 pub async fn execute(port: Option<u16>) -> Result<()> {
     println!("Starting local fn0 server...\n");
@@ -34,7 +39,10 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     let linker = fn0::build_linker(&engine);
 
     let cache = LocalCache::new(wasm_path, engine.clone(), linker.clone());
-    let ctx = Arc::new(ExecutionContext::new(engine, linker, cache));
+    let ctx = Arc::new(
+        ExecutionContext::new(engine, linker, cache)
+            .with_static_page_storage(Arc::new(InMemoryStaticPageStore::default())),
+    );
     let executor = Rc::new(CodeExecutor::new(ctx));
 
     let port = port.unwrap_or(3000);
@@ -124,9 +132,33 @@ impl LocalCache {
             service_pre,
             js: None,
             env_vars: Vec::new(),
-            code_version: None,
-            static_cache_enabled: false,
+            code_version: Some(LOCAL_CODE_VERSION),
+            static_cache_enabled: true,
         }))
+    }
+}
+
+#[derive(Default)]
+struct InMemoryStaticPageStore {
+    pages: Mutex<HashMap<String, Bytes>>,
+}
+
+impl StaticPageStorage for InMemoryStaticPageStore {
+    fn read<'storage>(
+        &'storage self,
+        key: &'storage str,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Bytes>>> + Send + 'storage>> {
+        let found = self.pages.lock().unwrap().get(key).cloned();
+        Box::pin(async move { Ok(found) })
+    }
+
+    fn write<'storage>(
+        &'storage self,
+        key: &'storage str,
+        body: Bytes,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'storage>> {
+        self.pages.lock().unwrap().insert(key.to_string(), body);
+        Box::pin(async move { Ok(()) })
     }
 }
 
