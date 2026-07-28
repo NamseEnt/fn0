@@ -34,6 +34,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             let fn0_wasmtime_version = fn0_wasmtime_version.clone();
             async move {
                 let mut should_enqueue = false;
+                // doc-db rejects a second read of the same key in one transaction.
+                let mut manifest = trx.get(WorkerManifestDocGet {}).await?;
                 let existing = trx
                     .get(CompiledBundleDocGet {
                         project_id: &project_id,
@@ -70,8 +72,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                         .map(|v| v.active.clone());
                     if active_fn0_wasmtime_version.as_deref() == Some(fn0_wasmtime_version.as_str())
                     {
-                        match trx.get(WorkerManifestDocGet {}).await? {
-                            Some(mut manifest) => {
+                        match &mut manifest {
+                            Some(manifest) => {
                                 let entry = manifest
                                     .project_manifests
                                     .entry(project_id.clone())
@@ -119,7 +121,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                         }
                     }
                 }
-                if let Some(manifest) = trx.get(WorkerManifestDocGet {}).await?
+                if !should_enqueue
+                    && let Some(manifest) = &manifest
                     && let Some(entry) = manifest.project_manifests.get(&project_id)
                     && entry.pending_code_version == Some(code_version)
                     && entry.static_cache_state
