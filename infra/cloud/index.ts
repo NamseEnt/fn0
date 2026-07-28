@@ -49,6 +49,12 @@ new cloudflare.Ruleset("native-static-page-cache", {
         edgeTtl: {
           mode: "bypass_by_default",
         },
+        // Cache purge cannot reach browsers, so the origin's `no-cache` must
+        // survive to the client or a deploy purge leaves repeat visitors on
+        // the previous version until their browser TTL expires.
+        browserTtl: {
+          mode: "respect_origin",
+        },
       },
       expression:
         'http.request.method in {"GET" "HEAD"} and not starts_with(http.request.uri.path, "/__fn0_queue_task/")',
