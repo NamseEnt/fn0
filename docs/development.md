@@ -127,6 +127,19 @@ Infrastructure is managed in `infra/`:
 
 Scaling configuration: `scripts/scale-config.sh`
 
+### Static page caching prerequisites
+
+[Lazy static page caching](forte/pages.md#lazy-static-page-caching) needs environment on both control and worker. Pulumi provisions both, but each has a silent-until-used failure mode worth knowing:
+
+| Component | Variables | Missing behaviour |
+|---|---|---|
+| control | `FN0_CLOUDFLARE_ZONE_ID`, `FN0_CLOUDFLARE_API_TOKEN`, `FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID` | Deploy-time cache purge fails, the project stays in `pre_purge`, and `forte deploy` never reaches `Done` |
+| worker | `FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID`, `_BUCKET`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | Worker exits at startup |
+
+`FN0_STATIC_ASSET_STORAGE_ENDPOINT` is optional and defaults to `https://<account_id>.r2.cloudflarestorage.com`.
+
+Control reads its environment from `fn0/control/env.yaml`, which `forte deploy` ships. `infra/cloud/index.ts` builds the same set for the one-time bootstrap only, so a variable added there must be added to `env.yaml` as well or redeploys will not pick it up. Worker environment is written by cloud-init from `infra/pulumi/OciFn0WorkerSite.ts` and is only re-read when an instance is recreated — see the instance roll procedure before assuming a worker deploy applied it.
+
 ## Local Database
 
 `forte dev` downloads and starts sqld automatically — no manual setup needed for Forte projects. For running `doc-db` tests directly, see [setup.md](setup.md#local-database-tursolibsql).

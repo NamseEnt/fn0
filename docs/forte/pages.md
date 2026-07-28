@@ -198,6 +198,8 @@ The annotation is optional. A route without it, or a WASM bundle without the opt
 
 The contract is a `POST /__fn0_cache_policy` request with the normalized target path in `x-fn0-cache-path`. A cacheable route returns `204 No Content` and `x-fn0-cache-policy: static`; every other result means that fn0 must continue with normal SSR.
 
+fn0 copies the incoming request's `Host` header onto the preflight request. A guest that rebuilds its request URI from scheme, authority and path must accept `Host` as the authority source, because the preflight carries no other authority.
+
 Lazy static caching has these constraints:
 
 - Paths must start with `/` and cannot contain a query string, fragment, backslash, or dot segment.
@@ -211,6 +213,30 @@ Lazy static caching has these constraints:
 - Deployments purge the project cache tag before and after code-version activation. Static responses remain disabled until the purge queue completes.
 
 Only declare pages whose output is safe to share with every visitor. Request headers, authentication, cookies, and other per-user state are intentionally absent during generation.
+
+### Response headers
+
+A static response carries:
+
+```
+cache-control: no-cache
+cloudflare-cdn-cache-control: public, max-age=<edge ttl>
+cache-tag: fn0-project-<project_id>
+```
+
+`<edge ttl>` comes from `FN0_STATIC_PAGE_EDGE_TTL_SECONDS` on the worker and defaults to `3600`. `cache-tag` is what deploy-time purges target, so every static page of a project is invalidated together.
+
+The CDN consumes `cloudflare-cdn-cache-control` and `cache-tag` and does not forward them. It may also rewrite the browser-facing `cache-control`: on fn0 Cloud a static response reaches the client as `cache-control: max-age=14400` rather than the `no-cache` fn0 emits. Do not build on the browser-facing value — reason about freshness in terms of the deploy purge instead.
+
+A dynamic SSR response carries `cache-control: private, no-store` and neither CDN header.
+
+### Storage layout
+
+Stored pages are keyed `<project_id>/<code_version>/__forte/pages/<sha256-of-normalized-path>.html` in a platform-internal R2 bucket. Because the key includes the code version, a deploy never reads a previous version's HTML, and entries from previous versions are retained rather than deleted. This bucket is separate from your project's object storage and does not consume its quota.
+
+### Local development
+
+`fn0 local` serves static pages from an in-memory store scoped to the process, so a restart starts from an empty cache and no R2 credentials are needed. Cache policy, header emission, and the miss/store/hit path behave as they do in production; deploy purges have no local equivalent.
 
 ## Error Handling
 

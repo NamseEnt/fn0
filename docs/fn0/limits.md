@@ -74,6 +74,8 @@ cached, and carry the quotas below.
 | Presigned URLs minted | 100k / month, 1k / hour | |
 | Presigned URL expiry | 5 minutes maximum | Longer requested expiries are clamped, not rejected |
 
+Pages cached by [lazy static page caching](../forte/pages.md#lazy-static-page-caching) live in a platform-internal bucket and count against none of these quotas.
+
 Treat presigned URLs as opaque, short-lived strings: mint one right before
 use, and never store one or parse its structure — the URL format may change.
 
