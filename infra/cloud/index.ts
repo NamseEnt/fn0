@@ -56,8 +56,12 @@ new cloudflare.Ruleset("native-static-page-cache", {
           mode: "respect_origin",
         },
       },
+      // `PURGE` is not client traffic: a Cache Rule that does not match during
+      // a single-file purge makes that purge silently no-op (it still returns
+      // `success: true`). Dropping it breaks by-URL invalidation with no error.
+      // https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/
       expression:
-        'http.request.method in {"GET" "HEAD"} and not starts_with(http.request.uri.path, "/__fn0_queue_task/")',
+        'http.request.method in {"GET" "HEAD" "PURGE"} and not starts_with(http.request.uri.path, "/__fn0_queue_task/")',
     },
   ],
 });
