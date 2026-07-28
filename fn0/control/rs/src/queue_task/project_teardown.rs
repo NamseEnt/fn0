@@ -12,7 +12,7 @@
 use crate::common::cloudflare::CloudflareClient;
 use crate::common::cloudflare_saas::CloudflareSaasClient;
 use crate::common::r2_store::{
-    BundleStore, ObjectStorageStore, StaticAssetStore, parse_compiled_key,
+    BundleStore, ObjectStorageStore, StaticAssetStore, StaticPageStore, parse_compiled_key,
 };
 use crate::docs::*;
 use forte_sdk::*;
@@ -34,6 +34,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     remove_routing_and_cron(&db, &project_id).await?;
     delete_bundle_store_objects(&project_id, now).await?;
     delete_static_assets(&project_id, now).await?;
+    delete_static_pages(&project_id, now).await?;
     delete_object_storage_bucket(&project_id, now).await?;
     delete_turso_database(&project_id).await?;
     delete_compiled_bundle_docs(&db, &project_id).await?;
@@ -118,6 +119,14 @@ async fn delete_bundle_store_objects(project_id: &str, now: DateTime) -> anyhow:
 
 async fn delete_static_assets(project_id: &str, now: DateTime) -> anyhow::Result<()> {
     let store = StaticAssetStore::from_env()?;
+    for object in store.list_all(&format!("{project_id}/"), now).await? {
+        store.delete(&object.key, now).await?;
+    }
+    Ok(())
+}
+
+async fn delete_static_pages(project_id: &str, now: DateTime) -> anyhow::Result<()> {
+    let store = StaticPageStore::from_env()?;
     for object in store.list_all(&format!("{project_id}/"), now).await? {
         store.delete(&object.key, now).await?;
     }

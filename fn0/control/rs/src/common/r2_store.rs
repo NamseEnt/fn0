@@ -168,6 +168,61 @@ impl StaticAssetStore {
     }
 }
 
+// Lazily generated page HTML, written by the worker. A different bucket from
+// `StaticAssetStore`: that one is public through static.fn0.dev, this one is
+// private and reachable only through fn0.
+pub struct StaticPageStore {
+    account_id: String,
+    bucket: String,
+    access_key_id: String,
+    secret_access_key: String,
+}
+
+impl StaticPageStore {
+    pub fn from_env() -> anyhow::Result<Self> {
+        Ok(Self {
+            account_id: std::env::var("FN0_STATIC_PAGE_STORAGE_ACCOUNT_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_ACCOUNT_ID not set"))?,
+            bucket: std::env::var("FN0_STATIC_PAGE_STORAGE_BUCKET")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_BUCKET not set"))?,
+            access_key_id: std::env::var("FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID")
+                .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID not set"))?,
+            secret_access_key: std::env::var("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY")
+                .map_err(|_| {
+                    anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY not set")
+                })?,
+        })
+    }
+
+    pub async fn list_all(
+        &self,
+        prefix: &str,
+        now: DateTime,
+    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
+        r2_list_all(
+            &self.account_id,
+            &self.bucket,
+            &self.access_key_id,
+            &self.secret_access_key,
+            prefix,
+            now,
+        )
+        .await
+    }
+
+    pub async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
+        r2_delete(
+            &self.account_id,
+            &self.bucket,
+            &self.access_key_id,
+            &self.secret_access_key,
+            key,
+            now,
+        )
+        .await
+    }
+}
+
 pub struct ObjectStorageStore {
     account_id: String,
     bucket: String,

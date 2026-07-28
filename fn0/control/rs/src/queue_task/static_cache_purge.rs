@@ -52,7 +52,12 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     }
 
     purge(&cloudflare, &cache_tag, &input, "post_purge").await?;
-    set_active(&db, &input).await
+    set_active(&db, &input).await?;
+
+    crate::enqueue::deploy_artifact_prune(crate::queue_task::deploy_artifact_prune::Input {
+        project_id: input.project_id,
+    })
+    .await
 }
 
 async fn purge(

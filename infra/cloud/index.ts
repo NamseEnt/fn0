@@ -444,6 +444,14 @@ const staticAssetPresignSecretAccessKeyCt = pulumi
   .all([controlDek.plaintext, staticAssetStorage.presignSecretAccessKey])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
+const staticPageAccessKeyIdCt = pulumi
+  .all([controlDek.plaintext, staticPageStorage.accessKeyId])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const staticPageSecretAccessKeyCt = pulumi
+  .all([controlDek.plaintext, staticPageStorage.secretAccessKey])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const cloudflareApiTokenCt = pulumi
   .all([controlDek.plaintext, staticAssetStorage.cloudflareApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
@@ -483,6 +491,10 @@ const controlEnvYamlBootstrap = pulumi
     staticAssetPresignAccessKeyIdCt,
     staticAssetPresignSecretAccessKeyCt,
     staticAssetStorage.bucketName,
+    staticPageStorage.accountId,
+    staticPageAccessKeyIdCt,
+    staticPageSecretAccessKeyCt,
+    staticPageStorage.bucketName,
     cloudflareApiTokenCt,
     staticAssetStorage.zoneId,
     controlTursoApiTokenCt,
@@ -512,6 +524,10 @@ const controlEnvYamlBootstrap = pulumi
       sasKeyCt,
       sasSecretCt,
       sasBucket,
+      staticPageAccountId,
+      staticPageKeyCt,
+      staticPageSecretCt,
+      staticPageBucket,
       cfApiTokenCt,
       cfZoneId,
       tursoApiTokenCt,
@@ -551,6 +567,17 @@ const controlEnvYamlBootstrap = pulumi
         "FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY:",
         `  secret: ${sasSecretCt}`,
         `FN0_STATIC_ASSET_STORAGE_BUCKET: ${sasBucket}`,
+        // A different bucket from FN0_STATIC_ASSET_STORAGE_*: that one holds
+        // deployed frontend assets and is public through static.fn0.dev, this
+        // one holds lazily generated page HTML and is private. The worker
+        // reads this bucket under the FN0_STATIC_ASSET_STORAGE_* names, so the
+        // two services do not share a naming scheme here.
+        `FN0_STATIC_PAGE_STORAGE_ACCOUNT_ID: ${staticPageAccountId}`,
+        "FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID:",
+        `  secret: ${staticPageKeyCt}`,
+        "FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY:",
+        `  secret: ${staticPageSecretCt}`,
+        `FN0_STATIC_PAGE_STORAGE_BUCKET: ${staticPageBucket}`,
         `FN0_CLOUDFLARE_ZONE_ID: ${cfZoneId}`,
         "FN0_CLOUDFLARE_API_TOKEN:",
         `  secret: ${cfApiTokenCt}`,
