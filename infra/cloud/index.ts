@@ -66,6 +66,15 @@ new cloudflare.Ruleset("native-static-page-cache", {
   ],
 });
 
+// Cache misses in any colo fill from an upper-tier colo instead of the origin,
+// so a miss costs an R2 Class B operation once per upper tier rather than once
+// per edge location. Smart Topology is available on the Free plan.
+// https://developers.cloudflare.com/cache/how-to/tiered-cache/
+new cloudflare.TieredCache("smart-tiered-cache", {
+  zoneId,
+  value: "on",
+});
+
 const forteDb = new fn0.ForteDb(
   "forte-db",
   {

@@ -13,6 +13,13 @@ use serde::{Deserialize, Serialize};
 const CODE_VERSION_FUTURE_SKEW_MILLIS: u64 = 5 * 60 * 1000;
 const CODE_VERSION_PAST_WINDOW_MILLIS: u64 = 24 * 60 * 60 * 1000;
 
+// Static asset keys are `{project_id}/{code_version}/{path}`, so a deployed
+// asset URL never changes content and needs no invalidation story. Without a
+// stored Cache-Control the CDN bypasses the object and every request bills an
+// R2 Class B operation. Signed into the presigned PUT so an upload cannot
+// store a weaker policy.
+const STATIC_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
+
 #[derive(Deserialize)]
 pub struct Input {
     pub project_id: String,
@@ -22,6 +29,12 @@ pub struct Input {
     // never fall back to an unbounded size. See #55.
     pub bundle_size: u64,
     pub files: Vec<FileEntry>,
+    // Signing Cache-Control into the static upload URLs makes the header
+    // mandatory on the PUT, which a CLI that does not send it would fail with
+    // an opaque 403. Older CLIs leave this false and keep the unsigned URLs
+    // they know how to use.
+    #[serde(default)]
+    pub supports_static_asset_cache_control: bool,
     #[serde(default)]
     pub jobs: Vec<CronJob>,
     pub cron_updated_at: DateTime,
@@ -55,6 +68,7 @@ pub enum Output {
 pub struct StaticUpload {
     pub path: String,
     pub presigned_url: String,
+    pub cache_control: String,
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
@@ -137,6 +151,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         expires_seconds: 600,
         now: forte_sdk::now(),
         content_length: Some(req.body.bundle_size),
+        cache_control: None,
     });
 
     let static_uploads = if req.body.files.is_empty() {
@@ -150,6 +165,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             }
         };
         let now_dt = forte_sdk::now();
+        let cache_control = req
+            .body
+            .supports_static_asset_cache_control
+            .then_some(STATIC_ASSET_CACHE_CONTROL);
         req.body
             .files
             .iter()
@@ -165,10 +184,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     expires_seconds: 600,
                     now: now_dt,
                     content_length: Some(f.size),
+                    cache_control,
                 });
                 StaticUpload {
                     path: f.path.clone(),
                     presigned_url: url,
+                    cache_control: cache_control.unwrap_or_default().to_string(),
                 }
             })
             .collect()

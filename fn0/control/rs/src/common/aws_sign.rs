@@ -49,6 +49,7 @@ pub struct R2PresignArgs<'a> {
     pub expires_seconds: u32,
     pub now: DateTime,
     pub content_length: Option<u64>,
+    pub cache_control: Option<&'a str>,
 }
 
 pub fn r2_presign_put(args: R2PresignArgs<'_>) -> String {
@@ -62,13 +63,23 @@ pub fn r2_presign_put(args: R2PresignArgs<'_>) -> String {
     let credential = format!("{}/{credential_scope}", args.access_key_id);
     let canonical_uri = format!("/{}", uri_encode(args.key, false));
 
-    let (signed_headers, canonical_headers) = match args.content_length {
-        Some(content_length) => (
-            "content-length;host".to_string(),
-            format!("content-length:{content_length}\nhost:{host}\n"),
-        ),
-        None => ("host".to_string(), format!("host:{host}\n")),
-    };
+    let mut headers_to_sign: Vec<(&str, String)> = vec![("host", host.clone())];
+    if let Some(content_length) = args.content_length {
+        headers_to_sign.push(("content-length", content_length.to_string()));
+    }
+    if let Some(cache_control) = args.cache_control {
+        headers_to_sign.push(("cache-control", cache_control.to_string()));
+    }
+    headers_to_sign.sort_by(|left, right| left.0.cmp(right.0));
+    let signed_headers = headers_to_sign
+        .iter()
+        .map(|(name, _)| *name)
+        .collect::<Vec<_>>()
+        .join(";");
+    let canonical_headers = headers_to_sign
+        .iter()
+        .map(|(name, value)| format!("{name}:{value}\n"))
+        .collect::<String>();
 
     let mut query: Vec<(String, String)> = vec![
         ("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()),

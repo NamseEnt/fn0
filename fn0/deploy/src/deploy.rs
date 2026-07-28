@@ -9,6 +9,7 @@ struct DeployInput<'a> {
     code_version: u64,
     bundle_size: u64,
     files: Vec<DeployFile>,
+    supports_static_asset_cache_control: bool,
     jobs: &'a [CronJob],
     cron_updated_at: &'a str,
 }
@@ -49,6 +50,11 @@ enum Deploy {
 struct StaticUpload {
     path: String,
     presigned_url: String,
+    // Signed into the presigned PUT by control, so it must be sent back
+    // verbatim: any other value fails the signature with 403. Empty when
+    // control did not sign one.
+    #[serde(default)]
+    cache_control: String,
 }
 
 #[derive(Serialize)]
@@ -207,6 +213,7 @@ async fn request_deploy(
             code_version,
             bundle_size,
             files,
+            supports_static_asset_cache_control: true,
             jobs,
             cron_updated_at,
         })
@@ -267,28 +274,34 @@ async fn upload_static_assets(
     use futures::StreamExt;
     use std::collections::HashMap;
 
-    let mut url_for_path: HashMap<String, String> = HashMap::new();
+    let mut upload_for_path: HashMap<String, StaticUpload> = HashMap::new();
     for u in uploads {
-        url_for_path.insert(u.path, u.presigned_url);
+        upload_for_path.insert(u.path.clone(), u);
     }
 
     let mut tasks = futures::stream::FuturesUnordered::new();
     for file in files {
-        let url = url_for_path.remove(&file.relative_path).ok_or_else(|| {
-            anyhow!(
-                "control did not return presigned URL for {}",
-                file.relative_path
-            )
-        })?;
+        let upload = upload_for_path
+            .remove(&file.relative_path)
+            .ok_or_else(|| {
+                anyhow!(
+                    "control did not return presigned URL for {}",
+                    file.relative_path
+                )
+            })?;
         let bytes = std::fs::read(&file.absolute_path)
             .map_err(|e| anyhow!("read {}: {}", file.absolute_path.display(), e))?;
         let client = client.clone();
         let content_type = file.content_type;
         let path = file.relative_path.clone();
         tasks.push(async move {
-            let resp = client
-                .put(&url)
-                .header("content-type", content_type)
+            let mut request = client
+                .put(&upload.presigned_url)
+                .header("content-type", content_type);
+            if !upload.cache_control.is_empty() {
+                request = request.header("cache-control", &upload.cache_control);
+            }
+            let resp = request
                 .body(bytes)
                 .send()
                 .await
@@ -420,17 +433,25 @@ mod tests {
 
     // control's deploy action requires `bundle_size` (it signs the bound into
     // the bundle's presigned PUT), so the wire payload must always carry it.
+    // `supports_static_asset_cache_control` decides whether control signs
+    // Cache-Control into the static upload URLs, and this crate always sends
+    // the header, so it must never go out false.
     #[test]
-    fn deploy_input_carries_bundle_size() {
+    fn deploy_input_carries_bundle_size_and_cache_control_support() {
         let input = DeployInput {
             project_id: "proj",
             code_version: 42,
             bundle_size: 999,
             files: Vec::new(),
+            supports_static_asset_cache_control: true,
             jobs: &[],
             cron_updated_at: "2026-07-21T00:00:00Z",
         };
         let value = serde_json::to_value(&input).unwrap();
         assert_eq!(value["bundle_size"], serde_json::json!(999));
+        assert_eq!(
+            value["supports_static_asset_cache_control"],
+            serde_json::json!(true)
+        );
     }
 }

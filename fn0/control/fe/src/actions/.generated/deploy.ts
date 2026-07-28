@@ -16,6 +16,7 @@ const CronJobSchema = z.object({
 const StaticUploadSchema = z.object({
     path: z.string(),
     presignedUrl: z.string(),
+    cacheControl: z.string(),
   });
 
 const InputSchema = z.object({
@@ -23,6 +24,7 @@ const InputSchema = z.object({
     codeVersion: z.number(),
     bundleSize: z.number(),
     files: z.array(FileEntrySchema),
+    supportsStaticAssetCacheControl: z.boolean(),
     jobs: z.array(CronJobSchema),
     cronUpdatedAt: z.coerce.date(),
   });
