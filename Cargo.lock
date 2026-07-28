@@ -1959,7 +1959,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-doc-db"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-object-storage"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "bytes",
  "forte-sdk",
@@ -2130,7 +2130,7 @@ dependencies = [
 
 [[package]]
 name = "forte-cli"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2168,7 +2168,7 @@ dependencies = [
 
 [[package]]
 name = "forte-codegen"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "forte-wit",
@@ -2195,7 +2195,7 @@ dependencies = [
 
 [[package]]
 name = "forte-macros"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2204,7 +2204,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "bytes",
