@@ -181,7 +181,7 @@ API endpoints (`src/apis/`) and actions do not include `Cache-Control: no-store`
 
 ## Lazy Static Page Caching
 
-Mark an exact page route with `#[forte_sdk::cache_static]`. Forte codegen adds the declaration to the WASM cache-policy interface; fn0 uses that interface before creating Rust props or invoking JavaScript. The first eligible request renders the page through Rust and JavaScript, stores the HTML in a private versioned R2 bucket, and returns headers that let Cloudflare's native CDN cache the response. Later CDN hits do not reach fn0.
+Mark a page route with `#[forte_sdk::cache_static]`. Forte codegen adds the declaration to the WASM cache-policy interface; fn0 uses that interface before creating Rust props or invoking JavaScript. The first eligible request renders the page through Rust and JavaScript, stores the HTML in a private versioned R2 bucket, and returns headers that let Cloudflare's native CDN cache the response. Later CDN hits do not reach fn0.
 
 Declare the cache policy on the route handler:
 
@@ -196,6 +196,27 @@ pub async fn handler(_req: ForteRequest<'_>) -> anyhow::Result<Props> {
 
 The annotation is optional. A route without it, or a WASM bundle without the optional fn0 cache-policy interface, remains private SSR. The cache-policy interface is part of fn0's generic WASM/HTTP contract and does not depend on Forte at runtime.
 
+### Dynamic routes
+
+A dynamic route stores one object per concrete path, so it must also export `cache_static_eligible` to say which paths exist. Without it the build fails: an unvalidated route would let any probed path write a cache object, and pages that render "not found" as HTTP 200 would store one for every miss.
+
+```rust
+pub struct PathParams {
+    pub id: u32,
+}
+
+pub async fn cache_static_eligible(params: PathParams) -> anyhow::Result<bool> {
+    Ok(episode::exists(params.id).await?)
+}
+
+#[forte_sdk::cache_static]
+pub async fn handler(_req: ForteRequest<'_>, params: PathParams) -> anyhow::Result<Props> {
+    ...
+}
+```
+
+It runs on the preflight, which is the request that was going to render anyway, and it decides caching only — returning `false`, returning an error, or a path parameter that fails to parse all fall back to normal SSR rather than failing the request.
+
 The contract is a `POST /__fn0_cache_policy` request with the normalized target path in `x-fn0-cache-path`. A cacheable route returns `204 No Content` and `x-fn0-cache-policy: static`; every other result means that fn0 must continue with normal SSR.
 
 fn0 copies the incoming request's `Host` header onto the preflight request. A guest that rebuilds its request URI from scheme, authority and path must accept `Host` as the authority source, because the preflight carries no other authority.
@@ -204,8 +225,8 @@ Lazy static caching has these constraints:
 
 - Paths must start with `/` and cannot contain a query string, fragment, backslash, or dot segment.
 - Every configured path must return HTTP 200 with an HTML content type.
-- Dynamic routes cannot use `cache_static`; annotate exact routes only.
-- Only exact `GET` and `HEAD` paths without query strings are eligible.
+- Dynamic routes must export `cache_static_eligible`. Exact routes are always eligible and do not use it.
+- Only `GET` and `HEAD` paths without query strings are eligible.
 - A response is persisted only when it is a final HTTP 200 HTML response without `Set-Cookie`.
 - Requests with query strings continue to use SSR.
 - Unannotated paths continue to use SSR.

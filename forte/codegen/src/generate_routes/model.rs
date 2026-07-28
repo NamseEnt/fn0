@@ -9,6 +9,7 @@ pub(super) struct PageInfo {
     pub(super) is_redirect_only: bool,
     pub(super) is_api: bool,
     pub(super) cache_static: bool,
+    pub(super) has_cache_static_eligible: bool,
 }
 
 #[derive(Debug, Clone)]

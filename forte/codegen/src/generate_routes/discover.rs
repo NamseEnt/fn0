@@ -576,6 +576,7 @@ fn discover_endpoints_recursive(
             let search_params = parse_search_params(&content);
             let path_params = parse_path_params(&content);
             let cache_static = has_cache_static_attribute(&content);
+            let has_cache_static_eligible = has_public_fn(&content, "cache_static_eligible");
 
             pages.push(PageInfo {
                 module_name,
@@ -587,9 +588,23 @@ fn discover_endpoints_recursive(
                 is_redirect_only,
                 is_api,
                 cache_static,
+                has_cache_static_eligible,
             });
         }
     }
+}
+
+fn has_public_fn(content: &str, name: &str) -> bool {
+    let Ok(syntax_tree) = syn::parse_file(content) else {
+        return false;
+    };
+
+    syntax_tree.items.iter().any(|item| {
+        let syn::Item::Fn(function) = item else {
+            return false;
+        };
+        function.sig.ident == name && matches!(function.vis, syn::Visibility::Public(_))
+    })
 }
 
 fn has_cache_static_attribute(content: &str) -> bool {

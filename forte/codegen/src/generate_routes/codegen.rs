@@ -167,7 +167,7 @@ pub(super) fn generate_code(
             let method = parts.method;
 
             if path == "/__fn0_cache_policy" {
-                return handle_cache_policy(&method, &headers);
+                return handle_cache_policy(&method, &headers).await;
             }
 
             let mut cookie_jar = make_cookie_jar(&headers);
@@ -1130,12 +1130,58 @@ fn generate_classify_route(pages: &[PageInfo]) -> TokenStream {
     }
 }
 
+// Same extraction as the page route, except a parameter that fails to parse
+// means "not a cacheable path" rather than a 400: the preflight only decides
+// caching, and the page handler still gets to answer the request.
+fn generate_cache_policy_path_params(
+    module_name: &syn::Ident,
+    route_segments: &[RouteSegment],
+    path_params: &[PathParamField],
+    not_cacheable: &TokenStream,
+) -> TokenStream {
+    let extractions: Vec<TokenStream> = route_segments
+        .iter()
+        .enumerate()
+        .filter_map(|(segment_index, segment)| {
+            let RouteSegment::Dynamic(param_name) = segment else {
+                return None;
+            };
+            let field = path_params.iter().find(|f| &f.name == param_name)?;
+            let field_ident = format_ident!("{}", field.name);
+            if field.inner_type == "String" {
+                return Some(quote! {
+                    let #field_ident: String = path_segments[#segment_index].to_string();
+                });
+            }
+            let inner_type: TokenStream = field.inner_type.parse().unwrap();
+            Some(quote! {
+                let Ok(#field_ident) = path_segments[#segment_index].parse::<#inner_type>() else {
+                    return #not_cacheable;
+                };
+            })
+        })
+        .collect();
+
+    let field_names: Vec<_> = path_params
+        .iter()
+        .map(|f| format_ident!("{}", f.name))
+        .collect();
+
+    quote! {
+        #(#extractions)*
+        let path_params = #module_name::PathParams { #(#field_names),* };
+    }
+}
+
 fn generate_cache_policy_handler(pages: &[PageInfo]) -> TokenStream {
     let static_pages: Vec<&PageInfo> = pages.iter().filter(|page| page.cache_static).collect();
     for page in &static_pages {
-        if has_dynamic_segments(&page.route_segments) {
+        // One concrete path is one stored object, so a dynamic route without a
+        // validator lets any probed path write one. The page owns the
+        // knowledge of which ids exist, so it has to answer.
+        if has_dynamic_segments(&page.route_segments) && !page.has_cache_static_eligible {
             panic!(
-                "cache_static cannot be used on dynamic route {}",
+                "cache_static on dynamic route {} requires `pub async fn cache_static_eligible(params: PathParams) -> anyhow::Result<bool>` in the same module",
                 page.route_path
             );
         }
@@ -1153,57 +1199,111 @@ fn generate_cache_policy_handler(pages: &[PageInfo]) -> TokenStream {
         }
     }
 
-    let path_checks: Vec<TokenStream> = static_pages
+    let cacheable = quote! {
+        Ok(Response::builder()
+            .status(StatusCode::NO_CONTENT)
+            .header("x-fn0-cache-policy", "static")
+            .body(Body::empty())
+            .unwrap())
+    };
+    let not_cacheable = quote! {
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::empty())
+            .unwrap())
+    };
+
+    let exact_checks: Vec<TokenStream> = static_pages
         .iter()
+        .filter(|page| !has_dynamic_segments(&page.route_segments))
         .map(|page| {
             let route_path = &page.route_path;
             quote! { target_path == #route_path }
         })
         .collect();
-    let static_policy = if path_checks.is_empty() {
+    let exact_policy = if exact_checks.is_empty() {
         quote! {}
     } else {
-        let is_static_path = quote! { #(#path_checks)||* };
+        quote! {
+            if #(#exact_checks)||* {
+                return #cacheable;
+            }
+        }
+    };
+
+    let dynamic_arms: Vec<TokenStream> = static_pages
+        .iter()
+        .filter(|page| has_dynamic_segments(&page.route_segments))
+        .map(|page| {
+            let module_name = format_ident!("{}", page.module_name);
+            let route_path = &page.route_path;
+            let Some(path_params) = &page.path_params else {
+                panic!(
+                    "cache_static on dynamic route {route_path} requires a PathParams struct to pass to cache_static_eligible",
+                );
+            };
+            let condition = generate_dynamic_route_condition(&page.route_segments);
+            let extraction = generate_cache_policy_path_params(
+                &module_name,
+                &page.route_segments,
+                path_params,
+                &not_cacheable,
+            );
+            quote! {
+                if #condition {
+                    #extraction
+                    let eligible = match #module_name::cache_static_eligible(path_params).await {
+                        Ok(eligible) => eligible,
+                        Err(error) => {
+                            tracing::warn!(%error, route = #route_path, "cache_static_eligible failed");
+                            false
+                        }
+                    };
+                    if eligible {
+                        return #cacheable;
+                    }
+                    return #not_cacheable;
+                }
+            }
+        })
+        .collect();
+    let dynamic_policy = if dynamic_arms.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            let path_segments: Vec<&str> = target_path.trim_start_matches('/').split('/').collect();
+            #(#dynamic_arms)*
+        }
+    };
+
+    let static_policy = if static_pages.is_empty() {
+        quote! { let _ = headers; }
+    } else {
         quote! {
             let Some(target_path) = headers
                 .get("x-fn0-cache-path")
                 .and_then(|value| value.to_str().ok())
             else {
-                return Ok(Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Body::empty())
-                    .unwrap());
+                return #not_cacheable;
             };
 
-            if #is_static_path {
-                return Ok(Response::builder()
-                    .status(StatusCode::NO_CONTENT)
-                    .header("x-fn0-cache-policy", "static")
-                    .body(Body::empty())
-                    .unwrap());
-            }
+            #exact_policy
+            #dynamic_policy
         }
     };
 
     quote! {
-        fn handle_cache_policy(
+        async fn handle_cache_policy(
             method: &forte_sdk::http::Method,
             headers: &HeaderMap,
         ) -> Result<Response<Body>> {
             if method != forte_sdk::http::Method::POST {
-                return Ok(Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Body::empty())
-                    .unwrap());
+                return #not_cacheable;
             }
 
-            let _ = headers;
             #static_policy
 
-            Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::empty())
-                .unwrap())
+            #not_cacheable
         }
     }
 }

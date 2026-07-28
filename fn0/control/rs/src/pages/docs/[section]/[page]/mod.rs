@@ -19,6 +19,11 @@ pub enum Props {
     },
 }
 
+pub async fn cache_static_eligible(params: PathParams) -> anyhow::Result<bool> {
+    Ok(docs_site::find(&format!("{}/{}", params.section, params.page)).is_some())
+}
+
+#[forte_sdk::cache_static]
 pub async fn handler(_req: ForteRequest<'_>, params: PathParams) -> anyhow::Result<Props> {
     let route = format!("{}/{}", params.section, params.page);
     Ok(match docs_site::find(&route) {
