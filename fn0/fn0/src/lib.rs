@@ -9,6 +9,7 @@ pub mod object_storage_hijack;
 pub mod otlp_hijack;
 mod panic_util;
 pub mod presign_gate;
+pub mod public_storage_hijack;
 pub mod queue_hijack;
 mod self_invoke;
 pub mod static_pages;
@@ -46,6 +47,7 @@ pub use metric_gate::MetricCardinalityGate;
 pub use object_storage_hijack::{DevReadResult, ObjectStorageHijack};
 pub use otlp_hijack::OtlpHijack;
 pub use presign_gate::PresignGate;
+pub use public_storage_hijack::PublicStorageHijack;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
 pub use turso_hijack::TursoHijack;
@@ -109,6 +111,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
     pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+    pub(crate) public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     pub(crate) static_page_storage: Option<Arc<dyn StaticPageStorage>>,
 }
 
@@ -125,6 +128,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             cross_project_invoke_hijack: None,
             vault_hijack: None,
             object_storage_hijack: None,
+            public_storage_hijack: None,
             static_page_storage: None,
         }
     }
@@ -173,6 +177,14 @@ impl<C: BundleCache> ExecutionContext<C> {
         self
     }
 
+    pub fn with_public_storage_hijack(
+        mut self,
+        public_storage_hijack: Arc<PublicStorageHijack>,
+    ) -> Self {
+        self.public_storage_hijack = Some(public_storage_hijack);
+        self
+    }
+
     pub fn with_static_page_storage(mut self, storage: Arc<dyn StaticPageStorage>) -> Self {
         self.static_page_storage = Some(storage);
         self
@@ -216,6 +228,10 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn object_storage_hijack(&self) -> Option<&Arc<ObjectStorageHijack>> {
         self.object_storage_hijack.as_ref()
+    }
+
+    pub fn public_storage_hijack(&self) -> Option<&Arc<PublicStorageHijack>> {
+        self.public_storage_hijack.as_ref()
     }
 
     pub fn static_page_storage(&self) -> Option<&Arc<dyn StaticPageStorage>> {
@@ -787,6 +803,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let cross_project_invoke_hijack = ctx.cross_project_invoke_hijack.clone();
         let vault_hijack = ctx.vault_hijack.clone();
         let object_storage_hijack = ctx.object_storage_hijack.clone();
+        let public_storage_hijack = ctx.public_storage_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
         let driver = tokio::task::spawn_local(async move {
@@ -803,6 +820,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 cross_project_invoke_hijack,
                 vault_hijack,
                 object_storage_hijack,
+                public_storage_hijack,
             ))
             .catch_unwind()
             .await;

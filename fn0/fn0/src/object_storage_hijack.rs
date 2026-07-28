@@ -550,7 +550,7 @@ fn parse_query(query: Option<&str>) -> HashMap<String, String> {
     map
 }
 
-fn canonical_query_string(query: Option<&str>) -> String {
+pub(crate) fn canonical_query_string(query: Option<&str>) -> String {
     let Some(query) = query else {
         return String::new();
     };
@@ -592,24 +592,24 @@ fn xml_escape(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
-fn sha256_hex(data: &[u8]) -> String {
+pub(crate) fn sha256_hex(data: &[u8]) -> String {
     hex_encode(&Sha256::digest(data))
 }
 
-fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
+pub(crate) fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
     let mut mac = <HmacSha256 as Mac>::new_from_slice(key).expect("HMAC accepts any key size");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }
 
-fn signing_key(secret: &str, date: &str, region: &str, service: &str) -> Vec<u8> {
+pub(crate) fn signing_key(secret: &str, date: &str, region: &str, service: &str) -> Vec<u8> {
     let k_date = hmac_sha256(format!("AWS4{secret}").as_bytes(), date.as_bytes());
     let k_region = hmac_sha256(&k_date, region.as_bytes());
     let k_service = hmac_sha256(&k_region, service.as_bytes());
     hmac_sha256(&k_service, b"aws4_request")
 }
 
-fn hex_encode(bytes: &[u8]) -> String {
+pub(crate) fn hex_encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
         out.push_str(&format!("{byte:02x}"));
@@ -637,4 +637,3 @@ fn uri_encode_query(s: &str) -> String {
     }
     out
 }
-

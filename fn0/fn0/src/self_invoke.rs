@@ -6,6 +6,7 @@ use crate::metric_gate;
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::otlp_hijack::OtlpHijack;
 use crate::presign_gate::PresignDenied;
+use crate::public_storage_hijack::PublicStorageHijack;
 use crate::queue_hijack::QueueHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::vault_hijack::VaultHijack;
@@ -87,6 +88,7 @@ pub(crate) struct SelfInvokeHooks {
     cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
     vault_hijack: Option<Arc<VaultHijack>>,
     object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+    public_storage_hijack: Option<Arc<PublicStorageHijack>>,
 }
 
 impl SelfInvokeHooks {
@@ -101,6 +103,7 @@ impl SelfInvokeHooks {
         cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
         vault_hijack: Option<Arc<VaultHijack>>,
         object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+        public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     ) -> Self {
         Self {
             project_id,
@@ -112,6 +115,7 @@ impl SelfInvokeHooks {
             cross_project_invoke_hijack,
             vault_hijack,
             object_storage_hijack,
+            public_storage_hijack,
         }
     }
 }
@@ -173,6 +177,12 @@ impl WasiHttpHooks for SelfInvokeHooks {
             && hijack.matches(request.uri())
         {
             return object_storage_send(hijack, self.project_id.clone(), request, options);
+        }
+
+        if let Some(hijack) = self.public_storage_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return public_storage_send(hijack, self.project_id.clone(), request, options);
         }
 
         default_send(request, options)
@@ -471,6 +481,27 @@ fn object_storage_send(
         let send_start = std::time::Instant::now();
         let (res, send_io) = default_send_request(request, options).await?;
         telemetry::stage_duration("hijack_object_storage", send_start.elapsed());
+        let res = res.map(BodyExt::boxed_unsync);
+        let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+            Box::new(send_io);
+        Ok((res, send_io))
+    })
+}
+
+fn public_storage_send(
+    hijack: Arc<PublicStorageHijack>,
+    project_id: String,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    options: Option<RequestOptions>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let mut request = request;
+        if let Err(e) = hijack.sign(&mut request, &project_id) {
+            return Err(e.into());
+        }
+        let send_start = std::time::Instant::now();
+        let (res, send_io) = default_send_request(request, options).await?;
+        telemetry::stage_duration("hijack_public_storage", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(send_io);

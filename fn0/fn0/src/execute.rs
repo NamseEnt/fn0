@@ -1,6 +1,7 @@
 use crate::cache::Bundle;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
 use crate::object_storage_hijack::ObjectStorageHijack;
+use crate::public_storage_hijack::PublicStorageHijack;
 use crate::self_invoke::{self, SELF_HOST, SelfInvokeHooks, call_service};
 use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
@@ -127,6 +128,7 @@ pub(crate) fn build_store<C>(
     cross_project_invoke_hijack: Option<&crate::CrossProjectInvokeHijack>,
     vault_hijack: Option<&crate::VaultHijack>,
     object_storage_hijack: Option<&ObjectStorageHijack>,
+    public_storage_hijack: Option<&PublicStorageHijack>,
 ) -> Store<ClientState<C>>
 where
     C: Clock,
@@ -154,6 +156,11 @@ where
             if object_storage_hijack.is_some() && key == "FN0_OBJECT_STORAGE_URL" {
                 continue;
             }
+            if public_storage_hijack.is_some()
+                && (key == "FN0_PUBLIC_STORAGE_URL" || key == "FN0_PUBLIC_STORAGE_BASE_URL")
+            {
+                continue;
+            }
             builder.env(key, value);
         }
         if let Some(hijack) = turso_hijack {
@@ -178,6 +185,13 @@ where
         }
         if let Some(hijack) = object_storage_hijack {
             builder.env("FN0_OBJECT_STORAGE_URL", hijack.placeholder_url());
+        }
+        if let Some(hijack) = public_storage_hijack {
+            builder.env("FN0_PUBLIC_STORAGE_URL", hijack.placeholder_url());
+            builder.env(
+                "FN0_PUBLIC_STORAGE_BASE_URL",
+                hijack.public_base_url_for(project_id),
+            );
         }
         builder.build()
     };
@@ -227,6 +241,7 @@ pub async fn run_wasm_instance_loop(
     cross_project_invoke_hijack: Option<Arc<crate::CrossProjectInvokeHijack>>,
     vault_hijack: Option<Arc<crate::VaultHijack>>,
     object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+    public_storage_hijack: Option<Arc<PublicStorageHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -247,6 +262,7 @@ pub async fn run_wasm_instance_loop(
             cross_project_invoke_hijack.clone(),
             vault_hijack.clone(),
             object_storage_hijack.clone(),
+            public_storage_hijack.clone(),
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
@@ -254,6 +270,7 @@ pub async fn run_wasm_instance_loop(
         cross_project_invoke_hijack.as_deref(),
         vault_hijack.as_deref(),
         object_storage_hijack.as_deref(),
+        public_storage_hijack.as_deref(),
     );
 
     let instantiate_start = std::time::Instant::now();
