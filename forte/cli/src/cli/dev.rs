@@ -347,6 +347,13 @@ pub async fn run(options: DevOptions) -> Result<()> {
         format!("http://localhost:{port}"),
     ));
 
+    let public_storage_placeholder = "fn0-public-storage.fn0.dev".to_string();
+    let public_storage_hijack = Arc::new(fn0::PublicStorageHijack::new_local(
+        public_storage_placeholder.clone(),
+        project_dir.join(".forte/data/public"),
+        format!("http://localhost:{port}"),
+    ));
+
     let local_service_env = vec![
         (
             "TURSO_URL".to_string(),
@@ -361,6 +368,14 @@ pub async fn run(options: DevOptions) -> Result<()> {
             "FN0_OBJECT_STORAGE_URL".to_string(),
             format!("http://{object_storage_placeholder}"),
         ),
+        (
+            "FN0_PUBLIC_STORAGE_URL".to_string(),
+            format!("http://{public_storage_placeholder}"),
+        ),
+        (
+            "FN0_PUBLIC_STORAGE_BASE_URL".to_string(),
+            public_storage_hijack.dev_base_url().to_string(),
+        ),
     ];
 
     let env_vars = resolve_dev_env(&project_dir, &local_service_env)?;
@@ -374,6 +389,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
         env_vars,
         queue_hijack: Some(queue_hijack),
         object_storage_hijack: Some(object_storage_hijack),
+        public_storage_hijack: Some(public_storage_hijack),
     };
 
     let handle = server::run(config).await?;

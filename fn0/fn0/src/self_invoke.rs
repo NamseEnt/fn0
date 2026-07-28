@@ -510,6 +510,16 @@ fn public_storage_send(
         let public_url =
             changes_content.then(|| hijack.public_url_for(&project_id, request.uri().path()));
 
+        if hijack.is_local() {
+            let resp = match hijack.serve_local(request).await {
+                Ok(resp) => resp,
+                Err(ec) => return Err(ec.into()),
+            };
+            let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+                Box::new(async { Ok(()) });
+            return Ok((resp, io));
+        }
+
         if let Err(e) = hijack.sign(&mut request, &project_id) {
             return Err(e.into());
         }

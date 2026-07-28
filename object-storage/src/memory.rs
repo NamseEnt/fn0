@@ -26,7 +26,12 @@ impl MemoryBucket {
         }
     }
 
-    pub(crate) async fn put(&self, key: &str, body: Body, content_type: Option<&str>) -> Result<()> {
+    pub(crate) async fn put(
+        &self,
+        key: &str,
+        body: Body,
+        content_type: Option<&str>,
+    ) -> Result<()> {
         let data = body.collect().await;
         self.store.lock().unwrap().insert(
             key.to_string(),

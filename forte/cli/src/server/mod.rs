@@ -3,7 +3,7 @@ pub mod vite_dev;
 
 use anyhow::Result;
 pub use cache::SimpleCache;
-use fn0::{CodeExecutor, ExecutionContext, ObjectStorageHijack, QueueHijack};
+use fn0::{CodeExecutor, ExecutionContext, ObjectStorageHijack, PublicStorageHijack, QueueHijack};
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -26,6 +26,7 @@ pub struct ServerConfig {
     pub env_vars: Vec<(String, String)>,
     pub queue_hijack: Option<Arc<QueueHijack>>,
     pub object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+    pub public_storage_hijack: Option<Arc<PublicStorageHijack>>,
 }
 
 pub struct ServerHandle {
@@ -53,6 +54,9 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let mut ctx = ExecutionContext::new(engine, linker, cache);
     if let Some(hijack) = config.queue_hijack {
         ctx = ctx.with_queue_hijack(hijack);
+    }
+    if let Some(hijack) = config.public_storage_hijack {
+        ctx = ctx.with_public_storage_hijack(hijack);
     }
     if let Some(hijack) = config.object_storage_hijack {
         ctx = ctx.with_object_storage_hijack(hijack);
@@ -131,6 +135,13 @@ async fn handle_request(
     if let Some(encoded_key) = path.strip_prefix("/__fn0_object_storage/") {
         let encoded_key = encoded_key.to_string();
         return serve_object_storage(req, &encoded_key, &executor).await;
+    }
+
+    // Public objects are world-readable in production; in dev the same URL is
+    // served straight off the local store with no signature.
+    if let Some(encoded_key) = path.strip_prefix("/__fn0_public_storage/") {
+        let encoded_key = encoded_key.to_string();
+        return serve_public_storage(req, &encoded_key, &executor).await;
     }
 
     {
@@ -271,6 +282,42 @@ async fn handle_request(
             eprintln!("Request error: {:?}", e);
             Err(anyhow::anyhow!("Request error: {:?}", e))
         }
+    }
+}
+
+/// Serves the `forte dev` public-object route. Read-only: writes go through
+/// the hijack like they do in production, so the dev path cannot drift into
+/// accepting uploads the real CDN origin would never take.
+async fn serve_public_storage(
+    req: Request<hyper::body::Incoming>,
+    encoded_key: &str,
+    executor: &CodeExecutor<SimpleCache>,
+) -> Result<fn0::Response> {
+    let key = percent_decode(encoded_key);
+    let Some(hijack) = executor.context().public_storage_hijack().cloned() else {
+        return Ok(text_response(
+            StatusCode::NOT_FOUND,
+            "public storage not configured",
+        ));
+    };
+    if !matches!(*req.method(), Method::GET | Method::HEAD) {
+        return Ok(text_response(StatusCode::METHOD_NOT_ALLOWED, ""));
+    }
+    match hijack.dev_read(&key) {
+        fn0::DevReadResult::Found { data, content_type } => {
+            let mut builder = Response::builder().status(StatusCode::OK);
+            if let Some(content_type) = content_type {
+                builder = builder.header(http::header::CONTENT_TYPE, content_type);
+            }
+            Ok(builder
+                .body(
+                    Full::new(bytes::Bytes::from(data))
+                        .map_err(|e| anyhow::anyhow!("{e}"))
+                        .boxed_unsync(),
+                )
+                .unwrap())
+        }
+        _ => Ok(text_response(StatusCode::NOT_FOUND, "Not Found")),
     }
 }
 

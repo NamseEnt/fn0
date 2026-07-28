@@ -157,9 +157,61 @@ expire. See [limits.md](../fn0/limits.md) for full quota values.
 In `forte dev` the URL points at the dev server's local object route
 (`/__fn0_object_storage/…`) and does not expire.
 
+## Public objects
+
+`object_storage::public` stores objects at a stable, world-readable URL served
+by the CDN, for assets embedded in HTML that outlives a signature.
+
+```rust
+let public = object_storage::public::bucket();
+
+let url = public.put("clips/intro.mp4", "video/mp4", bytes).await?;
+// https://static.fn0.dev/<project_id>/public/clips/intro.mp4
+
+public.url("clips/intro.mp4");   // same string, no request
+public.delete("clips/intro.mp4").await?;
+```
+
+`content_type` is required — a browser fetches these directly, with no app in
+the path to correct a wrong guess.
+
+Writing to a key overwrites it and invalidates the edge copy, so the URL can be
+persisted and embedded safely. `put` returns once the object is written and the
+invalidation is queued, **not** once the edge is consistent; until that drains
+the edge may still serve the previous bytes.
+
+There is no `presigned_get_url` here — the object is already public, so signing
+access to it means nothing. There is no presigned upload either: a write that
+bypasses the platform leaves nothing to invalidate the edge copy.
+
+### Caching
+
+Objects are stored with a platform-fixed header:
+
+```
+Cache-Control: public, max-age=0, s-maxage=31536000
+```
+
+The edge holds the object; the browser revalidates on every request. Apps
+cannot change this. A cache purge reaches the edge but can never reach a
+browser, so any browser-held copy would outlive an overwrite with no way to
+correct it.
+
+`s-maxage` is long because purge, not expiry, is what keeps the object correct.
+
+### Everything here is public
+
+The bucket is served by a custom domain, so every object under it is readable
+by anyone with the URL. Key naming is a convention, not access control. Use
+`object_storage::private` for anything else.
+
 ## Local development
 
 `forte dev` serves object storage from the local filesystem under
-`.forte/data/objects/` — no cloud credentials, no external service. The API is
-identical to production, so code paths do not change between `forte dev` and
-deployed apps.
+`.forte/data/objects/`, and public objects under `.forte/data/public/` — no
+cloud credentials, no external service. The API is identical to production, so
+code paths do not change between `forte dev` and deployed apps.
+
+Public URLs in dev point at the dev server (`/__fn0_public_storage/…`) and carry
+no project segment, since one dev server serves one project. Nothing is cached,
+so there is no purge step to mirror.

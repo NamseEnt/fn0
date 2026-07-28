@@ -109,7 +109,12 @@ impl PublicBucket {
     /// `after` resumes the listing after a given key (pass
     /// [`ObjectList::next_cursor`] from the previous page). At most `limit`
     /// entries are returned.
-    pub async fn list(&self, prefix: &str, after: Option<&str>, limit: usize) -> Result<ObjectList> {
+    pub async fn list(
+        &self,
+        prefix: &str,
+        after: Option<&str>,
+        limit: usize,
+    ) -> Result<ObjectList> {
         match &self.inner {
             Backend::Http(b) => b.list(prefix, after, limit).await,
             Backend::Memory(b) => b.list(prefix, after, limit).await,

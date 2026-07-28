@@ -12,7 +12,7 @@
 //! a cached page.
 
 use crate::object_storage_hijack::{
-    canonical_query_string, hex_encode, hmac_sha256, sha256_hex, signing_key,
+    ObjectStorageHijack, canonical_query_string, hex_encode, hmac_sha256, sha256_hex, signing_key,
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -33,13 +33,23 @@ const KEY_PREFIX: &str = "public";
 #[derive(Clone)]
 pub struct PublicStorageHijack {
     pub placeholder_host: String,
-    endpoint_host: String,
-    bucket: String,
-    region: String,
-    access_key_id: String,
-    secret_access_key: String,
+    backend: Backend,
     public_base_url: String,
     control_project_id: String,
+}
+
+#[derive(Clone)]
+enum Backend {
+    R2 {
+        endpoint_host: String,
+        bucket: String,
+        region: String,
+        access_key_id: String,
+        secret_access_key: String,
+    },
+    /// `forte dev`. Delegates to the object-storage hijack's filesystem store so
+    /// the two local backends cannot drift apart.
+    LocalFs(Box<ObjectStorageHijack>),
 }
 
 pub struct PublicStorageConfig {
@@ -57,13 +67,37 @@ impl PublicStorageHijack {
     pub fn new(config: PublicStorageConfig) -> Self {
         Self {
             placeholder_host: config.placeholder_host,
-            endpoint_host: format!("{}.r2.cloudflarestorage.com", config.account_id),
-            bucket: config.bucket,
-            region: config.region,
-            access_key_id: config.access_key_id,
-            secret_access_key: config.secret_access_key,
+            backend: Backend::R2 {
+                endpoint_host: format!("{}.r2.cloudflarestorage.com", config.account_id),
+                bucket: config.bucket,
+                region: config.region,
+                access_key_id: config.access_key_id,
+                secret_access_key: config.secret_access_key,
+            },
             public_base_url: config.public_base_url.trim_end_matches('/').to_string(),
             control_project_id: config.control_project_id,
+        }
+    }
+
+    /// Local store for `forte dev`. `dev_base_url` is where the dev server
+    /// serves these objects, so `url()` keeps working without a CDN.
+    pub fn new_local(
+        placeholder_host: String,
+        root: std::path::PathBuf,
+        dev_base_url: String,
+    ) -> Self {
+        Self {
+            placeholder_host,
+            backend: Backend::LocalFs(Box::new(ObjectStorageHijack::new_local(
+                placeholder_host_for_local(),
+                root,
+                dev_base_url.clone(),
+            ))),
+            public_base_url: format!(
+                "{}/__fn0_public_storage",
+                dev_base_url.trim_end_matches('/')
+            ),
+            control_project_id: String::new(),
         }
     }
 
@@ -94,8 +128,22 @@ impl PublicStorageHijack {
     }
 
     /// The base a guest builds public URLs from, already scoped to the project.
+    ///
+    /// `forte dev` serves one project out of one store, so it carries no project
+    /// segment and the URL matches the key the local backend actually writes.
     pub fn public_base_url_for(&self, project_id: &str) -> String {
-        format!("{}/{project_id}/{KEY_PREFIX}", self.public_base_url)
+        match &self.backend {
+            Backend::R2 { .. } => format!("{}/{project_id}/{KEY_PREFIX}", self.public_base_url),
+            Backend::LocalFs(_) => self.public_base_url.clone(),
+        }
+    }
+
+    /// Reads from the local store for the `forte dev` public route.
+    pub fn dev_read(&self, key: &str) -> crate::DevReadResult {
+        match &self.backend {
+            Backend::LocalFs(delegate) => delegate.dev_read(key),
+            Backend::R2 { .. } => crate::DevReadResult::NotLocal,
+        }
     }
 
     /// Where a platform queue task for this write is addressed.
@@ -110,23 +158,47 @@ impl PublicStorageHijack {
         format!("{}/{key}", self.public_base_url_for(project_id))
     }
 
-    pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
-        uri.host() == Some(self.placeholder_host.as_str())
+    /// Where the dev server publishes the local store, used to build `url()`.
+    pub fn dev_base_url(&self) -> &str {
+        &self.public_base_url
     }
 
-    /// The object key a guest request lands on, namespaced to the project.
-    fn object_path(&self, project_id: &str, raw_path: &str) -> String {
-        let key = raw_path.trim_start_matches('/');
-        if key.is_empty() {
-            format!("/{}/{project_id}/{KEY_PREFIX}", self.bucket)
-        } else {
-            format!("/{}/{project_id}/{KEY_PREFIX}/{key}", self.bucket)
-        }
+    pub(crate) fn is_local(&self) -> bool {
+        matches!(self.backend, Backend::LocalFs(_))
+    }
+
+    /// Serves a request against the local filesystem store (`forte dev`).
+    pub(crate) async fn serve_local(
+        &self,
+        req: HijackRequest,
+    ) -> Result<hyper::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
+        let Backend::LocalFs(delegate) = &self.backend else {
+            return Err(ErrorCode::InternalError(Some(
+                "serve_local called on R2 backend".to_string(),
+            )));
+        };
+        delegate.serve_local(req).await
+    }
+
+    pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
+        uri.host() == Some(self.placeholder_host.as_str())
     }
 
     /// Rewrites an unsigned S3 request in place into a signed R2 request against
     /// the shared static bucket, stamping the platform's cache policy.
     pub(crate) fn sign(&self, req: &mut HijackRequest, project_id: &str) -> Result<(), ErrorCode> {
+        let Backend::R2 {
+            endpoint_host,
+            bucket,
+            region,
+            access_key_id,
+            secret_access_key,
+        } = &self.backend
+        else {
+            return Err(ErrorCode::InternalError(Some(
+                "sign called on local backend".to_string(),
+            )));
+        };
         let method = req.method().to_string();
         let path_and_query = req
             .uri()
@@ -134,7 +206,7 @@ impl PublicStorageHijack {
             .cloned()
             .unwrap_or_else(|| "/".parse().unwrap());
         let query = path_and_query.query();
-        let canonical_uri = self.object_path(project_id, path_and_query.path());
+        let canonical_uri = object_path(bucket, project_id, path_and_query.path());
 
         let is_write = matches!(req.method(), &hyper::Method::PUT | &hyper::Method::POST);
         if is_write {
@@ -155,7 +227,7 @@ impl PublicStorageHijack {
                 "cache-control;host;x-amz-content-sha256;x-amz-date",
                 format!(
                     "cache-control:{PUBLIC_CACHE_CONTROL}\nhost:{}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n",
-                    self.endpoint_host
+                    endpoint_host
                 ),
             )
         } else {
@@ -163,7 +235,7 @@ impl PublicStorageHijack {
                 "host;x-amz-content-sha256;x-amz-date",
                 format!(
                     "host:{}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n",
-                    self.endpoint_host
+                    endpoint_host
                 ),
             )
         };
@@ -171,17 +243,17 @@ impl PublicStorageHijack {
         let canonical_request = format!(
             "{method}\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
         );
-        let credential_scope = format!("{date}/{}/s3/aws4_request", self.region);
+        let credential_scope = format!("{date}/{region}/s3/aws4_request");
         let string_to_sign = format!(
             "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
             sha256_hex(canonical_request.as_bytes())
         );
-        let key = signing_key(&self.secret_access_key, &date, &self.region, "s3");
+        let key = signing_key(secret_access_key, &date, region, "s3");
         let signature = hex_encode(&hmac_sha256(&key, string_to_sign.as_bytes()));
         let authorization = format!(
             "AWS4-HMAC-SHA256 Credential={}/{credential_scope}, \
              SignedHeaders={signed_headers}, Signature={signature}",
-            self.access_key_id
+            access_key_id
         );
 
         let new_path_and_query = match query {
@@ -190,7 +262,7 @@ impl PublicStorageHijack {
         };
         let new_uri = hyper::Uri::builder()
             .scheme(Scheme::HTTPS)
-            .authority(self.endpoint_host.as_str())
+            .authority(endpoint_host.as_str())
             .path_and_query(new_path_and_query.as_str())
             .build()
             .map_err(|_| ErrorCode::HttpRequestUriInvalid)?;
@@ -200,8 +272,7 @@ impl PublicStorageHijack {
         headers.remove(HOST);
         headers.insert(
             HOST,
-            HeaderValue::from_str(&self.endpoint_host)
-                .map_err(|_| ErrorCode::HttpRequestUriInvalid)?,
+            HeaderValue::from_str(endpoint_host).map_err(|_| ErrorCode::HttpRequestUriInvalid)?,
         );
         headers.insert(
             HeaderName::from_static("x-amz-date"),
@@ -216,6 +287,22 @@ impl PublicStorageHijack {
             HeaderValue::from_str(&authorization).map_err(|_| ErrorCode::HttpRequestDenied)?,
         );
         Ok(())
+    }
+}
+
+/// `forte dev` routes public objects through the same local store as private
+/// objects, so the delegate needs a host it will never actually match on.
+fn placeholder_host_for_local() -> String {
+    "fn0-public-storage.local".to_string()
+}
+
+/// The object key a guest request lands on, namespaced to the project.
+fn object_path(bucket: &str, project_id: &str, raw_path: &str) -> String {
+    let key = raw_path.trim_start_matches('/');
+    if key.is_empty() {
+        format!("/{bucket}/{project_id}/{KEY_PREFIX}")
+    } else {
+        format!("/{bucket}/{project_id}/{KEY_PREFIX}/{key}")
     }
 }
 
@@ -299,6 +386,19 @@ mod tests {
         );
         hijack().sign(&mut req, "proj1").unwrap();
         assert!(req.headers().get(CACHE_CONTROL).is_none());
+    }
+
+    #[test]
+    fn dev_urls_carry_no_project_segment() {
+        let hijack = PublicStorageHijack::new_local(
+            "fn0-public-storage.fn0.dev".to_string(),
+            std::path::PathBuf::from("/tmp/forte-public"),
+            "http://localhost:3000".to_string(),
+        );
+        assert_eq!(
+            hijack.public_url_for("app", "/clips/intro.mp4"),
+            "http://localhost:3000/__fn0_public_storage/clips/intro.mp4"
+        );
     }
 
     #[test]

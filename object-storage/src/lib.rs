@@ -18,9 +18,9 @@
 mod body;
 mod http;
 mod memory;
-mod runtime;
 pub mod private;
 pub mod public;
+mod runtime;
 
 pub use body::Body;
 
