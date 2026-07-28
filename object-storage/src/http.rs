@@ -2,6 +2,7 @@
 //! placeholder endpoint; the worker's object-storage hijack rewrites the host,
 //! prepends the project bucket, and adds the SigV4 signature.
 
+use crate::body::Body;
 use crate::runtime::{self, Request, Response};
 use crate::{Error, ListEntry, ObjectList, ObjectMetadata, Result};
 use bytes::Bytes;
@@ -26,10 +27,13 @@ impl HttpBucket {
     pub(crate) async fn put(
         &self,
         key: &str,
-        data: Bytes,
+        body: Body,
         content_type: Option<&str>,
     ) -> Result<()> {
-        let mut headers = vec![("content-length".to_string(), data.len().to_string())];
+        let mut headers = Vec::new();
+        if let Some(length) = body.known_length() {
+            headers.push(("content-length".to_string(), length.to_string()));
+        }
         if let Some(ct) = content_type {
             headers.push(("content-type".to_string(), ct.to_string()));
         }
@@ -37,7 +41,7 @@ impl HttpBucket {
             method: "PUT",
             url: self.object_url(key),
             headers,
-            body: Some(data),
+            body: Some(body),
         })
         .await?;
         match response.status {
@@ -185,7 +189,7 @@ fn metadata_from_headers(headers: &[(String, String)]) -> ObjectMetadata {
 
 /// Percent-encodes an object key for use as a URL path, keeping `/` so callers
 /// can address pseudo-directories.
-fn encode_path(s: &str) -> String {
+pub(crate) fn encode_path(s: &str) -> String {
     encode(s, true)
 }
 

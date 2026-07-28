@@ -75,12 +75,12 @@ See [doc-db/overview.md](../doc-db/overview.md#mocking-tests) for the full mock 
 
 ## Testing with In-Memory Object Storage
 
-`object_storage::memory()` returns an in-process `Bucket` backed by a `BTreeMap`. The API is identical to production; each call returns a fresh, isolated instance.
+`object_storage::private::memory()` returns an in-process `PrivateBucket` backed by a `BTreeMap`. The API is identical to production; each call returns a fresh, isolated instance.
 
 ```rust
 #[forte_sdk::test]
 async fn test_file_roundtrip() {
-    let bucket = object_storage::memory();
+    let bucket = object_storage::private::memory();
 
     bucket.put("avatars/alice.png", b"fake png data" as &[u8]).await.unwrap();
 
@@ -123,7 +123,7 @@ async fn test_login_ok() {
 }
 ```
 
-Combine with `doc_db::memory()` and `object_storage::memory()` to test handlers without any external services.
+Combine with `doc_db::memory()` and `object_storage::private::memory()` to test handlers without any external services.
 
 ## Running Tests
 

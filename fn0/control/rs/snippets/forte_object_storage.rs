@@ -1,4 +1,4 @@
-let bucket = object_storage::bucket();
+let bucket = object_storage::private::bucket();
 
 bucket.put("avatars/42.png", bytes).await?;
 

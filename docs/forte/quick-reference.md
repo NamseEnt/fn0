@@ -248,7 +248,7 @@ Async test macro:
 #[forte_sdk::test]
 async fn my_test() {
     let db = doc_db::memory();     // in-memory db, isolated per test
-    let bucket = object_storage::memory();  // in-memory storage
+    let bucket = object_storage::private::memory();  // in-memory storage
     // ...
 }
 ```

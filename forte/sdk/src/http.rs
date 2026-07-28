@@ -28,7 +28,6 @@ pub enum Error {
     InvalidAuthority,
     InvalidPathWithQuery,
     InvalidMethod,
-    StreamBodyNotSupported,
     Wasi(p3::ErrorCode),
     BuildResponse(http::Error),
     Json(serde_json::Error),
@@ -42,7 +41,6 @@ impl fmt::Display for Error {
             Error::InvalidAuthority => write!(f, "invalid authority"),
             Error::InvalidPathWithQuery => write!(f, "invalid path-with-query"),
             Error::InvalidMethod => write!(f, "invalid method"),
-            Error::StreamBodyNotSupported => write!(f, "outgoing streaming body not yet supported"),
             Error::Wasi(ec) => write!(f, "wasi http error: {ec:?}"),
             Error::BuildResponse(e) => write!(f, "failed to build response: {e}"),
             Error::Json(e) => write!(f, "failed to decode JSON: {e}"),
@@ -150,22 +148,18 @@ impl Client {
             .await
             .map_err(Error::Headers)?;
 
-        let body_bytes: Option<Vec<u8>> = match body {
+        let contents_reader = match body {
             Body::Empty => None,
-            Body::Bytes(b) if b.is_empty() => None,
-            Body::Bytes(b) => Some(b),
-            Body::Stream(_) => return Err(Error::StreamBodyNotSupported),
-        };
-
-        let contents_reader = if let Some(bytes) = body_bytes {
-            let (mut writer, reader) = wit_stream::new::<u8>();
-            crate::runtime::spawn(async move {
-                let _leftover = writer.write_all(bytes).await;
-                drop(writer);
-            });
-            Some(reader)
-        } else {
-            None
+            Body::Bytes(bytes) if bytes.is_empty() => None,
+            Body::Bytes(bytes) => {
+                let (mut writer, reader) = wit_stream::new::<u8>();
+                crate::runtime::spawn(async move {
+                    let _leftover = writer.write_all(bytes).await;
+                    drop(writer);
+                });
+                Some(reader)
+            }
+            Body::Stream(reader) => Some(reader),
         };
 
         let (trailers_writer, trailers_reader) = wit_future::new::<

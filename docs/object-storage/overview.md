@@ -4,25 +4,32 @@
 Forte apps. It works in both WASI components (Forte backends) and native Rust
 binaries.
 
-Each project gets its own private bucket. Application code never sees the
-storage endpoint or credentials: the fn0 runtime injects only a placeholder URL
-(`FN0_OBJECT_STORAGE_URL`), and the worker's object-storage hijack rewrites,
-routes, and signs every request out of band — the same hooks-only model as
-[doc-db](../doc-db/overview.md).
+Storage is split by access model into two namespaces, which are separate types
+rather than two configurations of one:
+
+| | Reachable by | Use for |
+|---|---|---|
+| `object_storage::private` | the app, or a presigned URL | anything not meant to be world-readable |
+| `object_storage::public` | anyone with the URL, served from the CDN | assets embedded in HTML that outlives a signature |
+
+Application code never sees the storage endpoint or credentials: each namespace
+reads only its injected placeholder URL, and the worker's object-storage hijack
+rewrites, routes, and signs every request out of band — the same hooks-only
+model as [doc-db](../doc-db/overview.md).
 
 ## Connecting
 
 ```rust
-use object_storage::Bucket;
+use object_storage::private::PrivateBucket;
 
 // Production / `forte dev`: reads the injected FN0_OBJECT_STORAGE_URL.
-let bucket: Bucket = object_storage::bucket();
+let bucket: PrivateBucket = object_storage::private::bucket();
 
 // In-memory (tests).
-let bucket: Bucket = object_storage::memory();
+let bucket: PrivateBucket = object_storage::private::memory();
 ```
 
-`Bucket` is `Clone`. Share it across your handler by cloning.
+`PrivateBucket` is `Clone`. Share it across your handler by cloning.
 
 ## Operations
 
@@ -37,8 +44,19 @@ bucket
     .await?;
 ```
 
-`put` accepts anything that converts into `Bytes` (`Vec<u8>`, `&[u8]`,
-`Bytes`, `String`, …). An existing object at the same key is overwritten.
+`put` accepts anything that converts into `object_storage::Body` — `Vec<u8>`,
+`&[u8]`, `Bytes`, `String`, `&str`. An existing object at the same key is
+overwritten.
+
+Inside a WASI component a `forte_sdk::http::Body` also converts, which forwards
+an incoming request body straight through without buffering it:
+
+```rust
+bucket.put_with_content_type("uploads/clip.mp4", request.into_body(), Some("video/mp4")).await?;
+```
+
+The length is then unknown until the body ends, so the upload is sent chunked
+rather than with a `Content-Length`.
 
 ### `get`
 

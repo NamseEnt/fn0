@@ -1,6 +1,7 @@
 //! In-process backend for tests. Same API as the HTTP backend, backed by a
 //! `BTreeMap` so listings are naturally key-ordered.
 
+use crate::body::Body;
 use crate::{ListEntry, ObjectList, ObjectMetadata, Result};
 use bytes::Bytes;
 use std::collections::BTreeMap;
@@ -25,12 +26,8 @@ impl MemoryBucket {
         }
     }
 
-    pub(crate) async fn put(
-        &self,
-        key: &str,
-        data: Bytes,
-        content_type: Option<&str>,
-    ) -> Result<()> {
+    pub(crate) async fn put(&self, key: &str, body: Body, content_type: Option<&str>) -> Result<()> {
+        let data = body.collect().await;
         self.store.lock().unwrap().insert(
             key.to_string(),
             StoredObject {
