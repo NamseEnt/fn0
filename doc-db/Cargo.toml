@@ -6,6 +6,12 @@ license.workspace = true
 repository.workspace = true
 description = "Document-oriented Turso/libSQL DB (works in both WASI components and native binaries)"
 
+# Dependents reach this crate as `doc_db` through the workspace alias, but that
+# alias does not exist inside the crate's own `tests/`. Naming the lib target to
+# match keeps one spelling everywhere.
+[lib]
+name = "doc_db"
+
 [features]
 dev-test = []
 
