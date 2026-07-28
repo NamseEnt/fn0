@@ -9,6 +9,7 @@ pub struct Props {
     pub nav: Vec<NavSection>,
 }
 
+#[forte_sdk::cache_static]
 pub async fn handler(_req: ForteRequest<'_>) -> anyhow::Result<Props> {
     let doc = docs_site::find("").expect("docs index must exist");
     Ok(Props {
