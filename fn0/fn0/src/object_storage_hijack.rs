@@ -626,7 +626,7 @@ fn sidecar_path(blob_path: &Path) -> PathBuf {
 
 /// Percent-encodes a value for an S3 canonical query string (RFC 3986
 /// unreserved set; `/` is encoded).
-fn uri_encode_query(s: &str) -> String {
+pub(crate) fn uri_encode_query(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for &byte in s.as_bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {

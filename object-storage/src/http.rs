@@ -158,6 +158,56 @@ impl HttpBucket {
         }
         String::from_utf8(response.body.to_vec()).map_err(|e| Error::Parse(e.to_string()))
     }
+
+    pub(crate) async fn presigned_public_put_url(
+        &self,
+        key: &str,
+        content_type: &str,
+        expires: Duration,
+        content_length: Option<u64>,
+    ) -> Result<String> {
+        let mut headers = vec![
+            (
+                "x-fn0-presign-put".to_string(),
+                expires.as_secs().to_string(),
+            ),
+            (
+                "x-fn0-presign-content-type".to_string(),
+                content_type.to_string(),
+            ),
+        ];
+        if let Some(content_length) = content_length {
+            headers.push((
+                "x-fn0-presign-content-length".to_string(),
+                content_length.to_string(),
+            ));
+        }
+        let response = runtime::send(Request {
+            method: "GET",
+            url: self.object_url(key),
+            headers,
+            body: None,
+        })
+        .await?;
+        if response.status != 200 {
+            return Err(unexpected(&response));
+        }
+        String::from_utf8(response.body.to_vec()).map_err(|e| Error::Parse(e.to_string()))
+    }
+
+    pub(crate) async fn purge(&self, key: &str) -> Result<()> {
+        let response = runtime::send(Request {
+            method: "GET",
+            url: self.object_url(key),
+            headers: vec![("x-fn0-public-purge".to_string(), "1".to_string())],
+            body: None,
+        })
+        .await?;
+        if response.status != 202 {
+            return Err(unexpected(&response));
+        }
+        Ok(())
+    }
 }
 
 fn unexpected(response: &Response) -> Error {

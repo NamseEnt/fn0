@@ -503,6 +503,27 @@ fn public_storage_send(
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
         let mut request = request;
+
+        if request.headers().contains_key("x-fn0-public-purge") {
+            let url = hijack.public_url_for(&project_id, request.uri().path());
+            enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, url).await;
+            return Ok((accepted_response()?, empty_io()));
+        }
+
+        if let Some(presign) = public_presign_request(&request) {
+            let url = match hijack.presign_put(
+                &request,
+                &project_id,
+                &presign.content_type,
+                presign.expires_secs,
+                presign.content_length,
+            ) {
+                Ok(url) => url,
+                Err(ec) => return Err(ec.into()),
+            };
+            return Ok((text_response(200, url)?, empty_io()));
+        }
+
         let changes_content = matches!(
             request.method(),
             &http::Method::PUT | &http::Method::POST | &http::Method::DELETE
@@ -538,6 +559,52 @@ fn public_storage_send(
             Box::new(send_io);
         Ok((res, send_io))
     })
+}
+
+struct PublicPresignRequest {
+    content_type: String,
+    expires_secs: u64,
+    content_length: Option<u64>,
+}
+
+fn public_presign_request(
+    request: &http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+) -> Option<PublicPresignRequest> {
+    let headers = request.headers();
+    let expires = headers.get("x-fn0-presign-put")?;
+    let content_type = headers.get("x-fn0-presign-content-type")?;
+    let content_length = match headers.get("x-fn0-presign-content-length") {
+        Some(value) => Some(value.to_str().ok()?.parse().ok()?),
+        None => None,
+    };
+    Some(PublicPresignRequest {
+        content_type: content_type.to_str().ok()?.to_string(),
+        expires_secs: expires.to_str().ok()?.parse().ok()?,
+        content_length,
+    })
+}
+
+fn empty_io() -> Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> {
+    Box::new(async { Ok(()) })
+}
+
+fn text_response(
+    status: u16,
+    body: String,
+) -> std::result::Result<http::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
+    http::Response::builder()
+        .status(status)
+        .body(
+            http_body_util::Full::new(Bytes::from(body))
+                .map_err(|never: std::convert::Infallible| match never {})
+                .boxed_unsync(),
+        )
+        .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))
+}
+
+fn accepted_response()
+-> std::result::Result<http::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
+    text_response(202, String::new())
 }
 
 /// Invalidates the edge copy of a public object the app just replaced.

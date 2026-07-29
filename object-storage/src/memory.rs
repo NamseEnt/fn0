@@ -113,4 +113,8 @@ impl MemoryBucket {
     ) -> Result<String> {
         Ok(format!("memory://{}/{key}", method.to_ascii_lowercase()))
     }
+
+    pub(crate) async fn purge(&self, _key: &str) -> Result<()> {
+        Ok(())
+    }
 }

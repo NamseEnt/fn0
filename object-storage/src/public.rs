@@ -14,6 +14,8 @@
 //! reaches the edge but could never reach a browser, so this is what makes an
 //! overwrite visible to returning visitors immediately.
 
+use std::time::Duration;
+
 use crate::body::Body;
 use crate::http::{self, HttpBucket};
 use crate::memory::MemoryBucket;
@@ -94,6 +96,48 @@ impl PublicBucket {
     /// string building — no request is made.
     pub fn url(&self, key: &str) -> String {
         format!("{}/{}", self.base_url, http::encode_path(key))
+    }
+
+    /// Returns a URL for uploading directly to `key`, without the bytes passing
+    /// through the app. Valid for `expires`; fn0 Cloud clamps longer durations
+    /// to 5 minutes. `content_length` binds the URL to an upload of exactly that
+    /// many bytes; `None` accepts any size.
+    ///
+    /// `Cache-Control` and `Content-Type` are part of the signature, so the
+    /// uploader cannot choose them — a browser-cacheable `max-age` would leave
+    /// copies that no purge could ever reach.
+    ///
+    /// Unlike [`Self::put`], this does **not** invalidate the edge copy: the
+    /// write never reaches the platform. Overwriting a key that is already
+    /// published requires a matching [`Self::purge`], or the edge keeps serving
+    /// the previous bytes for up to a year.
+    pub async fn presigned_put_url(
+        &self,
+        key: &str,
+        content_type: &str,
+        content_length: Option<u64>,
+        expires: Duration,
+    ) -> Result<String> {
+        match &self.inner {
+            Backend::Http(b) => {
+                b.presigned_public_put_url(key, content_type, expires, content_length)
+                    .await
+            }
+            Backend::Memory(b) => b.presigned_url(key, "PUT", expires, content_length).await,
+        }
+    }
+
+    /// Invalidates the edge copy of `key`. [`Self::put`] and [`Self::delete`] do
+    /// this already; this exists for writes that bypassed the platform through
+    /// [`Self::presigned_put_url`].
+    ///
+    /// Returns once the invalidation is queued, not once the edge is
+    /// consistent.
+    pub async fn purge(&self, key: &str) -> Result<()> {
+        match &self.inner {
+            Backend::Http(b) => b.purge(key).await,
+            Backend::Memory(b) => b.purge(key).await,
+        }
     }
 
     /// Fetches object metadata without downloading the body.

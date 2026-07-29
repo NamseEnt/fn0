@@ -12,7 +12,8 @@
 //! a cached page.
 
 use crate::object_storage_hijack::{
-    ObjectStorageHijack, canonical_query_string, hex_encode, hmac_sha256, sha256_hex, signing_key,
+    ObjectStorageHijack, PRESIGN_MAX_EXPIRES_SECS, canonical_query_string, hex_encode, hmac_sha256,
+    sha256_hex, signing_key, uri_encode_query,
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -184,6 +185,97 @@ impl PublicStorageHijack {
         uri.host() == Some(self.placeholder_host.as_str())
     }
 
+    /// Mints a query-signed upload URL for the object at the request path.
+    ///
+    /// `cache-control` and `content-type` go into `SignedHeaders`, so R2 rejects
+    /// an upload that does not send exactly these values. Letting the uploader
+    /// pick its own `max-age` would seed browser copies that no purge can reach,
+    /// which is the one failure this whole design refuses to allow.
+    pub(crate) fn presign_put(
+        &self,
+        req: &HijackRequest,
+        project_id: &str,
+        content_type: &str,
+        expires_secs: u64,
+        content_length: Option<u64>,
+    ) -> Result<String, ErrorCode> {
+        let Backend::R2 {
+            endpoint_host,
+            bucket,
+            region,
+            access_key_id,
+            secret_access_key,
+        } = &self.backend
+        else {
+            return Err(ErrorCode::InternalError(Some(
+                "presign_put called on local backend".to_string(),
+            )));
+        };
+        let canonical_uri = object_path(bucket, project_id, req.uri().path());
+        let expires = expires_secs.clamp(1, PRESIGN_MAX_EXPIRES_SECS);
+        let now = Utc::now();
+        let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
+        let date = now.format("%Y%m%d").to_string();
+        let credential_scope = format!("{date}/{region}/s3/aws4_request");
+        let credential = format!("{access_key_id}/{credential_scope}");
+
+        let mut signed_header_names = vec!["cache-control", "content-type", "host"];
+        if content_length.is_some() {
+            signed_header_names.push("content-length");
+        }
+        signed_header_names.sort_unstable();
+        let signed_headers = signed_header_names.join(";");
+
+        let mut canonical_header_lines = vec![
+            format!("cache-control:{PUBLIC_CACHE_CONTROL}"),
+            format!("content-type:{content_type}"),
+            format!("host:{endpoint_host}"),
+        ];
+        if let Some(content_length) = content_length {
+            canonical_header_lines.push(format!("content-length:{content_length}"));
+        }
+        canonical_header_lines.sort();
+        let canonical_headers = format!("{}\n", canonical_header_lines.join("\n"));
+
+        let mut params = [
+            (
+                "X-Amz-Algorithm".to_string(),
+                "AWS4-HMAC-SHA256".to_string(),
+            ),
+            (
+                "X-Amz-Credential".to_string(),
+                uri_encode_query(&credential),
+            ),
+            ("X-Amz-Date".to_string(), amz_date.clone()),
+            ("X-Amz-Expires".to_string(), expires.to_string()),
+            (
+                "X-Amz-SignedHeaders".to_string(),
+                uri_encode_query(&signed_headers),
+            ),
+        ];
+        params.sort();
+        let canonical_query = params
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect::<Vec<_>>()
+            .join("&");
+
+        let payload_hash = "UNSIGNED-PAYLOAD";
+        let canonical_request = format!(
+            "PUT\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+        );
+        let string_to_sign = format!(
+            "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
+            sha256_hex(canonical_request.as_bytes())
+        );
+        let key = signing_key(secret_access_key, &date, region, "s3");
+        let signature = hex_encode(&hmac_sha256(&key, string_to_sign.as_bytes()));
+
+        Ok(format!(
+            "https://{endpoint_host}{canonical_uri}?{canonical_query}&X-Amz-Signature={signature}"
+        ))
+    }
+
     /// Rewrites an unsigned S3 request in place into a signed R2 request against
     /// the shared static bucket, stamping the platform's cache policy.
     pub(crate) fn sign(&self, req: &mut HijackRequest, project_id: &str) -> Result<(), ErrorCode> {
@@ -310,6 +402,31 @@ fn object_path(bucket: &str, project_id: &str, raw_path: &str) -> String {
 mod tests {
     use super::*;
     use http_body_util::{BodyExt, Full};
+
+    #[test]
+    fn presigned_put_pins_the_cache_policy_into_the_signature() {
+        let hijack = hijack();
+        let req = request(hyper::Method::GET, "https://host/clips/intro.mp4");
+        let url = hijack
+            .presign_put(&req, "proj1", "video/mp4", 300, None)
+            .unwrap();
+
+        // Both headers must be signed, or an uploader could pick a browser-
+        // cacheable max-age that no purge could ever reach.
+        assert!(url.contains("X-Amz-SignedHeaders=cache-control%3Bcontent-type%3Bhost"));
+        assert!(url.contains("X-Amz-Signature="));
+        assert!(url.contains("/fn0-static-asset/proj1/public/clips/intro.mp4?"));
+    }
+
+    #[test]
+    fn presigned_put_expiry_is_clamped() {
+        let hijack = hijack();
+        let req = request(hyper::Method::GET, "https://host/clips/intro.mp4");
+        let url = hijack
+            .presign_put(&req, "proj1", "video/mp4", 86_400, None)
+            .unwrap();
+        assert!(url.contains(&format!("X-Amz-Expires={PRESIGN_MAX_EXPIRES_SECS}")));
+    }
 
     fn hijack() -> PublicStorageHijack {
         PublicStorageHijack::new(PublicStorageConfig {
