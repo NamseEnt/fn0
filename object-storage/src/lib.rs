@@ -43,6 +43,15 @@ pub struct ObjectMetadata {
     pub etag: Option<String>,
 }
 
+/// A fetched object: its stored `Content-Type` and its body, still unread.
+///
+/// `content_type` is `None` when the object was stored without one — measured
+/// against R2, which then omits the header rather than substituting a default.
+pub struct Object {
+    pub content_type: Option<String>,
+    pub body: Body,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ListEntry {
     pub key: String,
@@ -67,18 +76,17 @@ mod tests {
     #[forte_sdk::test]
     async fn put_get_head_delete() {
         let bucket = private::memory();
-        assert_eq!(bucket.get("a").await.unwrap(), None);
+        assert!(bucket.get("a").await.unwrap().is_none());
         assert_eq!(bucket.head("a").await.unwrap(), None);
 
         bucket
-            .put_with_content_type("a", &b"hello"[..], Some("text/plain"))
+            .put("a", Some("text/plain"), &b"hello"[..])
             .await
             .unwrap();
 
-        assert_eq!(
-            bucket.get("a").await.unwrap().as_deref(),
-            Some(&b"hello"[..])
-        );
+        let stored = bucket.get("a").await.unwrap().unwrap();
+        assert_eq!(stored.content_type.as_deref(), Some("text/plain"));
+        assert_eq!(stored.body.bytes().await.unwrap().as_ref(), b"hello");
         assert_eq!(
             bucket.head("a").await.unwrap(),
             Some(ObjectMetadata {
@@ -89,7 +97,48 @@ mod tests {
         );
 
         bucket.delete("a").await.unwrap();
-        assert_eq!(bucket.get("a").await.unwrap(), None);
+        assert!(bucket.get("a").await.unwrap().is_none());
+    }
+
+    #[forte_sdk::test]
+    async fn get_body_feeds_put() {
+        let bucket = private::memory();
+        bucket
+            .put("source", Some("video/mp4"), &b"payload"[..])
+            .await
+            .unwrap();
+
+        let object = bucket.get("source").await.unwrap().unwrap();
+        bucket
+            .put("copy", object.content_type.as_deref(), object.body)
+            .await
+            .unwrap();
+
+        let copied = bucket.get("copy").await.unwrap().unwrap();
+        assert_eq!(copied.content_type.as_deref(), Some("video/mp4"));
+        assert_eq!(copied.body.bytes().await.unwrap().as_ref(), b"payload");
+    }
+
+    #[forte_sdk::test]
+    async fn absent_content_type_round_trips_as_absent() {
+        let bucket = private::memory();
+        bucket.put("blob", None, &b"opaque"[..]).await.unwrap();
+
+        let object = bucket.get("blob").await.unwrap().unwrap();
+        assert_eq!(object.content_type, None);
+        assert_eq!(
+            bucket.head("blob").await.unwrap().unwrap().content_type,
+            None
+        );
+
+        bucket
+            .put("blob-copy", object.content_type.as_deref(), object.body)
+            .await
+            .unwrap();
+        assert_eq!(
+            bucket.get("blob-copy").await.unwrap().unwrap().content_type,
+            None
+        );
     }
 
     #[forte_sdk::test]

@@ -7,8 +7,7 @@
 use crate::body::Body;
 use crate::http::HttpBucket;
 use crate::memory::MemoryBucket;
-use crate::{ObjectList, ObjectMetadata, Result};
-use bytes::Bytes;
+use crate::{Object, ObjectList, ObjectMetadata, Result};
 use std::time::Duration;
 
 /// Connects to the project's private object storage.
@@ -43,16 +42,17 @@ enum Backend {
 
 impl PrivateBucket {
     /// Stores `body` at `key`, overwriting any existing object.
-    pub async fn put(&self, key: &str, body: impl Into<Body>) -> Result<()> {
-        self.put_with_content_type(key, body, None).await
-    }
-
-    /// Stores `body` at `key` with an explicit `Content-Type`.
-    pub async fn put_with_content_type(
+    ///
+    /// Pass a `content_type` for anything a browser will fetch through
+    /// [`PrivateBucket::presigned_get_url`]: no app is in that path to correct a
+    /// wrong guess, and R2 serves no `Content-Type` at all when none was stored.
+    /// `None` stores the object without one, which is what round-trips an
+    /// [`Object`] that had none.
+    pub async fn put(
         &self,
         key: &str,
-        body: impl Into<Body>,
         content_type: Option<&str>,
+        body: impl Into<Body>,
     ) -> Result<()> {
         let body = body.into();
         match &self.inner {
@@ -62,7 +62,11 @@ impl PrivateBucket {
     }
 
     /// Fetches the object at `key`, or `None` if it does not exist.
-    pub async fn get(&self, key: &str) -> Result<Option<Bytes>> {
+    ///
+    /// The body is returned unread: call [`Body::bytes`] for the whole object,
+    /// or hand it to [`PrivateBucket::put`] or an outgoing request to pipe it
+    /// on without holding it in memory.
+    pub async fn get(&self, key: &str) -> Result<Option<Object>> {
         match &self.inner {
             Backend::Http(b) => b.get(key).await,
             Backend::Memory(b) => b.get(key).await,

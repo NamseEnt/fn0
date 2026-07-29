@@ -36,35 +36,77 @@ let bucket: PrivateBucket = object_storage::private::memory();
 ### `put`
 
 ```rust
-bucket.put("avatars/42.png", png_bytes).await?;
+bucket.put("avatars/42.png", Some("image/png"), png_bytes).await?;
 
-// With an explicit Content-Type:
-bucket
-    .put_with_content_type("avatars/42.png", png_bytes, Some("image/png"))
-    .await?;
+// Stored with no type at all:
+bucket.put("scratch/blob", None, bytes).await?;
 ```
+
+Pass a `content_type` for anything a browser will fetch through a presigned URL:
+no app is in that path to correct a wrong guess, and R2 stores no type of its
+own. Measured against a real bucket, an object uploaded without the header is
+served back with **no `Content-Type` at all** — R2 does not substitute
+`application/octet-stream`.
+
+`None` therefore means the object genuinely has no stored type, which is what
+lets an [`Object`](#get) that had none round-trip unchanged. `public::put` takes
+a required `&str` instead, because a public object is by definition fetched from
+the CDN by a browser.
 
 `put` accepts anything that converts into `object_storage::Body` — `Vec<u8>`,
 `&[u8]`, `Bytes`, `String`, `&str`. An existing object at the same key is
 overwritten.
 
-Inside a WASI component a `forte_sdk::http::Body` also converts, which forwards
-an incoming request body straight through without buffering it:
-
-```rust
-bucket.put_with_content_type("uploads/clip.mp4", request.into_body(), Some("video/mp4")).await?;
-```
-
-The length is then unknown until the body ends, so the upload is sent chunked
-rather than with a `Content-Length`.
+A body already being streamed also converts, which forwards it without ever
+holding the object whole — see the `get` examples below. The length is then
+unknown until the body ends, so the upload is sent chunked rather than with a
+`Content-Length`.
 
 ### `get`
 
 ```rust
-let data: Option<Bytes> = bucket.get("avatars/42.png").await?;
+let object: Option<Object> = bucket.get("avatars/42.png").await?;
 ```
 
-Returns `None` if the key does not exist.
+Returns `None` if the key does not exist. `Object` is the stored type plus the
+body, still unread:
+
+```rust
+pub struct Object {
+    pub content_type: Option<String>,
+    pub body: Body,
+}
+```
+
+`content_type` is `None` only for objects genuinely stored without one — by a
+presigned upload, or by a `put` that passed `None`.
+
+Call `bytes()` for the whole object:
+
+```rust
+let Some(object) = bucket.get("avatars/42.png").await? else {
+    return Ok(not_found());
+};
+let data: Bytes = object.body.bytes().await?;
+```
+
+Or pass the body on without reading it. It is already what `put` accepts, and
+inside a WASI component it converts into a `forte_sdk::http::Body` to become the
+body of an outgoing request:
+
+```rust
+// Copy without holding the object in memory, keeping the stored type as it was.
+let object = bucket.get("uploads/clip.mp4").await?.expect("exists");
+bucket
+    .put("archive/clip.mp4", object.content_type.as_deref(), object.body)
+    .await?;
+
+// Or forward it to another service.
+let object = bucket.get("uploads/clip.mp4").await?.expect("exists");
+let request = http::Request::post("https://transcode.example/jobs")
+    .body(forte_sdk::http::Body::from(object.body))?;
+let response = forte_sdk::http::Client::new().send(request).await?;
+```
 
 ### `head`
 

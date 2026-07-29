@@ -1,11 +1,11 @@
-//! Request body for uploads.
+//! Object body, in both directions: what `put` sends and what `get` returns.
 //!
-//! A body is either bytes the caller already holds or, inside a WASM
-//! component, an incoming request body forwarded as-is. Forwarding costs no
-//! copy: the guest hands the same `StreamReader` to the outgoing request, so an
-//! app can pipe an upload to storage without the object ever sitting in linear
-//! memory.
+//! A body is either bytes the caller already holds or a response still being
+//! streamed. Streaming costs no copy — the same stream is handed on — so an
+//! object can be piped from one request to another, storage to storage or
+//! storage to an outgoing call, without ever sitting in memory as a whole.
 
+use crate::Result;
 use bytes::Bytes;
 
 pub struct Body(pub(crate) Inner);
@@ -14,24 +14,31 @@ pub(crate) enum Inner {
     Bytes(Bytes),
     #[cfg(target_arch = "wasm32")]
     Stream(forte_sdk::http::Body),
+    #[cfg(not(target_arch = "wasm32"))]
+    Stream(reqwest::Response),
 }
 
 impl Body {
-    /// `None` for a forwarded stream, whose length is unknown until it ends.
-    /// R2 accepts such a `PUT` as `Transfer-Encoding: chunked`.
+    /// `None` for a stream, whose length is unknown until it ends. R2 accepts
+    /// such a `PUT` as `Transfer-Encoding: chunked`.
     pub(crate) fn known_length(&self) -> Option<usize> {
         match &self.0 {
             Inner::Bytes(bytes) => Some(bytes.len()),
-            #[cfg(target_arch = "wasm32")]
             Inner::Stream(_) => None,
         }
     }
 
-    pub(crate) async fn collect(self) -> Bytes {
+    /// Reads the body to its end, holding all of it in memory.
+    pub async fn bytes(self) -> Result<Bytes> {
         match self.0 {
-            Inner::Bytes(bytes) => bytes,
+            Inner::Bytes(bytes) => Ok(bytes),
             #[cfg(target_arch = "wasm32")]
-            Inner::Stream(body) => body.bytes().await,
+            Inner::Stream(body) => Ok(body.bytes().await),
+            #[cfg(not(target_arch = "wasm32"))]
+            Inner::Stream(response) => response
+                .bytes()
+                .await
+                .map_err(|e| crate::Error::Transport(e.to_string())),
         }
     }
 }
@@ -70,5 +77,25 @@ impl From<&str> for Body {
 impl From<forte_sdk::http::Body> for Body {
     fn from(value: forte_sdk::http::Body) -> Self {
         Body(Inner::Stream(value))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl From<Body> for forte_sdk::http::Body {
+    fn from(value: Body) -> Self {
+        match value.0 {
+            Inner::Bytes(bytes) => forte_sdk::http::Body::Bytes(bytes.to_vec()),
+            Inner::Stream(body) => body,
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl From<Body> for reqwest::Body {
+    fn from(value: Body) -> Self {
+        match value.0 {
+            Inner::Bytes(bytes) => reqwest::Body::from(bytes),
+            Inner::Stream(response) => reqwest::Body::wrap_stream(response.bytes_stream()),
+        }
     }
 }

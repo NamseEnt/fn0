@@ -4,7 +4,6 @@
 
 use crate::body::Body;
 use crate::{Error, Result};
-use bytes::Bytes;
 
 pub(crate) struct Request {
     pub method: &'static str,
@@ -16,7 +15,7 @@ pub(crate) struct Request {
 pub(crate) struct Response {
     pub status: u16,
     pub headers: Vec<(String, String)>,
-    pub body: Bytes,
+    pub body: Body,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -55,17 +54,15 @@ pub(crate) async fn send(req: Request) -> Result<Response> {
             )
         })
         .collect();
-    let body = response.into_body().bytes().await;
     Ok(Response {
         status,
         headers,
-        body,
+        body: Body::from(response.into_body()),
     })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) async fn send(req: Request) -> Result<Response> {
-    use crate::body::Inner;
     use std::sync::OnceLock;
 
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -77,8 +74,8 @@ pub(crate) async fn send(req: Request) -> Result<Response> {
     for (name, value) in &req.headers {
         builder = builder.header(name, value);
     }
-    if let Some(Body(Inner::Bytes(bytes))) = req.body {
-        builder = builder.body(bytes);
+    if let Some(body) = req.body {
+        builder = builder.body(reqwest::Body::from(body));
     }
 
     let response = builder
@@ -97,13 +94,9 @@ pub(crate) async fn send(req: Request) -> Result<Response> {
             )
         })
         .collect();
-    let body = response
-        .bytes()
-        .await
-        .map_err(|e| Error::Transport(e.to_string()))?;
     Ok(Response {
         status,
         headers,
-        body,
+        body: Body(crate::body::Inner::Stream(response)),
     })
 }

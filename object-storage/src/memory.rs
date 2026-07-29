@@ -2,7 +2,7 @@
 //! `BTreeMap` so listings are naturally key-ordered.
 
 use crate::body::Body;
-use crate::{ListEntry, ObjectList, ObjectMetadata, Result};
+use crate::{ListEntry, Object, ObjectList, ObjectMetadata, Result};
 use bytes::Bytes;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -32,7 +32,7 @@ impl MemoryBucket {
         body: Body,
         content_type: Option<&str>,
     ) -> Result<()> {
-        let data = body.collect().await;
+        let data = body.bytes().await?;
         self.store.lock().unwrap().insert(
             key.to_string(),
             StoredObject {
@@ -43,13 +43,11 @@ impl MemoryBucket {
         Ok(())
     }
 
-    pub(crate) async fn get(&self, key: &str) -> Result<Option<Bytes>> {
-        Ok(self
-            .store
-            .lock()
-            .unwrap()
-            .get(key)
-            .map(|object| object.data.clone()))
+    pub(crate) async fn get(&self, key: &str) -> Result<Option<Object>> {
+        Ok(self.store.lock().unwrap().get(key).map(|object| Object {
+            content_type: object.content_type.clone(),
+            body: Body::from(object.data.clone()),
+        }))
     }
 
     pub(crate) async fn head(&self, key: &str) -> Result<Option<ObjectMetadata>> {

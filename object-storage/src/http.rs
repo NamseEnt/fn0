@@ -4,8 +4,7 @@
 
 use crate::body::Body;
 use crate::runtime::{self, Request, Response};
-use crate::{Error, ListEntry, ObjectList, ObjectMetadata, Result};
-use bytes::Bytes;
+use crate::{Error, ListEntry, Object, ObjectList, ObjectMetadata, Result};
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -31,11 +30,11 @@ impl HttpBucket {
         content_type: Option<&str>,
     ) -> Result<()> {
         let mut headers = Vec::new();
+        if let Some(content_type) = content_type {
+            headers.push(("content-type".to_string(), content_type.to_string()));
+        }
         if let Some(length) = body.known_length() {
             headers.push(("content-length".to_string(), length.to_string()));
-        }
-        if let Some(ct) = content_type {
-            headers.push(("content-type".to_string(), ct.to_string()));
         }
         let response = runtime::send(Request {
             method: "PUT",
@@ -46,11 +45,11 @@ impl HttpBucket {
         .await?;
         match response.status {
             200..=299 => Ok(()),
-            _ => Err(unexpected(&response)),
+            _ => Err(unexpected(response).await),
         }
     }
 
-    pub(crate) async fn get(&self, key: &str) -> Result<Option<Bytes>> {
+    pub(crate) async fn get(&self, key: &str) -> Result<Option<Object>> {
         let response = runtime::send(Request {
             method: "GET",
             url: self.object_url(key),
@@ -59,9 +58,12 @@ impl HttpBucket {
         })
         .await?;
         match response.status {
-            200 => Ok(Some(response.body)),
+            200 => Ok(Some(Object {
+                content_type: header(&response.headers, "content-type"),
+                body: response.body,
+            })),
             404 => Ok(None),
-            _ => Err(unexpected(&response)),
+            _ => Err(unexpected(response).await),
         }
     }
 
@@ -76,7 +78,7 @@ impl HttpBucket {
         match response.status {
             200 => Ok(Some(metadata_from_headers(&response.headers))),
             404 => Ok(None),
-            _ => Err(unexpected(&response)),
+            _ => Err(unexpected(response).await),
         }
     }
 
@@ -90,7 +92,7 @@ impl HttpBucket {
         .await?;
         match response.status {
             200..=299 | 404 => Ok(()),
-            _ => Err(unexpected(&response)),
+            _ => Err(unexpected(response).await),
         }
     }
 
@@ -115,9 +117,9 @@ impl HttpBucket {
         })
         .await?;
         if response.status != 200 {
-            return Err(unexpected(&response));
+            return Err(unexpected(response).await);
         }
-        parse_list_xml(&response.body)
+        parse_list_xml(&response.body.bytes().await?)
     }
 
     /// Asks the object-storage hijack to mint a presigned URL. The request is
@@ -154,9 +156,10 @@ impl HttpBucket {
         })
         .await?;
         if response.status != 200 {
-            return Err(unexpected(&response));
+            return Err(unexpected(response).await);
         }
-        String::from_utf8(response.body.to_vec()).map_err(|e| Error::Parse(e.to_string()))
+        String::from_utf8(response.body.bytes().await?.to_vec())
+            .map_err(|e| Error::Parse(e.to_string()))
     }
 
     pub(crate) async fn presigned_public_put_url(
@@ -190,9 +193,10 @@ impl HttpBucket {
         })
         .await?;
         if response.status != 200 {
-            return Err(unexpected(&response));
+            return Err(unexpected(response).await);
         }
-        String::from_utf8(response.body.to_vec()).map_err(|e| Error::Parse(e.to_string()))
+        String::from_utf8(response.body.bytes().await?.to_vec())
+            .map_err(|e| Error::Parse(e.to_string()))
     }
 
     pub(crate) async fn purge(&self, key: &str) -> Result<()> {
@@ -204,20 +208,26 @@ impl HttpBucket {
         })
         .await?;
         if response.status != 202 {
-            return Err(unexpected(&response));
+            return Err(unexpected(response).await);
         }
         Ok(())
     }
 }
 
-fn unexpected(response: &Response) -> Error {
+async fn unexpected(response: Response) -> Error {
+    let status = response.status;
+    let body = response.body.bytes().await.unwrap_or_default();
     Error::UnexpectedStatus {
-        status: response.status,
-        message: String::from_utf8_lossy(&response.body)
-            .chars()
-            .take(512)
-            .collect(),
+        status,
+        message: String::from_utf8_lossy(&body).chars().take(512).collect(),
     }
+}
+
+fn header(headers: &[(String, String)], name: &str) -> Option<String> {
+    headers
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.clone())
 }
 
 fn metadata_from_headers(headers: &[(String, String)]) -> ObjectMetadata {

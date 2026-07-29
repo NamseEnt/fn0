@@ -109,10 +109,10 @@ See [doc-db/overview.md](../doc-db/overview.md#mocking-tests) for the full mock 
 async fn test_file_roundtrip() {
     let bucket = object_storage::private::memory();
 
-    bucket.put("avatars/alice.png", b"fake png data" as &[u8]).await.unwrap();
+    bucket.put("avatars/alice.png", Some("image/png"), b"fake png data" as &[u8]).await.unwrap();
 
-    let data = bucket.get("avatars/alice.png").await.unwrap();
-    assert_eq!(data.unwrap().as_ref(), b"fake png data");
+    let object = bucket.get("avatars/alice.png").await.unwrap().unwrap();
+    assert_eq!(object.body.bytes().await.unwrap().as_ref(), b"fake png data");
 
     bucket.delete("avatars/alice.png").await.unwrap();
     assert!(bucket.get("avatars/alice.png").await.unwrap().is_none());

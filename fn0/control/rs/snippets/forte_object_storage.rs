@@ -1,6 +1,6 @@
 let bucket = object_storage::private::bucket();
 
-bucket.put("avatars/42.png", bytes).await?;
+bucket.put("avatars/42.png", Some("image/png"), bytes).await?;
 
 // hand the browser a direct download link
 let url = bucket
