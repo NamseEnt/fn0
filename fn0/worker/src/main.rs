@@ -16,7 +16,7 @@ use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
     ExecutionContext, MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, PresignGate,
-    PublicStorageHijack, QueueHijack, TursoHijack, VaultHijack,
+    PublicStorageHijack, PurgeGate, QueueHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -143,8 +143,12 @@ fn build_object_storage_hijack(presign_gate: Arc<PresignGate>) -> Arc<ObjectStor
     )
 }
 
-fn build_public_storage_hijack() -> Arc<PublicStorageHijack> {
-    Arc::new(PublicStorageHijack::from_env().expect("public storage hijack init failed"))
+fn build_public_storage_hijack(purge_gate: Arc<PurgeGate>) -> Arc<PublicStorageHijack> {
+    Arc::new(
+        PublicStorageHijack::from_env()
+            .expect("public storage hijack init failed")
+            .with_purge_gate(purge_gate),
+    )
 }
 
 fn main() -> Result<()> {
@@ -246,6 +250,7 @@ async fn run() -> Result<()> {
 
     let direct_hijack = build_cross_project_invoke_hijack();
     let presign_gate = Arc::new(PresignGate::new());
+    let purge_gate = Arc::new(PurgeGate::new());
     let metric_gate = Arc::new(MetricCardinalityGate::new());
 
     let execution_context = Arc::new(
@@ -257,7 +262,7 @@ async fn run() -> Result<()> {
             .with_vault_hijack(build_vault_hijack())
             .with_otlp_hijack(build_otlp_hijack(metric_gate.clone()))
             .with_object_storage_hijack(build_object_storage_hijack(presign_gate.clone()))
-            .with_public_storage_hijack(build_public_storage_hijack())
+            .with_public_storage_hijack(build_public_storage_hijack(purge_gate))
             .with_static_page_storage(Arc::new(static_page_store.clone())),
     );
 

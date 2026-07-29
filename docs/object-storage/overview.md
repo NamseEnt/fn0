@@ -181,8 +181,38 @@ invalidation is queued, **not** once the edge is consistent; until that drains
 the edge may still serve the previous bytes.
 
 There is no `presigned_get_url` here — the object is already public, so signing
-access to it means nothing. There is no presigned upload either: a write that
-bypasses the platform leaves nothing to invalidate the edge copy.
+access to it means nothing.
+
+### Presigned uploads
+
+`presigned_put_url` hands out an upload URL so the bytes never pass through
+your app, which is what makes files larger than the 100 MB request limit
+possible:
+
+```rust
+let url = public
+    .presigned_put_url("clips/intro.mp4", "video/mp4", Some(size), Duration::from_secs(300))
+    .await?;
+```
+
+`Cache-Control` and `Content-Type` are part of the signature. The uploader must
+send exactly those values or R2 rejects the request — a browser-cacheable
+`max-age` chosen by the uploader would seed copies that no invalidation could
+ever reach.
+
+**A presigned write does not invalidate the edge copy.** The platform never sees
+it. Overwriting a key that is already published needs an explicit purge:
+
+```rust
+public.purge("clips/intro.mp4").await?;
+```
+
+Skipping it leaves the edge serving the previous bytes for up to a year. Writing
+to a key that has never been published needs no purge — the edge does not cache
+404s, so there is nothing to invalidate.
+
+`forte purge <key>...` and `fn0 purge <key>...` do the same thing from a
+terminal.
 
 ### Caching
 

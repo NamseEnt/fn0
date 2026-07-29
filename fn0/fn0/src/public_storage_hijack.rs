@@ -11,6 +11,9 @@
 //! can reach, which is exactly what makes a stable public URL unsafe to embed in
 //! a cached page.
 
+use crate::purge_gate::PurgeGate;
+use std::sync::Arc;
+
 use crate::object_storage_hijack::{
     ObjectStorageHijack, PRESIGN_MAX_EXPIRES_SECS, canonical_query_string, hex_encode, hmac_sha256,
     sha256_hex, signing_key, uri_encode_query,
@@ -37,6 +40,7 @@ pub struct PublicStorageHijack {
     backend: Backend,
     public_base_url: String,
     control_project_id: String,
+    purge_gate: Option<Arc<PurgeGate>>,
 }
 
 #[derive(Clone)]
@@ -77,6 +81,20 @@ impl PublicStorageHijack {
             },
             public_base_url: config.public_base_url.trim_end_matches('/').to_string(),
             control_project_id: config.control_project_id,
+            purge_gate: None,
+        }
+    }
+
+    pub fn with_purge_gate(mut self, gate: Arc<PurgeGate>) -> Self {
+        self.purge_gate = Some(gate);
+        self
+    }
+
+    /// `true` when the project may spend one more invalidation this hour.
+    pub(crate) fn allow_purge(&self, project_id: &str) -> bool {
+        match &self.purge_gate {
+            Some(gate) => gate.try_purge(project_id, chrono::Utc::now().timestamp() / 3600),
+            None => true,
         }
     }
 
@@ -99,6 +117,7 @@ impl PublicStorageHijack {
                 dev_base_url.trim_end_matches('/')
             ),
             control_project_id: String::new(),
+            purge_gate: None,
         }
     }
 

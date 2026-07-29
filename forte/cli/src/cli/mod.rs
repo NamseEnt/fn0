@@ -12,6 +12,7 @@ pub mod init;
 pub mod login;
 pub mod open;
 pub mod project_config;
+pub mod purge;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -67,6 +68,14 @@ pub enum Commands {
         /// Print the URL without opening a browser
         #[arg(long)]
         print: bool,
+    },
+    /// Invalidate the edge copy of public objects
+    Purge {
+        /// Keys inside the project's public namespace, e.g. captures/1/0.mp4
+        #[arg(required = true)]
+        keys: Vec<String>,
+        #[arg(short, long)]
+        project: Option<PathBuf>,
     },
     Admin {
         #[command(subcommand)]

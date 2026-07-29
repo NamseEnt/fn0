@@ -505,6 +505,10 @@ fn public_storage_send(
         let mut request = request;
 
         if request.headers().contains_key("x-fn0-public-purge") {
+            if !hijack.allow_purge(&project_id) {
+                let resp = text_response(429, "purge refused: hourly limit reached".to_string())?;
+                return Ok((resp, empty_io()));
+            }
             let url = hijack.public_url_for(&project_id, request.uri().path());
             enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, url).await;
             return Ok((accepted_response()?, empty_io()));

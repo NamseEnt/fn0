@@ -73,6 +73,7 @@ cached, and carry the quotas below.
 | Read operations | 100k / month, 5k / hour | Downloads and HEADs — from your handlers or presigned GET |
 | Presigned URLs minted | 100k / month, 1k / hour | |
 | Presigned URL expiry | 5 minutes maximum | Longer requested expiries are clamped, not rejected |
+| Public object purges | 1k / hour | Explicit `public::purge` calls; the purge a `put` triggers on its own is not counted |
 
 Pages cached by [lazy static page caching](../forte/pages.md#lazy-static-page-caching) live in a platform-internal bucket and count against none of these quotas.
 

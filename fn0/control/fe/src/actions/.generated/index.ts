@@ -18,6 +18,7 @@ export { newProject } from "./new_project";
 export { oauthCliExchange } from "./oauth_cli_exchange";
 export { presignQuota } from "./presign_quota";
 export { promotePendingFn0Wasmtime } from "./promote_pending_fn0_wasmtime";
+export { publicPurge } from "./public_purge";
 export { renameProject } from "./rename_project";
 export { revokeToken } from "./revoke_token";
 export { secretsEncrypt } from "./secrets_encrypt";

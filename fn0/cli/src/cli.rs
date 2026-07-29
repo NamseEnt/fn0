@@ -32,6 +32,14 @@ pub enum Commands {
         #[arg(short, long)]
         port: Option<u16>,
     },
+    /// Invalidate the edge copy of public objects
+    Purge {
+        /// Keys inside the project's public namespace, e.g. captures/1/0.mp4
+        #[arg(required = true)]
+        keys: Vec<String>,
+        #[arg(short, long)]
+        project: Option<String>,
+    },
     Admin {
         #[command(subcommand)]
         command: AdminCommands,

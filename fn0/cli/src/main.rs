@@ -45,6 +45,9 @@ async fn async_main() -> Result<()> {
         Commands::Local { port } => {
             commands::local::execute(port).await?;
         }
+        Commands::Purge { keys, project } => {
+            commands::purge::run(keys, project).await?;
+        }
         Commands::Admin { command } => match command {
             AdminCommands::Run {
                 task,

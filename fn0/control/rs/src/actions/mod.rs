@@ -18,6 +18,7 @@ pub mod new_project;
 pub mod oauth_cli_exchange;
 pub mod presign_quota;
 pub mod promote_pending_fn0_wasmtime;
+pub mod public_purge;
 pub mod rename_project;
 pub mod revoke_token;
 pub mod secrets_encrypt;

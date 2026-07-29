@@ -68,6 +68,11 @@ async fn async_main() -> Result<()> {
             cli::open::run(project_dir, print).await?;
         }
 
+        Commands::Purge { keys, project } => {
+            let project_dir = project.unwrap_or_else(|| ".".into());
+            cli::purge::run(keys, project_dir).await?;
+        }
+
         Commands::Admin { command } => match command {
             AdminCommands::Run {
                 task,

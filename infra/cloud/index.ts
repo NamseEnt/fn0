@@ -504,6 +504,7 @@ const controlEnvYamlBootstrap = pulumi
     objectStorageStorage.accountId,
     controlObjectStorageAccessKeyIdCt,
     controlObjectStorageSecretAccessKeyCt,
+    pulumi.interpolate`https://${staticAssetStorage.publicBaseDomain}`,
   ])
   .apply(
     ([
@@ -537,6 +538,7 @@ const controlEnvYamlBootstrap = pulumi
       objectStorageAccountId,
       objectStorageAccessKeyIdCt,
       objectStorageSecretAccessKeyCt,
+      publicStorageCdnOrigin,
     ]) =>
       [
         "__dek:",
@@ -593,6 +595,9 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${objectStorageAccessKeyIdCt}`,
         "FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY:",
         `  secret: ${objectStorageSecretAccessKeyCt}`,
+        // Control composes public object URLs for purge-by-key, which needs the
+        // same origin the worker hands to apps. Not a credential.
+        `FN0_PUBLIC_STORAGE_CDN_ORIGIN: ${publicStorageCdnOrigin}`,
         "",
       ].join("\n"),
   );
