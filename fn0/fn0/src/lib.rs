@@ -76,6 +76,10 @@ const CACHE_POLICY_ENDPOINT: &str = "/__fn0_cache_policy";
 const CACHE_POLICY_TARGET_PATH_HEADER: &str = "x-fn0-cache-path";
 const CACHE_POLICY_RESPONSE_HEADER: &str = "x-fn0-cache-policy";
 const CACHE_POLICY_STATIC_VALUE: &str = "static";
+/// The edge holds a static page for a year because the deploy-time `cache-tag`
+/// purge, not expiry, is what replaces it. A shorter TTL would only add origin
+/// hits that return the same bytes.
+const STATIC_PAGE_CDN_CACHE_CONTROL: &str = "public, max-age=31536000";
 const EXECUTION_TIME_METRIC_KEY_HEADER: &str = "x-fn0-execution-time-metric-key";
 const FN0_HEADER_PREFIX: &str = "x-fn0-";
 
@@ -923,7 +927,7 @@ fn static_page_response(
         .header(CACHE_CONTROL, "no-cache")
         .header(
             "cloudflare-cdn-cache-control",
-            format!("public, max-age={}", static_page_edge_ttl()),
+            STATIC_PAGE_CDN_CACHE_CONTROL,
         )
         .header("cache-tag", format!("fn0-project-{project_id}"))
         .body(
@@ -959,11 +963,7 @@ fn static_page_response_from_parts(
     );
     parts.headers.insert(
         "cloudflare-cdn-cache-control",
-        hyper::header::HeaderValue::from_str(&format!(
-            "public, max-age={}",
-            static_page_edge_ttl()
-        ))
-        .unwrap(),
+        hyper::header::HeaderValue::from_static(STATIC_PAGE_CDN_CACHE_CONTROL),
     );
     parts.headers.insert(
         "cache-tag",
@@ -1000,13 +1000,6 @@ fn dynamic_ssr_response(mut response: Response) -> Response {
         hyper::header::HeaderValue::from_static("private, no-store"),
     );
     response
-}
-
-fn static_page_edge_ttl() -> u64 {
-    std::env::var("FN0_STATIC_PAGE_EDGE_TTL_SECONDS")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(3600)
 }
 
 fn strip_fn0_headers(mut resp: Response) -> Response {

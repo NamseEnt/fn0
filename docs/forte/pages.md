@@ -241,11 +241,11 @@ A static response carries:
 
 ```
 cache-control: no-cache
-cloudflare-cdn-cache-control: public, max-age=<edge ttl>
+cloudflare-cdn-cache-control: public, max-age=31536000
 cache-tag: fn0-project-<project_id>
 ```
 
-`<edge ttl>` comes from `FN0_STATIC_PAGE_EDGE_TTL_SECONDS` on the worker and defaults to `3600`. `cache-tag` is what deploy-time purges target, so every static page of a project is invalidated together.
+The edge TTL is a fixed year and is not configurable. Expiry is not the invalidation mechanism — `cache-tag` is what deploy-time purges target, so every static page of a project is invalidated together, and a shorter TTL would only add origin hits that return the same bytes.
 
 The CDN consumes `cloudflare-cdn-cache-control` and `cache-tag` and does not forward them. `cache-control: no-cache` does reach the browser, which is what makes a deploy purge effective: the browser revalidates against the edge on every request, the edge serves the cached copy until a purge, and a purge is therefore visible to repeat visitors immediately. A CDN configured to override the browser TTL instead breaks that — purges cannot reach a browser cache, so returning visitors would keep the previous version until their local TTL expired.
 
