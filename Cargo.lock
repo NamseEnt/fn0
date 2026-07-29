@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-object-storage"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bytes",
  "forte-sdk",
@@ -2029,7 +2029,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.57"
+version = "0.3.58"
 dependencies = [
  "aes-gcm",
  "anyhow",

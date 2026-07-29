@@ -98,6 +98,10 @@ impl PublicBucket {
         format!("{}/{}", self.base_url, http::encode_path(key))
     }
 
+    /// The exact `Cache-Control` an upload through [`Self::presigned_put_url`]
+    /// must send. It is part of the signature, so R2 rejects anything else.
+    pub const UPLOAD_CACHE_CONTROL: &'static str = "public, max-age=0, s-maxage=31536000";
+
     /// Returns a URL for uploading directly to `key`, without the bytes passing
     /// through the app. Valid for `expires`; fn0 Cloud clamps longer durations
     /// to 5 minutes. `content_length` binds the URL to an upload of exactly that

@@ -195,10 +195,17 @@ let url = public
     .await?;
 ```
 
-`Cache-Control` and `Content-Type` are part of the signature. The uploader must
-send exactly those values or R2 rejects the request — a browser-cacheable
-`max-age` chosen by the uploader would seed copies that no invalidation could
-ever reach.
+`Cache-Control` and `Content-Type` are part of the signature, so the upload must
+send exactly these two headers or R2 rejects it — a browser-cacheable `max-age`
+chosen by the uploader would seed copies that no invalidation could ever reach:
+
+```
+Cache-Control: public, max-age=0, s-maxage=31536000
+Content-Type: <the content_type you passed>
+```
+
+`PublicBucket::UPLOAD_CACHE_CONTROL` is that string, so a handler can hand it to
+whatever performs the upload rather than hardcoding it.
 
 **A presigned write does not invalidate the edge copy.** The platform never sees
 it. Overwriting a key that is already published needs an explicit purge:

@@ -732,10 +732,16 @@ async fn handle_user_request(
             Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)))
         }
         Err(err) => {
-            if matches!(
-                err.downcast_ref::<fn0::cache::Error>(),
-                Some(fn0::cache::Error::NotFound)
-            ) {
+            // Walk the chain: singleflight and the fetch path wrap this, and a
+            // wrapped NotFound answered 502 instead of 404, which reads as a
+            // broken deploy rather than an absent one.
+            let not_found = err.chain().any(|cause| {
+                matches!(
+                    cause.downcast_ref::<fn0::cache::Error>(),
+                    Some(fn0::cache::Error::NotFound)
+                )
+            });
+            if not_found {
                 return Ok(hyper::Response::builder()
                     .status(404)
                     .header("content-type", "text/plain; charset=utf-8")
@@ -744,7 +750,10 @@ async fn handle_user_request(
                     )))
                     .unwrap());
             }
-            tracing::error!(%err, %project_id, path = %request_path, "Failed to run fn0");
+            // The cause goes in the message, not a field: the log pipeline
+            // forwards message bodies and drops structured fields, so a field
+            // here is invisible exactly when an outage makes it matter.
+            tracing::error!(%project_id, path = %request_path, "Failed to run fn0: {err:#}");
             Ok(hyper::Response::builder()
                 .status(502)
                 .body(Full::new(Bytes::from("Bad Gateway")))
