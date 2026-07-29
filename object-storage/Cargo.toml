@@ -1,10 +1,13 @@
 [package]
 name = "fn0-object-storage"
-version = "0.4.1"
+version = "0.4.2"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "User-facing S3-compatible object storage for fn0/Forte apps (works in both WASI components and native binaries)"
+
+[lib]
+harness = false
 
 [dependencies]
 bytes = { workspace = true }
@@ -12,6 +15,9 @@ thiserror = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 forte-sdk = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+forte-sdk = { workspace = true, features = ["test-harness"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 reqwest = { workspace = true }

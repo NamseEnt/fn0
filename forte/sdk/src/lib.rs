@@ -6,6 +6,8 @@ pub(crate) mod otel;
 pub mod rand;
 pub mod runtime;
 pub mod serve;
+#[cfg(feature = "test-harness")]
+pub mod test_harness;
 pub mod time_wasi;
 
 pub use anyhow;
@@ -16,6 +18,8 @@ pub use forte_json;
 pub use forte_macros::{cache_static, forte_doc, test};
 pub use futures;
 pub use hex;
+#[cfg(feature = "test-harness")]
+pub use inventory;
 pub use serde;
 pub use serde_json;
 pub use sha2;

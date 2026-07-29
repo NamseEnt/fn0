@@ -1,0 +1,21 @@
+package fn0:test-harness;
+
+/// Test discovery and execution for wasm test binaries.
+///
+/// `wasi:cli/run` as emitted by the `wasm32-wasip2` target is a synchronous
+/// export, and a synchronous task may not block on a host future, so libtest's
+/// `main` traps on the first test that performs real I/O. An async export does
+/// not have that restriction, so the runner drives tests through this interface
+/// instead of through `run`.
+interface harness {
+  /// Names of every registered test, sorted.
+  list-tests: async func() -> list<string>;
+
+  /// Run one test. The error carries the failure message; a panic aborts the
+  /// instance instead of returning, which the runner reports as a failure.
+  run-test: async func(name: string) -> result<_, string>;
+}
+
+world tests {
+  export harness;
+}

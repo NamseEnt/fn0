@@ -239,7 +239,7 @@ cargo test
 
 # From the monorepo
 cargo test -p forte-sdk
-cargo test -p fn0-doc-db   # requires docker-compose up -d + forte-test-runner
+cargo test -p fn0-doc-db   # requires docker compose up -d libsql-test + forte-test-runner
 ```
 
 Async test macro:

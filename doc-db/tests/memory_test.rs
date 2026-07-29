@@ -1,5 +1,7 @@
 use doc_db::{BatchOp, DbOp, DbRequest, DbResult, Prepared};
 
+forte_sdk::test_main!();
+
 fn create_test_db() -> doc_db::Database {
     doc_db::memory()
 }

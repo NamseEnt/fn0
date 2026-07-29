@@ -1,0 +1,59 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+
+    services:
+      libsql:
+        image: ghcr.io/tursodatabase/libsql-server:latest
+        ports:
+          - 18123:8080
+        env:
+          SQLD_NODE_NAME: primary
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        run: |
+          rustup update stable
+          rustup target add wasm32-wasip2
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The crates under test build for wasm32-wasip2, so cargo runs their test
+      # binaries through this runner rather than executing them directly. It is
+      # built into the shared target dir instead of `cargo install`ing so the
+      # cache covers wasmtime, which dominates its build.
+      - name: Build forte-test-runner
+        run: |
+          cargo build --release -p forte-test-runner
+          echo "$GITHUB_WORKSPACE/target/release" >> "$GITHUB_PATH"
+
+      - name: Wait for libsql
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18123/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "libsql did not become healthy" >&2
+          exit 1
+
+      - name: Test doc-db
+        working-directory: doc-db
+        run: cargo test
+
+      - name: Test object-storage
+        working-directory: object-storage
+        run: cargo test
+
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings

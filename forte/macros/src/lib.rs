@@ -56,13 +56,19 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let output = input.sig.output;
     let block = input.block;
     quote! {
-        #[::core::prelude::v1::test]
-        pub fn #name() #output {
-            #(#attrs)*
-            async fn __run() #output {
-                #block
+        #(#attrs)*
+        async fn #name() #output {
+            #block
+        }
+
+        ::forte_sdk::inventory::submit! {
+            ::forte_sdk::test_harness::RegisteredTest {
+                module_path: ::core::module_path!(),
+                name: ::core::stringify!(#name),
+                run: || ::std::boxed::Box::pin(async {
+                    ::forte_sdk::test_harness::TestOutcome::into_outcome(#name().await)
+                }),
             }
-            ::forte_sdk::runtime::block_on(async { __run().await })
         }
     }
     .into()

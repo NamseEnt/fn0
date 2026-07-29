@@ -58,6 +58,9 @@ pub struct ObjectList {
 }
 
 #[cfg(test)]
+forte_sdk::test_main!();
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

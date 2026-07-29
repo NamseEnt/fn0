@@ -8,3 +8,15 @@ services:
     environment:
       - SQLD_NODE_NAME=primary
     user: "0:0"
+
+  # `cargo test -p fn0-doc-db` writes and deletes rows, so it gets a server of
+  # its own rather than sharing whatever a dev session has in `libsql`.
+  libsql-test:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    ports:
+      - "18123:8080"
+    volumes:
+      - ./docker/data/libsql-test:/var/lib/sqld
+    environment:
+      - SQLD_NODE_NAME=primary
+    user: "0:0"

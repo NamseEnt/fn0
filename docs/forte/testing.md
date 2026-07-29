@@ -1,6 +1,6 @@
 # Testing Forte Backends
 
-Backend tests in a Forte project are async Rust functions annotated with `#[forte_sdk::test]`. This macro runs the test inside `forte_sdk::runtime::block_on`, which is compatible with the WASI async runtime used by Forte components.
+Backend tests in a Forte project are async Rust functions annotated with `#[forte_sdk::test]`. They do not run under libtest: `forte-test-runner` discovers them through the `fn0:test-harness/harness` export and runs each one in its own component instance.
 
 ## `#[forte_sdk::test]`
 
@@ -13,7 +13,34 @@ async fn my_test() {
 }
 ```
 
-The test function must be `async fn` with no parameters.
+The test function must be `async fn` with no parameters. It may return `()` or a `Result`, and a returned `Err` fails the test just as a panic does.
+
+## Wiring a test target
+
+Every target holding these tests turns libtest off and invokes the harness once:
+
+```toml
+# Cargo.toml
+[[test]]
+name = "my_test"
+harness = false
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+forte-sdk = { version = "0.5", features = ["test-harness"] }
+```
+
+```rust
+// tests/my_test.rs
+forte_sdk::test_main!();
+```
+
+`test_main!()` exports the harness and supplies the `main` that `harness = false` requires. For unit tests living in `src/`, set `harness = false` under `[lib]` and put `#[cfg(test)] forte_sdk::test_main!();` at the crate root.
+
+### Why not libtest
+
+libtest's `main` reaches wasm through the `wasm32-wasip2` target's **synchronous** `wasi:cli/run` export, and a synchronous task may not block on a host future. Any test that performs real I/O — an HTTP request, a database round trip — therefore traps on its first await with `cannot block a synchronous task before returning`, killing the whole run. Only tests that never yield to the host (in-memory backends) survive, which is why the limitation went unnoticed for so long. The harness export is `async`, which lifts that restriction.
+
+Running each test in a fresh instance also contains failures: the guest is `panic = abort`, so under libtest one failing assertion aborts the process and the remaining tests never run.
 
 ## Testing with an In-Memory Database
 
@@ -158,4 +185,18 @@ cargo test -p forte-sdk     # forte-sdk only (native, no runner needed)
 
 ### doc-db integration tests
 
-`doc-db/tests/integration_test.rs` connects to a live libSQL server. See [development.md](../development.md#doc-db-integration-tests) for prerequisites (runner installation and starting the local DB).
+`doc-db/tests/integration_test.rs` connects to a live libSQL server — the `libsql-test` service in `docker-compose.yml`, on `127.0.0.1:18123`. Set `DOC_DB_TEST_URL` to point it elsewhere. See [development.md](../development.md#doc-db-integration-tests) for prerequisites (runner installation and starting the local DB).
+
+### Supported test filters
+
+The runner accepts the parts of libtest's command line that carry over, and ignores the rest rather than failing the run:
+
+| Argument | Behaviour |
+| --- | --- |
+| `<filter>` | substring match on the test name |
+| `--exact` | makes the filters exact matches |
+| `--list` | prints the test names and exits |
+| `--ignored` | runs nothing; there is no `#[ignore]` equivalent |
+| `--nocapture` | accepted; output is never captured to begin with |
+
+Tests run sequentially, and the guest's own panic message is printed above the failure line.

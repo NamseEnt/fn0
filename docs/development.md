@@ -44,7 +44,7 @@ async fn my_async_test() {
 }
 ```
 
-This macro uses `forte_sdk::runtime::block_on` which is compatible with the WASI async runtime.
+These tests do not run under libtest — `forte-test-runner` discovers them through the `fn0:test-harness/harness` export and runs each in its own instance. The target must set `harness = false` and call `forte_sdk::test_main!()`; see [forte/testing.md](forte/testing.md) for the wiring and the reason.
 
 ### doc-db integration tests
 
@@ -56,10 +56,10 @@ This macro uses `forte_sdk::runtime::block_on` which is compatible with the WASI
 cargo install --path forte/test-runner
 ```
 
-2. **Running libSQL server**:
+2. **Running libSQL server** — the `libsql-test` service, on `127.0.0.1:18123`. Override with `DOC_DB_TEST_URL`.
 
 ```sh
-docker-compose up -d
+docker compose up -d libsql-test
 ```
 
 Then run the tests:

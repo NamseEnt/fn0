@@ -1959,7 +1959,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-doc-db"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-object-storage"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "bytes",
  "forte-sdk",
@@ -1985,7 +1985,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-shared-schema"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "fn0-doc-db",
@@ -2029,7 +2029,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.58"
+version = "0.3.59"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2073,7 +2073,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker-agent"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "color-eyre",
@@ -2195,7 +2195,7 @@ dependencies = [
 
 [[package]]
 name = "forte-macros"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2204,7 +2204,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2220,6 +2220,7 @@ dependencies = [
  "http",
  "http-body",
  "http-body-util",
+ "inventory",
  "opentelemetry",
  "opentelemetry-proto",
  "opentelemetry_sdk",

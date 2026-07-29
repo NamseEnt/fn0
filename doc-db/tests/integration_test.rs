@@ -1,9 +1,13 @@
 use doc_db::{BatchOp, DbOp, DbResult, turso_with_config};
 
-const TEST_PORT: u16 = 18123;
+forte_sdk::test_main!();
+
+/// The `libsql-test` service in `docker-compose.yml`.
+const DEFAULT_TEST_URL: &str = "http://127.0.0.1:18123";
 
 fn create_test_db() -> doc_db::Database {
-    turso_with_config(format!("http://127.0.0.1:{}", TEST_PORT), String::new())
+    let url = std::env::var("DOC_DB_TEST_URL").unwrap_or_else(|_| DEFAULT_TEST_URL.to_string());
+    turso_with_config(url, String::new())
 }
 
 #[forte_sdk::test]

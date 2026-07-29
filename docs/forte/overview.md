@@ -41,13 +41,13 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 
 | Package | Version | Crate | Purpose |
 |---|---|---|---|
-| `forte-sdk` | 0.3.7 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
-| `forte-cli` | 0.4.5 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
-| `forte-macros` | 0.5.3 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
+| `forte-sdk` | 0.5.0 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
+| `forte-cli` | 0.4.9 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
+| `forte-macros` | 0.6.0 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
 | `forte-json` | 0.1.1 | `forte/json` | Streaming JSON serializer used for Props serialization |
-| `forte-codegen` | 0.2.1 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
+| `forte-codegen` | 0.2.2 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
 | `forte-wit` | 0.1.0 | `forte/wit` | Embeds the WASI WIT definitions (wasi:http p3 world); provides `extract_wit()` for build scripts |
-| `forte-test-runner` | 0.1.0 | `forte/test-runner` | Binary used as the `[target.wasm32-wasip2] runner` to execute WASM test binaries |
+| `forte-test-runner` | 0.1.0 | `forte/test-runner` | Binary used as the `[target.wasm32-wasip2] runner`; drives `fn0:test-harness/harness` exports test by test |
 | `forte-rs-to-ts` | 0.1.9 | `forte/rs-to-ts` | Standalone binary: Rust → TypeScript type generator (uses private rustc APIs; downloaded automatically) |
 
 ## Project Structure

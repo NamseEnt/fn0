@@ -1,6 +1,6 @@
 [package]
 name = "fn0-doc-db"
-version = "0.4.6"
+version = "0.4.7"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -15,6 +15,14 @@ name = "doc_db"
 [features]
 dev-test = []
 
+[[test]]
+name = "integration_test"
+harness = false
+
+[[test]]
+name = "memory_test"
+harness = false
+
 [dependencies]
 anyhow = { workspace = true }
 bytes = { workspace = true }
@@ -25,6 +33,9 @@ tracing = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 forte-sdk = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+forte-sdk = { workspace = true, features = ["test-harness"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rand = { workspace = true }
