@@ -6,6 +6,9 @@ import { callAction } from "@forte/react";
 const InputSchema = z.object({
     projectId: z.string(),
     domain: z.string(),
+    certificatePem: z.string().optional(),
+    privateKeyPem: z.string().optional(),
+    notAfterEpochSeconds: z.number().optional(),
   });
 
 const OutputSchema = z.discriminatedUnion("t", [

@@ -35,7 +35,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     delete_bundle_store_objects(&project_id, now).await?;
     delete_static_assets(&project_id, &storage, now).await?;
     delete_static_pages(&project_id, &storage, now).await?;
-    delete_object_storage_bucket(&project_id, &storage, now).await?;
+    delete_object_storage(&project_id, &storage, now).await?;
     delete_cloudflare_config(&db, &project_id).await?;
     delete_turso_database(&project_id).await?;
     delete_compiled_bundle_docs(&db, &project_id).await?;
@@ -149,19 +149,35 @@ async fn delete_static_pages(
     Ok(())
 }
 
-// The buckets a user's projects share are deliberately left standing: another
-// of their projects is probably still writing into them, and an empty bucket
-// costs nothing.
-async fn delete_object_storage_bucket(
+/// Empties the project's object storage.
+///
+/// The bucket itself is left standing for a connected project: fn0 holds only
+/// an object-scoped credential there, by design, and the bucket sits in the
+/// user's own account for them to remove. On the platform's own account the
+/// bucket is ours and goes with the project.
+async fn delete_object_storage(
     project_id: &str,
     storage: &ProjectStorage,
     now: DateTime,
 ) -> anyhow::Result<()> {
     let store = ProjectR2Store::objects(storage);
-    let cloudflare = storage.cloudflare()?;
-    // S3 ListObjectsV2 errors on a missing bucket instead of returning an
-    // empty page, so existence is checked up front to keep this step
-    // re-runnable.
+    if storage.is_byoc() {
+        // S3 ListObjectsV2 errors on a missing bucket rather than returning an
+        // empty page, and a project that never wrote an object may not have one.
+        match store.list_all("", now).await {
+            Ok(objects) => {
+                for object in objects {
+                    store.delete(&object.key, now).await?;
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%project_id, %error, "project_teardown: object storage unreadable, skipping");
+            }
+        }
+        return Ok(());
+    }
+
+    let cloudflare = crate::common::cloudflare::CloudflareClient::from_env()?;
     if !cloudflare.r2_bucket_exists(store.bucket()).await? {
         return Ok(());
     }

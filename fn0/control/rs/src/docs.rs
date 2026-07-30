@@ -141,14 +141,17 @@ pub enum CloudflareConnectionState {
 /// The Cloudflare account a project's objects, assets, pages and custom domain
 /// live in.
 ///
-/// The bootstrap token is the user's own account token and never leaves the
-/// control plane: it can create buckets, purge caches and sign certificates,
-/// which is a wider capability than any worker needs. Only the data-plane
-/// secret travels to workers, and only as ciphertext.
+/// Deliberately absent: the account-wide token that created all of this. That
+/// token can delete every bucket in the user's account and sign certificates
+/// for their zone, and fn0 never receives it — the CLI uses it on the user's
+/// own machine to provision, mints the two narrow credentials below, and
+/// discards it. What is stored here is what a full compromise of the worker
+/// fleet would yield: object access to three buckets, and cache purge.
 ///
 /// Buckets are per Cloudflare account, not per project: one account's projects
 /// share `asset_bucket` and `page_bucket` under `{project_id}/` prefixes, so a
 /// user's zone needs one `static.` DNS record however many projects they run.
+/// `object_bucket` is per project.
 #[forte_doc]
 pub struct ProjectCloudflareConfigDoc {
     #[pk]
@@ -157,11 +160,18 @@ pub struct ProjectCloudflareConfigDoc {
     pub zone_id: String,
     pub zone_name: String,
     pub static_hostname: String,
+    pub object_bucket: String,
     pub asset_bucket: String,
     pub page_bucket: String,
-    pub bootstrap_token_ciphertext: String,
+    /// R2 object read+write, scoped to the three buckets above. Cannot delete a
+    /// bucket, cannot reach any other bucket, and cannot call the REST API at
+    /// all — measured, not assumed.
     pub dataplane_access_key_id: String,
     pub dataplane_secret_ciphertext: String,
+    /// Cache purge on this one zone, and nothing else. Runtime needs it because
+    /// a public object write purges its edge copy, and that happens on a
+    /// request rather than on the user's machine.
+    pub purge_token_ciphertext: String,
     pub state: CloudflareConnectionState,
     pub checked_at: DateTime,
     /// Bumped on every credential or bucket change so workers can skip

@@ -1,6 +1,6 @@
 use crate::common::auth;
 use crate::common::byoc::ProjectStorage;
-use crate::common::{cert_manifest, origin_cert};
+use crate::common::cert_manifest;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,16 @@ use std::collections::HashMap;
 pub struct Input {
     pub project_id: String,
     pub domain: String,
+    /// Origin certificate for `domain`, signed through the owner's own
+    /// Cloudflare Origin CA by the CLI. fn0 cannot sign one: that needs a token
+    /// it deliberately never holds. Absent for a project still on the platform
+    /// account, where a Cloudflare for SaaS hostname is registered instead.
+    #[serde(default)]
+    pub certificate_pem: Option<String>,
+    #[serde(default)]
+    pub private_key_pem: Option<String>,
+    #[serde(default)]
+    pub not_after_epoch_seconds: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -173,7 +183,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     // A project on the platform's account still goes through Cloudflare for
     // SaaS: there is no user zone to issue an origin certificate on, and the
     // request never reaches this fleet with their hostname in SNI.
-    let Some(storage) = storage else {
+    let Some(_connected) = storage else {
         if let Err(e) =
             crate::enqueue::cloudflare_register(crate::queue_task::cloudflare_register::Input {
                 domain: domain.clone(),
@@ -194,33 +204,33 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::InternalError;
     };
 
-    let now = forte_sdk::now();
-    let issued = match origin_cert::issue(&storage, &domain, now).await {
-        Ok(issued) => issued,
+    let (Some(certificate_pem), Some(private_key_pem), Some(not_after_epoch_seconds)) = (
+        req.body.certificate_pem.clone(),
+        req.body.private_key_pem.clone(),
+        req.body.not_after_epoch_seconds,
+    ) else {
+        return Output::CertificateFailed {
+            message: "this project runs on your own Cloudflare account, so the origin \
+                      certificate has to be issued by the CLI; upgrade the CLI and retry"
+                .to_string(),
+        };
+    };
+    let key_ciphertext = match crate::common::vault::encrypt(private_key_pem.as_bytes()).await {
+        Ok(ciphertext) => ciphertext,
         Err(e) => {
-            tracing::error!("domain_add origin certificate: {e}");
-            return Output::CertificateFailed {
-                message: format!("{e}"),
-            };
+            tracing::error!("domain_add key encrypt: {e}");
+            return Output::InternalError;
         }
     };
-    let key_ciphertext =
-        match crate::common::vault::encrypt(issued.private_key_pem.as_bytes()).await {
-            Ok(ciphertext) => ciphertext,
-            Err(e) => {
-                tracing::error!("domain_add key encrypt: {e}");
-                return Output::InternalError;
-            }
-        };
 
     if let Err(e) = cert_manifest::put(
         &db,
         &domain,
         WorkerHostnameCert {
             project_id: project_id.clone(),
-            cert_pem: issued.certificate_pem,
+            cert_pem: certificate_pem,
             key_ciphertext,
-            not_after_epoch_seconds: issued.not_after_epoch_seconds,
+            not_after_epoch_seconds,
         },
     )
     .await

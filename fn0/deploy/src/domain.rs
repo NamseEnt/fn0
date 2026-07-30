@@ -1,26 +1,75 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
+use crate::cloudflare_provision::Provisioner;
+
 #[derive(Serialize)]
 struct DomainAddInput<'a> {
     project_id: &'a str,
     domain: &'a str,
+    certificate_pem: Option<&'a str>,
+    private_key_pem: Option<&'a str>,
+    not_after_epoch_seconds: Option<i64>,
 }
 
 #[derive(Deserialize)]
 #[serde(tag = "t", rename_all_fields = "camelCase")]
 enum DomainAdd {
-    Ok,
+    Ok {
+        origin_ip: String,
+        needs_dns_record: bool,
+    },
     NotLoggedIn,
     NotFound,
-    InvalidDomain { message: String },
-    DomainTaken { existing_project_id: String },
-    AlreadyHasDomain { current_domain: String },
+    InvalidDomain {
+        message: String,
+    },
+    CertificateFailed {
+        message: String,
+    },
+    DomainTaken {
+        existing_project_id: String,
+    },
+    AlreadyHasDomain {
+        current_domain: String,
+    },
     InternalError,
 }
 
-pub async fn domain_add(project_id: &str, domain: &str) -> Result<()> {
+/// Attaching a domain to a project on the owner's own Cloudflare account needs
+/// an origin certificate, and only a token with `SSL and Certificates -> Edit`
+/// can sign one. fn0 does not hold such a token by design, so the CLI signs the
+/// certificate here and uploads it. `account_id`/`zone_id`/`api_token` are the
+/// same ones used for `cloudflare connect`.
+pub struct OriginCertificateRequest<'a> {
+    pub account_id: &'a str,
+    pub zone_id: &'a str,
+    pub api_token: &'a str,
+}
+
+pub async fn domain_add(
+    project_id: &str,
+    domain: &str,
+    certificate: Option<OriginCertificateRequest<'_>>,
+) -> Result<()> {
     let creds = crate::credentials::require()?;
+
+    let issued = match certificate {
+        Some(request) => {
+            println!("signing an origin certificate for {domain} (this runs locally)...");
+            Some(
+                Provisioner::new(
+                    request.api_token.to_string(),
+                    request.account_id.to_string(),
+                    request.zone_id.to_string(),
+                )
+                .issue_origin_certificate(domain)
+                .await?,
+            )
+        }
+        None => None,
+    };
+
     let client = reqwest::Client::new();
     let url = format!(
         "{}/__forte_action/domain_add",
@@ -29,19 +78,40 @@ pub async fn domain_add(project_id: &str, domain: &str) -> Result<()> {
     let resp = client
         .post(&url)
         .bearer_auth(&creds.token)
-        .json(&DomainAddInput { project_id, domain })
+        .json(&DomainAddInput {
+            project_id,
+            domain,
+            certificate_pem: issued.as_ref().map(|i| i.certificate_pem.as_str()),
+            private_key_pem: issued.as_ref().map(|i| i.private_key_pem.as_str()),
+            not_after_epoch_seconds: issued.as_ref().map(|i| i.not_after_epoch_seconds),
+        })
         .send()
         .await?
         .error_for_status()?;
     let raw: DomainAdd = resp.json().await?;
     match raw {
-        DomainAdd::Ok => {
+        DomainAdd::Ok {
+            origin_ip,
+            needs_dns_record,
+        } => {
             println!("domain '{domain}' attached to project '{project_id}'");
-            println!(
-                "Cloudflare hostname registration is queued; run `fn0 domain status` to check."
-            );
+            if needs_dns_record {
+                println!();
+                println!("add this record in your Cloudflare dashboard, then you are done:");
+                println!("    A   {domain}   {origin_ip}   (proxied / orange cloud)");
+                println!();
+                println!(
+                    "it must stay proxied: the origin certificate is trusted by Cloudflare's \
+                     edge only, so turning the record grey breaks the hostname."
+                );
+            } else {
+                println!(
+                    "Cloudflare hostname registration is queued; run `forte domain status` to check."
+                );
+            }
             Ok(())
         }
+        DomainAdd::CertificateFailed { message } => Err(anyhow!("{message}")),
         DomainAdd::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
         DomainAdd::NotFound => Err(anyhow!(
             "project '{project_id}' not found or not owned by you."

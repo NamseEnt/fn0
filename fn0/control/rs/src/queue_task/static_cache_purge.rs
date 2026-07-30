@@ -111,7 +111,7 @@ async fn purge_user_zone(
     };
     let tag = format!("fn0-project-{}", input.project_id);
     storage
-        .cloudflare()?
+        .purge_client()?
         .purge_cache_tags(&[tag.as_str()])
         .await?;
     tracing::info!(

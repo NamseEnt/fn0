@@ -282,7 +282,22 @@ impl BundleEnv {
 
 async fn ensure_all_resources(project_id: &str, storage: &ProjectStorage) -> anyhow::Result<()> {
     ensure_turso_database(project_id).await?;
-    storage.ensure_resources(project_id).await?;
+    // A connected project's buckets were created by the CLI at connect time,
+    // with a token that is gone. Control has no way to create one here and no
+    // need to: `cloudflare_connect` refuses a configuration whose buckets it
+    // cannot reach.
+    if !storage.is_byoc() {
+        ensure_platform_object_bucket(&storage.object_bucket).await?;
+    }
+    Ok(())
+}
+
+async fn ensure_platform_object_bucket(bucket: &str) -> anyhow::Result<()> {
+    let cloudflare = crate::common::cloudflare::CloudflareClient::from_env()?;
+    cloudflare.create_r2_bucket(bucket, Some("apac")).await?;
+    cloudflare
+        .put_r2_bucket_cors(bucket, &["GET", "PUT", "HEAD"], "*", &["ETag"])
+        .await?;
     Ok(())
 }
 

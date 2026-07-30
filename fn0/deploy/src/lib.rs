@@ -4,6 +4,7 @@ mod asset_origin;
 mod bundle;
 pub mod cli_login;
 mod cloudflare;
+mod cloudflare_provision;
 pub mod credentials;
 mod deploy;
 mod domain;

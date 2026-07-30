@@ -221,7 +221,7 @@ Run the project's object storage, CDN and custom domain on your own Cloudflare a
 
 | Subcommand | Description |
 |---|---|
-| `connect` | Verify and store your Cloudflare credentials, then provision the buckets and CDN hostname |
+| `connect` | Provision your Cloudflare account locally, then hand fn0 two narrow credentials. Your account-wide token never leaves your machine |
 | `status` | Show which account the project uses and whether its credentials still work |
 
 ```sh
@@ -240,7 +240,7 @@ Manage custom domains for the deployed project.
 
 | Subcommand | Description |
 |---|---|
-| `add <domain>` | Attach a custom domain |
+| `add <domain>` | Attach a custom domain. On your own Cloudflare account, pass `--account-id --zone-id --api-token` so the CLI can sign the origin certificate locally |
 | `remove` | Detach the custom domain |
 | `status` | Show custom domain status |
 
@@ -252,7 +252,7 @@ forte domain status
 forte domain remove
 ```
 
-For a project on your own Cloudflare account, `add` issues an origin certificate through your Origin CA and prints the IP to point a **proxied** `A` record at. For a project still on the fn0 platform account, it registers a Cloudflare for SaaS hostname and you point a `CNAME` at fn0 instead.
+For a project on your own Cloudflare account, `add` signs an origin certificate through your Origin CA **on your machine** — fn0 holds no token that can sign one — uploads it, and prints the IP to point a **proxied** `A` record at. For a project still on the fn0 platform account, it registers a Cloudflare for SaaS hostname and you point a `CNAME` at fn0 instead.
 
 ---
 

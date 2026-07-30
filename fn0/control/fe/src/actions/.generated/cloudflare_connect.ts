@@ -7,19 +7,23 @@ const InputSchema = z.object({
     projectId: z.string(),
     accountId: z.string(),
     zoneId: z.string(),
-    apiToken: z.string(),
+    zoneName: z.string(),
+    staticHostname: z.string(),
+    objectBucket: z.string(),
+    assetBucket: z.string(),
+    pageBucket: z.string(),
+    dataplaneAccessKeyId: z.string(),
+    dataplaneSecret: z.string(),
+    purgeToken: z.string(),
   });
 
 const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
-    staticHostname: z.string(),
-    assetBucket: z.string(),
-    pageBucket: z.string(),
   }),
     z.object({
-    t: z.literal("MissingPermissions"),
-    missing: z.array(z.string()),
+    t: z.literal("CredentialRejected"),
+    reason: z.string(),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),

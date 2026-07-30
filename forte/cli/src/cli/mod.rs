@@ -118,9 +118,18 @@ pub enum EnvCommands {
 
 #[derive(Subcommand)]
 pub enum DomainCommands {
-    /// Attach a custom domain to this project (CNAME-based)
+    /// Attach a custom domain to this project
     Add {
         domain: String,
+        /// Required for a project on your own Cloudflare account: the origin
+        /// certificate is signed here, because fn0 holds no token that can
+        /// sign one
+        #[arg(long)]
+        account_id: Option<String>,
+        #[arg(long)]
+        zone_id: Option<String>,
+        #[arg(long)]
+        api_token: Option<String>,
         #[arg(short, long)]
         project: Option<PathBuf>,
     },

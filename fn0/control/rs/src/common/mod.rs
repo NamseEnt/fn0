@@ -7,7 +7,6 @@ pub mod cloudflare;
 pub mod cloudflare_saas;
 pub mod docs_site;
 pub mod github;
-pub mod origin_cert;
 pub mod project_name;
 pub mod r2_store;
 pub mod vault;

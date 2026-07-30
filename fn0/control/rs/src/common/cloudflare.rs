@@ -20,8 +20,9 @@ impl CloudflareClient {
         })
     }
 
-    /// A client bound to a user's own account and zone, driven by their token.
-    pub fn for_account(api_token: String, account_id: String, zone_id: String) -> Self {
+    /// A client bound to one user's zone, driven by their purge-scoped token.
+    /// It can purge and read zone metadata; anything else answers 403.
+    pub fn for_zone(api_token: String, account_id: String, zone_id: String) -> Self {
         Self {
             api_token,
             account_id,
@@ -52,9 +53,8 @@ impl CloudflareClient {
         Ok((status, body))
     }
 
-    /// `location_hint` is `None` for a user's own account: their objects should
-    /// land wherever Cloudflare places them for that account, not where the
-    /// platform's own fleet happens to sit.
+    /// Platform account only. A user's account is provisioned by the CLI with
+    /// a token fn0 never holds.
     pub async fn create_r2_bucket(
         &self,
         bucket_name: &str,
@@ -72,10 +72,7 @@ impl CloudflareClient {
         })?;
         let path = format!("/accounts/{}/r2/buckets", self.account_id);
         let (status, body) = self.call("POST", &path, payload).await?;
-        if (200..300).contains(&status) {
-            return Ok(());
-        }
-        if response_indicates_already_exists(&body) {
+        if (200..300).contains(&status) || response_indicates_already_exists(&body) {
             return Ok(());
         }
         anyhow::bail!(
@@ -84,33 +81,7 @@ impl CloudflareClient {
         );
     }
 
-    pub async fn r2_bucket_exists(&self, bucket_name: &str) -> anyhow::Result<bool> {
-        let path = format!("/accounts/{}/r2/buckets/{}", self.account_id, bucket_name);
-        let (status, body) = self.call("GET", &path, Vec::new()).await?;
-        if (200..300).contains(&status) {
-            return Ok(true);
-        }
-        if status == 404 {
-            return Ok(false);
-        }
-        anyhow::bail!(
-            "r2_bucket_exists {bucket_name} failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-
-    pub async fn delete_r2_bucket(&self, bucket_name: &str) -> anyhow::Result<()> {
-        let path = format!("/accounts/{}/r2/buckets/{}", self.account_id, bucket_name);
-        let (status, body) = self.call("DELETE", &path, Vec::new()).await?;
-        if (200..300).contains(&status) || status == 404 {
-            return Ok(());
-        }
-        anyhow::bail!(
-            "delete_r2_bucket {bucket_name} failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-
+    /// Platform account only.
     pub async fn put_r2_bucket_cors(
         &self,
         bucket_name: &str,
@@ -157,6 +128,34 @@ impl CloudflareClient {
         }
         anyhow::bail!(
             "put_r2_bucket_cors {bucket_name} failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
+    /// Platform account only.
+    pub async fn delete_r2_bucket(&self, bucket_name: &str) -> anyhow::Result<()> {
+        let path = format!("/accounts/{}/r2/buckets/{}", self.account_id, bucket_name);
+        let (status, body) = self.call("DELETE", &path, Vec::new()).await?;
+        if (200..300).contains(&status) || status == 404 {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "delete_r2_bucket {bucket_name} failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
+    pub async fn r2_bucket_exists(&self, bucket_name: &str) -> anyhow::Result<bool> {
+        let path = format!("/accounts/{}/r2/buckets/{}", self.account_id, bucket_name);
+        let (status, body) = self.call("GET", &path, Vec::new()).await?;
+        if (200..300).contains(&status) {
+            return Ok(true);
+        }
+        if status == 404 {
+            return Ok(false);
+        }
+        anyhow::bail!(
+            "r2_bucket_exists {bucket_name} failed (status={status}): {}",
             String::from_utf8_lossy(&body)
         );
     }
@@ -335,240 +334,11 @@ impl CloudflareClient {
             .name)
     }
 
-    /// Attaches `hostname` to `bucket_name` so the bucket is publicly readable
-    /// through the zone's CDN. Idempotent: an already-attached domain answers
-    /// with an "already exists" error that is not a failure here.
-    pub async fn create_r2_custom_domain(
-        &self,
-        bucket_name: &str,
-        hostname: &str,
-    ) -> anyhow::Result<()> {
-        #[derive(Serialize)]
-        struct Body<'a> {
-            domain: &'a str,
-            #[serde(rename = "zoneId")]
-            zone_id: &'a str,
-            enabled: bool,
-        }
-        let zone_id = self.zone_id()?;
-        let payload = serde_json::to_vec(&Body {
-            domain: hostname,
-            zone_id,
-            enabled: true,
-        })?;
-        let path = format!(
-            "/accounts/{}/r2/buckets/{bucket_name}/domains/custom",
-            self.account_id
-        );
-        let (status, body) = self.call("POST", &path, payload).await?;
-        if (200..300).contains(&status) || response_indicates_already_exists(&body) {
-            return Ok(());
-        }
-        anyhow::bail!(
-            "create_r2_custom_domain {hostname} failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-
-    pub async fn delete_r2_custom_domain(
-        &self,
-        bucket_name: &str,
-        hostname: &str,
-    ) -> anyhow::Result<()> {
-        let path = format!(
-            "/accounts/{}/r2/buckets/{bucket_name}/domains/custom/{hostname}",
-            self.account_id
-        );
-        let (status, body) = self.call("DELETE", &path, Vec::new()).await?;
-        if (200..300).contains(&status) || status == 404 {
-            return Ok(());
-        }
-        anyhow::bail!(
-            "delete_r2_custom_domain {hostname} failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-
-    /// Signs `csr` through the zone owner's Cloudflare Origin CA.
-    ///
-    /// The certificate is trusted only by the Cloudflare edge, for the edge to
-    /// origin leg, which is exactly the leg the worker terminates. We hold the
-    /// private key and it never leaves the platform, so the user grants
-    /// certificate issuance without handing over a key.
-    pub async fn create_origin_ca_certificate(
-        &self,
-        csr: &str,
-        hostnames: &[String],
-        request_type: &str,
-        requested_validity_days: u32,
-    ) -> anyhow::Result<OriginCertificate> {
-        #[derive(Serialize)]
-        struct Body<'a> {
-            csr: &'a str,
-            hostnames: &'a [String],
-            request_type: &'a str,
-            requested_validity: u32,
-        }
-        #[derive(Deserialize)]
-        struct Envelope {
-            result: Option<CertificateResult>,
-        }
-        #[derive(Deserialize)]
-        struct CertificateResult {
-            id: String,
-            certificate: String,
-            expires_on: String,
-        }
-        let payload = serde_json::to_vec(&Body {
-            csr,
-            hostnames,
-            request_type,
-            requested_validity: requested_validity_days,
-        })?;
-        let (status, body) = self.call("POST", "/certificates", payload).await?;
-        if !(200..300).contains(&status) {
-            anyhow::bail!(
-                "create_origin_ca_certificate failed (status={status}): {}",
-                String::from_utf8_lossy(&body)
-            );
-        }
-        let result = serde_json::from_slice::<Envelope>(&body)?
-            .result
-            .ok_or_else(|| anyhow::anyhow!("create_origin_ca_certificate: missing result"))?;
-        Ok(OriginCertificate {
-            id: result.id,
-            certificate_pem: result.certificate,
-            expires_on: result.expires_on,
-        })
-    }
-
-    pub async fn revoke_origin_ca_certificate(&self, certificate_id: &str) -> anyhow::Result<()> {
-        let path = format!("/certificates/{certificate_id}");
-        let (status, body) = self.call("DELETE", &path, Vec::new()).await?;
-        if (200..300).contains(&status) || status == 404 {
-            return Ok(());
-        }
-        anyhow::bail!(
-            "revoke_origin_ca_certificate failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-
-    /// Creates the cache rule the static page and public object caches depend
-    /// on, leaving the zone's other cache rules alone.
-    ///
-    /// `PURGE` has to be in the method match: without it the purge API still
-    /// answers `success: true` while the edge keeps serving the old object,
-    /// which is a silent year of stale bytes under `s-maxage=31536000` (#68).
-    ///
-    /// The phase entrypoint only accepts a whole rule list, and a `PUT` of one
-    /// rule deletes every other rule in the zone. This is a user's own zone and
-    /// this runs on every deploy, so the existing rules are read back and
-    /// carried through untouched; ours is matched by description so a re-run
-    /// replaces it instead of stacking duplicates.
-    /// The zone's current cache rules, as opaque values so the ones fn0 does
-    /// not own survive a round trip untouched.
-    ///
-    /// Doubles as the connect-time probe for `Zone -> Cache Rules`: a token
-    /// without it answers 403 here rather than failing later inside a deploy.
-    pub async fn read_cache_rules(&self) -> anyhow::Result<Vec<serde_json::Value>> {
-        #[derive(Deserialize)]
-        struct Envelope {
-            result: Option<RulesetResult>,
-        }
-        #[derive(Deserialize)]
-        struct RulesetResult {
-            #[serde(default)]
-            rules: Vec<serde_json::Value>,
-        }
-
-        let path = format!(
-            "/zones/{}/rulesets/phases/http_request_cache_settings/entrypoint",
-            self.zone_id()?
-        );
-        let (status, body) = self.call("GET", &path, Vec::new()).await?;
-        if (200..300).contains(&status) {
-            return Ok(serde_json::from_slice::<Envelope>(&body)?
-                .result
-                .map(|ruleset| ruleset.rules)
-                .unwrap_or_default());
-        }
-        // A zone with no cache rules yet has no entrypoint ruleset at all,
-        // which reads as 404 rather than an empty list.
-        if status == 404 {
-            return Ok(Vec::new());
-        }
-        anyhow::bail!(
-            "read_cache_rules failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-
-    pub async fn ensure_cache_rule(&self, hostname: &str) -> anyhow::Result<()> {
-        const RULE_DESCRIPTION: &str = "fn0 static assets, public objects and cached pages";
-
-        #[derive(Serialize)]
-        struct Body {
-            rules: Vec<serde_json::Value>,
-        }
-
-        let zone_id = self.zone_id()?;
-        let path =
-            format!("/zones/{zone_id}/rulesets/phases/http_request_cache_settings/entrypoint");
-
-        let mut rules = self.read_cache_rules().await?;
-
-        rules.retain(|rule| {
-            rule.get("description").and_then(|value| value.as_str()) != Some(RULE_DESCRIPTION)
-        });
-        // Ahead of the zone's own rules: the first match wins in a ruleset, and
-        // a broad user rule that disabled caching would otherwise swallow the
-        // asset hostname.
-        rules.insert(
-            0,
-            serde_json::json!({
-                "action": "set_cache_settings",
-                "expression": format!(
-                    r#"(http.host eq "{hostname}" and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
-                ),
-                "description": RULE_DESCRIPTION,
-                "action_parameters": {
-                    "cache": true,
-                    // Without this a zone's Browser Cache TTL wins over the
-                    // origin, and Cloudflare's default on a fresh zone is four
-                    // hours. Public objects are stored `max-age=0` precisely so
-                    // that a browser revalidates and an overwrite plus purge is
-                    // visible immediately; four hours of browser copies is the
-                    // one failure no purge can reach. Set per rule rather than
-                    // on the zone so the user's own hostnames keep their
-                    // setting.
-                    "browser_ttl": { "mode": "respect_origin" },
-                },
-            }),
-        );
-
-        let payload = serde_json::to_vec(&Body { rules })?;
-        let (status, body) = self.call("PUT", &path, payload).await?;
-        if (200..300).contains(&status) {
-            return Ok(());
-        }
-        anyhow::bail!(
-            "ensure_cache_rule failed (status={status}): {}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-
     fn zone_id(&self) -> anyhow::Result<&str> {
         self.zone_id
             .as_deref()
             .ok_or_else(|| anyhow::anyhow!("no Cloudflare zone id for this client"))
     }
-}
-
-pub struct OriginCertificate {
-    pub id: String,
-    pub certificate_pem: String,
-    pub expires_on: String,
 }
 
 #[derive(Deserialize)]

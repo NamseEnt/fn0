@@ -88,7 +88,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
     let migrating = config.state == CloudflareConnectionState::Migrating;
-    let cloudflare = match storage.cloudflare() {
+    let cloudflare = match storage.purge_client() {
         Ok(cloudflare) => cloudflare,
         Err(error) => {
             return Output::InternalError {

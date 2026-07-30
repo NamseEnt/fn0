@@ -113,9 +113,15 @@ async fn async_main() -> Result<()> {
             }
         },
         Commands::Domain { command } => match command {
-            DomainCommands::Add { domain, project } => {
+            DomainCommands::Add {
+                domain,
+                account_id,
+                zone_id,
+                api_token,
+                project,
+            } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
-                cli::domain::add(project_dir, domain).await?;
+                cli::domain::add(project_dir, domain, account_id, zone_id, api_token).await?;
             }
             DomainCommands::Remove { project } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
