@@ -38,7 +38,10 @@ be created.
 
 fn0 adds exactly one cache rule to your zone and leaves your own rules in
 place; re-running `connect` or deploying replaces that one rule rather than
-stacking copies.
+stacking copies. The rule also pins browser caching on the assets hostname to
+whatever fn0 stored on the object, because a zone's default Browser Cache TTL
+would otherwise leave browser copies of a replaced object that no purge can
+reach. Your other hostnames keep the zone setting.
 
 The SSL and Certificates permission is only needed if you attach a custom
 domain. Everything else works without it.

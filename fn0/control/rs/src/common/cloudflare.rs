@@ -265,7 +265,28 @@ pub struct VerifiedToken {
 }
 
 impl CloudflareClient {
+    /// Cloudflare has two kinds of API token and each verifies at its own
+    /// endpoint: one made under My Profile is user-owned and only
+    /// `/user/tokens/verify` accepts it, while one made under the account's own
+    /// API Tokens page answers at `/accounts/{id}/tokens/verify`. Asking the
+    /// wrong one returns `Invalid API Token`, which reads as a bad credential
+    /// rather than the wrong URL. Onboarding tells people to use My Profile, so
+    /// that is tried first.
     pub async fn verify_token(&self) -> anyhow::Result<VerifiedToken> {
+        match self.verify_token_at("/user/tokens/verify").await {
+            Ok(token) => Ok(token),
+            Err(user_error) => {
+                let account_path = format!("/accounts/{}/tokens/verify", self.account_id);
+                self.verify_token_at(&account_path).await.map_err(|_| {
+                    // The user-token error is the one to surface: it is the
+                    // path onboarding documents.
+                    user_error
+                })
+            }
+        }
+    }
+
+    async fn verify_token_at(&self, path: &str) -> anyhow::Result<VerifiedToken> {
         #[derive(Deserialize)]
         struct Envelope {
             result: Option<TokenResult>,
@@ -275,8 +296,7 @@ impl CloudflareClient {
             id: String,
             status: String,
         }
-        let path = format!("/accounts/{}/tokens/verify", self.account_id);
-        let (status, body) = self.call("GET", &path, Vec::new()).await?;
+        let (status, body) = self.call("GET", path, Vec::new()).await?;
         if !(200..300).contains(&status) {
             anyhow::bail!(
                 "verify_token failed (status={status}): {}",
@@ -512,7 +532,18 @@ impl CloudflareClient {
                     r#"(http.host eq "{hostname}" and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
                 ),
                 "description": RULE_DESCRIPTION,
-                "action_parameters": { "cache": true },
+                "action_parameters": {
+                    "cache": true,
+                    // Without this a zone's Browser Cache TTL wins over the
+                    // origin, and Cloudflare's default on a fresh zone is four
+                    // hours. Public objects are stored `max-age=0` precisely so
+                    // that a browser revalidates and an overwrite plus purge is
+                    // visible immediately; four hours of browser copies is the
+                    // one failure no purge can reach. Set per rule rather than
+                    // on the zone so the user's own hostnames keep their
+                    // setting.
+                    "browser_ttl": { "mode": "respect_origin" },
+                },
             }),
         );
 
