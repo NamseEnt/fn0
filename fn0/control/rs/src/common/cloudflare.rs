@@ -449,7 +449,7 @@ impl CloudflareClient {
     /// The zone's current cache rules, as opaque values so the ones fn0 does
     /// not own survive a round trip untouched.
     ///
-    /// Doubles as the connect-time probe for `Zone -> Cache Settings`: a token
+    /// Doubles as the connect-time probe for `Zone -> Cache Rules`: a token
     /// without it answers 403 here rather than failing later inside a deploy.
     pub async fn read_cache_rules(&self) -> anyhow::Result<Vec<serde_json::Value>> {
         #[derive(Deserialize)]

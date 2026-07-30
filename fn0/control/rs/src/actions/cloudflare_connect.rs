@@ -116,7 +116,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     // here unless it is probed.
     if let Err(error) = cloudflare.read_cache_rules().await {
         tracing::warn!(%error, "cloudflare_connect cache rule probe failed");
-        missing.push("Zone -> Cache Settings -> Edit".to_string());
+        missing.push("Zone -> Cache Rules -> Edit".to_string());
     }
     if !missing.is_empty() {
         return Output::MissingPermissions { missing };
