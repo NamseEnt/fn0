@@ -13,17 +13,22 @@
 //! scoped to three buckets that cannot delete a bucket or call the REST API,
 //! and a token that can purge one zone's cache and nothing else.
 //!
-//! The setup token the user creates carries a single permission,
-//! `User -> API Tokens -> Edit`, and this module mints everything else it needs
-//! from it — including the short-lived token that does the provisioning itself.
-//! Cloudflare lets a token grant permissions it does not hold, so one checkbox
-//! is enough; it also refuses to let a minted token mint further tokens, so the
-//! provisioning token cannot widen itself. Both measured against the live API.
+//! There are two ways in, because the convenient one asks for a permission not
+//! everyone should grant.
 //!
-//! That single permission is not a small one. A token that can create tokens
-//! can create any token, so it is account-wide however narrow it looks, which
-//! is the reason it stays on the user's machine and the reason this module
-//! gives the provisioning token a short expiry and revokes it on the way out.
+//! [`Provisioner::run_managed`] takes a setup token carrying only
+//! `User -> API Tokens -> Edit` and mints everything else from it, including
+//! the short-lived token that does the provisioning. Cloudflare lets a token
+//! grant permissions it does not hold, so one checkbox is enough; it also
+//! refuses to let a minted token mint further tokens, so the provisioning token
+//! cannot widen itself. Both measured against the live API. The catch is that a
+//! token which can create tokens can create *any* token, so it is account-wide
+//! however short its list looks.
+//!
+//! [`Provisioner::run_manual`] takes a token that can provision but cannot
+//! create tokens, and mints nothing. The user makes the two long-lived
+//! credentials themselves. It is more work and it never puts a token capable of
+//! escalation on disk.
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -55,6 +60,16 @@ const ZONE_READ: &str = "c8fed203ed3043cba015a93ad1616f1f";
 const CACHE_SETTINGS_WRITE: &str = "9ff81cbbe65c400b97d92c3c1033cab6";
 const SSL_AND_CERTIFICATES_WRITE: &str = "c03055bc037c4ea9afb9a9f104b7b721";
 
+/// Shared by every fn0 project in one account, separated by a `{project_id}/`
+/// key prefix, so a user's zone needs one `static.` record however many
+/// projects they run.
+pub const ASSET_BUCKET: &str = "fn0-static-asset";
+pub const PAGE_BUCKET: &str = "fn0-static-page";
+
+pub fn object_bucket_name(project_id: &str) -> String {
+    format!("fn0-object-storage-{project_id}")
+}
+
 pub struct Provisioner {
     client: reqwest::Client,
     /// The user's setup token. Used only to mint and revoke; never to
@@ -70,16 +85,22 @@ struct TemporaryToken {
     value: String,
 }
 
-pub struct Provisioned {
+/// What provisioning creates. Names only — no credentials.
+pub struct ProvisionedResources {
     pub zone_name: String,
     pub static_hostname: String,
     pub object_bucket: String,
     pub asset_bucket: String,
     pub page_bucket: String,
+}
+
+/// The two long-lived credentials fn0 is given.
+pub struct DataPlaneCredentials {
     pub dataplane_access_key_id: String,
-    /// SHA-256 of the minted data-plane token. The token value never leaves
-    /// this process: the hash is the only form fn0 needs, and unlike the token
-    /// it cannot be replayed against the REST API.
+    /// SHA-256 of the data-plane token, which is what R2 takes as an S3 secret
+    /// access key. The token value never leaves the user's machine: the hash is
+    /// the only form fn0 needs, and unlike the token it cannot be replayed
+    /// against the REST API.
     pub dataplane_secret: String,
     pub purge_token: String,
 }
@@ -435,11 +456,20 @@ impl Provisioner {
         ))
     }
 
-    /// Runs the whole flow and returns only what fn0 is allowed to see.
-    pub async fn run(&self, project_id: &str) -> Result<Provisioned> {
+    /// The convenient path: one `API Tokens -> Edit` token, everything else
+    /// minted here and the provisioning token revoked on the way out.
+    pub async fn run_managed(
+        &self,
+        project_id: &str,
+    ) -> Result<(ProvisionedResources, DataPlaneCredentials)> {
         self.verify().await?;
         let provisioning = self.mint_provisioning_token(project_id).await?;
-        let result = self.provision(&provisioning.value, project_id).await;
+        let result = async {
+            let resources = self.provision(&provisioning.value, project_id).await?;
+            let credentials = self.mint_credentials(project_id, &resources).await?;
+            Ok((resources, credentials))
+        }
+        .await;
         // Best effort, and reported rather than swallowed: the token expires on
         // its own, but a user who has to wait for that should know why.
         if let Err(error) = self.revoke_token(&provisioning.id).await {
@@ -451,13 +481,21 @@ impl Provisioner {
         result
     }
 
-    async fn provision(&self, token: &str, project_id: &str) -> Result<Provisioned> {
+    /// The careful path: provision with the token as given, mint nothing. The
+    /// caller's token is expected to be unable to create tokens, which is the
+    /// whole reason to choose this.
+    pub async fn run_manual(&self, project_id: &str) -> Result<ProvisionedResources> {
+        self.verify().await?;
+        self.provision(&self.setup_token, project_id).await
+    }
+
+    async fn provision(&self, token: &str, project_id: &str) -> Result<ProvisionedResources> {
         let zone_name = self.zone_name(token).await?;
         let static_hostname = format!("static.{zone_name}");
 
-        let object_bucket = format!("fn0-object-storage-{project_id}");
-        let asset_bucket = "fn0-static-asset".to_string();
-        let page_bucket = "fn0-static-page".to_string();
+        let object_bucket = object_bucket_name(project_id);
+        let asset_bucket = ASSET_BUCKET.to_string();
+        let page_bucket = PAGE_BUCKET.to_string();
 
         for bucket in [&object_bucket, &asset_bucket, &page_bucket] {
             self.create_bucket(token, bucket).await?;
@@ -468,26 +506,43 @@ impl Provisioner {
             .await?;
         self.ensure_cache_rule(token, &static_hostname).await?;
 
-        let resources: serde_json::Map<String, serde_json::Value> =
-            [&object_bucket, &asset_bucket, &page_bucket]
-                .iter()
-                .map(|bucket| {
-                    (
-                        format!(
-                            "com.cloudflare.edge.r2.bucket.{}_default_{bucket}",
-                            self.account_id
-                        ),
-                        serde_json::Value::String("*".to_string()),
-                    )
-                })
-                .collect();
+        Ok(ProvisionedResources {
+            zone_name,
+            static_hostname,
+            object_bucket,
+            asset_bucket,
+            page_bucket,
+        })
+    }
+
+    async fn mint_credentials(
+        &self,
+        project_id: &str,
+        resources: &ProvisionedResources,
+    ) -> Result<DataPlaneCredentials> {
+        let buckets: serde_json::Map<String, serde_json::Value> = [
+            &resources.object_bucket,
+            &resources.asset_bucket,
+            &resources.page_bucket,
+        ]
+        .iter()
+        .map(|bucket| {
+            (
+                format!(
+                    "com.cloudflare.edge.r2.bucket.{}_default_{bucket}",
+                    self.account_id
+                ),
+                serde_json::Value::String("*".to_string()),
+            )
+        })
+        .collect();
 
         let (dataplane_access_key_id, dataplane_token) = self
             .mint_with_expiry(
                 &format!("fn0 data plane ({project_id})"),
                 vec![serde_json::json!({
                     "effect": "allow",
-                    "resources": resources,
+                    "resources": buckets,
                     "permission_groups": [
                         { "id": R2_BUCKET_ITEM_READ },
                         { "id": R2_BUCKET_ITEM_WRITE },
@@ -511,12 +566,7 @@ impl Provisioner {
             )
             .await?;
 
-        Ok(Provisioned {
-            zone_name,
-            static_hostname,
-            object_bucket,
-            asset_bucket,
-            page_bucket,
+        Ok(DataPlaneCredentials {
             dataplane_access_key_id,
             dataplane_secret: hex_sha256(&dataplane_token),
             purge_token,
@@ -530,8 +580,17 @@ impl Provisioner {
     /// alongside the certificate, because the worker has to present it during
     /// the TLS handshake. Nothing that can sign another one is: the token that
     /// did the signing is revoked before this returns.
-    pub async fn issue_origin_certificate(&self, hostname: &str) -> Result<IssuedCertificate> {
+    pub async fn issue_origin_certificate(
+        &self,
+        hostname: &str,
+        mint_signing_token: bool,
+    ) -> Result<IssuedCertificate> {
         self.verify().await?;
+        if !mint_signing_token {
+            return self
+                .sign_origin_certificate(&self.setup_token, hostname)
+                .await;
+        }
         let signing = self.mint_provisioning_token(hostname).await?;
         let result = self.sign_origin_certificate(&signing.value, hostname).await;
         if let Err(error) = self.revoke_token(&signing.id).await {

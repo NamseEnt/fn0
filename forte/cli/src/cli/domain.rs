@@ -9,6 +9,7 @@ pub async fn add(
     account_id: Option<String>,
     zone_id: Option<String>,
     api_token: Option<String>,
+    mint_signing_token: bool,
 ) -> Result<()> {
     let id = read_project_id(&project_dir)?;
     // All three or none: a project on its own Cloudflare account needs an
@@ -19,6 +20,7 @@ pub async fn add(
                 account_id,
                 zone_id,
                 api_token,
+                mint_signing_token,
             })
         }
         (None, None, None) => None,

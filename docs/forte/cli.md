@@ -221,14 +221,21 @@ Run the project's object storage, CDN and custom domain on your own Cloudflare a
 
 | Subcommand | Description |
 |---|---|
-| `connect` | Provision your Cloudflare account locally, then hand fn0 two narrow credentials. Your account-wide token never leaves your machine |
+| `connect` | Hand fn0 the two narrow credentials it keeps. With `--api-token` the CLI provisions and mints them for you; otherwise pass credentials you made yourself |
+| `provision` | Create the buckets, CDN hostname and cache rule and stop, for people who would rather not hand any tool a token that can create tokens |
 | `status` | Show which account the project uses and whether its credentials still work |
 
+Whichever path you take, no token you create is ever sent to fn0.
+
 ```sh
-forte cloudflare connect \
-  --account-id <account id> \
-  --zone-id <zone id> \
-  --api-token <token>
+# convenient: one token with User -> API Tokens -> Edit
+forte cloudflare connect --account-id <a> --zone-id <z> --api-token <token>
+
+# careful: a token that can provision but cannot create tokens
+forte cloudflare provision --account-id <a> --zone-id <z> --api-token <token>
+forte cloudflare connect --account-id <a> --zone-id <z> --zone-name <domain> \
+  --dataplane-access-key-id <k> --dataplane-secret <s> --purge-token <p>
+
 forte cloudflare status
 ```
 

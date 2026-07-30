@@ -8,26 +8,6 @@ runs the compute and holds no storage on your behalf.
 This is a one-time setup per project, and it is required before a project can
 serve a frontend.
 
-## What fn0 is trusted with
-
-Setup needs an account-wide token. fn0 never receives it: `forte cloudflare
-connect` runs that part on your machine, and what it sends to fn0 is two much
-smaller credentials it mints on the way out.
-
-| Credential | Where it lives | What it can do |
-| --- | --- | --- |
-| Your setup token | your machine, for the length of one command | everything below, plus delete any bucket in the account |
-| R2 data-plane token | fn0 | read and write objects in fn0's three buckets. Cannot reach another bucket, cannot delete a bucket, cannot call the Cloudflare API at all |
-| Purge token | fn0 | purge this one zone's cache. Nothing else |
-
-Those limits are measured against the live API, not inferred from the
-permission names.
-
-So the worst a total compromise of fn0 can do to your Cloudflare account is
-rewrite objects in the three buckets it created, and clear your cache. It
-cannot delete a bucket, reach R2 data you keep for anything else, issue
-certificates, or change your account.
-
 ## What you need
 
 A Cloudflare account with **a zone in it** — a domain whose nameservers point
@@ -35,7 +15,25 @@ at Cloudflare. Not just an account: an R2 custom domain has to live in a zone
 in the same account as the bucket, and that hostname is where your frontend
 assets get served from.
 
-## 1. Create the setup token
+## Two ways to set this up
+
+Setup has to create buckets, point a hostname at one, write a cache rule and
+sign a certificate. Someone has to hold a Cloudflare token that can do those
+things. Pick who.
+
+| | Convenient | Careful |
+| --- | --- | --- |
+| Tokens you create by hand | 1 | 3 |
+| Most powerful token you create | account-wide | can provision, cannot create tokens |
+| fn0 ever sees it | no | no |
+| Commands | 1 | 2 |
+
+Both end in the same place: fn0 holds a bucket-scoped R2 credential and a
+purge-only token, and nothing else. The difference is only what you have to
+create along the way, and whether any of it could escalate if it leaked from
+your own machine.
+
+## Convenient: one token, the CLI does the rest
 
 Cloudflare dashboard → **My Profile → API Tokens → Create Token → Create
 Custom Token**. Give it exactly one permission:
@@ -44,23 +42,6 @@ Custom Token**. Give it exactly one permission:
 | --- | --- |
 | User | API Tokens → Edit |
 
-That is the whole list. `forte cloudflare connect` mints everything else it
-needs from this token — including a short-lived token for the provisioning
-itself, which it revokes before it exits. Cloudflare lets a token grant
-permissions it does not hold, and refuses to let a minted token mint further
-tokens, so one checkbox is enough and the token it creates cannot widen itself.
-
-**Delete this token once setup finishes.** One checkbox does not make it a
-small permission: a token that can create tokens can create *any* token in your
-account, so until you delete it, it is a full-account credential. That is why
-it stays on your machine, and why nothing fn0 runs will ever ask for it again —
-the two credentials fn0 keeps are minted during setup and are far smaller.
-
-If the CLI dies mid-run, the provisioning token it minted expires on its own
-within ten minutes.
-
-## 2. Connect
-
 ```sh
 forte cloudflare connect \
   --account-id <cloudflare account id> \
@@ -68,9 +49,74 @@ forte cloudflare connect \
   --api-token <the token you just made>
 ```
 
-Everything up to the last step happens locally. The command creates three
-buckets in your account, points a CDN hostname at the first, writes one cache
-rule, mints the two narrow tokens, and only then talks to fn0.
+The CLI mints a short-lived provisioning token from it, provisions your
+account, mints the two credentials fn0 keeps, and revokes the provisioning
+token before it exits. If it dies mid-run, that token expires by itself within
+ten minutes.
+
+**Delete the setup token afterwards.** One checkbox does not make it a small
+permission: a token that can create tokens can create *any* token in your
+account, so until you delete it, it is a full-account credential. That is the
+whole reason to consider the other path.
+
+## Careful: you create every token yourself
+
+Nothing you make here can create tokens, so nothing you make here can widen
+itself.
+
+**Step 1** — a provisioning token. My Profile → API Tokens → Create Custom
+Token:
+
+| Scope | Permission |
+| --- | --- |
+| Account | Workers R2 Storage → Edit |
+| Zone | Zone → Read |
+| Zone | Cache Rules → Edit |
+| Zone | SSL and Certificates → Edit |
+
+Restrict the zone scopes to the one zone. Then:
+
+```sh
+forte cloudflare provision \
+  --account-id <account id> --zone-id <zone id> --api-token <token>
+```
+
+This creates the buckets, the CDN hostname and the cache rule, then stops and
+prints the exact names for step 2.
+
+**Step 2** — the two credentials fn0 keeps.
+
+R2 → **Manage API Tokens → Create API token**, permission *Object Read &
+Write*, applied to the three buckets the previous command named. The screen
+shows an Access Key ID and a Secret Access Key; keep both.
+
+My Profile → **API Tokens → Create Custom Token**, permission *Zone → Cache
+Purge → Purge*, restricted to your zone.
+
+```sh
+forte cloudflare connect \
+  --account-id <account id> --zone-id <zone id> --zone-name <your-domain> \
+  --dataplane-access-key-id <Access Key ID> \
+  --dataplane-secret <Secret Access Key> \
+  --purge-token <purge token>
+```
+
+Delete the provisioning token from step 1 once this succeeds.
+
+## What the two stored credentials can do
+
+| Credential | What it can do |
+| --- | --- |
+| R2 data-plane | read and write objects in fn0's three buckets. Cannot reach another bucket, cannot delete a bucket, cannot call the Cloudflare API at all |
+| Purge | purge this one zone's cache. Nothing else — not DNS, not cache rules, not R2, not certificates |
+
+Those limits are measured against the live API, not inferred from the
+permission names.
+
+So the worst a total compromise of fn0 can do to your Cloudflare account is
+rewrite objects in the three buckets it created, and clear your cache.
+
+## What gets created
 
 - `fn0-object-storage-<project-id>` — your app's private object storage
 - `fn0-static-asset` — your deployed frontend and your public objects, served
@@ -82,8 +128,8 @@ The last two are shared by every fn0 project in that account, separated by a
 exactly one DNS record for them.
 
 fn0 adds exactly one cache rule and leaves your own rules in place; running
-`connect` again replaces that one rule rather than stacking copies. The rule
-also pins browser caching on the assets hostname to whatever fn0 stored on the
+setup again replaces that one rule rather than stacking copies. The rule also
+pins browser caching on the assets hostname to whatever fn0 stored on the
 object, because a zone's default Browser Cache TTL would otherwise leave
 browser copies of a replaced object that no purge can reach. Your other
 hostnames keep the zone setting.
@@ -96,15 +142,26 @@ until that finishes. Check with:
 forte cloudflare status
 ```
 
-## 3. Custom domain (optional)
+## Custom domain (optional)
 
 Signing an origin certificate needs a permission fn0 deliberately does not
-hold, so this command also runs locally and needs the setup token again (the
-same one-permission token; the CLI mints and revokes a signing token from it):
+hold, so this runs locally too.
+
+With a provisioning token (the careful path's step 1 token, which already has
+SSL and Certificates → Edit):
 
 ```sh
 forte domain add app.example.com \
   --account-id <account id> --zone-id <zone id> --api-token <token>
+```
+
+With the one-permission setup token, add `--mint-signing-token` so the CLI
+mints a signing token, uses it and revokes it:
+
+```sh
+forte domain add app.example.com \
+  --account-id <account id> --zone-id <zone id> --api-token <token> \
+  --mint-signing-token
 ```
 
 The CLI generates a key pair, has Cloudflare sign the certificate through your

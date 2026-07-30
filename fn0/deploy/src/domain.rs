@@ -45,6 +45,9 @@ pub struct OriginCertificateRequest<'a> {
     pub account_id: &'a str,
     pub zone_id: &'a str,
     pub api_token: &'a str,
+    /// `true` when the token can only create tokens, so a signing token has to
+    /// be minted from it; `false` when it can sign directly.
+    pub mint_signing_token: bool,
 }
 
 pub async fn domain_add(
@@ -63,7 +66,7 @@ pub async fn domain_add(
                     request.account_id.to_string(),
                     request.zone_id.to_string(),
                 )
-                .issue_origin_certificate(domain)
+                .issue_origin_certificate(domain, request.mint_signing_token)
                 .await?,
             )
         }

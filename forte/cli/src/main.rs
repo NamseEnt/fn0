@@ -102,10 +102,33 @@ async fn async_main() -> Result<()> {
                 account_id,
                 zone_id,
                 api_token,
+                zone_name,
+                dataplane_access_key_id,
+                dataplane_secret,
+                purge_token,
                 project,
             } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
-                cli::cloudflare::connect(project_dir, account_id, zone_id, api_token).await?;
+                cli::cloudflare::connect(
+                    project_dir,
+                    account_id,
+                    zone_id,
+                    api_token,
+                    zone_name,
+                    dataplane_access_key_id,
+                    dataplane_secret,
+                    purge_token,
+                )
+                .await?;
+            }
+            CloudflareCommands::Provision {
+                account_id,
+                zone_id,
+                api_token,
+                project,
+            } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::cloudflare::provision(project_dir, account_id, zone_id, api_token).await?;
             }
             CloudflareCommands::Status { project } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
@@ -118,10 +141,19 @@ async fn async_main() -> Result<()> {
                 account_id,
                 zone_id,
                 api_token,
+                mint_signing_token,
                 project,
             } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
-                cli::domain::add(project_dir, domain, account_id, zone_id, api_token).await?;
+                cli::domain::add(
+                    project_dir,
+                    domain,
+                    account_id,
+                    zone_id,
+                    api_token,
+                    mint_signing_token,
+                )
+                .await?;
             }
             DomainCommands::Remove { project } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());

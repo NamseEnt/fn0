@@ -128,8 +128,14 @@ pub enum DomainCommands {
         account_id: Option<String>,
         #[arg(long)]
         zone_id: Option<String>,
+        /// Either a token with SSL and Certificates Edit, or one with User ->
+        /// API Tokens -> Edit plus --mint-signing-token
         #[arg(long)]
         api_token: Option<String>,
+        /// Mint a short-lived signing token instead of signing with the token
+        /// directly. Needed when the token only carries API Tokens Edit.
+        #[arg(long)]
+        mint_signing_token: bool,
         #[arg(short, long)]
         project: Option<PathBuf>,
     },
@@ -145,14 +151,48 @@ pub enum DomainCommands {
 
 #[derive(Subcommand)]
 pub enum CloudflareCommands {
-    /// Store and verify the credentials for your Cloudflare account
+    /// Connect this project to your Cloudflare account
+    ///
+    /// Two ways in. With --api-token the CLI provisions your account and mints
+    /// the credentials fn0 keeps; that token needs only User -> API Tokens ->
+    /// Edit, but a token that can create tokens can create any token, so it is
+    /// account-wide until you delete it.
+    ///
+    /// If you would rather never create such a token, run `forte cloudflare
+    /// provision` first and pass the credentials you made yourself here
+    /// instead.
     Connect {
         #[arg(long)]
         account_id: String,
         #[arg(long)]
         zone_id: String,
-        /// Account API token with Workers R2 Storage Edit, Zone Read, Cache
-        /// Purge and SSL and Certificates Edit
+        /// Token with User -> API Tokens -> Edit. Provisions and mints.
+        #[arg(long, conflicts_with_all = ["zone_name", "dataplane_access_key_id"])]
+        api_token: Option<String>,
+        /// Credentials you created yourself, after `forte cloudflare provision`
+        #[arg(long, requires_all = ["dataplane_access_key_id", "dataplane_secret", "purge_token"])]
+        zone_name: Option<String>,
+        #[arg(long)]
+        dataplane_access_key_id: Option<String>,
+        #[arg(long)]
+        dataplane_secret: Option<String>,
+        #[arg(long)]
+        purge_token: Option<String>,
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+    /// Create the buckets, CDN hostname and cache rule, and stop there
+    ///
+    /// For people who would rather not hand any tool a token that can create
+    /// tokens. Use a token with Workers R2 Storage Edit, Zone Read, Cache Rules
+    /// Edit and SSL and Certificates Edit — it can provision but cannot create
+    /// tokens, so it cannot widen itself. The command then tells you which two
+    /// credentials to make by hand.
+    Provision {
+        #[arg(long)]
+        account_id: String,
+        #[arg(long)]
+        zone_id: String,
         #[arg(long)]
         api_token: String,
         #[arg(short, long)]
