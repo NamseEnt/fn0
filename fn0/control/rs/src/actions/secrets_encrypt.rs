@@ -39,7 +39,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
     let key: [u8; 32] = dek[..].try_into().expect("len-checked above");
 
-    let nonce_bytes = rand::get_random_bytes(12).await;
+    let nonce_bytes = rand::get_random_bytes(12);
     let Ok(nonce_arr): Result<[u8; 12], _> = nonce_bytes.as_slice().try_into() else {
         return Output::Error {
             message: "rng returned wrong length".to_string(),

@@ -128,7 +128,7 @@ impl TursoDatabase {
         const CAP_MS: u64 = 200;
         let ceiling = BASE_MS.checked_shl(attempt).unwrap_or(CAP_MS).min(CAP_MS);
         let mut buf = [0u8; 8];
-        runtime::random_bytes(&mut buf).await;
+        runtime::random_bytes(&mut buf);
         let raw = u64::from_le_bytes(buf);
         let delay_ms = raw % (ceiling + 1);
         runtime::sleep(std::time::Duration::from_millis(delay_ms)).await;

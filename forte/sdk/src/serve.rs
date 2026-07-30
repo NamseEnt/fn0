@@ -83,24 +83,21 @@ where
 async fn p3_to_http_request(
     req: p3::Request,
 ) -> core::result::Result<::http::Request<Vec<u8>>, ServeError> {
-    let method = method_from_p3(req.get_method().await);
+    let method = method_from_p3(req.get_method());
 
-    let scheme_str = match req.get_scheme().await {
+    let scheme_str = match req.get_scheme() {
         Some(p3::Scheme::Http) => "http".to_string(),
         Some(p3::Scheme::Https) => "https".to_string(),
         Some(p3::Scheme::Other(s)) => s,
         None => "http".to_string(),
     };
-    let path_with_query = req
-        .get_path_with_query()
-        .await
-        .unwrap_or_else(|| "/".into());
+    let path_with_query = req.get_path_with_query().unwrap_or_else(|| "/".into());
 
-    let wasi_headers = req.get_headers().await;
-    let header_list = wasi_headers.copy_all().await;
+    let wasi_headers = req.get_headers();
+    let header_list = wasi_headers.copy_all();
     drop(wasi_headers);
 
-    let authority = match req.get_authority().await {
+    let authority = match req.get_authority() {
         Some(a) if !a.is_empty() => a,
         _ => header_list
             .iter()
@@ -123,7 +120,7 @@ async fn p3_to_http_request(
     crate::runtime::spawn(async move {
         drop(trailers_writer);
     });
-    let (body_stream, _resp_trailers) = p3::Request::consume_body(req, trailers_reader).await;
+    let (body_stream, _resp_trailers) = p3::Request::consume_body(req, trailers_reader);
     let body_bytes: Vec<u8> = collect_stream(body_stream).await;
 
     builder.body(body_bytes).map_err(ServeError::BuildRequest)
@@ -139,9 +136,7 @@ async fn http_response_to_p3(
         .iter()
         .map(|(name, value)| (name.as_str().to_string(), value.as_bytes().to_vec()))
         .collect();
-    let fields = p3::Fields::from_list(header_entries)
-        .await
-        .map_err(ServeError::Headers)?;
+    let fields = p3::Fields::from_list(&header_entries).map_err(ServeError::Headers)?;
 
     let body_bytes = match body {
         Body::Empty => None,
@@ -167,10 +162,9 @@ async fn http_response_to_p3(
         drop(trailers_writer);
     });
 
-    let (wasi_resp, _transmit) = p3::Response::new(fields, contents_reader, trailers_reader).await;
+    let (wasi_resp, _transmit) = p3::Response::new(fields, contents_reader, trailers_reader);
     wasi_resp
         .set_status_code(parts.status.as_u16())
-        .await
         .map_err(|_| ServeError::InvalidStatusCode)?;
 
     Ok(wasi_resp)

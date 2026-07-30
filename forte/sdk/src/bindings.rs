@@ -18,6 +18,5 @@ wit_bindgen::generate!({
     path: "wit",
     world: "imports-only",
     generate_all,
-    async: true,
     features: ["clocks-timezone"],
 });

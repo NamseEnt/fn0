@@ -355,7 +355,7 @@ async fn conflict_backoff(attempt: u32) -> std::time::Duration {
         .unwrap_or(BACKOFF_CAP_MS)
         .min(BACKOFF_CAP_MS);
     let mut buf = [0u8; 8];
-    crate::runtime::random_bytes(&mut buf).await;
+    crate::runtime::random_bytes(&mut buf);
     let raw = u64::from_le_bytes(buf);
     let delay_ms = raw % (ceiling + 1);
     std::time::Duration::from_millis(delay_ms)

@@ -56,7 +56,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotFound;
     }
 
-    let started = time_wasi::Instant::now().await;
+    let started = time_wasi::Instant::now();
     loop {
         let snapshot = match load_state(&db, &req.body.project_id, req.body.code_version).await {
             Ok(v) => v,
@@ -88,7 +88,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             };
         }
 
-        if started.elapsed().await >= POLL_TIMEOUT {
+        if started.elapsed() >= POLL_TIMEOUT {
             return Output::Pending {
                 active_version,
                 pending_version: snapshot.pending,

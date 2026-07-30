@@ -82,7 +82,7 @@ const PROJECT_ID_ALPHABET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 const PROJECT_ID_LEN: usize = 8;
 
 async fn generate_project_id() -> Result<String, String> {
-    let bytes = rand::get_random_bytes(PROJECT_ID_LEN).await;
+    let bytes = rand::get_random_bytes(PROJECT_ID_LEN);
     if bytes.len() < PROJECT_ID_LEN {
         return Err("rng returned wrong length".to_string());
     }

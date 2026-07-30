@@ -20,7 +20,6 @@ pub mod bindings {
         world: "fn0:test-harness/tests",
         default_bindings_module: "forte_sdk::test_harness::bindings",
         pub_export_macro: true,
-        async: true,
         // The harness world imports nothing, but `path` is the shared WASI wit
         // directory and it does not parse with this feature left gated off.
         features: ["clocks-timezone"],
@@ -51,9 +50,8 @@ impl RegisteredTest {
 inventory::collect!(RegisteredTest);
 
 pub fn registered_tests() -> Vec<&'static RegisteredTest> {
-    let mut tests: Vec<&'static RegisteredTest> = inventory::iter::<RegisteredTest>
-        .into_iter()
-        .collect();
+    let mut tests: Vec<&'static RegisteredTest> =
+        inventory::iter::<RegisteredTest>.into_iter().collect();
     tests.sort_by_key(|test| test.full_name());
     tests
 }
