@@ -82,6 +82,16 @@ if (!isSSR && (window as any).__FORTE_HOOK_CACHE__) {
   }
 }
 
+// A host without a loopback HTTP server (Cloudflare Workers) sets this to an
+// origin it intercepts itself, so the SSR pass never leaves the process.
+function selfInvokeBase(): string {
+  const override = (globalThis as any).__FORTE_SELF_INVOKE_BASE__;
+  if (typeof override === "string") {
+    return override;
+  }
+  return `http://localhost:${process.env["FORTE_PORT"]}`;
+}
+
 export function useForteHook<T>(
   hookName: string,
   input: unknown,
@@ -109,11 +119,10 @@ export function useForteHook<T>(
   let url: string;
   let init: RequestInit;
   if (isSSR) {
-    const fortePort = process.env["FORTE_PORT"];
     if (requestCookie) {
       headers["Cookie"] = requestCookie;
     }
-    url = `http://localhost:${fortePort}/__self_invoke/${hookName}`;
+    url = `${selfInvokeBase()}/__self_invoke/${hookName}`;
     init = { method: "POST", headers, body: JSON.stringify(input) };
   } else {
     headers["X-Forte-Prefetch-Miss"] = "1";
