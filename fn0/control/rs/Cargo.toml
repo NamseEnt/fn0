@@ -27,3 +27,9 @@ forte-codegen = { path = "../../../forte/codegen" }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 syntect = "5"
 two-face = "0.5"
+
+# Deliberately its own workspace root, with its own lockfile: a forte app is
+# built the way a user's app is, not with the fn0 workspace's feature
+# unification. Without this, a git worktree nested under the repo makes cargo
+# resolve the outer checkout's workspace instead.
+[workspace]

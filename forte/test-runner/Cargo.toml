@@ -19,6 +19,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "time"] }
+wasmparser = { workspace = true }
 wasmtime = { workspace = true, default-features = true, features = ["component-model-async"] }
 wasmtime-wasi = { workspace = true, features = ["p3"] }
 wasmtime-wasi-http = { workspace = true, features = ["p3"] }

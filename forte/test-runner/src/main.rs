@@ -8,7 +8,7 @@
 
 use std::process::ExitCode;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use wasmtime::component::{Component, Linker, ResourceTable};
 use wasmtime::{Config, Engine, Store};
 use wasmtime_wasi::p2::bindings::CommandPre;
@@ -150,13 +150,30 @@ fn failure_message(err: &wasmtime::Error) -> String {
         .to_string()
 }
 
+/// Every wasm test binary is a component built by forte-sdk, so validating here
+/// makes `cargo test` the guard that forte-sdk keeps emitting spec-valid
+/// components. The wasmtime below cannot serve as that guard: it accepts
+/// constructs newer wasmparser releases reject (the `async` canonical option on
+/// non-async function types among them), so a regression would stay invisible
+/// until a runtime bump.
+fn validate_against_current_spec(component_bytes: &[u8], path: &str) -> Result<()> {
+    let mut validator =
+        wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all());
+    validator
+        .validate_all(component_bytes)
+        .with_context(|| format!("{path} is not a valid component"))?;
+    Ok(())
+}
+
 async fn run_component(component_path: String, forwarded: Vec<String>) -> Result<ExitCode> {
     let mut config = Config::new();
     config.wasm_component_model(true);
     config.wasm_component_model_async(true);
     let engine = Engine::new(&config)?;
 
-    let component = Component::from_file(&engine, &component_path)?;
+    let component_bytes = std::fs::read(&component_path)?;
+    validate_against_current_spec(&component_bytes, &component_path)?;
+    let component = Component::new(&engine, &component_bytes)?;
 
     let mut linker: Linker<State> = Linker::new(&engine);
     wasmtime_wasi::p2::add_to_linker_async(&mut linker)?;

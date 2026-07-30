@@ -144,9 +144,7 @@ impl Client {
             .iter()
             .map(|(name, value)| (name.as_str().to_string(), value.as_bytes().to_vec()))
             .collect();
-        let fields = p3::Fields::from_list(header_entries)
-            .await
-            .map_err(Error::Headers)?;
+        let fields = p3::Fields::from_list(&header_entries).map_err(Error::Headers)?;
 
         let contents_reader = match body {
             Body::Empty => None,
@@ -170,37 +168,33 @@ impl Client {
         });
 
         let (wasi_req, _transmit) =
-            p3::Request::new(fields, contents_reader, trailers_reader, None).await;
+            p3::Request::new(fields, contents_reader, trailers_reader, None);
 
         wasi_req
-            .set_method(convert_method(&parts.method))
-            .await
+            .set_method(&convert_method(&parts.method))
             .map_err(|_| Error::InvalidMethod)?;
 
         if let Some(scheme) = parts.uri.scheme_str() {
             wasi_req
-                .set_scheme(Some(convert_scheme(scheme)))
-                .await
+                .set_scheme(Some(&convert_scheme(scheme)))
                 .map_err(|_| Error::InvalidScheme)?;
         }
         if let Some(authority) = parts.uri.authority() {
             wasi_req
-                .set_authority(Some(authority.as_str().to_string()))
-                .await
+                .set_authority(Some(authority.as_str()))
                 .map_err(|_| Error::InvalidAuthority)?;
         }
         if let Some(pq) = parts.uri.path_and_query() {
             wasi_req
-                .set_path_with_query(Some(pq.as_str().to_string()))
-                .await
+                .set_path_with_query(Some(pq.as_str()))
                 .map_err(|_| Error::InvalidPathWithQuery)?;
         }
 
         let wasi_resp = client::send(wasi_req).await.map_err(Error::Wasi)?;
 
-        let status = wasi_resp.get_status_code().await;
-        let wasi_headers = wasi_resp.get_headers().await;
-        let header_list = wasi_headers.copy_all().await;
+        let status = wasi_resp.get_status_code();
+        let wasi_headers = wasi_resp.get_headers();
+        let header_list = wasi_headers.copy_all();
         drop(wasi_headers);
 
         let (res_trailers_writer, res_trailers_reader) =
@@ -209,7 +203,7 @@ impl Client {
             drop(res_trailers_writer);
         });
         let (body_stream, _trailers) =
-            p3::Response::consume_body(wasi_resp, res_trailers_reader).await;
+            p3::Response::consume_body(wasi_resp, res_trailers_reader);
 
         let mut builder = Response::builder().status(status);
         for (name, value) in header_list {

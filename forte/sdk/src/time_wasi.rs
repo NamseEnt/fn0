@@ -18,9 +18,9 @@ pub struct Instant {
 }
 
 impl Instant {
-    pub async fn now() -> Self {
+    pub fn now() -> Self {
         Self {
-            nanos: monotonic_clock::now().await,
+            nanos: monotonic_clock::now(),
         }
     }
 
@@ -28,7 +28,7 @@ impl Instant {
         Duration::from_nanos(self.nanos.saturating_sub(earlier.nanos))
     }
 
-    pub async fn elapsed(&self) -> Duration {
-        Self::now().await.duration_since(*self)
+    pub fn elapsed(&self) -> Duration {
+        Self::now().duration_since(*self)
     }
 }

@@ -20,7 +20,6 @@ pub mod bindings {
         world: "fn0:test-harness/tests",
         default_bindings_module: "forte_sdk::test_harness::bindings",
         pub_export_macro: true,
-        async: true,
         // The harness world imports nothing, but `path` is the shared WASI wit
         // directory and it does not parse with this feature left gated off.
         features: ["clocks-timezone"],

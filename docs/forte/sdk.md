@@ -138,16 +138,16 @@ use forte_sdk::time_wasi;
 time_wasi::sleep(time_wasi::Duration::from_secs(1)).await;
 
 // Measure elapsed time
-let start = time_wasi::Instant::now().await;
+let start = time_wasi::Instant::now();
 // ... do work ...
-let elapsed: time_wasi::Duration = start.elapsed().await;
+let elapsed: time_wasi::Duration = start.elapsed();
 ```
 
 API:
 - `time_wasi::sleep(duration: Duration)` — suspend the current task for `duration`
-- `time_wasi::Instant::now() -> Instant` — current monotonic time (async)
+- `time_wasi::Instant::now() -> Instant` — current monotonic time
 - `time_wasi::Instant::duration_since(&self, earlier: Instant) -> Duration` — time between two instants
-- `time_wasi::Instant::elapsed(&self) -> Duration` — time since this instant was recorded (async)
+- `time_wasi::Instant::elapsed(&self) -> Duration` — time since this instant was recorded
 - `time_wasi::Duration` — re-exported `std::time::Duration`
 
 ## UUID
@@ -161,23 +161,23 @@ let id = Uuid::now_v7();
 
 ## Randomness
 
-Backed by WASI random. All functions are `async`.
+Backed by WASI random.
 
 ```rust
 use forte_sdk::rand;
 
 // Fill a buffer with cryptographically secure random bytes
-rand::fill_bytes(&mut buf).await;
+rand::fill_bytes(&mut buf);
 
 // Get a Vec<u8> of secure random bytes
-let bytes: Vec<u8> = rand::get_random_bytes(32).await;
+let bytes: Vec<u8> = rand::get_random_bytes(32);
 
 // Get a single u64
-let n: u64 = rand::get_random_u64().await;
+let n: u64 = rand::get_random_u64();
 
 // Insecure (fast) variants — not suitable for secrets
-rand::get_insecure_random_bytes(&mut buf).await;
-let n: u64 = rand::get_insecure_random_u64().await;
+rand::get_insecure_random_bytes(&mut buf);
+let n: u64 = rand::get_insecure_random_u64();
 ```
 
 ## Tracing / Logging

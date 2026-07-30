@@ -74,7 +74,7 @@ pub(crate) async fn sleep(duration: Duration) {
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) async fn random_bytes(buf: &mut [u8]) {
-    forte_sdk::rand::get_insecure_random_bytes(buf).await;
+    forte_sdk::rand::get_insecure_random_bytes(buf);
 }
 
 #[cfg(not(target_arch = "wasm32"))]

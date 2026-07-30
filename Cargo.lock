@@ -1936,7 +1936,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-deploy"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1955,6 +1955,7 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "urlencoding",
+ "wasmparser 0.252.0",
 ]
 
 [[package]]
@@ -2168,7 +2169,7 @@ dependencies = [
 
 [[package]]
 name = "forte-codegen"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "forte-wit",
@@ -2204,7 +2205,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2242,6 +2243,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "tokio",
+ "wasmparser 0.252.0",
  "wasmtime",
  "wasmtime-wasi",
  "wasmtime-wasi-http",
@@ -2563,6 +2565,11 @@ name = "hashbrown"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
+dependencies = [
+ "foldhash 0.2.0",
+ "serde",
+ "serde_core",
+]
 
 [[package]]
 name = "heck"
@@ -6519,6 +6526,19 @@ dependencies = [
  "bitflags 2.10.0",
  "indexmap",
  "semver",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.252.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3eb099dcadcde5be9eef55e3a337128efd4e44b4c93122487e4d2e4e1c6627c"
+dependencies = [
+ "bitflags 2.10.0",
+ "hashbrown 0.17.0",
+ "indexmap",
+ "semver",
+ "serde",
 ]
 
 [[package]]

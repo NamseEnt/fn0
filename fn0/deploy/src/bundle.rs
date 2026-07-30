@@ -21,6 +21,7 @@ pub fn create_raw_bundle_wasm(
     append_bytes(&mut builder, "manifest.json", br#"{"kind":"wasm"}"#)?;
     let wasm_bytes = std::fs::read(wasm_path)
         .map_err(|e| anyhow!("Failed to read {}: {}", wasm_path.display(), e))?;
+    validate_wasm(&wasm_bytes, wasm_path)?;
     append_bytes(&mut builder, "backend.wasm", &wasm_bytes)?;
     if let Some(env) = env_yaml {
         append_bytes(&mut builder, "env.yaml", env)?;
@@ -42,6 +43,7 @@ pub fn create_raw_bundle_forte(
     let backend_wasm = dist_dir.join("backend.wasm");
     let wasm_bytes = std::fs::read(&backend_wasm)
         .map_err(|e| anyhow!("Failed to read {}: {}", backend_wasm.display(), e))?;
+    validate_wasm(&wasm_bytes, &backend_wasm)?;
     append_bytes(&mut builder, "backend.wasm", &wasm_bytes)?;
 
     let server_js = dist_dir.join("server.js");
@@ -54,6 +56,28 @@ pub fn create_raw_bundle_forte(
     }
 
     builder.finish()?;
+    Ok(())
+}
+
+/// Rejects a bundle the platform's runtime would refuse to load.
+///
+/// This is stricter than the wasmtime the fleet currently runs: wasmtime 43
+/// accepts constructs later wasmparser releases reject (notably the `async`
+/// canonical option on non-async function types, which wit-bindgen's
+/// `async: true` emits), so a bundle that loads today can stop loading on a
+/// runtime bump. Validating at upload time keeps that failure at the developer's
+/// terminal instead of surfacing as a 500 after a fleet upgrade.
+fn validate_wasm(wasm_bytes: &[u8], source: &Path) -> Result<()> {
+    let mut validator =
+        wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all());
+    validator.validate_all(wasm_bytes).map_err(|e| {
+        anyhow!(
+            "{} is not a valid WebAssembly component: {e}\n\
+             Rebuild it with a current forte-sdk; older SDKs emitted components \
+             that only load on wasmtime 43.",
+            source.display()
+        )
+    })?;
     Ok(())
 }
 

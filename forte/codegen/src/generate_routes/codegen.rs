@@ -116,7 +116,6 @@ pub(super) fn generate_code(
                 world: "service-export",
                 default_bindings_module: "crate::route_generated::proxy",
                 pub_export_macro: true,
-                async: true,
                 features: ["clocks-timezone"],
                 with: {
                     "wasi:http/handler@0.3.0-rc-2026-03-15": generate,
