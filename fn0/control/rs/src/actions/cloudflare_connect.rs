@@ -10,7 +10,7 @@
 //! at request time or, for purge, as a stale object nobody notices for a year.
 
 use crate::common::auth;
-use crate::common::byoc::ProjectStorage;
+use crate::common::byoc::{self, ProjectStorage};
 use crate::common::cloudflare::CloudflareClient;
 use crate::common::vault;
 use crate::docs::*;
@@ -138,6 +138,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
+    // A project that already finished migrating is not connecting, it is
+    // rotating: its objects are in the user's account and the platform's copies
+    // are a frozen snapshot from the first migration. Running the migration
+    // again would copy that snapshot back over live data.
+    let rotating = existing
+        .as_ref()
+        .is_some_and(|doc| doc.state != CloudflareConnectionState::Migrating);
+
     let config = ProjectCloudflareConfigDoc {
         project_id: req.body.project_id.clone(),
         account_id: req.body.account_id.clone(),
@@ -150,12 +158,22 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         dataplane_access_key_id: req.body.dataplane_access_key_id.clone(),
         dataplane_secret_ciphertext,
         purge_token_ciphertext,
-        state: CloudflareConnectionState::Migrating,
+        state: if rotating {
+            CloudflareConnectionState::Ok
+        } else {
+            CloudflareConnectionState::Migrating
+        },
         checked_at: forte_sdk::now(),
-        config_version: existing.map(|doc| doc.config_version + 1).unwrap_or(1),
+        config_version: existing
+            .as_ref()
+            .map(|doc| doc.config_version + 1)
+            .unwrap_or(1),
     };
 
-    if let Err(error) = (ProjectCloudflareConfigDocPut(config)).send_with(&db).await {
+    if let Err(error) = (ProjectCloudflareConfigDocPut(config.clone()))
+        .send_with(&db)
+        .await
+    {
         tracing::error!("cloudflare_connect config put: {error}");
         return Output::InternalError {
             reason: format!("config write: {error}"),
@@ -163,37 +181,51 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     // Proves the data-plane credential against the bucket it will actually be
-    // used on, now that it is decryptable through the stored config.
-    match ProjectStorage::resolve_connected(&db, &req.body.project_id).await {
-        Ok(Some(storage)) => {
-            if let Err(error) = crate::common::r2_store::ProjectR2Store::assets(&storage)
-                .list_all(&format!("{}/", req.body.project_id), forte_sdk::now())
+    // used on, now that it is decryptable through the stored config. A rotation
+    // that fails here has already overwritten a working credential, so the old
+    // one goes back.
+    let probe = match ProjectStorage::resolve_connected(&db, &req.body.project_id).await {
+        Ok(Some(storage)) => crate::common::r2_store::ProjectR2Store::assets(&storage)
+            .list_all(&format!("{}/", req.body.project_id), forte_sdk::now())
+            .await
+            .map_err(|error| {
+                format!(
+                    "the data-plane token cannot read {}: {error}",
+                    storage.asset_bucket
+                )
+            }),
+        Ok(None) => Err("config vanished between write and read".to_string()),
+        Err(error) => Err(format!("resolve: {error}")),
+    };
+    if let Err(reason) = probe {
+        tracing::warn!(%reason, "cloudflare_connect data-plane probe failed");
+        if let Some(previous) = existing
+            && let Err(error) = (ProjectCloudflareConfigDocPut(previous))
+                .send_with(&db)
                 .await
-            {
-                tracing::warn!(%error, "cloudflare_connect data-plane probe failed");
-                return Output::CredentialRejected {
-                    reason: format!(
-                        "the data-plane token cannot read {}: {error}",
-                        storage.asset_bucket
-                    ),
-                };
-            }
+        {
+            tracing::error!("cloudflare_connect could not restore the previous config: {error}");
         }
-        Ok(None) => {
-            return Output::InternalError {
-                reason: "config vanished between write and read".to_string(),
-            };
-        }
-        Err(error) => {
-            return Output::InternalError {
-                reason: format!("resolve: {error}"),
-            };
-        }
+        return Output::CredentialRejected { reason };
     }
 
-    // The manifest is not published here: workers must keep reading the
-    // platform account until the migration has copied everything across.
-    // `byoc_migrate` flips both when it finishes.
+    if rotating {
+        // Straight to the manifest: nothing is moving, only the credential the
+        // workers sign with. They pick it up on their next poll.
+        if let Err(error) =
+            byoc::publish_storage_to_manifest(&db, &req.body.project_id, Some(&config)).await
+        {
+            tracing::error!("cloudflare_connect publish_storage_to_manifest: {error}");
+            return Output::InternalError {
+                reason: format!("manifest publish: {error}"),
+            };
+        }
+        return Output::Ok;
+    }
+
+    // First connect. The manifest is not published here: workers must keep
+    // reading the platform account until the migration has copied everything
+    // across. `byoc_migrate` flips both when it finishes.
     if let Err(error) = crate::enqueue::byoc_migrate(crate::queue_task::byoc_migrate::Input {
         project_id: req.body.project_id.clone(),
     })
