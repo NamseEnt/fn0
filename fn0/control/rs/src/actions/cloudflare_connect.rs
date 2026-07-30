@@ -12,9 +12,16 @@
 //! First connection only. Reconnecting would have to decide whether to rotate
 //! credentials and whether objects already written to the old account should
 //! follow, and neither answer is obvious enough to pick silently.
+//!
+//! Nothing is written until every credential has been proved, and what is
+//! written goes in one transaction. A half-written connection would leave
+//! control signing against the user's account while the fleet still signed
+//! against the platform's, and `connect` would refuse to run again to repair
+//! it.
 
 use crate::common::auth;
-use crate::common::byoc::{self, ProjectStorage};
+use crate::common::aws_sign;
+use crate::common::byoc;
 use crate::common::cloudflare::CloudflareClient;
 use crate::common::vault;
 use crate::docs::*;
@@ -121,6 +128,33 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         };
     }
 
+    // Probed with the credential as sent, before anything is written. All three
+    // buckets, because on the path where the user scopes the token by hand a
+    // missed bucket is an easy mistake and a confusing failure later.
+    for bucket in [
+        &req.body.object_bucket,
+        &req.body.asset_bucket,
+        &req.body.page_bucket,
+    ] {
+        if let Err(error) = aws_sign::r2_list_objects(aws_sign::R2ListArgs {
+            account_id: &req.body.account_id,
+            bucket,
+            region: "auto",
+            prefix: &format!("{}/", req.body.project_id),
+            continuation_token: None,
+            access_key_id: &req.body.dataplane_access_key_id,
+            secret_access_key: &req.body.dataplane_secret,
+            now: forte_sdk::now(),
+        })
+        .await
+        {
+            tracing::warn!(%error, %bucket, "cloudflare_connect data-plane probe failed");
+            return Output::CredentialRejected {
+                reason: format!("the data-plane credential cannot read {bucket}: {error}"),
+            };
+        }
+    }
+
     let (dataplane_secret_ciphertext, purge_token_ciphertext) = match (
         vault::encrypt(req.body.dataplane_secret.as_bytes()).await,
         vault::encrypt(req.body.purge_token.as_bytes()).await,
@@ -133,28 +167,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             };
         }
     };
-
-    let existing = match (ProjectCloudflareConfigDocGet {
-        project_id: &req.body.project_id,
-    })
-    .send_with(&db)
-    .await
-    {
-        Ok(existing) => existing,
-        Err(error) => {
-            tracing::error!("cloudflare_connect ProjectCloudflareConfigDocGet: {error}");
-            return Output::InternalError {
-                reason: format!("config read: {error}"),
-            };
-        }
-    };
-
-    if let Some(existing) = existing {
-        return Output::AlreadyConnected {
-            account_id: existing.account_id,
-            zone_name: existing.zone_name,
-        };
-    }
 
     let config = ProjectCloudflareConfigDoc {
         project_id: req.body.project_id.clone(),
@@ -173,54 +185,23 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         config_version: 1,
     };
 
-    if let Err(error) = (ProjectCloudflareConfigDocPut(config.clone()))
-        .send_with(&db)
-        .await
-    {
-        tracing::error!("cloudflare_connect config put: {error}");
-        return Output::InternalError {
-            reason: format!("config write: {error}"),
-        };
-    }
-
-    // Proves the data-plane credential against the bucket it will actually be
-    // used on, now that it is decryptable through the stored config. Deleting
-    // the config on failure leaves the project exactly as it was.
-    let probe = match ProjectStorage::resolve(&db, &req.body.project_id).await {
-        Ok(storage) => crate::common::r2_store::ProjectR2Store::assets(&storage)
-            .list_all(&format!("{}/", req.body.project_id), forte_sdk::now())
-            .await
-            .map_err(|error| {
-                format!(
-                    "the data-plane token cannot read {}: {error}",
-                    storage.asset_bucket
-                )
-            }),
-        Err(error) => Err(format!("resolve: {error}")),
-    };
-    if let Err(reason) = probe {
-        tracing::warn!(%reason, "cloudflare_connect data-plane probe failed");
-        if let Err(error) = (ProjectCloudflareConfigDocDelete {
-            project_id: &req.body.project_id,
-        })
-        .send_with(&db)
-        .await
-        {
-            tracing::error!("cloudflare_connect could not undo the config write: {error}");
+    match byoc::connect_project(&db, config).await {
+        Ok(byoc::ConnectOutcome::Connected) => {}
+        Ok(byoc::ConnectOutcome::AlreadyConnected {
+            account_id,
+            zone_name,
+        }) => {
+            return Output::AlreadyConnected {
+                account_id,
+                zone_name,
+            };
         }
-        return Output::CredentialRejected { reason };
-    }
-
-    // Workers pick this up on their next poll, about a second later. There is
-    // nothing to move first: a project connects before it has objects, and one
-    // that already has them on the platform account keeps them there.
-    if let Err(error) =
-        byoc::publish_storage_to_manifest(&db, &req.body.project_id, Some(&config)).await
-    {
-        tracing::error!("cloudflare_connect publish_storage_to_manifest: {error}");
-        return Output::InternalError {
-            reason: format!("manifest publish: {error}"),
-        };
+        Err(error) => {
+            tracing::error!("cloudflare_connect connect_project: {error}");
+            return Output::InternalError {
+                reason: format!("connect: {error}"),
+            };
+        }
     }
 
     Output::Ok

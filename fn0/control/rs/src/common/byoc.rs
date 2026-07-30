@@ -147,33 +147,113 @@ impl ProjectStorage {
     }
 }
 
-/// Mirrors a project's storage configuration into the worker manifest, which is
-/// how workers learn to sign that project's traffic against the user's account.
+/// How a stored configuration looks to a worker.
+pub fn worker_storage_for(config: &ProjectCloudflareConfigDoc) -> WorkerProjectStorage {
+    let credential = WorkerR2Credential {
+        access_key_id: config.dataplane_access_key_id.clone(),
+        secret_ciphertext: config.dataplane_secret_ciphertext.clone(),
+    };
+    WorkerProjectStorage {
+        account_id: config.account_id.clone(),
+        region: "auto".to_string(),
+        object: credential.clone(),
+        public: credential.clone(),
+        public_bucket: config.asset_bucket.clone(),
+        public_base_url: format!("https://{}", config.static_hostname),
+        page: credential,
+        page_bucket: config.page_bucket.clone(),
+        config_version: config.config_version,
+    }
+}
+
+pub enum ConnectOutcome {
+    Connected,
+    AlreadyConnected {
+        account_id: String,
+        zone_name: String,
+    },
+}
+
+/// Stores the configuration and points workers at it in one transaction.
+///
+/// Two writes that can fail independently would let control believe a project
+/// is on the user's account while the fleet still signs against the platform's,
+/// and the project could not be reconnected to repair it because a
+/// configuration would already exist. One transaction removes the state. It
+/// also settles two concurrent connects, since the existence check happens
+/// inside it.
+pub async fn connect_project(
+    db: &doc_db::Database,
+    config: ProjectCloudflareConfigDoc,
+) -> anyhow::Result<ConnectOutcome> {
+    let storage = worker_storage_for(&config);
+    let result = db
+        .trx(|trx| {
+            let config = config.clone();
+            let storage = storage.clone();
+            async move {
+                if let Some(existing) = trx
+                    .get(ProjectCloudflareConfigDocGet {
+                        project_id: config.project_id.as_str(),
+                    })
+                    .await?
+                {
+                    return trx.commit::<_, std::convert::Infallible>(
+                        ConnectOutcome::AlreadyConnected {
+                            account_id: existing.account_id.clone(),
+                            zone_name: existing.zone_name.clone(),
+                        },
+                    );
+                }
+
+                let project_id = config.project_id.clone();
+                trx.create(config)?;
+
+                let mut manifest = match trx.get(WorkerManifestDocGet {}).await? {
+                    Some(manifest) => manifest,
+                    None => trx.create(WorkerManifestDoc {
+                        manifest_version: 0,
+                        project_manifests: std::collections::HashMap::new(),
+                    })?,
+                };
+                let entry =
+                    manifest
+                        .project_manifests
+                        .entry(project_id)
+                        .or_insert(WorkerProjectManifest {
+                            code_version: 0,
+                            custom_domain: None,
+                            static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
+                                .to_string(),
+                            pending_code_version: None,
+                            storage: None,
+                        });
+                entry.storage = Some(storage);
+                manifest.manifest_version += 1;
+                trx.commit::<_, std::convert::Infallible>(ConnectOutcome::Connected)
+            }
+        })
+        .await;
+    match result {
+        doc_db::TrxResult::Committed(outcome) => Ok(outcome),
+        doc_db::TrxResult::Cancelled(cancel) => match cancel {},
+        doc_db::TrxResult::Conflict(detail) => {
+            anyhow::bail!("connect_project conflict: {detail:?}")
+        }
+        doc_db::TrxResult::Err(error) => Err(error),
+    }
+}
+
+/// Mirrors a project's storage configuration into the worker manifest.
 ///
 /// Passing `None` puts the project back on the platform's account, which is
-/// what disconnecting and tearing down both want.
+/// what tearing down wants.
 pub async fn publish_storage_to_manifest(
     db: &doc_db::Database,
     project_id: &str,
     config: Option<&ProjectCloudflareConfigDoc>,
 ) -> anyhow::Result<()> {
-    let storage = config.map(|config| {
-        let credential = WorkerR2Credential {
-            access_key_id: config.dataplane_access_key_id.clone(),
-            secret_ciphertext: config.dataplane_secret_ciphertext.clone(),
-        };
-        WorkerProjectStorage {
-            account_id: config.account_id.clone(),
-            region: "auto".to_string(),
-            object: credential.clone(),
-            public: credential.clone(),
-            public_bucket: config.asset_bucket.clone(),
-            public_base_url: format!("https://{}", config.static_hostname),
-            page: credential,
-            page_bucket: config.page_bucket.clone(),
-            config_version: config.config_version,
-        }
-    });
+    let storage = config.map(worker_storage_for);
 
     let result = db
         .trx(|trx| {
