@@ -9,20 +9,20 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/NamseEnt/fn0"
 
 [workspace.dependencies]
-fn0 = { path = "fn0/fn0", version = "=0.3.0" }
+fn0 = { path = "fn0/fn0", version = "=0.4.0" }
 fn0-shared-schema = { path = "fn0/shared-schema", version = "=0.1.8" }
 fn0-deploy = { path = "fn0/deploy", version = "=0.1.20" }
-fn0-wasmtime = { path = "fn0/wasmtime", version = "=0.1.3" }
+fn0-wasmtime = { path = "fn0/wasmtime", version = "=0.2.0" }
 ski = { package = "fn0-ski", path = "fn0/ski", version = "=0.1.7" }
-doc-db = { package = "fn0-doc-db", path = "doc-db", version = "=0.4.8" }
-object-storage = { package = "fn0-object-storage", path = "object-storage", version = "=0.5.1" }
+doc-db = { package = "fn0-doc-db", path = "doc-db", version = "=0.4.9" }
+object-storage = { package = "fn0-object-storage", path = "object-storage", version = "=0.5.2" }
 forte-json = { path = "forte/json", version = "=0.1.1" }
 forte-macros = { path = "forte/macros", version = "=0.6.0" }
-forte-sdk = { path = "forte/sdk", version = "=0.6.0" }
-forte-wit = { path = "forte/wit", version = "=0.1.0" }
+forte-sdk = { path = "forte/sdk", version = "=0.7.0" }
+forte-wit = { path = "forte/wit", version = "=0.2.0" }
 
 aes-gcm = "=0.10.3"
-anyhow = "=1.0.100"
+anyhow = "=1.0.104"
 assert_cmd = "=2.2.1"
 async_singleflight = "=0.6.2"
 async-trait = "=0.1.89"
@@ -42,13 +42,13 @@ dirs = "=6.0.0"
 encoding_rs = "=0.8.35"
 form_urlencoded = "=1.2.2"
 futures = "=0.3.31"
-h2 = "=0.4.13"
+h2 = "=0.4.15"
 hex = "=0.4.3"
 hmac = "=0.12.1"
 http = "=1.4.0"
 http-body = "=1.0.1"
 http-body-util = "=0.1.3"
-hyper = "=1.8.1"
+hyper = "=1.11.0"
 hyper-rustls = { version = "=0.27.7", default-features = false, features = ["webpki-roots", "http1", "http2", "ring", "tls12", "logging"] }
 hyper-util = "=0.1.20"
 include_dir = "=0.7.4"
@@ -87,7 +87,7 @@ serde_json = "=1.0.148"
 serde_yaml = "=0.9.34"
 sha2 = "=0.10.9"
 singleflight = "=0.3.0"
-socket2 = "=0.6.1"
+socket2 = "=0.6.5"
 sonic-rs = "=0.5.8"
 struson = "=0.7.2"
 syn = { version = "=2.0.113", features = ["full"] }
@@ -96,7 +96,7 @@ tar = "=0.4.45"
 tempfile = "=3.27.0"
 thiserror = "=2.0.18"
 time = "=0.3.44"
-tokio = "=1.49.0"
+tokio = "=1.53.1"
 tokio-rustls = "=0.26.4"
 tokio-util = "=0.7.18"
 toml = "=0.8.23"
@@ -109,11 +109,11 @@ tracing-subscriber = { version = "=0.3.23", default-features = false, features =
 url = "=2.5.8"
 uuid = "=1.19.0"
 wasmparser = "=0.252.0"
-wasmtime = { version = "=43.0.1", default-features = false }
-wasmtime-wasi = "=43.0.1"
-wasmtime-wasi-http = "=43.0.1"
+wasmtime = { version = "=47.0.2", default-features = false }
+wasmtime-wasi = "=47.0.2"
+wasmtime-wasi-http = "=47.0.2"
 wiremock = "=0.6.5"
-wit-bindgen = { version = "=0.50.0", features = ["default", "async-spawn", "inter-task-wakeup"] }
+wit-bindgen = { version = "=0.60.0", features = ["default", "async-spawn", "inter-task-wakeup"] }
 zstd = "=0.13.3"
 
 [profile.release]

@@ -1,5 +1,8 @@
+mod wasi_version_rewrite;
+
 use wasmtime::*;
 
+pub use wasi_version_rewrite::{is_component, rewrite_wasi_030_rc_names};
 pub use wasmtime;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -47,9 +50,51 @@ pub fn engine_config() -> Config {
 pub fn compile(wasm_bytes: &[u8]) -> Result<Vec<u8>, Error> {
     let engine = Engine::new(&engine_config())?;
 
-    if wasm_bytes.len() > 8 && wasm_bytes[4..8] == [0x0d, 0x00, 0x01, 0x00] {
-        engine.precompile_component(wasm_bytes)
-    } else {
-        engine.precompile_module(wasm_bytes)
+    if !is_component(wasm_bytes) {
+        return engine.precompile_module(wasm_bytes);
     }
+
+    let rewritten = rewrite_wasi_030_rc_names(wasm_bytes);
+    let component = rewritten.as_deref().unwrap_or(wasm_bytes);
+
+    // Precompiling resolves nothing by name, so a component whose imports no
+    // host offers still compiles and only fails when a bundle is served. These
+    // two checks move that to compile time, which is where the deploy pipeline
+    // can act on it.
+    wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
+        .validate_all(component)
+        .map_err(|e| Error::msg(format!("component failed validation: {e}")))?;
+    if let Some(name) = prerelease_wasi_name(component) {
+        return Err(Error::msg(format!(
+            "component imports or exports `{name}`, which no released WASI \
+             version provides; rebuild it with a current forte-sdk"
+        )));
+    }
+
+    engine.precompile_component(component)
+}
+
+fn prerelease_wasi_name(component: &[u8]) -> Option<String> {
+    let mut found = None;
+    for payload in wasmparser::Parser::new(0).parse_all(component) {
+        let names: Vec<&str> = match payload {
+            Ok(wasmparser::Payload::ComponentImportSection(reader)) => reader
+                .into_iter()
+                .filter_map(|import| import.ok().map(|import| import.name.name))
+                .collect(),
+            Ok(wasmparser::Payload::ComponentExportSection(reader)) => reader
+                .into_iter()
+                .filter_map(|export| export.ok().map(|export| export.name.name))
+                .collect(),
+            _ => continue,
+        };
+        if let Some(name) = names
+            .into_iter()
+            .find(|name| name.starts_with("wasi:") && name.contains("-rc-"))
+        {
+            found = Some(name.to_string());
+            break;
+        }
+    }
+    found
 }
