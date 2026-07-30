@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "forte-codegen"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "forte-wit",
@@ -487,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bytes",
