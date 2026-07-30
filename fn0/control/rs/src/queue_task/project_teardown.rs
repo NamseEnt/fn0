@@ -59,7 +59,10 @@ async fn delete_custom_domain(db: &doc_db::Database, project_id: &str) -> anyhow
     else {
         return Ok(());
     };
-    if ProjectStorage::resolve(db, project_id).await?.is_byoc() {
+    if ProjectStorage::resolve_connected(db, project_id)
+        .await?
+        .is_some()
+    {
         crate::common::cert_manifest::remove(db, &domain).await?;
     } else {
         CloudflareSaasClient::from_env()?

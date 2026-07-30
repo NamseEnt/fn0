@@ -50,21 +50,22 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let storage = ProjectStorage::resolve(&db, &input.project_id).await?;
     // Which edge holds this project's cached pages follows the hostname the
     // visitor used, not where the objects are stored. Every project is
     // reachable at `{project_id}.fn0.dev`, so the platform zone always has a
     // copy to invalidate; a custom domain on the owner's own zone puts a
-    // second copy there, and that one is purged with their own token and
+    // second copy there, and that one is purged with their own token off
     // their own budget.
-    let user_zone = storage
-        .is_byoc()
-        .then(|| entry.custom_domain.clone())
-        .flatten();
+    let user_zone = match entry.custom_domain.clone() {
+        Some(domain) => ProjectStorage::resolve_connected(&db, &input.project_id)
+            .await?
+            .map(|storage| (storage, domain)),
+        None => None,
+    };
     let platform = CloudflareClient::from_env()?;
     if entry.static_cache_state == STATIC_CACHE_STATE_PRE_PURGE {
         purge(&db, &platform, &input, "pre_purge").await?;
-        purge_user_zone(&storage, &input, user_zone.as_deref(), "pre_purge").await?;
+        purge_user_zone(user_zone.as_ref(), &input, "pre_purge").await?;
         set_activating(&db, &input).await?;
     }
 
@@ -82,7 +83,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     }
 
     purge(&db, &platform, &input, "post_purge").await?;
-    purge_user_zone(&storage, &input, user_zone.as_deref(), "post_purge").await?;
+    purge_user_zone(user_zone.as_ref(), &input, "post_purge").await?;
     set_active(&db, &input).await?;
 
     crate::enqueue::deploy_artifact_prune(crate::queue_task::deploy_artifact_prune::Input {
@@ -101,12 +102,11 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 /// its own 5/min budget, so the shared token bucket below would only delay
 /// their deploys for a budget they do not spend from.
 async fn purge_user_zone(
-    storage: &ProjectStorage,
+    user_zone: Option<&(ProjectStorage, String)>,
     input: &Input,
-    custom_domain: Option<&str>,
     phase: &str,
 ) -> anyhow::Result<()> {
-    let Some(custom_domain) = custom_domain else {
+    let Some((storage, custom_domain)) = user_zone else {
         return Ok(());
     };
     let tag = format!("fn0-project-{}", input.project_id);

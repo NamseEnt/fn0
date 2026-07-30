@@ -159,10 +159,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     let db = doc_db::turso();
-    let storage = match ProjectStorage::resolve(&db, &project_id).await {
+    // `resolve_connected`, not `resolve`: which zone can sign an origin
+    // certificate depends on the user owning one, not on whether their objects
+    // have finished copying across.
+    let storage = match ProjectStorage::resolve_connected(&db, &project_id).await {
         Ok(storage) => storage,
         Err(e) => {
-            tracing::error!("domain_add ProjectStorage::resolve: {e}");
+            tracing::error!("domain_add ProjectStorage::resolve_connected: {e}");
             return Output::InternalError;
         }
     };
@@ -170,7 +173,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     // A project on the platform's account still goes through Cloudflare for
     // SaaS: there is no user zone to issue an origin certificate on, and the
     // request never reaches this fleet with their hostname in SNI.
-    if !storage.is_byoc() {
+    let Some(storage) = storage else {
         if let Err(e) =
             crate::enqueue::cloudflare_register(crate::queue_task::cloudflare_register::Input {
                 domain: domain.clone(),
@@ -184,7 +187,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             origin_ip: String::new(),
             needs_dns_record: false,
         };
-    }
+    };
 
     let Ok(origin_ip) = std::env::var("FN0_WORKER_ORIGIN_IP") else {
         tracing::error!("domain_add: FN0_WORKER_ORIGIN_IP not set");

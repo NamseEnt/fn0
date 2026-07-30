@@ -82,10 +82,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
 
     let db = doc_db::turso();
-    let is_byoc = match ProjectStorage::resolve(&db, &project_id).await {
-        Ok(storage) => storage.is_byoc(),
+    let is_byoc = match ProjectStorage::resolve_connected(&db, &project_id).await {
+        Ok(storage) => storage.is_some(),
         Err(e) => {
-            tracing::error!("domain_remove ProjectStorage::resolve: {e}");
+            tracing::error!("domain_remove ProjectStorage::resolve_connected: {e}");
             return Output::InternalError;
         }
     };

@@ -77,8 +77,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotConfigured;
     };
 
-    match ProjectStorage::resolve(&db, &req.body.project_id).await {
-        Ok(storage) if storage.is_byoc() => {
+    match ProjectStorage::resolve_connected(&db, &req.body.project_id).await {
+        Ok(Some(_)) => {
             let cert = match (WorkerCertManifestDocGet {}).send_with(&db).await {
                 Ok(manifest) => manifest.and_then(|manifest| manifest.certs.get(&domain).cloned()),
                 Err(e) => {
@@ -95,9 +95,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 origin_ip: std::env::var("FN0_WORKER_ORIGIN_IP").unwrap_or_default(),
             };
         }
-        Ok(_) => {}
+        Ok(None) => {}
         Err(e) => {
-            tracing::error!("domain_status ProjectStorage::resolve: {e}");
+            tracing::error!("domain_status ProjectStorage::resolve_connected: {e}");
             return Output::InternalError;
         }
     }
