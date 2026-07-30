@@ -242,10 +242,23 @@ pub async fn handle(input: Input) -> Result<Output> {
 }
 ```
 
-Run it:
+Run it against the deployed app:
 
 ```sh
 forte admin run seed_database --input '{"count": 10}'
+# or read input from a file:
+forte admin run seed_database --input-file seed.json
 ```
+
+Run it against a locally running `forte dev` server:
+
+```sh
+forte admin run-local seed_database --input '{"count": 10}'
+forte admin run-local seed_database -P 8080 --input '{"count": 10}'  # custom port
+```
+
+`forte admin run-local` sends the request to `http://localhost:<port>` (default 3000) instead of the deployed app. Use it to test admin tasks without a deploy.
+
+See [`forte admin run`](cli.md#forte-admin-run-task-options) and [`forte admin run-local`](cli.md#forte-admin-run-local-task-options) in the CLI reference for all flags (`--input`, `--input-file`, `--timeout-seconds`).
 
 **Serialization note:** Admin task input is deserialized with standard `serde_json` (no camelCase→snake_case conversion). The `Output` is also serialized with standard `serde_json` — field names appear as snake_case in the JSON output printed to the terminal. This differs from actions and hooks, whose output goes through `forte_json` (camelCase field names).

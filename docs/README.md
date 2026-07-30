@@ -18,6 +18,7 @@ Forte is the full-stack web framework built on fn0.
 - [Per-page Head](forte/head.md) — Per-page `<title>` and meta tags via `head` exports
 - [Frontend Runtime](forte/frontend.md) — `@forte/react` API, `__FORTE_BASE_URL__`, SSR/hydration lifecycle
 - [SDK Reference](forte/sdk.md) — `ForteRequest`, HTTP client, cookies, re-exported crates
+- [Serialization](forte/serialization.md) — `forte_json` rules, enum encoding, TypeScript type mapping
 - [Code Generation](forte/codegen.md) — How `forte-codegen` and `forte-rs-to-ts` work
 - [Testing](forte/testing.md) — `#[forte_sdk::test]`, in-memory DB/storage, testing handlers
 - [Troubleshooting](forte/troubleshooting.md) — Common build, dev, and deployment issues
