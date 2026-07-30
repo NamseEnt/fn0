@@ -13,3 +13,5 @@ dist = false
 
 [dependencies]
 fn0 = { workspace = true }
+tar = { workspace = true }
+wasmparser = { workspace = true }

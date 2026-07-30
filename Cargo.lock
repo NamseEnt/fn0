@@ -1848,7 +1848,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-cli"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1877,6 +1877,8 @@ name = "fn0-compiler"
 version = "0.1.0"
 dependencies = [
  "fn0",
+ "tar",
+ "wasmparser 0.252.0",
 ]
 
 [[package]]
@@ -2131,7 +2133,7 @@ dependencies = [
 
 [[package]]
 name = "forte-cli"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "anyhow",
  "assert_cmd",

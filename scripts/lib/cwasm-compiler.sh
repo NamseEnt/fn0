@@ -15,6 +15,9 @@ if [[ -n "${__FN0_CWASM_COMPILER_LOADED:-}" ]]; then
 fi
 __FN0_CWASM_COMPILER_LOADED=1
 
+# shellcheck source=r2.sh
+source "$(dirname "${BASH_SOURCE[0]}")/r2.sh"
+
 CWASM_COMPILER_PARALLEL="${CWASM_COMPILER_PARALLEL:-20}"
 
 ensure_cwasm_lambda() {
@@ -152,35 +155,6 @@ ensure_cwasm_pending() {
     "$work_dir"
 }
 
-__cwasm_list_r2() {
-  local r2_endpoint="$1" r2_bucket="$2" r2_ak="$3" r2_sk="$4" prefix="$5"
-  local token="" out=""
-  while :; do
-    if [[ -n "$token" ]]; then
-      out="$(AWS_ACCESS_KEY_ID="$r2_ak" \
-             AWS_SECRET_ACCESS_KEY="$r2_sk" \
-             AWS_DEFAULT_REGION=auto \
-             aws s3api list-objects-v2 \
-               --endpoint-url "$r2_endpoint" \
-               --bucket "$r2_bucket" \
-               --prefix "$prefix" \
-               --starting-token "$token" \
-               --output json)"
-    else
-      out="$(AWS_ACCESS_KEY_ID="$r2_ak" \
-             AWS_SECRET_ACCESS_KEY="$r2_sk" \
-             AWS_DEFAULT_REGION=auto \
-             aws s3api list-objects-v2 \
-               --endpoint-url "$r2_endpoint" \
-               --bucket "$r2_bucket" \
-               --prefix "$prefix" \
-               --output json)"
-    fi
-    jq -c '.Contents[]? | {Key, LastModified}' <<<"$out"
-    token="$(jq -r '.NextContinuationToken // empty' <<<"$out")"
-    [[ -z "$token" ]] && break
-  done
-}
 
 __cwasm_invoke_one() {
   local entry pid code_version input_key output_key payload_file out_file meta_file rc fn_err log_b64
@@ -257,11 +231,11 @@ __cwasm_sync_compile_all() {
   : > "$success_file"
   : > "$fail_file"
 
-  __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "original/" \
+  r2_list_objects "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "original/" \
     | jq -c 'select(.Key | test("^original/[^/]+/[0-9]+\\.tar$")) | (.Key | capture("^original/(?<p>[^/]+)/(?<cv>[0-9]+)\\.tar$")) | {project_id: .p, code_version: (.cv | tonumber)}' \
     > "$originals_file" || true
 
-  __cwasm_list_r2 "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "compiled/${new_fn0_wasmtime_version}/" \
+  r2_list_objects "$r2_endpoint" "$r2_bucket" "$r2_ak" "$r2_sk" "compiled/${new_fn0_wasmtime_version}/" \
     | jq -r 'select(.Key | test("^compiled/[^/]+/[^/]+/[0-9]+\\.tar\\.zst$")) | (.Key | capture("^compiled/[^/]+/(?<p>[^/]+)/(?<cv>[0-9]+)\\.tar\\.zst$") | "\(.p)|\(.cv)")' \
     > "$compiled_file" || true
 
