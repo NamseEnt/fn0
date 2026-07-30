@@ -1,0 +1,6 @@
+{
+  "name": "workers-jspi-probe",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-07-29",
+  "observability": { "enabled": true }
+}
