@@ -53,7 +53,7 @@ workerd at compatibility date 2026-07-29, in an ordinary JS Worker — not only 
 Python Workers. The transpiled glue uses both (`WebAssembly.promising` wraps the
 `[async-lift]` export, `new WebAssembly.Suspending` wraps async imports).
 
-### `async: true` in wit-bindgen produces a component jco rejects
+### `async: true` in wit-bindgen produces a spec-invalid component
 
 With `async: true`, wit-bindgen lowers *every* import through the async ABI,
 including functions that are plain `func` in WIT. jco refuses that component:
@@ -63,11 +63,29 @@ the `async` canonical option requires an async function type (at offset 0x41d98)
 ```
 
 Dropping the option — wit-bindgen's default, where only WIT `async func`s are
-async — transpiles. `forte/sdk/src/bindings.rs` and
-`forte/codegen/src/generate_routes/codegen.rs` both pass `async: true` today, so
-path A requires changing that and removing the `.await`s on the sync calls
-(`Fields::from_list`, `Request::new`, the setters, `get_status_code`,
-`consume_body`, `monotonic_clock::now`).
+async — transpiles.
+
+This is not jco being behind, and not a wit-bindgen version to bump:
+
+| Check | Result |
+|---|---|
+| `wasm-tools 1.254.0 validate --features all`, wit-bindgen 0.50 + `async: true` | same error, offset 0x41d98 |
+| same, rebuilt on wit-bindgen **0.60.0** (newest) | same error, offset 0x42f13 |
+| same, wit-bindgen default async | validates clean |
+
+The Component Model Explainer states the rule directly: "the `async` option may
+only be used with async function types". `async: true` async-lowers WIT `func`s,
+which violates it. wasmtime 43 — what the fleet runs, on wasmparser 0.243 —
+accepts it anyway, which is why every component we deploy today is built this way
+and nothing has complained.
+
+Two consequences. Path A cannot use the artifact forte-sdk produces today, at the
+artifact level, before JSPI or Workers enter the picture. And independently of
+#80, the components we ship are spec-invalid and only run because of the pinned
+wasmtime; a wasmtime bump is where that surfaces.
+
+Also of note for a future bump: wit-bindgen 0.60 renamed `spawn` to
+`spawn_local`.
 
 ### p3 streams and futures land on web standards
 
