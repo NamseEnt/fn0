@@ -73,6 +73,10 @@ export class P3Fields {
     return P3Fields.fromList([...headers].map(([name, value]) => [name, textEncoder.encode(value)]));
   }
 
+  copyAll() {
+    return (this.entries ?? []).map(([name, value]) => [name, value]);
+  }
+
   toHeaders({ skipUnsettable = false } = {}) {
     const headers = new Headers();
     for (const [name, value] of this.entries ?? []) {
@@ -101,6 +105,11 @@ export class P3Request {
     return [request, Promise.resolve({ tag: 'ok', val: undefined })];
   }
 
+  static consumeBody(request, _result) {
+    const body = request.nativeBody ?? request.contents ?? emptyReadableStream();
+    return [body, Promise.resolve({ tag: 'ok', val: undefined })];
+  }
+
   setMethod(method) {
     this.method = method;
   }
@@ -115,6 +124,26 @@ export class P3Request {
 
   setAuthority(authority) {
     this.authority = authority;
+  }
+
+  getMethod() {
+    return this.method ?? { tag: 'get' };
+  }
+
+  getPathWithQuery() {
+    return this.pathWithQuery;
+  }
+
+  getScheme() {
+    return this.scheme;
+  }
+
+  getAuthority() {
+    return this.authority;
+  }
+
+  getHeaders() {
+    return this.headers ?? P3Fields.fromList([]);
   }
 }
 
@@ -139,6 +168,10 @@ export class P3Response {
 
   setStatusCode(statusCode) {
     this.statusCode = statusCode;
+  }
+
+  getHeaders() {
+    return this.headers ?? P3Fields.fromList([]);
   }
 }
 
@@ -193,6 +226,10 @@ function internalError(message) {
   return { tag: 'internal-error', val: message };
 }
 
+function randomU64() {
+  return new BigUint64Array(crypto.getRandomValues(new Uint8Array(8)).buffer)[0];
+}
+
 async function send(request) {
   if (request.authority === undefined || request.authority === '') {
     throw internalError('outbound request has no authority');
@@ -222,13 +259,13 @@ async function send(request) {
   return response;
 }
 
-export function makeImports() {
+export function makeImports({ environment = [] } = {}) {
   const stdout = new OutputStream('stdout');
   const stderr = new OutputStream('stderr');
   const stdin = new InputStream();
 
   return {
-    'wasi:cli/environment': { getEnvironment: () => [] },
+    'wasi:cli/environment': { getEnvironment: () => environment },
     'wasi:cli/exit': {
       exit: (status) => {
         throw new Error(`guest called exit(${JSON.stringify(status)})`);
@@ -249,6 +286,24 @@ export function makeImports() {
         new Promise((resolve) => setTimeout(resolve, Number(duration / NANOS_PER_MILLI))),
       subscribeDuration: () => new Pollable(),
     },
+    'wasi:clocks/wall-clock': {
+      now: () => {
+        const millis = Date.now();
+        return {
+          seconds: BigInt(Math.floor(millis / 1000)),
+          nanoseconds: (millis % 1000) * 1_000_000,
+        };
+      },
+    },
+    'wasi:random/random': {
+      getRandomBytes: (length) => crypto.getRandomValues(new Uint8Array(Number(length))),
+      getRandomU64: randomU64,
+    },
+    'wasi:random/insecure': {
+      getInsecureRandomBytes: (length) => crypto.getRandomValues(new Uint8Array(Number(length))),
+      getInsecureRandomU64: randomU64,
+    },
+    'wasi:random/insecure-seed': { insecureSeed: () => [randomU64(), randomU64()] },
     'wasi:io/error': { Error: IoError },
     'wasi:io/poll': { Pollable, poll: () => [] },
     'wasi:io/streams': { InputStream, OutputStream },

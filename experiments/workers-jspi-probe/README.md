@@ -11,13 +11,17 @@ The component runs under `wrangler dev` and deployed on the free plan, returning
 200 with the fetched bytes streamed. The one blocker found is that a component
 instance serves exactly one request (see "Instance reuse" below).
 
+P1 took this to a real Forte app: `../workers-forte-app`. One conclusion recorded
+here — that the free plan does not enforce its documented CPU limit — was
+overturned there, and is withdrawn below.
+
 ## Layout
 
 | Path | What it is |
 |---|---|
 | `src/lib.rs` | The component. Awaits `monotonic-clock.wait-for`, awaits an outbound `http/client.send`, returns the fetched bytes as a `stream<u8>` fed by a spawned task. No forte-sdk, so a failure points at the toolchain. |
 | `wit/` | Copy of `forte/wit/wit` — the same WASI `0.3.0-rc-2026-03-15` definitions forte-sdk builds against. |
-| `worker/shim.js` | Workers-side implementation of every host import the glue asks for. |
+| `worker/shim.js` | Workers-side implementation of every host import the glue asks for. Shared with `../workers-forte-app`, so it covers that app's surface too. |
 | `worker/index.js` | The `fetch` handler: instantiates the component, converts request/response. |
 | `worker/gen/` | `jco transpile` output. Regenerate with the command below; not hand-edited. |
 | `jspi-check/` | Two-line Worker that reports whether `WebAssembly.promising` exists. The cheapest reproduction of the gate. |
@@ -53,7 +57,7 @@ workerd at compatibility date 2026-07-29, in an ordinary JS Worker — not only 
 Python Workers. The transpiled glue uses both (`WebAssembly.promising` wraps the
 `[async-lift]` export, `new WebAssembly.Suspending` wraps async imports).
 
-### `async: true` in wit-bindgen produces a spec-invalid component
+### `async: true` in wit-bindgen produces a component jco rejects
 
 With `async: true`, wit-bindgen lowers *every* import through the async ABI,
 including functions that are plain `func` in WIT. jco refuses that component:
@@ -63,29 +67,10 @@ the `async` canonical option requires an async function type (at offset 0x41d98)
 ```
 
 Dropping the option — wit-bindgen's default, where only WIT `async func`s are
-async — transpiles.
+async — transpiles. This probe is built that way, which is why it exists at all.
 
-This is not jco being behind, and not a wit-bindgen version to bump:
-
-| Check | Result |
-|---|---|
-| `wasm-tools 1.254.0 validate --features all`, wit-bindgen 0.50 + `async: true` | same error, offset 0x41d98 |
-| same, rebuilt on wit-bindgen **0.60.0** (newest) | same error, offset 0x42f13 |
-| same, wit-bindgen default async | validates clean |
-
-The Component Model Explainer states the rule directly: "the `async` option may
-only be used with async function types". `async: true` async-lowers WIT `func`s,
-which violates it. wasmtime 43 — what the fleet runs, on wasmparser 0.243 —
-accepts it anyway, which is why every component we deploy today is built this way
-and nothing has complained.
-
-Two consequences. Path A cannot use the artifact forte-sdk produces today, at the
-artifact level, before JSPI or Workers enter the picture. And independently of
-#80, the components we ship are spec-invalid and only run because of the pinned
-wasmtime; a wasmtime bump is where that surfaces.
-
-Also of note for a future bump: wit-bindgen 0.60 renamed `spawn` to
-`spawn_local`.
+forte-sdk has since dropped the option too, so path A no longer needs a special
+artifact; see `../workers-forte-app/README.md`.
 
 ### p3 streams and futures land on web standards
 
@@ -121,21 +106,24 @@ The cause was not isolated further. The cost of the workaround is small measured
 locally — `new WebAssembly.Instance` for an already-compiled module is 0–1 ms
 warm, 8 ms on the first request of an isolate.
 
-### The documented 10 ms free-plan CPU limit is not what is enforced
+### The documented 10 ms free-plan CPU limit — withdrawn, it is enforced
 
-The account is on the free plan — deploying `limits.cpu_ms` fails with
-`CPU limits are not supported for the Free plan [code: 100328]`. Yet on that same
-account:
+This section previously recorded that the limit was not enforced: `?burn=1e8` and
+`?burn=1e9` — ~100 ms and ~960 ms of CPU by node's calibration of the same loop —
+both returned 200 on a free-plan account.
 
-| `?burn=` | wall time | same loop in node (V8) |
-|---|---|---|
-| 1e8 | 1.06 s | 100 ms CPU |
-| 1e9 | 6.49 s | 960 ms CPU |
+**That does not reproduce.** Re-run hours later against the same worker and
+account, `?burn=1e7` (~10 ms) and everything above it returns `1102 Worker
+exceeded CPU limit`, and the threshold sits between 1e6 and 1e7 — the documented
+number. The original reading was taken inside an anomalous window. The measured
+table and what it costs a real app are in `../workers-forte-app/README.md`.
 
-Both returned 200. A request burning ~1 s of CPU is ~100x the documented 10 ms
-free-plan limit and was not killed, so "10 ms free-tier CPU rules out the free
-plan for SSR" cannot be taken at face value. This does not prove what the ceiling
-is; it proves the documented number is not the enforced one here.
+Deploying `limits.cpu_ms` does fail with
+`CPU limits are not supported for the Free plan [code: 100328]`; that part
+stands, and is unrelated to what is enforced.
+
+The probe itself now returns 200 for only about 3 requests in 10, for the same
+reason.
 
 ### Numbers
 
@@ -146,8 +134,10 @@ is; it proves the documented number is not the enforced one here.
 | Instantiate, warm isolate | 0–1 ms |
 | Instantiate, first request in an isolate | 8 ms |
 | End-to-end, `wrangler dev` | 65–170 ms |
-| End-to-end, deployed | 0.49–0.68 s typical, occasional 6 s outlier |
+| End-to-end, deployed | 0.49–0.68 s typical, occasional 6 s outlier — measured in the window where the CPU limit was not being enforced |
 
-The probe's own CPU time is not recorded: `wrangler tail` produced no events, and
-the observability telemetry API rejects wrangler's OAuth token (403,
-`Authentication error`). Getting it needs an API token with observability read.
+`wrangler tail` produced no events during this run and the observability
+telemetry API rejects wrangler's OAuth token (403, `Authentication error`), so
+per-request CPU was never read directly; getting it needs an API token with
+observability read. `wrangler tail` did work later, during P1, and is what
+identified the `1102`s as `Worker exceeded CPU time limit`.

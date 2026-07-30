@@ -1,0 +1,24 @@
+[workspace]
+
+[package]
+name = "workers-forte-app"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1"
+cookie = "0.18"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+http = "1"
+tracing = "0.1"
+forte-json = { path = "../../../forte/json" }
+forte-sdk = { path = "../../../forte/sdk" }
+doc-db = { package = "fn0-doc-db", path = "../../../doc-db" }
+object-storage = { package = "fn0-object-storage", path = "../../../object-storage" }
+
+[build-dependencies]
+forte-codegen = { path = "../../../forte/codegen" }
