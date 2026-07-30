@@ -338,10 +338,14 @@ async fn run() -> Result<()> {
         }
     });
 
-    let cert_resolver = Arc::new(build_cert_resolver(vault_client.clone())?);
+    let cert_resolver = Arc::new(build_cert_resolver()?);
     let cert_db =
         manifest_poller::build_database_from_env().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
-    let cert_handle = tokio::spawn(cert_poller::run(cert_db, cert_resolver.clone()));
+    let cert_handle = tokio::spawn(cert_poller::run(
+        cert_db,
+        cert_resolver.clone(),
+        vault_client.clone(),
+    ));
 
     let queue_consumer_handle = {
         let config = queue_consumer::QueueConsumerConfig::from_env()
@@ -419,13 +423,13 @@ fn apex_route_from_env() -> Option<Arc<ApexRoute>> {
     }
 }
 
-fn build_cert_resolver(vault: Arc<VaultClient>) -> Result<SniCertResolver> {
+fn build_cert_resolver() -> Result<SniCertResolver> {
     let cert_pem =
         read_pem_env("ORIGIN_CERT_PEM").expect("ORIGIN_CERT_PEM (or _BASE64) must be set");
     let key_pem = read_pem_env("ORIGIN_KEY_PEM").expect("ORIGIN_KEY_PEM (or _BASE64) must be set");
     let fallback = cert_resolver::certified_key(&cert_pem, &key_pem)
         .map_err(|error| color_eyre::eyre::eyre!("platform origin certificate: {error}"))?;
-    Ok(SniCertResolver::new(fallback, vault))
+    Ok(SniCertResolver::new(fallback))
 }
 
 async fn run_user_server(

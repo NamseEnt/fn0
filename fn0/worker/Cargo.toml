@@ -46,3 +46,6 @@ tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 zstd = { workspace = true }
+
+[dev-dependencies]
+rcgen = { workspace = true }
