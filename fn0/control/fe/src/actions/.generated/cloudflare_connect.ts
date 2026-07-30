@@ -22,6 +22,11 @@ const OutputSchema = z.discriminatedUnion("t", [
     t: z.literal("Ok"),
   }),
     z.object({
+    t: z.literal("AlreadyConnected"),
+    accountId: z.string(),
+    zoneName: z.string(),
+  }),
+    z.object({
     t: z.literal("CredentialRejected"),
     reason: z.string(),
   }),

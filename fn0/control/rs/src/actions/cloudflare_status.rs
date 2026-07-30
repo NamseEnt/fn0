@@ -28,9 +28,6 @@ pub enum Output {
         page_bucket: String,
         healthy: bool,
         problem: Option<String>,
-        /// Existing objects are still being copied across; the project is
-        /// still served from the platform account until they are.
-        migrating: bool,
     },
     NotLoggedIn,
     NotFound,
@@ -78,16 +75,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    let storage = match ProjectStorage::resolve_connected(&db, &req.body.project_id).await {
-        Ok(Some(storage)) => storage,
-        Ok(None) => return Output::Platform,
+    let storage = match ProjectStorage::resolve(&db, &req.body.project_id).await {
+        Ok(storage) if storage.is_byoc() => storage,
+        Ok(_) => return Output::Platform,
         Err(error) => {
             return Output::InternalError {
                 reason: format!("resolve: {error}"),
             };
         }
     };
-    let migrating = config.state == CloudflareConnectionState::Migrating;
     let cloudflare = match storage.purge_client() {
         Ok(cloudflare) => cloudflare,
         Err(error) => {
@@ -106,13 +102,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         Err(error) => Some(format!("token is no longer valid: {error}")),
     };
 
-    // A migration in flight is not a health verdict, so it is left alone: the
-    // queue task owns that transition and overwriting it here would switch the
-    // project over before its objects had arrived.
-    let state = match (&problem, migrating) {
-        (_, true) => CloudflareConnectionState::Migrating,
-        (None, false) => CloudflareConnectionState::Ok,
-        (Some(problem), false) => CloudflareConnectionState::Degraded {
+    let state = match &problem {
+        None => CloudflareConnectionState::Ok,
+        Some(problem) => CloudflareConnectionState::Degraded {
             missing: vec![problem.clone()],
         },
     };
@@ -136,6 +128,5 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         page_bucket: config.page_bucket,
         healthy: problem.is_none(),
         problem,
-        migrating,
     }
 }

@@ -31,10 +31,18 @@ struct ConnectInput<'a> {
 #[serde(tag = "t", rename_all_fields = "camelCase")]
 enum Connect {
     Ok,
-    CredentialRejected { reason: String },
+    CredentialRejected {
+        reason: String,
+    },
+    AlreadyConnected {
+        account_id: String,
+        zone_name: String,
+    },
     NotLoggedIn,
     NotFound,
-    InternalError { reason: String },
+    InternalError {
+        reason: String,
+    },
 }
 
 /// One `API Tokens -> Edit` token; the CLI provisions and mints from it.
@@ -174,14 +182,19 @@ async fn send_connect(
             println!();
             println!("connected. the token you used was not sent to fn0 and is no longer");
             println!("needed — you can delete it in the Cloudflare dashboard.");
-            println!(
-                "existing objects are being copied across; the project keeps using the fn0 \
-                 platform account until that finishes."
-            );
+            println!("workers pick this up within a second; no redeploy needed.");
             Ok(())
         }
-        Connect::CredentialRejected { reason } => Err(anyhow!(
-            "fn0 rejected the credentials this command minted: {reason}"
+        Connect::CredentialRejected { reason } => {
+            Err(anyhow!("fn0 rejected the credentials: {reason}"))
+        }
+        Connect::AlreadyConnected {
+            account_id,
+            zone_name,
+        } => Err(anyhow!(
+            "project '{project_id}' is already connected to account {account_id} ({zone_name}). \
+             Reconnecting is not supported yet — it would have to decide whether to rotate \
+             credentials and whether to move objects already written to that account."
         )),
         Connect::NotLoggedIn => Err(anyhow!("control rejected token; sign in again.")),
         Connect::NotFound => Err(anyhow!(
@@ -208,7 +221,6 @@ enum Status {
         page_bucket: String,
         healthy: bool,
         problem: Option<String>,
-        migrating: bool,
     },
     NotLoggedIn,
     NotFound,
@@ -245,20 +257,15 @@ pub async fn cloudflare_status(project_id: &str) -> Result<()> {
             page_bucket,
             healthy,
             problem,
-            migrating,
         } => {
             println!("account: {account_id}");
             println!("zone:    {zone_name}");
             println!("assets:  {asset_bucket} -> https://{static_hostname}");
             println!("pages:   {page_bucket}");
-            match (migrating, healthy, problem) {
-                (true, _, _) => println!(
-                    "status:  migrating - still served from the fn0 platform account until \
-                     existing objects finish copying"
-                ),
-                (false, true, _) => println!("status:  ok"),
-                (false, false, Some(problem)) => println!("status:  degraded - {problem}"),
-                (false, false, None) => println!("status:  degraded"),
+            match (healthy, problem) {
+                (true, _) => println!("status:  ok"),
+                (false, Some(problem)) => println!("status:  degraded - {problem}"),
+                (false, None) => println!("status:  degraded"),
             }
             Ok(())
         }

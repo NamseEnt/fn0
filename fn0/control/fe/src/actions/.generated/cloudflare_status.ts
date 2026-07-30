@@ -20,7 +20,6 @@ const OutputSchema = z.discriminatedUnion("t", [
     pageBucket: z.string(),
     healthy: z.boolean(),
     problem: z.string().optional(),
-    migrating: z.boolean(),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),

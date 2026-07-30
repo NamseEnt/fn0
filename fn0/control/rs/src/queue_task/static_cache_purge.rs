@@ -57,9 +57,10 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     // second copy there, and that one is purged with their own token off
     // their own budget.
     let user_zone = match entry.custom_domain.clone() {
-        Some(domain) => ProjectStorage::resolve_connected(&db, &input.project_id)
-            .await?
-            .map(|storage| (storage, domain)),
+        Some(domain) => {
+            let storage = ProjectStorage::resolve(&db, &input.project_id).await?;
+            storage.is_byoc().then_some((storage, domain))
+        }
         None => None,
     };
     let platform = CloudflareClient::from_env()?;

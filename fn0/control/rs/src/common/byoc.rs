@@ -55,34 +55,15 @@ pub struct Connection {
 }
 
 impl ProjectStorage {
-    /// Where the project's objects are served from *right now*. A connection
-    /// that is still migrating resolves to the platform account, because that
-    /// is where the objects still are.
+    /// The account this project's objects live in: the owner's if they have
+    /// connected one, the platform's otherwise.
     pub async fn resolve(db: &doc_db::Database, project_id: &str) -> anyhow::Result<Self> {
         match (ProjectCloudflareConfigDocGet { project_id })
             .send_with(db)
             .await?
         {
-            Some(config) if config.state != CloudflareConnectionState::Migrating => {
-                Self::from_config(config).await
-            }
-            _ => Self::platform(project_id),
-        }
-    }
-
-    /// The connected account regardless of migration state. Only the migration
-    /// itself and the domain flow want this: everything else must see the
-    /// account the project is actually being served from.
-    pub async fn resolve_connected(
-        db: &doc_db::Database,
-        project_id: &str,
-    ) -> anyhow::Result<Option<Self>> {
-        match (ProjectCloudflareConfigDocGet { project_id })
-            .send_with(db)
-            .await?
-        {
-            Some(config) => Ok(Some(Self::from_config(config).await?)),
-            None => Ok(None),
+            Some(config) => Self::from_config(config).await,
+            None => Self::platform(project_id),
         }
     }
 

@@ -8,6 +8,10 @@
 //! They are still proved before being stored. A credential that is wrong is
 //! wrong whoever minted it, and the failure it would otherwise cause shows up
 //! at request time or, for purge, as a stale object nobody notices for a year.
+//!
+//! First connection only. Reconnecting would have to decide whether to rotate
+//! credentials and whether objects already written to the old account should
+//! follow, and neither answer is obvious enough to pick silently.
 
 use crate::common::auth;
 use crate::common::byoc::{self, ProjectStorage};
@@ -41,6 +45,13 @@ pub struct Input {
 #[derive(Serialize)]
 pub enum Output {
     Ok,
+    /// Connecting a second time would need decisions this action does not make:
+    /// whether to rotate credentials, and whether the objects already in the
+    /// old account should follow. Refused rather than guessed.
+    AlreadyConnected {
+        account_id: String,
+        zone_name: String,
+    },
     /// A credential does not do what it is supposed to. Nothing was stored.
     CredentialRejected {
         reason: String,
@@ -138,13 +149,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    // A project that already finished migrating is not connecting, it is
-    // rotating: its objects are in the user's account and the platform's copies
-    // are a frozen snapshot from the first migration. Running the migration
-    // again would copy that snapshot back over live data.
-    let rotating = existing
-        .as_ref()
-        .is_some_and(|doc| doc.state != CloudflareConnectionState::Migrating);
+    if let Some(existing) = existing {
+        return Output::AlreadyConnected {
+            account_id: existing.account_id,
+            zone_name: existing.zone_name,
+        };
+    }
 
     let config = ProjectCloudflareConfigDoc {
         project_id: req.body.project_id.clone(),
@@ -158,16 +168,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         dataplane_access_key_id: req.body.dataplane_access_key_id.clone(),
         dataplane_secret_ciphertext,
         purge_token_ciphertext,
-        state: if rotating {
-            CloudflareConnectionState::Ok
-        } else {
-            CloudflareConnectionState::Migrating
-        },
+        state: CloudflareConnectionState::Ok,
         checked_at: forte_sdk::now(),
-        config_version: existing
-            .as_ref()
-            .map(|doc| doc.config_version + 1)
-            .unwrap_or(1),
+        config_version: 1,
     };
 
     if let Err(error) = (ProjectCloudflareConfigDocPut(config.clone()))
@@ -181,11 +184,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     // Proves the data-plane credential against the bucket it will actually be
-    // used on, now that it is decryptable through the stored config. A rotation
-    // that fails here has already overwritten a working credential, so the old
-    // one goes back.
-    let probe = match ProjectStorage::resolve_connected(&db, &req.body.project_id).await {
-        Ok(Some(storage)) => crate::common::r2_store::ProjectR2Store::assets(&storage)
+    // used on, now that it is decryptable through the stored config. Deleting
+    // the config on failure leaves the project exactly as it was.
+    let probe = match ProjectStorage::resolve(&db, &req.body.project_id).await {
+        Ok(storage) => crate::common::r2_store::ProjectR2Store::assets(&storage)
             .list_all(&format!("{}/", req.body.project_id), forte_sdk::now())
             .await
             .map_err(|error| {
@@ -194,46 +196,30 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     storage.asset_bucket
                 )
             }),
-        Ok(None) => Err("config vanished between write and read".to_string()),
         Err(error) => Err(format!("resolve: {error}")),
     };
     if let Err(reason) = probe {
         tracing::warn!(%reason, "cloudflare_connect data-plane probe failed");
-        if let Some(previous) = existing
-            && let Err(error) = (ProjectCloudflareConfigDocPut(previous))
-                .send_with(&db)
-                .await
+        if let Err(error) = (ProjectCloudflareConfigDocDelete {
+            project_id: &req.body.project_id,
+        })
+        .send_with(&db)
+        .await
         {
-            tracing::error!("cloudflare_connect could not restore the previous config: {error}");
+            tracing::error!("cloudflare_connect could not undo the config write: {error}");
         }
         return Output::CredentialRejected { reason };
     }
 
-    if rotating {
-        // Straight to the manifest: nothing is moving, only the credential the
-        // workers sign with. They pick it up on their next poll.
-        if let Err(error) =
-            byoc::publish_storage_to_manifest(&db, &req.body.project_id, Some(&config)).await
-        {
-            tracing::error!("cloudflare_connect publish_storage_to_manifest: {error}");
-            return Output::InternalError {
-                reason: format!("manifest publish: {error}"),
-            };
-        }
-        return Output::Ok;
-    }
-
-    // First connect. The manifest is not published here: workers must keep
-    // reading the platform account until the migration has copied everything
-    // across. `byoc_migrate` flips both when it finishes.
-    if let Err(error) = crate::enqueue::byoc_migrate(crate::queue_task::byoc_migrate::Input {
-        project_id: req.body.project_id.clone(),
-    })
-    .await
+    // Workers pick this up on their next poll, about a second later. There is
+    // nothing to move first: a project connects before it has objects, and one
+    // that already has them on the platform account keeps them there.
+    if let Err(error) =
+        byoc::publish_storage_to_manifest(&db, &req.body.project_id, Some(&config)).await
     {
-        tracing::error!("cloudflare_connect enqueue byoc_migrate: {error}");
+        tracing::error!("cloudflare_connect publish_storage_to_manifest: {error}");
         return Output::InternalError {
-            reason: format!("migration enqueue: {error}"),
+            reason: format!("manifest publish: {error}"),
         };
     }
 

@@ -124,11 +124,6 @@ pub struct CliAuthorizationCodeDoc {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum CloudflareConnectionState {
-    /// Credentials verified and buckets created, but the project's existing
-    /// objects have not finished copying across. Reads and writes stay on the
-    /// platform account until they have: switching first would 404 every
-    /// object written before the account was connected.
-    Migrating,
     Ok,
     /// The credentials no longer satisfy what the platform needs. The project
     /// keeps running on them until they actually fail, because a permission we

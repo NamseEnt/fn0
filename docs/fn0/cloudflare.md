@@ -134,13 +134,20 @@ object, because a zone's default Browser Cache TTL would otherwise leave
 browser copies of a replaced object that no purge can reach. Your other
 hostnames keep the zone setting.
 
-Objects your project already had on the fn0 platform account are copied across
-in the background, and the project keeps serving from the platform account
-until that finishes. Check with:
+Workers pick the change up within about a second; no redeploy is needed. Check
+with:
 
 ```sh
 forte cloudflare status
 ```
+
+**Connect before your project stores anything.** Objects already written to
+fn0's own account stay there and become unreachable once the project is
+connected — fn0 does not copy them across. For a project that has been running,
+move its objects yourself before connecting, or start a fresh project.
+
+Connecting is first-time only. Reconnecting to rotate credentials or to move to
+a different Cloudflare account is not supported yet.
 
 ## Custom domain (optional)
 
