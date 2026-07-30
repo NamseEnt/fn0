@@ -6,9 +6,6 @@ license.workspace = true
 repository.workspace = true
 description = "Build-time code generators for the Forte web framework (routes, env, wit assets)"
 
-[package.metadata.release]
-release = false
-
 [dependencies]
 anyhow = { workspace = true }
 forte-wit = { workspace = true }
