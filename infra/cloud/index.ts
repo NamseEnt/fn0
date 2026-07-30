@@ -784,7 +784,18 @@ export const controlOwnerGithubId = config.requireNumber(
 );
 export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
 export const vaultKeyOcid = ociGlobalVault.keyOcid;
-export const controlBootstrapEnvYaml = pulumi.secret(controlEnvYamlBootstrap);
+// Appended here rather than inside the block above because the worker fleet,
+// and therefore its load balancer address, is created after everything else
+// control needs to know. Users point their own DNS at this address when they
+// attach a custom domain to a project on their own Cloudflare account.
+export const controlBootstrapEnvYaml = pulumi.secret(
+  pulumi
+    .all([
+      controlEnvYamlBootstrap,
+      ociFn0WorkerSite.networkLoadBalancerPublicIp,
+    ])
+    .apply(([yaml, originIp]) => `${yaml}FN0_WORKER_ORIGIN_IP: ${originIp}\n`),
+);
 export const controlUrl = pulumi.interpolate`https://fn0-control.${domain}`;
 export const controlAdminTokenBase64 = pulumi.secret(controlAdminToken.base64);
 export const bundleStoreR2AccountId = bundleStoreR2.accountId;

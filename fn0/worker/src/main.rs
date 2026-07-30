@@ -1,10 +1,12 @@
 mod cache;
+mod cert_poller;
+mod cert_resolver;
 mod env_crypto;
 mod env_yaml;
 mod manifest_poller;
-mod presign_sync;
 mod queue_consumer;
 mod static_pages;
+mod storage_resolver;
 mod telemetry;
 mod vault_client;
 mod worker_pool;
@@ -12,6 +14,7 @@ mod worker_pool;
 use base64::Engine;
 use bytes::Bytes;
 use cache::S3BundleCache;
+use cert_resolver::SniCertResolver;
 use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
@@ -26,6 +29,7 @@ use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use storage_resolver::ManifestStorageResolver;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -135,18 +139,28 @@ fn build_turso_hijack() -> Arc<TursoHijack> {
     })
 }
 
-fn build_object_storage_hijack(presign_gate: Arc<PresignGate>) -> Arc<ObjectStorageHijack> {
+fn build_object_storage_hijack(
+    resolver: Arc<ManifestStorageResolver>,
+    presign_gate: Arc<PresignGate>,
+) -> Arc<ObjectStorageHijack> {
+    let placeholder_host = std::env::var("FN0_OBJECT_STORAGE_PLACEHOLDER_HOST")
+        .unwrap_or_else(|_| "fn0-object-storage.fn0.dev".to_string());
     Arc::new(
-        ObjectStorageHijack::from_env()
-            .expect("object storage hijack init failed")
+        ObjectStorageHijack::new_r2_resolved(placeholder_host, resolver)
             .with_presign_gate(presign_gate),
     )
 }
 
-fn build_public_storage_hijack(purge_gate: Arc<PurgeGate>) -> Arc<PublicStorageHijack> {
+fn build_public_storage_hijack(
+    resolver: Arc<ManifestStorageResolver>,
+    purge_gate: Arc<PurgeGate>,
+) -> Arc<PublicStorageHijack> {
+    let placeholder_host = std::env::var("FN0_PUBLIC_STORAGE_PLACEHOLDER_HOST")
+        .unwrap_or_else(|_| "fn0-public-storage.fn0.dev".to_string());
+    let control_project_id =
+        std::env::var("FN0_CONTROL_PROJECT_ID").expect("FN0_CONTROL_PROJECT_ID must be set");
     Arc::new(
-        PublicStorageHijack::from_env()
-            .expect("public storage hijack init failed")
+        PublicStorageHijack::new_resolved(placeholder_host, resolver, control_project_id)
             .with_purge_gate(purge_gate),
     )
 }
@@ -245,8 +259,12 @@ async fn run() -> Result<()> {
         vault_client.clone(),
         cache_size_bytes,
     );
-    let static_page_store = static_pages::StaticPageStore::from_env()
-        .map_err(|error| color_eyre::eyre::eyre!("static page store init: {error}"))?;
+    let storage_resolver = Arc::new(ManifestStorageResolver::new(
+        storage_resolver::PlatformTargets::from_env()
+            .map_err(|error| color_eyre::eyre::eyre!("platform storage targets: {error}"))?,
+        vault_client.clone(),
+    ));
+    let static_page_store = static_pages::StaticPageStore::new(storage_resolver.clone());
 
     let direct_hijack = build_cross_project_invoke_hijack();
     let presign_gate = Arc::new(PresignGate::new());
@@ -261,9 +279,15 @@ async fn run() -> Result<()> {
             .with_cross_project_invoke_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
             .with_otlp_hijack(build_otlp_hijack(metric_gate.clone()))
-            .with_object_storage_hijack(build_object_storage_hijack(presign_gate.clone()))
-            .with_public_storage_hijack(build_public_storage_hijack(purge_gate))
-            .with_static_page_storage(Arc::new(static_page_store.clone())),
+            .with_object_storage_hijack(build_object_storage_hijack(
+                storage_resolver.clone(),
+                presign_gate.clone(),
+            ))
+            .with_public_storage_hijack(build_public_storage_hijack(
+                storage_resolver.clone(),
+                purge_gate,
+            ))
+            .with_static_page_storage(Arc::new(static_page_store)),
     );
 
     // Recorded on the worker's own meter rather than stamped into guest
@@ -308,14 +332,16 @@ async fn run() -> Result<()> {
     let manifest_handle = tokio::spawn({
         let cache = cache.clone();
         let manifest_loaded = manifest_loaded.clone();
+        let storage_resolver = storage_resolver.clone();
         async move {
-            manifest_poller::run(manifest_db, cache, manifest_loaded).await;
+            manifest_poller::run(manifest_db, cache, storage_resolver, manifest_loaded).await;
         }
     });
 
-    let presign_db =
+    let cert_resolver = Arc::new(build_cert_resolver(vault_client.clone())?);
+    let cert_db =
         manifest_poller::build_database_from_env().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
-    let presign_handle = tokio::spawn(presign_sync::run(presign_db, presign_gate.clone()));
+    let cert_handle = tokio::spawn(cert_poller::run(cert_db, cert_resolver.clone()));
 
     let queue_consumer_handle = {
         let config = queue_consumer::QueueConsumerConfig::from_env()
@@ -333,6 +359,7 @@ async fn run() -> Result<()> {
         let instance_count = instance_count.clone();
         let cache = cache.clone();
         let drain_flag = drain_flag.clone();
+        let cert_resolver = cert_resolver.clone();
         async move {
             if let Err(err) = run_user_server(
                 user_port,
@@ -341,6 +368,7 @@ async fn run() -> Result<()> {
                 drain_flag,
                 cache,
                 apex_route,
+                cert_resolver,
             )
             .await
             {
@@ -364,7 +392,7 @@ async fn run() -> Result<()> {
 
     tokio::select! {
         _ = manifest_handle => {},
-        _ = presign_handle => {},
+        _ = cert_handle => {},
         _ = user_handle => {},
         _ = ops_handle => {},
         _ = queue_consumer_handle => {},
@@ -391,6 +419,15 @@ fn apex_route_from_env() -> Option<Arc<ApexRoute>> {
     }
 }
 
+fn build_cert_resolver(vault: Arc<VaultClient>) -> Result<SniCertResolver> {
+    let cert_pem =
+        read_pem_env("ORIGIN_CERT_PEM").expect("ORIGIN_CERT_PEM (or _BASE64) must be set");
+    let key_pem = read_pem_env("ORIGIN_KEY_PEM").expect("ORIGIN_KEY_PEM (or _BASE64) must be set");
+    let fallback = cert_resolver::certified_key(&cert_pem, &key_pem)
+        .map_err(|error| color_eyre::eyre::eyre!("platform origin certificate: {error}"))?;
+    Ok(SniCertResolver::new(fallback, vault))
+}
+
 async fn run_user_server(
     port: u16,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
@@ -398,19 +435,12 @@ async fn run_user_server(
     drain_flag: Arc<AtomicBool>,
     cache: S3BundleCache,
     apex_route: Option<Arc<ApexRoute>>,
+    cert_resolver: Arc<SniCertResolver>,
 ) -> Result<()> {
     let tls_acceptor = {
-        let cert_pem =
-            read_pem_env("ORIGIN_CERT_PEM").expect("ORIGIN_CERT_PEM (or _BASE64) must be set");
-        let key_pem =
-            read_pem_env("ORIGIN_KEY_PEM").expect("ORIGIN_KEY_PEM (or _BASE64) must be set");
-        let certs: Vec<_> = rustls_pemfile::certs(&mut cert_pem.as_bytes())
-            .collect::<std::result::Result<_, _>>()?;
-        let key = rustls_pemfile::private_key(&mut key_pem.as_bytes())?
-            .ok_or_else(|| color_eyre::eyre::eyre!("no private key found in ORIGIN_KEY_PEM"))?;
         let config = rustls::ServerConfig::builder()
             .with_no_client_auth()
-            .with_single_cert(certs, key)?;
+            .with_cert_resolver(cert_resolver);
         TlsAcceptor::from(Arc::new(config))
     };
 

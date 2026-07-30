@@ -1,15 +1,13 @@
 # Presigned URL Abuse Defense
 
-Decision record, 2026-07-20. fn0 cloud currently runs **GET Stage 1** below,
-with the #11 quota enforcement implemented on top of it (see "Interaction
-with quota enforcement" at the bottom).
+Decision record, 2026-07-20. Superseded in part by BYO-Cloudflare (#79),
+2026-07-30 — see "What BYO-Cloudflare changed" below before acting on
+anything here.
 
-Business decision (2026-07-20): default presign quotas are deliberately
-small (100k mints and 100k Class B reads per rolling 30 days, per project —
-see `dollar-plan.md`). Apps that legitimately need more are asked to contact
-us; that demand funds the Stage 2/3 upgrade as a **paid add-on**, and the
-zone-level fixed cost ($5 Workers Paid, later $20–25 Pro) is shared across
-every add-on customer.
+Business decision (2026-07-20, now void): default presign quotas were
+deliberately small (100k mints and 100k Class B reads per rolling 30 days,
+per project) so that apps needing more would fund the Stage 2/3 upgrade as a
+paid add-on.
 
 Tenant apps mint presigned URLs through the object-storage hijack and hand
 them to untrusted end users, so the URLs are an open attack surface for the
@@ -35,9 +33,9 @@ and cache can never see this traffic — and that is acceptable, because:
   ```
 
   There is no size term. Storage is a stock, not a flow: however large and
-  however many PUT URLs a project mints, its stored bytes cannot exceed the
-  per-project storage quota, which usage metering already enforces. A
-  per-URL size cap would be a second, cruder copy of that quota.
+  however many PUT URLs a project mints, its stored bytes are bounded by the
+  R2 account they land in — since #79 that is the project owner's own
+  account and their own bill.
 
 ## Verified facts (Cloudflare docs, checked 2026-07-20)
 
@@ -79,11 +77,10 @@ most ~600 billable Class A ops ≈ $0.003). Required hardening in the hijack
    The bound is exact, not a maximum: SigV4 cannot express a size range, and
    R2 does not implement presigned POST (verified: 501 NotImplemented),
    which is the only S3 mechanism offering `content-length-range`.
-3. **Per-project mint rate limit**, with mint counts recorded in usage
-   metering. DONE (#11): worker-local 1k/hour gate + `PresignMintCountDoc`
-   reporting + 100k rolling-30-day cap enforced control-side. Minting is a
+3. **Per-project mint rate limit**: worker-local 1k/hour gate. Minting is a
    pure local signing operation (free), but the mint rate is the coefficient
-   in the damage formula above.
+   in the damage formula above. The control-side monthly cap that shipped
+   with #11 was removed by #79 along with the metering that fed it.
 
 Open verification (tracked in **#54**): are 429-rejected writes billed as
 Class A? The pricing FAQ only exempts 401. If they bill at full rate, a
@@ -102,10 +99,9 @@ and the availability of the S3 endpoint is Cloudflare's problem, not ours.
 
 - No availability cap; a valid-URL botnet costs us $0.36/M — about $130/hour
   at a sustained 100k req/s, so real damage ≈ detection latency.
-- Sensor: hourly per-bucket operation counts in usage metering
-  (`actions/usage_metering.rs`) — the only sensor that sees S3-endpoint
-  traffic. Response: set the project's mint-gate flag (stop issuing URLs)
-  and let outstanding URLs age out.
+- No sensor on our side since #79: S3-endpoint traffic is visible only in
+  the account that owns the bucket, which is the user's. Their own R2
+  analytics and billing alerts are the detection path.
 
 ### Stage 2 — custom hostname + Worker (Workers Paid, $5/mo)
 
@@ -138,30 +134,33 @@ roughly **60–77M requests/month** (Pro $20–25 vs Workers $5, difference
   Valid-URL replays are served by cache. The Worker route is removed (or
   kept solely as the metering path).
 
-## Interaction with quota enforcement (#11) — implemented
+## What BYO-Cloudflare changed (#79, 2026-07-30)
 
-The sensor→actuator loop shipped with #11:
+Every user project's objects now live in that user's own Cloudflare account.
+The presigned URLs an app mints are signed with the user's own R2
+credentials, against the user's own bucket, and every operation they drive
+is billed to the user.
 
-- **Sensor**: #48's `usage_metering` (hourly per-bucket/per-prefix ops from
-  GraphQL Analytics) plus worker-reported `PresignMintCountDoc` rows.
-- **Decision**: `presign_quota::run_enforcement` in fn0-control, hourly after
-  metering. Compares object-storage Class A/B and mint counts against
-  `quota.rs` defaults (or `ProjectQuotaOverridesDoc`), both per latest hourly
-  window and per rolling 30 days, and publishes breaches in
-  `PresignBlockedDoc`.
-- **Actuator**: workers poll `PresignBlockedDoc` (1 s) into the fn0
-  `PresignGate`; the object-storage hijack refuses minting (`429`) for
-  blocked projects. Already-minted URLs age out within 5 minutes. Release is
-  automatic: the next hourly evaluation unlists a project once usage is back
-  under the caps.
-- There is still no per-project Cloudflare-side lever — #31 consolidated
-  static assets onto one shared custom domain, so the per-project
-  `R2CustomDomain.enabled` toggle from the original #11 text no longer
-  exists. Deploys are not blocked by this quota; the mint gate is the single
-  lever.
-- The public "unlimited downloads" claim is now scoped to static assets;
-  object-storage reads carry explicit quotas (`docs/fn0/limits.md`). The
-  cached-download story returns as the paid Stage 2/3 add-on.
+That removes the premise the whole quota loop rested on. Denial-of-wallet
+against *us* is no longer possible through this surface, so the sensor and
+the decision layer were deleted rather than retuned:
+
+- Removed: `actions/usage_metering.rs`, `actions/presign_quota.rs`,
+  `common/cloudflare_analytics.rs`, `PresignBlockedDoc`,
+  `PresignMintCountDoc`, `ProjectQuotaOverridesDoc`, the worker's
+  `presign_sync`, and the object-storage quota constants in `quota.rs`.
+- Kept: the worker-local mint ceiling (`fn0::presign_gate`,
+  `PRESIGN_MINT_PER_HOUR`) and the 5-minute expiry cap
+  (`PRESIGN_MAX_EXPIRES_SECS`). Both are policy against a runaway app, not
+  cost control, and both still hold with no control-plane round trip.
+
+The Stage 2/3 plan below is unchanged in mechanism but no longer has a
+funding argument attached to it: a user who wants cached, authenticated
+downloads owns the zone it would run on. It stays here as a design record.
+
+The damage formula still describes the exposure — it is just the user's
+money on the right-hand side now, and the storage-quota term it referred to
+no longer exists on our side at all.
 
 ## The other presigned-PUT surface: static asset deploys
 
@@ -185,4 +184,5 @@ The 1 GB total remains the only size ceiling (#56). A per-file ceiling was
 considered and dropped: static storage costs $0.015/GB-mo against free
 CDN-cached egress, so the cap is insurance, not a cost lever
 (`dollar-plan.md`), and the now-binding 1 GB total already bounds the stock.
-An asset that large belongs in object storage, which is metered and quota'd.
+An asset that large belongs in object storage, which since #79 is billed to
+the project owner's own Cloudflare account.

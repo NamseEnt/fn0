@@ -5,4 +5,5 @@ pub mod project_teardown;
 pub mod deploy_artifact_prune;
 pub mod static_cache_purge;
 pub mod cloudflare_register;
+pub mod byoc_migrate;
 pub mod cloudflare_unregister;

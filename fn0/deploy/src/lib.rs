@@ -1,7 +1,9 @@
 mod admin;
 mod app_url;
+mod asset_origin;
 mod bundle;
 pub mod cli_login;
+mod cloudflare;
 pub mod credentials;
 mod deploy;
 mod domain;
@@ -13,7 +15,9 @@ mod static_files;
 
 pub use admin::*;
 pub use app_url::*;
+pub use asset_origin::*;
 pub use bundle::*;
+pub use cloudflare::*;
 pub use deploy::*;
 pub use domain::*;
 pub use name::*;

@@ -131,6 +131,11 @@ const SECTIONS: &[SectionSource] = &[
                 path: "fn0/limits.md",
             },
             DocSource {
+                route: "fn0/cloudflare",
+                title: "Bring Your Own Cloudflare",
+                path: "fn0/cloudflare.md",
+            },
+            DocSource {
                 route: "doc-db/overview",
                 title: "doc-db",
                 path: "doc-db/overview.md",

@@ -9,6 +9,7 @@
 //! straight through.
 
 use crate::presign_gate::PresignGate;
+use crate::storage_target::{ObjectStorageResolver, R2Credentials, StaticResolver};
 use bytes::Bytes;
 use chrono::Utc;
 use hmac::{Hmac, Mac};
@@ -43,10 +44,7 @@ pub struct ObjectStorageHijack {
 #[derive(Clone)]
 enum Backend {
     R2 {
-        endpoint_host: String,
-        region: String,
-        access_key_id: String,
-        secret_access_key: String,
+        resolver: Arc<dyn ObjectStorageResolver>,
     },
     LocalFs {
         root: PathBuf,
@@ -72,14 +70,26 @@ impl ObjectStorageHijack {
         access_key_id: String,
         secret_access_key: String,
     ) -> Self {
-        Self {
+        Self::new_r2_resolved(
             placeholder_host,
-            backend: Backend::R2 {
-                endpoint_host: format!("{account_id}.r2.cloudflarestorage.com"),
+            Arc::new(StaticResolver::new(R2Credentials::for_account(
+                &account_id,
                 region,
                 access_key_id,
                 secret_access_key,
-            },
+            ))),
+        )
+    }
+
+    /// Signs each project's requests against whatever account the resolver
+    /// names, so one worker can serve projects in different R2 accounts.
+    pub fn new_r2_resolved(
+        placeholder_host: String,
+        resolver: Arc<dyn ObjectStorageResolver>,
+    ) -> Self {
+        Self {
+            placeholder_host,
+            backend: Backend::R2 { resolver },
             presign_gate: None,
         }
     }
@@ -135,17 +145,18 @@ impl ObjectStorageHijack {
         req: &mut HijackRequest,
         project_id: &str,
     ) -> Result<(), ErrorCode> {
-        let Backend::R2 {
-            endpoint_host,
-            region,
-            access_key_id,
-            secret_access_key,
-        } = &self.backend
-        else {
+        let Backend::R2 { resolver } = &self.backend else {
             return Err(ErrorCode::InternalError(Some(
                 "sign_r2 called on local backend".to_string(),
             )));
         };
+        let credentials = resolve(resolver.as_ref(), project_id)?;
+        let R2Credentials {
+            endpoint_host,
+            region,
+            access_key_id,
+            secret_access_key,
+        } = credentials.as_ref();
 
         let bucket = format!("{BUCKET_PREFIX}{project_id}");
         let method = req.method().to_string();
@@ -323,12 +334,14 @@ impl ObjectStorageHijack {
                 "{}/__fn0_object_storage{raw_path}",
                 dev_base_url.trim_end_matches('/')
             )),
-            Backend::R2 {
-                endpoint_host,
-                region,
-                access_key_id,
-                secret_access_key,
-            } => {
+            Backend::R2 { resolver } => {
+                let credentials = resolve(resolver.as_ref(), project_id)?;
+                let R2Credentials {
+                    endpoint_host,
+                    region,
+                    access_key_id,
+                    secret_access_key,
+                } = credentials.as_ref();
                 let bucket = format!("{BUCKET_PREFIX}{project_id}");
                 let canonical_uri = if raw_path == "/" {
                     format!("/{bucket}")
@@ -434,6 +447,17 @@ impl ObjectStorageHijack {
         }
         Ok(())
     }
+}
+
+fn resolve(
+    resolver: &dyn ObjectStorageResolver,
+    project_id: &str,
+) -> Result<Arc<R2Credentials>, ErrorCode> {
+    resolver.resolve(project_id).ok_or_else(|| {
+        ErrorCode::InternalError(Some(format!(
+            "no object storage target for project {project_id}"
+        )))
+    })
 }
 
 fn local_list(root: &Path, query: Option<&str>) -> Result<HijackResponse, ErrorCode> {

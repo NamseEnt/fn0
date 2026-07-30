@@ -12,6 +12,40 @@ pub struct WorkerProjectManifest {
     pub static_cache_state: String,
     #[serde(default)]
     pub pending_code_version: Option<u64>,
+    /// Absent for projects whose objects live in the platform's own Cloudflare
+    /// account; workers fall back to their process-wide target for those.
+    #[serde(default)]
+    pub storage: Option<WorkerProjectStorage>,
+}
+
+/// One R2 token as it travels to the worker: the key id in the clear, the
+/// secret only as KMS ciphertext, so a leaked manifest row is not a usable
+/// credential.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct WorkerR2Credential {
+    pub access_key_id: String,
+    pub secret_ciphertext: String,
+}
+
+/// Where one project's objects live, as the worker sees it.
+///
+/// Three credentials rather than one because the platform account already
+/// issues a separate token per store, and because it leaves room to hand a
+/// worker a token scoped to a single bucket.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct WorkerProjectStorage {
+    pub account_id: String,
+    pub region: String,
+    pub object: WorkerR2Credential,
+    pub public: WorkerR2Credential,
+    pub public_bucket: String,
+    /// CDN origin for `public_bucket`, without a trailing slash.
+    pub public_base_url: String,
+    pub page: WorkerR2Credential,
+    pub page_bucket: String,
+    /// Bumped by control on every credential or bucket change, so a worker can
+    /// skip re-decrypting a target it already holds.
+    pub config_version: u64,
 }
 
 pub const STATIC_CACHE_STATE_ACTIVE: &str = "active";
@@ -28,6 +62,26 @@ pub struct WorkerManifestDoc {
     pub project_manifests: HashMap<String, WorkerProjectManifest>,
 }
 
+/// A certificate the worker serves for one custom hostname, issued through the
+/// project owner's own Cloudflare Origin CA. Only valid for the Cloudflare edge
+/// to origin leg, which is the only leg the worker terminates.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct WorkerHostnameCert {
+    pub project_id: String,
+    pub cert_pem: String,
+    pub key_ciphertext: String,
+    pub not_after_epoch_seconds: i64,
+}
+
+/// Certificates live outside `WorkerManifestDoc` because every worker polls
+/// that document once a second and a PEM per project is a different order of
+/// magnitude from a bucket name. Custom hostnames are far fewer than projects.
+#[forte_doc]
+pub struct WorkerCertManifestDoc {
+    pub cert_version: u64,
+    pub certs: HashMap<String, WorkerHostnameCert>,
+}
+
 #[forte_doc]
 pub struct WorkerHostStatusDoc {
     #[sk]
@@ -35,21 +89,4 @@ pub struct WorkerHostStatusDoc {
     pub addr: String,
     pub active_image_ref: Option<String>,
     pub reported_at: i64,
-}
-
-#[forte_doc]
-pub struct PresignBlockedDoc {
-    pub updated_epoch_hour: i64,
-    pub blocked_project_ids: Vec<String>,
-}
-
-#[forte_doc]
-pub struct PresignMintCountDoc {
-    #[pk]
-    pub project_id: String,
-    #[sk]
-    pub window_epoch_hour: i64,
-    #[sk]
-    pub writer_id: String,
-    pub minted: u64,
 }

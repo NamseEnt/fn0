@@ -1,6 +1,6 @@
 use crate::common::auth;
 use crate::common::aws_sign;
-use crate::common::cloudflare::CloudflareClient;
+use crate::common::byoc::ProjectStorage;
 use crate::docs::*;
 use crate::quota;
 use forte_sdk::*;
@@ -128,7 +128,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         };
     }
 
-    if let Err(e) = ensure_all_resources(&req.body.project_id).await {
+    let storage = match ProjectStorage::resolve(&db, &req.body.project_id).await {
+        Ok(storage) => storage,
+        Err(e) => {
+            tracing::error!("deploy ProjectStorage::resolve: {e}");
+            return Output::InternalError;
+        }
+    };
+
+    if let Err(e) = ensure_all_resources(&req.body.project_id, &storage).await {
         tracing::error!("deploy ensure_all_resources: {e}");
         return Output::InternalError;
     }
@@ -157,13 +165,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let static_uploads = if req.body.files.is_empty() {
         Vec::new()
     } else {
-        let static_env = match StaticEnv::from_env() {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::error!("deploy StaticEnv::from_env: {e}");
-                return Output::InternalError;
-            }
-        };
         let now_dt = forte_sdk::now();
         let cache_control = req
             .body
@@ -175,12 +176,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             .map(|f| {
                 let key = format!("{}/{}/{}", project.project_id, code_version, f.path);
                 let url = aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
-                    account_id: &static_env.account_id,
-                    bucket: &static_env.bucket,
+                    account_id: &storage.account_id,
+                    bucket: &storage.asset_bucket,
                     region: "auto",
                     key: &key,
-                    access_key_id: &static_env.access_key_id,
-                    secret_access_key: &static_env.secret_access_key,
+                    access_key_id: &storage.asset_keys.access_key_id,
+                    secret_access_key: &storage.asset_keys.secret_access_key,
                     expires_seconds: 600,
                     now: now_dt,
                     content_length: Some(f.size),
@@ -279,48 +280,9 @@ impl BundleEnv {
     }
 }
 
-struct StaticEnv {
-    account_id: String,
-    bucket: String,
-    access_key_id: String,
-    secret_access_key: String,
-}
-
-impl StaticEnv {
-    fn from_env() -> anyhow::Result<Self> {
-        Ok(Self {
-            account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
-            bucket: std::env::var("FN0_STATIC_ASSET_STORAGE_BUCKET")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_BUCKET not set"))?,
-            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"))?,
-            secret_access_key: std::env::var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")
-                .map_err(|_| {
-                    anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY not set")
-                })?,
-        })
-    }
-}
-
-async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
-    let cf = CloudflareClient::from_env()?;
+async fn ensure_all_resources(project_id: &str, storage: &ProjectStorage) -> anyhow::Result<()> {
     ensure_turso_database(project_id).await?;
-    ensure_object_storage_bucket(&cf, project_id).await?;
-    Ok(())
-}
-
-async fn ensure_object_storage_bucket(
-    cf: &CloudflareClient,
-    project_id: &str,
-) -> anyhow::Result<()> {
-    let bucket = format!(
-        "{}{project_id}",
-        crate::common::r2_store::OBJECT_STORAGE_BUCKET_PREFIX
-    );
-    cf.create_r2_bucket(&bucket, "apac").await?;
-    cf.put_r2_bucket_cors(&bucket, &["GET", "PUT", "HEAD"], "*", &["ETag"])
-        .await?;
+    storage.ensure_resources(project_id).await?;
     Ok(())
 }
 

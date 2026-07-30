@@ -5,6 +5,7 @@
 //! so. The project degrades to uncached SSR until a purge lands, never to
 //! stale HTML, and no failure mode pins it there permanently.
 
+use crate::common::byoc::ProjectStorage;
 use crate::common::cloudflare::CloudflareClient;
 use crate::docs::*;
 use fn0_shared_schema::{
@@ -49,9 +50,21 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let cloudflare = CloudflareClient::from_env()?;
+    let storage = ProjectStorage::resolve(&db, &input.project_id).await?;
+    // Which edge holds this project's cached pages follows the hostname the
+    // visitor used, not where the objects are stored. Every project is
+    // reachable at `{project_id}.fn0.dev`, so the platform zone always has a
+    // copy to invalidate; a custom domain on the owner's own zone puts a
+    // second copy there, and that one is purged with their own token and
+    // their own budget.
+    let user_zone = storage
+        .is_byoc()
+        .then(|| entry.custom_domain.clone())
+        .flatten();
+    let platform = CloudflareClient::from_env()?;
     if entry.static_cache_state == STATIC_CACHE_STATE_PRE_PURGE {
-        purge(&db, &cloudflare, &input, "pre_purge").await?;
+        purge(&db, &platform, &input, "pre_purge").await?;
+        purge_user_zone(&storage, &input, user_zone.as_deref(), "pre_purge").await?;
         set_activating(&db, &input).await?;
     }
 
@@ -68,7 +81,8 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    purge(&db, &cloudflare, &input, "post_purge").await?;
+    purge(&db, &platform, &input, "post_purge").await?;
+    purge_user_zone(&storage, &input, user_zone.as_deref(), "post_purge").await?;
     set_active(&db, &input).await?;
 
     crate::enqueue::deploy_artifact_prune(crate::queue_task::deploy_artifact_prune::Input {
@@ -82,6 +96,34 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 /// instead of one each. Returns once this project's purge for this phase is
 /// known to have happened, whether this call performed it or another task's
 /// batch already covered it.
+/// Invalidates the copy held by the owner's own zone, which exists only while
+/// the project has a custom domain there. Unbatched on purpose: their zone has
+/// its own 5/min budget, so the shared token bucket below would only delay
+/// their deploys for a budget they do not spend from.
+async fn purge_user_zone(
+    storage: &ProjectStorage,
+    input: &Input,
+    custom_domain: Option<&str>,
+    phase: &str,
+) -> anyhow::Result<()> {
+    let Some(custom_domain) = custom_domain else {
+        return Ok(());
+    };
+    let tag = format!("fn0-project-{}", input.project_id);
+    storage
+        .cloudflare()?
+        .purge_cache_tags(&[tag.as_str()])
+        .await?;
+    tracing::info!(
+        project_id = %input.project_id,
+        code_version = input.code_version,
+        custom_domain,
+        phase,
+        "static cache purge completed on the project owner's zone"
+    );
+    Ok(())
+}
+
 async fn purge(
     db: &doc_db::Database,
     cloudflare: &CloudflareClient,

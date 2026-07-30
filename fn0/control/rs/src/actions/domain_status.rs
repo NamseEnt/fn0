@@ -1,4 +1,5 @@
 use crate::common::auth;
+use crate::common::byoc::ProjectStorage;
 use crate::common::cloudflare_saas::{CloudflareSaasClient, HostnameStatus};
 use crate::docs::*;
 use forte_sdk::*;
@@ -15,6 +16,14 @@ pub enum Output {
     Configured {
         domain: String,
         cloudflare_status: CloudflareStatus,
+    },
+    /// The project runs on its owner's Cloudflare account: their edge holds the
+    /// visitor-facing certificate, and fn0 only holds the origin certificate.
+    SelfHosted {
+        domain: String,
+        origin_certificate_ready: bool,
+        origin_certificate_expires_epoch_seconds: Option<i64>,
+        origin_ip: String,
     },
     NotLoggedIn,
     NotFound,
@@ -67,6 +76,31 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let Some(domain) = entry.custom_domain.clone() else {
         return Output::NotConfigured;
     };
+
+    match ProjectStorage::resolve(&db, &req.body.project_id).await {
+        Ok(storage) if storage.is_byoc() => {
+            let cert = match (WorkerCertManifestDocGet {}).send_with(&db).await {
+                Ok(manifest) => manifest.and_then(|manifest| manifest.certs.get(&domain).cloned()),
+                Err(e) => {
+                    tracing::error!("domain_status WorkerCertManifestDocGet: {e}");
+                    return Output::InternalError;
+                }
+            };
+            return Output::SelfHosted {
+                domain,
+                origin_certificate_ready: cert.is_some(),
+                origin_certificate_expires_epoch_seconds: cert
+                    .as_ref()
+                    .map(|cert| cert.not_after_epoch_seconds),
+                origin_ip: std::env::var("FN0_WORKER_ORIGIN_IP").unwrap_or_default(),
+            };
+        }
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!("domain_status ProjectStorage::resolve: {e}");
+            return Output::InternalError;
+        }
+    }
 
     let client = match CloudflareSaasClient::from_env() {
         Ok(c) => c,

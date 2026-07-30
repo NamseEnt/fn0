@@ -146,6 +146,7 @@ struct InMemoryStaticPageStore {
 impl StaticPageStorage for InMemoryStaticPageStore {
     fn read<'storage>(
         &'storage self,
+        _project_id: &'storage str,
         key: &'storage str,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Bytes>>> + Send + 'storage>> {
         let found = self.pages.lock().unwrap().get(key).cloned();
@@ -154,6 +155,7 @@ impl StaticPageStorage for InMemoryStaticPageStore {
 
     fn write<'storage>(
         &'storage self,
+        _project_id: &'storage str,
         key: &'storage str,
         body: Bytes,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'storage>> {

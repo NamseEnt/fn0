@@ -1,7 +1,7 @@
 use crate::common::auth;
 use crate::docs::*;
-use forte_sdk::*;
 use fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE;
+use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]

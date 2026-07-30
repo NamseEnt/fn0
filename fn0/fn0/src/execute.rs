@@ -186,12 +186,14 @@ where
         if let Some(hijack) = object_storage_hijack {
             builder.env("FN0_OBJECT_STORAGE_URL", hijack.placeholder_url());
         }
-        if let Some(hijack) = public_storage_hijack {
+        // Both or neither: `object_storage::public::bucket()` needs the base URL
+        // to build the URLs it hands back, so injecting only the endpoint would
+        // hand the guest a bucket that panics on first use.
+        if let Some(hijack) = public_storage_hijack
+            && let Some(base_url) = hijack.public_base_url_for(project_id)
+        {
             builder.env("FN0_PUBLIC_STORAGE_URL", hijack.placeholder_url());
-            builder.env(
-                "FN0_PUBLIC_STORAGE_BASE_URL",
-                hijack.public_base_url_for(project_id),
-            );
+            builder.env("FN0_PUBLIC_STORAGE_BASE_URL", base_url);
         }
         builder.build()
     };

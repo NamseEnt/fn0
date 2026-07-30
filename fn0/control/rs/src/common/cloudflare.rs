@@ -20,6 +20,19 @@ impl CloudflareClient {
         })
     }
 
+    /// A client bound to a user's own account and zone, driven by their token.
+    pub fn for_account(api_token: String, account_id: String, zone_id: String) -> Self {
+        Self {
+            api_token,
+            account_id,
+            zone_id: Some(zone_id),
+        }
+    }
+
+    pub fn account_id(&self) -> &str {
+        &self.account_id
+    }
+
     async fn call(
         &self,
         method: &str,
@@ -39,16 +52,19 @@ impl CloudflareClient {
         Ok((status, body))
     }
 
+    /// `location_hint` is `None` for a user's own account: their objects should
+    /// land wherever Cloudflare places them for that account, not where the
+    /// platform's own fleet happens to sit.
     pub async fn create_r2_bucket(
         &self,
         bucket_name: &str,
-        location_hint: &str,
+        location_hint: Option<&str>,
     ) -> anyhow::Result<()> {
         #[derive(Serialize)]
         struct Body<'a> {
             name: &'a str,
-            #[serde(rename = "locationHint")]
-            location_hint: &'a str,
+            #[serde(rename = "locationHint", skip_serializing_if = "Option::is_none")]
+            location_hint: Option<&'a str>,
         }
         let payload = serde_json::to_vec(&Body {
             name: bucket_name,
@@ -207,11 +223,7 @@ impl CloudflareClient {
             tags: &'a [&'a str],
         }
         let payload = serde_json::to_vec(&Body { tags })?;
-        let zone_id = self
-            .zone_id
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("FN0_CLOUDFLARE_ZONE_ID not set"))?;
-        let path = format!("/zones/{zone_id}/purge_cache");
+        let path = format!("/zones/{}/purge_cache", self.zone_id()?);
         let (status, body) = self.call("POST", &path, payload).await?;
         if (200..300).contains(&status) {
             return Ok(());
@@ -234,11 +246,7 @@ impl CloudflareClient {
             files: &'a [String],
         }
         let payload = serde_json::to_vec(&Body { files: urls })?;
-        let zone_id = self
-            .zone_id
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("FN0_CLOUDFLARE_ZONE_ID not set"))?;
-        let path = format!("/zones/{zone_id}/purge_cache");
+        let path = format!("/zones/{}/purge_cache", self.zone_id()?);
         let (status, body) = self.call("POST", &path, payload).await?;
         if (200..300).contains(&status) {
             return Ok(());
@@ -248,6 +256,248 @@ impl CloudflareClient {
             String::from_utf8_lossy(&body)
         );
     }
+}
+
+/// The Cloudflare API token id, which doubles as the R2 S3 access key id. The
+/// matching secret is the SHA-256 of the token value, derived by the caller.
+pub struct VerifiedToken {
+    pub id: String,
+}
+
+impl CloudflareClient {
+    pub async fn verify_token(&self) -> anyhow::Result<VerifiedToken> {
+        #[derive(Deserialize)]
+        struct Envelope {
+            result: Option<TokenResult>,
+        }
+        #[derive(Deserialize)]
+        struct TokenResult {
+            id: String,
+            status: String,
+        }
+        let path = format!("/accounts/{}/tokens/verify", self.account_id);
+        let (status, body) = self.call("GET", &path, Vec::new()).await?;
+        if !(200..300).contains(&status) {
+            anyhow::bail!(
+                "verify_token failed (status={status}): {}",
+                String::from_utf8_lossy(&body)
+            );
+        }
+        let result = serde_json::from_slice::<Envelope>(&body)?
+            .result
+            .ok_or_else(|| anyhow::anyhow!("verify_token: missing result"))?;
+        if result.status != "active" {
+            anyhow::bail!("token status is {}, expected active", result.status);
+        }
+        Ok(VerifiedToken { id: result.id })
+    }
+
+    pub async fn zone_name(&self) -> anyhow::Result<String> {
+        #[derive(Deserialize)]
+        struct Envelope {
+            result: Option<ZoneResult>,
+        }
+        #[derive(Deserialize)]
+        struct ZoneResult {
+            name: String,
+        }
+        let path = format!("/zones/{}", self.zone_id()?);
+        let (status, body) = self.call("GET", &path, Vec::new()).await?;
+        if !(200..300).contains(&status) {
+            anyhow::bail!(
+                "zone_name failed (status={status}): {}",
+                String::from_utf8_lossy(&body)
+            );
+        }
+        Ok(serde_json::from_slice::<Envelope>(&body)?
+            .result
+            .ok_or_else(|| anyhow::anyhow!("zone_name: missing result"))?
+            .name)
+    }
+
+    /// Attaches `hostname` to `bucket_name` so the bucket is publicly readable
+    /// through the zone's CDN. Idempotent: an already-attached domain answers
+    /// with an "already exists" error that is not a failure here.
+    pub async fn create_r2_custom_domain(
+        &self,
+        bucket_name: &str,
+        hostname: &str,
+    ) -> anyhow::Result<()> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            domain: &'a str,
+            #[serde(rename = "zoneId")]
+            zone_id: &'a str,
+            enabled: bool,
+        }
+        let zone_id = self.zone_id()?;
+        let payload = serde_json::to_vec(&Body {
+            domain: hostname,
+            zone_id,
+            enabled: true,
+        })?;
+        let path = format!(
+            "/accounts/{}/r2/buckets/{bucket_name}/domains/custom",
+            self.account_id
+        );
+        let (status, body) = self.call("POST", &path, payload).await?;
+        if (200..300).contains(&status) || response_indicates_already_exists(&body) {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "create_r2_custom_domain {hostname} failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
+    pub async fn delete_r2_custom_domain(
+        &self,
+        bucket_name: &str,
+        hostname: &str,
+    ) -> anyhow::Result<()> {
+        let path = format!(
+            "/accounts/{}/r2/buckets/{bucket_name}/domains/custom/{hostname}",
+            self.account_id
+        );
+        let (status, body) = self.call("DELETE", &path, Vec::new()).await?;
+        if (200..300).contains(&status) || status == 404 {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "delete_r2_custom_domain {hostname} failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
+    /// Signs `csr` through the zone owner's Cloudflare Origin CA.
+    ///
+    /// The certificate is trusted only by the Cloudflare edge, for the edge to
+    /// origin leg, which is exactly the leg the worker terminates. We hold the
+    /// private key and it never leaves the platform, so the user grants
+    /// certificate issuance without handing over a key.
+    pub async fn create_origin_ca_certificate(
+        &self,
+        csr: &str,
+        hostnames: &[String],
+        request_type: &str,
+        requested_validity_days: u32,
+    ) -> anyhow::Result<OriginCertificate> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            csr: &'a str,
+            hostnames: &'a [String],
+            request_type: &'a str,
+            requested_validity: u32,
+        }
+        #[derive(Deserialize)]
+        struct Envelope {
+            result: Option<CertificateResult>,
+        }
+        #[derive(Deserialize)]
+        struct CertificateResult {
+            id: String,
+            certificate: String,
+            expires_on: String,
+        }
+        let payload = serde_json::to_vec(&Body {
+            csr,
+            hostnames,
+            request_type,
+            requested_validity: requested_validity_days,
+        })?;
+        let (status, body) = self.call("POST", "/certificates", payload).await?;
+        if !(200..300).contains(&status) {
+            anyhow::bail!(
+                "create_origin_ca_certificate failed (status={status}): {}",
+                String::from_utf8_lossy(&body)
+            );
+        }
+        let result = serde_json::from_slice::<Envelope>(&body)?
+            .result
+            .ok_or_else(|| anyhow::anyhow!("create_origin_ca_certificate: missing result"))?;
+        Ok(OriginCertificate {
+            id: result.id,
+            certificate_pem: result.certificate,
+            expires_on: result.expires_on,
+        })
+    }
+
+    pub async fn revoke_origin_ca_certificate(&self, certificate_id: &str) -> anyhow::Result<()> {
+        let path = format!("/certificates/{certificate_id}");
+        let (status, body) = self.call("DELETE", &path, Vec::new()).await?;
+        if (200..300).contains(&status) || status == 404 {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "revoke_origin_ca_certificate failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
+    /// Creates the cache rule the static page and public object caches depend
+    /// on.
+    ///
+    /// `PURGE` has to be in the method match: without it the purge API still
+    /// answers `success: true` while the edge keeps serving the old object,
+    /// which is a silent year of stale bytes under `s-maxage=31536000` (#68).
+    pub async fn ensure_cache_rule(&self, hostname: &str) -> anyhow::Result<()> {
+        #[derive(Serialize)]
+        struct Ruleset<'a> {
+            name: &'static str,
+            kind: &'static str,
+            phase: &'static str,
+            rules: Vec<Rule<'a>>,
+        }
+        #[derive(Serialize)]
+        struct Rule<'a> {
+            action: &'static str,
+            expression: &'a str,
+            description: &'static str,
+            action_parameters: ActionParameters,
+        }
+        #[derive(Serialize)]
+        struct ActionParameters {
+            cache: bool,
+        }
+
+        let zone_id = self.zone_id()?;
+        let expression = format!(
+            r#"(http.host eq "{hostname}" and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
+        );
+        let payload = serde_json::to_vec(&Ruleset {
+            name: "fn0 cacheable assets",
+            kind: "zone",
+            phase: "http_request_cache_settings",
+            rules: vec![Rule {
+                action: "set_cache_settings",
+                expression: &expression,
+                description: "fn0 static assets, public objects and cached pages",
+                action_parameters: ActionParameters { cache: true },
+            }],
+        })?;
+        let path =
+            format!("/zones/{zone_id}/rulesets/phases/http_request_cache_settings/entrypoint");
+        let (status, body) = self.call("PUT", &path, payload).await?;
+        if (200..300).contains(&status) {
+            return Ok(());
+        }
+        anyhow::bail!(
+            "ensure_cache_rule failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
+    fn zone_id(&self) -> anyhow::Result<&str> {
+        self.zone_id
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("no Cloudflare zone id for this client"))
+    }
+}
+
+pub struct OriginCertificate {
+    pub id: String,
+    pub certificate_pem: String,
+    pub expires_on: String,
 }
 
 #[derive(Deserialize)]

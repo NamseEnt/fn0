@@ -1,28 +1,24 @@
-//! Per-project presign mint gate, attached to the object-storage hijack by
-//! the worker (absent in `forte dev`). Minting is refused for projects the
-//! control plane flagged over quota (`PresignBlockedDoc`) and rate-limited
-//! per project per hour worker-locally. Mint counts accumulate per
-//! (project, hour) for the worker to report to the control DB, which
-//! evaluates the monthly mint quota against them.
+//! Per-project presign mint ceiling, attached to the object-storage hijack by
+//! the worker (absent in `forte dev`).
+//!
+//! This used to be the actuator for a cost-control loop: the control plane
+//! metered R2 operations against the platform's bill, decided which projects
+//! were over quota, and workers refused to mint for those. Objects now live in
+//! each project's own Cloudflare account, so there is no platform bill to
+//! ration and no reason to ask the control plane's permission. What is left is
+//! a flat worker-local ceiling — policy against a runaway loop, not accounting.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 pub const PRESIGN_MINT_PER_HOUR: u64 = 1_000;
 
 #[derive(Default)]
 pub struct PresignGate {
-    state: Mutex<GateState>,
-}
-
-#[derive(Default)]
-struct GateState {
-    blocked: HashSet<String>,
-    minted: HashMap<(String, i64), u64>,
+    minted: Mutex<HashMap<(String, i64), u64>>,
 }
 
 pub enum PresignDenied {
-    ProjectBlocked,
     RateLimited,
 }
 
@@ -31,40 +27,40 @@ impl PresignGate {
         Self::default()
     }
 
-    pub fn set_blocked(&self, blocked: HashSet<String>) {
-        self.state.lock().unwrap().blocked = blocked;
-    }
-
     pub fn try_mint(&self, project_id: &str, epoch_hour: i64) -> Result<(), PresignDenied> {
-        let mut state = self.state.lock().unwrap();
-        if state.blocked.contains(project_id) {
-            return Err(PresignDenied::ProjectBlocked);
-        }
-        let minted = state
-            .minted
+        let mut minted = self.minted.lock().unwrap();
+        minted.retain(|(_, hour), _| *hour >= epoch_hour - 1);
+        let count = minted
             .entry((project_id.to_string(), epoch_hour))
             .or_insert(0);
-        if *minted >= PRESIGN_MINT_PER_HOUR {
+        if *count >= PRESIGN_MINT_PER_HOUR {
             return Err(PresignDenied::RateLimited);
         }
-        *minted += 1;
+        *count += 1;
         Ok(())
     }
+}
 
-    /// Returns all per-(project, hour) mint totals, then prunes hours before
-    /// the previous one. The pruned hours are still part of the returned
-    /// snapshot, so the caller reports every hour at least once after it
-    /// closed.
-    pub fn snapshot_minted(&self, current_epoch_hour: i64) -> Vec<(String, i64, u64)> {
-        let mut state = self.state.lock().unwrap();
-        let snapshot = state
-            .minted
-            .iter()
-            .map(|((project_id, hour), count)| (project_id.clone(), *hour, *count))
-            .collect();
-        state
-            .minted
-            .retain(|(_, hour), _| *hour >= current_epoch_hour - 1);
-        snapshot
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allows_up_to_the_hourly_ceiling_then_refuses() {
+        let gate = PresignGate::new();
+        for _ in 0..PRESIGN_MINT_PER_HOUR {
+            assert!(gate.try_mint("proj1", 100).is_ok());
+        }
+        assert!(gate.try_mint("proj1", 100).is_err());
+    }
+
+    #[test]
+    fn budgets_are_per_project_and_per_hour() {
+        let gate = PresignGate::new();
+        for _ in 0..PRESIGN_MINT_PER_HOUR {
+            assert!(gate.try_mint("proj1", 100).is_ok());
+        }
+        assert!(gate.try_mint("proj2", 100).is_ok());
+        assert!(gate.try_mint("proj1", 101).is_ok());
     }
 }

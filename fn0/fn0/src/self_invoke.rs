@@ -435,9 +435,6 @@ fn object_storage_send(
                 let epoch_hour = chrono::Utc::now().timestamp() / 3600;
                 if let Err(denied) = gate.try_mint(&project_id, epoch_hour) {
                     let message = match denied {
-                        PresignDenied::ProjectBlocked => {
-                            "presign refused: project over storage quota"
-                        }
                         PresignDenied::RateLimited => "presign refused: hourly mint limit reached",
                     };
                     let resp = http::Response::builder()
@@ -509,8 +506,11 @@ fn public_storage_send(
                 let resp = text_response(429, "purge refused: hourly limit reached".to_string())?;
                 return Ok((resp, empty_io()));
             }
-            let url = hijack.public_url_for(&project_id, request.uri().path());
-            enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, url).await;
+            let Some(url) = hijack.public_url_for(&project_id, request.uri().path()) else {
+                let resp = text_response(500, "public storage is not configured".to_string())?;
+                return Ok((resp, empty_io()));
+            };
+            enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, &project_id, url).await;
             return Ok((accepted_response()?, empty_io()));
         }
 
@@ -532,8 +532,9 @@ fn public_storage_send(
             request.method(),
             &http::Method::PUT | &http::Method::POST | &http::Method::DELETE
         );
-        let public_url =
-            changes_content.then(|| hijack.public_url_for(&project_id, request.uri().path()));
+        let public_url = changes_content
+            .then(|| hijack.public_url_for(&project_id, request.uri().path()))
+            .flatten();
 
         if hijack.is_local() {
             let resp = match hijack.serve_local(request).await {
@@ -555,7 +556,7 @@ fn public_storage_send(
         if let Some(url) = public_url
             && res.status().is_success()
         {
-            enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, url).await;
+            enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, &project_id, url).await;
         }
 
         let res = res.map(BodyExt::boxed_unsync);
@@ -624,13 +625,14 @@ fn accepted_response()
 async fn enqueue_public_object_purge(
     queue_hijack: Option<&QueueHijack>,
     hijack: &PublicStorageHijack,
+    project_id: &str,
     url: String,
 ) {
     let Some(queue_hijack) = queue_hijack else {
         tracing::warn!(url, "public object written with no queue to purge through");
         return;
     };
-    let payload = serde_json::json!({ "urls": [url] });
+    let payload = serde_json::json!({ "project_id": project_id, "urls": [url] });
     let action = queue_hijack.build_platform_enqueue(
         hijack.control_project_id(),
         "public_object_purge",

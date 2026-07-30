@@ -33,6 +33,13 @@ const OutputSchema = z.discriminatedUnion("t", [
     cloudflareStatus: CloudflareStatusSchema,
   }),
     z.object({
+    t: z.literal("SelfHosted"),
+    domain: z.string(),
+    originCertificateReady: z.boolean(),
+    originCertificateExpiresEpochSeconds: z.number().optional(),
+    originIp: z.string(),
+  }),
+    z.object({
     t: z.literal("NotLoggedIn"),
   }),
     z.object({

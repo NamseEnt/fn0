@@ -74,20 +74,24 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     {
                         match &mut manifest {
                             Some(manifest) => {
-                                let entry = manifest
-                                    .project_manifests
-                                    .entry(project_id.clone())
-                                    .or_insert(WorkerProjectManifest {
-                                        code_version: 0,
-                                        custom_domain: None,
-                                        static_cache_state:
-                                            fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE.to_string(),
-                                        pending_code_version: None,
-                                    });
+                                let entry =
+                                    manifest
+                                        .project_manifests
+                                        .entry(project_id.clone())
+                                        .or_insert(WorkerProjectManifest {
+                                            code_version: 0,
+                                            custom_domain: None,
+                                            static_cache_state:
+                                                fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
+                                                    .to_string(),
+                                            pending_code_version: None,
+                                            storage: None,
+                                        });
                                 if (code_version > entry.code_version
                                     || (code_version == entry.code_version
                                         && entry.pending_code_version.is_none()))
-                                    && entry.pending_code_version
+                                    && entry
+                                        .pending_code_version
                                         .is_none_or(|pending| code_version > pending)
                                 {
                                     if entry.code_version == 0 {
@@ -108,8 +112,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                                         code_version,
                                         custom_domain: None,
                                         static_cache_state:
-                                            fn0_shared_schema::STATIC_CACHE_STATE_PRE_PURGE.to_string(),
+                                            fn0_shared_schema::STATIC_CACHE_STATE_PRE_PURGE
+                                                .to_string(),
                                         pending_code_version: Some(code_version),
+                                        storage: None,
                                     },
                                 );
                                 trx.create(WorkerManifestDoc {
@@ -125,8 +131,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     && let Some(manifest) = &manifest
                     && let Some(entry) = manifest.project_manifests.get(&project_id)
                     && entry.pending_code_version == Some(code_version)
-                    && entry.static_cache_state
-                        != fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
+                    && entry.static_cache_state != fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
                 {
                     should_enqueue = true;
                 }
@@ -137,13 +142,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     match result {
         doc_db::TrxResult::Committed(true) => {
-            if let Err(error) = crate::enqueue::static_cache_purge(
-                crate::queue_task::static_cache_purge::Input {
+            if let Err(error) =
+                crate::enqueue::static_cache_purge(crate::queue_task::static_cache_purge::Input {
                     project_id,
                     code_version,
-                },
-            )
-            .await
+                })
+                .await
             {
                 return Output::Error {
                     message: error.to_string(),

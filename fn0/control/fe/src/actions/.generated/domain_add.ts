@@ -11,6 +11,8 @@ const InputSchema = z.object({
 const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
+    originIp: z.string(),
+    needsDnsRecord: z.boolean(),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),
@@ -20,6 +22,10 @@ const OutputSchema = z.discriminatedUnion("t", [
   }),
     z.object({
     t: z.literal("InvalidDomain"),
+    message: z.string(),
+  }),
+    z.object({
+    t: z.literal("CertificateFailed"),
     message: z.string(),
   }),
     z.object({

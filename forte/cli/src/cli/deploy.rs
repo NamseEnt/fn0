@@ -5,8 +5,6 @@ use super::build::{BuildOptions, run_build};
 use super::cron;
 use super::project_config::{read_optional_project_id, write_project_id};
 
-const DEFAULT_STATIC_BASE_DOMAIN: &str = "static.fn0.dev";
-
 pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
     let existing_project_id = read_optional_project_id(&project_dir)?;
 
@@ -46,9 +44,10 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
         .timestamp_millis()
         .try_into()
         .expect("system clock returns positive timestamp");
-    let static_base_domain = std::env::var("FORTE_STATIC_BASE_DOMAIN")
-        .unwrap_or_else(|_| DEFAULT_STATIC_BASE_DOMAIN.to_string());
-    let static_base_url = format!("https://{static_base_domain}/{project_id}/{code_version}/");
+    let static_base_url = match std::env::var("FORTE_STATIC_BASE_DOMAIN") {
+        Ok(domain) => format!("https://{domain}/{project_id}/{code_version}/"),
+        Err(_) => fn0_deploy::resolve_asset_base_url(&project_id, code_version).await?,
+    };
     println!("project_id: {project_id}");
     println!("code_version: {code_version}");
     println!("static base URL: {static_base_url}");

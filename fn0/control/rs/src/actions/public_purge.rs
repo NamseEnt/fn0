@@ -1,4 +1,5 @@
 use crate::common::auth;
+use crate::common::byoc::ProjectStorage;
 use crate::docs::*;
 use crate::route_generated::enqueue;
 use forte_sdk::*;
@@ -58,12 +59,16 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Forbidden;
     }
 
-    let Ok(cdn_origin) = std::env::var("FN0_PUBLIC_STORAGE_CDN_ORIGIN") else {
-        return Output::InternalError {
-            reason: "FN0_PUBLIC_STORAGE_CDN_ORIGIN not set".to_string(),
-        };
+    let storage = match ProjectStorage::resolve(&db, &req.body.project_id).await {
+        Ok(storage) => storage,
+        Err(error) => {
+            tracing::error!(?error, "public_purge ProjectStorage::resolve");
+            return Output::InternalError {
+                reason: format!("resolve: {error}"),
+            };
+        }
     };
-    let cdn_origin = cdn_origin.trim_end_matches('/');
+    let cdn_origin = storage.public_base_url.as_str();
 
     let urls: Vec<String> = req
         .body
@@ -82,10 +87,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Ok { urls };
     }
 
-    if let Err(error) = enqueue::public_object_purge(crate::queue_task::public_object_purge::Input {
-        urls: urls.clone(),
-    })
-    .await
+    if let Err(error) =
+        enqueue::public_object_purge(crate::queue_task::public_object_purge::Input {
+            project_id: Some(req.body.project_id.clone()),
+            urls: urls.clone(),
+        })
+        .await
     {
         tracing::error!(?error, "public_purge enqueue");
         return Output::InternalError {

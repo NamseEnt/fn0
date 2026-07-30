@@ -3,6 +3,10 @@ import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
 import { CustomWorkerImage } from "./CustomWorkerImage";
+import {
+  CLOUDFLARE_IPV4_RANGES,
+  CLOUDFLARE_IPV6_RANGES,
+} from "./cloudflareIpRanges";
 
 export interface OciFn0WorkerSiteArgs {
   region: pulumi.Input<string>;
@@ -367,25 +371,30 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    // NLB subnet: 443 from the world (Cloudflare proxy fronts it anyway,
-    // and OCI NLB has no native NSG-on-NLB-VNIC equivalent on this resource
-    // type) so the NLB itself accepts the public traffic.
+    // NLB subnet: 443 from Cloudflare's published edge ranges only.
+    //
+    // Users point their own proxied DNS records straight at this NLB, so its
+    // address is published by design and cannot rely on being unknown. Every
+    // legitimate request arrives through a Cloudflare edge — the platform's
+    // zone or a user's — so anything else reaching 443 is either a scan or an
+    // attempt to bypass the edge, and both should be dropped before they cost
+    // a TLS handshake.
     const nlbSecurityList = new oci.core.SecurityList(
       "nlb-security-list",
       {
         compartmentId: compartment.id,
         vcnId: vcn.id,
         ingressSecurityRules: [
-          {
+          ...CLOUDFLARE_IPV4_RANGES.map((source) => ({
             protocol: "6",
-            source: "0.0.0.0/0",
+            source,
             tcpOptions: { min: 443, max: 443 },
-          },
-          {
+          })),
+          ...CLOUDFLARE_IPV6_RANGES.map((source) => ({
             protocol: "6",
-            source: "::/0",
+            source,
             tcpOptions: { min: 443, max: 443 },
-          },
+          })),
         ],
         egressSecurityRules: [
           {

@@ -1,4 +1,5 @@
 use crate::cache::S3BundleCache;
+use crate::storage_resolver::ManifestStorageResolver;
 use doc_db::{Database, DbRequest};
 use fn0_shared_schema::{STATIC_CACHE_STATE_ACTIVE, WorkerManifestDocGet};
 use std::collections::HashMap;
@@ -17,7 +18,12 @@ pub fn build_database_from_env() -> anyhow::Result<Database> {
     Ok(doc_db::turso_with_config(url, group_token))
 }
 
-pub async fn run(db: Database, cache: S3BundleCache, manifest_loaded: Arc<AtomicBool>) {
+pub async fn run(
+    db: Database,
+    cache: S3BundleCache,
+    storage_resolver: Arc<ManifestStorageResolver>,
+    manifest_loaded: Arc<AtomicBool>,
+) {
     let mut last_version: Option<u64> = None;
     let mut known_projects: HashMap<String, u64> = HashMap::new();
     let mut known_domains: HashMap<String, String> = HashMap::new();
@@ -40,6 +46,24 @@ pub async fn run(db: Database, cache: S3BundleCache, manifest_loaded: Arc<Atomic
 
         let mut new_projects: HashMap<String, u64> = HashMap::new();
         let mut new_domains: HashMap<String, String> = HashMap::new();
+
+        // Before registering the projects: a bundle that becomes servable
+        // before its storage target is in place would sign its first writes
+        // against the platform account.
+        storage_resolver
+            .apply(
+                manifest
+                    .project_manifests
+                    .iter()
+                    .filter_map(|(project_id, project_manifest)| {
+                        project_manifest
+                            .storage
+                            .as_ref()
+                            .map(|storage| (project_id, storage))
+                    })
+                    .collect(),
+            )
+            .await;
 
         for (project_id, project_manifest) in &manifest.project_manifests {
             new_projects.insert(project_id.clone(), project_manifest.code_version);

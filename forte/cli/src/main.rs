@@ -5,7 +5,9 @@ mod tools;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AddCommands, AdminCommands, Cli, Commands, DomainCommands, EnvCommands};
+use cli::{
+    AddCommands, AdminCommands, Cli, CloudflareCommands, Commands, DomainCommands, EnvCommands,
+};
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -95,6 +97,21 @@ async fn async_main() -> Result<()> {
             }
         },
 
+        Commands::Cloudflare { command } => match command {
+            CloudflareCommands::Connect {
+                account_id,
+                zone_id,
+                api_token,
+                project,
+            } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::cloudflare::connect(project_dir, account_id, zone_id, api_token).await?;
+            }
+            CloudflareCommands::Status { project } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::cloudflare::status(project_dir).await?;
+            }
+        },
         Commands::Domain { command } => match command {
             DomainCommands::Add { domain, project } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());

@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 
 pub use doc_db::DbRequest;
 pub use fn0_shared_schema::{
-    PresignBlockedDoc, PresignBlockedDocGet, PresignBlockedDocPut, PresignMintCountDoc,
-    PresignMintCountDocQuery, WorkerManifestDoc, WorkerManifestDocGet, WorkerManifestDocPut,
-    WorkerManifestDocQuery, WorkerProjectManifest,
+    WorkerCertManifestDoc, WorkerCertManifestDocGet, WorkerCertManifestDocPut, WorkerHostnameCert,
+    WorkerManifestDoc, WorkerManifestDocGet, WorkerManifestDocPut, WorkerManifestDocQuery,
+    WorkerProjectManifest, WorkerProjectStorage, WorkerR2Credential,
 };
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -111,54 +111,6 @@ pub struct WaitlistDoc {
     pub created_at: DateTime,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Default)]
-pub struct SampledOperationCount {
-    pub estimate: u64,
-    pub lower_bound: u64,
-    pub upper_bound: u64,
-    pub is_valid: bool,
-}
-
-#[forte_doc]
-pub struct ProjectOperationsUsageDoc {
-    #[pk]
-    pub project_id: String,
-    #[sk]
-    pub window_start_epoch_hour: i64,
-    pub static_asset_reads: SampledOperationCount,
-    pub static_asset_writes: SampledOperationCount,
-    pub object_storage_reads: SampledOperationCount,
-    pub object_storage_writes: SampledOperationCount,
-    pub polled_at: DateTime,
-}
-
-#[forte_doc]
-pub struct ProjectStorageSnapshotDoc {
-    #[pk]
-    pub project_id: String,
-    #[sk]
-    pub snapshot_epoch_hour: i64,
-    pub static_asset_bytes: u64,
-    pub static_asset_object_count: u64,
-    pub object_storage_bytes: u64,
-    pub object_storage_object_count: u64,
-    pub taken_at: DateTime,
-}
-
-// `None` fields fall back to the `quota.rs` defaults. Raising these is the
-// operator action behind the "contact us for higher presigned-URL volume"
-// offer; the doc is written by hand (admin), never by user-facing actions.
-#[forte_doc]
-pub struct ProjectQuotaOverridesDoc {
-    #[pk]
-    pub project_id: String,
-    pub presign_mint_per_month: Option<u64>,
-    pub object_storage_class_a_per_hour: Option<u64>,
-    pub object_storage_class_a_per_month: Option<u64>,
-    pub object_storage_class_b_per_hour: Option<u64>,
-    pub object_storage_class_b_per_month: Option<u64>,
-}
-
 #[forte_doc]
 pub struct CliAuthorizationCodeDoc {
     #[pk]
@@ -168,4 +120,51 @@ pub struct CliAuthorizationCodeDoc {
     pub redirect_uri: String,
     pub label: String,
     pub expires_at: DateTime,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum CloudflareConnectionState {
+    /// Credentials verified and buckets created, but the project's existing
+    /// objects have not finished copying across. Reads and writes stay on the
+    /// platform account until they have: switching first would 404 every
+    /// object written before the account was connected.
+    Migrating,
+    Ok,
+    /// The credentials no longer satisfy what the platform needs. The project
+    /// keeps running on them until they actually fail, because a permission we
+    /// cannot see is not the same as a permission that is gone.
+    Degraded {
+        missing: Vec<String>,
+    },
+}
+
+/// The Cloudflare account a project's objects, assets, pages and custom domain
+/// live in.
+///
+/// The bootstrap token is the user's own account token and never leaves the
+/// control plane: it can create buckets, purge caches and sign certificates,
+/// which is a wider capability than any worker needs. Only the data-plane
+/// secret travels to workers, and only as ciphertext.
+///
+/// Buckets are per Cloudflare account, not per project: one account's projects
+/// share `asset_bucket` and `page_bucket` under `{project_id}/` prefixes, so a
+/// user's zone needs one `static.` DNS record however many projects they run.
+#[forte_doc]
+pub struct ProjectCloudflareConfigDoc {
+    #[pk]
+    pub project_id: String,
+    pub account_id: String,
+    pub zone_id: String,
+    pub zone_name: String,
+    pub static_hostname: String,
+    pub asset_bucket: String,
+    pub page_bucket: String,
+    pub bootstrap_token_ciphertext: String,
+    pub dataplane_access_key_id: String,
+    pub dataplane_secret_ciphertext: String,
+    pub state: CloudflareConnectionState,
+    pub checked_at: DateTime,
+    /// Bumped on every credential or bucket change so workers can skip
+    /// re-decrypting a target they already hold.
+    pub config_version: u64,
 }

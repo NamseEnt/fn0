@@ -1,4 +1,6 @@
 use crate::common::auth;
+use crate::common::byoc::ProjectStorage;
+use crate::common::{cert_manifest, origin_cert};
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -12,12 +14,28 @@ pub struct Input {
 
 #[derive(Serialize)]
 pub enum Output {
-    Ok,
+    Ok {
+        /// The one thing the user has to do: a proxied A record for `domain`
+        /// pointing here.
+        origin_ip: String,
+        /// `false` for projects still on the platform's Cloudflare account,
+        /// where a SaaS custom hostname is registered instead.
+        needs_dns_record: bool,
+    },
     NotLoggedIn,
     NotFound,
-    InvalidDomain { message: String },
-    DomainTaken { existing_project_id: String },
-    AlreadyHasDomain { current_domain: String },
+    InvalidDomain {
+        message: String,
+    },
+    CertificateFailed {
+        message: String,
+    },
+    DomainTaken {
+        existing_project_id: String,
+    },
+    AlreadyHasDomain {
+        current_domain: String,
+    },
     InternalError,
 }
 
@@ -67,9 +85,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                             WorkerProjectManifest {
                                 code_version: 0,
                                 custom_domain: Some(domain.clone()),
-                                static_cache_state:
-                                    fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE.to_string(),
+                                static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
+                                    .to_string(),
                                 pending_code_version: None,
+                                storage: None,
                             },
                         );
                         trx.create(WorkerManifestDoc {
@@ -97,9 +116,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     .or_insert(WorkerProjectManifest {
                         code_version: 0,
                         custom_domain: None,
-                        static_cache_state:
-                            fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE.to_string(),
+                        static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
+                            .to_string(),
                         pending_code_version: None,
+                        storage: None,
                     });
                 if let Some(current) = entry.custom_domain.clone()
                     && current != domain
@@ -138,17 +158,78 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     }
 
-    if let Err(e) =
-        crate::enqueue::cloudflare_register(crate::queue_task::cloudflare_register::Input {
-            domain: domain.clone(),
-        })
-        .await
+    let db = doc_db::turso();
+    let storage = match ProjectStorage::resolve(&db, &project_id).await {
+        Ok(storage) => storage,
+        Err(e) => {
+            tracing::error!("domain_add ProjectStorage::resolve: {e}");
+            return Output::InternalError;
+        }
+    };
+
+    // A project on the platform's account still goes through Cloudflare for
+    // SaaS: there is no user zone to issue an origin certificate on, and the
+    // request never reaches this fleet with their hostname in SNI.
+    if !storage.is_byoc() {
+        if let Err(e) =
+            crate::enqueue::cloudflare_register(crate::queue_task::cloudflare_register::Input {
+                domain: domain.clone(),
+            })
+            .await
+        {
+            tracing::error!("domain_add enqueue cloudflare_register: {e}");
+            return Output::InternalError;
+        }
+        return Output::Ok {
+            origin_ip: String::new(),
+            needs_dns_record: false,
+        };
+    }
+
+    let Ok(origin_ip) = std::env::var("FN0_WORKER_ORIGIN_IP") else {
+        tracing::error!("domain_add: FN0_WORKER_ORIGIN_IP not set");
+        return Output::InternalError;
+    };
+
+    let now = forte_sdk::now();
+    let issued = match origin_cert::issue(&storage, &domain, now).await {
+        Ok(issued) => issued,
+        Err(e) => {
+            tracing::error!("domain_add origin certificate: {e}");
+            return Output::CertificateFailed {
+                message: format!("{e}"),
+            };
+        }
+    };
+    let key_ciphertext =
+        match crate::common::vault::encrypt(issued.private_key_pem.as_bytes()).await {
+            Ok(ciphertext) => ciphertext,
+            Err(e) => {
+                tracing::error!("domain_add key encrypt: {e}");
+                return Output::InternalError;
+            }
+        };
+
+    if let Err(e) = cert_manifest::put(
+        &db,
+        &domain,
+        WorkerHostnameCert {
+            project_id: project_id.clone(),
+            cert_pem: issued.certificate_pem,
+            key_ciphertext,
+            not_after_epoch_seconds: issued.not_after_epoch_seconds,
+        },
+    )
+    .await
     {
-        tracing::error!("domain_add enqueue cloudflare_register: {e}");
+        tracing::error!("domain_add cert manifest: {e}");
         return Output::InternalError;
     }
 
-    Output::Ok
+    Output::Ok {
+        origin_ip,
+        needs_dns_record: true,
+    }
 }
 
 fn validate_domain(d: &str) -> Result<(), String> {

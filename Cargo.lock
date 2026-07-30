@@ -1798,7 +1798,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.2.52"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1988,7 +1988,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-shared-schema"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "fn0-doc-db",
@@ -2032,7 +2032,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.3.59"
+version = "0.3.60"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2041,6 +2041,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "color-eyre",
+ "dashmap",
  "fn0",
  "fn0-doc-db",
  "fn0-shared-schema",

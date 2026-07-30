@@ -9,11 +9,9 @@
 //! flight and resurrect some resources. That is the owner racing their own
 //! destroy, so it is accepted rather than locked against.
 
-use crate::common::cloudflare::CloudflareClient;
+use crate::common::byoc::{self, ProjectStorage};
 use crate::common::cloudflare_saas::CloudflareSaasClient;
-use crate::common::r2_store::{
-    BundleStore, ObjectStorageStore, StaticAssetStore, StaticPageStore, parse_compiled_key,
-};
+use crate::common::r2_store::{BundleStore, ProjectR2Store, parse_compiled_key};
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -30,12 +28,15 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     let db = doc_db::turso();
     let now = forte_sdk::now();
 
+    let storage = ProjectStorage::resolve(&db, &project_id).await?;
+
     delete_custom_domain(&db, &project_id).await?;
     remove_routing_and_cron(&db, &project_id).await?;
     delete_bundle_store_objects(&project_id, now).await?;
-    delete_static_assets(&project_id, now).await?;
-    delete_static_pages(&project_id, now).await?;
-    delete_object_storage_bucket(&project_id, now).await?;
+    delete_static_assets(&project_id, &storage, now).await?;
+    delete_static_pages(&project_id, &storage, now).await?;
+    delete_object_storage_bucket(&project_id, &storage, now).await?;
+    delete_cloudflare_config(&db, &project_id).await?;
     delete_turso_database(&project_id).await?;
     delete_compiled_bundle_docs(&db, &project_id).await?;
     delete_identity_docs(&db, &project_id).await?;
@@ -44,7 +45,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     Ok(())
 }
 
-// The SaaS custom hostname must go before the manifest entry: the domain name
+// The hostname registration must go before the manifest entry: the domain name
 // only lives in the manifest, so deleting the entry first would strand the
 // hostname on a redelivered message.
 async fn delete_custom_domain(db: &doc_db::Database, project_id: &str) -> anyhow::Result<()> {
@@ -58,9 +59,13 @@ async fn delete_custom_domain(db: &doc_db::Database, project_id: &str) -> anyhow
     else {
         return Ok(());
     };
-    CloudflareSaasClient::from_env()?
-        .delete_by_name(&domain)
-        .await?;
+    if ProjectStorage::resolve(db, project_id).await?.is_byoc() {
+        crate::common::cert_manifest::remove(db, &domain).await?;
+    } else {
+        CloudflareSaasClient::from_env()?
+            .delete_by_name(&domain)
+            .await?;
+    }
     tracing::info!(%project_id, %domain, "project_teardown: custom domain deleted");
     Ok(())
 }
@@ -117,25 +122,40 @@ async fn delete_bundle_store_objects(project_id: &str, now: DateTime) -> anyhow:
     Ok(())
 }
 
-async fn delete_static_assets(project_id: &str, now: DateTime) -> anyhow::Result<()> {
-    let store = StaticAssetStore::from_env()?;
+async fn delete_static_assets(
+    project_id: &str,
+    storage: &ProjectStorage,
+    now: DateTime,
+) -> anyhow::Result<()> {
+    let store = ProjectR2Store::assets(storage);
     for object in store.list_all(&format!("{project_id}/"), now).await? {
         store.delete(&object.key, now).await?;
     }
     Ok(())
 }
 
-async fn delete_static_pages(project_id: &str, now: DateTime) -> anyhow::Result<()> {
-    let store = StaticPageStore::from_env()?;
+async fn delete_static_pages(
+    project_id: &str,
+    storage: &ProjectStorage,
+    now: DateTime,
+) -> anyhow::Result<()> {
+    let store = ProjectR2Store::pages(storage);
     for object in store.list_all(&format!("{project_id}/"), now).await? {
         store.delete(&object.key, now).await?;
     }
     Ok(())
 }
 
-async fn delete_object_storage_bucket(project_id: &str, now: DateTime) -> anyhow::Result<()> {
-    let store = ObjectStorageStore::from_env(project_id)?;
-    let cloudflare = CloudflareClient::from_env()?;
+// The buckets a user's projects share are deliberately left standing: another
+// of their projects is probably still writing into them, and an empty bucket
+// costs nothing.
+async fn delete_object_storage_bucket(
+    project_id: &str,
+    storage: &ProjectStorage,
+    now: DateTime,
+) -> anyhow::Result<()> {
+    let store = ProjectR2Store::objects(storage);
+    let cloudflare = storage.cloudflare()?;
     // S3 ListObjectsV2 errors on a missing bucket instead of returning an
     // empty page, so existence is checked up front to keep this step
     // re-runnable.
@@ -147,6 +167,14 @@ async fn delete_object_storage_bucket(project_id: &str, now: DateTime) -> anyhow
     }
     cloudflare.delete_r2_bucket(store.bucket()).await?;
     tracing::info!(%project_id, bucket = store.bucket(), "project_teardown: object storage bucket deleted");
+    Ok(())
+}
+
+async fn delete_cloudflare_config(db: &doc_db::Database, project_id: &str) -> anyhow::Result<()> {
+    byoc::publish_storage_to_manifest(db, project_id, None).await?;
+    (ProjectCloudflareConfigDocDelete { project_id })
+        .send_with(db)
+        .await?;
     Ok(())
 }
 

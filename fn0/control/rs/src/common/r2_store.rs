@@ -62,6 +62,78 @@ async fn r2_delete(
     .await
 }
 
+/// One project's view of one of its buckets, in whichever Cloudflare account
+/// the project belongs to. Replaces the three env-configured stores for
+/// everything that is per-project; the bundle store stays on the platform
+/// account and keeps its own type.
+pub struct ProjectR2Store {
+    account_id: String,
+    bucket: String,
+    access_key_id: String,
+    secret_access_key: String,
+}
+
+impl ProjectR2Store {
+    pub fn objects(storage: &crate::common::byoc::ProjectStorage) -> Self {
+        Self {
+            account_id: storage.account_id.clone(),
+            bucket: storage.object_bucket.clone(),
+            access_key_id: storage.object_keys.access_key_id.clone(),
+            secret_access_key: storage.object_keys.secret_access_key.clone(),
+        }
+    }
+
+    pub fn assets(storage: &crate::common::byoc::ProjectStorage) -> Self {
+        Self {
+            account_id: storage.account_id.clone(),
+            bucket: storage.asset_bucket.clone(),
+            access_key_id: storage.asset_keys.access_key_id.clone(),
+            secret_access_key: storage.asset_keys.secret_access_key.clone(),
+        }
+    }
+
+    pub fn pages(storage: &crate::common::byoc::ProjectStorage) -> Self {
+        Self {
+            account_id: storage.account_id.clone(),
+            bucket: storage.page_bucket.clone(),
+            access_key_id: storage.page_keys.access_key_id.clone(),
+            secret_access_key: storage.page_keys.secret_access_key.clone(),
+        }
+    }
+
+    pub fn bucket(&self) -> &str {
+        &self.bucket
+    }
+
+    pub async fn list_all(
+        &self,
+        prefix: &str,
+        now: DateTime,
+    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
+        r2_list_all(
+            &self.account_id,
+            &self.bucket,
+            &self.access_key_id,
+            &self.secret_access_key,
+            prefix,
+            now,
+        )
+        .await
+    }
+
+    pub async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
+        r2_delete(
+            &self.account_id,
+            &self.bucket,
+            &self.access_key_id,
+            &self.secret_access_key,
+            key,
+            now,
+        )
+        .await
+    }
+}
+
 pub struct BundleStore {
     account_id: String,
     bucket: String,

@@ -1,11 +1,13 @@
 pub mod admin;
 pub mod auth;
 pub mod aws_sign;
+pub mod byoc;
+pub mod cert_manifest;
 pub mod cloudflare;
-pub mod cloudflare_analytics;
 pub mod cloudflare_saas;
 pub mod docs_site;
 pub mod github;
+pub mod origin_cert;
 pub mod project_name;
 pub mod r2_store;
 pub mod vault;

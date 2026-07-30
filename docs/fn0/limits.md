@@ -51,9 +51,10 @@ month's budget instead of hitting a daily wall.
 | Compute egress | 20 GB / month | Bytes leaving your handlers: SSR pages, API responses |
 | Static asset downloads | Unlimited | Served through the CDN cache — never metered, never counted as egress |
 
-Static assets (your deployed build's files) are the unlimited-download path.
-Object storage downloads go directly to the storage endpoint, are not
-cached, and carry the quotas below.
+Static assets (your deployed build's files) are served from your own
+Cloudflare account through your own CDN hostname, so their bandwidth is
+between you and Cloudflare — R2 egress is free. Object storage downloads go
+directly to the storage endpoint and are not cached.
 
 ### Document database
 
@@ -66,26 +67,29 @@ cached, and carry the quotas below.
 
 ### Object storage
 
+Object storage, public objects, deployed static assets and cached pages all
+live in **your own Cloudflare account**, connected with `forte cloudflare
+connect`. Their storage and operation limits are whatever your Cloudflare
+plan gives you — R2's forever-free tier is 10 GB, 1M writes and 10M reads a
+month — and fn0 does not meter or cap them.
+
+What fn0 still limits is how fast your app can mint presigned URLs and ask
+for purges, because those are actions the runtime takes on your behalf:
+
 | Quota | Value | Notes |
 | --- | --- | --- |
-| Storage | 10 GB | |
-| Write operations | 100k / month, 2k / hour | Uploads, copies, lists — from your handlers or presigned PUT |
-| Read operations | 100k / month, 5k / hour | Downloads and HEADs — from your handlers or presigned GET |
-| Presigned URLs minted | 100k / month, 1k / hour | |
+| Presigned URLs minted | 1k / hour | Per project; a runaway loop stops here, not on your bill |
 | Presigned URL expiry | 5 minutes maximum | Longer requested expiries are clamped, not rejected |
 | Public object purges | 1k / hour | Explicit `public::purge` calls; the purge a `put` triggers on its own is not counted |
 
-Pages cached by [lazy static page caching](../forte/pages.md#lazy-static-page-caching) live in a platform-internal bucket and count against none of these quotas.
+Pages cached by [lazy static page caching](../forte/pages.md#lazy-static-page-caching) live in a private bucket in your account.
 
 Treat presigned URLs as opaque, short-lived strings: mint one right before
 use, and never store one or parse its structure — the URL format may change.
 
-Going over quota blocks **presigned URL minting only** (requests get `429`);
-your deployed app keeps serving and already-minted URLs stay valid until
-they expire. The block lifts automatically once usage falls back under the
-hourly and rolling 30-day limits — no action needed. If your app legitimately
-needs high-volume presigned downloads, contact us: a paid add-on serving
-them through the CDN cache is planned.
+Exceeding the mint ceiling refuses new presigned URLs (`429`) for the rest of
+the hour; your deployed app keeps serving and already-minted URLs stay valid
+until they expire.
 
 ### Metrics
 

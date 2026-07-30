@@ -1,6 +1,7 @@
 pub mod add;
 pub mod admin;
 pub mod build;
+pub mod cloudflare;
 pub mod cron;
 pub mod deploy;
 pub mod destroy;
@@ -85,6 +86,12 @@ pub enum Commands {
         #[command(subcommand)]
         command: DomainCommands,
     },
+    /// Run this project's storage, CDN and custom domain on your own
+    /// Cloudflare account
+    Cloudflare {
+        #[command(subcommand)]
+        command: CloudflareCommands,
+    },
     Env {
         #[command(subcommand)]
         command: EnvCommands,
@@ -118,6 +125,27 @@ pub enum DomainCommands {
         project: Option<PathBuf>,
     },
     Remove {
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+    Status {
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum CloudflareCommands {
+    /// Store and verify the credentials for your Cloudflare account
+    Connect {
+        #[arg(long)]
+        account_id: String,
+        #[arg(long)]
+        zone_id: String,
+        /// Account API token with Workers R2 Storage Edit, Zone Read, Cache
+        /// Purge and SSL and Certificates Edit
+        #[arg(long)]
+        api_token: String,
         #[arg(short, long)]
         project: Option<PathBuf>,
     },

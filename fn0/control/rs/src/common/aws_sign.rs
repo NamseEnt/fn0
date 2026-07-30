@@ -227,6 +227,145 @@ pub async fn r2_delete_object(args: R2ObjectRef<'_>) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub struct R2Object {
+    pub body: Vec<u8>,
+    pub content_type: Option<String>,
+    pub cache_control: Option<String>,
+}
+
+pub async fn r2_get_object(args: R2ObjectRef<'_>) -> anyhow::Result<R2Object> {
+    let host = r2_host(args.bucket, args.account_id);
+    let canonical_uri = format!("/{}", uri_encode(args.key, false));
+    let (auth, amz_date) = sign_object_request("GET", &host, &canonical_uri, &args);
+
+    let request = http::Request::builder()
+        .method("GET")
+        .uri(format!("https://{host}{canonical_uri}"))
+        .header("Authorization", auth)
+        .header("x-amz-content-sha256", EMPTY_PAYLOAD_HASH)
+        .header("x-amz-date", amz_date)
+        .body(Vec::<u8>::new())?;
+
+    let resp = http::Client::new().send(request).await?;
+    let status = resp.status();
+    let header = |name: &str| {
+        resp.headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string)
+    };
+    let content_type = header("content-type");
+    let cache_control = header("cache-control");
+    let body = resp.into_body().bytes().await.to_vec();
+    if !status.is_success() {
+        anyhow::bail!("r2 get {}: {}", status, String::from_utf8_lossy(&body));
+    }
+    Ok(R2Object {
+        body,
+        content_type,
+        cache_control,
+    })
+}
+
+/// Streams nothing: the body is signed as `UNSIGNED-PAYLOAD` so the caller does
+/// not have to hash it, which matters because the object is already in memory
+/// by the time it gets here.
+pub async fn r2_put_object(
+    args: R2ObjectRef<'_>,
+    body: Vec<u8>,
+    content_type: Option<&str>,
+    cache_control: Option<&str>,
+) -> anyhow::Result<()> {
+    let host = r2_host(args.bucket, args.account_id);
+    let canonical_uri = format!("/{}", uri_encode(args.key, false));
+    let amz_date = args.now.format("%Y%m%dT%H%M%SZ").to_string();
+    let date = args.now.format("%Y%m%d").to_string();
+    let credential_scope = format!("{date}/{}/s3/aws4_request", args.region);
+    let credential = format!("{}/{credential_scope}", args.access_key_id);
+
+    let mut header_lines = vec![
+        format!("host:{host}"),
+        "x-amz-content-sha256:UNSIGNED-PAYLOAD".to_string(),
+        format!("x-amz-date:{amz_date}"),
+    ];
+    let mut header_names = vec!["host", "x-amz-content-sha256", "x-amz-date"];
+    if let Some(cache_control) = cache_control {
+        header_lines.push(format!("cache-control:{cache_control}"));
+        header_names.push("cache-control");
+    }
+    if let Some(content_type) = content_type {
+        header_lines.push(format!("content-type:{content_type}"));
+        header_names.push("content-type");
+    }
+    header_lines.sort();
+    header_names.sort_unstable();
+    let canonical_headers = format!("{}\n", header_lines.join("\n"));
+    let signed_headers = header_names.join(";");
+
+    let canonical_request =
+        format!("PUT\n{canonical_uri}\n\n{canonical_headers}\n{signed_headers}\nUNSIGNED-PAYLOAD",);
+    let string_to_sign = format!(
+        "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
+        sha256_hex(canonical_request.as_bytes()),
+    );
+    let key = signing_key(args.secret_access_key, &date, args.region, "s3");
+    let signature = forte_sdk::hex::encode(hmac_sha256(&key, string_to_sign.as_bytes()));
+    let auth = format!(
+        "AWS4-HMAC-SHA256 Credential={credential}, SignedHeaders={signed_headers}, Signature={signature}",
+    );
+
+    let mut builder = http::Request::builder()
+        .method("PUT")
+        .uri(format!("https://{host}{canonical_uri}"))
+        .header("Authorization", auth)
+        .header("x-amz-content-sha256", "UNSIGNED-PAYLOAD")
+        .header("x-amz-date", amz_date);
+    if let Some(cache_control) = cache_control {
+        builder = builder.header("cache-control", cache_control);
+    }
+    if let Some(content_type) = content_type {
+        builder = builder.header("content-type", content_type);
+    }
+
+    let resp = http::Client::new().send(builder.body(body)?).await?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.into_body().bytes().await;
+        anyhow::bail!("r2 put {}: {}", status, String::from_utf8_lossy(&body));
+    }
+    Ok(())
+}
+
+fn sign_object_request(
+    method: &str,
+    host: &str,
+    canonical_uri: &str,
+    args: &R2ObjectRef<'_>,
+) -> (String, String) {
+    let amz_date = args.now.format("%Y%m%dT%H%M%SZ").to_string();
+    let date = args.now.format("%Y%m%d").to_string();
+    let credential_scope = format!("{date}/{}/s3/aws4_request", args.region);
+    let credential = format!("{}/{credential_scope}", args.access_key_id);
+    let canonical_headers =
+        format!("host:{host}\nx-amz-content-sha256:{EMPTY_PAYLOAD_HASH}\nx-amz-date:{amz_date}\n");
+    let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+    let canonical_request = format!(
+        "{method}\n{canonical_uri}\n\n{canonical_headers}\n{signed_headers}\n{EMPTY_PAYLOAD_HASH}",
+    );
+    let string_to_sign = format!(
+        "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
+        sha256_hex(canonical_request.as_bytes()),
+    );
+    let key = signing_key(args.secret_access_key, &date, args.region, "s3");
+    let signature = forte_sdk::hex::encode(hmac_sha256(&key, string_to_sign.as_bytes()));
+    (
+        format!(
+            "AWS4-HMAC-SHA256 Credential={credential}, SignedHeaders={signed_headers}, Signature={signature}",
+        ),
+        amz_date,
+    )
+}
+
 pub struct R2ListArgs<'a> {
     pub account_id: &'a str,
     pub bucket: &'a str,

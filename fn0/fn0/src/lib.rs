@@ -14,6 +14,7 @@ pub mod purge_gate;
 pub mod queue_hijack;
 mod self_invoke;
 pub mod static_pages;
+pub mod storage_target;
 pub mod telemetry;
 pub mod turso_hijack;
 pub mod vault_hijack;
@@ -52,6 +53,10 @@ pub use public_storage_hijack::PublicStorageHijack;
 pub use purge_gate::PurgeGate;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
+pub use storage_target::{
+    ObjectStorageResolver, PublicStorageResolver, PublicStorageTarget, R2Credentials,
+    StaticResolver,
+};
 pub use turso_hijack::TursoHijack;
 pub use vault_hijack::VaultHijack;
 pub use wasmtime;
@@ -61,13 +66,19 @@ pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
 
+/// `project_id` is passed alongside the key rather than parsed back out of it:
+/// the key is only conventionally prefixed with the project, and a store that
+/// picks one project's bucket by parsing another project's string is a tenancy
+/// boundary held together by a `split('/')`.
 pub trait StaticPageStorage: Send + Sync {
     fn read<'storage>(
         &'storage self,
+        project_id: &'storage str,
         key: &'storage str,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Bytes>>> + Send + 'storage>>;
     fn write<'storage>(
         &'storage self,
+        project_id: &'storage str,
         key: &'storage str,
         body: Bytes,
     ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'storage>>;
@@ -364,7 +375,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 &candidate.object_path,
                 "eligible",
             );
-            match storage.read(&candidate.object_key).await {
+            match storage.read(project_id, &candidate.object_key).await {
                 Ok(Some(body)) => {
                     static_pages::record_result(
                         project_id,
@@ -562,7 +573,10 @@ impl<C: BundleCache> CodeExecutor<C> {
 
         if safe {
             if let Some(storage) = self.ctx.static_page_storage.as_ref() {
-                match storage.write(&candidate.object_key, body.clone()).await {
+                match storage
+                    .write(project_id, &candidate.object_key, body.clone())
+                    .await
+                {
                     Ok(()) => {
                         static_pages::record_result(
                             project_id,

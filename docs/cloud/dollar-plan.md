@@ -263,9 +263,9 @@ Planned (public copy uses the existing "planned" badge tone):
   (Stage 2 Worker at $5/mo Workers Paid, then Stage 3 Pro WAF HMAC — see
   `presigned-url-abuse.md`). Priced per customer; the zone-level cost is
   shared across every add-on customer.
-- Bring-your-own R2 bucket / Turso database: quotas for that resource become
-  the user's own. Doubles as the open-source/no-lock-in story and moves the
-  heaviest users out of our cost structure.
+- Bring-your-own Turso database: quotas for that resource become the user's
+  own. The R2 half of this line shipped as #79 and is no longer planned —
+  see below.
 
 ## Positioning vs Cloudflare
 
