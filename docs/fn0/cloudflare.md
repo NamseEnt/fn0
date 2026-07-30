@@ -44,21 +44,24 @@ Custom Token**. Give it:
 | --- | --- | --- |
 | Account | Workers R2 Storage → Edit | Create the buckets and attach the CDN hostname |
 | Zone | Zone → Read | Resolve your zone's name |
-| Zone | Cache Purge → Purge | Prove the purge path before fn0 depends on it |
 | Zone | Cache Rules → Edit | Create the cache rule that makes the assets hostname cacheable and purgeable |
 | Zone | SSL and Certificates → Edit | Sign the origin certificate for a custom domain |
 | User | API Tokens → Edit | Mint the two narrow tokens fn0 actually gets |
 
-Restrict the zone scopes to the one zone you want to use.
+Restrict the zone scopes to the one zone you want to use. Every permission
+here is one the CLI actually exercises — checked by running setup with exactly
+this list and nothing more.
 
-This token is powerful, which is exactly why it stays on your machine. Delete
-it once setup is done; nothing fn0 runs will ever need it again.
+**Delete this token once setup finishes.** `API Tokens → Edit` lets it create
+any token in your account, including permissions it does not hold itself, so
+until you delete it it is a full-account credential no matter how narrow the
+rest of the list looks. Nothing fn0 runs will ever ask for it again — the two
+credentials fn0 keeps are minted during setup and are far smaller.
 
-The two cache permissions are not optional. Public objects are stored with a
-one-year edge TTL and a purge is the only thing that replaces them — without
-Cache Purge, overwriting an object silently keeps serving the old bytes, and
-without Cache Rules the rule that makes `PURGE` reach the edge at all cannot
-be created.
+Cache Rules is not optional. Public objects are stored with a one-year edge
+TTL and a purge is the only thing that replaces them; without this rule
+`PURGE` never reaches the edge, and overwriting an object silently keeps
+serving the old bytes.
 
 ## 2. Connect
 
