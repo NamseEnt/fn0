@@ -435,48 +435,88 @@ impl CloudflareClient {
     }
 
     /// Creates the cache rule the static page and public object caches depend
-    /// on.
+    /// on, leaving the zone's other cache rules alone.
     ///
     /// `PURGE` has to be in the method match: without it the purge API still
     /// answers `success: true` while the edge keeps serving the old object,
     /// which is a silent year of stale bytes under `s-maxage=31536000` (#68).
+    ///
+    /// The phase entrypoint only accepts a whole rule list, and a `PUT` of one
+    /// rule deletes every other rule in the zone. This is a user's own zone and
+    /// this runs on every deploy, so the existing rules are read back and
+    /// carried through untouched; ours is matched by description so a re-run
+    /// replaces it instead of stacking duplicates.
+    /// The zone's current cache rules, as opaque values so the ones fn0 does
+    /// not own survive a round trip untouched.
+    ///
+    /// Doubles as the connect-time probe for `Zone -> Cache Settings`: a token
+    /// without it answers 403 here rather than failing later inside a deploy.
+    pub async fn read_cache_rules(&self) -> anyhow::Result<Vec<serde_json::Value>> {
+        #[derive(Deserialize)]
+        struct Envelope {
+            result: Option<RulesetResult>,
+        }
+        #[derive(Deserialize)]
+        struct RulesetResult {
+            #[serde(default)]
+            rules: Vec<serde_json::Value>,
+        }
+
+        let path = format!(
+            "/zones/{}/rulesets/phases/http_request_cache_settings/entrypoint",
+            self.zone_id()?
+        );
+        let (status, body) = self.call("GET", &path, Vec::new()).await?;
+        if (200..300).contains(&status) {
+            return Ok(serde_json::from_slice::<Envelope>(&body)?
+                .result
+                .map(|ruleset| ruleset.rules)
+                .unwrap_or_default());
+        }
+        // A zone with no cache rules yet has no entrypoint ruleset at all,
+        // which reads as 404 rather than an empty list.
+        if status == 404 {
+            return Ok(Vec::new());
+        }
+        anyhow::bail!(
+            "read_cache_rules failed (status={status}): {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+
     pub async fn ensure_cache_rule(&self, hostname: &str) -> anyhow::Result<()> {
+        const RULE_DESCRIPTION: &str = "fn0 static assets, public objects and cached pages";
+
         #[derive(Serialize)]
-        struct Ruleset<'a> {
-            name: &'static str,
-            kind: &'static str,
-            phase: &'static str,
-            rules: Vec<Rule<'a>>,
-        }
-        #[derive(Serialize)]
-        struct Rule<'a> {
-            action: &'static str,
-            expression: &'a str,
-            description: &'static str,
-            action_parameters: ActionParameters,
-        }
-        #[derive(Serialize)]
-        struct ActionParameters {
-            cache: bool,
+        struct Body {
+            rules: Vec<serde_json::Value>,
         }
 
         let zone_id = self.zone_id()?;
-        let expression = format!(
-            r#"(http.host eq "{hostname}" and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
-        );
-        let payload = serde_json::to_vec(&Ruleset {
-            name: "fn0 cacheable assets",
-            kind: "zone",
-            phase: "http_request_cache_settings",
-            rules: vec![Rule {
-                action: "set_cache_settings",
-                expression: &expression,
-                description: "fn0 static assets, public objects and cached pages",
-                action_parameters: ActionParameters { cache: true },
-            }],
-        })?;
         let path =
             format!("/zones/{zone_id}/rulesets/phases/http_request_cache_settings/entrypoint");
+
+        let mut rules = self.read_cache_rules().await?;
+
+        rules.retain(|rule| {
+            rule.get("description").and_then(|value| value.as_str()) != Some(RULE_DESCRIPTION)
+        });
+        // Ahead of the zone's own rules: the first match wins in a ruleset, and
+        // a broad user rule that disabled caching would otherwise swallow the
+        // asset hostname.
+        rules.insert(
+            0,
+            serde_json::json!({
+                "action": "set_cache_settings",
+                "expression": format!(
+                    r#"(http.host eq "{hostname}" and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
+                ),
+                "description": RULE_DESCRIPTION,
+                "action_parameters": { "cache": true },
+            }),
+        );
+
+        let payload = serde_json::to_vec(&Body { rules })?;
         let (status, body) = self.call("PUT", &path, payload).await?;
         if (200..300).contains(&status) {
             return Ok(());

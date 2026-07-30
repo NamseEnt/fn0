@@ -37,8 +37,16 @@ pub async fn issue(
 ) -> anyhow::Result<IssuedCertificate> {
     let key_pair = rcgen::KeyPair::generate()
         .map_err(|error| anyhow::anyhow!("origin key generation: {error}"))?;
-    let params = rcgen::CertificateParams::new(vec![hostname.to_string()])
+    let mut params = rcgen::CertificateParams::new(vec![hostname.to_string()])
         .map_err(|error| anyhow::anyhow!("origin csr params: {error}"))?;
+    // rcgen's default subject is a placeholder string. Full (strict) accepts a
+    // match on either the CN or a SAN and the SAN above is correct, but leaving
+    // a stranger's name in the CN of a certificate we ask a user's CA to sign
+    // is not worth the one line it costs to set.
+    params.distinguished_name = rcgen::DistinguishedName::new();
+    params
+        .distinguished_name
+        .push(rcgen::DnType::CommonName, hostname);
     let signing_request = params
         .serialize_request(&key_pair)
         .map_err(|error| anyhow::anyhow!("origin csr: {error}"))?;

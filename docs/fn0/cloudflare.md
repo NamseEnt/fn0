@@ -25,13 +25,20 @@ Custom Token**. Give it:
 | Account | Workers R2 Storage → Edit | Create the buckets and attach the CDN hostname |
 | Zone | Zone → Read | Resolve your zone's name |
 | Zone | Cache Purge → Purge | Replace a public object and have visitors see it |
+| Zone | Cache Settings → Edit | Create the cache rule that makes the assets hostname cacheable and purgeable |
 | Zone | SSL and Certificates → Edit | Issue the origin certificate for a custom domain |
 
 Restrict the zone scopes to the one zone you want to use.
 
-The Cache Purge permission is not optional. Public objects are stored with a
+The two cache permissions are not optional. Public objects are stored with a
 one-year edge TTL and a purge is the only thing that replaces them — without
-it, overwriting an object silently keeps serving the old bytes.
+Cache Purge, overwriting an object silently keeps serving the old bytes, and
+without Cache Settings the rule that makes `PURGE` reach the edge at all
+cannot be created.
+
+fn0 adds exactly one cache rule to your zone and leaves your own rules in
+place; re-running `connect` or deploying replaces that one rule rather than
+stacking copies.
 
 The SSL and Certificates permission is only needed if you attach a custom
 domain. Everything else works without it.
