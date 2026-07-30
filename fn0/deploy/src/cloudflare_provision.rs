@@ -12,6 +12,18 @@
 //! exits. What fn0 receives is what this module mints at the end: an R2 token
 //! scoped to three buckets that cannot delete a bucket or call the REST API,
 //! and a token that can purge one zone's cache and nothing else.
+//!
+//! The setup token the user creates carries a single permission,
+//! `User -> API Tokens -> Edit`, and this module mints everything else it needs
+//! from it — including the short-lived token that does the provisioning itself.
+//! Cloudflare lets a token grant permissions it does not hold, so one checkbox
+//! is enough; it also refuses to let a minted token mint further tokens, so the
+//! provisioning token cannot widen itself. Both measured against the live API.
+//!
+//! That single permission is not a small one. A token that can create tokens
+//! can create any token, so it is account-wide however narrow it looks, which
+//! is the reason it stays on the user's machine and the reason this module
+//! gives the provisioning token a short expiry and revokes it on the way out.
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -34,11 +46,28 @@ const SECONDS_PER_DAY: i64 = 86_400;
 /// `origin-ecc`. Asking for `origin-rsa` with an ECDSA CSR is rejected.
 const CERTIFICATE_REQUEST_TYPE: &str = "origin-ecc";
 
+// Permission groups the provisioning token is minted with. Setup is seconds of
+// API calls; the expiry is generous by comparison and exists so that a crash
+// between minting and revoking leaves nothing usable for long.
+const PROVISIONING_TOKEN_MINUTES: i64 = 10;
+const R2_STORAGE_WRITE: &str = "bf7481a1826f439697cb59a20b22293e";
+const ZONE_READ: &str = "c8fed203ed3043cba015a93ad1616f1f";
+const CACHE_SETTINGS_WRITE: &str = "9ff81cbbe65c400b97d92c3c1033cab6";
+const SSL_AND_CERTIFICATES_WRITE: &str = "c03055bc037c4ea9afb9a9f104b7b721";
+
 pub struct Provisioner {
     client: reqwest::Client,
-    api_token: String,
+    /// The user's setup token. Used only to mint and revoke; never to
+    /// provision, because it is not granted the permissions to.
+    setup_token: String,
     account_id: String,
     zone_id: String,
+}
+
+/// A token minted for the length of one command, and revoked at the end of it.
+struct TemporaryToken {
+    id: String,
+    value: String,
 }
 
 pub struct Provisioned {
@@ -89,10 +118,10 @@ fn describe(errors: &[ApiError]) -> String {
 }
 
 impl Provisioner {
-    pub fn new(api_token: String, account_id: String, zone_id: String) -> Self {
+    pub fn new(setup_token: String, account_id: String, zone_id: String) -> Self {
         Self {
             client: reqwest::Client::new(),
-            api_token,
+            setup_token,
             account_id,
             zone_id,
         }
@@ -100,6 +129,7 @@ impl Provisioner {
 
     async fn call<T: serde::de::DeserializeOwned>(
         &self,
+        token: &str,
         method: reqwest::Method,
         path: &str,
         body: Option<serde_json::Value>,
@@ -107,7 +137,7 @@ impl Provisioner {
         let mut request = self
             .client
             .request(method, format!("{API_BASE}{path}"))
-            .bearer_auth(&self.api_token);
+            .bearer_auth(token);
         if let Some(body) = body {
             request = request.json(&body);
         }
@@ -134,7 +164,9 @@ impl Provisioner {
             "/user/tokens/verify".to_string(),
             format!("/accounts/{}/tokens/verify", self.account_id),
         ] {
-            if let Ok((_, envelope)) = self.call::<Token>(reqwest::Method::GET, &path, None).await
+            if let Ok((_, envelope)) = self
+                .call::<Token>(&self.setup_token, reqwest::Method::GET, &path, None)
+                .await
                 && let Some(token) = envelope.result.filter(|_| envelope.success)
             {
                 if token.status != "active" {
@@ -148,13 +180,14 @@ impl Provisioner {
         ))
     }
 
-    pub async fn zone_name(&self) -> Result<String> {
+    async fn zone_name(&self, token: &str) -> Result<String> {
         #[derive(Deserialize)]
         struct Zone {
             name: String,
         }
         let (_, envelope) = self
             .call::<Zone>(
+                token,
                 reqwest::Method::GET,
                 &format!("/zones/{}", self.zone_id),
                 None,
@@ -172,9 +205,10 @@ impl Provisioner {
             })
     }
 
-    async fn create_bucket(&self, name: &str) -> Result<()> {
+    async fn create_bucket(&self, token: &str, name: &str) -> Result<()> {
         let (status, envelope) = self
             .call::<serde_json::Value>(
+                token,
                 reqwest::Method::POST,
                 &format!("/accounts/{}/r2/buckets", self.account_id),
                 Some(serde_json::json!({ "name": name })),
@@ -189,9 +223,10 @@ impl Provisioner {
         ))
     }
 
-    async fn put_cors(&self, bucket: &str) -> Result<()> {
+    async fn put_cors(&self, token: &str, bucket: &str) -> Result<()> {
         let (status, envelope) = self
             .call::<serde_json::Value>(
+                token,
                 reqwest::Method::PUT,
                 &format!("/accounts/{}/r2/buckets/{bucket}/cors", self.account_id),
                 Some(serde_json::json!({
@@ -216,9 +251,10 @@ impl Provisioner {
         ))
     }
 
-    async fn attach_custom_domain(&self, bucket: &str, hostname: &str) -> Result<()> {
+    async fn attach_custom_domain(&self, token: &str, bucket: &str, hostname: &str) -> Result<()> {
         let (status, envelope) = self
             .call::<serde_json::Value>(
+                token,
                 reqwest::Method::POST,
                 &format!(
                     "/accounts/{}/r2/buckets/{bucket}/domains/custom",
@@ -250,7 +286,7 @@ impl Provisioner {
     /// a fresh zone's four-hour default Browser Cache TTL from overriding the
     /// `max-age=0` fn0 stores on public objects — four hours of browser copies
     /// is the one staleness no purge can reach.
-    async fn ensure_cache_rule(&self, hostname: &str) -> Result<()> {
+    async fn ensure_cache_rule(&self, token: &str, hostname: &str) -> Result<()> {
         const RULE_DESCRIPTION: &str = "fn0 static assets, public objects and cached pages";
 
         #[derive(Deserialize)]
@@ -264,7 +300,7 @@ impl Provisioner {
             self.zone_id
         );
         let (status, envelope) = self
-            .call::<Ruleset>(reqwest::Method::GET, &path, None)
+            .call::<Ruleset>(token, reqwest::Method::GET, &path, None)
             .await?;
         // A zone with no cache rules has no entrypoint ruleset at all, which
         // reads as 404 rather than an empty list.
@@ -301,6 +337,7 @@ impl Provisioner {
 
         let (status, envelope) = self
             .call::<serde_json::Value>(
+                token,
                 reqwest::Method::PUT,
                 &path,
                 Some(serde_json::json!({ "rules": rules })),
@@ -315,7 +352,12 @@ impl Provisioner {
         ))
     }
 
-    async fn mint_token(&self, name: &str, policy: serde_json::Value) -> Result<(String, String)> {
+    async fn mint_with_expiry(
+        &self,
+        name: &str,
+        policies: Vec<serde_json::Value>,
+        expires_on: Option<String>,
+    ) -> Result<(String, String)> {
         #[derive(Deserialize)]
         struct Minted {
             id: String,
@@ -323,9 +365,15 @@ impl Provisioner {
         }
         let (status, envelope) = self
             .call::<Minted>(
+                &self.setup_token,
                 reqwest::Method::POST,
                 "/user/tokens",
-                Some(serde_json::json!({ "name": name, "policies": [policy] })),
+                Some(match expires_on {
+                    Some(expires_on) => serde_json::json!({
+                        "name": name, "policies": policies, "expires_on": expires_on,
+                    }),
+                    None => serde_json::json!({ "name": name, "policies": policies }),
+                }),
             )
             .await?;
         let minted = envelope.result.filter(|_| envelope.success).ok_or_else(|| {
@@ -337,10 +385,74 @@ impl Provisioner {
         Ok((minted.id, minted.value))
     }
 
+    /// Mints a token that can do the provisioning, since the setup token
+    /// itself is only allowed to create tokens.
+    async fn mint_provisioning_token(&self, purpose: &str) -> Result<TemporaryToken> {
+        let expires_on = (chrono::Utc::now()
+            + chrono::Duration::minutes(PROVISIONING_TOKEN_MINUTES))
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+        let (id, value) = self
+            .mint_with_expiry(
+                &format!("fn0 setup ({purpose})"),
+                vec![
+                    serde_json::json!({
+                        "effect": "allow",
+                        "resources": { format!("com.cloudflare.api.account.{}", self.account_id): "*" },
+                        "permission_groups": [{ "id": R2_STORAGE_WRITE }],
+                    }),
+                    serde_json::json!({
+                        "effect": "allow",
+                        "resources": { format!("com.cloudflare.api.account.zone.{}", self.zone_id): "*" },
+                        "permission_groups": [
+                            { "id": ZONE_READ },
+                            { "id": CACHE_SETTINGS_WRITE },
+                            { "id": SSL_AND_CERTIFICATES_WRITE },
+                        ],
+                    }),
+                ],
+                Some(expires_on),
+            )
+            .await?;
+        Ok(TemporaryToken { id, value })
+    }
+
+    async fn revoke_token(&self, id: &str) -> Result<()> {
+        let (status, envelope) = self
+            .call::<serde_json::Value>(
+                &self.setup_token,
+                reqwest::Method::DELETE,
+                &format!("/user/tokens/{id}"),
+                None,
+            )
+            .await?;
+        if envelope.success {
+            return Ok(());
+        }
+        Err(anyhow!(
+            "could not revoke the temporary setup token ({status}): {}",
+            describe(&envelope.errors)
+        ))
+    }
+
     /// Runs the whole flow and returns only what fn0 is allowed to see.
     pub async fn run(&self, project_id: &str) -> Result<Provisioned> {
         self.verify().await?;
-        let zone_name = self.zone_name().await?;
+        let provisioning = self.mint_provisioning_token(project_id).await?;
+        let result = self.provision(&provisioning.value, project_id).await;
+        // Best effort, and reported rather than swallowed: the token expires on
+        // its own, but a user who has to wait for that should know why.
+        if let Err(error) = self.revoke_token(&provisioning.id).await {
+            eprintln!(
+                "warning: {error}. It expires by itself within \
+                 {PROVISIONING_TOKEN_MINUTES} minutes."
+            );
+        }
+        result
+    }
+
+    async fn provision(&self, token: &str, project_id: &str) -> Result<Provisioned> {
+        let zone_name = self.zone_name(token).await?;
         let static_hostname = format!("static.{zone_name}");
 
         let object_bucket = format!("fn0-object-storage-{project_id}");
@@ -348,13 +460,13 @@ impl Provisioner {
         let page_bucket = "fn0-static-page".to_string();
 
         for bucket in [&object_bucket, &asset_bucket, &page_bucket] {
-            self.create_bucket(bucket).await?;
+            self.create_bucket(token, bucket).await?;
         }
-        self.put_cors(&object_bucket).await?;
-        self.put_cors(&asset_bucket).await?;
-        self.attach_custom_domain(&asset_bucket, &static_hostname)
+        self.put_cors(token, &object_bucket).await?;
+        self.put_cors(token, &asset_bucket).await?;
+        self.attach_custom_domain(token, &asset_bucket, &static_hostname)
             .await?;
-        self.ensure_cache_rule(&static_hostname).await?;
+        self.ensure_cache_rule(token, &static_hostname).await?;
 
         let resources: serde_json::Map<String, serde_json::Value> =
             [&object_bucket, &asset_bucket, &page_bucket]
@@ -371,29 +483,31 @@ impl Provisioner {
                 .collect();
 
         let (dataplane_access_key_id, dataplane_token) = self
-            .mint_token(
+            .mint_with_expiry(
                 &format!("fn0 data plane ({project_id})"),
-                serde_json::json!({
+                vec![serde_json::json!({
                     "effect": "allow",
                     "resources": resources,
                     "permission_groups": [
                         { "id": R2_BUCKET_ITEM_READ },
                         { "id": R2_BUCKET_ITEM_WRITE },
                     ],
-                }),
+                })],
+                None,
             )
             .await?;
 
         let (_, purge_token) = self
-            .mint_token(
+            .mint_with_expiry(
                 &format!("fn0 cache purge ({project_id})"),
-                serde_json::json!({
+                vec![serde_json::json!({
                     "effect": "allow",
                     "resources": {
                         format!("com.cloudflare.api.account.zone.{}", self.zone_id): "*",
                     },
                     "permission_groups": [{ "id": CACHE_PURGE }],
-                }),
+                })],
+                None,
             )
             .await?;
 
@@ -414,9 +528,26 @@ impl Provisioner {
     ///
     /// The key pair is generated here and the private key is sent to fn0
     /// alongside the certificate, because the worker has to present it during
-    /// the TLS handshake. The signing token is not: fn0 can serve the
-    /// certificate it was given and cannot mint another.
+    /// the TLS handshake. Nothing that can sign another one is: the token that
+    /// did the signing is revoked before this returns.
     pub async fn issue_origin_certificate(&self, hostname: &str) -> Result<IssuedCertificate> {
+        self.verify().await?;
+        let signing = self.mint_provisioning_token(hostname).await?;
+        let result = self.sign_origin_certificate(&signing.value, hostname).await;
+        if let Err(error) = self.revoke_token(&signing.id).await {
+            eprintln!(
+                "warning: {error}. It expires by itself within \
+                 {PROVISIONING_TOKEN_MINUTES} minutes."
+            );
+        }
+        result
+    }
+
+    async fn sign_origin_certificate(
+        &self,
+        token: &str,
+        hostname: &str,
+    ) -> Result<IssuedCertificate> {
         #[derive(Serialize)]
         struct Body<'a> {
             csr: &'a str,
@@ -445,6 +576,7 @@ impl Provisioner {
 
         let (status, envelope) = self
             .call::<Certificate>(
+                token,
                 reqwest::Method::POST,
                 "/certificates",
                 Some(serde_json::to_value(Body {
@@ -455,12 +587,15 @@ impl Provisioner {
                 })?),
             )
             .await?;
-        let certificate = envelope.result.filter(|_| envelope.success).ok_or_else(|| {
-            anyhow!(
-                "Cloudflare would not sign the origin certificate ({status}). The token needs Zone -> SSL and Certificates -> Edit. {}",
-                describe(&envelope.errors)
-            )
-        })?;
+        let certificate = envelope
+            .result
+            .filter(|_| envelope.success)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Cloudflare would not sign the origin certificate ({status}): {}",
+                    describe(&envelope.errors)
+                )
+            })?;
 
         Ok(IssuedCertificate {
             certificate_pem: certificate.certificate,

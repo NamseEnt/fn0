@@ -38,30 +38,26 @@ assets get served from.
 ## 1. Create the setup token
 
 Cloudflare dashboard → **My Profile → API Tokens → Create Token → Create
-Custom Token**. Give it:
+Custom Token**. Give it exactly one permission:
 
-| Scope | Permission | Why |
-| --- | --- | --- |
-| Account | Workers R2 Storage → Edit | Create the buckets and attach the CDN hostname |
-| Zone | Zone → Read | Resolve your zone's name |
-| Zone | Cache Rules → Edit | Create the cache rule that makes the assets hostname cacheable and purgeable |
-| Zone | SSL and Certificates → Edit | Sign the origin certificate for a custom domain |
-| User | API Tokens → Edit | Mint the two narrow tokens fn0 actually gets |
+| Scope | Permission |
+| --- | --- |
+| User | API Tokens → Edit |
 
-Restrict the zone scopes to the one zone you want to use. Every permission
-here is one the CLI actually exercises — checked by running setup with exactly
-this list and nothing more.
+That is the whole list. `forte cloudflare connect` mints everything else it
+needs from this token — including a short-lived token for the provisioning
+itself, which it revokes before it exits. Cloudflare lets a token grant
+permissions it does not hold, and refuses to let a minted token mint further
+tokens, so one checkbox is enough and the token it creates cannot widen itself.
 
-**Delete this token once setup finishes.** `API Tokens → Edit` lets it create
-any token in your account, including permissions it does not hold itself, so
-until you delete it it is a full-account credential no matter how narrow the
-rest of the list looks. Nothing fn0 runs will ever ask for it again — the two
-credentials fn0 keeps are minted during setup and are far smaller.
+**Delete this token once setup finishes.** One checkbox does not make it a
+small permission: a token that can create tokens can create *any* token in your
+account, so until you delete it, it is a full-account credential. That is why
+it stays on your machine, and why nothing fn0 runs will ever ask for it again —
+the two credentials fn0 keeps are minted during setup and are far smaller.
 
-Cache Rules is not optional. Public objects are stored with a one-year edge
-TTL and a purge is the only thing that replaces them; without this rule
-`PURGE` never reaches the edge, and overwriting an object silently keeps
-serving the old bytes.
+If the CLI dies mid-run, the provisioning token it minted expires on its own
+within ten minutes.
 
 ## 2. Connect
 
@@ -103,8 +99,8 @@ forte cloudflare status
 ## 3. Custom domain (optional)
 
 Signing an origin certificate needs a permission fn0 deliberately does not
-hold, so this command also runs the signing locally and needs the setup token
-again:
+hold, so this command also runs locally and needs the setup token again (the
+same one-permission token; the CLI mints and revokes a signing token from it):
 
 ```sh
 forte domain add app.example.com \
