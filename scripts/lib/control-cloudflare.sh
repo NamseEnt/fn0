@@ -134,6 +134,51 @@ ensure_fn0_cache_rule() {
   __cf_expect "$code" "write cache rules"
 }
 
+# mint_provisioning_token <user_token> <account_id> <zone_id> <purpose>
+# Echoes "<token_id> <token_value>".
+#
+# The token that provisions is not the token that mints. `cloudflareUserApiToken`
+# carries API Tokens -> Edit and nothing else, so it can create this one but
+# cannot write a cache rule itself; this one can provision but cannot create
+# tokens. Cloudflare grants a new token any permission the owning *user* holds,
+# not merely what the creating token holds — which is what makes the split work.
+mint_provisioning_token() {
+  local user_token="$1" account_id="$2" zone_id="$3" purpose="$4"
+  local expires body code
+  expires="$(python3 -c "import datetime; print((datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=${FN0_PROVISIONING_TOKEN_MINUTES:-15})).strftime('%Y-%m-%dT%H:%M:%SZ'))")"
+  body="$(jq -nc \
+    --arg n "fn0 setup (${purpose})" \
+    --arg exp "$expires" \
+    --arg acct "com.cloudflare.api.account.${account_id}" \
+    --arg zone "com.cloudflare.api.account.zone.${zone_id}" '{
+      name:$n,
+      expires_on:$exp,
+      policies:[
+        {effect:"allow", resources:{($acct):"*"},
+         permission_groups:[{id:"bf7481a1826f439697cb59a20b22293e"}]},
+        {effect:"allow", resources:{($zone):"*"},
+         permission_groups:[
+           {id:"c8fed203ed3043cba015a93ad1616f1f"},
+           {id:"9ff81cbbe65c400b97d92c3c1033cab6"},
+           {id:"c03055bc037c4ea9afb9a9f104b7b721"}
+         ]}
+      ]
+    }')"
+  code=$(__cf_call POST "/user/tokens" "$user_token" "$body")
+  __cf_expect "$code" "mint provisioning token (${purpose})" || return 1
+  jq -r '"\(.result.id) \(.result.value)"' < /tmp/__cf_resp.body
+}
+
+# revoke_provisioning_token <user_token> <token_id>
+revoke_provisioning_token() {
+  local user_token="$1" token_id="$2"
+  local code
+  code=$(__cf_call DELETE "/user/tokens/${token_id}" "$user_token")
+  if [[ ! "$code" =~ ^2 ]]; then
+    echo "warning: could not revoke provisioning token ${token_id} (status=${code}); it expires by itself" >&2
+  fi
+}
+
 # mint_r2_token <cf_token> <account_id> <name> <bucket>...
 # Echoes "<access_key_id> <secret_access_key>". R2 takes the SHA-256 of the
 # token value as the S3 secret access key.

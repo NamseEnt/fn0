@@ -115,12 +115,16 @@ printf '%s' "$control_env_yaml" > "$env_yaml_path"
 # other; it just cannot run `forte cloudflare connect` against itself.
 cf_account_id="$(pulumi_pick staticAssetAccountId)"
 cf_zone_id="$(pulumi_pick staticAssetZoneId)"
-cf_token="$(pulumi_pick staticAssetCloudflareApiToken)"
+# The operator's own token, the same thing `forte cloudflare connect --api-token`
+# is handed. It carries API Tokens -> Edit and nothing else, so it mints the two
+# narrow credentials below and a short-lived token to provision with — it cannot
+# write a bucket or a cache rule itself.
+cf_user_token="$(cd "${REPO_ROOT}/infra/cloud" && pulumi config get fn0Cloud:cloudflareUserApiToken)"
 vault_crypto_endpoint="$(pulumi_pick vaultCryptoEndpoint)"
 vault_key_ocid="$(pulumi_pick vaultKeyOcid)"
-if [[ -z "$cf_account_id" || -z "$cf_zone_id" || -z "$cf_token" \
+if [[ -z "$cf_account_id" || -z "$cf_zone_id" || -z "$cf_user_token" \
    || -z "$vault_crypto_endpoint" || -z "$vault_key_ocid" ]]; then
-  echo "missing pulumi outputs: staticAsset* / vaultCryptoEndpoint / vaultKeyOcid" >&2
+  echo "missing pulumi config/outputs: staticAsset* / cloudflareUserApiToken / vault*" >&2
   exit 1
 fi
 cf_zone_name="${FN0_APEX_DOMAIN:-$(pulumi_pick apexDomain)}"
@@ -129,21 +133,29 @@ if [[ -z "$cf_zone_name" ]]; then
   exit 1
 fi
 
+read -r provisioning_token_id provisioning_token < <(mint_provisioning_token \
+  "$cf_user_token" "$cf_account_id" "$cf_zone_id" "$CONTROL_PROJECT_ID")
+if [[ -z "${provisioning_token_id:-}" || -z "${provisioning_token:-}" ]]; then
+  echo "could not mint a provisioning token; check that cloudflareUserApiToken has User -> API Tokens -> Edit" >&2
+  exit 1
+fi
+trap 'revoke_provisioning_token "$cf_user_token" "$provisioning_token_id"; rm -rf "$work_dir"' EXIT
+
 provision_control_cloudflare \
-  "$cf_account_id" "$cf_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID"
+  "$cf_account_id" "$provisioning_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID"
 
 # Minted here rather than taken from the stack: these are the same narrow
 # credentials `forte cloudflare connect` produces, and pulumi no longer holds
 # an account-wide R2 token to hand out instead.
 read -r worker_key_id worker_secret < <(mint_r2_token \
-  "$cf_token" "$cf_account_id" "fn0 worker (${CONTROL_PROJECT_ID})" \
+  "$cf_user_token" "$cf_account_id" "fn0 worker (${CONTROL_PROJECT_ID})" \
   "fn0-${CONTROL_PROJECT_ID}-private-object-storage" \
   "fn0-${CONTROL_PROJECT_ID}-public-object-storage" \
   "fn0-${CONTROL_PROJECT_ID}-rendered-html-cache")
 read -r asset_key_id asset_secret < <(mint_r2_token \
-  "$cf_token" "$cf_account_id" "fn0 frontend assets (${CONTROL_PROJECT_ID})" \
+  "$cf_user_token" "$cf_account_id" "fn0 frontend assets (${CONTROL_PROJECT_ID})" \
   "fn0-${CONTROL_PROJECT_ID}-frontend-asset")
-purge_token="$(mint_purge_token "$cf_token" "$cf_zone_id" "fn0 cache purge (${CONTROL_PROJECT_ID})")"
+purge_token="$(mint_purge_token "$cf_user_token" "$cf_zone_id" "fn0 cache purge (${CONTROL_PROJECT_ID})")"
 
 worker_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$worker_secret")"
 asset_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$asset_secret")"
