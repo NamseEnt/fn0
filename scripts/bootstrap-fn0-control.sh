@@ -57,6 +57,7 @@ need oci
 need curl
 need tar
 need uuidgen
+need python3
 
 load_pulumi_outputs
 
@@ -138,11 +139,12 @@ upload_fe_dist \
   "$static_bucket" "$build_id" "${REPO_ROOT}/fn0/control/fe/dist"
 
 # Step 4-5 — R2 upload of original/ + cwasm-compiler invoke. code_version =
-# epoch seconds (monotonic across re-runs; the worker treats each as a new
-# version, but the manifest below only references the latest one). Decide it
-# up front so the same value is embedded in both R2 key and the cwasm output
-# key.
-code_version="$(date +%s)"
+# epoch milliseconds, the same unit control's deploy action mints. Seconds would
+# read as older than every bundle a normal deploy ever produced, and bundle_gc
+# only drops a version below the current one — so a bootstrap-seeded control
+# would leave the bundle it replaced in R2 forever. Decide it up front so the
+# same value is embedded in both R2 key and the cwasm output key.
+code_version="$(python3 -c 'import time; print(int(time.time() * 1000))')"
 upload_r2_original "$CONTROL_PROJECT_ID" "$code_version" "$bundle_path"
 compile_via_cwasm "$CONTROL_PROJECT_ID" "$code_version" "$target_wasmtime" "$CWASM_LAMBDA_FUNCTION_NAME"
 
