@@ -306,6 +306,9 @@ impl Provisioner {
     }
 
     async fn attach_custom_domain(&self, token: &str, bucket: &str, hostname: &str) -> Result<()> {
+        if self.custom_domain_present(token, bucket, hostname).await {
+            return Ok(());
+        }
         let (status, envelope) = self
             .call::<serde_json::Value>(
                 token,
@@ -328,6 +331,49 @@ impl Provisioner {
             "could not point {hostname} at {bucket} ({status}): {}",
             describe(&envelope.errors)
         ))
+    }
+
+    /// Whether `hostname` is already attached to `bucket` specifically.
+    ///
+    /// Cloudflare answers "already in use" for a hostname attached to any
+    /// bucket, and [`already_exists`] deliberately refuses to read that as
+    /// success — pointed at someone else's bucket it would serve 404s. Asking
+    /// this bucket first is what makes a retry after a partial provision
+    /// distinguishable from that.
+    async fn custom_domain_present(&self, token: &str, bucket: &str, hostname: &str) -> bool {
+        #[derive(Deserialize)]
+        struct Domain {
+            domain: String,
+        }
+        #[derive(Deserialize)]
+        struct Domains {
+            #[serde(default)]
+            domains: Vec<Domain>,
+        }
+
+        let Ok((_, envelope)) = self
+            .call::<Domains>(
+                token,
+                reqwest::Method::GET,
+                &format!(
+                    "/accounts/{}/r2/buckets/{bucket}/domains/custom",
+                    self.account_id
+                ),
+                None,
+            )
+            .await
+        else {
+            return false;
+        };
+        envelope
+            .result
+            .filter(|_| envelope.success)
+            .is_some_and(|listed| {
+                listed
+                    .domains
+                    .iter()
+                    .any(|attached| attached.domain == hostname)
+            })
     }
 
     /// Adds the cache rule fn0's public hostnames need, keeping every other rule

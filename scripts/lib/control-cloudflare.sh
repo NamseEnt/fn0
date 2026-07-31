@@ -83,10 +83,19 @@ provision_control_cloudflare() {
   # address it serves from cannot drift apart.
   for bucket in "$asset_bucket" "$public_bucket"; do
     local hostname="${bucket}.${zone_name}"
-    echo ">> attach ${hostname} -> ${bucket}"
-    body=$(jq -nc --arg d "$hostname" --arg z "$zone_id" '{domain:$d, zoneId:$z, enabled:true, minTLS:"1.2"}')
-    code=$(__cf_call POST "/accounts/${account_id}/r2/buckets/${bucket}/custom_domains" "$cf_token" "$body")
-    __cf_expect "$code" "attach ${hostname}" allow_exists || return 1
+    # "Domain already in use" means attached to *some* bucket, which is a
+    # failure worth reporting unless the bucket is this one — as it is on a
+    # re-run. Asking which bucket holds it separates the two.
+    code=$(__cf_call GET "/accounts/${account_id}/r2/buckets/${bucket}/domains/custom" "$cf_token")
+    if [[ "$code" =~ ^2 ]] && jq -e --arg d "$hostname" \
+      '[(.result.domains // .result // [])[] | .domain] | index($d)' < /tmp/__cf_resp.body >/dev/null 2>&1; then
+      echo ">> ${hostname} already points at ${bucket}"
+    else
+      echo ">> attach ${hostname} -> ${bucket}"
+      body=$(jq -nc --arg d "$hostname" --arg z "$zone_id" '{domain:$d, zoneId:$z, enabled:true, minTLS:"1.2"}')
+      code=$(__cf_call POST "/accounts/${account_id}/r2/buckets/${bucket}/custom_domains" "$cf_token" "$body")
+      __cf_expect "$code" "attach ${hostname}" allow_exists || return 1
+    fi
 
     # The POST answers enabled:false even when asked for true. Idempotent.
     body='{"enabled":true}'
