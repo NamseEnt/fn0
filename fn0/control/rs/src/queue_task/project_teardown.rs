@@ -27,12 +27,14 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     let db = doc_db::turso();
     let now = forte_sdk::now();
 
-    let storage = ProjectStorage::resolve(&db, &project_id).await?;
+    let storage = ProjectStorage::resolve_if_connected(&db, &project_id).await?;
 
     delete_custom_domain(&db, &project_id).await?;
     remove_routing_and_cron(&db, &project_id).await?;
     delete_bundle_store_objects(&project_id, now).await?;
-    empty_project_buckets(&project_id, &storage, now).await?;
+    if let Some(storage) = &storage {
+        empty_project_buckets(&project_id, storage, now).await?;
+    }
     delete_cloudflare_config(&db, &project_id).await?;
     delete_turso_database(&project_id).await?;
     delete_compiled_bundle_docs(&db, &project_id).await?;

@@ -53,15 +53,30 @@ impl ProjectStorage {
     /// The account this project's objects live in: the owner's if they have
     /// connected one, the platform's otherwise.
     pub async fn resolve(db: &doc_db::Database, project_id: &str) -> anyhow::Result<Self> {
-        match (ProjectCloudflareConfigDocGet { project_id })
-            .send_with(db)
-            .await?
-        {
-            Some(config) => Self::from_config(config).await,
+        match Self::resolve_if_connected(db, project_id).await? {
+            Some(storage) => Ok(storage),
             None => anyhow::bail!(
                 "project {project_id} has no Cloudflare account connected; \
                  run `forte cloudflare connect`"
             ),
+        }
+    }
+
+    /// For the callers that have something to do either way. Tearing a project
+    /// down is the case that matters: a project that was created and never
+    /// connected owns no buckets, but it still owns a bundle, a database and
+    /// its identity documents, and [`resolve`](Self::resolve) failing would
+    /// leave those behind forever on a queue that redelivers.
+    pub async fn resolve_if_connected(
+        db: &doc_db::Database,
+        project_id: &str,
+    ) -> anyhow::Result<Option<Self>> {
+        match (ProjectCloudflareConfigDocGet { project_id })
+            .send_with(db)
+            .await?
+        {
+            Some(config) => Self::from_config(config).await.map(Some),
+            None => Ok(None),
         }
     }
 

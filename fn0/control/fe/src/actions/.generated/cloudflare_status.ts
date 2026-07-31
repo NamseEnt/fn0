@@ -9,15 +9,18 @@ const InputSchema = z.object({
 
 const OutputSchema = z.discriminatedUnion("t", [
     z.object({
-    t: z.literal("Platform"),
+    t: z.literal("NotConnected"),
   }),
     z.object({
     t: z.literal("Connected"),
     accountId: z.string(),
     zoneName: z.string(),
-    staticHostname: z.string(),
-    assetBucket: z.string(),
-    pageBucket: z.string(),
+    frontendAssetHostname: z.string(),
+    publicObjectStorageHostname: z.string(),
+    frontendAssetBucket: z.string(),
+    publicObjectStorageBucket: z.string(),
+    privateObjectStorageBucket: z.string(),
+    renderedHtmlCacheBucket: z.string(),
     healthy: z.boolean(),
     problem: z.string().optional(),
   }),
