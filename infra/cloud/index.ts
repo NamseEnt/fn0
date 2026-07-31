@@ -346,36 +346,6 @@ const metricsBasicAuthSecret = new random.RandomBytes(
   { length: 24 },
 );
 
-const staticAssetStorage = new fn0.StaticAssetStorage(
-  "static-asset-storage",
-  {
-    accountId,
-    zoneId,
-    publicBaseDomain: `static.${domain}`,
-    bucketName: pulumi.interpolate`fn0-static-asset-${suffix}`,
-    cloudflareUserApiToken: config.requireSecret("cloudflareUserApiToken"),
-  },
-  {},
-);
-
-const staticPageStorage = new fn0.StaticPageStorage(
-  "static-page-storage",
-  {
-    accountId,
-    bucketName: pulumi.interpolate`fn0-static-page-${suffix}`,
-  },
-  {},
-);
-
-const objectStorageStorage = new fn0.ObjectStorageStorage(
-  "object-storage-storage",
-  {
-    accountId,
-    cloudflareUserApiToken: config.requireSecret("cloudflareUserApiToken"),
-  },
-  {},
-);
-
 const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
   "bundle-store-r2-worker",
   {
@@ -704,18 +674,8 @@ export const workerBastionId = ociFn0WorkerSite.bastionId;
 // because it cannot call `forte cloudflare connect` against a control plane
 // that is not serving yet.
 export const apexDomain = domain;
-export const staticAssetAccountId = staticAssetStorage.accountId;
-export const staticAssetPublicBaseDomain = staticAssetStorage.publicBaseDomain;
-export const staticAssetZoneId = staticAssetStorage.zoneId;
-export const staticAssetPresignAccessKeyId = pulumi.secret(
-  staticAssetStorage.presignAccessKeyId,
-);
-export const staticAssetPresignSecretAccessKey = pulumi.secret(
-  staticAssetStorage.presignSecretAccessKey,
-);
-export const staticAssetCloudflareApiToken = pulumi.secret(
-  staticAssetStorage.cloudflareApiToken,
-);
+export const cloudflareAccountId = accountId;
+export const cloudflareZoneId = zoneId;
 export const metricsWriteUrl = `https://${metricsHostname}/api/v1/write`;
 export const metricsQueryUrl = `https://${metricsHostname}`;
 export const metricsOtlpUrl = `https://${metricsHostname}/opentelemetry`;
@@ -730,11 +690,4 @@ export const metricsBackupR2AccessKeyId = pulumi.secret(
 );
 export const metricsBackupR2SecretAccessKey = pulumi.secret(
   metricsBackupR2.secretAccessKey,
-);
-export const objectStorageAccountId = objectStorageStorage.accountId;
-export const objectStorageAccessKeyId = pulumi.secret(
-  objectStorageStorage.accessKeyId,
-);
-export const objectStorageSecretAccessKey = pulumi.secret(
-  objectStorageStorage.secretAccessKey,
 );

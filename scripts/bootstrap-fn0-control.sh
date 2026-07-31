@@ -113,8 +113,8 @@ printf '%s' "$control_env_yaml" > "$env_yaml_path"
 # against a stable build_id, so vite emits real asset URLs instead of the
 # __FORTE_BASE__ placeholder. fn0-control is a connected project like any
 # other; it just cannot run `forte cloudflare connect` against itself.
-cf_account_id="$(pulumi_pick staticAssetAccountId)"
-cf_zone_id="$(pulumi_pick staticAssetZoneId)"
+cf_account_id="$(pulumi_pick cloudflareAccountId)"
+cf_zone_id="$(pulumi_pick cloudflareZoneId)"
 # The operator's own token, the same thing `forte cloudflare connect --api-token`
 # is handed. It carries API Tokens -> Edit and nothing else, so it mints the two
 # narrow credentials below and a short-lived token to provision with — it cannot
@@ -124,7 +124,7 @@ vault_crypto_endpoint="$(pulumi_pick vaultCryptoEndpoint)"
 vault_key_ocid="$(pulumi_pick vaultKeyOcid)"
 if [[ -z "$cf_account_id" || -z "$cf_zone_id" || -z "$cf_user_token" \
    || -z "$vault_crypto_endpoint" || -z "$vault_key_ocid" ]]; then
-  echo "missing pulumi config/outputs: staticAsset* / cloudflareUserApiToken / vault*" >&2
+  echo "missing pulumi config/outputs: cloudflare* / vault*" >&2
   exit 1
 fi
 cf_zone_name="${FN0_APEX_DOMAIN:-$(pulumi_pick apexDomain)}"
