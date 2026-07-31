@@ -176,7 +176,7 @@ seed_worker_manifest() {
     --argjson cv "$code_version" \
     --arg dom "$custom_domain" \
     --argjson floor "$code_version" '
-      .project_manifests[$pid] = {code_version:$cv, custom_domain:(if $dom == "" then null else $dom end), static_cache_state:"active", pending_code_version:null}
+      .project_manifests[$pid] = ((.project_manifests[$pid] // {}) + {code_version:$cv, custom_domain:(if $dom == "" then null else $dom end), static_cache_state:"active", pending_code_version:null})
       | .manifest_version = ([(.manifest_version // 0) + 1, $floor] | max)
     ' <<<"$existing_data")"
 
@@ -283,4 +283,53 @@ seed_cloudflare_config() {
     }')"
   echo ">> seed ProjectCloudflareConfigDoc project_id=${project_id}"
   __upsert_doc "$db_url" "$db_token" "ProjectCloudflareConfigDoc/project_id=${project_id}" "" "$data"
+}
+
+# seed_manifest_storage <db_url> <db_token> <project_id>
+#
+# The bash half of `connect_project`, which is what puts a connected project's
+# storage in front of the fleet. Seeding ProjectCloudflareConfigDoc alone tells
+# control where the buckets are but leaves workers with no target, so the
+# project's guest code gets no object storage and no rendered-HTML cache.
+#
+# Derived from the seeded config rather than from the caller's variables so the
+# bucket names have exactly one source.
+seed_manifest_storage() {
+  local db_url="$1" db_token="$2" project_id="$3"
+  local https_url config storage existing merged
+  https_url="${db_url/libsql:\/\//https://}"
+  https_url="${https_url%/}"
+
+  config="$(__select_doc_data "$https_url" "$db_token" \
+    "ProjectCloudflareConfigDoc/project_id=${project_id}" "")"
+  if [[ -z "$config" ]]; then
+    echo "seed_manifest_storage: no ProjectCloudflareConfigDoc for ${project_id}" >&2
+    return 1
+  fi
+
+  storage="$(jq -c '{
+    account_id,
+    region: "auto",
+    credential: {access_key_id: .worker_access_key_id, secret_ciphertext: .worker_secret_ciphertext},
+    private_object_storage_bucket,
+    public_object_storage_bucket,
+    public_object_storage_base_url: ("https://" + .public_object_storage_hostname),
+    rendered_html_cache_bucket,
+    config_version
+  }' <<<"$config")"
+
+  existing="$(__select_doc_data "$https_url" "$db_token" "WorkerManifestDoc" "")"
+  if [[ -z "$existing" ]]; then
+    echo "seed_manifest_storage: no WorkerManifestDoc; seed the manifest first" >&2
+    return 1
+  fi
+
+  merged="$(jq -c --arg pid "$project_id" --argjson storage "$storage" '
+    if .project_manifests[$pid].storage == $storage then .
+    else .project_manifests[$pid].storage = $storage | .manifest_version += 1
+    end
+  ' <<<"$existing")"
+
+  echo ">> seed WorkerManifestDoc storage for project=${project_id} manifest_version=$(jq -r '.manifest_version' <<<"$merged")"
+  __upsert_doc "$db_url" "$db_token" "WorkerManifestDoc" "" "$merged"
 }

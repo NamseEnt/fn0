@@ -15,7 +15,8 @@
 #   6. Seed the fn0-control turso database with:
 #        - Fn0WasmtimeVersionDoc (active=<wasmtime>)
 #        - CompiledBundleDoc (project_id=fn0-control, code_version=<cv>)
-#        - WorkerManifestDoc (fn0-control mapped to its custom_domain)
+#        - WorkerManifestDoc (fn0-control mapped to its custom_domain, and its
+#          storage target so workers can reach the buckets)
 #        - ProjectCloudflareConfigDoc (the buckets and credentials step 3a made)
 #   7. Seed the worker-agent turso database (fn0-doc-db) with
 #      TargetFn0WorkerConfigDoc.image_ref = <new fn0-worker image_ref>.
@@ -195,6 +196,7 @@ seed_cloudflare_config "$control_db_url" "$forte_group_token" \
   "$CONTROL_PROJECT_ID" "$cf_account_id" "$cf_zone_id" "$cf_zone_name" \
   "$worker_key_id" "$worker_secret_ct" \
   "$asset_key_id" "$asset_secret_ct" "$purge_token_ct"
+seed_manifest_storage "$control_db_url" "$forte_group_token" "$CONTROL_PROJECT_ID"
 
 # Step 7 — seed the worker-agent's rollout target into the same control DB.
 seed_target_fn0_worker_config "$control_db_url" "$forte_group_token" "$worker_image_ref"
