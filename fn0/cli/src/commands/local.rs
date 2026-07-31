@@ -5,7 +5,7 @@ use fn0::execute::ClientState;
 use fn0::measure_cpu_time::SystemClock;
 use fn0::wasmtime::Engine;
 use fn0::wasmtime::component::Linker;
-use fn0::{CodeExecutor, ExecutionContext, StaticPageStorage};
+use fn0::{CodeExecutor, ExecutionContext, RenderedHtmlCache};
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -41,7 +41,7 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     let cache = LocalCache::new(wasm_path, engine.clone(), linker.clone());
     let ctx = Arc::new(
         ExecutionContext::new(engine, linker, cache)
-            .with_static_page_storage(Arc::new(InMemoryStaticPageStore::default())),
+            .with_rendered_html_cache(Arc::new(InMemoryRenderedHtmlCache::default())),
     );
     let executor = Rc::new(CodeExecutor::new(ctx));
 
@@ -139,17 +139,17 @@ impl LocalCache {
 }
 
 #[derive(Default)]
-struct InMemoryStaticPageStore {
-    pages: Mutex<HashMap<String, Bytes>>,
+struct InMemoryRenderedHtmlCache {
+    rendered_html: Mutex<HashMap<String, Bytes>>,
 }
 
-impl StaticPageStorage for InMemoryStaticPageStore {
+impl RenderedHtmlCache for InMemoryRenderedHtmlCache {
     fn read<'storage>(
         &'storage self,
         _project_id: &'storage str,
         key: &'storage str,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Bytes>>> + Send + 'storage>> {
-        let found = self.pages.lock().unwrap().get(key).cloned();
+        let found = self.rendered_html.lock().unwrap().get(key).cloned();
         Box::pin(async move { Ok(found) })
     }
 
@@ -159,7 +159,10 @@ impl StaticPageStorage for InMemoryStaticPageStore {
         key: &'storage str,
         body: Bytes,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'storage>> {
-        self.pages.lock().unwrap().insert(key.to_string(), body);
+        self.rendered_html
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), body);
         Box::pin(async move { Ok(()) })
     }
 }
