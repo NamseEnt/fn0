@@ -73,6 +73,9 @@ get_fn0_wasmtime_version_doc() {
   rm -f "$resp_file"
 }
 
+# An action's Output enum comes back in forte-json's shape: the variant name is a
+# `t` field, and a struct variant's fields sit beside it rather than nested under
+# it — `{"t":"Ok","old_active":"..."}`, not `{"Ok":{"old_active":"..."}}`.
 # Calls control set_pending_fn0_wasmtime admin action. Idempotent.
 control_set_pending_fn0_wasmtime() {
   local version="$1"
@@ -82,7 +85,7 @@ control_set_pending_fn0_wasmtime() {
     echo "set_pending_fn0_wasmtime failed: ${resp}" >&2
     return 1
   fi
-  outcome="$(jq -r 'if type == "string" then . else (keys[0]) end' <<<"$resp")"
+  outcome="$(jq -r '.t' <<<"$resp")"
   case "$outcome" in
     Ok) ;;
     Unauthorized) echo "admin token rejected (set_pending)" >&2; return 1 ;;
@@ -99,13 +102,10 @@ control_promote_pending_fn0_wasmtime() {
     echo "promote_pending_fn0_wasmtime failed: ${resp}" >&2
     return 1
   fi
-  outcome="$(jq -r '
-    if type == "string" then .
-    elif has("Ok") then "Ok"
-    else (keys[0]) end' <<<"$resp")"
+  outcome="$(jq -r '.t' <<<"$resp")"
   case "$outcome" in
     Ok)
-      jq -c '.Ok' <<<"$resp"
+      jq -c 'del(.t)' <<<"$resp"
       ;;
     NoPending)
       echo ""
