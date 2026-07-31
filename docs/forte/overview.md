@@ -42,9 +42,9 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 | Package | Version | Crate | Purpose |
 |---|---|---|---|
 | `forte-sdk` | 0.7.0 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
-| `forte-cli` | 0.4.10 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
+| `forte-cli` | 0.5.1 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
 | `forte-macros` | 0.6.0 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
-| `forte-json` | 0.1.1 | `forte/json` | Streaming JSON serializer used for Props serialization |
+| `forte-json` | 0.1.2 | `forte/json` | Streaming JSON serializer used for Props serialization |
 | `forte-codegen` | 0.4.0 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
 | `forte-wit` | 0.2.0 | `forte/wit` | Embeds the WASI WIT definitions (wasi:http p3 world); provides `extract_wit()` for build scripts |
 | `forte-test-runner` | 0.1.0 | `forte/test-runner` | Binary used as the `[target.wasm32-wasip2] runner`; drives `fn0:test-harness/harness` exports test by test |

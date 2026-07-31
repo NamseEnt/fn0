@@ -1,6 +1,6 @@
 # fn0 Platform Overview
 
-fn0 (pronounced "f-n-zero") is a FaaS (Function-as-a-Service) platform powered by [Wasmtime](https://wasmtime.dev/). It executes WebAssembly components compiled to WASI 0.2 (Component Model).
+fn0 (pronounced "f-n-zero") is a FaaS (Function-as-a-Service) platform powered by [Wasmtime](https://wasmtime.dev/). It executes WebAssembly components compiled to WASI 0.3.0 (Component Model).
 
 ## Core Concepts
 
@@ -51,14 +51,14 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.3.0 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
-| `fn0-cli` | 0.1.10 | Local development CLI |
-| `fn0-worker` | 0.3.59 | Worker binary (distributed execution node) |
+| `fn0` | 0.5.0 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0-cli` | 0.1.15 | Local development CLI |
+| `fn0-worker` | 0.4.0 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.6 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.0 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
-| `fn0-deploy` | 0.1.19 | fn0 Cloud deployment client |
+| `fn0-deploy` | 0.2.1 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.2.0 | Wasmtime wrapper with fn0-specific config |
-| `fn0-ski` | 0.1.7 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
+| `fn0-ski` | 0.1.8 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | CLI tool: compiles `.wasm` → `.cwasm` (Wasmtime pre-compiled native format); used internally by the platform |
 
 ## fn0-cli Commands

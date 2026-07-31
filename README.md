@@ -8,7 +8,7 @@
 
 ## Features
 
-- Any program that can be built into Wasm (WASI 0.2 - Component Model) can run on fn0.
+- Any program that can be built into Wasm (WASI 0.3.0 - Component Model) can run on fn0.
 - You can easily run the server in a local development environment using the CLI.
 - You can run the fn0 platform on various cloud providers using Adapters.
 - Instead of managing the platform yourself, you can conveniently use fn0 Cloud, a managed service.
