@@ -699,6 +699,11 @@ export const bundleStoreR2QueueId = bundleStoreR2.queueId;
 export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
 export const workerCompartmentId = ociFn0WorkerSite.compartmentId;
 export const workerBastionId = ociFn0WorkerSite.bastionId;
+// The operator's own Cloudflare account and zone. fn0-control is a connected
+// project like any other, and `bootstrap-fn0-control.sh` provisions it here
+// because it cannot call `forte cloudflare connect` against a control plane
+// that is not serving yet.
+export const apexDomain = domain;
 export const staticAssetAccountId = staticAssetStorage.accountId;
 export const staticAssetPublicBaseDomain = staticAssetStorage.publicBaseDomain;
 export const staticAssetZoneId = staticAssetStorage.zoneId;

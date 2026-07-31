@@ -236,3 +236,51 @@ seed_target_fn0_worker_config() {
   echo ">> seed TargetFn0WorkerConfigDoc image_ref=${image_ref}"
   __upsert_doc "$db_url" "$db_token" "TargetFn0WorkerConfigDoc" "" "$data"
 }
+
+# seed_cloudflare_config <db_url> <db_token> <project_id> <account_id> <zone_id>
+#   <zone_name> <worker_key_id> <worker_secret_ct> <asset_key_id>
+#   <asset_secret_ct> <purge_token_ct>
+#
+# Stands in for the `cloudflare_connect` action, which cannot run here because
+# it posts to a control plane that is not serving yet. Upsert rather than
+# insert-only: connect refuses a project that is already connected, so a
+# re-bootstrap has no other way to correct a credential.
+seed_cloudflare_config() {
+  local db_url="$1" db_token="$2" project_id="$3" account_id="$4" zone_id="$5" zone_name="$6"
+  local worker_key_id="$7" worker_secret_ct="$8"
+  local asset_key_id="$9" asset_secret_ct="${10}" purge_token_ct="${11}"
+  local checked_at data
+  checked_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  data="$(jq -nc \
+    --arg pid "$project_id" \
+    --arg acct "$account_id" \
+    --arg zid "$zone_id" \
+    --arg zname "$zone_name" \
+    --arg wkey "$worker_key_id" \
+    --arg wsec "$worker_secret_ct" \
+    --arg akey "$asset_key_id" \
+    --arg asec "$asset_secret_ct" \
+    --arg purge "$purge_token_ct" \
+    --arg checked "$checked_at" '{
+      project_id:$pid,
+      account_id:$acct,
+      zone_id:$zid,
+      zone_name:$zname,
+      frontend_asset_hostname:("fn0-" + $pid + "-frontend-asset." + $zname),
+      public_object_storage_hostname:("fn0-" + $pid + "-public-object-storage." + $zname),
+      private_object_storage_bucket:("fn0-" + $pid + "-private-object-storage"),
+      public_object_storage_bucket:("fn0-" + $pid + "-public-object-storage"),
+      frontend_asset_bucket:("fn0-" + $pid + "-frontend-asset"),
+      rendered_html_cache_bucket:("fn0-" + $pid + "-rendered-html-cache"),
+      worker_access_key_id:$wkey,
+      worker_secret_ciphertext:$wsec,
+      frontend_asset_access_key_id:$akey,
+      frontend_asset_secret_ciphertext:$asec,
+      purge_token_ciphertext:$purge,
+      state:"Ok",
+      checked_at:$checked,
+      config_version:1
+    }')"
+  echo ">> seed ProjectCloudflareConfigDoc project_id=${project_id}"
+  __upsert_doc "$db_url" "$db_token" "ProjectCloudflareConfigDoc/project_id=${project_id}" "" "$data"
+}

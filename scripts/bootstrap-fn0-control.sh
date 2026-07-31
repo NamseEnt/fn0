@@ -16,6 +16,7 @@
 #        - Fn0WasmtimeVersionDoc (active=<wasmtime>)
 #        - CompiledBundleDoc (project_id=fn0-control, code_version=<cv>)
 #        - WorkerManifestDoc (fn0-control mapped to its custom_domain)
+#        - ProjectCloudflareConfigDoc (the buckets and credentials step 3a made)
 #   7. Seed the worker-agent turso database (fn0-doc-db) with
 #      TargetFn0WorkerConfigDoc.image_ref = <new fn0-worker image_ref>.
 #
@@ -43,6 +44,8 @@ source "${REPO_ROOT}/scripts/lib/worker-image.sh"
 source "${REPO_ROOT}/scripts/lib/control-bundle.sh"
 # shellcheck source=lib/control-deploy.sh
 source "${REPO_ROOT}/scripts/lib/control-deploy.sh"
+# shellcheck source=lib/control-cloudflare.sh
+source "${REPO_ROOT}/scripts/lib/control-cloudflare.sh"
 # shellcheck source=lib/control-seed.sh
 source "${REPO_ROOT}/scripts/lib/control-seed.sh"
 # shellcheck source=lib/control-static-upload.sh
@@ -105,37 +108,56 @@ fi
 env_yaml_path="${work_dir}/env.yaml"
 printf '%s' "$control_env_yaml" > "$env_yaml_path"
 
-# 3a — provision fn0-control static-asset R2 bucket (idempotent) and build
-# the frontend against a stable build_id so vite emits real asset URLs
-# under https://{project_id}.{public_base_domain}/{build_id}/ instead of
-# the __FORTE_BASE__ placeholder. We then upload fe/dist after forte build.
-static_asset_account_id="$(pulumi_pick staticAssetAccountId)"
-static_asset_public_base_domain="$(pulumi_pick staticAssetPublicBaseDomain)"
-static_asset_zone_id="$(pulumi_pick staticAssetZoneId)"
-static_asset_cf_token="$(pulumi_pick staticAssetCloudflareApiToken)"
-static_asset_access_key="$(pulumi_pick staticAssetPresignAccessKeyId)"
-static_asset_secret_key="$(pulumi_pick staticAssetPresignSecretAccessKey)"
-if [[ -z "$static_asset_account_id" || -z "$static_asset_public_base_domain" \
-   || -z "$static_asset_zone_id" || -z "$static_asset_cf_token" \
-   || -z "$static_asset_access_key" || -z "$static_asset_secret_key" ]]; then
-  echo "missing pulumi outputs for static asset storage (staticAsset* family)" >&2
+# 3a — provision fn0-control's own Cloudflare resources and build the frontend
+# against a stable build_id, so vite emits real asset URLs instead of the
+# __FORTE_BASE__ placeholder. fn0-control is a connected project like any
+# other; it just cannot run `forte cloudflare connect` against itself.
+cf_account_id="$(pulumi_pick staticAssetAccountId)"
+cf_zone_id="$(pulumi_pick staticAssetZoneId)"
+cf_token="$(pulumi_pick staticAssetCloudflareApiToken)"
+vault_crypto_endpoint="$(pulumi_pick vaultCryptoEndpoint)"
+vault_key_ocid="$(pulumi_pick vaultKeyOcid)"
+if [[ -z "$cf_account_id" || -z "$cf_zone_id" || -z "$cf_token" \
+   || -z "$vault_crypto_endpoint" || -z "$vault_key_ocid" ]]; then
+  echo "missing pulumi outputs: staticAsset* / vaultCryptoEndpoint / vaultKeyOcid" >&2
   exit 1
 fi
-static_bucket="fn0-static-asset-${CONTROL_PROJECT_ID}"
-static_custom_domain="${CONTROL_PROJECT_ID}.${static_asset_public_base_domain}"
-build_id="$(uuidgen | tr 'A-Z' 'a-z')"
-export VITE_PUBLIC_URL="https://${static_custom_domain}/${build_id}/"
-echo ">> build_id=${build_id} VITE_PUBLIC_URL=${VITE_PUBLIC_URL}"
+cf_zone_name="${FN0_APEX_DOMAIN:-$(pulumi_pick apexDomain)}"
+if [[ -z "$cf_zone_name" ]]; then
+  echo "missing pulumi output: apexDomain" >&2
+  exit 1
+fi
 
-ensure_static_asset_bucket \
-  "$static_asset_account_id" "$static_asset_cf_token" \
-  "$static_bucket" "$static_custom_domain" "$static_asset_zone_id"
+provision_control_cloudflare \
+  "$cf_account_id" "$cf_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID"
+
+# Minted here rather than taken from the stack: these are the same narrow
+# credentials `forte cloudflare connect` produces, and pulumi no longer holds
+# an account-wide R2 token to hand out instead.
+read -r worker_key_id worker_secret < <(mint_r2_token \
+  "$cf_token" "$cf_account_id" "fn0 worker (${CONTROL_PROJECT_ID})" \
+  "fn0-${CONTROL_PROJECT_ID}-private-object-storage" \
+  "fn0-${CONTROL_PROJECT_ID}-public-object-storage" \
+  "fn0-${CONTROL_PROJECT_ID}-rendered-html-cache")
+read -r asset_key_id asset_secret < <(mint_r2_token \
+  "$cf_token" "$cf_account_id" "fn0 frontend assets (${CONTROL_PROJECT_ID})" \
+  "fn0-${CONTROL_PROJECT_ID}-frontend-asset")
+purge_token="$(mint_purge_token "$cf_token" "$cf_zone_id" "fn0 cache purge (${CONTROL_PROJECT_ID})")"
+
+worker_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$worker_secret")"
+asset_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$asset_secret")"
+purge_token_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$purge_token")"
+
+static_bucket="fn0-${CONTROL_PROJECT_ID}-frontend-asset"
+build_id="$(uuidgen | tr 'A-Z' 'a-z')"
+export VITE_PUBLIC_URL="https://${static_bucket}.${cf_zone_name}/${build_id}/"
+echo ">> build_id=${build_id} VITE_PUBLIC_URL=${VITE_PUBLIC_URL}"
 
 bundle_path="${work_dir}/bundle.raw.tar"
 build_control_raw_bundle "$env_yaml_path" "$bundle_path"
 
 upload_fe_dist \
-  "$static_asset_account_id" "$static_asset_access_key" "$static_asset_secret_key" \
+  "$cf_account_id" "$asset_key_id" "$asset_secret" \
   "$static_bucket" "$build_id" "${REPO_ROOT}/fn0/control/fe/dist"
 
 # Step 4-5 — R2 upload of original/ + cwasm-compiler invoke. code_version =
@@ -169,6 +191,10 @@ seed_compiled_bundle "$control_db_url" "$forte_group_token" \
   "$CONTROL_PROJECT_ID" "$code_version" "$target_wasmtime"
 seed_worker_manifest "$control_db_url" "$forte_group_token" \
   "$CONTROL_PROJECT_ID" "$code_version" "$CONTROL_CUSTOM_DOMAIN"
+seed_cloudflare_config "$control_db_url" "$forte_group_token" \
+  "$CONTROL_PROJECT_ID" "$cf_account_id" "$cf_zone_id" "$cf_zone_name" \
+  "$worker_key_id" "$worker_secret_ct" \
+  "$asset_key_id" "$asset_secret_ct" "$purge_token_ct"
 
 # Step 7 — seed the worker-agent's rollout target into the same control DB.
 seed_target_fn0_worker_config "$control_db_url" "$forte_group_token" "$worker_image_ref"
