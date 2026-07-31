@@ -12,8 +12,8 @@ pub struct WorkerProjectManifest {
     pub static_cache_state: String,
     #[serde(default)]
     pub pending_code_version: Option<u64>,
-    /// Absent for projects whose objects live in the platform's own Cloudflare
-    /// account; workers fall back to their process-wide target for those.
+    /// Absent only between a project's creation and its owner connecting a
+    /// Cloudflare account; a worker cannot serve the project until it is set.
     #[serde(default)]
     pub storage: Option<WorkerProjectStorage>,
 }
@@ -29,20 +29,21 @@ pub struct WorkerR2Credential {
 
 /// Where one project's objects live, as the worker sees it.
 ///
-/// Three credentials rather than one because the platform account already
-/// issues a separate token per store, and because it leaves room to hand a
-/// worker a token scoped to a single bucket.
+/// One credential, scoped to exactly the three buckets named here. The
+/// frontend-asset bucket is deliberately outside it: nothing in the worker
+/// serves assets — the CDN does, straight off the bucket — so a fleet-wide
+/// credential able to rewrite a deployed frontend would be reach with no use
+/// for it.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct WorkerProjectStorage {
     pub account_id: String,
     pub region: String,
-    pub object: WorkerR2Credential,
-    pub public: WorkerR2Credential,
-    pub public_bucket: String,
-    /// CDN origin for `public_bucket`, without a trailing slash.
-    pub public_base_url: String,
-    pub page: WorkerR2Credential,
-    pub page_bucket: String,
+    pub credential: WorkerR2Credential,
+    pub private_object_storage_bucket: String,
+    pub public_object_storage_bucket: String,
+    /// CDN origin for `public_object_storage_bucket`, without a trailing slash.
+    pub public_object_storage_base_url: String,
+    pub rendered_html_cache_bucket: String,
     /// Bumped by control on every credential or bucket change, so a worker can
     /// skip re-decrypting a target it already holds.
     pub config_version: u64,

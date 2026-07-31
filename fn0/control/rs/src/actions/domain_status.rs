@@ -1,6 +1,4 @@
 use crate::common::auth;
-use crate::common::byoc::ProjectStorage;
-use crate::common::cloudflare_saas::{CloudflareSaasClient, HostnameStatus};
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -13,10 +11,6 @@ pub struct Input {
 #[derive(Serialize)]
 pub enum Output {
     NotConfigured,
-    Configured {
-        domain: String,
-        cloudflare_status: CloudflareStatus,
-    },
     /// The project runs on its owner's Cloudflare account: their edge holds the
     /// visitor-facing certificate, and fn0 only holds the origin certificate.
     SelfHosted {
@@ -28,14 +22,6 @@ pub enum Output {
     NotLoggedIn,
     NotFound,
     InternalError,
-}
-
-#[derive(Serialize)]
-pub enum CloudflareStatus {
-    Active,
-    Pending,
-    Missing,
-    Other { value: String },
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
@@ -77,56 +63,19 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotConfigured;
     };
 
-    match ProjectStorage::resolve(&db, &req.body.project_id).await {
-        Ok(storage) if storage.is_byoc() => {
-            let cert = match (WorkerCertManifestDocGet {}).send_with(&db).await {
-                Ok(manifest) => manifest.and_then(|manifest| manifest.certs.get(&domain).cloned()),
-                Err(e) => {
-                    tracing::error!("domain_status WorkerCertManifestDocGet: {e}");
-                    return Output::InternalError;
-                }
-            };
-            return Output::SelfHosted {
-                domain,
-                origin_certificate_ready: cert.is_some(),
-                origin_certificate_expires_epoch_seconds: cert
-                    .as_ref()
-                    .map(|cert| cert.not_after_epoch_seconds),
-                origin_ip: std::env::var("FN0_WORKER_ORIGIN_IP").unwrap_or_default(),
-            };
-        }
-        Ok(_) => {}
+    let cert = match (WorkerCertManifestDocGet {}).send_with(&db).await {
+        Ok(manifest) => manifest.and_then(|manifest| manifest.certs.get(&domain).cloned()),
         Err(e) => {
-            tracing::error!("domain_status ProjectStorage::resolve: {e}");
-            return Output::InternalError;
-        }
-    }
-
-    let client = match CloudflareSaasClient::from_env() {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!("domain_status CloudflareSaasClient::from_env: {e}");
+            tracing::error!("domain_status WorkerCertManifestDocGet: {e}");
             return Output::InternalError;
         }
     };
-    let cloudflare_status = match client.find_by_name(&domain).await {
-        Ok(Some(h)) => match h.status {
-            HostnameStatus::Active => CloudflareStatus::Active,
-            HostnameStatus::Pending => CloudflareStatus::Pending,
-            HostnameStatus::Other(s) => CloudflareStatus::Other { value: s },
-            other => CloudflareStatus::Other {
-                value: format!("{other:?}"),
-            },
-        },
-        Ok(None) => CloudflareStatus::Missing,
-        Err(e) => {
-            tracing::error!("domain_status cloudflare lookup: {e}");
-            return Output::InternalError;
-        }
-    };
-
-    Output::Configured {
+    Output::SelfHosted {
         domain,
-        cloudflare_status,
+        origin_certificate_ready: cert.is_some(),
+        origin_certificate_expires_epoch_seconds: cert
+            .as_ref()
+            .map(|cert| cert.not_after_epoch_seconds),
+        origin_ip: std::env::var("FN0_WORKER_ORIGIN_IP").unwrap_or_default(),
     }
 }

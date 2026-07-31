@@ -84,11 +84,16 @@ forte cloudflare provision \
 This creates the buckets, the CDN hostname and the cache rule, then stops and
 prints the exact names for step 2.
 
-**Step 2** — the two credentials fn0 keeps.
+**Step 2** — the three credentials fn0 keeps.
 
-R2 → **Manage API Tokens → Create API token**, permission *Object Read &
-Write*, applied to the three buckets the previous command named. The screen
-shows an Access Key ID and a Secret Access Key; keep both.
+The two R2 tokens are separate on purpose. Only the worker one is handed to the
+fleet, and only the frontend-asset one is used by the GC that deletes; scoping
+them apart is what keeps either from reaching the other's bucket. Both are made
+at R2 → **Manage API Tokens → Create API token**, permission *Object Read &
+Write*, applied to the buckets the previous command named — the first to the
+two object-storage buckets and the rendered-HTML cache, the second to the
+frontend-asset bucket alone. Each screen shows an Access Key ID and a Secret
+Access Key; keep all four values.
 
 My Profile → **API Tokens → Create Custom Token**, permission *Zone → Cache
 Purge → Purge*, restricted to your zone.
@@ -96,8 +101,10 @@ Purge → Purge*, restricted to your zone.
 ```sh
 forte cloudflare connect \
   --account-id <account id> --zone-id <zone id> --zone-name <your-domain> \
-  --dataplane-access-key-id <Access Key ID> \
-  --dataplane-secret <Secret Access Key> \
+  --worker-access-key-id <Access Key ID> \
+  --worker-secret <Secret Access Key> \
+  --frontend-asset-access-key-id <Access Key ID> \
+  --frontend-asset-secret <Secret Access Key> \
   --purge-token <purge token>
 ```
 
@@ -107,32 +114,42 @@ Delete the provisioning token from step 1 once this succeeds.
 
 | Credential | What it can do |
 | --- | --- |
-| R2 data-plane | read and write objects in fn0's three buckets. Cannot reach another bucket, cannot delete a bucket, cannot call the Cloudflare API at all |
+| Worker R2 | read and write objects in this project's two object-storage buckets and its rendered-HTML cache. Cannot reach the frontend-asset bucket, cannot reach another project's buckets, cannot delete a bucket, cannot call the Cloudflare API at all |
+| Frontend-asset R2 | read and write objects in this project's frontend-asset bucket, and nothing else. Never sent to a worker |
 | Purge | purge this one zone's cache. Nothing else — not DNS, not cache rules, not R2, not certificates |
 
 Those limits are measured against the live API, not inferred from the
 permission names.
 
 So the worst a total compromise of fn0 can do to your Cloudflare account is
-rewrite objects in the three buckets it created, and clear your cache.
+rewrite objects in the four buckets it created for this project, and clear your
+cache.
 
 ## What gets created
 
-- `fn0-object-storage-<project-id>` — your app's private object storage
-- `fn0-static-asset` — your deployed frontend and your public objects, served
-  at `static.<your-domain>`
-- `fn0-static-page` — cached SSR HTML, private
+Four buckets, all this project's alone. Nothing is shared with your other fn0
+projects, so no key prefix is carrying the separation.
 
-The last two are shared by every fn0 project in that account, separated by a
-`<project-id>/` key prefix, so however many projects you run your zone needs
-exactly one DNS record for them.
+| Bucket | Holds | Reachable at |
+| --- | --- | --- |
+| `fn0-<project-id>-private-object-storage` | what `object_storage::private` writes | nowhere — signed requests only |
+| `fn0-<project-id>-public-object-storage` | what `object_storage::public` writes | `fn0-<project-id>-public-object-storage.<your-domain>` |
+| `fn0-<project-id>-frontend-asset` | your deployed frontend build | `fn0-<project-id>-frontend-asset.<your-domain>` |
+| `fn0-<project-id>-rendered-html-cache` | HTML rendered on the server and kept for the next request | nowhere — private |
 
-fn0 adds exactly one cache rule and leaves your own rules in place; running
-setup again replaces that one rule rather than stacking copies. The rule also
-pins browser caching on the assets hostname to whatever fn0 stored on the
-object, because a zone's default Browser Cache TTL would otherwise leave
-browser copies of a replaced object that no purge can reach. Your other
-hostnames keep the zone setting.
+The two public buckets answer on a hostname that is the bucket's own name in
+your zone, so a bucket and the address it serves from cannot drift apart. Each
+costs one DNS record.
+
+fn0 adds exactly one cache rule to your zone and leaves your own rules in
+place. It matches `fn0-*-frontend-asset.<your-domain>` and
+`fn0-*-public-object-storage.<your-domain>`, so it covers every fn0 project you
+ever add without a second rule — a free zone allows ten, and a rule per project
+would run out at ten projects. Both halves of each pattern are required so the
+rule cannot swallow a hostname of your own. The rule also pins browser caching
+on those hostnames to whatever fn0 stored on the object, because a zone's
+default Browser Cache TTL would otherwise leave browser copies of a replaced
+object that no purge can reach. Your other hostnames keep the zone setting.
 
 Workers pick the change up within about a second; no redeploy is needed. Check
 with:
@@ -141,13 +158,14 @@ with:
 forte cloudflare status
 ```
 
-**Connect before your project stores anything.** Objects already written to
-fn0's own account stay there and become unreachable once the project is
-connected — fn0 does not copy them across. For a project that has been running,
-move its objects yourself before connecting, or start a fresh project.
+**Connect before your project stores anything.** A project has nowhere to store
+and cannot serve a frontend until it is connected.
 
-Connecting is first-time only. Reconnecting to rotate credentials or to move to
-a different Cloudflare account is not supported yet.
+Connecting is first-time only, and there is no way back. Reconnecting, rotating
+a credential and moving to a different Cloudflare account are all unsupported —
+not merely undocumented, but refused by `connect`. If a stored credential is
+lost or revoked, the project cannot be repaired through the CLI. Treat the
+three credentials as things you do not lose.
 
 ## Custom domain (optional)
 
@@ -182,9 +200,11 @@ hostname immediately and visibly.
 
 ## What fn0 still holds
 
-- The compute, the request routing and the `<project>.fn0.dev` subdomain
+- The compute and the request routing
 - Your document database (Turso), which is not part of this
-- The bundle store your deployed code is distributed from
+- The bundle store your deployed code is distributed from. It holds compiled
+  WebAssembly rather than anything your app stores, and it grows with deploys
+  rather than with traffic, so it stays on fn0's account
 
 ## Removing a project
 
@@ -194,7 +214,11 @@ yours to remove.
 
 ## Revoking
 
-Deleting the data-plane token in your Cloudflare dashboard breaks the
-project's storage at request time — there is no grace period, because every
-request signs against it. `forte cloudflare status` reports the failure;
-re-run `forte cloudflare connect` to issue fresh credentials.
+Deleting either R2 token in your Cloudflare dashboard breaks the project at
+request time — there is no grace period, because every request signs against
+it. `forte cloudflare status` probes both and reports which one failed.
+
+There is no recovery path. `connect` refuses a project that is already
+connected, and nothing else can replace a stored credential, so a revoked token
+means the project has to be recreated. Rotation is on the list; it is not
+built.

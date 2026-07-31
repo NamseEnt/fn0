@@ -8,8 +8,9 @@ use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 use crate::cloudflare_provision::{
-    ASSET_BUCKET, DataPlaneCredentials, PAGE_BUCKET, ProvisionedResources, Provisioner,
-    object_bucket_name,
+    ConnectCredentials, ProvisionedResources, Provisioner, frontend_asset_bucket_name,
+    private_object_storage_bucket_name, public_object_storage_bucket_name,
+    rendered_html_cache_bucket_name,
 };
 
 #[derive(Serialize)]
@@ -18,12 +19,16 @@ struct ConnectInput<'a> {
     account_id: &'a str,
     zone_id: &'a str,
     zone_name: &'a str,
-    static_hostname: &'a str,
-    object_bucket: &'a str,
-    asset_bucket: &'a str,
-    page_bucket: &'a str,
-    dataplane_access_key_id: &'a str,
-    dataplane_secret: &'a str,
+    frontend_asset_hostname: &'a str,
+    public_object_storage_hostname: &'a str,
+    private_object_storage_bucket: &'a str,
+    public_object_storage_bucket: &'a str,
+    frontend_asset_bucket: &'a str,
+    rendered_html_cache_bucket: &'a str,
+    worker_access_key_id: &'a str,
+    worker_secret: &'a str,
+    frontend_asset_access_key_id: &'a str,
+    frontend_asset_secret: &'a str,
     purge_token: &'a str,
 }
 
@@ -60,7 +65,7 @@ pub async fn cloudflare_connect_managed(
     );
     let (resources, credentials, minted) = provisioner.run_managed(project_id).await?;
     print_resources(&resources);
-    println!("  minted a bucket-scoped R2 token and a purge-only token");
+    println!("  minted two bucket-scoped R2 tokens and a purge-only token");
 
     match send_connect(project_id, account_id, zone_id, &resources, &credentials).await {
         Ok(()) => Ok(()),
@@ -77,8 +82,9 @@ pub async fn cloudflare_connect_managed(
         Err(ConnectFailure::Indeterminate(error)) => {
             eprintln!(
                 "warning: could not tell whether fn0 stored the credentials. If it did not, \
-                 revoke these in the Cloudflare dashboard: data plane {}, cache purge {}.",
-                minted.dataplane, minted.purge
+                 revoke these in the Cloudflare dashboard: worker {}, frontend assets {}, \
+                 cache purge {}.",
+                minted.worker, minted.frontend_asset, minted.purge
             );
             Err(error)
         }
@@ -103,18 +109,27 @@ pub async fn cloudflare_provision(
     print_resources(&resources);
 
     println!();
-    println!("Now create the two credentials fn0 will keep. Neither can be minted for");
+    println!("Now create the three credentials fn0 will keep. None can be minted for");
     println!("you here, because this token deliberately cannot create tokens.");
+    println!();
+    println!("The first two are separate on purpose: only the worker one is handed to");
+    println!("the fleet, and only the frontend-asset one is used by the GC that deletes.");
+    println!("Scoping them apart is what keeps either from reaching the other's bucket.");
     println!();
     println!("1. R2 -> Manage API Tokens -> Create API token");
     println!("     permission: Object Read & Write");
     println!("     apply to specific buckets:");
-    println!("       {}", resources.object_bucket);
-    println!("       {}", resources.asset_bucket);
-    println!("       {}", resources.page_bucket);
+    println!("       {}", resources.private_object_storage_bucket);
+    println!("       {}", resources.public_object_storage_bucket);
+    println!("       {}", resources.rendered_html_cache_bucket);
     println!("     the screen shows an Access Key ID and a Secret Access Key; keep both");
     println!();
-    println!("2. My Profile -> API Tokens -> Create Custom Token");
+    println!("2. R2 -> Manage API Tokens -> Create API token");
+    println!("     permission: Object Read & Write");
+    println!("     apply to specific buckets:");
+    println!("       {}", resources.frontend_asset_bucket);
+    println!();
+    println!("3. My Profile -> API Tokens -> Create Custom Token");
     println!("     permission: Zone -> Cache Purge -> Purge");
     println!("     zone resources: {} only", resources.zone_name);
     println!();
@@ -124,34 +139,45 @@ pub async fn cloudflare_provision(
     println!("      --account-id {account_id} \\");
     println!("      --zone-id {zone_id} \\");
     println!("      --zone-name {} \\", resources.zone_name);
-    println!("      --dataplane-access-key-id <Access Key ID> \\");
-    println!("      --dataplane-secret <Secret Access Key> \\");
-    println!("      --purge-token <purge token>");
+    println!("      --worker-access-key-id <Access Key ID from 1> \\");
+    println!("      --worker-secret <Secret Access Key from 1> \\");
+    println!("      --frontend-asset-access-key-id <Access Key ID from 2> \\");
+    println!("      --frontend-asset-secret <Secret Access Key from 2> \\");
+    println!("      --purge-token <purge token from 3>");
     println!();
     println!("You can delete the token you just used once you have done that.");
     Ok(())
 }
 
 /// The second half of the careful path: credentials the user made by hand.
+#[allow(clippy::too_many_arguments)]
 pub async fn cloudflare_connect_manual(
     project_id: &str,
     account_id: &str,
     zone_id: &str,
     zone_name: &str,
-    dataplane_access_key_id: &str,
-    dataplane_secret: &str,
+    worker_access_key_id: &str,
+    worker_secret: &str,
+    frontend_asset_access_key_id: &str,
+    frontend_asset_secret: &str,
     purge_token: &str,
 ) -> Result<()> {
+    let frontend_asset_bucket = frontend_asset_bucket_name(project_id);
+    let public_object_storage_bucket = public_object_storage_bucket_name(project_id);
     let resources = ProvisionedResources {
+        frontend_asset_hostname: format!("{frontend_asset_bucket}.{zone_name}"),
+        public_object_storage_hostname: format!("{public_object_storage_bucket}.{zone_name}"),
         zone_name: zone_name.to_string(),
-        static_hostname: format!("static.{zone_name}"),
-        object_bucket: object_bucket_name(project_id),
-        asset_bucket: ASSET_BUCKET.to_string(),
-        page_bucket: PAGE_BUCKET.to_string(),
+        private_object_storage_bucket: private_object_storage_bucket_name(project_id),
+        public_object_storage_bucket,
+        frontend_asset_bucket,
+        rendered_html_cache_bucket: rendered_html_cache_bucket_name(project_id),
     };
-    let credentials = DataPlaneCredentials {
-        dataplane_access_key_id: dataplane_access_key_id.to_string(),
-        dataplane_secret: dataplane_secret.to_string(),
+    let credentials = ConnectCredentials {
+        worker_access_key_id: worker_access_key_id.to_string(),
+        worker_secret: worker_secret.to_string(),
+        frontend_asset_access_key_id: frontend_asset_access_key_id.to_string(),
+        frontend_asset_secret: frontend_asset_secret.to_string(),
         purge_token: purge_token.to_string(),
     };
     // Nothing to revoke on failure: these credentials are the user's own, and
@@ -163,11 +189,15 @@ pub async fn cloudflare_connect_manual(
 
 fn print_resources(resources: &ProvisionedResources) {
     println!("  zone:    {}", resources.zone_name);
+    println!("  buckets: {}", resources.private_object_storage_bucket);
+    println!("           {}", resources.public_object_storage_bucket);
+    println!("           {}", resources.frontend_asset_bucket);
+    println!("           {}", resources.rendered_html_cache_bucket);
+    println!("  assets:  https://{}", resources.frontend_asset_hostname);
     println!(
-        "  buckets: {}, {}, {}",
-        resources.object_bucket, resources.asset_bucket, resources.page_bucket
+        "  public:  https://{}",
+        resources.public_object_storage_hostname
     );
-    println!("  assets:  https://{}", resources.static_hostname);
 }
 
 /// Why a connect did not succeed, split by what it says about fn0's state — the
@@ -195,7 +225,7 @@ async fn send_connect(
     account_id: &str,
     zone_id: &str,
     provisioned: &ProvisionedResources,
-    credentials: &DataPlaneCredentials,
+    credentials: &ConnectCredentials,
 ) -> std::result::Result<(), ConnectFailure> {
     let creds = crate::credentials::require().map_err(ConnectFailure::Indeterminate)?;
     let url = format!(
@@ -211,12 +241,16 @@ async fn send_connect(
                 account_id,
                 zone_id,
                 zone_name: &provisioned.zone_name,
-                static_hostname: &provisioned.static_hostname,
-                object_bucket: &provisioned.object_bucket,
-                asset_bucket: &provisioned.asset_bucket,
-                page_bucket: &provisioned.page_bucket,
-                dataplane_access_key_id: &credentials.dataplane_access_key_id,
-                dataplane_secret: &credentials.dataplane_secret,
+                frontend_asset_hostname: &provisioned.frontend_asset_hostname,
+                public_object_storage_hostname: &provisioned.public_object_storage_hostname,
+                private_object_storage_bucket: &provisioned.private_object_storage_bucket,
+                public_object_storage_bucket: &provisioned.public_object_storage_bucket,
+                frontend_asset_bucket: &provisioned.frontend_asset_bucket,
+                rendered_html_cache_bucket: &provisioned.rendered_html_cache_bucket,
+                worker_access_key_id: &credentials.worker_access_key_id,
+                worker_secret: &credentials.worker_secret,
+                frontend_asset_access_key_id: &credentials.frontend_asset_access_key_id,
+                frontend_asset_secret: &credentials.frontend_asset_secret,
                 purge_token: &credentials.purge_token,
             })
             .send()
@@ -267,13 +301,16 @@ struct StatusInput<'a> {
 #[derive(Deserialize)]
 #[serde(tag = "t", rename_all_fields = "camelCase")]
 enum Status {
-    Platform,
+    NotConnected,
     Connected {
         account_id: String,
         zone_name: String,
-        static_hostname: String,
-        asset_bucket: String,
-        page_bucket: String,
+        frontend_asset_hostname: String,
+        public_object_storage_hostname: String,
+        frontend_asset_bucket: String,
+        public_object_storage_bucket: String,
+        private_object_storage_bucket: String,
+        rendered_html_cache_bucket: String,
         healthy: bool,
         problem: Option<String>,
     },
@@ -299,24 +336,31 @@ pub async fn cloudflare_status(project_id: &str) -> Result<()> {
         .error_for_status()?;
 
     match response.json::<Status>().await? {
-        Status::Platform => {
-            println!("project '{project_id}' runs on the fn0 platform Cloudflare account.");
-            println!("run `forte cloudflare connect` to move it onto your own.");
+        Status::NotConnected => {
+            println!("project '{project_id}' has no Cloudflare account connected.");
+            println!("run `forte cloudflare connect` before deploying it.");
             Ok(())
         }
         Status::Connected {
             account_id,
             zone_name,
-            static_hostname,
-            asset_bucket,
-            page_bucket,
+            frontend_asset_hostname,
+            public_object_storage_hostname,
+            frontend_asset_bucket,
+            public_object_storage_bucket,
+            private_object_storage_bucket,
+            rendered_html_cache_bucket,
             healthy,
             problem,
         } => {
             println!("account: {account_id}");
             println!("zone:    {zone_name}");
-            println!("assets:  {asset_bucket} -> https://{static_hostname}");
-            println!("pages:   {page_bucket}");
+            println!("assets:  {frontend_asset_bucket} -> https://{frontend_asset_hostname}");
+            println!(
+                "public:  {public_object_storage_bucket} -> https://{public_object_storage_hostname}"
+            );
+            println!("private: {private_object_storage_bucket}");
+            println!("cache:   {rendered_html_cache_bucket}");
             match (healthy, problem) {
                 (true, _) => println!("status:  ok"),
                 (false, Some(problem)) => println!("status:  degraded - {problem}"),

@@ -167,15 +167,21 @@ pub enum CloudflareCommands {
         #[arg(long)]
         zone_id: String,
         /// Token with User -> API Tokens -> Edit. Provisions and mints.
-        #[arg(long, conflicts_with_all = ["zone_name", "dataplane_access_key_id"])]
+        #[arg(long, conflicts_with_all = ["zone_name", "worker_access_key_id"])]
         api_token: Option<String>,
         /// Credentials you created yourself, after `forte cloudflare provision`
-        #[arg(long, requires_all = ["dataplane_access_key_id", "dataplane_secret", "purge_token"])]
+        #[arg(long, requires_all = ["worker_access_key_id", "worker_secret", "frontend_asset_access_key_id", "frontend_asset_secret", "purge_token"])]
         zone_name: Option<String>,
+        /// Scoped to the object-storage buckets and the rendered-HTML cache
         #[arg(long)]
-        dataplane_access_key_id: Option<String>,
+        worker_access_key_id: Option<String>,
         #[arg(long)]
-        dataplane_secret: Option<String>,
+        worker_secret: Option<String>,
+        /// Scoped to the frontend-asset bucket
+        #[arg(long)]
+        frontend_asset_access_key_id: Option<String>,
+        #[arg(long)]
+        frontend_asset_secret: Option<String>,
         #[arg(long)]
         purge_token: Option<String>,
         #[arg(short, long)]

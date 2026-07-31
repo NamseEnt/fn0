@@ -10,7 +10,6 @@
 //! destroy, so it is accepted rather than locked against.
 
 use crate::common::byoc::{self, ProjectStorage};
-use crate::common::cloudflare_saas::CloudflareSaasClient;
 use crate::common::r2_store::{BundleStore, ProjectR2Store, parse_compiled_key};
 use crate::docs::*;
 use forte_sdk::*;
@@ -33,9 +32,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     delete_custom_domain(&db, &project_id).await?;
     remove_routing_and_cron(&db, &project_id).await?;
     delete_bundle_store_objects(&project_id, now).await?;
-    delete_static_assets(&project_id, &storage, now).await?;
-    delete_static_pages(&project_id, &storage, now).await?;
-    delete_object_storage(&project_id, &storage, now).await?;
+    empty_project_buckets(&project_id, &storage, now).await?;
     delete_cloudflare_config(&db, &project_id).await?;
     delete_turso_database(&project_id).await?;
     delete_compiled_bundle_docs(&db, &project_id).await?;
@@ -59,13 +56,7 @@ async fn delete_custom_domain(db: &doc_db::Database, project_id: &str) -> anyhow
     else {
         return Ok(());
     };
-    if ProjectStorage::resolve(db, project_id).await?.is_byoc() {
-        crate::common::cert_manifest::remove(db, &domain).await?;
-    } else {
-        CloudflareSaasClient::from_env()?
-            .delete_by_name(&domain)
-            .await?;
-    }
+    crate::common::cert_manifest::remove(db, &domain).await?;
     tracing::info!(%project_id, %domain, "project_teardown: custom domain deleted");
     Ok(())
 }
@@ -122,45 +113,26 @@ async fn delete_bundle_store_objects(project_id: &str, now: DateTime) -> anyhow:
     Ok(())
 }
 
-async fn delete_static_assets(
-    project_id: &str,
-    storage: &ProjectStorage,
-    now: DateTime,
-) -> anyhow::Result<()> {
-    let store = ProjectR2Store::assets(storage);
-    for object in store.list_all(&format!("{project_id}/"), now).await? {
-        store.delete(&object.key, now).await?;
-    }
-    Ok(())
-}
-
-async fn delete_static_pages(
-    project_id: &str,
-    storage: &ProjectStorage,
-    now: DateTime,
-) -> anyhow::Result<()> {
-    let store = ProjectR2Store::pages(storage);
-    for object in store.list_all(&format!("{project_id}/"), now).await? {
-        store.delete(&object.key, now).await?;
-    }
-    Ok(())
-}
-
-/// Empties the project's object storage.
+/// Empties every bucket the project owns.
 ///
-/// The bucket itself is left standing for a connected project: fn0 holds only
-/// an object-scoped credential there, by design, and the bucket sits in the
-/// user's own account for them to remove. On the platform's own account the
-/// bucket is ours and goes with the project.
-async fn delete_object_storage(
+/// The buckets themselves are left standing: fn0 holds only object-scoped
+/// credentials there, by design, and they sit in the owner's own account for
+/// them to remove.
+///
+/// A bucket that cannot be listed is logged and skipped rather than failing the
+/// teardown. S3 `ListObjectsV2` errors on a missing bucket instead of returning
+/// an empty page, and a project that never wrote may not have one.
+async fn empty_project_buckets(
     project_id: &str,
     storage: &ProjectStorage,
     now: DateTime,
 ) -> anyhow::Result<()> {
-    let store = ProjectR2Store::objects(storage);
-    if storage.is_byoc() {
-        // S3 ListObjectsV2 errors on a missing bucket rather than returning an
-        // empty page, and a project that never wrote an object may not have one.
+    for store in [
+        ProjectR2Store::frontend_assets(storage),
+        ProjectR2Store::rendered_html_cache(storage),
+        ProjectR2Store::private_objects(storage),
+        ProjectR2Store::public_objects(storage),
+    ] {
         match store.list_all("", now).await {
             Ok(objects) => {
                 for object in objects {
@@ -168,21 +140,11 @@ async fn delete_object_storage(
                 }
             }
             Err(error) => {
-                tracing::warn!(%project_id, %error, "project_teardown: object storage unreadable, skipping");
+                let bucket = store.bucket();
+                tracing::warn!(%project_id, %bucket, %error, "project_teardown: bucket unreadable, skipping");
             }
         }
-        return Ok(());
     }
-
-    let cloudflare = crate::common::cloudflare::CloudflareClient::from_env()?;
-    if !cloudflare.r2_bucket_exists(store.bucket()).await? {
-        return Ok(());
-    }
-    for object in store.list_all("", now).await? {
-        store.delete(&object.key, now).await?;
-    }
-    cloudflare.delete_r2_bucket(store.bucket()).await?;
-    tracing::info!(%project_id, bucket = store.bucket(), "project_teardown: object storage bucket deleted");
     Ok(())
 }
 

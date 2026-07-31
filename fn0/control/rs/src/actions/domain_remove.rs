@@ -1,5 +1,4 @@
 use crate::common::auth;
-use crate::common::byoc::ProjectStorage;
 use crate::common::cert_manifest;
 use crate::docs::*;
 use forte_sdk::*;
@@ -82,29 +81,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
 
     let db = doc_db::turso();
-    let is_byoc = match ProjectStorage::resolve(&db, &project_id).await {
-        Ok(storage) => storage.is_byoc(),
-        Err(e) => {
-            tracing::error!("domain_remove ProjectStorage::resolve: {e}");
-            return Output::InternalError;
-        }
-    };
 
     // The certificate is dropped but not revoked: revocation is the user's
     // call on their own zone, and a certificate no worker serves is already
     // unreachable.
-    if is_byoc {
-        if let Err(e) = cert_manifest::remove(&db, &removed_domain).await {
-            tracing::error!("domain_remove cert manifest: {e}");
-            return Output::InternalError;
-        }
-    } else if let Err(e) =
-        crate::enqueue::cloudflare_unregister(crate::queue_task::cloudflare_unregister::Input {
-            domain: removed_domain.clone(),
-        })
-        .await
-    {
-        tracing::error!("domain_remove enqueue cloudflare_unregister: {e}");
+    if let Err(e) = cert_manifest::remove(&db, &removed_domain).await {
+        tracing::error!("domain_remove cert manifest: {e}");
         return Output::InternalError;
     }
 

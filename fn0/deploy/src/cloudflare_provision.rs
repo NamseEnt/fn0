@@ -9,9 +9,16 @@
 //! included.
 //!
 //! So the account-wide token stays here and is discarded when the command
-//! exits. What fn0 receives is what this module mints at the end: an R2 token
-//! scoped to three buckets that cannot delete a bucket or call the REST API,
-//! and a token that can purge one zone's cache and nothing else.
+//! exits. What fn0 receives is what this module mints at the end: two R2 tokens
+//! that cannot delete a bucket or call the REST API, and a token that can purge
+//! one zone's cache and nothing else.
+//!
+//! The two R2 tokens are split by who holds them. The worker token reaches the
+//! project's objects, public objects and page cache, and is the only one
+//! published to the fleet; the asset token reaches the deployed frontend and
+//! stays in control. So a compromised worker cannot rewrite a deployed
+//! frontend, and asset GC — which is the only thing that deletes on a schedule
+//! — holds a credential that cannot open a bucket holding user data.
 //!
 //! There are two ways in, because the convenient one asks for a permission not
 //! everyone should grant.
@@ -60,14 +67,23 @@ const ZONE_READ: &str = "c8fed203ed3043cba015a93ad1616f1f";
 const CACHE_SETTINGS_WRITE: &str = "9ff81cbbe65c400b97d92c3c1033cab6";
 const SSL_AND_CERTIFICATES_WRITE: &str = "c03055bc037c4ea9afb9a9f104b7b721";
 
-/// Shared by every fn0 project in one account, separated by a `{project_id}/`
-/// key prefix, so a user's zone needs one `static.` record however many
-/// projects they run.
-pub const ASSET_BUCKET: &str = "fn0-static-asset";
-pub const PAGE_BUCKET: &str = "fn0-static-page";
+/// One set of buckets per project. The two that are served publicly take their
+/// hostname from their own name, so a bucket and the address it answers on are
+/// the same string and cannot drift apart.
+pub fn private_object_storage_bucket_name(project_id: &str) -> String {
+    format!("fn0-{project_id}-private-object-storage")
+}
 
-pub fn object_bucket_name(project_id: &str) -> String {
-    format!("fn0-object-storage-{project_id}")
+pub fn public_object_storage_bucket_name(project_id: &str) -> String {
+    format!("fn0-{project_id}-public-object-storage")
+}
+
+pub fn frontend_asset_bucket_name(project_id: &str) -> String {
+    format!("fn0-{project_id}-frontend-asset")
+}
+
+pub fn rendered_html_cache_bucket_name(project_id: &str) -> String {
+    format!("fn0-{project_id}-rendered-html-cache")
 }
 
 pub struct Provisioner {
@@ -88,27 +104,37 @@ struct TemporaryToken {
 /// What provisioning creates. Names only — no credentials.
 pub struct ProvisionedResources {
     pub zone_name: String,
-    pub static_hostname: String,
-    pub object_bucket: String,
-    pub asset_bucket: String,
-    pub page_bucket: String,
+    pub frontend_asset_hostname: String,
+    pub public_object_storage_hostname: String,
+    pub private_object_storage_bucket: String,
+    pub public_object_storage_bucket: String,
+    pub frontend_asset_bucket: String,
+    pub rendered_html_cache_bucket: String,
 }
 
-/// The two long-lived credentials fn0 is given.
-pub struct DataPlaneCredentials {
-    pub dataplane_access_key_id: String,
-    /// SHA-256 of the data-plane token, which is what R2 takes as an S3 secret
-    /// access key. The token value never leaves the user's machine: the hash is
-    /// the only form fn0 needs, and unlike the token it cannot be replayed
-    /// against the REST API.
-    pub dataplane_secret: String,
+/// The three long-lived credentials fn0 is given.
+pub struct ConnectCredentials {
+    /// Reaches the two object-storage buckets and the rendered-HTML cache. The
+    /// only R2 credential published to the worker fleet.
+    pub worker_access_key_id: String,
+    /// SHA-256 of the token, which is what R2 takes as an S3 secret access key.
+    /// The token value never leaves the user's machine: the hash is the only
+    /// form fn0 needs, and unlike the token it cannot be replayed against the
+    /// REST API.
+    pub worker_secret: String,
+    /// Reaches the frontend-asset bucket only, and stays in control. Asset GC
+    /// runs on a schedule and deletes; holding a credential that cannot open a
+    /// bucket of user data is what keeps a bug in it from being unbounded.
+    pub frontend_asset_access_key_id: String,
+    pub frontend_asset_secret: String,
     pub purge_token: String,
 }
 
 /// The ids of the credentials the managed path minted, so a connect that fn0
 /// refused does not leave them live on the user's account.
 pub struct MintedCredentialIds {
-    pub dataplane: String,
+    pub worker: String,
+    pub frontend_asset: String,
     pub purge: String,
 }
 
@@ -304,8 +330,15 @@ impl Provisioner {
         ))
     }
 
-    /// Adds the cache rule the assets hostname needs, keeping every other rule
+    /// Adds the cache rule fn0's public hostnames need, keeping every other rule
     /// in the zone.
+    ///
+    /// The match is a wildcard over the whole zone rather than one hostname, so
+    /// this rule is written once and never grows: a free zone allows ten cache
+    /// rules, which a rule per project would exhaust at ten projects. Both
+    /// halves of the pattern are required — a bare `*-frontend-asset` would also
+    /// match a hostname of the user's own and quietly pull it into fn0's caching
+    /// policy.
     ///
     /// A `PUT` to a phase entrypoint replaces the whole rule list, so the
     /// existing rules are read back and carried through. `PURGE` has to be in
@@ -314,8 +347,8 @@ impl Provisioner {
     /// a fresh zone's four-hour default Browser Cache TTL from overriding the
     /// `max-age=0` fn0 stores on public objects — four hours of browser copies
     /// is the one staleness no purge can reach.
-    async fn ensure_cache_rule(&self, token: &str, hostname: &str) -> Result<()> {
-        const RULE_DESCRIPTION: &str = "fn0 static assets, public objects and cached pages";
+    async fn ensure_cache_rule(&self, token: &str, zone_name: &str) -> Result<()> {
+        const RULE_DESCRIPTION: &str = "fn0 frontend assets and public objects";
 
         #[derive(Deserialize)]
         struct Ruleset {
@@ -353,7 +386,7 @@ impl Provisioner {
             serde_json::json!({
                 "action": "set_cache_settings",
                 "expression": format!(
-                    r#"(http.host eq "{hostname}" and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
+                    r#"((http.host wildcard "fn0-*-frontend-asset.{zone_name}" or http.host wildcard "fn0-*-public-object-storage.{zone_name}") and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
                 ),
                 "description": RULE_DESCRIPTION,
                 "action_parameters": {
@@ -470,7 +503,7 @@ impl Provisioner {
         project_id: &str,
     ) -> Result<(
         ProvisionedResources,
-        DataPlaneCredentials,
+        ConnectCredentials,
         MintedCredentialIds,
     )> {
         self.verify().await?;
@@ -502,27 +535,70 @@ impl Provisioner {
 
     async fn provision(&self, token: &str, project_id: &str) -> Result<ProvisionedResources> {
         let zone_name = self.zone_name(token).await?;
-        let static_hostname = format!("static.{zone_name}");
 
-        let object_bucket = object_bucket_name(project_id);
-        let asset_bucket = ASSET_BUCKET.to_string();
-        let page_bucket = PAGE_BUCKET.to_string();
+        let private_object_storage_bucket = private_object_storage_bucket_name(project_id);
+        let public_object_storage_bucket = public_object_storage_bucket_name(project_id);
+        let frontend_asset_bucket = frontend_asset_bucket_name(project_id);
+        let rendered_html_cache_bucket = rendered_html_cache_bucket_name(project_id);
+        let frontend_asset_hostname = format!("{frontend_asset_bucket}.{zone_name}");
+        let public_object_storage_hostname = format!("{public_object_storage_bucket}.{zone_name}");
 
-        for bucket in [&object_bucket, &asset_bucket, &page_bucket] {
+        for bucket in [
+            &private_object_storage_bucket,
+            &public_object_storage_bucket,
+            &frontend_asset_bucket,
+            &rendered_html_cache_bucket,
+        ] {
             self.create_bucket(token, bucket).await?;
         }
-        self.put_cors(token, &object_bucket).await?;
-        self.put_cors(token, &asset_bucket).await?;
-        self.attach_custom_domain(token, &asset_bucket, &static_hostname)
+        for bucket in [
+            &private_object_storage_bucket,
+            &public_object_storage_bucket,
+            &frontend_asset_bucket,
+        ] {
+            self.put_cors(token, bucket).await?;
+        }
+        self.attach_custom_domain(token, &frontend_asset_bucket, &frontend_asset_hostname)
             .await?;
-        self.ensure_cache_rule(token, &static_hostname).await?;
+        self.attach_custom_domain(
+            token,
+            &public_object_storage_bucket,
+            &public_object_storage_hostname,
+        )
+        .await?;
+        self.ensure_cache_rule(token, &zone_name).await?;
 
         Ok(ProvisionedResources {
             zone_name,
-            static_hostname,
-            object_bucket,
-            asset_bucket,
-            page_bucket,
+            frontend_asset_hostname,
+            public_object_storage_hostname,
+            private_object_storage_bucket,
+            public_object_storage_bucket,
+            frontend_asset_bucket,
+            rendered_html_cache_bucket,
+        })
+    }
+
+    fn bucket_scope(&self, buckets: &[&String]) -> serde_json::Value {
+        let resources: serde_json::Map<String, serde_json::Value> = buckets
+            .iter()
+            .map(|bucket| {
+                (
+                    format!(
+                        "com.cloudflare.edge.r2.bucket.{}_default_{bucket}",
+                        self.account_id
+                    ),
+                    serde_json::Value::String("*".to_string()),
+                )
+            })
+            .collect();
+        serde_json::json!({
+            "effect": "allow",
+            "resources": resources,
+            "permission_groups": [
+                { "id": R2_BUCKET_ITEM_READ },
+                { "id": R2_BUCKET_ITEM_WRITE },
+            ],
         })
     }
 
@@ -530,35 +606,23 @@ impl Provisioner {
         &self,
         project_id: &str,
         resources: &ProvisionedResources,
-    ) -> Result<(DataPlaneCredentials, MintedCredentialIds)> {
-        let buckets: serde_json::Map<String, serde_json::Value> = [
-            &resources.object_bucket,
-            &resources.asset_bucket,
-            &resources.page_bucket,
-        ]
-        .iter()
-        .map(|bucket| {
-            (
-                format!(
-                    "com.cloudflare.edge.r2.bucket.{}_default_{bucket}",
-                    self.account_id
-                ),
-                serde_json::Value::String("*".to_string()),
-            )
-        })
-        .collect();
-
-        let (dataplane_access_key_id, dataplane_token) = self
+    ) -> Result<(ConnectCredentials, MintedCredentialIds)> {
+        let (worker_access_key_id, worker_token) = self
             .mint_with_expiry(
-                &format!("fn0 data plane ({project_id})"),
-                vec![serde_json::json!({
-                    "effect": "allow",
-                    "resources": buckets,
-                    "permission_groups": [
-                        { "id": R2_BUCKET_ITEM_READ },
-                        { "id": R2_BUCKET_ITEM_WRITE },
-                    ],
-                })],
+                &format!("fn0 worker ({project_id})"),
+                vec![self.bucket_scope(&[
+                    &resources.private_object_storage_bucket,
+                    &resources.public_object_storage_bucket,
+                    &resources.rendered_html_cache_bucket,
+                ])],
+                None,
+            )
+            .await?;
+
+        let (frontend_asset_access_key_id, frontend_asset_token) = self
+            .mint_with_expiry(
+                &format!("fn0 frontend assets ({project_id})"),
+                vec![self.bucket_scope(&[&resources.frontend_asset_bucket])],
                 None,
             )
             .await?;
@@ -578,13 +642,16 @@ impl Provisioner {
             .await?;
 
         let minted = MintedCredentialIds {
-            dataplane: dataplane_access_key_id.clone(),
+            worker: worker_access_key_id.clone(),
+            frontend_asset: frontend_asset_access_key_id.clone(),
             purge: purge_token_id,
         };
         Ok((
-            DataPlaneCredentials {
-                dataplane_access_key_id,
-                dataplane_secret: hex_sha256(&dataplane_token),
+            ConnectCredentials {
+                worker_access_key_id,
+                worker_secret: hex_sha256(&worker_token),
+                frontend_asset_access_key_id,
+                frontend_asset_secret: hex_sha256(&frontend_asset_token),
                 purge_token,
             },
             minted,
@@ -595,7 +662,11 @@ impl Provisioner {
     /// token these carry no expiry, so one left behind stays until the user
     /// finds it.
     pub async fn revoke_minted_credentials(&self, ids: &MintedCredentialIds) {
-        for (purpose, id) in [("data plane", &ids.dataplane), ("cache purge", &ids.purge)] {
+        for (purpose, id) in [
+            ("worker", &ids.worker),
+            ("frontend assets", &ids.frontend_asset),
+            ("cache purge", &ids.purge),
+        ] {
             if let Err(error) = self.revoke_token(purpose, id).await {
                 eprintln!("warning: {error}. Delete it in the Cloudflare dashboard.");
             }
@@ -708,12 +779,15 @@ fn hex_sha256(value: &str) -> String {
     out
 }
 
+/// Deliberately does not accept "already in use": Cloudflare answers that when a
+/// hostname is attached to a *different* bucket, which is a failure to report
+/// rather than a step to skip. Treating it as success ends in a hostname that
+/// resolves and serves 404 for every object.
 fn already_exists(errors: &[ApiError]) -> bool {
     errors.iter().any(|error| {
         let message = error.message.to_lowercase();
         message.contains("already exists")
             || message.contains("already configured")
-            || message.contains("already in use")
             || message.contains("duplicate")
     })
 }

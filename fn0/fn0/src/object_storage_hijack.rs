@@ -9,7 +9,9 @@
 //! straight through.
 
 use crate::presign_gate::PresignGate;
-use crate::storage_target::{ObjectStorageResolver, R2Credentials, StaticResolver};
+use crate::storage_target::{
+    ObjectStorageResolver, PrivateObjectStorageTarget, R2Credentials, StaticResolver,
+};
 use bytes::Bytes;
 use chrono::Utc;
 use hmac::{Hmac, Mac};
@@ -27,7 +29,6 @@ type HmacSha256 = Hmac<Sha256>;
 type HijackRequest = hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>;
 type HijackResponse = hyper::Response<UnsyncBoxBody<Bytes, ErrorCode>>;
 
-const BUCKET_PREFIX: &str = "fn0-object-storage-";
 const SIDECAR_SUFFIX: &str = ".__fn0meta";
 
 // Expiry is the only revocation mechanism for a minted URL: once minting is
@@ -67,17 +68,21 @@ impl ObjectStorageHijack {
         placeholder_host: String,
         account_id: String,
         region: String,
+        bucket: String,
         access_key_id: String,
         secret_access_key: String,
     ) -> Self {
         Self::new_r2_resolved(
             placeholder_host,
-            Arc::new(StaticResolver::new(R2Credentials::for_account(
-                &account_id,
-                region,
-                access_key_id,
-                secret_access_key,
-            ))),
+            Arc::new(StaticResolver::new(PrivateObjectStorageTarget {
+                credentials: R2Credentials::for_account(
+                    &account_id,
+                    region,
+                    access_key_id,
+                    secret_access_key,
+                ),
+                bucket,
+            })),
         )
     }
 
@@ -122,6 +127,7 @@ impl ObjectStorageHijack {
             placeholder_host,
             var("FN0_OBJECT_STORAGE_ACCOUNT_ID")?,
             region,
+            var("FN0_OBJECT_STORAGE_BUCKET")?,
             var("FN0_OBJECT_STORAGE_ACCESS_KEY_ID")?,
             var("FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY")?,
         ))
@@ -150,15 +156,15 @@ impl ObjectStorageHijack {
                 "sign_r2 called on local backend".to_string(),
             )));
         };
-        let credentials = resolve(resolver.as_ref(), project_id)?;
+        let target = resolve(resolver.as_ref(), project_id)?;
         let R2Credentials {
             endpoint_host,
             region,
             access_key_id,
             secret_access_key,
-        } = credentials.as_ref();
+        } = &target.credentials;
 
-        let bucket = format!("{BUCKET_PREFIX}{project_id}");
+        let bucket = &target.bucket;
         let method = req.method().to_string();
         let path_and_query = req
             .uri()
@@ -335,14 +341,14 @@ impl ObjectStorageHijack {
                 dev_base_url.trim_end_matches('/')
             )),
             Backend::R2 { resolver } => {
-                let credentials = resolve(resolver.as_ref(), project_id)?;
+                let target = resolve(resolver.as_ref(), project_id)?;
                 let R2Credentials {
                     endpoint_host,
                     region,
                     access_key_id,
                     secret_access_key,
-                } = credentials.as_ref();
-                let bucket = format!("{BUCKET_PREFIX}{project_id}");
+                } = &target.credentials;
+                let bucket = &target.bucket;
                 let canonical_uri = if raw_path == "/" {
                     format!("/{bucket}")
                 } else {
@@ -452,7 +458,7 @@ impl ObjectStorageHijack {
 fn resolve(
     resolver: &dyn ObjectStorageResolver,
     project_id: &str,
-) -> Result<Arc<R2Credentials>, ErrorCode> {
+) -> Result<Arc<PrivateObjectStorageTarget>, ErrorCode> {
     resolver.resolve(project_id).ok_or_else(|| {
         ErrorCode::InternalError(Some(format!(
             "no object storage target for project {project_id}"

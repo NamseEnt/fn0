@@ -10,7 +10,8 @@
 //!   asset prefixes.
 
 use crate::common::admin;
-use crate::common::r2_store::{BundleStore, StaticAssetStore, parse_compiled_key};
+use crate::common::byoc::ProjectStorage;
+use crate::common::r2_store::{BundleStore, ProjectR2Store, parse_compiled_key};
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -62,7 +63,6 @@ pub struct GcStats {
 pub async fn run_gc() -> anyhow::Result<GcStats> {
     let db = doc_db::turso();
     let bundle_store = BundleStore::from_env()?;
-    let static_store = StaticAssetStore::from_env()?;
     let now = forte_sdk::now();
 
     let pending_fn0_wasmtime_version = (Fn0WasmtimeVersionDocGet {})
@@ -74,13 +74,12 @@ pub async fn run_gc() -> anyhow::Result<GcStats> {
     gc_superseded_versions(
         &db,
         &bundle_store,
-        &static_store,
         now,
         pending_fn0_wasmtime_version.as_deref(),
         &mut stats,
     )
     .await?;
-    gc_abandoned_uploads(&db, &bundle_store, &static_store, now, &mut stats).await?;
+    gc_abandoned_uploads(&db, &bundle_store, now, &mut stats).await?;
 
     let deleted = metrics::meter().u64_counter("fn0.gc.deleted").build();
     for (kind, count) in [
@@ -103,7 +102,6 @@ pub async fn run_gc() -> anyhow::Result<GcStats> {
 async fn gc_superseded_versions(
     db: &doc_db::Database,
     bundle_store: &BundleStore,
-    static_store: &StaticAssetStore,
     now: DateTime,
     pending_fn0_wasmtime_version: Option<&str>,
     stats: &mut GcStats,
@@ -158,25 +156,24 @@ async fn gc_superseded_versions(
         }
 
         if latest_age_secs >= STATIC_ASSET_GRACE_SECS {
-            gc_superseded_static_prefixes(static_store, project_id, latest, now, stats).await?;
+            gc_superseded_frontend_assets(db, project_id, latest, now, stats).await?;
         }
     }
     Ok(())
 }
 
-async fn gc_superseded_static_prefixes(
-    static_store: &StaticAssetStore,
+async fn gc_superseded_frontend_assets(
+    db: &doc_db::Database,
     project_id: &str,
     latest: u64,
     now: DateTime,
     stats: &mut GcStats,
 ) -> anyhow::Result<()> {
-    let objects = static_store
-        .list_all(&format!("{project_id}/"), now)
-        .await?;
+    let store = ProjectR2Store::frontend_assets(&ProjectStorage::resolve(db, project_id).await?);
+    let objects = store.list_all("", now).await?;
     let mut keys_by_code_version: HashMap<u64, Vec<String>> = HashMap::new();
     for object in objects {
-        let Some(code_version) = parse_static_key(project_id, &object.key) else {
+        let Some(code_version) = parse_frontend_asset_key(&object.key) else {
             continue;
         };
         keys_by_code_version
@@ -189,7 +186,7 @@ async fn gc_superseded_static_prefixes(
             continue;
         }
         for key in keys {
-            static_store.delete(&key, now).await?;
+            store.delete(&key, now).await?;
         }
         stats.deleted_static_prefixes += 1;
     }
@@ -199,7 +196,6 @@ async fn gc_superseded_static_prefixes(
 async fn gc_abandoned_uploads(
     db: &doc_db::Database,
     bundle_store: &BundleStore,
-    static_store: &StaticAssetStore,
     now: DateTime,
     stats: &mut GcStats,
 ) -> anyhow::Result<()> {
@@ -240,26 +236,25 @@ async fn gc_abandoned_uploads(
         }
         bundle_store.delete(&object.key, now).await?;
         stats.deleted_orphans += 1;
-        gc_abandoned_static_prefix(static_store, &project_id, code_version, now, stats).await?;
+        gc_abandoned_frontend_assets(db, &project_id, code_version, now, stats).await?;
     }
     Ok(())
 }
 
-async fn gc_abandoned_static_prefix(
-    static_store: &StaticAssetStore,
+async fn gc_abandoned_frontend_assets(
+    db: &doc_db::Database,
     project_id: &str,
     code_version: u64,
     now: DateTime,
     stats: &mut GcStats,
 ) -> anyhow::Result<()> {
-    let objects = static_store
-        .list_all(&format!("{project_id}/{code_version}/"), now)
-        .await?;
+    let store = ProjectR2Store::frontend_assets(&ProjectStorage::resolve(db, project_id).await?);
+    let objects = store.list_all(&format!("{code_version}/"), now).await?;
     if objects.is_empty() {
         return Ok(());
     }
     for object in objects {
-        static_store.delete(&object.key, now).await?;
+        store.delete(&object.key, now).await?;
     }
     stats.deleted_static_prefixes += 1;
     Ok(())
@@ -297,9 +292,8 @@ fn parse_original_key(key: &str) -> Option<(String, u64)> {
     Some((project_id.to_string(), code_version.parse().ok()?))
 }
 
-fn parse_static_key(project_id: &str, key: &str) -> Option<u64> {
-    let rest = key.strip_prefix(project_id)?.strip_prefix('/')?;
-    rest.split_once('/')?.0.parse().ok()
+fn parse_frontend_asset_key(key: &str) -> Option<u64> {
+    key.split_once('/')?.0.parse().ok()
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {

@@ -136,7 +136,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    if let Err(e) = ensure_all_resources(&req.body.project_id, &storage).await {
+    if let Err(e) = ensure_all_resources(&req.body.project_id).await {
         tracing::error!("deploy ensure_all_resources: {e}");
         return Output::InternalError;
     }
@@ -174,14 +174,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             .files
             .iter()
             .map(|f| {
-                let key = format!("{}/{}/{}", project.project_id, code_version, f.path);
+                let key = format!("{}/{}", code_version, f.path);
                 let url = aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
                     account_id: &storage.account_id,
-                    bucket: &storage.asset_bucket,
+                    bucket: &storage.frontend_asset_bucket,
                     region: "auto",
                     key: &key,
-                    access_key_id: &storage.asset_keys.access_key_id,
-                    secret_access_key: &storage.asset_keys.secret_access_key,
+                    access_key_id: &storage.frontend_asset_keys.access_key_id,
+                    secret_access_key: &storage.frontend_asset_keys.secret_access_key,
                     expires_seconds: 600,
                     now: now_dt,
                     content_length: Some(f.size),
@@ -280,25 +280,12 @@ impl BundleEnv {
     }
 }
 
-async fn ensure_all_resources(project_id: &str, storage: &ProjectStorage) -> anyhow::Result<()> {
-    ensure_turso_database(project_id).await?;
-    // A connected project's buckets were created by the CLI at connect time,
-    // with a token that is gone. Control has no way to create one here and no
-    // need to: `cloudflare_connect` refuses a configuration whose buckets it
-    // cannot reach.
-    if !storage.is_byoc() {
-        ensure_platform_object_bucket(&storage.object_bucket).await?;
-    }
-    Ok(())
-}
-
-async fn ensure_platform_object_bucket(bucket: &str) -> anyhow::Result<()> {
-    let cloudflare = crate::common::cloudflare::CloudflareClient::from_env()?;
-    cloudflare.create_r2_bucket(bucket, Some("apac")).await?;
-    cloudflare
-        .put_r2_bucket_cors(bucket, &["GET", "PUT", "HEAD"], "*", &["ETag"])
-        .await?;
-    Ok(())
+/// Buckets are deliberately absent here. They were created by the CLI at
+/// connect time with a token that is gone, and `cloudflare_connect` refuses a
+/// configuration whose buckets it cannot reach — so by the time a deploy runs,
+/// they exist.
+async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
+    ensure_turso_database(project_id).await
 }
 
 async fn ensure_turso_database(project_id: &str) -> anyhow::Result<()> {
@@ -347,6 +334,5 @@ fn database_already_exists(body: &[u8]) -> bool {
         error: String,
     }
 
-    serde_json::from_slice::<TursoError>(body)
-        .is_ok_and(|parsed| parsed.error == ALREADY_EXISTS)
+    serde_json::from_slice::<TursoError>(body).is_ok_and(|parsed| parsed.error == ALREADY_EXISTS)
 }

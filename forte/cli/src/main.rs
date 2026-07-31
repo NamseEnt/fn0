@@ -103,8 +103,10 @@ async fn async_main() -> Result<()> {
                 zone_id,
                 api_token,
                 zone_name,
-                dataplane_access_key_id,
-                dataplane_secret,
+                worker_access_key_id,
+                worker_secret,
+                frontend_asset_access_key_id,
+                frontend_asset_secret,
                 purge_token,
                 project,
             } => {
@@ -115,8 +117,10 @@ async fn async_main() -> Result<()> {
                     zone_id,
                     api_token,
                     zone_name,
-                    dataplane_access_key_id,
-                    dataplane_secret,
+                    worker_access_key_id,
+                    worker_secret,
+                    frontend_asset_access_key_id,
+                    frontend_asset_secret,
                     purge_token,
                 )
                 .await?;

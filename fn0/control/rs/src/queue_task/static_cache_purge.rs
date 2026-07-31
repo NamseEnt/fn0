@@ -50,17 +50,14 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Which edge holds this project's cached pages follows the hostname the
-    // visitor used, not where the objects are stored. Every project is
-    // reachable at `{project_id}.fn0.dev`, so the platform zone always has a
-    // copy to invalidate; a custom domain on the owner's own zone puts a
-    // second copy there, and that one is purged with their own token off
-    // their own budget.
+    // The edge holding this project's cached pages is the owner's own, reached
+    // through the custom domain on their zone, and purged with their own token
+    // off their own budget.
     let user_zone = match entry.custom_domain.clone() {
-        Some(domain) => {
-            let storage = ProjectStorage::resolve(&db, &input.project_id).await?;
-            storage.is_byoc().then_some((storage, domain))
-        }
+        Some(domain) => Some((
+            ProjectStorage::resolve(&db, &input.project_id).await?,
+            domain,
+        )),
         None => None,
     };
     let platform = CloudflareClient::from_env()?;
@@ -112,7 +109,7 @@ async fn purge_user_zone(
     };
     let tag = format!("fn0-project-{}", input.project_id);
     storage
-        .purge_client()?
+        .purge_client()
         .purge_cache_tags(&[tag.as_str()])
         .await?;
     tracing::info!(

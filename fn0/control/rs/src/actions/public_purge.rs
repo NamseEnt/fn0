@@ -68,7 +68,11 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             };
         }
     };
-    let cdn_origin = storage.public_base_url.as_str();
+    let cdn_origin = format!(
+        "https://{}",
+        storage.connection.public_object_storage_hostname
+    );
+    let cdn_origin = cdn_origin.as_str();
 
     let urls: Vec<String> = req
         .body

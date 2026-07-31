@@ -1,4 +1,5 @@
-//! Shared path and telemetry rules for lazy static page caching.
+//! Path and telemetry rules shared by everything that caches server-rendered
+//! HTML: which request paths are cacheable, and what a hit, miss or render costs.
 
 use opentelemetry::{KeyValue, global};
 use sha2::{Digest, Sha256};
@@ -6,7 +7,7 @@ use sha2::{Digest, Sha256};
 pub const PAGE_DIRECTORY: &str = "__forte/pages";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StaticPageError {
+pub enum RenderedHtmlPathError {
     EmptyPath,
     MissingLeadingSlash,
     QueryOrFragment,
@@ -15,7 +16,7 @@ pub enum StaticPageError {
     Backslash,
 }
 
-impl std::fmt::Display for StaticPageError {
+impl std::fmt::Display for RenderedHtmlPathError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyPath => write!(formatter, "path is empty"),
@@ -32,20 +33,20 @@ impl std::fmt::Display for StaticPageError {
     }
 }
 
-impl std::error::Error for StaticPageError {}
+impl std::error::Error for RenderedHtmlPathError {}
 
-pub fn normalize_path(path: &str) -> Result<String, StaticPageError> {
+pub fn normalize_path(path: &str) -> Result<String, RenderedHtmlPathError> {
     if path.is_empty() {
-        return Err(StaticPageError::EmptyPath);
+        return Err(RenderedHtmlPathError::EmptyPath);
     }
     if !path.starts_with('/') {
-        return Err(StaticPageError::MissingLeadingSlash);
+        return Err(RenderedHtmlPathError::MissingLeadingSlash);
     }
     if path.contains(['?', '#']) {
-        return Err(StaticPageError::QueryOrFragment);
+        return Err(RenderedHtmlPathError::QueryOrFragment);
     }
     if path.contains('\\') {
-        return Err(StaticPageError::Backslash);
+        return Err(RenderedHtmlPathError::Backslash);
     }
 
     let bytes = path.as_bytes();
@@ -58,15 +59,15 @@ pub fn normalize_path(path: &str) -> Result<String, StaticPageError> {
             continue;
         }
         if byte_offset + 2 >= bytes.len() {
-            return Err(StaticPageError::InvalidPercentEncoding);
+            return Err(RenderedHtmlPathError::InvalidPercentEncoding);
         }
-        let high =
-            hex_value(bytes[byte_offset + 1]).ok_or(StaticPageError::InvalidPercentEncoding)?;
-        let low =
-            hex_value(bytes[byte_offset + 2]).ok_or(StaticPageError::InvalidPercentEncoding)?;
+        let high = hex_value(bytes[byte_offset + 1])
+            .ok_or(RenderedHtmlPathError::InvalidPercentEncoding)?;
+        let low = hex_value(bytes[byte_offset + 2])
+            .ok_or(RenderedHtmlPathError::InvalidPercentEncoding)?;
         let decoded = high * 16 + low;
         if decoded == b'\\' {
-            return Err(StaticPageError::Backslash);
+            return Err(RenderedHtmlPathError::Backslash);
         }
         normalized_bytes.push(b'%');
         normalized_bytes.push(upper_hex_byte(high));
@@ -77,7 +78,7 @@ pub fn normalize_path(path: &str) -> Result<String, StaticPageError> {
 
     for segment in normalized.split('/') {
         if is_dot_segment(segment) {
-            return Err(StaticPageError::DotSegment);
+            return Err(RenderedHtmlPathError::DotSegment);
         }
     }
 
@@ -96,7 +97,7 @@ pub fn object_path_for(normalized_path: &str) -> String {
 
 pub fn record_result(project_id: &str, code_version: u64, object_path: &str, result: &'static str) {
     global::meter("fn0")
-        .u64_counter("fn0.static_page_requests")
+        .u64_counter("fn0.rendered_html_requests")
         .build()
         .add(
             1,
@@ -116,7 +117,7 @@ pub fn record_generation_duration(
     duration: std::time::Duration,
 ) {
     global::meter("fn0")
-        .f64_histogram("fn0.static_page_generation_duration_seconds")
+        .f64_histogram("fn0.rendered_html_generation_duration_seconds")
         .build()
         .record(
             duration.as_secs_f64(),

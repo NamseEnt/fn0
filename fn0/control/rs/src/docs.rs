@@ -133,20 +133,19 @@ pub enum CloudflareConnectionState {
     },
 }
 
-/// The Cloudflare account a project's objects, assets, pages and custom domain
-/// live in.
+/// The Cloudflare account a project's objects, assets, cached HTML and custom
+/// domain live in.
 ///
 /// Deliberately absent: the account-wide token that created all of this. That
 /// token can delete every bucket in the user's account and sign certificates
 /// for their zone, and fn0 never receives it — the CLI uses it on the user's
-/// own machine to provision, mints the two narrow credentials below, and
-/// discards it. What is stored here is what a full compromise of the worker
-/// fleet would yield: object access to three buckets, and cache purge.
+/// own machine to provision, mints the narrow credentials below, and discards
+/// it.
 ///
-/// Buckets are per Cloudflare account, not per project: one account's projects
-/// share `asset_bucket` and `page_bucket` under `{project_id}/` prefixes, so a
-/// user's zone needs one `static.` DNS record however many projects they run.
-/// `object_bucket` is per project.
+/// Every bucket is this project's alone, and the two that are served publicly
+/// answer on a hostname that is their own name in the owner's zone. Nothing is
+/// shared between projects, so no key prefix carries tenancy and no listing
+/// walks another project's objects.
 #[forte_doc]
 pub struct ProjectCloudflareConfigDoc {
     #[pk]
@@ -154,15 +153,22 @@ pub struct ProjectCloudflareConfigDoc {
     pub account_id: String,
     pub zone_id: String,
     pub zone_name: String,
-    pub static_hostname: String,
-    pub object_bucket: String,
-    pub asset_bucket: String,
-    pub page_bucket: String,
-    /// R2 object read+write, scoped to the three buckets above. Cannot delete a
-    /// bucket, cannot reach any other bucket, and cannot call the REST API at
-    /// all — measured, not assumed.
-    pub dataplane_access_key_id: String,
-    pub dataplane_secret_ciphertext: String,
+    pub frontend_asset_hostname: String,
+    pub public_object_storage_hostname: String,
+    pub private_object_storage_bucket: String,
+    pub public_object_storage_bucket: String,
+    pub frontend_asset_bucket: String,
+    pub rendered_html_cache_bucket: String,
+    /// R2 object read+write on the two object-storage buckets and the
+    /// rendered-HTML cache. The only R2 credential published to the fleet, so
+    /// this is what a full compromise of the workers would yield.
+    pub worker_access_key_id: String,
+    pub worker_secret_ciphertext: String,
+    /// R2 object read+write on the frontend-asset bucket alone, and never sent
+    /// to a worker. Asset GC deletes on a schedule; scoping it here is what
+    /// bounds a mistake in it to artifacts a redeploy rebuilds.
+    pub frontend_asset_access_key_id: String,
+    pub frontend_asset_secret_ciphertext: String,
     /// Cache purge on this one zone, and nothing else. Runtime needs it because
     /// a public object write purges its edge copy, and that happens on a
     /// request rather than on the user's machine.

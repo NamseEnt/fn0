@@ -1,10 +1,9 @@
 //! Public-object hijack: turns the placeholder endpoint that `object_storage::public`
-//! talks to into a signed request against the shared static-asset bucket.
+//! talks to into a signed request against the project's public-object bucket.
 //!
-//! Unlike [`crate::object_storage_hijack`], every project shares one bucket here
-//! and is separated by a `{project_id}/public/` key prefix, because the bucket's
-//! custom domain is what serves the objects and a domain per project would
-//! exhaust the zone's DNS records.
+//! The bucket is the project's own and carries its own CDN hostname, so a
+//! guest's key is the whole key — the object it writes at `clips/intro.mp4` is
+//! served from `https://{bucket}.{zone}/clips/intro.mp4`.
 //!
 //! The cache header is stamped here rather than accepted from the guest. An app
 //! that could set its own `max-age` would put copies in browsers that no purge
@@ -34,8 +33,6 @@ type HijackRequest = hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>;
 /// so an overwrite plus a purge is visible to returning visitors immediately.
 /// `s-maxage` is long because purge, not expiry, is the correctness mechanism.
 const PUBLIC_CACHE_CONTROL: &str = "public, max-age=0, s-maxage=31536000";
-
-const KEY_PREFIX: &str = "public";
 
 #[derive(Clone)]
 pub struct PublicStorageHijack {
@@ -149,9 +146,6 @@ impl PublicStorageHijack {
             .unwrap_or_else(|_| "fn0-public-storage.fn0.dev".to_string());
         let region =
             std::env::var("FN0_PUBLIC_STORAGE_REGION").unwrap_or_else(|_| "auto".to_string());
-        // Deliberately not the worker's `FN0_STATIC_ASSET_STORAGE_*`: those name
-        // the private `fn0-static-page-*` bucket that holds cached HTML. Public
-        // objects belong in the bucket that carries the CDN custom domain.
         Ok(Self::new(PublicStorageConfig {
             placeholder_host,
             account_id: var("FN0_PUBLIC_STORAGE_ACCOUNT_ID")?,
@@ -168,19 +162,13 @@ impl PublicStorageHijack {
         format!("http://{}", self.placeholder_host)
     }
 
-    /// The base a guest builds public URLs from, already scoped to the project.
+    /// The base a guest builds public URLs from.
     ///
     /// `None` when the project has no public storage target, which is what a
     /// project that has not connected a Cloudflare account looks like.
-    ///
-    /// `forte dev` serves one project out of one store, so it carries no project
-    /// segment and the URL matches the key the local backend actually writes.
     pub fn public_base_url_for(&self, project_id: &str) -> Option<String> {
         match &self.backend {
-            Backend::R2 { resolver } => {
-                let target = resolver.resolve(project_id)?;
-                Some(format!("{}/{project_id}/{KEY_PREFIX}", target.base_url))
-            }
+            Backend::R2 { resolver } => Some(resolver.resolve(project_id)?.base_url.clone()),
             Backend::LocalFs { base_url, .. } => Some(base_url.clone()),
         }
     }
@@ -260,7 +248,7 @@ impl PublicStorageHijack {
             access_key_id,
             secret_access_key,
         } = &target.credentials;
-        let canonical_uri = object_path(&target.bucket, project_id, req.uri().path());
+        let canonical_uri = object_path(&target.bucket, req.uri().path());
         let expires = expires_secs.clamp(1, PRESIGN_MAX_EXPIRES_SECS);
         let now = Utc::now();
         let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
@@ -347,7 +335,7 @@ impl PublicStorageHijack {
             .cloned()
             .unwrap_or_else(|| "/".parse().unwrap());
         let query = path_and_query.query();
-        let canonical_uri = object_path(&target.bucket, project_id, path_and_query.path());
+        let canonical_uri = object_path(&target.bucket, path_and_query.path());
 
         let is_write = matches!(req.method(), &hyper::Method::PUT | &hyper::Method::POST);
         if is_write {
@@ -448,13 +436,12 @@ fn placeholder_host_for_local() -> String {
     "fn0-public-storage.local".to_string()
 }
 
-/// The object key a guest request lands on, namespaced to the project.
-fn object_path(bucket: &str, project_id: &str, raw_path: &str) -> String {
+fn object_path(bucket: &str, raw_path: &str) -> String {
     let key = raw_path.trim_start_matches('/');
     if key.is_empty() {
-        format!("/{bucket}/{project_id}/{KEY_PREFIX}")
+        format!("/{bucket}")
     } else {
-        format!("/{bucket}/{project_id}/{KEY_PREFIX}/{key}")
+        format!("/{bucket}/{key}")
     }
 }
 
@@ -475,7 +462,7 @@ mod tests {
         // cacheable max-age that no purge could ever reach.
         assert!(url.contains("X-Amz-SignedHeaders=cache-control%3Bcontent-type%3Bhost"));
         assert!(url.contains("X-Amz-Signature="));
-        assert!(url.contains("/fn0-static-asset/proj1/public/clips/intro.mp4?"));
+        assert!(url.contains("/fn0-proj1-public-object-storage/clips/intro.mp4?"));
     }
 
     #[test]
@@ -492,11 +479,11 @@ mod tests {
         PublicStorageHijack::new(PublicStorageConfig {
             placeholder_host: "fn0-public-storage.fn0.dev".to_string(),
             account_id: "acct".to_string(),
-            bucket: "fn0-static-asset".to_string(),
+            bucket: "fn0-proj1-public-object-storage".to_string(),
             region: "auto".to_string(),
             access_key_id: "key".to_string(),
             secret_access_key: "secret".to_string(),
-            public_base_url: "https://static.fn0.dev".to_string(),
+            public_base_url: "https://fn0-proj1-public-object-storage.example".to_string(),
             control_project_id: "fn0-control".to_string(),
         })
     }
@@ -514,7 +501,7 @@ mod tests {
     }
 
     #[test]
-    fn namespaces_keys_under_the_project() {
+    fn a_guests_key_is_the_whole_key() {
         let mut req = request(
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/clips/a.mp4",
@@ -522,7 +509,7 @@ mod tests {
         hijack().sign(&mut req, "proj1").unwrap();
         assert_eq!(
             req.uri().path(),
-            "/fn0-static-asset/proj1/public/clips/a.mp4"
+            "/fn0-proj1-public-object-storage/clips/a.mp4"
         );
         assert_eq!(req.uri().host(), Some("acct.r2.cloudflarestorage.com"));
     }
@@ -583,15 +570,15 @@ mod tests {
         let hijack = hijack();
         assert_eq!(
             hijack.public_url_for("proj1", "/clips/intro.mp4").unwrap(),
-            "https://static.fn0.dev/proj1/public/clips/intro.mp4"
+            "https://fn0-proj1-public-object-storage.example/clips/intro.mp4"
         );
     }
 
     #[test]
-    fn public_base_url_is_scoped_to_the_project() {
+    fn public_base_url_is_the_projects_own_cdn_origin() {
         assert_eq!(
             hijack().public_base_url_for("proj1").unwrap(),
-            "https://static.fn0.dev/proj1/public"
+            "https://fn0-proj1-public-object-storage.example"
         );
     }
 
@@ -627,7 +614,7 @@ mod tests {
             first.uri().host(),
             Some("acct-one.r2.cloudflarestorage.com")
         );
-        assert_eq!(first.uri().path(), "/assets-one/one/public/a.txt");
+        assert_eq!(first.uri().path(), "/assets-one/a.txt");
 
         let mut second = request(
             hyper::Method::PUT,
@@ -638,11 +625,11 @@ mod tests {
             second.uri().host(),
             Some("acct-two.r2.cloudflarestorage.com")
         );
-        assert_eq!(second.uri().path(), "/assets-two/two/public/a.txt");
+        assert_eq!(second.uri().path(), "/assets-two/a.txt");
 
         assert_eq!(
             hijack.public_base_url_for("two").unwrap(),
-            "https://static.two.example/two/public"
+            "https://static.two.example"
         );
     }
 
@@ -668,16 +655,16 @@ mod tests {
     }
 
     #[test]
-    fn one_project_cannot_reach_another_via_traversal() {
+    fn a_traversing_key_cannot_leave_the_projects_bucket() {
         let mut req = request(
             hyper::Method::PUT,
-            "http://fn0-public-storage.fn0.dev/../proj2/public/x",
+            "http://fn0-public-storage.fn0.dev/../fn0-proj2-public-object-storage/x",
         );
         hijack().sign(&mut req, "proj1").unwrap();
         assert!(
             req.uri()
                 .path()
-                .starts_with("/fn0-static-asset/proj1/public/")
+                .starts_with("/fn0-proj1-public-object-storage/")
         );
     }
 }

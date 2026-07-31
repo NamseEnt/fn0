@@ -208,7 +208,7 @@ by the CDN, for assets embedded in HTML that outlives a signature.
 let public = object_storage::public::bucket();
 
 let url = public.put("clips/intro.mp4", "video/mp4", bytes).await?;
-// https://static.fn0.dev/<project_id>/public/clips/intro.mp4
+// https://fn0-<project_id>-public-object-storage.<your-domain>/clips/intro.mp4
 
 public.url("clips/intro.mp4");   // same string, no request
 public.delete("clips/intro.mp4").await?;

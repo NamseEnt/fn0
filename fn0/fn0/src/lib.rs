@@ -12,8 +12,8 @@ pub mod presign_gate;
 pub mod public_storage_hijack;
 pub mod purge_gate;
 pub mod queue_hijack;
+pub mod rendered_html;
 mod self_invoke;
-pub mod static_pages;
 pub mod storage_target;
 pub mod telemetry;
 pub mod turso_hijack;
@@ -54,8 +54,8 @@ pub use purge_gate::PurgeGate;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
 pub use storage_target::{
-    ObjectStorageResolver, PublicStorageResolver, PublicStorageTarget, R2Credentials,
-    StaticResolver,
+    ObjectStorageResolver, PrivateObjectStorageTarget, PublicStorageResolver, PublicStorageTarget,
+    R2Credentials, StaticResolver,
 };
 pub use turso_hijack::TursoHijack;
 pub use vault_hijack::VaultHijack;
@@ -66,11 +66,10 @@ pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
 pub type Request = hyper::Request<Body>;
 pub type Response = hyper::Response<Body>;
 
-/// `project_id` is passed alongside the key rather than parsed back out of it:
-/// the key is only conventionally prefixed with the project, and a store that
-/// picks one project's bucket by parsing another project's string is a tenancy
-/// boundary held together by a `split('/')`.
-pub trait StaticPageStorage: Send + Sync {
+/// `project_id` selects the bucket and the key addresses within it. The key
+/// carries no project segment at all, so there is nothing to parse it out of
+/// and no way for one project's string to name another project's store.
+pub trait RenderedHtmlCache: Send + Sync {
     fn read<'storage>(
         &'storage self,
         project_id: &'storage str,
@@ -92,7 +91,7 @@ const CACHE_POLICY_STATIC_VALUE: &str = "static";
 /// The edge holds a static page for a year because the deploy-time `cache-tag`
 /// purge, not expiry, is what replaces it. A shorter TTL would only add origin
 /// hits that return the same bytes.
-const STATIC_PAGE_CDN_CACHE_CONTROL: &str = "public, max-age=31536000";
+const RENDERED_HTML_CDN_CACHE_CONTROL: &str = "public, max-age=31536000";
 const EXECUTION_TIME_METRIC_KEY_HEADER: &str = "x-fn0-execution-time-metric-key";
 const FN0_HEADER_PREFIX: &str = "x-fn0-";
 
@@ -129,7 +128,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
     pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     pub(crate) public_storage_hijack: Option<Arc<PublicStorageHijack>>,
-    pub(crate) static_page_storage: Option<Arc<dyn StaticPageStorage>>,
+    pub(crate) rendered_html_cache: Option<Arc<dyn RenderedHtmlCache>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -146,7 +145,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             vault_hijack: None,
             object_storage_hijack: None,
             public_storage_hijack: None,
-            static_page_storage: None,
+            rendered_html_cache: None,
         }
     }
 
@@ -202,8 +201,8 @@ impl<C: BundleCache> ExecutionContext<C> {
         self
     }
 
-    pub fn with_static_page_storage(mut self, storage: Arc<dyn StaticPageStorage>) -> Self {
-        self.static_page_storage = Some(storage);
+    pub fn with_rendered_html_cache(mut self, storage: Arc<dyn RenderedHtmlCache>) -> Self {
+        self.rendered_html_cache = Some(storage);
         self
     }
 
@@ -251,8 +250,8 @@ impl<C: BundleCache> ExecutionContext<C> {
         self.public_storage_hijack.as_ref()
     }
 
-    pub fn static_page_storage(&self) -> Option<&Arc<dyn StaticPageStorage>> {
-        self.static_page_storage.as_ref()
+    pub fn rendered_html_cache(&self) -> Option<&Arc<dyn RenderedHtmlCache>> {
+        self.rendered_html_cache.as_ref()
     }
 }
 
@@ -363,13 +362,13 @@ impl<C: BundleCache> CodeExecutor<C> {
         bundle: Arc<Bundle>,
         request: Request,
     ) -> Result<Response> {
-        if let Some(candidate) = static_page_candidate(project_id, &bundle, &request)
-            && let Some(storage) = self.ctx.static_page_storage.as_ref()
+        if let Some(candidate) = rendered_html_candidate(&bundle, &request)
+            && let Some(storage) = self.ctx.rendered_html_cache.as_ref()
             && self
-                .static_page_preflight(project_id, &bundle, &candidate, &request)
+                .rendered_html_preflight(project_id, &bundle, &candidate, &request)
                 .await
         {
-            static_pages::record_result(
+            rendered_html::record_result(
                 project_id,
                 candidate.code_version,
                 &candidate.object_path,
@@ -377,16 +376,18 @@ impl<C: BundleCache> CodeExecutor<C> {
             );
             match storage.read(project_id, &candidate.object_key).await {
                 Ok(Some(body)) => {
-                    static_pages::record_result(
+                    rendered_html::record_result(
                         project_id,
                         candidate.code_version,
                         &candidate.object_path,
                         "hit",
                     );
-                    return Ok(static_page_response(project_id, &candidate, body, &request));
+                    return Ok(rendered_html_response(
+                        project_id, &candidate, body, &request,
+                    ));
                 }
                 Ok(None) => {
-                    static_pages::record_result(
+                    rendered_html::record_result(
                         project_id,
                         candidate.code_version,
                         &candidate.object_path,
@@ -401,7 +402,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                     let result = self
                         .finish_static_response(project_id, &candidate, response, used_js)
                         .await;
-                    static_pages::record_generation_duration(
+                    rendered_html::record_generation_duration(
                         project_id,
                         candidate.code_version,
                         &candidate.object_path,
@@ -410,7 +411,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                     return result;
                 }
                 Err(error) => {
-                    static_pages::record_result(
+                    rendered_html::record_result(
                         project_id,
                         candidate.code_version,
                         &candidate.object_path,
@@ -436,11 +437,11 @@ impl<C: BundleCache> CodeExecutor<C> {
         Ok(response)
     }
 
-    async fn static_page_preflight(
+    async fn rendered_html_preflight(
         &self,
         project_id: &str,
         bundle: &Arc<Bundle>,
-        candidate: &StaticPageCandidate,
+        candidate: &RenderedHtmlCandidate,
         incoming: &Request,
     ) -> bool {
         // The guest rebuilds its URI as `{scheme}://{authority}{path}`, taking the
@@ -461,7 +462,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let request = match request {
             Ok(request) => request,
             Err(error) => {
-                static_pages::record_result(
+                rendered_html::record_result(
                     project_id,
                     candidate.code_version,
                     &candidate.object_path,
@@ -490,7 +491,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 true
             }
             Ok(_) => {
-                static_pages::record_result(
+                rendered_html::record_result(
                     project_id,
                     candidate.code_version,
                     &candidate.object_path,
@@ -499,7 +500,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 false
             }
             Err(error) => {
-                static_pages::record_result(
+                rendered_html::record_result(
                     project_id,
                     candidate.code_version,
                     &candidate.object_path,
@@ -555,7 +556,7 @@ impl<C: BundleCache> CodeExecutor<C> {
     async fn finish_static_response(
         &self,
         project_id: &str,
-        candidate: &StaticPageCandidate,
+        candidate: &RenderedHtmlCandidate,
         response: Response,
         used_js: bool,
     ) -> Result<Response> {
@@ -572,30 +573,30 @@ impl<C: BundleCache> CodeExecutor<C> {
             && !parts.headers.contains_key(SET_COOKIE);
 
         if safe {
-            if let Some(storage) = self.ctx.static_page_storage.as_ref() {
+            if let Some(storage) = self.ctx.rendered_html_cache.as_ref() {
                 match storage
                     .write(project_id, &candidate.object_key, body.clone())
                     .await
                 {
                     Ok(()) => {
-                        static_pages::record_result(
+                        rendered_html::record_result(
                             project_id,
                             candidate.code_version,
                             &candidate.object_path,
                             "generated",
                         );
-                        static_pages::record_result(
+                        rendered_html::record_result(
                             project_id,
                             candidate.code_version,
                             &candidate.object_path,
                             "cdn_cacheable",
                         );
-                        return Ok(static_page_response_from_parts(
+                        return Ok(rendered_html_response_from_parts(
                             project_id, candidate, parts, body,
                         ));
                     }
                     Err(error) => {
-                        static_pages::record_result(
+                        rendered_html::record_result(
                             project_id,
                             candidate.code_version,
                             &candidate.object_path,
@@ -612,7 +613,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 }
             }
         } else {
-            static_pages::record_result(
+            rendered_html::record_result(
                 project_id,
                 candidate.code_version,
                 &candidate.object_path,
@@ -874,7 +875,7 @@ impl<C: BundleCache> CodeExecutor<C> {
     }
 }
 
-struct StaticPageCandidate {
+struct RenderedHtmlCandidate {
     code_version: u64,
     normalized_path: String,
     object_path: String,
@@ -882,11 +883,7 @@ struct StaticPageCandidate {
     method: Method,
 }
 
-fn static_page_candidate(
-    project_id: &str,
-    bundle: &Bundle,
-    request: &Request,
-) -> Option<StaticPageCandidate> {
+fn rendered_html_candidate(bundle: &Bundle, request: &Request) -> Option<RenderedHtmlCandidate> {
     if !bundle.static_cache_enabled
         || (request.method() != Method::GET && request.method() != Method::HEAD)
         || request.uri().query().is_some()
@@ -894,13 +891,13 @@ fn static_page_candidate(
         return None;
     }
     let code_version = bundle.code_version?;
-    let normalized_path = static_pages::normalize_path(request.uri().path()).ok()?;
-    let object_path = static_pages::object_path_for(&normalized_path);
-    Some(StaticPageCandidate {
+    let normalized_path = rendered_html::normalize_path(request.uri().path()).ok()?;
+    let object_path = rendered_html::object_path_for(&normalized_path);
+    Some(RenderedHtmlCandidate {
         code_version,
         normalized_path,
         object_path: object_path.clone(),
-        object_key: format!("{project_id}/{code_version}/{object_path}"),
+        object_key: format!("{code_version}/{object_path}"),
         method: request.method().clone(),
     })
 }
@@ -924,9 +921,9 @@ fn sanitize_static_request(request: Request, normalized_path: &str) -> Request {
     )
 }
 
-fn static_page_response(
+fn rendered_html_response(
     project_id: &str,
-    candidate: &StaticPageCandidate,
+    candidate: &RenderedHtmlCandidate,
     body: Bytes,
     request: &Request,
 ) -> Response {
@@ -943,7 +940,7 @@ fn static_page_response(
         .header(CACHE_CONTROL, "no-cache")
         .header(
             "cloudflare-cdn-cache-control",
-            STATIC_PAGE_CDN_CACHE_CONTROL,
+            RENDERED_HTML_CDN_CACHE_CONTROL,
         )
         .header("cache-tag", format!("fn0-project-{project_id}"))
         .body(
@@ -961,9 +958,9 @@ fn static_page_response(
     response
 }
 
-fn static_page_response_from_parts(
+fn rendered_html_response_from_parts(
     project_id: &str,
-    candidate: &StaticPageCandidate,
+    candidate: &RenderedHtmlCandidate,
     mut parts: hyper::http::response::Parts,
     body: Bytes,
 ) -> Response {
@@ -979,7 +976,7 @@ fn static_page_response_from_parts(
     );
     parts.headers.insert(
         "cloudflare-cdn-cache-control",
-        hyper::header::HeaderValue::from_static(STATIC_PAGE_CDN_CACHE_CONTROL),
+        hyper::header::HeaderValue::from_static(RENDERED_HTML_CDN_CACHE_CONTROL),
     );
     parts.headers.insert(
         "cache-tag",

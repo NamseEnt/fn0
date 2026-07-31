@@ -187,10 +187,6 @@ pub async fn domain_remove(project_id: &str) -> Result<()> {
 #[serde(tag = "t", rename_all_fields = "camelCase")]
 pub enum DomainStatus {
     NotConfigured,
-    Configured {
-        domain: String,
-        cloudflare_status: CloudflareStatus,
-    },
     /// A project on its owner's own Cloudflare account. Their edge holds the
     /// visitor-facing certificate, so there is no fn0-side DV status to report;
     /// what fn0 holds is the origin certificate the worker presents.
@@ -203,15 +199,6 @@ pub enum DomainStatus {
     NotLoggedIn,
     NotFound,
     InternalError,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "t", rename_all_fields = "camelCase")]
-pub enum CloudflareStatus {
-    Active,
-    Pending,
-    Missing,
-    Other { value: String },
 }
 
 pub async fn fetch_domain_status(
@@ -238,17 +225,6 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
     match fetch_domain_status(&creds, project_id).await? {
         DomainStatus::NotConfigured => {
             println!("project '{project_id}' has no custom domain configured.");
-            Ok(())
-        }
-        DomainStatus::Configured {
-            domain,
-            cloudflare_status,
-        } => {
-            println!("project '{project_id}' custom domain: {domain}");
-            println!(
-                "cloudflare status: {}",
-                format_cloudflare_status(&cloudflare_status)
-            );
             Ok(())
         }
         DomainStatus::SelfHosted {
@@ -289,13 +265,3 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
     }
 }
 
-pub(crate) fn format_cloudflare_status(status: &CloudflareStatus) -> String {
-    match status {
-        CloudflareStatus::Active => "active".to_string(),
-        CloudflareStatus::Pending => "pending (waiting for DV verification)".to_string(),
-        CloudflareStatus::Missing => {
-            "missing on Cloudflare (registration may still be in progress)".to_string()
-        }
-        CloudflareStatus::Other { value } => format!("other: {value}"),
-    }
-}

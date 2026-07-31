@@ -66,7 +66,7 @@ Internal function called by generated hooks in `fe/src/hooks/.generated/`. Do no
 A Vite `define` constant injected at build time. Contains the base URL for static assets:
 
 - **`forte dev`**: `"/"`
-- **`forte deploy`**: the CDN URL for this deploy (`https://<project_id>.static.fn0.dev/<code_version>/`)
+- **`forte deploy`**: the CDN URL for this deploy (`https://fn0-<project_id>-frontend-asset.<your-domain>/<code_version>/`)
 
 Available in any frontend TypeScript file:
 

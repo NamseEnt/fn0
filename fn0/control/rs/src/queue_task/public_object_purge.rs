@@ -22,7 +22,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     let cloudflare = match &input.project_id {
         Some(project_id) => ProjectStorage::resolve(&doc_db::turso(), project_id)
             .await?
-            .purge_client()?,
+            .purge_client(),
         None => crate::common::cloudflare::CloudflareClient::from_env()?,
     };
     for chunk in input.urls.chunks(MAX_URLS_PER_REQUEST) {

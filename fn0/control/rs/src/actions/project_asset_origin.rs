@@ -56,7 +56,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     match ProjectStorage::resolve(&db, &req.body.project_id).await {
         Ok(storage) => Output::Ok {
-            static_base_url: storage.asset_base_url(&req.body.project_id, req.body.code_version),
+            static_base_url: storage.asset_base_url(req.body.code_version),
         },
         Err(error) => Output::InternalError {
             reason: format!("resolve: {error}"),

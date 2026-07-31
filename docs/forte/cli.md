@@ -89,7 +89,7 @@ If a `cron.yaml` file exists in the project root, its scheduled jobs are registe
 
 Deploy steps (in addition to `forte build`):
 1. **Registers project** — on first deploy, prompts for a display name and saves the assigned `project_id` to `Forte.toml`.
-2. **Uploads static assets** — `fe/dist/` (client JS/CSS/assets) is uploaded to the fn0 Cloud CDN at `https://<project_id>.static.fn0.dev/<code_version>/`. The `VITE_PUBLIC_URL` env var is set to this URL during the Vite client build so asset references resolve correctly.
+2. **Uploads static assets** — `fe/dist/` (client JS/CSS/assets) is uploaded to the project's own frontend-asset bucket, served from `https://fn0-<project_id>-frontend-asset.<your-domain>/<code_version>/`. The `VITE_PUBLIC_URL` env var is set to this URL during the Vite client build so asset references resolve correctly.
 3. **Uploads backend bundle** — packages `dist/backend.wasm`, `dist/server.js`, and `env.yaml` into `dist/bundle.raw.tar` and uploads it to the fn0 Cloud control plane.
 4. **Compiles to native** — the control plane invokes the `fn0-cwasm-compiler` Lambda to ahead-of-time compile `backend.wasm` to a Wasmtime-native `.cwasm` bundle. The CLI polls `deploy_status` until compilation finishes (one compilation per active Wasmtime version). Workers load the pre-compiled bundle on the next request, so there is no JIT cost at runtime.
 5. **Registers cron jobs** — if `cron.yaml` exists, schedules are synced.
@@ -234,7 +234,9 @@ forte cloudflare connect --account-id <a> --zone-id <z> --api-token <token>
 # careful: a token that can provision but cannot create tokens
 forte cloudflare provision --account-id <a> --zone-id <z> --api-token <token>
 forte cloudflare connect --account-id <a> --zone-id <z> --zone-name <domain> \
-  --dataplane-access-key-id <k> --dataplane-secret <s> --purge-token <p>
+  --worker-access-key-id <k> --worker-secret <s> \
+  --frontend-asset-access-key-id <k> --frontend-asset-secret <s> \
+  --purge-token <p>
 
 forte cloudflare status
 ```

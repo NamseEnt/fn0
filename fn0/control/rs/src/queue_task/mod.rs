@@ -4,5 +4,3 @@ pub mod public_object_purge;
 pub mod project_teardown;
 pub mod deploy_artifact_prune;
 pub mod static_cache_purge;
-pub mod cloudflare_register;
-pub mod cloudflare_unregister;

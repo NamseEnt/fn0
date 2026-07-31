@@ -8,7 +8,7 @@
 use anyhow::{Result, anyhow};
 
 use crate::domain::{
-    CloudflareStatus, DomainStatus, fetch_domain_status, format_cloudflare_status,
+    DomainStatus, fetch_domain_status,
 };
 
 pub struct ResolvedAppUrl {
@@ -60,20 +60,6 @@ pub async fn resolve_app_url(project_id: &str) -> Result<ResolvedAppUrl> {
     };
 
     Ok(match fetch_domain_status(&creds, project_id).await {
-        Ok(DomainStatus::Configured {
-            domain,
-            cloudflare_status: CloudflareStatus::Active,
-        }) => ResolvedAppUrl {
-            url: format!("https://{domain}"),
-            note: None,
-        },
-        Ok(DomainStatus::Configured {
-            domain,
-            cloudflare_status,
-        }) => fallback(format!(
-            "custom domain '{domain}' is not serving yet ({}), so the default subdomain is used",
-            format_cloudflare_status(&cloudflare_status)
-        )),
         // The owner's own edge terminates the visitor connection, so the domain
         // serves as soon as their DNS points at the origin — there is no fn0-side
         // DV state to wait on. The origin certificate is what fn0 must hold.

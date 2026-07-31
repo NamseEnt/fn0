@@ -168,32 +168,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     }
 
+    // Resolved only to refuse a project with no connected account: the worker
+    // answers a custom hostname with an origin certificate signed on the
+    // owner's own zone, and there is no zone to have signed one without it.
     let db = doc_db::turso();
-    let storage = match ProjectStorage::resolve(&db, &project_id).await {
-        Ok(storage) => storage,
-        Err(e) => {
-            tracing::error!("domain_add ProjectStorage::resolve: {e}");
-            return Output::InternalError;
-        }
-    };
-
-    // A project on the platform's account still goes through Cloudflare for
-    // SaaS: there is no user zone to issue an origin certificate on, and the
-    // request never reaches this fleet with their hostname in SNI.
-    if !storage.is_byoc() {
-        if let Err(e) =
-            crate::enqueue::cloudflare_register(crate::queue_task::cloudflare_register::Input {
-                domain: domain.clone(),
-            })
-            .await
-        {
-            tracing::error!("domain_add enqueue cloudflare_register: {e}");
-            return Output::InternalError;
-        }
-        return Output::Ok {
-            origin_ip: String::new(),
-            needs_dns_record: false,
-        };
+    if let Err(e) = ProjectStorage::resolve(&db, &project_id).await {
+        tracing::error!("domain_add ProjectStorage::resolve: {e}");
+        return Output::InternalError;
     }
 
     let Ok(origin_ip) = std::env::var("FN0_WORKER_ORIGIN_IP") else {

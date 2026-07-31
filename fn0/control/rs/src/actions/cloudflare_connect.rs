@@ -1,8 +1,8 @@
 //! Records a project's connection to its owner's Cloudflare account.
 //!
-//! The provisioning itself — buckets, CORS, the CDN hostname, the cache rule —
+//! The provisioning itself — buckets, CORS, the CDN hostnames, the cache rule —
 //! already happened, in the CLI, on the user's machine, with an account-wide
-//! token fn0 is never given. What arrives here is the residue: two narrow
+//! token fn0 is never given. What arrives here is the residue: three narrow
 //! credentials and the names of what they reach.
 //!
 //! They are still proved before being stored. A credential that is wrong is
@@ -15,9 +15,8 @@
 //!
 //! Nothing is written until every credential has been proved, and what is
 //! written goes in one transaction. A half-written connection would leave
-//! control signing against the user's account while the fleet still signed
-//! against the platform's, and `connect` would refuse to run again to repair
-//! it.
+//! control holding a configuration the fleet never received, and `connect`
+//! would refuse to run again to repair it.
 
 use crate::common::auth;
 use crate::common::aws_sign;
@@ -62,16 +61,20 @@ pub struct Input {
     pub account_id: String,
     pub zone_id: String,
     pub zone_name: String,
-    pub static_hostname: String,
-    pub object_bucket: String,
-    pub asset_bucket: String,
-    pub page_bucket: String,
-    /// The data-plane token's id, which is also its S3 access key id.
-    pub dataplane_access_key_id: String,
-    /// SHA-256 of the data-plane token, already derived by the CLI. The token
-    /// value itself is never sent: this hash is the only form fn0 needs, and a
-    /// hash cannot be replayed against the REST API.
-    pub dataplane_secret: String,
+    pub frontend_asset_hostname: String,
+    pub public_object_storage_hostname: String,
+    pub private_object_storage_bucket: String,
+    pub public_object_storage_bucket: String,
+    pub frontend_asset_bucket: String,
+    pub rendered_html_cache_bucket: String,
+    /// The worker token's id, which is also its S3 access key id.
+    pub worker_access_key_id: String,
+    /// SHA-256 of the worker token, already derived by the CLI. The token value
+    /// itself is never sent: this hash is the only form fn0 needs, and a hash
+    /// cannot be replayed against the REST API.
+    pub worker_secret: String,
+    pub frontend_asset_access_key_id: String,
+    pub frontend_asset_secret: String,
     /// Sent whole, because purging needs a bearer token rather than a hash.
     /// Scoped to cache purge on `zone_id` and nothing else.
     pub purge_token: String,
@@ -123,16 +126,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotFound;
     }
 
-    if req.body.dataplane_secret.len() != 64
-        || !req
-            .body
-            .dataplane_secret
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Output::CredentialRejected {
-            reason: "data-plane secret is not a SHA-256 hex digest".to_string(),
-        };
+    for (what, secret) in [
+        ("worker", &req.body.worker_secret),
+        ("frontend asset", &req.body.frontend_asset_secret),
+    ] {
+        if secret.len() != 64 || !secret.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Output::CredentialRejected {
+                reason: format!("{what} secret is not a SHA-256 hex digest"),
+            };
+        }
     }
 
     // Purge is probed for real: an unpurgeable zone is the one failure that is
@@ -145,9 +147,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     );
     let probe_url = format!(
         "https://{}/__fn0_connect_probe",
-        req.body.static_hostname
+        req.body.frontend_asset_hostname
     );
-    if let Err(error) = prove(|| purge_client.purge_cache_urls(std::slice::from_ref(&probe_url))).await
+    if let Err(error) =
+        prove(|| purge_client.purge_cache_urls(std::slice::from_ref(&probe_url))).await
     {
         tracing::warn!(%error, "cloudflare_connect purge probe failed");
         return Output::CredentialRejected {
@@ -155,24 +158,44 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         };
     }
 
-    // Probed with the credential as sent, before anything is written. All three
-    // buckets, because on the path where the user scopes the token by hand a
-    // missed bucket is an easy mistake and a confusing failure later.
-    for bucket in [
-        &req.body.object_bucket,
-        &req.body.asset_bucket,
-        &req.body.page_bucket,
-    ] {
-        let prefix = format!("{}/", req.body.project_id);
+    // Probed with each credential as sent, before anything is written. Every
+    // bucket, because on the path where the user scopes the tokens by hand a
+    // missed bucket is an easy mistake and a confusing failure later. Each
+    // credential is proved only against the buckets it is meant to open, so a
+    // pair swapped between the two tokens is caught here rather than becoming a
+    // worker that can rewrite a deployed frontend.
+    let probes: [(&str, &str, &str); 4] = [
+        (
+            &req.body.private_object_storage_bucket,
+            &req.body.worker_access_key_id,
+            &req.body.worker_secret,
+        ),
+        (
+            &req.body.public_object_storage_bucket,
+            &req.body.worker_access_key_id,
+            &req.body.worker_secret,
+        ),
+        (
+            &req.body.rendered_html_cache_bucket,
+            &req.body.worker_access_key_id,
+            &req.body.worker_secret,
+        ),
+        (
+            &req.body.frontend_asset_bucket,
+            &req.body.frontend_asset_access_key_id,
+            &req.body.frontend_asset_secret,
+        ),
+    ];
+    for (bucket, access_key_id, secret_access_key) in probes {
         if let Err(error) = prove(|| async {
             aws_sign::r2_list_objects(aws_sign::R2ListArgs {
                 account_id: &req.body.account_id,
                 bucket,
                 region: "auto",
-                prefix: &prefix,
+                prefix: "",
                 continuation_token: None,
-                access_key_id: &req.body.dataplane_access_key_id,
-                secret_access_key: &req.body.dataplane_secret,
+                access_key_id,
+                secret_access_key,
                 now: forte_sdk::now(),
             })
             .await
@@ -180,37 +203,43 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         })
         .await
         {
-            tracing::warn!(%error, %bucket, "cloudflare_connect data-plane probe failed");
+            tracing::warn!(%error, %bucket, "cloudflare_connect R2 probe failed");
             return Output::CredentialRejected {
-                reason: format!("the data-plane credential cannot read {bucket}: {error}"),
+                reason: format!("the stored credential cannot read {bucket}: {error}"),
             };
         }
     }
 
-    let (dataplane_secret_ciphertext, purge_token_ciphertext) = match (
-        vault::encrypt(req.body.dataplane_secret.as_bytes()).await,
-        vault::encrypt(req.body.purge_token.as_bytes()).await,
-    ) {
-        (Ok(secret), Ok(purge)) => (secret, purge),
-        (Err(error), _) | (_, Err(error)) => {
-            tracing::error!("cloudflare_connect vault encrypt: {error}");
-            return Output::InternalError {
-                reason: format!("vault encrypt: {error}"),
-            };
-        }
-    };
+    let (worker_secret_ciphertext, frontend_asset_secret_ciphertext, purge_token_ciphertext) =
+        match (
+            vault::encrypt(req.body.worker_secret.as_bytes()).await,
+            vault::encrypt(req.body.frontend_asset_secret.as_bytes()).await,
+            vault::encrypt(req.body.purge_token.as_bytes()).await,
+        ) {
+            (Ok(worker), Ok(asset), Ok(purge)) => (worker, asset, purge),
+            (Err(error), ..) | (_, Err(error), _) | (.., Err(error)) => {
+                tracing::error!("cloudflare_connect vault encrypt: {error}");
+                return Output::InternalError {
+                    reason: format!("vault encrypt: {error}"),
+                };
+            }
+        };
 
     let config = ProjectCloudflareConfigDoc {
         project_id: req.body.project_id.clone(),
         account_id: req.body.account_id.clone(),
         zone_id: req.body.zone_id.clone(),
         zone_name: req.body.zone_name.clone(),
-        static_hostname: req.body.static_hostname.clone(),
-        object_bucket: req.body.object_bucket.clone(),
-        asset_bucket: req.body.asset_bucket.clone(),
-        page_bucket: req.body.page_bucket.clone(),
-        dataplane_access_key_id: req.body.dataplane_access_key_id.clone(),
-        dataplane_secret_ciphertext,
+        frontend_asset_hostname: req.body.frontend_asset_hostname.clone(),
+        public_object_storage_hostname: req.body.public_object_storage_hostname.clone(),
+        private_object_storage_bucket: req.body.private_object_storage_bucket.clone(),
+        public_object_storage_bucket: req.body.public_object_storage_bucket.clone(),
+        frontend_asset_bucket: req.body.frontend_asset_bucket.clone(),
+        rendered_html_cache_bucket: req.body.rendered_html_cache_bucket.clone(),
+        worker_access_key_id: req.body.worker_access_key_id.clone(),
+        worker_secret_ciphertext,
+        frontend_asset_access_key_id: req.body.frontend_asset_access_key_id.clone(),
+        frontend_asset_secret_ciphertext,
         purge_token_ciphertext,
         state: CloudflareConnectionState::Ok,
         checked_at: forte_sdk::now(),

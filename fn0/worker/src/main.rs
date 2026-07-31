@@ -5,7 +5,7 @@ mod env_crypto;
 mod env_yaml;
 mod manifest_poller;
 mod queue_consumer;
-mod static_pages;
+mod rendered_html_cache;
 mod storage_resolver;
 mod telemetry;
 mod vault_client;
@@ -259,12 +259,9 @@ async fn run() -> Result<()> {
         vault_client.clone(),
         cache_size_bytes,
     );
-    let storage_resolver = Arc::new(ManifestStorageResolver::new(
-        storage_resolver::PlatformTargets::from_env()
-            .map_err(|error| color_eyre::eyre::eyre!("platform storage targets: {error}"))?,
-        vault_client.clone(),
-    ));
-    let static_page_store = static_pages::StaticPageStore::new(storage_resolver.clone());
+    let storage_resolver = Arc::new(ManifestStorageResolver::new(vault_client.clone()));
+    let rendered_html_cache =
+        rendered_html_cache::R2RenderedHtmlCache::new(storage_resolver.clone());
 
     let direct_hijack = build_cross_project_invoke_hijack();
     let presign_gate = Arc::new(PresignGate::new());
@@ -287,7 +284,7 @@ async fn run() -> Result<()> {
                 storage_resolver.clone(),
                 purge_gate,
             ))
-            .with_static_page_storage(Arc::new(static_page_store)),
+            .with_rendered_html_cache(Arc::new(rendered_html_cache)),
     );
 
     // Recorded on the worker's own meter rather than stamped into guest

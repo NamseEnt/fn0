@@ -12,9 +12,7 @@
 
 use std::sync::Arc;
 
-/// Credentials for one R2 endpoint. One per store rather than one per project,
-/// because the platform account issues a different token to each and because it
-/// lets a per-project token be scoped to a single bucket.
+/// Credentials for one R2 endpoint.
 #[derive(Clone, PartialEq, Eq)]
 pub struct R2Credentials {
     pub endpoint_host: String,
@@ -39,8 +37,15 @@ impl R2Credentials {
     }
 }
 
-/// The bucket a project's public objects and deployed static assets live in,
-/// and the origin its CDN serves them from.
+/// The bucket a project's private objects live in.
+#[derive(Clone, PartialEq, Eq)]
+pub struct PrivateObjectStorageTarget {
+    pub credentials: R2Credentials,
+    pub bucket: String,
+}
+
+/// The bucket a project's public objects live in, and the origin its CDN serves
+/// them from.
 #[derive(Clone, PartialEq, Eq)]
 pub struct PublicStorageTarget {
     pub credentials: R2Credentials,
@@ -49,12 +54,12 @@ pub struct PublicStorageTarget {
     pub base_url: String,
 }
 
-/// Resolves the private object-storage credentials for a project. The bucket
-/// itself is not resolved: it is derived from the project id, and bucket names
-/// are scoped to an account, so the derivation holds in a user's account
-/// exactly as it does in the platform's.
+/// Resolves where a project's private objects live, bucket included. The bucket
+/// name is provisioned on the owner's own account and travels with the rest of
+/// their configuration; deriving it here instead would put the naming rule in
+/// two crates that version apart from each other.
 pub trait ObjectStorageResolver: Send + Sync {
-    fn resolve(&self, project_id: &str) -> Option<Arc<R2Credentials>>;
+    fn resolve(&self, project_id: &str) -> Option<Arc<PrivateObjectStorageTarget>>;
 }
 
 pub trait PublicStorageResolver: Send + Sync {
@@ -74,8 +79,8 @@ impl<T> StaticResolver<T> {
     }
 }
 
-impl ObjectStorageResolver for StaticResolver<R2Credentials> {
-    fn resolve(&self, _project_id: &str) -> Option<Arc<R2Credentials>> {
+impl ObjectStorageResolver for StaticResolver<PrivateObjectStorageTarget> {
+    fn resolve(&self, _project_id: &str) -> Option<Arc<PrivateObjectStorageTarget>> {
         Some(self.target.clone())
     }
 }

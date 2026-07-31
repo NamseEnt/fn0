@@ -1,15 +1,12 @@
-//! S3-API access to the three R2 stores control manages: the bundle store
-//! (`original/`/`compiled/` deploy artifacts), the shared static asset bucket
-//! (`{project_id}/{code_version}/` prefixes), and the per-project
-//! `fn0-object-storage-{project_id}` buckets. Used by `bundle_gc` (superseded
-//! artifact GC) and `project_teardown` (full project deletion).
+//! S3-API access to the R2 stores control manages: the bundle store
+//! (`original/`/`compiled/` deploy artifacts, on fn0's own account) and the
+//! project's own buckets in its owner's account. Used by `bundle_gc`
+//! (superseded artifact GC) and `project_teardown` (full project deletion).
 
 use crate::common::aws_sign;
 use forte_sdk::*;
 
 const R2_REGION: &str = "auto";
-
-pub const OBJECT_STORAGE_BUCKET_PREFIX: &str = "fn0-object-storage-";
 
 async fn r2_list_all(
     account_id: &str,
@@ -62,10 +59,12 @@ async fn r2_delete(
     .await
 }
 
-/// One project's view of one of its buckets, in whichever Cloudflare account
-/// the project belongs to. Replaces the three env-configured stores for
-/// everything that is per-project; the bundle store stays on the platform
-/// account and keeps its own type.
+/// One project's view of one of its buckets, in its owner's Cloudflare account.
+/// The bundle store is fn0's own and keeps its own type.
+///
+/// Which credential a constructor picks is the access boundary, not a detail:
+/// [`Self::frontend_assets`] cannot open a bucket holding user data, and the
+/// other three cannot open the frontend-asset bucket.
 pub struct ProjectR2Store {
     account_id: String,
     bucket: String,
@@ -74,30 +73,33 @@ pub struct ProjectR2Store {
 }
 
 impl ProjectR2Store {
-    pub fn objects(storage: &crate::common::byoc::ProjectStorage) -> Self {
+    fn with_worker_keys(storage: &crate::common::byoc::ProjectStorage, bucket: String) -> Self {
         Self {
             account_id: storage.account_id.clone(),
-            bucket: storage.object_bucket.clone(),
-            access_key_id: storage.object_keys.access_key_id.clone(),
-            secret_access_key: storage.object_keys.secret_access_key.clone(),
+            bucket,
+            access_key_id: storage.worker_keys.access_key_id.clone(),
+            secret_access_key: storage.worker_keys.secret_access_key.clone(),
         }
     }
 
-    pub fn assets(storage: &crate::common::byoc::ProjectStorage) -> Self {
-        Self {
-            account_id: storage.account_id.clone(),
-            bucket: storage.asset_bucket.clone(),
-            access_key_id: storage.asset_keys.access_key_id.clone(),
-            secret_access_key: storage.asset_keys.secret_access_key.clone(),
-        }
+    pub fn private_objects(storage: &crate::common::byoc::ProjectStorage) -> Self {
+        Self::with_worker_keys(storage, storage.private_object_storage_bucket.clone())
     }
 
-    pub fn pages(storage: &crate::common::byoc::ProjectStorage) -> Self {
+    pub fn public_objects(storage: &crate::common::byoc::ProjectStorage) -> Self {
+        Self::with_worker_keys(storage, storage.public_object_storage_bucket.clone())
+    }
+
+    pub fn rendered_html_cache(storage: &crate::common::byoc::ProjectStorage) -> Self {
+        Self::with_worker_keys(storage, storage.rendered_html_cache_bucket.clone())
+    }
+
+    pub fn frontend_assets(storage: &crate::common::byoc::ProjectStorage) -> Self {
         Self {
             account_id: storage.account_id.clone(),
-            bucket: storage.page_bucket.clone(),
-            access_key_id: storage.page_keys.access_key_id.clone(),
-            secret_access_key: storage.page_keys.secret_access_key.clone(),
+            bucket: storage.frontend_asset_bucket.clone(),
+            access_key_id: storage.frontend_asset_keys.access_key_id.clone(),
+            secret_access_key: storage.frontend_asset_keys.secret_access_key.clone(),
         }
     }
 
@@ -178,169 +180,6 @@ impl BundleStore {
             &self.access_key_id,
             &self.secret_access_key,
             prefix,
-            now,
-        )
-        .await
-    }
-}
-
-pub struct StaticAssetStore {
-    account_id: String,
-    bucket: String,
-    access_key_id: String,
-    secret_access_key: String,
-}
-
-impl StaticAssetStore {
-    pub fn bucket(&self) -> &str {
-        &self.bucket
-    }
-
-    pub fn from_env() -> anyhow::Result<Self> {
-        Ok(Self {
-            account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
-            bucket: std::env::var("FN0_STATIC_ASSET_STORAGE_BUCKET")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_BUCKET not set"))?,
-            access_key_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID not set"))?,
-            secret_access_key: std::env::var("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY")
-                .map_err(|_| {
-                    anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY not set")
-                })?,
-        })
-    }
-
-    pub async fn list_all(
-        &self,
-        prefix: &str,
-        now: DateTime,
-    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
-        r2_list_all(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            prefix,
-            now,
-        )
-        .await
-    }
-
-    pub async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
-        r2_delete(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            key,
-            now,
-        )
-        .await
-    }
-}
-
-// Lazily generated page HTML, written by the worker. A different bucket from
-// `StaticAssetStore`: that one is public through static.fn0.dev, this one is
-// private and reachable only through fn0.
-pub struct StaticPageStore {
-    account_id: String,
-    bucket: String,
-    access_key_id: String,
-    secret_access_key: String,
-}
-
-impl StaticPageStore {
-    pub fn from_env() -> anyhow::Result<Self> {
-        Ok(Self {
-            account_id: std::env::var("FN0_STATIC_PAGE_STORAGE_ACCOUNT_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_ACCOUNT_ID not set"))?,
-            bucket: std::env::var("FN0_STATIC_PAGE_STORAGE_BUCKET")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_BUCKET not set"))?,
-            access_key_id: std::env::var("FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID not set"))?,
-            secret_access_key: std::env::var("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY").map_err(
-                |_| anyhow::anyhow!("FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY not set"),
-            )?,
-        })
-    }
-
-    pub async fn list_all(
-        &self,
-        prefix: &str,
-        now: DateTime,
-    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
-        r2_list_all(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            prefix,
-            now,
-        )
-        .await
-    }
-
-    pub async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
-        r2_delete(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            key,
-            now,
-        )
-        .await
-    }
-}
-
-pub struct ObjectStorageStore {
-    account_id: String,
-    bucket: String,
-    access_key_id: String,
-    secret_access_key: String,
-}
-
-impl ObjectStorageStore {
-    pub fn from_env(project_id: &str) -> anyhow::Result<Self> {
-        Ok(Self {
-            account_id: std::env::var("FN0_OBJECT_STORAGE_ACCOUNT_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_OBJECT_STORAGE_ACCOUNT_ID not set"))?,
-            bucket: format!("{OBJECT_STORAGE_BUCKET_PREFIX}{project_id}"),
-            access_key_id: std::env::var("FN0_OBJECT_STORAGE_ACCESS_KEY_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_OBJECT_STORAGE_ACCESS_KEY_ID not set"))?,
-            secret_access_key: std::env::var("FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY")
-                .map_err(|_| anyhow::anyhow!("FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY not set"))?,
-        })
-    }
-
-    pub fn bucket(&self) -> &str {
-        &self.bucket
-    }
-
-    pub async fn list_all(
-        &self,
-        prefix: &str,
-        now: DateTime,
-    ) -> anyhow::Result<Vec<aws_sign::R2ListedObject>> {
-        r2_list_all(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            prefix,
-            now,
-        )
-        .await
-    }
-
-    pub async fn delete(&self, key: &str, now: DateTime) -> anyhow::Result<()> {
-        r2_delete(
-            &self.account_id,
-            &self.bucket,
-            &self.access_key_id,
-            &self.secret_access_key,
-            key,
             now,
         )
         .await

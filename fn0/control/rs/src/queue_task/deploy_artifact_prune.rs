@@ -1,15 +1,16 @@
 //! Reclaims the R2 prefixes of superseded code versions for one project.
 //!
-//! Both `{project_id}/{code_version}/` prefixes grow with every deploy and
-//! nothing else removes them: the static asset bucket holds the deployed
-//! frontend build, the static page bucket holds lazily generated page HTML.
+//! The `{code_version}/` prefixes grow with every deploy and nothing else
+//! removes them: the frontend-asset bucket holds the deployed build, the
+//! rendered-HTML cache holds pages generated against it.
 //!
 //! Enqueued once a deploy reaches `static_cache_state == active`, and it
 //! re-reads the manifest rather than trusting the payload, so a redelivered
 //! message never prunes against a stale active version.
 
 use crate::common::aws_sign::R2ListedObject;
-use crate::common::r2_store::{StaticAssetStore, StaticPageStore};
+use crate::common::byoc::ProjectStorage;
+use crate::common::r2_store::ProjectR2Store;
 use crate::docs::*;
 use fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE;
 use forte_sdk::*;
@@ -36,27 +37,17 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     }
     let active_code_version = entry.code_version;
     let now = forte_sdk::now();
-    let prefix = format!("{}/", input.project_id);
+    let storage = ProjectStorage::resolve(&db, &input.project_id).await?;
 
-    let asset_store = StaticAssetStore::from_env()?;
     let mut deleted = 0usize;
-    for key in prunable_keys(
-        &asset_store.list_all(&prefix, now).await?,
-        &input.project_id,
-        active_code_version,
-    ) {
-        asset_store.delete(&key, now).await?;
-        deleted += 1;
-    }
-
-    let page_store = StaticPageStore::from_env()?;
-    for key in prunable_keys(
-        &page_store.list_all(&prefix, now).await?,
-        &input.project_id,
-        active_code_version,
-    ) {
-        page_store.delete(&key, now).await?;
-        deleted += 1;
+    for store in [
+        ProjectR2Store::frontend_assets(&storage),
+        ProjectR2Store::rendered_html_cache(&storage),
+    ] {
+        for key in prunable_keys(&store.list_all("", now).await?, active_code_version) {
+            store.delete(&key, now).await?;
+            deleted += 1;
+        }
     }
 
     tracing::info!(
@@ -80,14 +71,10 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 /// actually still loading from.
 const RETAINED_VERSIONS_BELOW_ACTIVE: usize = 2;
 
-fn prunable_keys(
-    objects: &[R2ListedObject],
-    project_id: &str,
-    active_code_version: u64,
-) -> Vec<String> {
+fn prunable_keys(objects: &[R2ListedObject], active_code_version: u64) -> Vec<String> {
     let below_active: BTreeSet<u64> = objects
         .iter()
-        .filter_map(|object| code_version_of(&object.key, project_id))
+        .filter_map(|object| code_version_of(&object.key))
         .filter(|code_version| *code_version < active_code_version)
         .collect();
     let retained: HashSet<u64> = below_active
@@ -99,7 +86,7 @@ fn prunable_keys(
 
     objects
         .iter()
-        .filter(|object| match code_version_of(&object.key, project_id) {
+        .filter(|object| match code_version_of(&object.key) {
             Some(code_version) => {
                 code_version < active_code_version && !retained.contains(&code_version)
             }
@@ -109,13 +96,8 @@ fn prunable_keys(
         .collect()
 }
 
-fn code_version_of(key: &str, project_id: &str) -> Option<u64> {
-    key.strip_prefix(project_id)?
-        .strip_prefix('/')?
-        .split('/')
-        .next()?
-        .parse()
-        .ok()
+fn code_version_of(key: &str) -> Option<u64> {
+    key.split('/').next()?.parse().ok()
 }
 
 #[cfg(test)]
@@ -134,15 +116,15 @@ mod tests {
     #[test]
     fn keeps_active_and_two_below_and_prunes_older() {
         let objects = vec![
-            object("proj/100/client.js"),
-            object("proj/200/client.js"),
-            object("proj/300/client.js"),
-            object("proj/400/client.js"),
-            object("proj/400/__forte/pages/AB.html"),
+            object("100/client.js"),
+            object("200/client.js"),
+            object("300/client.js"),
+            object("400/client.js"),
+            object("400/__forte/pages/AB.html"),
         ];
         assert_eq!(
-            prunable_keys(&objects, "proj", 400),
-            vec!["proj/100/client.js".to_string()]
+            prunable_keys(&objects, 400),
+            vec!["100/client.js".to_string()]
         );
     }
 
@@ -151,26 +133,26 @@ mod tests {
     #[test]
     fn a_failed_deploy_below_active_does_not_evict_the_live_previous_version() {
         let objects = vec![
-            object("proj/100/client.js"),
-            object("proj/200/client.js"),
-            object("proj/300/partial-upload.js"),
-            object("proj/400/client.js"),
+            object("100/client.js"),
+            object("200/client.js"),
+            object("300/partial-upload.js"),
+            object("400/client.js"),
         ];
         assert_eq!(
-            prunable_keys(&objects, "proj", 400),
-            vec!["proj/100/client.js".to_string()]
+            prunable_keys(&objects, 400),
+            vec!["100/client.js".to_string()]
         );
     }
 
     #[test]
     fn keeps_versions_newer_than_active() {
         let objects = vec![
-            object("proj/100/client.js"),
-            object("proj/200/client.js"),
-            object("proj/300/client.js"),
+            object("100/client.js"),
+            object("200/client.js"),
+            object("300/client.js"),
         ];
         assert_eq!(
-            prunable_keys(&objects, "proj", 200),
+            prunable_keys(&objects, 200),
             Vec::<String>::new(),
             "300 is a deploy that uploaded before activating"
         );
@@ -178,7 +160,7 @@ mod tests {
 
     #[test]
     fn leaves_keys_without_a_code_version() {
-        let objects = vec![object("proj/not-a-version/client.js"), object("proj/x")];
-        assert_eq!(prunable_keys(&objects, "proj", 300), Vec::<String>::new());
+        let objects = vec![object("not-a-version/client.js"), object("x")];
+        assert_eq!(prunable_keys(&objects, 300), Vec::<String>::new());
     }
 }
