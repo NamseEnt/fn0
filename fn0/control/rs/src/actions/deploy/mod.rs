@@ -322,12 +322,31 @@ async fn ensure_turso_database(project_id: &str) -> anyhow::Result<()> {
         .body(body)?;
     let resp = http::Client::new().send(req).await?;
     let status = resp.status().as_u16();
-    if (200..300).contains(&status) || status == 409 {
+    let body_bytes = resp.into_body().bytes().await.to_vec();
+    if (200..300).contains(&status) || status == 409 || database_already_exists(&body_bytes) {
         return Ok(());
     }
-    let body_bytes = resp.into_body().bytes().await.to_vec();
     anyhow::bail!(
         "turso ensure_database {project_id} failed (status={status}): {}",
         String::from_utf8_lossy(&body_bytes)
     );
+}
+
+/// Turso's docs promise 409 with `database with name <name> already exists`, but
+/// since 2026-07-30 it answers a duplicate name with 400 and the message below,
+/// which broke every deploy: this call is the provisioning backstop each one runs.
+/// Reported as https://github.com/tursodatabase/turso-docs/issues/409.
+///
+/// The whole message is compared rather than a fragment, so a reworded error
+/// fails the deploy loudly instead of being read as something it is not.
+fn database_already_exists(body: &[u8]) -> bool {
+    const ALREADY_EXISTS: &str = "database with same name already exists";
+
+    #[derive(serde::Deserialize)]
+    struct TursoError {
+        error: String,
+    }
+
+    serde_json::from_slice::<TursoError>(body)
+        .is_ok_and(|parsed| parsed.error == ALREADY_EXISTS)
 }
