@@ -235,10 +235,14 @@ pub async fn connect_project(
     }
 }
 
-/// Mirrors a project's storage configuration into the worker manifest.
+/// Mirrors a project's storage configuration into the worker manifest entry it
+/// already has.
 ///
 /// Passing `None` leaves the project with nowhere to store, which is what
-/// tearing down wants.
+/// tearing down wants. A project with no entry is left without one: teardown
+/// removes the entry before it gets here, and creating one to blank its storage
+/// resurrected the project as a `code_version: 0` route the worker registered
+/// and could never serve.
 pub async fn publish_storage_to_manifest(
     db: &doc_db::Database,
     project_id: &str,
@@ -251,26 +255,12 @@ pub async fn publish_storage_to_manifest(
             let project_id = project_id.to_string();
             let storage = storage.clone();
             async move {
-                let mut manifest = match trx.get(WorkerManifestDocGet {}).await? {
-                    Some(manifest) => manifest,
-                    None => trx.create(WorkerManifestDoc {
-                        manifest_version: 0,
-                        project_manifests: std::collections::HashMap::new(),
-                    })?,
+                let Some(mut manifest) = trx.get(WorkerManifestDocGet {}).await? else {
+                    return trx.commit::<_, std::convert::Infallible>(());
                 };
-                let entry =
-                    manifest
-                        .project_manifests
-                        .entry(project_id)
-                        .or_insert(WorkerProjectManifest {
-                            code_version: 0,
-                            custom_domain: None,
-                            static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
-                                .to_string(),
-                            pending_code_version: None,
-                            storage: None,
-                        });
-                if entry.storage != storage {
+                if let Some(entry) = manifest.project_manifests.get_mut(&project_id)
+                    && entry.storage != storage
+                {
                     entry.storage = storage;
                     manifest.manifest_version += 1;
                 }
