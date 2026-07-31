@@ -57,32 +57,6 @@ pub struct CompiledBundleDoc {
     pub fn0_wasmtime_versions: Vec<String>,
 }
 
-// Cloudflare rate-limits tag purges per account, not per zone or per project,
-// so the budget is shared platform-wide and has to be accounted for in one
-// place. A request identifies a project's one purge obligation for a given
-// code version and phase, which is what lets a batch drained by one deploy's
-// task satisfy another deploy's task.
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct CachePurgeRequest {
-    pub project_id: String,
-    pub code_version: u64,
-    pub phase: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct CompletedCachePurge {
-    pub request: CachePurgeRequest,
-    pub purged_at: DateTime,
-}
-
-#[forte_doc]
-pub struct CachePurgeDoc {
-    pub tokens: f64,
-    pub refilled_at: DateTime,
-    pub pending: Vec<CachePurgeRequest>,
-    pub completed: Vec<CompletedCachePurge>,
-}
-
 #[forte_doc]
 pub struct Fn0WasmtimeVersionDoc {
     pub active: String,

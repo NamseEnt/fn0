@@ -93,7 +93,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     if let Err(error) =
         enqueue::public_object_purge(crate::queue_task::public_object_purge::Input {
-            project_id: Some(req.body.project_id.clone()),
+            project_id: req.body.project_id.clone(),
             urls: urls.clone(),
         })
         .await

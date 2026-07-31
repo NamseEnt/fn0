@@ -117,6 +117,18 @@ impl S3BundleCache {
         inner.domain_to_project_id.get(domain).cloned()
     }
 
+    /// The hostname a project answers on, for requests fn0 originates rather
+    /// than receives — a queue task has no client to take a `Host` from, and a
+    /// guest that builds absolute URLs must get the same host a visitor would.
+    pub async fn domain_of(&self, project_id: &str) -> Option<String> {
+        let inner = self.inner.lock().await;
+        inner
+            .domain_to_project_id
+            .iter()
+            .find(|(_, owner)| owner.as_str() == project_id)
+            .map(|(domain, _)| domain.clone())
+    }
+
     pub async fn code_version(&self, project_id: &str) -> Option<u64> {
         self.inner
             .lock()

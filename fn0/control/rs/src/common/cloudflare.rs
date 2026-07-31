@@ -10,16 +10,6 @@ pub struct CloudflareClient {
 }
 
 impl CloudflareClient {
-    pub fn from_env() -> anyhow::Result<Self> {
-        Ok(Self {
-            api_token: std::env::var("FN0_CLOUDFLARE_API_TOKEN")
-                .map_err(|_| anyhow::anyhow!("FN0_CLOUDFLARE_API_TOKEN not set"))?,
-            account_id: std::env::var("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID")
-                .map_err(|_| anyhow::anyhow!("FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID not set"))?,
-            zone_id: std::env::var("FN0_CLOUDFLARE_ZONE_ID").ok(),
-        })
-    }
-
     /// A client bound to one user's zone, driven by their purge-scoped token.
     /// It can purge and read zone metadata; anything else answers 403.
     pub fn for_zone(api_token: String, account_id: String, zone_id: String) -> Self {

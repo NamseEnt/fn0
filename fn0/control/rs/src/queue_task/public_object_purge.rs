@@ -10,7 +10,7 @@ pub struct Input {
     /// Which project's zone to purge on. Absent from messages enqueued before
     /// projects could own their own zone; those are platform-zone purges.
     #[serde(default)]
-    pub project_id: Option<String>,
+    pub project_id: String,
     pub urls: Vec<String>,
 }
 
@@ -19,12 +19,9 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let cloudflare = match &input.project_id {
-        Some(project_id) => ProjectStorage::resolve(&doc_db::turso(), project_id)
-            .await?
-            .purge_client(),
-        None => crate::common::cloudflare::CloudflareClient::from_env()?,
-    };
+    let cloudflare = ProjectStorage::resolve(&doc_db::turso(), &input.project_id)
+        .await?
+        .purge_client();
     for chunk in input.urls.chunks(MAX_URLS_PER_REQUEST) {
         let started = std::time::Instant::now();
         // A failure must propagate: the queue retry is the only thing standing

@@ -436,40 +436,8 @@ const controlLambdaSecretAccessKeyCt = pulumi
   .all([controlDek.plaintext, controlAwsAccessKey.secret])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
-const staticAssetPresignAccessKeyIdCt = pulumi
-  .all([controlDek.plaintext, staticAssetStorage.presignAccessKeyId])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-const staticAssetPresignSecretAccessKeyCt = pulumi
-  .all([controlDek.plaintext, staticAssetStorage.presignSecretAccessKey])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-const staticPageAccessKeyIdCt = pulumi
-  .all([controlDek.plaintext, staticPageStorage.accessKeyId])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-const staticPageSecretAccessKeyCt = pulumi
-  .all([controlDek.plaintext, staticPageStorage.secretAccessKey])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-const cloudflareApiTokenCt = pulumi
-  .all([controlDek.plaintext, staticAssetStorage.cloudflareApiToken])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-const controlObjectStorageAccessKeyIdCt = pulumi
-  .all([controlDek.plaintext, objectStorageStorage.accessKeyId])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-const controlObjectStorageSecretAccessKeyCt = pulumi
-  .all([controlDek.plaintext, objectStorageStorage.secretAccessKey])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
 const controlTursoApiTokenCt = pulumi
   .all([controlDek.plaintext, tursoApiToken])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-const cloudflareSaasApiTokenCt = pulumi
-  .all([controlDek.plaintext, dns.saasApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
 const controlEnvYamlBootstrap = pulumi
@@ -487,24 +455,9 @@ const controlEnvYamlBootstrap = pulumi
     pulumi.output(cwasmCompilerRegion),
     controlLambdaAccessKeyIdCt,
     controlLambdaSecretAccessKeyCt,
-    staticAssetStorage.accountId,
-    staticAssetPresignAccessKeyIdCt,
-    staticAssetPresignSecretAccessKeyCt,
-    staticAssetStorage.bucketName,
-    staticPageStorage.accountId,
-    staticPageAccessKeyIdCt,
-    staticPageSecretAccessKeyCt,
-    staticPageStorage.bucketName,
-    cloudflareApiTokenCt,
-    staticAssetStorage.zoneId,
     controlTursoApiTokenCt,
     pulumi.output(config.require("tursoOrganizationSlug")),
     forteDb.groupName,
-    cloudflareSaasApiTokenCt,
-    objectStorageStorage.accountId,
-    controlObjectStorageAccessKeyIdCt,
-    controlObjectStorageSecretAccessKeyCt,
-    pulumi.interpolate`https://${staticAssetStorage.publicBaseDomain}`,
   ])
   .apply(
     ([
@@ -521,24 +474,9 @@ const controlEnvYamlBootstrap = pulumi
       lambdaRegion,
       lambdaKeyCt,
       lambdaSecretCt,
-      sasAccountId,
-      sasKeyCt,
-      sasSecretCt,
-      sasBucket,
-      staticPageAccountId,
-      staticPageKeyCt,
-      staticPageSecretCt,
-      staticPageBucket,
-      cfApiTokenCt,
-      cfZoneId,
       tursoApiTokenCt,
       tursoOrgSlug,
       tursoGroupName,
-      cfSaasApiTokenCt,
-      objectStorageAccountId,
-      objectStorageAccessKeyIdCt,
-      objectStorageSecretAccessKeyCt,
-      publicStorageCdnOrigin,
     ]) =>
       [
         "__dek:",
@@ -563,41 +501,10 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${lambdaKeyCt}`,
         "FN0_LAMBDA_SECRET_ACCESS_KEY:",
         `  secret: ${lambdaSecretCt}`,
-        `FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID: ${sasAccountId}`,
-        "FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID:",
-        `  secret: ${sasKeyCt}`,
-        "FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY:",
-        `  secret: ${sasSecretCt}`,
-        `FN0_STATIC_ASSET_STORAGE_BUCKET: ${sasBucket}`,
-        // A different bucket from FN0_STATIC_ASSET_STORAGE_*: that one holds
-        // deployed frontend assets and is public through static.fn0.dev, this
-        // one holds lazily generated page HTML and is private. The worker
-        // reads this bucket under the FN0_STATIC_ASSET_STORAGE_* names, so the
-        // two services do not share a naming scheme here.
-        `FN0_STATIC_PAGE_STORAGE_ACCOUNT_ID: ${staticPageAccountId}`,
-        "FN0_STATIC_PAGE_STORAGE_ACCESS_KEY_ID:",
-        `  secret: ${staticPageKeyCt}`,
-        "FN0_STATIC_PAGE_STORAGE_SECRET_ACCESS_KEY:",
-        `  secret: ${staticPageSecretCt}`,
-        `FN0_STATIC_PAGE_STORAGE_BUCKET: ${staticPageBucket}`,
-        `FN0_CLOUDFLARE_ZONE_ID: ${cfZoneId}`,
-        "FN0_CLOUDFLARE_API_TOKEN:",
-        `  secret: ${cfApiTokenCt}`,
         "FN0_TURSO_API_TOKEN:",
         `  secret: ${tursoApiTokenCt}`,
         `FN0_TURSO_ORG_SLUG: ${tursoOrgSlug}`,
         `FN0_TURSO_GROUP_NAME: ${tursoGroupName}`,
-        `FN0_CLOUDFLARE_SAAS_ZONE_ID: ${cfZoneId}`,
-        "FN0_CLOUDFLARE_SAAS_API_TOKEN:",
-        `  secret: ${cfSaasApiTokenCt}`,
-        `FN0_OBJECT_STORAGE_ACCOUNT_ID: ${objectStorageAccountId}`,
-        "FN0_OBJECT_STORAGE_ACCESS_KEY_ID:",
-        `  secret: ${objectStorageAccessKeyIdCt}`,
-        "FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY:",
-        `  secret: ${objectStorageSecretAccessKeyCt}`,
-        // Control composes public object URLs for purge-by-key, which needs the
-        // same origin the worker hands to apps. Not a credential.
-        `FN0_PUBLIC_STORAGE_CDN_ORIGIN: ${publicStorageCdnOrigin}`,
         "",
       ].join("\n"),
   );
@@ -663,26 +570,7 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       accessKeyId: bundleStoreR2.accessKeyId,
       secretAccessKey: bundleStoreR2.secretAccessKey,
     },
-    staticAssets: {
-      accountId: staticPageStorage.accountId,
-      bucketName: staticPageStorage.bucketName,
-      endpoint: staticPageStorage.endpoint,
-      accessKeyId: staticPageStorage.accessKeyId,
-      secretAccessKey: staticPageStorage.secretAccessKey,
-    },
-    publicStorage: {
-      accountId: staticAssetStorage.accountId,
-      bucketName: staticAssetStorage.bucketName,
-      accessKeyId: staticAssetStorage.presignAccessKeyId,
-      secretAccessKey: staticAssetStorage.presignSecretAccessKey,
-      cdnOrigin: pulumi.interpolate`https://${staticAssetStorage.publicBaseDomain}`,
-      controlProjectId: "fn0-control",
-    },
-    objectStorage: {
-      accountId: objectStorageStorage.accountId,
-      accessKeyId: objectStorageStorage.accessKeyId,
-      secretAccessKey: objectStorageStorage.secretAccessKey,
-    },
+    controlProjectId: "fn0-control",
     apex: {
       domain,
       projectId: "fn0-control",

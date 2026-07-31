@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Semaphore, mpsc, oneshot};
 
+use crate::cache::S3BundleCache;
 use crate::worker_pool::{self, DispatchError, RequestEnvelope};
 
 const PUT_MESSAGES_API_VERSION: &str = "20210201";
@@ -85,6 +86,7 @@ struct WrappedMessage {
 
 pub async fn run(
     config: QueueConsumerConfig,
+    cache: Arc<S3BundleCache>,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
 ) {
     let consumer = match Consumer::new(config) {
@@ -108,9 +110,10 @@ pub async fn run(
                         .expect("dispatch semaphore closed");
                     let consumer = consumer.clone();
                     let worker_senders = worker_senders.clone();
+                    let cache = cache.clone();
                     tokio::spawn(async move {
                         let _permit = permit;
-                        if let Err(err) = consumer.dispatch_one(msg, worker_senders).await {
+                        if let Err(err) = consumer.dispatch_one(msg, &cache, worker_senders).await {
                             tracing::warn!(?err, "queue dispatch failed; leaving for redelivery");
                         }
                     });
@@ -233,6 +236,7 @@ impl Consumer {
     async fn dispatch_one(
         &self,
         msg: IncomingMessage,
+        cache: &S3BundleCache,
         worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     ) -> Result<()> {
         let content_bytes =
@@ -265,10 +269,21 @@ impl Consumer {
         }))
         .map_err(|e| anyhow!("queue inner body: {e}"))?;
 
+        // A queue task has no client whose `Host` to carry, so the project's own
+        // hostname stands in. Without one the project is not reachable at all,
+        // and the guest would build absolute URLs against a host nobody serves.
+        let Some(host) = cache.domain_of(&wrapped.project_id).await else {
+            tracing::error!(
+                project_id = %wrapped.project_id,
+                "queue task for a project with no domain; acking"
+            );
+            return self.delete_message(&msg.receipt).await;
+        };
+
         let req: hyper::Request<UnsyncBoxBody<Bytes, anyhow::Error>> = hyper::Request::builder()
             .method("POST")
             .uri("/__fn0_queue_task/execute")
-            .header("host", format!("{}.fn0.dev", wrapped.project_id))
+            .header("host", host)
             .header("content-type", "application/json")
             .body(
                 Full::new(Bytes::from(inner_body))

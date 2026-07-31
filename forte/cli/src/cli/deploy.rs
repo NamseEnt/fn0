@@ -83,7 +83,10 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
     if let Some(note) = &resolved.note {
         eprintln!("note: {note}");
     }
-    println!("app URL: {}", resolved.url);
+    match resolved.url {
+        Some(url) => println!("app URL: {url}"),
+        None => println!("app URL: none yet"),
+    }
 
     Ok(())
 }

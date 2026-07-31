@@ -10,10 +10,13 @@ pub async fn run(project_dir: PathBuf, print: bool) -> Result<()> {
     if let Some(note) = &resolved.note {
         eprintln!("note: {note}");
     }
-    println!("{}", resolved.url);
+    let Some(url) = resolved.url else {
+        anyhow::bail!("project '{project_id}' has no URL to open yet");
+    };
+    println!("{url}");
 
     if !print {
-        open::that_detached(&resolved.url)?;
+        open::that_detached(&url)?;
     }
     Ok(())
 }

@@ -33,9 +33,7 @@ export interface WorkerArgs {
   otlp: WorkerOtlpArgs;
   hostObservability: WorkerHostObservabilityArgs;
   bundleStorage: WorkerBundleStorageArgs;
-  staticAssets: WorkerStaticAssetsArgs;
-  publicStorage: WorkerPublicStorageArgs;
-  objectStorage: WorkerObjectStorageArgs;
+  controlProjectId: pulumi.Input<string>;
   apex: WorkerApexArgs;
 }
 
@@ -48,31 +46,6 @@ export interface WorkerBundleStorageArgs {
   bucketName: pulumi.Input<string>;
   endpoint: pulumi.Input<string>;
   region: pulumi.Input<string>;
-  accessKeyId: pulumi.Input<string>;
-  secretAccessKey: pulumi.Input<string>;
-}
-
-export interface WorkerObjectStorageArgs {
-  accountId: pulumi.Input<string>;
-  accessKeyId: pulumi.Input<string>;
-  secretAccessKey: pulumi.Input<string>;
-}
-
-// The bucket behind the CDN custom domain, which is not the one
-// `staticAssets` names: that is the private bucket holding cached HTML.
-export interface WorkerPublicStorageArgs {
-  accountId: pulumi.Input<string>;
-  bucketName: pulumi.Input<string>;
-  accessKeyId: pulumi.Input<string>;
-  secretAccessKey: pulumi.Input<string>;
-  cdnOrigin: pulumi.Input<string>;
-  controlProjectId: pulumi.Input<string>;
-}
-
-export interface WorkerStaticAssetsArgs {
-  accountId: pulumi.Input<string>;
-  bucketName: pulumi.Input<string>;
-  endpoint: pulumi.Input<string>;
   accessKeyId: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
 }
@@ -1161,23 +1134,9 @@ function buildWorkerEnv(
     AWS_ACCESS_KEY_ID: worker.bundleStorage.accessKeyId,
     AWS_SECRET_ACCESS_KEY: worker.bundleStorage.secretAccessKey,
 
-    FN0_OBJECT_STORAGE_ACCOUNT_ID: worker.objectStorage.accountId,
-    FN0_OBJECT_STORAGE_ACCESS_KEY_ID: worker.objectStorage.accessKeyId,
-    FN0_OBJECT_STORAGE_SECRET_ACCESS_KEY: worker.objectStorage.secretAccessKey,
-
-    FN0_STATIC_ASSET_STORAGE_ACCOUNT_ID: worker.staticAssets.accountId,
-    FN0_STATIC_ASSET_STORAGE_BUCKET: worker.staticAssets.bucketName,
-    FN0_STATIC_ASSET_STORAGE_ENDPOINT: worker.staticAssets.endpoint,
-    FN0_STATIC_ASSET_STORAGE_ACCESS_KEY_ID: worker.staticAssets.accessKeyId,
-    FN0_STATIC_ASSET_STORAGE_SECRET_ACCESS_KEY:
-      worker.staticAssets.secretAccessKey,
-
-    FN0_PUBLIC_STORAGE_ACCOUNT_ID: worker.publicStorage.accountId,
-    FN0_PUBLIC_STORAGE_BUCKET: worker.publicStorage.bucketName,
-    FN0_PUBLIC_STORAGE_ACCESS_KEY_ID: worker.publicStorage.accessKeyId,
-    FN0_PUBLIC_STORAGE_SECRET_ACCESS_KEY: worker.publicStorage.secretAccessKey,
-    FN0_PUBLIC_STORAGE_CDN_ORIGIN: worker.publicStorage.cdnOrigin,
-    FN0_CONTROL_PROJECT_ID: worker.publicStorage.controlProjectId,
+    // No R2 credentials: every project's storage is its owner's, resolved per
+    // request from the worker manifest.
+    FN0_CONTROL_PROJECT_ID: worker.controlProjectId,
 
     FN0_APEX_DOMAIN: worker.apex.domain,
     FN0_APEX_PROJECT_ID: worker.apex.projectId,

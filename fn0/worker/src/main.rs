@@ -348,8 +348,9 @@ async fn run() -> Result<()> {
         let config = queue_consumer::QueueConsumerConfig::from_env()
             .map_err(|err| color_eyre::eyre::eyre!("queue consumer config: {err}"))?;
         let worker_senders = worker_senders.clone();
+        let cache = Arc::new(cache.clone());
         tokio::spawn(async move {
-            queue_consumer::run(config, worker_senders).await;
+            queue_consumer::run(config, cache, worker_senders).await;
         })
     };
 
