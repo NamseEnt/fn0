@@ -58,10 +58,31 @@ pub async fn cloudflare_connect_managed(
         account_id.to_string(),
         zone_id.to_string(),
     );
-    let (resources, credentials) = provisioner.run_managed(project_id).await?;
+    let (resources, credentials, minted) = provisioner.run_managed(project_id).await?;
     print_resources(&resources);
     println!("  minted a bucket-scoped R2 token and a purge-only token");
-    send_connect(project_id, account_id, zone_id, &resources, &credentials).await
+
+    match send_connect(project_id, account_id, zone_id, &resources, &credentials).await {
+        Ok(()) => Ok(()),
+        // fn0 answered, and its answer proves it stored nothing. These two
+        // credentials never expire, so leaving them would hand the account a
+        // live R2 read-write pair for every failed attempt.
+        Err(ConnectFailure::Rejected(error)) => {
+            provisioner.revoke_minted_credentials(&minted).await;
+            Err(error)
+        }
+        // No answer arrived, so whether fn0 stored them is unknown. Revoking
+        // could break a connection that did succeed; naming them lets the user
+        // decide.
+        Err(ConnectFailure::Indeterminate(error)) => {
+            eprintln!(
+                "warning: could not tell whether fn0 stored the credentials. If it did not, \
+                 revoke these in the Cloudflare dashboard: data plane {}, cache purge {}.",
+                minted.dataplane, minted.purge
+            );
+            Err(error)
+        }
+    }
 }
 
 /// A token that can provision but cannot create tokens. Provisions and stops;
@@ -133,7 +154,11 @@ pub async fn cloudflare_connect_manual(
         dataplane_secret: dataplane_secret.to_string(),
         purge_token: purge_token.to_string(),
     };
-    send_connect(project_id, account_id, zone_id, &resources, &credentials).await
+    // Nothing to revoke on failure: these credentials are the user's own, and
+    // fn0 holds no token that could revoke them anyway.
+    send_connect(project_id, account_id, zone_id, &resources, &credentials)
+        .await
+        .map_err(ConnectFailure::into_error)
 }
 
 fn print_resources(resources: &ProvisionedResources) {
@@ -145,39 +170,65 @@ fn print_resources(resources: &ProvisionedResources) {
     println!("  assets:  https://{}", resources.static_hostname);
 }
 
+/// Why a connect did not succeed, split by what it says about fn0's state — the
+/// caller has credentials to clean up and may only do so when nothing was
+/// stored.
+enum ConnectFailure {
+    /// fn0 answered. Every answer other than `Ok` is returned before anything
+    /// is written, so the credentials sent are certainly unused.
+    Rejected(anyhow::Error),
+    /// The request or its answer did not complete. fn0 may or may not have
+    /// stored the credentials.
+    Indeterminate(anyhow::Error),
+}
+
+impl ConnectFailure {
+    fn into_error(self) -> anyhow::Error {
+        match self {
+            Self::Rejected(error) | Self::Indeterminate(error) => error,
+        }
+    }
+}
+
 async fn send_connect(
     project_id: &str,
     account_id: &str,
     zone_id: &str,
     provisioned: &ProvisionedResources,
     credentials: &DataPlaneCredentials,
-) -> Result<()> {
-    let creds = crate::credentials::require()?;
+) -> std::result::Result<(), ConnectFailure> {
+    let creds = crate::credentials::require().map_err(ConnectFailure::Indeterminate)?;
     let url = format!(
         "{}/__forte_action/cloudflare_connect",
         creds.control_url.trim_end_matches('/')
     );
-    let response = reqwest::Client::new()
-        .post(&url)
-        .bearer_auth(&creds.token)
-        .json(&ConnectInput {
-            project_id,
-            account_id,
-            zone_id,
-            zone_name: &provisioned.zone_name,
-            static_hostname: &provisioned.static_hostname,
-            object_bucket: &provisioned.object_bucket,
-            asset_bucket: &provisioned.asset_bucket,
-            page_bucket: &provisioned.page_bucket,
-            dataplane_access_key_id: &credentials.dataplane_access_key_id,
-            dataplane_secret: &credentials.dataplane_secret,
-            purge_token: &credentials.purge_token,
-        })
-        .send()
-        .await?
-        .error_for_status()?;
+    let response = async {
+        reqwest::Client::new()
+            .post(&url)
+            .bearer_auth(&creds.token)
+            .json(&ConnectInput {
+                project_id,
+                account_id,
+                zone_id,
+                zone_name: &provisioned.zone_name,
+                static_hostname: &provisioned.static_hostname,
+                object_bucket: &provisioned.object_bucket,
+                asset_bucket: &provisioned.asset_bucket,
+                page_bucket: &provisioned.page_bucket,
+                dataplane_access_key_id: &credentials.dataplane_access_key_id,
+                dataplane_secret: &credentials.dataplane_secret,
+                purge_token: &credentials.purge_token,
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<Connect>()
+            .await
+    }
+    .await
+    .map_err(|error| ConnectFailure::Indeterminate(error.into()))?;
 
-    match response.json::<Connect>().await? {
+    match response {
         Connect::Ok => {
             println!();
             println!("connected. the token you used was not sent to fn0 and is no longer");
@@ -185,22 +236,26 @@ async fn send_connect(
             println!("workers pick this up within a second; no redeploy needed.");
             Ok(())
         }
-        Connect::CredentialRejected { reason } => {
-            Err(anyhow!("fn0 rejected the credentials: {reason}"))
-        }
+        Connect::CredentialRejected { reason } => Err(ConnectFailure::Rejected(anyhow!(
+            "fn0 rejected the credentials: {reason}"
+        ))),
         Connect::AlreadyConnected {
             account_id,
             zone_name,
-        } => Err(anyhow!(
+        } => Err(ConnectFailure::Rejected(anyhow!(
             "project '{project_id}' is already connected to account {account_id} ({zone_name}). \
              Reconnecting is not supported yet — it would have to decide whether to rotate \
              credentials and whether to move objects already written to that account."
-        )),
-        Connect::NotLoggedIn => Err(anyhow!("control rejected token; sign in again.")),
-        Connect::NotFound => Err(anyhow!(
+        ))),
+        Connect::NotLoggedIn => Err(ConnectFailure::Rejected(anyhow!(
+            "control rejected token; sign in again."
+        ))),
+        Connect::NotFound => Err(ConnectFailure::Rejected(anyhow!(
             "project '{project_id}' not found or not owned by you."
-        )),
-        Connect::InternalError { reason } => Err(anyhow!("cloudflare_connect: {reason}")),
+        ))),
+        Connect::InternalError { reason } => Err(ConnectFailure::Rejected(anyhow!(
+            "cloudflare_connect: {reason}"
+        ))),
     }
 }
 

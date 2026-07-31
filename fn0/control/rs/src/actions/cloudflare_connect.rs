@@ -27,6 +27,34 @@ use crate::common::vault;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
+use std::future::Future;
+use std::time::Duration;
+
+/// Cloudflare answers 401 on both cache purge and the R2 data plane for about
+/// two seconds after `/user/tokens` hands back the credential: a token's
+/// identity propagates ahead of its scoped permissions. Measured against the
+/// live API, where `/user/tokens/verify` passes at 0.2s while the operations
+/// the credential exists for are still refused at 2.3s — so verify cannot be
+/// the readiness signal, and only the real call can.
+///
+/// Retried, not slept on, because the careful path's hand-made credentials are
+/// minutes old and must not pay for the managed path's freshly minted ones.
+const PROBE_ATTEMPTS: usize = 10;
+const PROBE_RETRY_INTERVAL: Duration = Duration::from_millis(750);
+
+async fn prove<Probe, Fut>(probe: Probe) -> anyhow::Result<()>
+where
+    Probe: Fn() -> Fut,
+    Fut: Future<Output = anyhow::Result<()>>,
+{
+    for _ in 1..PROBE_ATTEMPTS {
+        if probe().await.is_ok() {
+            return Ok(());
+        }
+        time_wasi::sleep(PROBE_RETRY_INTERVAL).await;
+    }
+    probe().await
+}
 
 #[derive(Deserialize)]
 pub struct Input {
@@ -115,12 +143,11 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         req.body.account_id.clone(),
         req.body.zone_id.clone(),
     );
-    if let Err(error) = purge_client
-        .purge_cache_urls(&[format!(
-            "https://{}/__fn0_connect_probe",
-            req.body.static_hostname
-        )])
-        .await
+    let probe_url = format!(
+        "https://{}/__fn0_connect_probe",
+        req.body.static_hostname
+    );
+    if let Err(error) = prove(|| purge_client.purge_cache_urls(std::slice::from_ref(&probe_url))).await
     {
         tracing::warn!(%error, "cloudflare_connect purge probe failed");
         return Output::CredentialRejected {
@@ -136,15 +163,20 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         &req.body.asset_bucket,
         &req.body.page_bucket,
     ] {
-        if let Err(error) = aws_sign::r2_list_objects(aws_sign::R2ListArgs {
-            account_id: &req.body.account_id,
-            bucket,
-            region: "auto",
-            prefix: &format!("{}/", req.body.project_id),
-            continuation_token: None,
-            access_key_id: &req.body.dataplane_access_key_id,
-            secret_access_key: &req.body.dataplane_secret,
-            now: forte_sdk::now(),
+        let prefix = format!("{}/", req.body.project_id);
+        if let Err(error) = prove(|| async {
+            aws_sign::r2_list_objects(aws_sign::R2ListArgs {
+                account_id: &req.body.account_id,
+                bucket,
+                region: "auto",
+                prefix: &prefix,
+                continuation_token: None,
+                access_key_id: &req.body.dataplane_access_key_id,
+                secret_access_key: &req.body.dataplane_secret,
+                now: forte_sdk::now(),
+            })
+            .await
+            .map(|_| ())
         })
         .await
         {

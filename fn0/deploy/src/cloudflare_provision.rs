@@ -105,6 +105,13 @@ pub struct DataPlaneCredentials {
     pub purge_token: String,
 }
 
+/// The ids of the credentials the managed path minted, so a connect that fn0
+/// refused does not leave them live on the user's account.
+pub struct MintedCredentialIds {
+    pub dataplane: String,
+    pub purge: String,
+}
+
 pub struct IssuedCertificate {
     pub certificate_pem: String,
     pub private_key_pem: String,
@@ -438,7 +445,7 @@ impl Provisioner {
         Ok(TemporaryToken { id, value })
     }
 
-    async fn revoke_token(&self, id: &str) -> Result<()> {
+    async fn revoke_token(&self, purpose: &str, id: &str) -> Result<()> {
         let (status, envelope) = self
             .call::<serde_json::Value>(
                 &self.setup_token,
@@ -451,7 +458,7 @@ impl Provisioner {
             return Ok(());
         }
         Err(anyhow!(
-            "could not revoke the temporary setup token ({status}): {}",
+            "could not revoke the {purpose} token {id} ({status}): {}",
             describe(&envelope.errors)
         ))
     }
@@ -461,18 +468,22 @@ impl Provisioner {
     pub async fn run_managed(
         &self,
         project_id: &str,
-    ) -> Result<(ProvisionedResources, DataPlaneCredentials)> {
+    ) -> Result<(
+        ProvisionedResources,
+        DataPlaneCredentials,
+        MintedCredentialIds,
+    )> {
         self.verify().await?;
         let provisioning = self.mint_provisioning_token(project_id).await?;
         let result = async {
             let resources = self.provision(&provisioning.value, project_id).await?;
-            let credentials = self.mint_credentials(project_id, &resources).await?;
-            Ok((resources, credentials))
+            let (credentials, minted) = self.mint_credentials(project_id, &resources).await?;
+            Ok((resources, credentials, minted))
         }
         .await;
         // Best effort, and reported rather than swallowed: the token expires on
         // its own, but a user who has to wait for that should know why.
-        if let Err(error) = self.revoke_token(&provisioning.id).await {
+        if let Err(error) = self.revoke_token("provisioning", &provisioning.id).await {
             eprintln!(
                 "warning: {error}. It expires by itself within \
                  {PROVISIONING_TOKEN_MINUTES} minutes."
@@ -519,7 +530,7 @@ impl Provisioner {
         &self,
         project_id: &str,
         resources: &ProvisionedResources,
-    ) -> Result<DataPlaneCredentials> {
+    ) -> Result<(DataPlaneCredentials, MintedCredentialIds)> {
         let buckets: serde_json::Map<String, serde_json::Value> = [
             &resources.object_bucket,
             &resources.asset_bucket,
@@ -552,7 +563,7 @@ impl Provisioner {
             )
             .await?;
 
-        let (_, purge_token) = self
+        let (purge_token_id, purge_token) = self
             .mint_with_expiry(
                 &format!("fn0 cache purge ({project_id})"),
                 vec![serde_json::json!({
@@ -566,11 +577,29 @@ impl Provisioner {
             )
             .await?;
 
-        Ok(DataPlaneCredentials {
-            dataplane_access_key_id,
-            dataplane_secret: hex_sha256(&dataplane_token),
-            purge_token,
-        })
+        let minted = MintedCredentialIds {
+            dataplane: dataplane_access_key_id.clone(),
+            purge: purge_token_id,
+        };
+        Ok((
+            DataPlaneCredentials {
+                dataplane_access_key_id,
+                dataplane_secret: hex_sha256(&dataplane_token),
+                purge_token,
+            },
+            minted,
+        ))
+    }
+
+    /// Best effort, and reported rather than swallowed: unlike the provisioning
+    /// token these carry no expiry, so one left behind stays until the user
+    /// finds it.
+    pub async fn revoke_minted_credentials(&self, ids: &MintedCredentialIds) {
+        for (purpose, id) in [("data plane", &ids.dataplane), ("cache purge", &ids.purge)] {
+            if let Err(error) = self.revoke_token(purpose, id).await {
+                eprintln!("warning: {error}. Delete it in the Cloudflare dashboard.");
+            }
+        }
     }
 
     /// Signs an origin certificate for `hostname` through the zone owner's own
@@ -593,7 +622,7 @@ impl Provisioner {
         }
         let signing = self.mint_provisioning_token(hostname).await?;
         let result = self.sign_origin_certificate(&signing.value, hostname).await;
-        if let Err(error) = self.revoke_token(&signing.id).await {
+        if let Err(error) = self.revoke_token("signing", &signing.id).await {
             eprintln!(
                 "warning: {error}. It expires by itself within \
                  {PROVISIONING_TOKEN_MINUTES} minutes."
