@@ -191,6 +191,15 @@ pub enum DomainStatus {
         domain: String,
         cloudflare_status: CloudflareStatus,
     },
+    /// A project on its owner's own Cloudflare account. Their edge holds the
+    /// visitor-facing certificate, so there is no fn0-side DV status to report;
+    /// what fn0 holds is the origin certificate the worker presents.
+    SelfHosted {
+        domain: String,
+        origin_certificate_ready: bool,
+        origin_certificate_expires_epoch_seconds: Option<i64>,
+        origin_ip: String,
+    },
     NotLoggedIn,
     NotFound,
     InternalError,
@@ -240,6 +249,34 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
                 "cloudflare status: {}",
                 format_cloudflare_status(&cloudflare_status)
             );
+            Ok(())
+        }
+        DomainStatus::SelfHosted {
+            domain,
+            origin_certificate_ready,
+            origin_certificate_expires_epoch_seconds,
+            origin_ip,
+        } => {
+            println!("project '{project_id}' custom domain: {domain}");
+            println!("served from your own Cloudflare account.");
+            if origin_certificate_ready {
+                match origin_certificate_expires_epoch_seconds
+                    .and_then(|seconds| chrono::DateTime::from_timestamp(seconds, 0))
+                {
+                    Some(expires) => println!(
+                        "origin certificate: held by fn0, expires {}",
+                        expires.format("%Y-%m-%d")
+                    ),
+                    None => println!("origin certificate: held by fn0"),
+                }
+            } else {
+                println!(
+                    "origin certificate: missing — run `forte domain add {domain}` to issue one."
+                );
+            }
+            if !origin_ip.is_empty() {
+                println!("point a proxied A record at {origin_ip}.");
+            }
             Ok(())
         }
         DomainStatus::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),

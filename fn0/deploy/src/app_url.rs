@@ -74,6 +74,21 @@ pub async fn resolve_app_url(project_id: &str) -> Result<ResolvedAppUrl> {
             "custom domain '{domain}' is not serving yet ({}), so the default subdomain is used",
             format_cloudflare_status(&cloudflare_status)
         )),
+        // The owner's own edge terminates the visitor connection, so the domain
+        // serves as soon as their DNS points at the origin — there is no fn0-side
+        // DV state to wait on. The origin certificate is what fn0 must hold.
+        Ok(DomainStatus::SelfHosted {
+            domain,
+            origin_certificate_ready: true,
+            ..
+        }) => ResolvedAppUrl {
+            url: format!("https://{domain}"),
+            note: None,
+        },
+        Ok(DomainStatus::SelfHosted { domain, .. }) => fallback(format!(
+            "custom domain '{domain}' has no origin certificate yet, so the default \
+             subdomain is used"
+        )),
         Ok(DomainStatus::NotConfigured) => ResolvedAppUrl {
             url: default_url,
             note: None,
