@@ -126,9 +126,11 @@ impl ProjectStorage {
         self.connection.is_some()
     }
 
-    /// A client that can purge this project's zone and read its metadata, and
-    /// nothing else. Named for what it can do rather than for whose account it
-    /// belongs to, because that difference is the point.
+    /// A client that can purge this project's zone and nothing else — on a
+    /// connected project it carries the purge token, which the Cloudflare API
+    /// refuses for every other call, R2 included. Named for what it can do
+    /// rather than for whose account it belongs to, because that difference is
+    /// the point.
     pub fn purge_client(&self) -> anyhow::Result<CloudflareClient> {
         match &self.connection {
             Some(connection) => Ok(CloudflareClient::for_zone(

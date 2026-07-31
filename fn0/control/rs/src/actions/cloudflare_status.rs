@@ -7,6 +7,7 @@
 
 use crate::common::auth;
 use crate::common::byoc::ProjectStorage;
+use crate::common::r2_store::ProjectR2Store;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -93,13 +94,23 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
+    // Probed the way traffic reaches it: an S3 list with the data-plane
+    // credential. The REST bucket endpoint would answer 403 for every healthy
+    // connection, because the credential fn0 stores deliberately cannot call
+    // the Cloudflare API at all — which is also what makes a real revocation
+    // indistinguishable there.
     let problem = match cloudflare.verify_token().await {
-        Ok(_) => match cloudflare.r2_bucket_exists(&storage.asset_bucket).await {
-            Ok(true) => None,
-            Ok(false) => Some(format!("bucket {} is gone", storage.asset_bucket)),
-            Err(error) => Some(format!("bucket check failed: {error}")),
+        Ok(_) => match ProjectR2Store::assets(&storage)
+            .list_all(&format!("{}/", req.body.project_id), forte_sdk::now())
+            .await
+        {
+            Ok(_) => None,
+            Err(error) => Some(format!(
+                "asset storage {} is unreachable: {error}",
+                storage.asset_bucket
+            )),
         },
-        Err(error) => Some(format!("token is no longer valid: {error}")),
+        Err(error) => Some(format!("purge token is no longer valid: {error}")),
     };
 
     let state = match &problem {
