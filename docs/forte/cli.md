@@ -142,6 +142,27 @@ Requires `project_id` in `Forte.toml`, which `forte deploy` writes on first depl
 
 ---
 
+### `forte purge <key>... [options]`
+
+Invalidate the CDN edge copy of one or more public objects. Use this after an out-of-band write (e.g. a presigned PUT upload) that bypasses your app's `public::put` call — `public::put` triggers its own invalidation automatically, so an explicit purge is only needed for presigned uploads.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-p, --project <dir>` | `.` | Project directory |
+
+`<key>...` is one or more keys inside the project's public object namespace (the same strings you pass to `object_storage::public::put`), e.g. `clips/intro.mp4`.
+
+```sh
+forte purge clips/intro.mp4
+forte purge avatars/1.png avatars/2.png
+```
+
+Prints each queued CDN invalidation URL and a count of invalidations submitted. Purges are subject to the project's hourly quota (1 000 per hour on the one-dollar plan); see [limits.md](../fn0/limits.md) for details.
+
+See [object-storage/overview.md](../object-storage/overview.md#presigned-uploads) for the full presigned-upload pattern where this is needed.
+
+---
+
 ### `forte add page <path>`
 
 Add a new page (Rust handler + React component).

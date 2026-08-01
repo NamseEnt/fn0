@@ -81,6 +81,7 @@ The fn0 CLI (`fn0/cli`) provides tooling for projects deployed directly to fn0 w
 | `fn0 env set <key> <value> [--secret]` | Set an env entry (plain by default; `--secret` encrypts via vault and injects through vault_hijack at runtime) |
 | `fn0 env list` | List env entries with their kind (plain / secret) |
 | `fn0 env unset <key>` | Remove an env entry |
+| `fn0 purge <key>...` | Invalidate the CDN edge copy of one or more public objects (needed after presigned PUT uploads; `public::put` already purges automatically) |
 
 > **Note:** Most Forte developers use `forte` CLI instead of `fn0` CLI. `fn0` CLI is for projects that use fn0 as a raw FaaS platform (e.g., Hono-based TypeScript apps).
 
