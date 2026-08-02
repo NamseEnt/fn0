@@ -78,13 +78,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         .body
         .keys
         .iter()
-        .map(|key| {
-            format!(
-                "{cdn_origin}/{}/public/{}",
-                req.body.project_id,
-                key.trim_start_matches('/')
-            )
-        })
+        .map(|key| served_url(cdn_origin, key))
         .collect();
 
     if urls.is_empty() {
@@ -105,4 +99,39 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     Output::Ok { urls }
+}
+
+/// The URL the CDN serves this key at, which is the only URL a purge can
+/// invalidate.
+///
+/// The key maps straight onto the path: the project owns the bucket, so there
+/// is no project segment. This has to stay identical to `public_url_for` in the
+/// `fn0` crate, which builds the URL the guest hands out. The two live in
+/// crates that share no dependency, so nothing but this note couples them.
+fn served_url(cdn_origin: &str, key: &str) -> String {
+    format!("{cdn_origin}/{}", key.trim_start_matches('/'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::served_url;
+
+    #[test]
+    fn served_url_carries_no_project_segment() {
+        assert_eq!(
+            served_url(
+                "https://fn0-proj1-public-object-storage.example",
+                "captures/8/captures.json"
+            ),
+            "https://fn0-proj1-public-object-storage.example/captures/8/captures.json"
+        );
+    }
+
+    #[test]
+    fn a_leading_slash_does_not_double_up() {
+        assert_eq!(
+            served_url("https://cdn.example", "/clips/intro.mp4"),
+            "https://cdn.example/clips/intro.mp4"
+        );
+    }
 }
