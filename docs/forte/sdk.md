@@ -281,7 +281,7 @@ All re-exported at the crate root and usable via `forte_sdk::`:
 | `cookie`, `Cookie`, `CookieBuilder`, `CookieJar` | `cookie` |
 | `form_urlencoded` | `form_urlencoded` |
 | `forte_json` | `forte-json` |
-| `forte_macros::{forte_doc, test}` | `forte-macros` |
+| `forte_macros::{cache_static, forte_doc, test}` | `forte-macros` |
 | `futures` | `futures` |
 | `hex` | `hex` |
 | `serde` | `serde` |

@@ -95,6 +95,20 @@ exclude = ["vendor/*", "forte/rs-to-ts", "fn0/control"]
 
 `forte/rs-to-ts` and `fn0/control` are excluded from the workspace and must be built separately.
 
+### Building excluded members
+
+**`forte/rs-to-ts`** uses private rustc APIs and requires the pinned nightly compiler bundled inside the crate. Build and install it from inside its own directory:
+
+```sh
+cd forte/rs-to-ts
+cargo build --release
+# the binary is at target/release/forte-rs-to-ts
+```
+
+The CLI downloads the correct pre-built version automatically on first use (`~/.forte/bin/forte-rs-to-ts-<version>/forte-rs-to-ts`). You only need to build from source if you are developing `forte-rs-to-ts` itself.
+
+**`fn0/control`** is a full Forte project (Rust backend + React frontend). Build it with `forte build` from inside `fn0/control/`, using a `forte` CLI built from the monorepo. Use `scripts/bootstrap-fn0-control.sh` for the initial platform deploy.
+
 ## Code Generation (forte-codegen)
 
 Code generation runs as part of `cargo build` via `build.rs`. If `route_generated.rs` looks wrong after adding/removing pages or actions, run:
