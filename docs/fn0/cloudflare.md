@@ -17,7 +17,7 @@ assets get served from.
 
 ## Two ways to set this up
 
-Setup has to create buckets, point a hostname at one, write a cache rule and
+Setup has to create buckets, point a hostname at one, write two zone rules and
 sign a certificate. Someone has to hold a Cloudflare token that can do those
 things. Pick who.
 
@@ -72,6 +72,7 @@ Token:
 | Account | Workers R2 Storage → Edit |
 | Zone | Zone → Read |
 | Zone | Cache Rules → Edit |
+| Zone | Transform Rules → Edit |
 | Zone | SSL and Certificates → Edit |
 
 Restrict the zone scopes to the one zone. Then:
@@ -81,8 +82,8 @@ forte cloudflare provision \
   --account-id <account id> --zone-id <zone id> --api-token <token>
 ```
 
-This creates the buckets, the CDN hostname and the cache rule, then stops and
-prints the exact names for step 2.
+This creates the buckets, the CDN hostname and the two zone rules, then stops
+and prints the exact names for step 2.
 
 **Step 2** — the three credentials fn0 keeps.
 
@@ -141,15 +142,24 @@ The two public buckets answer on a hostname that is the bucket's own name in
 your zone, so a bucket and the address it serves from cannot drift apart. Each
 costs one DNS record.
 
-fn0 adds exactly one cache rule to your zone and leaves your own rules in
-place. It matches `fn0-*-frontend-asset.<your-domain>` and
-`fn0-*-public-object-storage.<your-domain>`, so it covers every fn0 project you
-ever add without a second rule — a free zone allows ten, and a rule per project
-would run out at ten projects. Both halves of each pattern are required so the
-rule cannot swallow a hostname of your own. The rule also pins browser caching
-on those hostnames to whatever fn0 stored on the object, because a zone's
-default Browser Cache TTL would otherwise leave browser copies of a replaced
-object that no purge can reach. Your other hostnames keep the zone setting.
+fn0 adds two rules to your zone and leaves your own rules in place. Both match
+`fn0-*-frontend-asset.<your-domain>` and
+`fn0-*-public-object-storage.<your-domain>`, so they cover every fn0 project you
+ever add without a rule per project — a free zone allows ten of each, and a rule
+per project would run out at ten projects. Both halves of each pattern are
+required so a rule cannot swallow a hostname of your own.
+
+The **cache rule** pins browser caching on those hostnames to whatever fn0
+stored on the object, because a zone's default Browser Cache TTL would otherwise
+leave browser copies of a replaced object that no purge can reach. Your other
+hostnames keep the zone setting.
+
+The **response header rule** removes `Vary: Origin`, which R2 attaches to every
+CORS response. The buckets allow `*`, so that header says nothing — but it makes
+Cloudflare keep one cache entry per requesting origin, and a purge by URL clears
+only the entry for a request that sent no `Origin`. Browsers send one, so
+without this rule a replaced object keeps serving its old bytes to browsers for
+the full year fn0 stores on public objects.
 
 Workers pick the change up within about a second; no redeploy is needed. Check
 with:

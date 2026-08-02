@@ -65,6 +65,7 @@ const PROVISIONING_TOKEN_MINUTES: i64 = 10;
 const R2_STORAGE_WRITE: &str = "bf7481a1826f439697cb59a20b22293e";
 const ZONE_READ: &str = "c8fed203ed3043cba015a93ad1616f1f";
 const CACHE_SETTINGS_WRITE: &str = "9ff81cbbe65c400b97d92c3c1033cab6";
+const ZONE_TRANSFORM_RULES_WRITE: &str = "0ac90a90249747bca6b047d97f0803e9";
 const SSL_AND_CERTIFICATES_WRITE: &str = "c03055bc037c4ea9afb9a9f104b7b721";
 
 /// One set of buckets per project. The two that are served publicly take their
@@ -459,6 +460,80 @@ impl Provisioner {
         ))
     }
 
+    /// Drops the `Vary: Origin` R2 attaches to every CORS response on these
+    /// hostnames.
+    ///
+    /// The buckets allow `*`, so the CORS answer is the same whoever asks and
+    /// the header carries no information. What it does do is give Cloudflare a
+    /// separate cache entry per requesting origin, and purge by URL clears only
+    /// the entry for a request that sent no `Origin` at all. A browser sends
+    /// one, so every purge left the copy browsers actually read untouched —
+    /// for the `s-maxage` of a year that fn0 stores on public objects.
+    ///
+    /// Response header rules all run, in order, so this one goes last: a zone
+    /// rule that adds `Vary` back has to be overridden, not overridden by.
+    async fn ensure_vary_rule(&self, token: &str, zone_name: &str) -> Result<()> {
+        const RULE_DESCRIPTION: &str = "fn0 single cache entry per public object";
+
+        #[derive(Deserialize)]
+        struct Ruleset {
+            #[serde(default)]
+            rules: Vec<serde_json::Value>,
+        }
+
+        let path = format!(
+            "/zones/{}/rulesets/phases/http_response_headers_transform/entrypoint",
+            self.zone_id
+        );
+        let (status, envelope) = self
+            .call::<Ruleset>(token, reqwest::Method::GET, &path, None)
+            .await?;
+        // A zone with no response header rules has no entrypoint ruleset at
+        // all, which reads as 404 rather than an empty list.
+        let mut rules = if envelope.success {
+            envelope.result.map(|set| set.rules).unwrap_or_default()
+        } else if status == reqwest::StatusCode::NOT_FOUND {
+            Vec::new()
+        } else {
+            return Err(anyhow!(
+                "could not read the zone's response header rules ({status}). The token needs Zone -> Transform Rules -> Edit. {}",
+                describe(&envelope.errors)
+            ));
+        };
+
+        rules.retain(|rule| {
+            rule.get("description").and_then(|value| value.as_str()) != Some(RULE_DESCRIPTION)
+        });
+        rules.push(serde_json::json!({
+            "action": "rewrite",
+            "expression": format!(
+                r#"(http.host wildcard "fn0-*-frontend-asset.{zone_name}" or http.host wildcard "fn0-*-public-object-storage.{zone_name}")"#
+            ),
+            "description": RULE_DESCRIPTION,
+            "action_parameters": {
+                "headers": {
+                    "Vary": { "operation": "remove" },
+                },
+            },
+        }));
+
+        let (status, envelope) = self
+            .call::<serde_json::Value>(
+                token,
+                reqwest::Method::PUT,
+                &path,
+                Some(serde_json::json!({ "rules": rules })),
+            )
+            .await?;
+        if envelope.success {
+            return Ok(());
+        }
+        Err(anyhow!(
+            "could not write the zone's response header rules ({status}). The token needs Zone -> Transform Rules -> Edit. {}",
+            describe(&envelope.errors)
+        ))
+    }
+
     async fn mint_with_expiry(
         &self,
         name: &str,
@@ -514,6 +589,7 @@ impl Provisioner {
                         "permission_groups": [
                             { "id": ZONE_READ },
                             { "id": CACHE_SETTINGS_WRITE },
+                            { "id": ZONE_TRANSFORM_RULES_WRITE },
                             { "id": SSL_AND_CERTIFICATES_WRITE },
                         ],
                     }),
@@ -613,6 +689,7 @@ impl Provisioner {
         )
         .await?;
         self.ensure_cache_rule(token, &zone_name).await?;
+        self.ensure_vary_rule(token, &zone_name).await?;
 
         Ok(ProvisionedResources {
             zone_name,
