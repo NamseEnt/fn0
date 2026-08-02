@@ -187,13 +187,13 @@ pub enum CloudflareCommands {
         #[arg(short, long)]
         project: Option<PathBuf>,
     },
-    /// Create the buckets, CDN hostname and cache rule, and stop there
+    /// Create the buckets, CDN hostname and zone rules, and stop there
     ///
     /// For people who would rather not hand any tool a token that can create
     /// tokens. Use a token with Workers R2 Storage Edit, Zone Read, Cache Rules
-    /// Edit and SSL and Certificates Edit — it can provision but cannot create
-    /// tokens, so it cannot widen itself. The command then tells you which two
-    /// credentials to make by hand.
+    /// Edit, Transform Rules Edit and SSL and Certificates Edit — it can
+    /// provision but cannot create tokens, so it cannot widen itself. The
+    /// command then tells you which two credentials to make by hand.
     Provision {
         #[arg(long)]
         account_id: String,
