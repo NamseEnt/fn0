@@ -14,6 +14,19 @@ if [[ -n "${__FN0_CONTROL_CLOUDFLARE_LOADED:-}" ]]; then
 fi
 __FN0_CONTROL_CLOUDFLARE_LOADED=1
 
+# Named after the constants of the same value in cloudflare_provision.rs, so the
+# two permission sets can be diffed by eye. ZONE_TRANSFORM_RULES_WRITE is in the
+# Rust set and deliberately absent here: nothing on this path writes a transform
+# rule, and the provisioning token should not carry a permission it never uses.
+readonly __CF_PERMISSION_R2_STORAGE_WRITE="bf7481a1826f439697cb59a20b22293e"
+readonly __CF_PERMISSION_R2_BUCKET_ITEM_READ="6a018a9f2fc74eb6b293b0c548f38b39"
+readonly __CF_PERMISSION_R2_BUCKET_ITEM_WRITE="2efd5506f9c8494dacb1fa10a3e7d5b6"
+readonly __CF_PERMISSION_ZONE_READ="c8fed203ed3043cba015a93ad1616f1f"
+readonly __CF_PERMISSION_CACHE_SETTINGS_WRITE="9ff81cbbe65c400b97d92c3c1033cab6"
+readonly __CF_PERMISSION_ZONE_SETTINGS_WRITE="3030687196b94b638145a3953da2b699"
+readonly __CF_PERMISSION_SSL_AND_CERTIFICATES_WRITE="c03055bc037c4ea9afb9a9f104b7b721"
+readonly __CF_PERMISSION_CACHE_PURGE="e17beae8b8cb423a99b1730f21238bed"
+
 __cf_call() {
   local method="$1" path="$2" token="$3" body="${4:-}"
   local args=(-sS -o /tmp/__cf_resp.body -w '%{http_code}'
@@ -165,17 +178,23 @@ mint_provisioning_token() {
     --arg n "fn0 setup (${purpose})" \
     --arg exp "$expires" \
     --arg acct "com.cloudflare.api.account.${account_id}" \
-    --arg zone "com.cloudflare.api.account.zone.${zone_id}" '{
+    --arg zone "com.cloudflare.api.account.zone.${zone_id}" \
+    --arg r2_storage_write "$__CF_PERMISSION_R2_STORAGE_WRITE" \
+    --arg zone_read "$__CF_PERMISSION_ZONE_READ" \
+    --arg cache_settings_write "$__CF_PERMISSION_CACHE_SETTINGS_WRITE" \
+    --arg zone_settings_write "$__CF_PERMISSION_ZONE_SETTINGS_WRITE" \
+    --arg ssl_and_certificates_write "$__CF_PERMISSION_SSL_AND_CERTIFICATES_WRITE" '{
       name:$n,
       expires_on:$exp,
       policies:[
         {effect:"allow", resources:{($acct):"*"},
-         permission_groups:[{id:"bf7481a1826f439697cb59a20b22293e"}]},
+         permission_groups:[{id:$r2_storage_write}]},
         {effect:"allow", resources:{($zone):"*"},
          permission_groups:[
-           {id:"c8fed203ed3043cba015a93ad1616f1f"},
-           {id:"9ff81cbbe65c400b97d92c3c1033cab6"},
-           {id:"c03055bc037c4ea9afb9a9f104b7b721"}
+           {id:$zone_read},
+           {id:$cache_settings_write},
+           {id:$zone_settings_write},
+           {id:$ssl_and_certificates_write}
          ]}
       ]
     }')"
@@ -203,11 +222,13 @@ mint_r2_token() {
   local resources body code token_id token_value secret
   resources="$(printf '%s\n' "$@" | jq -R . | jq -sc --arg a "$account_id" \
     'map({key:("com.cloudflare.edge.r2.bucket." + $a + "_default_" + .), value:"*"}) | from_entries')"
-  body="$(jq -nc --arg n "$name" --argjson res "$resources" '{
+  body="$(jq -nc --arg n "$name" --argjson res "$resources" \
+    --arg bucket_item_read "$__CF_PERMISSION_R2_BUCKET_ITEM_READ" \
+    --arg bucket_item_write "$__CF_PERMISSION_R2_BUCKET_ITEM_WRITE" '{
     name:$n,
     policies:[{effect:"allow", resources:$res, permission_groups:[
-      {id:"6a018a9f2fc74eb6b293b0c548f38b39"},
-      {id:"2efd5506f9c8494dacb1fa10a3e7d5b6"}
+      {id:$bucket_item_read},
+      {id:$bucket_item_write}
     ]}]
   }')"
   code=$(__cf_call POST "/user/tokens" "$cf_token" "$body")
@@ -222,11 +243,12 @@ mint_r2_token() {
 mint_purge_token() {
   local cf_token="$1" zone_id="$2" name="$3"
   local body code
-  body="$(jq -nc --arg n "$name" --arg z "$zone_id" '{
+  body="$(jq -nc --arg n "$name" --arg z "$zone_id" \
+    --arg cache_purge "$__CF_PERMISSION_CACHE_PURGE" '{
     name:$n,
     policies:[{effect:"allow",
       resources:{("com.cloudflare.api.account.zone." + $z):"*"},
-      permission_groups:[{id:"e17beae8b8cb423a99b1730f21238bed"}]}]
+      permission_groups:[{id:$cache_purge}]}]
   }')"
   code=$(__cf_call POST "/user/tokens" "$cf_token" "$body")
   __cf_expect "$code" "mint purge token ${name}" || return 1
