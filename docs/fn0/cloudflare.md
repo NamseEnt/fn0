@@ -28,7 +28,9 @@ forte cloud init \
 ```
 
 The command is non-interactive. Set `CLOUDFLARE_API_TOKEN` in the execution
-environment before running it. The token is not a command-line argument, and
+environment before running it. `forte login` must also be run first — the
+command loads fn0 credentials to register the project and fails immediately if
+they are absent. The token is not a command-line argument, and
 the CLI never prompts or reads standard input. If the variable or any required
 argument is missing, the command exits with an error.
 

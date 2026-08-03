@@ -86,11 +86,41 @@ On the first `forte dev` run, two tools are downloaded automatically and cached 
 
 Subsequent runs use the cached binaries. See [forte/cli.md#local-tool-cache](forte/cli.md#local-tool-cache) for cache paths and how to clear them.
 
-To deploy, authenticate first:
+## Deploying to fn0 Cloud
+
+Deploying requires three steps the first time:
+
+**1. Authenticate with fn0 Cloud:**
 
 ```sh
-forte login          # PKCE flow: opens browser, exchanges code for token, saves credentials
+forte login
+```
+
+Opens a browser for PKCE OAuth, exchanges the code for a token, and saves credentials locally.
+
+**2. Connect your Cloudflare account:**
+
+```sh
+CLOUDFLARE_API_TOKEN=<your-token> forte cloud init \
+  --project . \
+  --project-name my-app \
+  --zone example.com
+```
+
+Registers the project with fn0 Cloud, provisions three R2 buckets in your Cloudflare account, and prints the `CNAME` record to add. Requires `forte login` to have run first.
+
+The token must have **User → API Tokens → Edit** permission. See [Bring Your Own Cloudflare](fn0/cloudflare.md) for token setup and what gets created in your account.
+
+This step is idempotent — re-running it on an existing project reuses the existing resources.
+
+**3. Deploy:**
+
+```sh
 forte deploy
 ```
+
+Builds, uploads, and activates the project. A project that has not completed `forte cloud init` is refused at this step.
+
+On subsequent deploys, only step 3 is needed.
 
 See [forte/overview.md](forte/overview.md) for project layout and [forte/cli.md](forte/cli.md) for all CLI commands.

@@ -246,6 +246,8 @@ project can be deployed. See [Bring Your Own Cloudflare](../fn0/cloudflare.md)
 for what it creates and which token permissions it needs. The normative command
 contract is [the cloud init specification](../../forte/cli/CLOUD_INIT_SPEC.md).
 
+**Prerequisites:** `forte login` must be run before `forte cloud init` — the command loads fn0 credentials and fails with "not signed in" if they are missing.
+
 ```sh
 forte cloud init \
   --project . \
