@@ -5,7 +5,6 @@ mod env_crypto;
 mod env_yaml;
 mod manifest_poller;
 mod queue_consumer;
-mod rendered_html_cache;
 mod storage_resolver;
 mod telemetry;
 mod vault_client;
@@ -260,9 +259,6 @@ async fn run() -> Result<()> {
         cache_size_bytes,
     );
     let storage_resolver = Arc::new(ManifestStorageResolver::new(vault_client.clone()));
-    let rendered_html_cache =
-        rendered_html_cache::R2RenderedHtmlCache::new(storage_resolver.clone());
-
     let direct_hijack = build_cross_project_invoke_hijack();
     let presign_gate = Arc::new(PresignGate::new());
     let purge_gate = Arc::new(PurgeGate::new());
@@ -283,8 +279,7 @@ async fn run() -> Result<()> {
             .with_public_storage_hijack(build_public_storage_hijack(
                 storage_resolver.clone(),
                 purge_gate,
-            ))
-            .with_rendered_html_cache(Arc::new(rendered_html_cache)),
+            )),
     );
 
     // Recorded on the worker's own meter rather than stamped into guest

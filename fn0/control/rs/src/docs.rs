@@ -132,9 +132,8 @@ pub struct ProjectCloudflareConfigDoc {
     pub private_object_storage_bucket: String,
     pub public_object_storage_bucket: String,
     pub frontend_asset_bucket: String,
-    pub rendered_html_cache_bucket: String,
-    /// R2 object read+write on the two object-storage buckets and the
-    /// rendered-HTML cache. The only R2 credential published to the fleet, so
+    /// R2 object read+write on the two object-storage buckets. The only R2
+    /// credential published to the fleet, so
     /// this is what a full compromise of the workers would yield.
     pub worker_access_key_id: String,
     pub worker_secret_ciphertext: String,

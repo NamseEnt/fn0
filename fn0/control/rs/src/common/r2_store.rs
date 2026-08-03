@@ -90,10 +90,6 @@ impl ProjectR2Store {
         Self::with_worker_keys(storage, storage.public_object_storage_bucket.clone())
     }
 
-    pub fn rendered_html_cache(storage: &crate::common::byoc::ProjectStorage) -> Self {
-        Self::with_worker_keys(storage, storage.rendered_html_cache_bucket.clone())
-    }
-
     pub fn frontend_assets(storage: &crate::common::byoc::ProjectStorage) -> Self {
         Self {
             account_id: storage.account_id.clone(),

@@ -4,7 +4,7 @@
 # posts to a control plane that is not serving yet.
 #
 # Mirrors fn0/deploy/src/cloudflare_provision.rs. When that file changes, this
-# one has to follow: the two produce the same four buckets, the same two
+# one has to follow: the two produce the same three buckets, the same two
 # hostnames and the same cache rule.
 #
 # Source-only.
@@ -49,21 +49,19 @@ control_bucket_names() {
   echo "fn0-${project_id}-private-object-storage"
   echo "fn0-${project_id}-public-object-storage"
   echo "fn0-${project_id}-frontend-asset"
-  echo "fn0-${project_id}-rendered-html-cache"
 }
 
-# provision_control_cloudflare <account_id> <cf_token> <zone_id> <zone_name> <project_id>
+# provision_control_cloudflare <account_id> <cf_token> <zone_id> <zone_name> <project_id> <app_hostname>
 provision_control_cloudflare() {
-  local account_id="$1" cf_token="$2" zone_id="$3" zone_name="$4" project_id="$5"
-  local private_bucket public_bucket asset_bucket cache_bucket code body
+  local account_id="$1" cf_token="$2" zone_id="$3" zone_name="$4" project_id="$5" app_hostname="$6"
+  local private_bucket public_bucket asset_bucket code body
 
   private_bucket="fn0-${project_id}-private-object-storage"
   public_bucket="fn0-${project_id}-public-object-storage"
   asset_bucket="fn0-${project_id}-frontend-asset"
-  cache_bucket="fn0-${project_id}-rendered-html-cache"
 
   local bucket
-  for bucket in "$private_bucket" "$public_bucket" "$asset_bucket" "$cache_bucket"; do
+  for bucket in "$private_bucket" "$public_bucket" "$asset_bucket"; do
     echo ">> ensure R2 bucket ${bucket}"
     body=$(jq -nc --arg name "$bucket" '{name:$name, locationHint:"apac"}')
     code=$(__cf_call POST "/accounts/${account_id}/r2/buckets" "$cf_token" "$body")
@@ -103,15 +101,16 @@ provision_control_cloudflare() {
     __cf_expect "$code" "enable ${hostname}" || return 1
   done
 
-  ensure_fn0_cache_rule "$cf_token" "$zone_id" "$zone_name"
+  ensure_fn0_cache_rule "$cf_token" "$zone_id" "$zone_name" "$app_hostname"
+  ensure_smart_tiered_cache "$cf_token" "$zone_id"
 }
 
-# ensure_fn0_cache_rule <cf_token> <zone_id> <zone_name>
+# ensure_fn0_cache_rule <cf_token> <zone_id> <zone_name> <app_hostname>
 # One rule for the whole zone, matched by wildcard, so it is written once and
 # never grows: a free zone allows ten cache rules and a rule per project would
 # run out at ten projects.
 ensure_fn0_cache_rule() {
-  local cf_token="$1" zone_id="$2" zone_name="$3"
+  local cf_token="$1" zone_id="$2" zone_name="$3" app_hostname="$4"
   local description="fn0 frontend assets and public objects"
   local path="/zones/${zone_id}/rulesets/phases/http_request_cache_settings/entrypoint"
   local code rules expression merged
@@ -128,7 +127,7 @@ ensure_fn0_cache_rule() {
     return 1
   fi
 
-  expression="((http.host wildcard \"fn0-*-frontend-asset.${zone_name}\" or http.host wildcard \"fn0-*-public-object-storage.${zone_name}\") and http.request.method in {\"GET\" \"HEAD\" \"PURGE\"})"
+  expression="((http.host wildcard \"fn0-*-frontend-asset.${zone_name}\" or http.host wildcard \"fn0-*-public-object-storage.${zone_name}\" or http.host in {\"${app_hostname}\"}) and http.request.method in {\"GET\" \"HEAD\" \"PURGE\"})"
 
   # Ahead of the zone's own rules: first match wins, and a broad user rule that
   # disabled caching would otherwise swallow these hostnames.
@@ -141,6 +140,13 @@ ensure_fn0_cache_rule() {
   echo ">> ensure fn0 cache rule on zone ${zone_name}"
   code=$(__cf_call PUT "$path" "$cf_token" "$(jq -nc --argjson r "$merged" '{rules:$r}')")
   __cf_expect "$code" "write cache rules"
+}
+
+ensure_smart_tiered_cache() {
+  local cf_token="$1" zone_id="$2"
+  local code
+  code=$(__cf_call PATCH "/zones/${zone_id}/cache/tiered_cache_smart_topology_enable" "$cf_token" '{"value":"on"}')
+  __cf_expect "$code" "enable Smart Tiered Cache"
 }
 
 # mint_provisioning_token <user_token> <account_id> <zone_id> <purpose>

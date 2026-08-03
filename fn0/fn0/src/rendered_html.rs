@@ -1,5 +1,5 @@
 //! Path and telemetry rules shared by everything that caches server-rendered
-//! HTML: which request paths are cacheable, and what a hit, miss or render costs.
+//! HTML: which request paths are cacheable, and what rendering costs.
 
 use opentelemetry::{KeyValue, global};
 use sha2::{Digest, Sha256};

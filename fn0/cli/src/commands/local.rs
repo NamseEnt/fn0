@@ -5,18 +5,15 @@ use fn0::execute::ClientState;
 use fn0::measure_cpu_time::SystemClock;
 use fn0::wasmtime::Engine;
 use fn0::wasmtime::component::Linker;
-use fn0::{CodeExecutor, ExecutionContext, RenderedHtmlCache};
+use fn0::{CodeExecutor, ExecutionContext};
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
-use std::collections::HashMap;
-use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::OnceCell;
 
@@ -39,10 +36,7 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     let linker = fn0::build_linker(&engine);
 
     let cache = LocalCache::new(wasm_path, engine.clone(), linker.clone());
-    let ctx = Arc::new(
-        ExecutionContext::new(engine, linker, cache)
-            .with_rendered_html_cache(Arc::new(InMemoryRenderedHtmlCache::default())),
-    );
+    let ctx = Arc::new(ExecutionContext::new(engine, linker, cache));
     let executor = Rc::new(CodeExecutor::new(ctx));
 
     let port = port.unwrap_or(3000);
@@ -135,35 +129,6 @@ impl LocalCache {
             code_version: Some(LOCAL_CODE_VERSION),
             static_cache_enabled: true,
         }))
-    }
-}
-
-#[derive(Default)]
-struct InMemoryRenderedHtmlCache {
-    rendered_html: Mutex<HashMap<String, Bytes>>,
-}
-
-impl RenderedHtmlCache for InMemoryRenderedHtmlCache {
-    fn read<'storage>(
-        &'storage self,
-        _project_id: &'storage str,
-        key: &'storage str,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Option<Bytes>>> + Send + 'storage>> {
-        let found = self.rendered_html.lock().unwrap().get(key).cloned();
-        Box::pin(async move { Ok(found) })
-    }
-
-    fn write<'storage>(
-        &'storage self,
-        _project_id: &'storage str,
-        key: &'storage str,
-        body: Bytes,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'storage>> {
-        self.rendered_html
-            .lock()
-            .unwrap()
-            .insert(key.to_string(), body);
-        Box::pin(async move { Ok(()) })
     }
 }
 

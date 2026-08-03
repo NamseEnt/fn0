@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use crate::cloudflare_provision::{
     ConnectCredentials, ProvisionedResources, Provisioner, frontend_asset_bucket_name,
     private_object_storage_bucket_name, public_object_storage_bucket_name,
-    rendered_html_cache_bucket_name,
 };
 
 /// What the user chose and typed, carried between the steps of one setup.
@@ -57,7 +56,6 @@ struct ConnectInput<'a> {
     private_object_storage_bucket: &'a str,
     public_object_storage_bucket: &'a str,
     frontend_asset_bucket: &'a str,
-    rendered_html_cache_bucket: &'a str,
     worker_access_key_id: &'a str,
     worker_secret: &'a str,
     frontend_asset_access_key_id: &'a str,
@@ -88,7 +86,7 @@ enum Connect {
 pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<ProvisionedResources> {
     let provisioner = setup.provisioner();
     let (resources, credentials, minted) = provisioner
-        .run_managed(setup.project_id, &setup.app_origin())
+        .run_managed(setup.project_id, &setup.app_origin(), setup.domain)
         .await?;
 
     match send_connect(setup, &resources, &credentials).await {
@@ -121,7 +119,7 @@ pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<Provisioned
 pub async fn provision_only(setup: &CloudSetup<'_>) -> Result<ProvisionedResources> {
     setup
         .provisioner()
-        .run_manual(setup.project_id, &setup.app_origin())
+        .run_manual(setup.project_id, &setup.app_origin(), setup.domain)
         .await
 }
 
@@ -151,7 +149,6 @@ pub fn expected_resources(project_id: &str, zone_name: &str) -> ProvisionedResou
         private_object_storage_bucket: private_object_storage_bucket_name(project_id),
         public_object_storage_bucket,
         frontend_asset_bucket,
-        rendered_html_cache_bucket: rendered_html_cache_bucket_name(project_id),
     }
 }
 
@@ -200,7 +197,6 @@ async fn send_connect(
                 private_object_storage_bucket: &provisioned.private_object_storage_bucket,
                 public_object_storage_bucket: &provisioned.public_object_storage_bucket,
                 frontend_asset_bucket: &provisioned.frontend_asset_bucket,
-                rendered_html_cache_bucket: &provisioned.rendered_html_cache_bucket,
                 worker_access_key_id: &credentials.worker_access_key_id,
                 worker_secret: &credentials.worker_secret,
                 frontend_asset_access_key_id: &credentials.frontend_asset_access_key_id,

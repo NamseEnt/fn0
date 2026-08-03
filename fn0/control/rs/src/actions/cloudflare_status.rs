@@ -30,7 +30,6 @@ pub enum Output {
         frontend_asset_bucket: String,
         public_object_storage_bucket: String,
         private_object_storage_bucket: String,
-        rendered_html_cache_bucket: String,
         healthy: bool,
         problem: Option<String>,
     },
@@ -145,7 +144,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         frontend_asset_bucket: config.frontend_asset_bucket,
         public_object_storage_bucket: config.public_object_storage_bucket,
         private_object_storage_bucket: config.private_object_storage_bucket,
-        rendered_html_cache_bucket: config.rendered_html_cache_bucket,
         healthy: problem.is_none(),
         problem,
     }

@@ -114,6 +114,13 @@ pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
     provisioner(setup)
         .put_app_cors(project_id, &setup.app_origin(), setup.mint_from_setup_token)
         .await?;
+    provisioner(setup)
+        .ensure_app_cache(
+            setup.domain,
+            replaced_domain.as_deref(),
+            setup.mint_from_setup_token,
+        )
+        .await?;
 
     Ok(DomainOutcome {
         origin_hostname,

@@ -14,7 +14,7 @@
 //! one zone's cache and nothing else.
 //!
 //! The two R2 tokens are split by who holds them. The worker token reaches the
-//! project's objects, public objects and page cache, and is the only one
+//! project's objects and public objects, and is the only one
 //! published to the fleet; the asset token reaches the deployed frontend and
 //! stays in control. So a compromised worker cannot rewrite a deployed
 //! frontend, and asset GC — which is the only thing that deletes on a schedule
@@ -40,6 +40,7 @@
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 
 const API_BASE: &str = "https://api.cloudflare.com/client/v4";
 
@@ -81,10 +82,6 @@ pub fn public_object_storage_bucket_name(project_id: &str) -> String {
 
 pub fn frontend_asset_bucket_name(project_id: &str) -> String {
     format!("fn0-{project_id}-frontend-asset")
-}
-
-pub fn rendered_html_cache_bucket_name(project_id: &str) -> String {
-    format!("fn0-{project_id}-rendered-html-cache")
 }
 
 /// A zone the setup token can reach, and the account that owns it.
@@ -211,13 +208,12 @@ pub struct ProvisionedResources {
     pub private_object_storage_bucket: String,
     pub public_object_storage_bucket: String,
     pub frontend_asset_bucket: String,
-    pub rendered_html_cache_bucket: String,
 }
 
 /// The three long-lived credentials fn0 is given.
 pub struct ConnectCredentials {
-    /// Reaches the two object-storage buckets and the rendered-HTML cache. The
-    /// only R2 credential published to the worker fleet.
+    /// Reaches the two object-storage buckets. The only R2 credential published
+    /// to the worker fleet.
     pub worker_access_key_id: String,
     /// SHA-256 of the token, which is what R2 takes as an S3 secret access key.
     /// The token value never leaves the user's machine: the hash is the only
@@ -569,7 +565,13 @@ impl Provisioner {
     /// a fresh zone's four-hour default Browser Cache TTL from overriding the
     /// `max-age=0` fn0 stores on public objects — four hours of browser copies
     /// is the one staleness no purge can reach.
-    async fn ensure_cache_rule(&self, token: &str, zone_name: &str) -> Result<()> {
+    async fn ensure_cache_rule(
+        &self,
+        token: &str,
+        zone_name: &str,
+        app_hostname: Option<&str>,
+        replaced_app_hostname: Option<&str>,
+    ) -> Result<()> {
         const RULE_DESCRIPTION: &str = "fn0 frontend assets and public objects";
 
         #[derive(Deserialize)]
@@ -598,17 +600,29 @@ impl Provisioner {
             ));
         };
 
+        let managed_rule = rules.iter().find(|rule| {
+            rule.get("description").and_then(|value| value.as_str()) == Some(RULE_DESCRIPTION)
+        });
+        let mut app_hostnames = managed_rule
+            .map(cache_rule_app_hostnames)
+            .unwrap_or_default();
+        if let Some(replaced_app_hostname) = replaced_app_hostname {
+            app_hostnames.remove(replaced_app_hostname);
+        }
+        if let Some(app_hostname) = app_hostname {
+            app_hostnames.insert(app_hostname.to_string());
+        }
+
         rules.retain(|rule| {
             rule.get("description").and_then(|value| value.as_str()) != Some(RULE_DESCRIPTION)
         });
-        // Ahead of the zone's own rules: first match wins, and a broad user rule
-        // that disabled caching would otherwise swallow the assets hostname.
         rules.insert(
             0,
             serde_json::json!({
                 "action": "set_cache_settings",
                 "expression": format!(
-                    r#"((http.host wildcard "fn0-*-frontend-asset.{zone_name}" or http.host wildcard "fn0-*-public-object-storage.{zone_name}") and http.request.method in {{"GET" "HEAD" "PURGE"}})"#
+                    "(({}) and http.request.method in {{\"GET\" \"HEAD\" \"PURGE\"}})",
+                    cache_rule_host_expression(zone_name, &app_hostnames),
                 ),
                 "description": RULE_DESCRIPTION,
                 "action_parameters": {
@@ -633,6 +647,69 @@ impl Provisioner {
             "could not write the zone's cache rules ({status}). The token needs Zone -> Cache Rules -> Edit. {}",
             describe(&envelope.errors)
         ))
+    }
+
+    async fn ensure_tiered_cache(&self, token: &str) -> Result<()> {
+        let path = format!(
+            "/zones/{}/cache/tiered_cache_smart_topology_enable",
+            self.zone_id
+        );
+        let (status, envelope) = self
+            .call::<serde_json::Value>(
+                token,
+                reqwest::Method::PATCH,
+                &path,
+                Some(serde_json::json!({ "value": "on" })),
+            )
+            .await?;
+        if envelope.success {
+            return Ok(());
+        }
+        Err(anyhow!(
+            "could not enable Smart Tiered Cache ({status}). The token needs Zone -> Cache Rules -> Edit. {}",
+            describe(&envelope.errors)
+        ))
+    }
+
+    pub async fn ensure_app_cache(
+        &self,
+        app_hostname: &str,
+        replaced_app_hostname: Option<&str>,
+        mint_writing_token: bool,
+    ) -> Result<()> {
+        if !mint_writing_token {
+            let zone_name = self.zone_name(&self.setup_token).await?;
+            self.ensure_tiered_cache(&self.setup_token).await?;
+            return self
+                .ensure_cache_rule(
+                    &self.setup_token,
+                    &zone_name,
+                    Some(app_hostname),
+                    replaced_app_hostname,
+                )
+                .await;
+        }
+
+        let writing = self.mint_provisioning_token(app_hostname).await?;
+        let result = async {
+            let zone_name = self.zone_name(&writing.value).await?;
+            self.ensure_tiered_cache(&writing.value).await?;
+            self.ensure_cache_rule(
+                &writing.value,
+                &zone_name,
+                Some(app_hostname),
+                replaced_app_hostname,
+            )
+            .await
+        }
+        .await;
+        if let Err(error) = self.revoke_token("cache settings", &writing.id).await {
+            eprintln!(
+                "warning: {error}. It expires by itself within \
+                 {PROVISIONING_TOKEN_MINUTES} minutes."
+            );
+        }
+        result
     }
 
     /// Drops the `Vary: Origin` R2 attaches to every CORS response on these
@@ -764,6 +841,7 @@ impl Provisioner {
         &self,
         project_id: &str,
         app_origin: &str,
+        app_hostname: &str,
     ) -> Result<(
         ProvisionedResources,
         ConnectCredentials,
@@ -773,7 +851,7 @@ impl Provisioner {
         let provisioning = self.mint_provisioning_token(project_id).await?;
         let result = async {
             let resources = self
-                .provision(&provisioning.value, project_id, app_origin)
+                .provision(&provisioning.value, project_id, app_origin, app_hostname)
                 .await?;
             let (credentials, minted) = self.mint_credentials(project_id, &resources).await?;
             Ok((resources, credentials, minted))
@@ -797,9 +875,10 @@ impl Provisioner {
         &self,
         project_id: &str,
         app_origin: &str,
+        app_hostname: &str,
     ) -> Result<ProvisionedResources> {
         self.verify().await?;
-        self.provision(&self.setup_token, project_id, app_origin)
+        self.provision(&self.setup_token, project_id, app_origin, app_hostname)
             .await
     }
 
@@ -808,13 +887,13 @@ impl Provisioner {
         token: &str,
         project_id: &str,
         app_origin: &str,
+        app_hostname: &str,
     ) -> Result<ProvisionedResources> {
         let zone_name = self.zone_name(token).await?;
 
         let private_object_storage_bucket = private_object_storage_bucket_name(project_id);
         let public_object_storage_bucket = public_object_storage_bucket_name(project_id);
         let frontend_asset_bucket = frontend_asset_bucket_name(project_id);
-        let rendered_html_cache_bucket = rendered_html_cache_bucket_name(project_id);
         let frontend_asset_hostname = format!("{frontend_asset_bucket}.{zone_name}");
         let public_object_storage_hostname = format!("{public_object_storage_bucket}.{zone_name}");
 
@@ -822,7 +901,6 @@ impl Provisioner {
             &private_object_storage_bucket,
             &public_object_storage_bucket,
             &frontend_asset_bucket,
-            &rendered_html_cache_bucket,
         ] {
             self.create_bucket(token, bucket).await?;
         }
@@ -841,7 +919,9 @@ impl Provisioner {
             &public_object_storage_hostname,
         )
         .await?;
-        self.ensure_cache_rule(token, &zone_name).await?;
+        self.ensure_cache_rule(token, &zone_name, Some(app_hostname), None)
+            .await?;
+        self.ensure_tiered_cache(token).await?;
         self.ensure_vary_rule(token, &zone_name).await?;
 
         Ok(ProvisionedResources {
@@ -851,7 +931,6 @@ impl Provisioner {
             private_object_storage_bucket,
             public_object_storage_bucket,
             frontend_asset_bucket,
-            rendered_html_cache_bucket,
         })
     }
 
@@ -889,7 +968,6 @@ impl Provisioner {
                 vec![self.bucket_scope(&[
                     &resources.private_object_storage_bucket,
                     &resources.public_object_storage_bucket,
-                    &resources.rendered_html_cache_bucket,
                 ])],
                 None,
             )
@@ -1085,6 +1163,49 @@ impl Provisioner {
 
 /// R2's S3 API takes the SHA-256 of the token value as the secret access key,
 /// lowercase hex — the same string `printf '%s' <token> | sha256sum` produces.
+fn cache_rule_app_hostnames(rule: &serde_json::Value) -> BTreeSet<String> {
+    let Some(expression) = rule.get("expression").and_then(|value| value.as_str()) else {
+        return BTreeSet::new();
+    };
+    if let Some(hostname) = expression
+        .split_once("http.host eq \"")
+        .and_then(|(_, remainder)| remainder.split_once('"'))
+        .map(|(hostname, _)| hostname)
+    {
+        return BTreeSet::from([hostname.to_string()]);
+    }
+    let Some(host_list) = expression
+        .split_once("http.host in {")
+        .and_then(|(_, remainder)| remainder.split_once('}'))
+        .map(|(host_list, _)| host_list)
+    else {
+        return BTreeSet::new();
+    };
+    host_list
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .filter(|hostname| !hostname.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn cache_rule_host_expression(zone_name: &str, app_hostnames: &BTreeSet<String>) -> String {
+    let mut host_expressions = vec![
+        format!(r#"http.host wildcard "fn0-*-frontend-asset.{zone_name}""#),
+        format!(r#"http.host wildcard "fn0-*-public-object-storage.{zone_name}""#),
+    ];
+    if !app_hostnames.is_empty() {
+        let exact_hostnames = app_hostnames
+            .iter()
+            .map(|hostname| format!(r#""{hostname}""#))
+            .collect::<Vec<_>>()
+            .join(" ");
+        host_expressions.push(format!("http.host in {{{exact_hostnames}}}"));
+    }
+    host_expressions.join(" or ")
+}
+
 fn hex_sha256(value: &str) -> String {
     let digest = Sha256::digest(value.as_bytes());
     let mut out = String::with_capacity(digest.len() * 2);
@@ -1110,4 +1231,45 @@ fn already_exists(errors: &[ApiError]) -> bool {
             || message.contains("already configured")
             || message.contains("duplicate")
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cache_rule_app_hostnames, cache_rule_host_expression};
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn cache_rule_expression_contains_bucket_and_app_hosts() {
+        let app_hostnames =
+            BTreeSet::from(["app.example.com".to_string(), "www.example.com".to_string()]);
+
+        assert_eq!(
+            cache_rule_host_expression("example.com", &app_hostnames),
+            r#"http.host wildcard "fn0-*-frontend-asset.example.com" or http.host wildcard "fn0-*-public-object-storage.example.com" or http.host in {"app.example.com" "www.example.com"}"#
+        );
+    }
+
+    #[test]
+    fn cache_rule_app_hostnames_reads_managed_rule_expression() {
+        let rule = serde_json::json!({
+            "expression": r#"((http.host wildcard "fn0-*-frontend-asset.example.com" or http.host in {"app.example.com" "www.example.com"}) and http.request.method in {"GET" "HEAD" "PURGE"})"#
+        });
+
+        assert_eq!(
+            cache_rule_app_hostnames(&rule),
+            BTreeSet::from(["app.example.com".to_string(), "www.example.com".to_string(),])
+        );
+    }
+
+    #[test]
+    fn cache_rule_app_hostnames_reads_single_host_expression() {
+        let rule = serde_json::json!({
+            "expression": r#"http.host eq "control.example.com""#
+        });
+
+        assert_eq!(
+            cache_rule_app_hostnames(&rule),
+            BTreeSet::from(["control.example.com".to_string()])
+        );
+    }
 }

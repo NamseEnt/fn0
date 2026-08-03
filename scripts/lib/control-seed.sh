@@ -271,7 +271,6 @@ seed_cloudflare_config() {
       private_object_storage_bucket:("fn0-" + $pid + "-private-object-storage"),
       public_object_storage_bucket:("fn0-" + $pid + "-public-object-storage"),
       frontend_asset_bucket:("fn0-" + $pid + "-frontend-asset"),
-      rendered_html_cache_bucket:("fn0-" + $pid + "-rendered-html-cache"),
       worker_access_key_id:$wkey,
       worker_secret_ciphertext:$wsec,
       frontend_asset_access_key_id:$akey,
@@ -290,7 +289,7 @@ seed_cloudflare_config() {
 # The bash half of `connect_project`, which is what puts a connected project's
 # storage in front of the fleet. Seeding ProjectCloudflareConfigDoc alone tells
 # control where the buckets are but leaves workers with no target, so the
-# project's guest code gets no object storage and no rendered-HTML cache.
+# project's guest code gets no object storage.
 #
 # Derived from the seeded config rather than from the caller's variables so the
 # bucket names have exactly one source.
@@ -314,7 +313,6 @@ seed_manifest_storage() {
     private_object_storage_bucket,
     public_object_storage_bucket,
     public_object_storage_base_url: ("https://" + .public_object_storage_hostname),
-    rendered_html_cache_bucket,
     config_version
   }' <<<"$config")"
 

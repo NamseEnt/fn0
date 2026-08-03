@@ -258,7 +258,6 @@ fn ask_own_credentials(setup: &CloudSetup<'_>, zone_name: &str) -> Result<Connec
     println!("     apply to specific buckets:");
     println!("       {}", resources.private_object_storage_bucket);
     println!("       {}", resources.public_object_storage_bucket);
-    println!("       {}", resources.rendered_html_cache_bucket);
     println!();
     println!("2. R2 -> Manage API Tokens -> Create API token");
     println!("     permission: Object Read & Write");
@@ -306,7 +305,6 @@ fn print_resources(resources: &ProvisionedResources) {
     println!("  buckets  {}", resources.private_object_storage_bucket);
     println!("           {}", resources.public_object_storage_bucket);
     println!("           {}", resources.frontend_asset_bucket);
-    println!("           {}", resources.rendered_html_cache_bucket);
     println!("  assets   https://{}", resources.frontend_asset_hostname);
     println!(
         "  public   https://{}",

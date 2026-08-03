@@ -43,7 +43,6 @@ pub struct WorkerProjectStorage {
     pub public_object_storage_bucket: String,
     /// CDN origin for `public_object_storage_bucket`, without a trailing slash.
     pub public_object_storage_base_url: String,
-    pub rendered_html_cache_bucket: String,
     /// Bumped by control on every credential or bucket change, so a worker can
     /// skip re-decrypting a target it already holds.
     pub config_version: u64,

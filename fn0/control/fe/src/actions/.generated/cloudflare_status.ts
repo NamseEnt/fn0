@@ -20,7 +20,6 @@ const OutputSchema = z.discriminatedUnion("t", [
     frontendAssetBucket: z.string(),
     publicObjectStorageBucket: z.string(),
     privateObjectStorageBucket: z.string(),
-    renderedHtmlCacheBucket: z.string(),
     healthy: z.boolean(),
     problem: z.string().optional(),
   }),

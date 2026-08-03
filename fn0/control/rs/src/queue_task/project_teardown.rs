@@ -131,7 +131,6 @@ async fn empty_project_buckets(
 ) -> anyhow::Result<()> {
     for store in [
         ProjectR2Store::frontend_assets(storage),
-        ProjectR2Store::rendered_html_cache(storage),
         ProjectR2Store::private_objects(storage),
         ProjectR2Store::public_objects(storage),
     ] {

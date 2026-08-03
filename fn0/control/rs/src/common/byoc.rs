@@ -9,7 +9,7 @@
 //! Provisioning — creating buckets, attaching the CDN hostnames, writing the
 //! cache rule, signing origin certificates — runs in the CLI on the user's own
 //! machine with a token fn0 never receives. What is left here is object access
-//! to four buckets, split across two credentials, and cache purge on one zone.
+//! to three buckets, split across two credentials, and cache purge on one zone.
 
 use crate::common::cloudflare::CloudflareClient;
 use crate::common::vault;
@@ -24,7 +24,7 @@ pub struct R2Keys {
 /// Everything an operation needs to reach one project's objects.
 ///
 /// The two key sets are not interchangeable. `worker_keys` opens the buckets
-/// holding user data and the rendered-HTML cache; `frontend_asset_keys` opens
+/// holding user data; `frontend_asset_keys` opens
 /// the frontend-asset bucket and nothing else. An operation takes the one that
 /// matches what it is allowed to touch, so a wrong prefix in a delete loop
 /// fails on a 403 rather than on user data.
@@ -33,7 +33,6 @@ pub struct ProjectStorage {
     pub private_object_storage_bucket: String,
     pub public_object_storage_bucket: String,
     pub frontend_asset_bucket: String,
-    pub rendered_html_cache_bucket: String,
     pub worker_keys: R2Keys,
     pub frontend_asset_keys: R2Keys,
     pub connection: Connection,
@@ -98,7 +97,6 @@ impl ProjectStorage {
             private_object_storage_bucket: config.private_object_storage_bucket,
             public_object_storage_bucket: config.public_object_storage_bucket,
             frontend_asset_bucket: config.frontend_asset_bucket,
-            rendered_html_cache_bucket: config.rendered_html_cache_bucket,
             worker_keys: R2Keys {
                 access_key_id: config.worker_access_key_id,
                 secret_access_key: worker_secret,
@@ -153,7 +151,6 @@ pub fn worker_storage_for(config: &ProjectCloudflareConfigDoc) -> WorkerProjectS
             "https://{}",
             config.public_object_storage_hostname
         ),
-        rendered_html_cache_bucket: config.rendered_html_cache_bucket.clone(),
         config_version: config.config_version,
     }
 }

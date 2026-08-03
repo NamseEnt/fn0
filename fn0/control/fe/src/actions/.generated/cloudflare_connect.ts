@@ -13,7 +13,6 @@ const InputSchema = z.object({
     privateObjectStorageBucket: z.string(),
     publicObjectStorageBucket: z.string(),
     frontendAssetBucket: z.string(),
-    renderedHtmlCacheBucket: z.string(),
     workerAccessKeyId: z.string(),
     workerSecret: z.string(),
     frontendAssetAccessKeyId: z.string(),

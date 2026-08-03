@@ -18,35 +18,13 @@ use fn0::{
     R2Credentials,
 };
 use fn0_shared_schema::{WorkerProjectStorage, WorkerR2Credential};
-use opendal::Operator;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-
-fn rendered_html_cache_operator(
-    endpoint: &str,
-    bucket: &str,
-    region: &str,
-    access_key_id: &str,
-    secret_access_key: &str,
-) -> anyhow::Result<Operator> {
-    Ok(Operator::new(
-        opendal::services::S3::default()
-            .bucket(bucket)
-            .region(region)
-            .endpoint(endpoint)
-            .access_key_id(access_key_id)
-            .secret_access_key(secret_access_key)
-            .disable_config_load()
-            .disable_ec2_metadata(),
-    )?
-    .finish())
-}
 
 struct ProjectTargets {
     config_version: u64,
     private_object_storage: Arc<PrivateObjectStorageTarget>,
     public_object_storage: Arc<PublicStorageTarget>,
-    rendered_html_cache: Operator,
 }
 
 pub struct ManifestStorageResolver {
@@ -105,13 +83,6 @@ impl ManifestStorageResolver {
 
     async fn build(&self, storage: &WorkerProjectStorage) -> anyhow::Result<ProjectTargets> {
         let credentials = self.credentials(storage, &storage.credential).await?;
-        let rendered_html_cache = rendered_html_cache_operator(
-            &format!("https://{}", credentials.endpoint_host),
-            &storage.rendered_html_cache_bucket,
-            &credentials.region,
-            &credentials.access_key_id,
-            &credentials.secret_access_key,
-        )?;
         Ok(ProjectTargets {
             config_version: storage.config_version,
             private_object_storage: Arc::new(PrivateObjectStorageTarget {
@@ -126,7 +97,6 @@ impl ManifestStorageResolver {
                     .trim_end_matches('/')
                     .to_string(),
             }),
-            rendered_html_cache,
         })
     }
 
@@ -152,12 +122,6 @@ impl ManifestStorageResolver {
         self.decrypted_secrets
             .insert(ciphertext.to_string(), plaintext.clone());
         Ok(plaintext)
-    }
-
-    pub fn rendered_html_cache_operator(&self, project_id: &str) -> Option<Operator> {
-        self.projects
-            .get(project_id)
-            .map(|targets| targets.rendered_html_cache.clone())
     }
 }
 

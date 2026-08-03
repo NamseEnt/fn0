@@ -1,8 +1,7 @@
 //! Reclaims the R2 prefixes of superseded code versions for one project.
 //!
 //! The `{code_version}/` prefixes grow with every deploy and nothing else
-//! removes them: the frontend-asset bucket holds the deployed build, the
-//! rendered-HTML cache holds pages generated against it.
+//! removes them: the frontend-asset bucket holds the deployed build.
 //!
 //! Enqueued once a deploy reaches `static_cache_state == active`, and it
 //! re-reads the manifest rather than trusting the payload, so a redelivered
@@ -40,14 +39,10 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     let storage = ProjectStorage::resolve(&db, &input.project_id).await?;
 
     let mut deleted = 0usize;
-    for store in [
-        ProjectR2Store::frontend_assets(&storage),
-        ProjectR2Store::rendered_html_cache(&storage),
-    ] {
-        for key in prunable_keys(&store.list_all("", now).await?, active_code_version) {
-            store.delete(&key, now).await?;
-            deleted += 1;
-        }
+    let store = ProjectR2Store::frontend_assets(&storage);
+    for key in prunable_keys(&store.list_all("", now).await?, active_code_version) {
+        store.delete(&key, now).await?;
+        deleted += 1;
     }
 
     tracing::info!(

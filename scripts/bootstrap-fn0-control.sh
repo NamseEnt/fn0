@@ -142,7 +142,7 @@ fi
 trap 'revoke_provisioning_token "$cf_user_token" "$provisioning_token_id"; rm -rf "$work_dir"' EXIT
 
 provision_control_cloudflare \
-  "$cf_account_id" "$provisioning_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID"
+  "$cf_account_id" "$provisioning_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID" "$CONTROL_CUSTOM_DOMAIN"
 
 # Minted here rather than taken from the stack: these are the same narrow
 # credentials `forte cloudflare connect` produces, and pulumi no longer holds
@@ -150,8 +150,7 @@ provision_control_cloudflare \
 read -r worker_key_id worker_secret < <(mint_r2_token \
   "$cf_user_token" "$cf_account_id" "fn0 worker (${CONTROL_PROJECT_ID})" \
   "fn0-${CONTROL_PROJECT_ID}-private-object-storage" \
-  "fn0-${CONTROL_PROJECT_ID}-public-object-storage" \
-  "fn0-${CONTROL_PROJECT_ID}-rendered-html-cache")
+  "fn0-${CONTROL_PROJECT_ID}-public-object-storage")
 read -r asset_key_id asset_secret < <(mint_r2_token \
   "$cf_user_token" "$cf_account_id" "fn0 frontend assets (${CONTROL_PROJECT_ID})" \
   "fn0-${CONTROL_PROJECT_ID}-frontend-asset")

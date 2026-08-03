@@ -1,7 +1,7 @@
 # Bring your own Cloudflare account
 
 Your project's object storage, public objects, deployed frontend assets,
-cached pages and custom domain all run on **your** Cloudflare account, not
+CDN-cached pages and custom domain all run on **your** Cloudflare account, not
 fn0's. You keep R2's free tier, your own purge budget and your own bill; fn0
 runs the compute and holds no storage on your behalf.
 
@@ -94,9 +94,9 @@ fleet, and only the frontend-asset one is used by the GC that deletes; scoping
 them apart is what keeps either from reaching the other's bucket. Both are made
 at R2 → **Manage API Tokens → Create API token**, permission *Object Read &
 Write*, applied to the buckets the previous command named — the first to the
-two object-storage buckets and the rendered-HTML cache, the second to the
-frontend-asset bucket alone. Each screen shows an Access Key ID and a Secret
-Access Key; keep all four values.
+two object-storage buckets, the second to the frontend-asset bucket alone.
+Each screen shows an Access Key ID and a Secret Access Key; keep all four
+values.
 
 My Profile → **API Tokens → Create Custom Token**, permission *Zone → Cache
 Purge → Purge*, restricted to your zone.
@@ -108,7 +108,7 @@ provisioning token from step 1 once it succeeds.
 
 | Credential | What it can do |
 | --- | --- |
-| Worker R2 | read and write objects in this project's two object-storage buckets and its rendered-HTML cache. Cannot reach the frontend-asset bucket, cannot reach another project's buckets, cannot delete a bucket, cannot call the Cloudflare API at all |
+| Worker R2 | read and write objects in this project's two object-storage buckets. Cannot reach the frontend-asset bucket, cannot reach another project's buckets, cannot delete a bucket, cannot call the Cloudflare API at all |
 | Frontend-asset R2 | read and write objects in this project's frontend-asset bucket, and nothing else. Never sent to a worker |
 | Purge | purge this one zone's cache. Nothing else — not DNS, not cache rules, not R2, not certificates |
 
@@ -116,12 +116,12 @@ Those limits are measured against the live API, not inferred from the
 permission names.
 
 So the worst a total compromise of fn0 can do to your Cloudflare account is
-rewrite objects in the four buckets it created for this project, and clear your
+rewrite objects in the three buckets it created for this project, and clear your
 cache.
 
 ## What gets created
 
-Four buckets, all this project's alone. Nothing is shared with your other fn0
+Three buckets, all this project's alone. Nothing is shared with your other fn0
 projects, so no key prefix is carrying the separation.
 
 | Bucket | Holds | Reachable at |
@@ -129,23 +129,24 @@ projects, so no key prefix is carrying the separation.
 | `fn0-<project-id>-private-object-storage` | what `object_storage::private` writes | nowhere — signed requests only |
 | `fn0-<project-id>-public-object-storage` | what `object_storage::public` writes | `fn0-<project-id>-public-object-storage.<your-domain>` |
 | `fn0-<project-id>-frontend-asset` | your deployed frontend build | `fn0-<project-id>-frontend-asset.<your-domain>` |
-| `fn0-<project-id>-rendered-html-cache` | HTML rendered on the server and kept for the next request | nowhere — private |
 
 The two public buckets answer on a hostname that is the bucket's own name in
 your zone, so a bucket and the address it serves from cannot drift apart. Each
 costs one DNS record.
 
-fn0 adds two rules to your zone and leaves your own rules in place. Both match
+fn0 adds two rules to your zone and leaves your own rules in place. They match
 `fn0-*-frontend-asset.<your-domain>` and
-`fn0-*-public-object-storage.<your-domain>`, so they cover every fn0 project you
-ever add without a rule per project — a free zone allows ten of each, and a rule
-per project would run out at ten projects. Both halves of each pattern are
-required so a rule cannot swallow a hostname of your own.
+`fn0-*-public-object-storage.<your-domain>`; the cache rule also matches the
+custom domains registered for fn0 projects. This covers every fn0 project you
+add without a rule per project — a free zone allows ten of each, and a rule per
+project would run out at ten projects. Both halves of each pattern are required
+so a rule cannot swallow a hostname of your own.
 
-The **cache rule** pins browser caching on those hostnames to whatever fn0
-stored on the object, because a zone's default Browser Cache TTL would otherwise
-leave browser copies of a replaced object that no purge can reach. Your other
-hostnames keep the zone setting.
+The **cache rule** makes static HTML eligible for the CDN and respects the
+origin's cache headers. Your other hostnames keep the zone setting.
+
+Smart Tiered Cache is enabled for the zone so a cache miss in an edge location
+can be filled by an upper tier instead of reaching the worker fleet directly.
 
 The **response header rule** removes `Vary: Origin`, which R2 attaches to every
 CORS response. It makes Cloudflare keep one cache entry per requesting origin,
@@ -153,7 +154,7 @@ and a purge by URL clears only the entry for a request that sent no `Origin`.
 Browsers send one, so without this rule a replaced object keeps serving its old
 bytes to browsers for the full year fn0 stores on public objects.
 
-The three buckets a browser can reach are also given a **CORS allowlist holding
+The two buckets a browser can reach are also given a **CORS allowlist holding
 one origin: your project's own domain**. Cloudflare keys a separate cache entry
 per `Origin` value and `Origin` is not verified, so an allowlist of `*` would
 let any site on the web read every one of those entries and bill the misses to

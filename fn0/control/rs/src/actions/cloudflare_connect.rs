@@ -66,7 +66,6 @@ pub struct Input {
     pub private_object_storage_bucket: String,
     pub public_object_storage_bucket: String,
     pub frontend_asset_bucket: String,
-    pub rendered_html_cache_bucket: String,
     /// The worker token's id, which is also its S3 access key id.
     pub worker_access_key_id: String,
     /// SHA-256 of the worker token, already derived by the CLI. The token value
@@ -164,7 +163,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     // credential is proved only against the buckets it is meant to open, so a
     // pair swapped between the two tokens is caught here rather than becoming a
     // worker that can rewrite a deployed frontend.
-    let probes: [(&str, &str, &str); 4] = [
+    let probes: [(&str, &str, &str); 3] = [
         (
             &req.body.private_object_storage_bucket,
             &req.body.worker_access_key_id,
@@ -172,11 +171,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         ),
         (
             &req.body.public_object_storage_bucket,
-            &req.body.worker_access_key_id,
-            &req.body.worker_secret,
-        ),
-        (
-            &req.body.rendered_html_cache_bucket,
             &req.body.worker_access_key_id,
             &req.body.worker_secret,
         ),
@@ -235,7 +229,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         private_object_storage_bucket: req.body.private_object_storage_bucket.clone(),
         public_object_storage_bucket: req.body.public_object_storage_bucket.clone(),
         frontend_asset_bucket: req.body.frontend_asset_bucket.clone(),
-        rendered_html_cache_bucket: req.body.rendered_html_cache_bucket.clone(),
         worker_access_key_id: req.body.worker_access_key_id.clone(),
         worker_secret_ciphertext,
         frontend_asset_access_key_id: req.body.frontend_asset_access_key_id.clone(),

@@ -98,7 +98,7 @@ Understanding the lifecycle helps when debugging SSR issues or writing code that
      - `window.__FORTE_PROPS__` — the serialized Props.
      - `window.__FORTE_HOOK_CACHE__` — all hook results fetched during SSR.
    - Includes `<script src="client.js">` to boot the client.
-   - Sets `Cache-Control: no-store` on the response so CDNs and browser caches do not store the rendered HTML.
+   - Sets `Cache-Control: no-store` on dynamic responses so CDNs and browser caches do not store request-specific HTML.
 6. The browser loads `client.js`, which calls `hydrateRoot` with the same Props from `__FORTE_PROPS__`.
 
 Hook results embedded in `__FORTE_HOOK_CACHE__` are read synchronously on the client — no network request is made on first render unless there is a cache miss. After a `clearHookCache()` call, the next render fetches fresh data.

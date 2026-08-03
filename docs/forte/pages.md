@@ -175,13 +175,13 @@ pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
 
 ## Response Headers
 
-SSR page responses always include `Cache-Control: no-store`. This prevents CDNs and browser caches from storing the rendered HTML, which is intentional: every page response embeds request-specific data (hook results, cookie-derived state) that must not be reused across requests.
+Dynamic SSR page responses include `Cache-Control: no-store`. This prevents CDNs and browser caches from storing request-specific HTML. Static pages opt into CDN caching only when their output is safe to share.
 
 API endpoints (`src/apis/`) and actions do not include `Cache-Control: no-store` — they control their own headers via the response.
 
 ## Lazy Static Page Caching
 
-Mark a page route with `#[forte_sdk::cache_static]`. Forte codegen adds the declaration to the WASM cache-policy interface; fn0 uses that interface before creating Rust props or invoking JavaScript. The first eligible request renders the page through Rust and JavaScript, stores the HTML in a private versioned R2 bucket, and returns headers that let Cloudflare's native CDN cache the response. Later CDN hits do not reach fn0.
+Mark a page route with `#[forte_sdk::cache_static]`. Forte codegen adds the declaration to the WASM cache-policy interface; fn0 uses that interface before creating Rust props or invoking JavaScript. The first eligible request renders the page through Rust and JavaScript and returns headers that let Cloudflare's native CDN cache the response. Later CDN hits do not reach fn0.
 
 Declare the cache policy on the route handler:
 
@@ -198,7 +198,7 @@ The annotation is optional. A route without it, or a WASM bundle without the opt
 
 ### Dynamic routes
 
-A dynamic route stores one object per concrete path, so it must also export `cache_static_eligible` to say which paths exist. Without it the build fails: an unvalidated route would let any probed path write a cache object, and pages that render "not found" as HTTP 200 would store one for every miss.
+A dynamic route caches one response per concrete path, so it must also export `cache_static_eligible` to say which paths exist. Without it the build fails: an unvalidated route would let any probed path become a CDN entry, and pages that render "not found" as HTTP 200 would store one for every miss.
 
 ```rust
 pub struct PathParams {
@@ -227,10 +227,10 @@ Lazy static caching has these constraints:
 - Every configured path must return HTTP 200 with an HTML content type.
 - Dynamic routes must export `cache_static_eligible`. Exact routes are always eligible and do not use it.
 - Only `GET` and `HEAD` paths without query strings are eligible.
-- A response is persisted only when it is a final HTTP 200 HTML response without `Set-Cookie`.
+- A response is cached only when it is a final HTTP 200 HTML response without `Set-Cookie`.
 - Requests with query strings continue to use SSR.
 - Unannotated paths continue to use SSR.
-- R2 read or write failures return private, uncached SSR output and are recorded in telemetry.
+- CDN caching is controlled by the response headers; a response that is not safe remains private SSR.
 - Deployments purge the project cache tag before and after code-version activation. Static responses remain disabled until the purge queue completes.
 
 Only declare pages whose output is safe to share with every visitor. Request headers, authentication, cookies, and other per-user state are intentionally absent during generation.
@@ -251,13 +251,9 @@ The CDN consumes `cloudflare-cdn-cache-control` and `cache-tag` and does not for
 
 A dynamic SSR response carries `cache-control: private, no-store` and neither CDN header.
 
-### Storage layout
-
-Stored pages are keyed `<project_id>/<code_version>/__forte/pages/<sha256-of-normalized-path>.html` in a platform-internal R2 bucket. Because the key includes the code version, a deploy never reads a previous version's HTML, and entries from previous versions are retained rather than deleted. This bucket is separate from your project's object storage and does not consume its quota.
-
 ### Local development
 
-`fn0 local` serves static pages from an in-memory store scoped to the process, so a restart starts from an empty cache and no R2 credentials are needed. Cache policy, header emission, and the miss/store/hit path behave as they do in production; deploy purges have no local equivalent.
+`fn0 local` evaluates static pages on every request because there is no CDN in front of the local server. Cache policy and header emission behave as they do in production; deploy purges have no local equivalent.
 
 ## Error Handling
 
