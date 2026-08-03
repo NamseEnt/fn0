@@ -116,18 +116,19 @@ pub enum EnvCommands {
 #[derive(Subcommand)]
 pub enum CloudCommands {
     /// Give this project an identity, a Cloudflare account and a domain
-    ///
-    /// Interactive, because it asks for a Cloudflare API token and for a
-    /// choice between two trust models. A token passed as an argument would
-    /// land in shell history and in `ps`; here it is read hidden and never
-    /// written down.
-    ///
-    /// Run it again to change the domain the project answers on. That means
-    /// signing a new origin certificate, which needs the same token, so this
-    /// is the only command that can do it.
     Init {
         #[arg(short, long)]
         project: Option<PathBuf>,
+        #[arg(
+            long,
+            help = "Project identity and DNS label; required for a new project"
+        )]
+        project_name: Option<String>,
+        #[arg(
+            long,
+            help = "Cloudflare zone name, not a zone ID; required for a new project"
+        )]
+        zone: Option<String>,
     },
 }
 

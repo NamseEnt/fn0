@@ -5,11 +5,11 @@ CDN-cached pages and custom domain all run on **your** Cloudflare account, not
 fn0's. You keep R2's free tier, your own purge budget and your own bill; fn0
 runs the compute and holds no storage on your behalf.
 
-This is a one-time setup per project, and it is required before a project can
-serve a frontend: fn0 Cloud has no way to meter object storage usage on an
-account it does not own, so bring-your-own-Cloudflare is the default premise
-for every project, not an opt-in. There is no `fn0.dev` fallback to fall back
-to — a project without a custom domain has no public URL.
+This setup is required before a project can serve a frontend: fn0 Cloud has no
+way to meter object storage usage on an account it does not own, so
+bring-your-own-Cloudflare is the default premise for every project, not an
+opt-in. There is no `fn0.dev` fallback to fall back to — every project gets a
+hostname inside one of the owner's zones.
 
 ## What you need
 
@@ -21,90 +21,54 @@ assets get served from.
 ## One command
 
 ```sh
-forte cloud init
+forte cloud init \
+  --project . \
+  --project-name my-app \
+  --zone example.com
 ```
 
-It asks everything it needs and takes no flags. You are never asked for an
-account id or a zone id: it reads the zones your token can reach and lets you
-pick one. The token is read hidden, so it does not land in your shell history
-or in `ps`, and it is never written to disk or sent to fn0.
+The command is non-interactive. Set `CLOUDFLARE_API_TOKEN` in the execution
+environment before running it. The token is not a command-line argument, and
+the CLI never prompts or reads standard input. If the variable or any required
+argument is missing, the command exits with an error.
 
-The first question is the one that matters.
+`--zone` is the zone name, such as `example.com`. It is not the hexadecimal
+zone ID shown in Cloudflare's API details. The CLI resolves the exact zone
+named by the argument and never picks the first zone returned by the API.
 
-## Two ways to set this up
+`--project-name` is also a DNS label. It must contain only lowercase ASCII
+letters, digits, and hyphens, be 1–63 characters long, and start and end with a
+letter or digit. The public hostname is derived as:
+
+```text
+<project-name>.<zone>
+```
+
+For example, this project answers on `my-app.example.com`. A separate domain
+argument is not needed.
+
+## Setup credential
 
 Setup has to create buckets, point a hostname at one, write two zone rules and
-sign a certificate. Someone has to hold a Cloudflare token that can do those
-things. Pick who.
-
-| | Convenient | Careful |
-| --- | --- | --- |
-| Tokens you create by hand | 1 | 3 |
-| Most powerful token you create | account-wide | can provision, cannot create tokens |
-| fn0 ever sees it | no | no |
-
-Both end in the same place: fn0 holds a bucket-scoped R2 credential and a
-purge-only token, and nothing else. The difference is only what you have to
-create along the way, and whether any of it could escalate if it leaked from
-your own machine.
-
-## Convenient: one token, the CLI does the rest
-
-Pick **Let fn0 set it up**. Cloudflare dashboard → **My Profile → API Tokens →
+sign a certificate. Create one reusable bootstrap token and provide it through
+`CLOUDFLARE_API_TOKEN`. Cloudflare dashboard → **My Profile → API Tokens →
 Create Token → Create Custom Token**. Give it exactly one permission:
 
 | Scope | Permission |
 | --- | --- |
 | User | API Tokens → Edit |
 
-The CLI mints a short-lived provisioning token from it, provisions your
-account, mints the two credentials fn0 keeps, and revokes the provisioning
-token before it exits. If it dies mid-run, that token expires by itself within
-ten minutes.
+The CLI uses this token locally for every project. It creates a short-lived
+provisioning token when needed, provisions the account, creates the narrow
+credentials fn0 keeps, and revokes the short-lived token. The bootstrap token
+itself is not sent to fn0.
 
-**Delete the setup token afterwards.** One checkbox does not make it a small
-permission: a token that can create tokens can create *any* token in your
-account, so until you delete it, it is a full-account credential. That is the
-whole reason to consider the other path.
+This token is powerful: a token that can create tokens can create any token
+allowed by the account. Store it in a secret manager or protected process
+environment and rotate it deliberately. Do not put its value in the command
+line, project files, or logs.
 
-## Careful: you create every token yourself
-
-Pick **I create every credential myself**. Nothing you make here can create
-tokens, so nothing you make here can widen itself.
-
-**Step 1** — a provisioning token. My Profile → API Tokens → Create Custom
-Token:
-
-| Scope | Permission |
-| --- | --- |
-| Account | Workers R2 Storage → Edit |
-| Zone | Zone → Read |
-| Zone | Cache Rules → Edit |
-| Zone | Transform Rules → Edit |
-| Zone | SSL and Certificates → Edit |
-
-Restrict the zone scopes to the one zone. Give it to `forte cloud init`; it
-creates the buckets, the CDN hostnames and the two zone rules, then stops and
-prints the exact names for step 2.
-
-**Step 2** — the three credentials fn0 keeps.
-
-The two R2 tokens are separate on purpose. Only the worker one is handed to the
-fleet, and only the frontend-asset one is used by the GC that deletes; scoping
-them apart is what keeps either from reaching the other's bucket. Both are made
-at R2 → **Manage API Tokens → Create API token**, permission *Object Read &
-Write*, applied to the buckets the previous command named — the first to the
-two object-storage buckets, the second to the frontend-asset bucket alone.
-Each screen shows an Access Key ID and a Secret Access Key; keep all four
-values.
-
-My Profile → **API Tokens → Create Custom Token**, permission *Zone → Cache
-Purge → Purge*, restricted to your zone.
-
-The command waits for those five values and then connects. Delete the
-provisioning token from step 1 once it succeeds.
-
-## What the two stored credentials can do
+## What the stored credentials can do
 
 | Credential | What it can do |
 | --- | --- |
@@ -127,16 +91,16 @@ projects, so no key prefix is carrying the separation.
 | Bucket | Holds | Reachable at |
 | --- | --- | --- |
 | `fn0-<project-id>-private-object-storage` | what `object_storage::private` writes | nowhere — signed requests only |
-| `fn0-<project-id>-public-object-storage` | what `object_storage::public` writes | `fn0-<project-id>-public-object-storage.<your-domain>` |
-| `fn0-<project-id>-frontend-asset` | your deployed frontend build | `fn0-<project-id>-frontend-asset.<your-domain>` |
+| `fn0-<project-id>-public-object-storage` | what `object_storage::public` writes | `fn0-<project-id>-public-object-storage.<zone>` |
+| `fn0-<project-id>-frontend-asset` | your deployed frontend build | `fn0-<project-id>-frontend-asset.<zone>` |
 
 The two public buckets answer on a hostname that is the bucket's own name in
 your zone, so a bucket and the address it serves from cannot drift apart. Each
 costs one DNS record.
 
 fn0 adds two rules to your zone and leaves your own rules in place. They match
-`fn0-*-frontend-asset.<your-domain>` and
-`fn0-*-public-object-storage.<your-domain>`; the cache rule also matches the
+`fn0-*-frontend-asset.<zone>` and
+`fn0-*-public-object-storage.<zone>`; the cache rule also matches the
 custom domains registered for fn0 projects. This covers every fn0 project you
 add without a rule per project — a free zone allows ten of each, and a rule per
 project would run out at ten projects. Both halves of each pattern are required
@@ -173,8 +137,8 @@ credentials as things you do not lose.
 
 ## The domain
 
-Not optional: a project answers on the domain you gave `forte cloud init` and
-on nothing else. There is no `fn0.dev` fallback.
+Not optional: a project answers on the hostname derived from its project name
+and zone, and on nothing else. There is no `fn0.dev` fallback.
 
 Signing an origin certificate needs a permission fn0 deliberately does not
 hold, so this runs locally too. The CLI generates a key pair, has Cloudflare
@@ -182,9 +146,9 @@ sign the certificate through your own Origin CA, uploads the certificate and
 key, and prints the one thing left to do: add a **proxied** `CNAME` record for
 that hostname pointing at the printed origin hostname.
 
-To change the domain later, run `forte cloud init` again. It skips everything
-already done and signs a certificate for the new hostname. The domain is also
-written to `Forte.toml`, and `forte deploy` refuses if the two disagree.
+The derived hostname is written to `Forte.toml`, and `forte deploy` refuses if
+the stored project name, zone, and hostname disagree with the live project.
+Changing the zone or project hostname requires a new project connection.
 
 The record must stay orange-clouded. An Origin CA certificate is not valid for
 a direct visitor connection, so switching the record to DNS-only breaks the

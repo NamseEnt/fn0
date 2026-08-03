@@ -92,7 +92,7 @@ If a `cron.yaml` file exists in the project root, its scheduled jobs are registe
 
 Deploy steps (in addition to `forte build`):
 1. **Checks the project is set up** — `Forte.toml` must name a `project_id` with a Cloudflare account behind it, and if it declares a `domain`, that must be the domain the project actually answers on. Otherwise the deploy stops and points at `forte cloud init`.
-2. **Uploads static assets** — `fe/dist/` (client JS/CSS/assets) is uploaded to the project's own frontend-asset bucket, served from `https://fn0-<project_id>-frontend-asset.<your-domain>/<code_version>/`. The `VITE_PUBLIC_URL` env var is set to this URL during the Vite client build so asset references resolve correctly.
+2. **Uploads static assets** — `fe/dist/` (client JS/CSS/assets) is uploaded to the project's own frontend-asset bucket, served from `https://fn0-<project_id>-frontend-asset.<zone>/<code_version>/`. The `VITE_PUBLIC_URL` env var is set to this URL during the Vite client build so asset references resolve correctly.
 3. **Uploads backend bundle** — packages `dist/backend.wasm`, `dist/server.js`, and `env.yaml` into `dist/bundle.raw.tar` and uploads it to the fn0 Cloud control plane.
 4. **Compiles to native** — the control plane invokes the `fn0-cwasm-compiler` Lambda to ahead-of-time compile `backend.wasm` to a Wasmtime-native `.cwasm` bundle. The CLI polls `deploy_status` until compilation finishes (one compilation per active Wasmtime version). Workers load the pre-compiled bundle on the next request, so there is no JIT cost at runtime.
 5. **Registers cron jobs** — if `cron.yaml` exists, schedules are synced.
@@ -115,7 +115,7 @@ Delete the deployed project and all of its resources: routing, custom domain, de
 
 Runs against the project in the current directory only — the `project_id` is read from `Forte.toml`, and there is no flag to target another directory or another project id. Without `--yes`, you must type the project id to confirm.
 
-On success the `project_id` and `domain` keys are removed from `Forte.toml` (all other keys and formatting are preserved), so the next `forte cloud init` registers a new project. Teardown is enqueued on the control plane and runs asynchronously.
+On success the `project_id`, `project_name`, `zone`, and `domain` keys are removed from `Forte.toml` (all other keys and formatting are preserved), so the next `forte cloud init` registers a new project. Teardown is enqueued on the control plane and runs asynchronously.
 
 ```sh
 forte destroy
@@ -240,45 +240,59 @@ forte login --token fn0_xxxxx
 
 ### `forte cloud init`
 
-Give a project an identity, a Cloudflare account to live in, and the domain it
-answers on. This is the one-time setup every project needs before it can be
-deployed. See [Bring Your Own Cloudflare](../fn0/cloudflare.md) for what it
-creates and which token permissions it needs.
+Give a project an identity and a Cloudflare zone. The public hostname is
+derived from the project name and zone, and this setup must complete before the
+project can be deployed. See [Bring Your Own Cloudflare](../fn0/cloudflare.md)
+for what it creates and which token permissions it needs. The normative command
+contract is [the cloud init specification](../../forte/cli/CLOUD_INIT_SPEC.md).
 
 ```sh
-forte cloud init
+forte cloud init \
+  --project . \
+  --project-name my-app \
+  --zone example.com
 ```
 
-It is interactive, and takes no flags beyond `-p, --project <dir>` (default:
-`.`). That is deliberate: it asks for a Cloudflare API token, and a token
-passed as a command-line argument lands in your shell history and in `ps`.
-Here it is read hidden and never written to disk. It also asks you to choose
-between two trust models, which is a choice you should be shown rather than
-expected to know.
+The command is non-interactive. It never prompts and never reads from standard
+input. The setup token must be available as `CLOUDFLARE_API_TOKEN`; if it is
+missing, the command exits immediately with an error.
 
-You are never asked to paste an account or zone id. The command reads the
-zones your token can reach and lets you pick one; the account comes with it.
+`--zone` is a Cloudflare zone name such as `example.com`, not the internal
+hexadecimal zone ID. The CLI resolves the exact zone and must not choose one
+implicitly when several zones are accessible.
+
+`--project-name` must be a single DNS hostname label: lowercase ASCII letters,
+digits, and hyphens only; 1–63 characters; and no leading or trailing hyphen.
+The CLI rejects invalid values without normalizing them.
+
+The app hostname is derived automatically:
+
+```text
+<project-name>.<zone>
+```
+
+For example, `my-app` in `example.com` becomes `my-app.example.com`. There is
+no separate `--domain` argument in the default contract.
 
 What it does, in order:
 
-1. Asks how the Cloudflare setup should be done — fn0 mints the credentials
-   from one token, or you create all three yourself
-2. Reads your token, lists your zones, and asks which zone and which domain
-3. Registers the project and writes `project_id` and `domain` to `Forte.toml`
-4. Creates the buckets, CDN hostnames and cache rule on your account, and
-   narrows the buckets' CORS to your domain
-5. Hands fn0 the three narrow credentials it keeps
+1. Validates all arguments and `CLOUDFLARE_API_TOKEN`
+2. Resolves the requested zone and derives the app hostname
+3. Registers the project and writes `project_id`, `project_name`, `zone`, and
+   `domain` to `Forte.toml`
+4. Creates or reuses the buckets, CDN hostnames, and cache rule on your account
+5. Hands fn0 the narrow project credentials it keeps
 6. Signs an origin certificate through your Origin CA **on your machine** —
-   fn0 holds no token that can sign one — and registers the domain
+   fn0 holds no token that can sign one — and registers the derived domain
 7. Prints the proxied `CNAME` you have to add
 
-No token you create is ever sent to fn0.
+The bootstrap token is never sent to fn0. It is used locally to provision the
+account and create project-scoped credentials.
 
-**Run it again to change the domain.** Signing a new origin certificate needs
-the same token, so this is the only command that can do it. On a project that
-is already set up it skips straight to the token, the domain and the
-certificate. Moving a project to a different Cloudflare account is not
-supported.
+The bootstrap token can be reused for multiple projects. Re-running setup for
+an existing project checks the stored project name, zone, and derived domain;
+it refuses mismatches rather than entering a prompt-driven reconfiguration
+flow. Moving a project to a different Cloudflare account is not supported.
 
 ---
 

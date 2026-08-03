@@ -30,7 +30,8 @@ Where a reference app and the hard requirements disagree, this spec takes the mo
 - Init does NOT install a Rust toolchain, a Node.js runtime, or the bundled `forte-rs-to-ts` binary. Those are responsibilities of the developer's environment or of other CLI subcommands.
 - Init does NOT pre-create any file that the CLI itself generates on the first `forte dev` / `forte build` (those files are listed in §5).
 - Init does NOT pick a styling solution, a state management library, a router, a meta-framework, an ORM, or any opinion beyond what the CLI's codegen makes mandatory.
-- Init does NOT bake a `Forte.toml` `project_id` — that is filled in by `forte deploy` on first deploy.
+- Init does NOT bake a `Forte.toml` `project_id` — that is filled in by
+  `forte cloud init` before the first deploy.
 
 ---
 
@@ -60,7 +61,7 @@ The complete tree that init writes (◆ = file written by init, generated direct
 ```
 <name>/
 ├── .gitignore                ◆
-├── Forte.toml                ◆  (empty file; populated by forte deploy)
+├── Forte.toml                ◆  (empty file; populated by forte cloud init)
 ├── rs/
 │   ├── .cargo/
 │   │   └── config.toml       ◆
@@ -112,7 +113,9 @@ Rationale: `/target` covers the case where the user runs `cargo` at the root; `/
 ```
 ```
 
-(Zero-byte file.) `forte deploy` deserializes this as `ForteConfig { project_id: Option<String> }`; an empty file is valid and equivalent to `project_id = None`. On first deploy, the CLI writes `project_id = "..."` into this file.
+(Zero-byte file.) An empty file is valid before Cloudflare setup. `forte cloud init`
+writes `project_id`, `project_name`, `zone`, and the derived `domain` into this
+file before the first deploy.
 
 ### 4.3 `<name>/rs/.gitignore`
 

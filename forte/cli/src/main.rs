@@ -96,9 +96,13 @@ async fn async_main() -> Result<()> {
         },
 
         Commands::Cloud { command } => match command {
-            CloudCommands::Init { project } => {
+            CloudCommands::Init {
+                project,
+                project_name,
+                zone,
+            } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
-                cli::cloud::init(project_dir).await?;
+                cli::cloud::init(project_dir, project_name, zone).await?;
             }
         },
 

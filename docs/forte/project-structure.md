@@ -4,7 +4,7 @@ A Forte project created by `forte init <name>` has the following layout:
 
 ```
 <name>/
-├── Forte.toml                 # Project config (project_id written here by forte deploy)
+├── Forte.toml                 # Project config (written by forte cloud init)
 ├── cron.yaml                  # (optional) Scheduled cron job definitions
 ├── env.yaml                   # (optional) Shared env vars, secrets encrypted; managed via `forte env set`
 ├── env.local.yaml             # (optional) Local-only plaintext overrides; gitignored, never bundled
@@ -209,15 +209,25 @@ export default {
 
 ## Forte.toml
 
-`forte init` writes an empty `Forte.toml` as a project marker. After the first `forte deploy`, the control-plane-assigned project ID is written back:
+`forte init` writes an empty `Forte.toml` as a project marker. After
+`forte cloud init`, the project identity and Cloudflare hostname are written
+back:
 
 ```toml
 project_id = "some-unique-id"
+project_name = "my-app"
+zone = "example.com"
+domain = "my-app.example.com"
 ```
 
-The `project_id` field is the only recognized key. The project's display name is chosen interactively during the first `forte deploy` (or via `--name`) and stored in the control plane, not in `Forte.toml`.
+`project_id`, `project_name`, `zone`, and `domain` are recognized keys. The
+project name is a DNS label and the domain is derived from the project name and
+zone. `forte cloud init` refuses to continue if the saved values disagree with
+the requested project or the live Cloudflare connection.
 
-`forte deploy` and `forte destroy` edit only the `project_id` key in place — unrecognized keys, tables, and formatting are left untouched. `forte destroy` removes the key so the next `forte deploy` registers a new project.
+`forte deploy` and `forte destroy` preserve the Cloudflare configuration.
+`forte destroy` removes the project identity and hostname keys so the next
+`forte cloud init` registers a new project.
 
 ## cron.yaml (optional)
 

@@ -22,7 +22,9 @@ pub async fn run(project_dir: PathBuf, yes: bool) -> Result<()> {
     fn0_deploy::delete_project(&project_id).await?;
 
     clear_cloud_config(&project_dir)?;
-    println!("Removed project_id from Forte.toml (next `forte deploy` creates a new project)");
+    println!(
+        "Removed cloud configuration from Forte.toml (next `forte deploy` creates a new project)"
+    );
     println!("Teardown of '{project_id}' enqueued; resources are being deleted.");
     Ok(())
 }

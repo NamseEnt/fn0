@@ -1,48 +1,41 @@
-//! `forte cloud init` — gives a project an identity, a Cloudflare account to
-//! live in, and the domain it answers on.
-//!
-//! It is interactive on purpose. The inputs are a Cloudflare API token and a
-//! choice between two trust models, and neither belongs on a command line: a
-//! token passed as an argument lands in shell history and in `ps`, and the
-//! choice is one a user should be shown rather than expected to know.
-//!
-//! It is also the only command that can change a project's domain, because
-//! doing so means signing a new origin certificate and that needs the same
-//! token. Re-running it on a project that is already set up asks for the token
-//! and the new domain and skips everything already done, so `forte deploy`
-//! never has to prompt for anything.
-
 use anyhow::{Result, anyhow};
-use inquire::{Confirm, Password, PasswordDisplayMode, Select, Text};
 use std::path::PathBuf;
 
-use super::project_config::{read_optional_project_id, write_cloud_config};
-use fn0_deploy::cloudflare_provision::{
-    ConnectCredentials, ProvisionedResources, ReachableZone, ZoneDiscovery,
-};
+use super::project_config::{read_cloud_config, write_cloud_config};
+use fn0_deploy::cloudflare_provision::{ProvisionedResources, ReachableZone, ZoneDiscovery};
 use fn0_deploy::{
-    CloudSetup, CloudflareConnection, connect_with_own_credentials, expected_resources,
-    fetch_cloudflare_connection, provision_and_connect, provision_only, set_domain,
+    CloudSetup, CloudflareConnection, DomainStatus, fetch_cloudflare_connection,
+    provision_and_connect, set_domain,
 };
 
-/// How the user wants to hand the setup the permissions it needs.
-#[derive(Clone, Copy, PartialEq)]
-enum SetupStyle {
-    /// One token carrying `API Tokens -> Edit`. Everything else is minted from
-    /// it and revoked on the way out.
-    Managed,
-    /// A token that can provision but cannot create tokens. The user makes the
-    /// three long-lived credentials by hand.
-    SelfMade,
-}
-
-impl SetupStyle {
-    fn mints_its_own_tokens(self) -> bool {
-        self == Self::Managed
+pub async fn init(
+    project_dir: PathBuf,
+    requested_project_name: Option<String>,
+    requested_zone: Option<String>,
+) -> Result<()> {
+    let api_token = read_cloudflare_token()?;
+    let config = read_cloud_config(&project_dir)?;
+    let has_project_id = config.project_id.is_some();
+    let project_name = resolve_setting(
+        requested_project_name,
+        config.project_name,
+        "--project-name",
+        has_project_id,
+    )?;
+    validate_project_name(&project_name)?;
+    let zone_name = resolve_setting(requested_zone, config.zone, "--zone", has_project_id)?;
+    validate_zone_name(&zone_name)?;
+    let domain = derive_domain(&project_name, &zone_name)?;
+    if has_project_id {
+        if let Some(stored_domain) = config.domain.as_deref() {
+            if stored_domain != domain {
+                return Err(anyhow!(
+                    "Forte.toml domain '{stored_domain}' does not match the derived domain '{domain}'."
+                ));
+            }
+        }
     }
-}
 
-pub async fn init(project_dir: PathBuf) -> Result<()> {
     let creds = fn0_deploy::credentials::load()?.ok_or_else(|| {
         anyhow!(
             "not signed in. Run `forte login` first (credentials at {}).",
@@ -52,93 +45,59 @@ pub async fn init(project_dir: PathBuf) -> Result<()> {
         )
     })?;
 
-    let registered = read_optional_project_id(&project_dir)?;
-    let connection = match &registered {
-        Some(project_id) => fetch_cloudflare_connection(project_id).await?,
-        None => CloudflareConnection::NotConnected,
-    };
-    if let CloudflareConnection::NotFound = connection {
-        return Err(anyhow!(
-            "Forte.toml names project '{}', which does not exist under your account.",
-            registered.unwrap_or_default()
-        ));
-    }
-    let connected_zone_name = match &connection {
-        CloudflareConnection::Connected { zone_name } => Some(zone_name.clone()),
-        _ => None,
-    };
-
-    println!();
-    match &connected_zone_name {
-        Some(zone_name) => {
-            println!("This project is already connected to {zone_name}.");
-            println!("Continuing will change the domain it answers on.");
-        }
-        None => {
-            println!("fn0 runs this project's storage, CDN and domain on your own");
-            println!("Cloudflare account. Nothing is stored on fn0's.");
-        }
-    }
-    println!();
-
-    let style = ask_setup_style()?;
-    let api_token = Password::new("Cloudflare API token")
-        .with_display_mode(PasswordDisplayMode::Masked)
-        .without_confirmation()
-        .with_help_message("not saved anywhere, and never sent to fn0")
-        .prompt()?;
-
     println!("reading the zones this token can reach...");
-    let zones = ZoneDiscovery::new(api_token.clone())
-        .list(style.mints_its_own_tokens())
-        .await?;
-    let zone = pick_zone(zones, connected_zone_name.as_deref())?;
-    let domain = ask_domain(&zone)?;
+    let zones = ZoneDiscovery::new(api_token.clone()).list(true).await?;
+    let zone = resolve_zone(zones, &zone_name)?;
 
-    let project_id = match registered {
-        Some(project_id) => project_id,
-        None => {
-            let project_name = ask_project_name()?;
-            let project_id = fn0_deploy::ensure_project_id(
-                &reqwest::Client::new(),
-                &creds.control_url,
-                &creds.token,
-                &project_name,
-                &mut None,
-            )
-            .await?;
-            println!();
-            println!("  created project {project_name} ({project_id})");
-            project_id
-        }
+    let mut project_id = config.project_id;
+    let project_id = fn0_deploy::ensure_project_id(
+        &reqwest::Client::new(),
+        &creds.control_url,
+        &creds.token,
+        &project_name,
+        &mut project_id,
+    )
+    .await?;
+    write_cloud_config(
+        &project_dir,
+        &project_id,
+        &project_name,
+        &zone_name,
+        &domain,
+    )?;
+
+    let connection = if has_project_id {
+        fetch_cloudflare_connection(&project_id).await?
+    } else {
+        CloudflareConnection::NotConnected
     };
-    write_cloud_config(&project_dir, &project_id, &domain)?;
+    validate_existing_connection(&creds, &project_id, &connection, &zone, &domain).await?;
 
     let setup = CloudSetup {
         project_id: &project_id,
         account_id: &zone.account_id,
         zone_id: &zone.zone_id,
         api_token: &api_token,
-        mint_from_setup_token: style.mints_its_own_tokens(),
+        mint_from_setup_token: true,
         domain: &domain,
     };
 
-    if connected_zone_name.is_none() {
-        println!("  provisioning your Cloudflare account (this runs locally)...");
-        match style {
-            SetupStyle::Managed => {
-                let resources = provision_and_connect(&setup).await?;
-                print_resources(&resources);
-                println!("  minted two bucket-scoped R2 tokens and a purge-only token");
-            }
-            SetupStyle::SelfMade => {
-                let resources = provision_only(&setup).await?;
-                print_resources(&resources);
-                let credentials = ask_own_credentials(&setup, &zone.zone_name)?;
-                connect_with_own_credentials(&setup, &resources, &credentials).await?;
-            }
+    match connection {
+        CloudflareConnection::NotConnected => {
+            println!("  provisioning your Cloudflare account (this runs locally)...");
+            let resources = provision_and_connect(&setup).await?;
+            print_resources(&resources);
+            println!("  minted two bucket-scoped R2 tokens and a purge-only token");
+            println!("  connected");
         }
-        println!("  connected");
+        CloudflareConnection::Connected { .. } => {
+            println!("  Cloudflare account already connected");
+        }
+        CloudflareConnection::NotFound => {
+            return Err(anyhow!(
+                "project '{project_id}' not found or not owned by you."
+            ));
+        }
     }
 
     let outcome = set_domain(&setup).await?;
@@ -148,7 +107,7 @@ pub async fn init(project_dir: PathBuf) -> Result<()> {
     }
 
     println!();
-    println!("One thing left. Add this record in your Cloudflare dashboard:");
+    println!("Add this proxied record in your Cloudflare DNS:");
     println!();
     println!(
         "    CNAME   {domain}   {}   (proxied / orange cloud)",
@@ -159,145 +118,169 @@ pub async fn init(project_dir: PathBuf) -> Result<()> {
     println!("edge only, so turning the record grey breaks the hostname.");
     println!();
     println!("Then: forte deploy");
-    if style.mints_its_own_tokens() {
-        println!();
-        println!("The token you just used was not sent to fn0 and is no longer needed —");
-        println!("you can delete it in the Cloudflare dashboard.");
+    Ok(())
+}
+
+fn read_cloudflare_token() -> Result<String> {
+    let token = std::env::var("CLOUDFLARE_API_TOKEN").map_err(|_| {
+        anyhow!("CLOUDFLARE_API_TOKEN is required. Set it before running `forte cloud init`.")
+    })?;
+    let trimmed_token = token.trim();
+    if trimmed_token.is_empty() {
+        return Err(anyhow!(
+            "CLOUDFLARE_API_TOKEN cannot be empty. Set it before running `forte cloud init`."
+        ));
+    }
+    Ok(trimmed_token.to_string())
+}
+
+fn resolve_setting(
+    requested_value: Option<String>,
+    stored_value: Option<String>,
+    option_name: &str,
+    has_project_id: bool,
+) -> Result<String> {
+    match (requested_value, stored_value) {
+        (Some(requested_value), Some(stored_value)) => {
+            if requested_value != stored_value {
+                return Err(anyhow!(
+                    "Forte.toml value '{stored_value}' does not match {option_name} '{requested_value}'."
+                ));
+            }
+            Ok(stored_value)
+        }
+        (Some(requested_value), None) => Ok(requested_value),
+        (None, Some(stored_value)) => Ok(stored_value),
+        (None, None) if has_project_id => Err(anyhow!(
+            "Forte.toml is missing {option_name}. Pass {option_name} to continue without interactive input."
+        )),
+        (None, None) => Err(anyhow!("{option_name} is required for a new project.")),
+    }
+}
+
+fn validate_project_name(project_name: &str) -> Result<()> {
+    if project_name.is_empty() || project_name.len() > 63 {
+        return Err(anyhow!(
+            "project name '{project_name}' must be 1 to 63 ASCII characters"
+        ));
+    }
+    let Some(first_character) = project_name.bytes().next() else {
+        return Err(anyhow!(
+            "project name '{project_name}' must start with a letter or digit"
+        ));
+    };
+    let Some(last_character) = project_name.bytes().last() else {
+        return Err(anyhow!(
+            "project name '{project_name}' must end with a letter or digit"
+        ));
+    };
+    if !is_dns_label_edge_character(first_character) || !is_dns_label_edge_character(last_character)
+    {
+        return Err(anyhow!(
+            "project name '{project_name}' must start and end with a lowercase letter or digit"
+        ));
+    }
+    if project_name
+        .bytes()
+        .any(|character| !is_dns_label_character(character))
+    {
+        return Err(anyhow!(
+            "project name '{project_name}' must contain only lowercase letters, digits, and hyphens"
+        ));
     }
     Ok(())
 }
 
-fn ask_setup_style() -> Result<SetupStyle> {
-    const MANAGED: &str = "Let fn0 set it up  -  one token, but it can create tokens, so it is account-wide until you delete it";
-    const SELF_MADE: &str = "I create every credential myself  -  more steps, but nothing you hand over can widen itself";
-    let choice = Select::new(
-        "How should the Cloudflare setup be done?",
-        vec![MANAGED, SELF_MADE],
-    )
-    .prompt()?;
-    Ok(if choice == MANAGED {
-        SetupStyle::Managed
-    } else {
-        SetupStyle::SelfMade
-    })
+fn is_dns_label_character(character: u8) -> bool {
+    character.is_ascii_lowercase() || character.is_ascii_digit() || character == b'-'
 }
 
-fn pick_zone(zones: Vec<ReachableZone>, must_be: Option<&str>) -> Result<ReachableZone> {
-    if zones.is_empty() {
-        return Err(anyhow!(
-            "that token cannot see any zone. fn0 serves a project from a domain in a zone you \
-             own, so there is nowhere to put it."
-        ));
-    }
-    if let Some(zone_name) = must_be {
-        return zones
-            .into_iter()
-            .find(|zone| zone.zone_name == zone_name)
-            .ok_or_else(|| {
-                anyhow!(
-                    "this project lives in {zone_name}, which that token cannot see. Moving a \
-                     project to another zone is not supported."
-                )
-            });
-    }
-    let labels: Vec<String> = zones
-        .iter()
-        .map(|zone| format!("{}  ({})", zone.zone_name, zone.account_name))
-        .collect();
-    let choice = Select::new("Which zone should this project live in?", labels.clone()).prompt()?;
-    let picked = labels
-        .iter()
-        .position(|label| label == &choice)
-        .expect("Select returns one of the options it was given");
-    Ok(zones
-        .into_iter()
-        .nth(picked)
-        .expect("index came from zones"))
+fn is_dns_label_edge_character(character: u8) -> bool {
+    character.is_ascii_lowercase() || character.is_ascii_digit()
 }
 
-fn ask_domain(zone: &ReachableZone) -> Result<String> {
-    let domain = Text::new("Domain this app answers on")
-        .with_help_message(&format!("a hostname in {}", zone.zone_name))
-        .prompt()?
-        .trim()
-        .to_ascii_lowercase();
-    if domain != zone.zone_name && !domain.ends_with(&format!(".{}", zone.zone_name)) {
+fn validate_zone_name(zone_name: &str) -> Result<()> {
+    if zone_name.is_empty() || zone_name.chars().any(|character| character.is_whitespace()) {
+        return Err(anyhow!("zone name must be a non-empty hostname"));
+    }
+    Ok(())
+}
+
+fn derive_domain(project_name: &str, zone_name: &str) -> Result<String> {
+    let domain = format!("{project_name}.{zone_name}");
+    if domain.len() > 253 {
         return Err(anyhow!(
-            "'{domain}' is not inside {}. The record that points it at fn0 has to be created in \
-             that zone.",
-            zone.zone_name
+            "derived domain '{domain}' exceeds the 253-character DNS hostname limit"
         ));
     }
     Ok(domain)
 }
 
-fn ask_project_name() -> Result<String> {
-    let name = Text::new("Project name")
-        .with_help_message("a label in the control plane, not the domain")
-        .prompt()?
-        .trim()
-        .to_string();
-    if name.is_empty() {
-        return Err(anyhow!("project name cannot be empty"));
+fn resolve_zone(zones: Vec<ReachableZone>, zone_name: &str) -> Result<ReachableZone> {
+    let matching_zones: Vec<ReachableZone> = zones
+        .into_iter()
+        .filter(|zone| zone.zone_name == zone_name)
+        .collect();
+    match matching_zones.len() {
+        0 => Err(anyhow!(
+            "Cloudflare zone '{zone_name}' was not found or is not accessible to CLOUDFLARE_API_TOKEN."
+        )),
+        1 => matching_zones
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("Cloudflare zone '{zone_name}' could not be resolved")),
+        _ => {
+            let account_names: Vec<&str> = matching_zones
+                .iter()
+                .map(|zone| zone.account_name.as_str())
+                .collect();
+            Err(anyhow!(
+                "Cloudflare zone '{zone_name}' exists in multiple accounts: {}",
+                account_names.join(", ")
+            ))
+        }
     }
-    Ok(name)
 }
 
-fn ask_own_credentials(setup: &CloudSetup<'_>, zone_name: &str) -> Result<ConnectCredentials> {
-    let resources = expected_resources(setup.project_id, zone_name);
-    println!();
-    println!("Now create the three credentials fn0 will keep. None can be minted for");
-    println!("you here, because the token you chose deliberately cannot create tokens.");
-    println!();
-    println!("The first two are separate on purpose: only the worker one is handed to");
-    println!("the fleet, and only the frontend-asset one is used by the GC that deletes.");
-    println!("Scoping them apart is what keeps either from reaching the other's bucket.");
-    println!();
-    println!("1. R2 -> Manage API Tokens -> Create API token");
-    println!("     permission: Object Read & Write");
-    println!("     apply to specific buckets:");
-    println!("       {}", resources.private_object_storage_bucket);
-    println!("       {}", resources.public_object_storage_bucket);
-    println!();
-    println!("2. R2 -> Manage API Tokens -> Create API token");
-    println!("     permission: Object Read & Write");
-    println!("     apply to specific buckets:");
-    println!("       {}", resources.frontend_asset_bucket);
-    println!();
-    println!("3. My Profile -> API Tokens -> Create Custom Token");
-    println!("     permission: Zone -> Cache Purge -> Purge");
-    println!("     zone resources: {zone_name} only");
-    println!();
-    if !Confirm::new("Created all three?")
-        .with_default(false)
-        .prompt()?
-    {
+async fn validate_existing_connection(
+    creds: &fn0_deploy::credentials::Credentials,
+    project_id: &str,
+    connection: &CloudflareConnection,
+    zone: &ReachableZone,
+    domain: &str,
+) -> Result<()> {
+    let CloudflareConnection::Connected { zone_name } = connection else {
+        if let CloudflareConnection::NotFound = connection {
+            return Err(anyhow!(
+                "project '{project_id}' not found or not owned by you."
+            ));
+        }
+        return Ok(());
+    };
+
+    if zone_name != &zone.zone_name {
         return Err(anyhow!(
-            "stopped before connecting. The buckets are provisioned; re-run `forte cloud init` \
-             once the credentials exist."
+            "project '{project_id}' is connected to zone '{zone_name}', not requested zone '{}'. Reconnecting is not supported.",
+            zone.zone_name
         ));
     }
 
-    Ok(ConnectCredentials {
-        worker_access_key_id: plain("Access Key ID from 1")?,
-        worker_secret: secret("Secret Access Key from 1")?,
-        frontend_asset_access_key_id: plain("Access Key ID from 2")?,
-        frontend_asset_secret: secret("Secret Access Key from 2")?,
-        purge_token: secret("Purge token from 3")?,
-    })
-}
-
-fn plain(prompt: &str) -> Result<String> {
-    Ok(Text::new(prompt).prompt()?.trim().to_string())
-}
-
-fn secret(prompt: &str) -> Result<String> {
-    Ok(Password::new(prompt)
-        .with_display_mode(PasswordDisplayMode::Masked)
-        .without_confirmation()
-        .prompt()?
-        .trim()
-        .to_string())
+    match fn0_deploy::fetch_domain_status(creds, project_id).await? {
+        DomainStatus::SelfHosted {
+            domain: live_domain,
+            ..
+        } if live_domain != domain => Err(anyhow!(
+            "project '{project_id}' is configured for domain '{live_domain}', not '{domain}'. Reconfiguration is not supported by `forte cloud init`."
+        )),
+        DomainStatus::NotLoggedIn => Err(anyhow!("control rejected token; sign in again.")),
+        DomainStatus::NotFound => Err(anyhow!(
+            "project '{project_id}' not found or not owned by you."
+        )),
+        DomainStatus::InternalError => Err(anyhow!(
+            "domain_status: server error; check fn0-control logs"
+        )),
+        _ => Ok(()),
+    }
 }
 
 fn print_resources(resources: &ProvisionedResources) {
@@ -310,4 +293,50 @@ fn print_resources(resources: &ProvisionedResources) {
         "  public   https://{}",
         resources.public_object_storage_hostname
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_dns_label_project_names() {
+        assert!(validate_project_name("my-app").is_ok());
+        assert!(validate_project_name("a1").is_ok());
+        let maximum_length_name = "a".repeat(63);
+        assert!(validate_project_name(&maximum_length_name).is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_dns_label_project_names() {
+        for project_name in ["", "-my-app", "my-app-", "My-app", "my_app", "my.app"] {
+            assert!(validate_project_name(project_name).is_err());
+        }
+        let too_long_name = "a".repeat(64);
+        assert!(validate_project_name(&too_long_name).is_err());
+    }
+
+    #[test]
+    fn derives_domain_from_project_name_and_zone() {
+        assert_eq!(
+            derive_domain("my-app", "example.com").unwrap(),
+            "my-app.example.com"
+        );
+    }
+
+    #[test]
+    fn resolves_only_the_exact_zone_name() {
+        let resolved_zone = resolve_zone(
+            vec![ReachableZone {
+                zone_id: "zone-id".to_string(),
+                zone_name: "example.com".to_string(),
+                account_id: "account-id".to_string(),
+                account_name: "account".to_string(),
+            }],
+            "example.com",
+        )
+        .unwrap();
+        assert_eq!(resolved_zone.zone_id, "zone-id");
+        assert!(resolve_zone(Vec::new(), "other.example.com").is_err());
+    }
 }

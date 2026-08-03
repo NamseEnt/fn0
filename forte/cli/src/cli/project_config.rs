@@ -4,6 +4,14 @@ use toml_edit::{DocumentMut, value};
 
 const CONFIG_FILE_NAME: &str = "Forte.toml";
 
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct CloudConfig {
+    pub project_id: Option<String>,
+    pub project_name: Option<String>,
+    pub zone: Option<String>,
+    pub domain: Option<String>,
+}
+
 fn load(project_dir: &Path) -> Result<DocumentMut> {
     let config_path = project_dir.join(CONFIG_FILE_NAME);
     let content = std::fs::read_to_string(&config_path)
@@ -18,11 +26,25 @@ fn save(project_dir: &Path, document: &DocumentMut) -> Result<()> {
         .map_err(|e| anyhow!("Failed to write Forte.toml: {}", e))
 }
 
-pub fn read_optional_project_id(project_dir: &Path) -> Result<Option<String>> {
-    Ok(load(project_dir)?
-        .get("project_id")
+fn read_optional_string(document: &DocumentMut, key: &str) -> Option<String> {
+    document
+        .get(key)
         .and_then(|item| item.as_str())
-        .map(str::to_string))
+        .map(str::to_string)
+}
+
+pub fn read_cloud_config(project_dir: &Path) -> Result<CloudConfig> {
+    let document = load(project_dir)?;
+    Ok(CloudConfig {
+        project_id: read_optional_string(&document, "project_id"),
+        project_name: read_optional_string(&document, "project_name"),
+        zone: read_optional_string(&document, "zone"),
+        domain: read_optional_string(&document, "domain"),
+    })
+}
+
+pub fn read_optional_project_id(project_dir: &Path) -> Result<Option<String>> {
+    Ok(read_cloud_config(project_dir)?.project_id)
 }
 
 pub fn read_project_id(project_dir: &Path) -> Result<String> {
@@ -37,15 +59,20 @@ pub fn read_project_id(project_dir: &Path) -> Result<String> {
 /// deploy` reconciles control against this, so moving a project is an edit here
 /// rather than a command.
 pub fn read_optional_domain(project_dir: &Path) -> Result<Option<String>> {
-    Ok(load(project_dir)?
-        .get("domain")
-        .and_then(|item| item.as_str())
-        .map(str::to_string))
+    Ok(read_cloud_config(project_dir)?.domain)
 }
 
-pub fn write_cloud_config(project_dir: &Path, project_id: &str, domain: &str) -> Result<()> {
+pub fn write_cloud_config(
+    project_dir: &Path,
+    project_id: &str,
+    project_name: &str,
+    zone: &str,
+    domain: &str,
+) -> Result<()> {
     let mut document = load(project_dir)?;
     document["project_id"] = value(project_id);
+    document["project_name"] = value(project_name);
+    document["zone"] = value(zone);
     document["domain"] = value(domain);
     save(project_dir, &document)
 }
@@ -53,6 +80,8 @@ pub fn write_cloud_config(project_dir: &Path, project_id: &str, domain: &str) ->
 pub fn clear_cloud_config(project_dir: &Path) -> Result<()> {
     let mut document = load(project_dir)?;
     document.remove("project_id");
+    document.remove("project_name");
+    document.remove("zone");
     document.remove("domain");
     save(project_dir, &document)
 }
@@ -74,27 +103,63 @@ mod tests {
     #[test]
     fn write_cloud_config_keeps_other_keys_and_formatting() {
         let dir = project_with("# keep me\nother = \"value\"\n\n[table]\nnested = 1\n");
-        write_cloud_config(dir.path(), "abc123", "app.example.com").unwrap();
+        write_cloud_config(
+            dir.path(),
+            "abc123",
+            "my-app",
+            "example.com",
+            "my-app.example.com",
+        )
+        .unwrap();
         assert_eq!(
             read_back(&dir),
-            "# keep me\nother = \"value\"\nproject_id = \"abc123\"\ndomain = \"app.example.com\"\n\n[table]\nnested = 1\n"
+            "# keep me\nother = \"value\"\nproject_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\n\n[table]\nnested = 1\n"
         );
     }
 
     #[test]
     fn read_optional_domain_reads_what_was_written() {
         let dir = project_with("");
-        write_cloud_config(dir.path(), "abc123", "app.example.com").unwrap();
+        write_cloud_config(
+            dir.path(),
+            "abc123",
+            "my-app",
+            "example.com",
+            "my-app.example.com",
+        )
+        .unwrap();
         assert_eq!(
             read_optional_domain(dir.path()).unwrap().as_deref(),
-            Some("app.example.com")
+            Some("my-app.example.com")
+        );
+    }
+
+    #[test]
+    fn read_cloud_config_reads_all_cloud_fields() {
+        let dir = project_with("");
+        write_cloud_config(
+            dir.path(),
+            "abc123",
+            "my-app",
+            "example.com",
+            "my-app.example.com",
+        )
+        .unwrap();
+        assert_eq!(
+            read_cloud_config(dir.path()).unwrap(),
+            CloudConfig {
+                project_id: Some("abc123".to_string()),
+                project_name: Some("my-app".to_string()),
+                zone: Some("example.com".to_string()),
+                domain: Some("my-app.example.com".to_string()),
+            }
         );
     }
 
     #[test]
     fn clear_cloud_config_keeps_other_keys_and_formatting() {
         let dir = project_with(
-            "project_id = \"abc123\"\ndomain = \"app.example.com\"\n# keep me\nother = \"value\"\n\n[table]\nnested = 1\n",
+            "project_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\n# keep me\nother = \"value\"\n\n[table]\nnested = 1\n",
         );
         clear_cloud_config(dir.path()).unwrap();
         assert_eq!(
@@ -105,7 +170,9 @@ mod tests {
 
     #[test]
     fn clear_cloud_config_drops_the_comment_attached_to_the_id() {
-        let dir = project_with("# about the id\nproject_id = \"abc123\"\nother = \"value\"\n");
+        let dir = project_with(
+            "# about the id\nproject_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\nother = \"value\"\n",
+        );
         clear_cloud_config(dir.path()).unwrap();
         assert_eq!(read_back(&dir), "other = \"value\"\n");
     }
