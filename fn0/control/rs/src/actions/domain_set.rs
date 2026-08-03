@@ -12,39 +12,29 @@ pub struct Input {
     pub domain: String,
     /// Origin certificate for `domain`, signed through the owner's own
     /// Cloudflare Origin CA by the CLI. fn0 cannot sign one: that needs a token
-    /// it deliberately never holds. Absent for a project still on the platform
-    /// account, where a Cloudflare for SaaS hostname is registered instead.
-    #[serde(default)]
-    pub certificate_pem: Option<String>,
-    #[serde(default)]
-    pub private_key_pem: Option<String>,
-    #[serde(default)]
-    pub not_after_epoch_seconds: Option<i64>,
+    /// it deliberately never holds.
+    pub certificate_pem: String,
+    pub private_key_pem: String,
+    pub not_after_epoch_seconds: i64,
 }
 
 #[derive(Serialize)]
 pub enum Output {
     Ok {
-        /// The one thing the user has to do: a proxied A record for `domain`
+        /// The one thing the user has to do: a proxied CNAME for `domain`
         /// pointing here.
-        origin_ip: String,
-        /// `false` for projects still on the platform's Cloudflare account,
-        /// where a SaaS custom hostname is registered instead.
-        needs_dns_record: bool,
+        origin_hostname: String,
+        /// The domain this replaced, when the project already had a different
+        /// one. Its certificate has been dropped.
+        replaced_domain: Option<String>,
     },
     NotLoggedIn,
     NotFound,
     InvalidDomain {
         message: String,
     },
-    CertificateFailed {
-        message: String,
-    },
     DomainTaken {
         existing_project_id: String,
-    },
-    AlreadyHasDomain {
-        current_domain: String,
     },
     InternalError,
 }
@@ -52,7 +42,6 @@ pub enum Output {
 enum Cancel {
     NotFound,
     DomainTaken { existing_project_id: String },
-    AlreadyHasDomain { current_domain: String },
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
@@ -105,7 +94,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                             manifest_version: 1,
                             project_manifests: entries,
                         })?;
-                        return trx.commit::<_, _>(());
+                        return trx.commit::<_, _>(None);
                     }
                 };
 
@@ -131,22 +120,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                         pending_code_version: None,
                         storage: None,
                     });
-                if let Some(current) = entry.custom_domain.clone()
-                    && current != domain
-                {
-                    return trx.cancel(Cancel::AlreadyHasDomain {
-                        current_domain: current,
-                    });
-                }
-                entry.custom_domain = Some(domain.clone());
+                let replaced = entry.custom_domain.replace(domain.clone());
                 handle.manifest_version += 1;
-                trx.commit::<_, _>(())
+                trx.commit::<_, _>(replaced.filter(|previous| previous != &domain))
             }
         })
         .await;
 
-    match result {
-        doc_db::TrxResult::Committed(()) => {}
+    let replaced_domain = match result {
+        doc_db::TrxResult::Committed(replaced) => replaced,
         doc_db::TrxResult::Cancelled(Cancel::NotFound) => return Output::NotFound,
         doc_db::TrxResult::Cancelled(Cancel::DomainTaken {
             existing_project_id,
@@ -155,48 +137,36 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 existing_project_id,
             };
         }
-        doc_db::TrxResult::Cancelled(Cancel::AlreadyHasDomain { current_domain }) => {
-            return Output::AlreadyHasDomain { current_domain };
-        }
         doc_db::TrxResult::Conflict(d) => {
-            tracing::error!("domain_add trx conflict: {d:?}");
+            tracing::error!("domain_set trx conflict: {d:?}");
             return Output::InternalError;
         }
         doc_db::TrxResult::Err(e) => {
-            tracing::error!("domain_add trx err: {e}");
+            tracing::error!("domain_set trx err: {e}");
             return Output::InternalError;
         }
-    }
+    };
 
     // Resolved only to refuse a project with no connected account: the worker
     // answers a custom hostname with an origin certificate signed on the
     // owner's own zone, and there is no zone to have signed one without it.
     let db = doc_db::turso();
     if let Err(e) = ProjectStorage::resolve(&db, &project_id).await {
-        tracing::error!("domain_add ProjectStorage::resolve: {e}");
+        tracing::error!("domain_set ProjectStorage::resolve: {e}");
         return Output::InternalError;
     }
 
-    let Ok(origin_ip) = std::env::var("FN0_WORKER_ORIGIN_IP") else {
-        tracing::error!("domain_add: FN0_WORKER_ORIGIN_IP not set");
+    let Ok(origin_hostname) = std::env::var("FN0_WORKER_ORIGIN_HOSTNAME") else {
+        tracing::error!("domain_set: FN0_WORKER_ORIGIN_HOSTNAME not set");
         return Output::InternalError;
     };
 
-    let (Some(certificate_pem), Some(private_key_pem), Some(not_after_epoch_seconds)) = (
-        req.body.certificate_pem.clone(),
-        req.body.private_key_pem.clone(),
-        req.body.not_after_epoch_seconds,
-    ) else {
-        return Output::CertificateFailed {
-            message: "this project runs on your own Cloudflare account, so the origin \
-                      certificate has to be issued by the CLI; upgrade the CLI and retry"
-                .to_string(),
-        };
-    };
-    let key_ciphertext = match crate::common::vault::encrypt(private_key_pem.as_bytes()).await {
+    let key_ciphertext = match crate::common::vault::encrypt(req.body.private_key_pem.as_bytes())
+        .await
+    {
         Ok(ciphertext) => ciphertext,
         Err(e) => {
-            tracing::error!("domain_add key encrypt: {e}");
+            tracing::error!("domain_set key encrypt: {e}");
             return Output::InternalError;
         }
     };
@@ -206,20 +176,30 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         &domain,
         WorkerHostnameCert {
             project_id: project_id.clone(),
-            cert_pem: certificate_pem,
+            cert_pem: req.body.certificate_pem.clone(),
             key_ciphertext,
-            not_after_epoch_seconds,
+            not_after_epoch_seconds: req.body.not_after_epoch_seconds,
         },
     )
     .await
     {
-        tracing::error!("domain_add cert manifest: {e}");
+        tracing::error!("domain_set cert manifest: {e}");
+        return Output::InternalError;
+    }
+
+    // The replaced certificate is dropped but not revoked: revocation is the
+    // user's call on their own zone, and a certificate no worker serves is
+    // already unreachable.
+    if let Some(replaced) = replaced_domain.as_deref()
+        && let Err(e) = cert_manifest::remove(&db, replaced).await
+    {
+        tracing::error!("domain_set cert manifest remove {replaced}: {e}");
         return Output::InternalError;
     }
 
     Output::Ok {
-        origin_ip,
-        needs_dns_record: true,
+        origin_hostname,
+        replaced_domain,
     }
 }
 

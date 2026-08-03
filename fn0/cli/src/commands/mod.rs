@@ -2,7 +2,6 @@ pub mod admin;
 pub mod build;
 pub mod deploy;
 pub mod destroy;
-pub mod domain;
 pub mod env;
 pub mod init;
 pub mod local;

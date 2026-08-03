@@ -87,6 +87,107 @@ pub fn rendered_html_cache_bucket_name(project_id: &str) -> String {
     format!("fn0-{project_id}-rendered-html-cache")
 }
 
+/// A zone the setup token can reach, and the account that owns it.
+pub struct ReachableZone {
+    pub zone_id: String,
+    pub zone_name: String,
+    pub account_id: String,
+    pub account_name: String,
+}
+
+/// Reads which zones a token can reach, so nobody has to copy a hex id out of
+/// the dashboard. Separate from [`Provisioner`], which cannot be built until an
+/// account and a zone have been picked — which is what this is for.
+pub struct ZoneDiscovery {
+    client: reqwest::Client,
+    setup_token: String,
+}
+
+impl ZoneDiscovery {
+    pub fn new(setup_token: String) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            setup_token,
+        }
+    }
+
+    /// `GET /zones` carries the owning account on every zone, so one call
+    /// settles both ids.
+    ///
+    /// A setup token carries only `API Tokens -> Edit` and cannot read zones,
+    /// so `mint_reader` has it mint one that can and revokes it afterwards. The
+    /// minted policy scopes `com.cloudflare.api.account.*` — a wildcard the
+    /// tokens API accepts, and the only form available here, since the account
+    /// id is the thing being discovered. Measured against the live API.
+    pub async fn list(&self, mint_reader: bool) -> Result<Vec<ReachableZone>> {
+        if !mint_reader {
+            return self.zones(&self.setup_token).await;
+        }
+        let expires_on = (chrono::Utc::now()
+            + chrono::Duration::minutes(PROVISIONING_TOKEN_MINUTES))
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+        let reader = mint_token(
+            &self.client,
+            &self.setup_token,
+            "fn0 setup (zone discovery)",
+            vec![serde_json::json!({
+                "effect": "allow",
+                "resources": { "com.cloudflare.api.account.*": "*" },
+                "permission_groups": [{ "id": ZONE_READ }],
+            })],
+            Some(expires_on),
+        )
+        .await?;
+        let result = self.zones(&reader.value).await;
+        if let Err(error) = revoke_token(&self.client, &self.setup_token, &reader.id).await {
+            eprintln!(
+                "warning: could not revoke the zone discovery token: {error}. It expires by \
+                 itself within {PROVISIONING_TOKEN_MINUTES} minutes."
+            );
+        }
+        result
+    }
+
+    async fn zones(&self, token: &str) -> Result<Vec<ReachableZone>> {
+        #[derive(Deserialize)]
+        struct Zone {
+            id: String,
+            name: String,
+            account: Account,
+        }
+        #[derive(Deserialize)]
+        struct Account {
+            id: String,
+            #[serde(default)]
+            name: String,
+        }
+        let (status, envelope) = call::<Vec<Zone>>(
+            &self.client,
+            token,
+            reqwest::Method::GET,
+            "/zones?per_page=200",
+            None,
+        )
+        .await?;
+        let zones = envelope.result.filter(|_| envelope.success).ok_or_else(|| {
+            anyhow!(
+                "could not list your zones ({status}). The token needs Zone -> Zone -> Read. {}",
+                describe(&envelope.errors)
+            )
+        })?;
+        Ok(zones
+            .into_iter()
+            .map(|zone| ReachableZone {
+                zone_id: zone.id,
+                zone_name: zone.name,
+                account_id: zone.account.id,
+                account_name: zone.account.name,
+            })
+            .collect())
+    }
+}
+
 pub struct Provisioner {
     client: reqwest::Client,
     /// The user's setup token. Used only to mint and revoke; never to
@@ -161,6 +262,82 @@ struct ApiError {
     message: String,
 }
 
+async fn mint_token(
+    client: &reqwest::Client,
+    setup_token: &str,
+    name: &str,
+    policies: Vec<serde_json::Value>,
+    expires_on: Option<String>,
+) -> Result<TemporaryToken> {
+    #[derive(Deserialize)]
+    struct Minted {
+        id: String,
+        value: String,
+    }
+    let (status, envelope) = call::<Minted>(
+        client,
+        setup_token,
+        reqwest::Method::POST,
+        "/user/tokens",
+        Some(match expires_on {
+            Some(expires_on) => serde_json::json!({
+                "name": name, "policies": policies, "expires_on": expires_on,
+            }),
+            None => serde_json::json!({ "name": name, "policies": policies }),
+        }),
+    )
+    .await?;
+    let minted = envelope.result.filter(|_| envelope.success).ok_or_else(|| {
+        anyhow!(
+            "could not mint the {name} token ({status}). The token needs User -> API Tokens -> Edit. {}",
+            describe(&envelope.errors)
+        )
+    })?;
+    Ok(TemporaryToken {
+        id: minted.id,
+        value: minted.value,
+    })
+}
+
+async fn revoke_token(client: &reqwest::Client, setup_token: &str, id: &str) -> Result<()> {
+    let (status, envelope) = call::<serde_json::Value>(
+        client,
+        setup_token,
+        reqwest::Method::DELETE,
+        &format!("/user/tokens/{id}"),
+        None,
+    )
+    .await?;
+    if envelope.success {
+        return Ok(());
+    }
+    Err(anyhow!(
+        "could not revoke token {id} ({status}): {}",
+        describe(&envelope.errors)
+    ))
+}
+
+async fn call<T: serde::de::DeserializeOwned>(
+    client: &reqwest::Client,
+    token: &str,
+    method: reqwest::Method,
+    path: &str,
+    body: Option<serde_json::Value>,
+) -> Result<(reqwest::StatusCode, Envelope<T>)> {
+    let mut request = client
+        .request(method, format!("{API_BASE}{path}"))
+        .bearer_auth(token);
+    if let Some(body) = body {
+        request = request.json(&body);
+    }
+    let response = request.send().await?;
+    let status = response.status();
+    let text = response.text().await?;
+    let envelope: Envelope<T> =
+        serde_json::from_str(&text).with_context(|| format!("{path} returned {status}: {text}"))?;
+    Ok((status, envelope))
+}
+
 fn describe(errors: &[ApiError]) -> String {
     if errors.is_empty() {
         return "no detail".to_string();
@@ -189,19 +366,7 @@ impl Provisioner {
         path: &str,
         body: Option<serde_json::Value>,
     ) -> Result<(reqwest::StatusCode, Envelope<T>)> {
-        let mut request = self
-            .client
-            .request(method, format!("{API_BASE}{path}"))
-            .bearer_auth(token);
-        if let Some(body) = body {
-            request = request.json(&body);
-        }
-        let response = request.send().await?;
-        let status = response.status();
-        let text = response.text().await?;
-        let envelope: Envelope<T> = serde_json::from_str(&text)
-            .with_context(|| format!("{path} returned {status}: {text}"))?;
-        Ok((status, envelope))
+        call(&self.client, token, method, path, body).await
     }
 
     /// Confirms the token works and returns its id, which is also the S3 access
@@ -278,26 +443,36 @@ impl Provisioner {
         ))
     }
 
-    async fn put_cors(&self, token: &str, bucket: &str) -> Result<()> {
-        let (status, envelope) = self
-            .call::<serde_json::Value>(
-                token,
+    /// Bounds who may read these objects from a browser to the one origin the
+    /// project answers on. `None` removes the configuration entirely, which is
+    /// how "no origin may read this" has to be spelled: R2 rejects both an
+    /// empty `origins` and an empty `rules` with `10001`, measured against the
+    /// live API.
+    async fn put_cors(&self, token: &str, bucket: &str, app_origin: Option<&str>) -> Result<()> {
+        let path = format!("/accounts/{}/r2/buckets/{bucket}/cors", self.account_id);
+        let (method, body) = match app_origin {
+            Some(origin) => (
                 reqwest::Method::PUT,
-                &format!("/accounts/{}/r2/buckets/{bucket}/cors", self.account_id),
                 Some(serde_json::json!({
                     "rules": [{
                         "allowed": {
                             "methods": ["GET", "PUT", "HEAD"],
-                            "origins": ["*"],
+                            "origins": [origin],
                             "headers": ["*"],
                         },
                         "exposeHeaders": ["ETag"],
                         "maxAgeSeconds": 86400,
                     }],
                 })),
-            )
+            ),
+            None => (reqwest::Method::DELETE, None),
+        };
+        let (status, envelope) = self
+            .call::<serde_json::Value>(token, method, &path, body)
             .await?;
-        if envelope.success {
+        // Deleting a configuration that was never written is the state asked
+        // for, not a failure.
+        if envelope.success || (app_origin.is_none() && cors_absent(&envelope.errors)) {
             return Ok(());
         }
         Err(anyhow!(
@@ -463,12 +638,11 @@ impl Provisioner {
     /// Drops the `Vary: Origin` R2 attaches to every CORS response on these
     /// hostnames.
     ///
-    /// The buckets allow `*`, so the CORS answer is the same whoever asks and
-    /// the header carries no information. What it does do is give Cloudflare a
-    /// separate cache entry per requesting origin, and purge by URL clears only
-    /// the entry for a request that sent no `Origin` at all. A browser sends
-    /// one, so every purge left the copy browsers actually read untouched —
-    /// for the `s-maxage` of a year that fn0 stores on public objects.
+    /// The header gives Cloudflare a separate cache entry per requesting
+    /// origin, and purge by URL clears only the entry for a request that sent
+    /// no `Origin` at all. A browser sends one, so every purge left the copy
+    /// browsers actually read untouched — for the `s-maxage` of a year that fn0
+    /// stores on public objects.
     ///
     /// Response header rules all run, in order, so this one goes last: a zone
     /// rule that adds `Vary` back has to be overridden, not overridden by.
@@ -540,30 +714,8 @@ impl Provisioner {
         policies: Vec<serde_json::Value>,
         expires_on: Option<String>,
     ) -> Result<(String, String)> {
-        #[derive(Deserialize)]
-        struct Minted {
-            id: String,
-            value: String,
-        }
-        let (status, envelope) = self
-            .call::<Minted>(
-                &self.setup_token,
-                reqwest::Method::POST,
-                "/user/tokens",
-                Some(match expires_on {
-                    Some(expires_on) => serde_json::json!({
-                        "name": name, "policies": policies, "expires_on": expires_on,
-                    }),
-                    None => serde_json::json!({ "name": name, "policies": policies }),
-                }),
-            )
-            .await?;
-        let minted = envelope.result.filter(|_| envelope.success).ok_or_else(|| {
-            anyhow!(
-                "could not mint the {name} token ({status}). The token needs User -> API Tokens -> Edit. {}",
-                describe(&envelope.errors)
-            )
-        })?;
+        let minted =
+            mint_token(&self.client, &self.setup_token, name, policies, expires_on).await?;
         Ok((minted.id, minted.value))
     }
 
@@ -601,21 +753,9 @@ impl Provisioner {
     }
 
     async fn revoke_token(&self, purpose: &str, id: &str) -> Result<()> {
-        let (status, envelope) = self
-            .call::<serde_json::Value>(
-                &self.setup_token,
-                reqwest::Method::DELETE,
-                &format!("/user/tokens/{id}"),
-                None,
-            )
-            .await?;
-        if envelope.success {
-            return Ok(());
-        }
-        Err(anyhow!(
-            "could not revoke the {purpose} token {id} ({status}): {}",
-            describe(&envelope.errors)
-        ))
+        revoke_token(&self.client, &self.setup_token, id)
+            .await
+            .with_context(|| format!("the {purpose} token"))
     }
 
     /// The convenient path: one `API Tokens -> Edit` token, everything else
@@ -623,6 +763,7 @@ impl Provisioner {
     pub async fn run_managed(
         &self,
         project_id: &str,
+        app_origin: &str,
     ) -> Result<(
         ProvisionedResources,
         ConnectCredentials,
@@ -631,7 +772,9 @@ impl Provisioner {
         self.verify().await?;
         let provisioning = self.mint_provisioning_token(project_id).await?;
         let result = async {
-            let resources = self.provision(&provisioning.value, project_id).await?;
+            let resources = self
+                .provision(&provisioning.value, project_id, app_origin)
+                .await?;
             let (credentials, minted) = self.mint_credentials(project_id, &resources).await?;
             Ok((resources, credentials, minted))
         }
@@ -650,12 +793,22 @@ impl Provisioner {
     /// The careful path: provision with the token as given, mint nothing. The
     /// caller's token is expected to be unable to create tokens, which is the
     /// whole reason to choose this.
-    pub async fn run_manual(&self, project_id: &str) -> Result<ProvisionedResources> {
+    pub async fn run_manual(
+        &self,
+        project_id: &str,
+        app_origin: &str,
+    ) -> Result<ProvisionedResources> {
         self.verify().await?;
-        self.provision(&self.setup_token, project_id).await
+        self.provision(&self.setup_token, project_id, app_origin)
+            .await
     }
 
-    async fn provision(&self, token: &str, project_id: &str) -> Result<ProvisionedResources> {
+    async fn provision(
+        &self,
+        token: &str,
+        project_id: &str,
+        app_origin: &str,
+    ) -> Result<ProvisionedResources> {
         let zone_name = self.zone_name(token).await?;
 
         let private_object_storage_bucket = private_object_storage_bucket_name(project_id);
@@ -678,7 +831,7 @@ impl Provisioner {
             &public_object_storage_bucket,
             &frontend_asset_bucket,
         ] {
-            self.put_cors(token, bucket).await?;
+            self.put_cors(token, bucket, Some(app_origin)).await?;
         }
         self.attach_custom_domain(token, &frontend_asset_bucket, &frontend_asset_hostname)
             .await?;
@@ -825,6 +978,45 @@ impl Provisioner {
         result
     }
 
+    /// Repoints the buckets' CORS at a domain the project has moved to.
+    /// Provisioning writes the same rules for the domain the project starts
+    /// with; this is how they follow it afterwards.
+    pub async fn put_app_cors(
+        &self,
+        project_id: &str,
+        app_origin: &str,
+        mint_writing_token: bool,
+    ) -> Result<()> {
+        let buckets = [
+            private_object_storage_bucket_name(project_id),
+            public_object_storage_bucket_name(project_id),
+            frontend_asset_bucket_name(project_id),
+        ];
+        if !mint_writing_token {
+            for bucket in &buckets {
+                self.put_cors(&self.setup_token, bucket, Some(app_origin))
+                    .await?;
+            }
+            return Ok(());
+        }
+        let writing = self.mint_provisioning_token(app_origin).await?;
+        let result = async {
+            for bucket in &buckets {
+                self.put_cors(&writing.value, bucket, Some(app_origin))
+                    .await?;
+            }
+            Ok(())
+        }
+        .await;
+        if let Err(error) = self.revoke_token("CORS", &writing.id).await {
+            eprintln!(
+                "warning: {error}. It expires by itself within \
+                 {PROVISIONING_TOKEN_MINUTES} minutes."
+            );
+        }
+        result
+    }
+
     async fn sign_origin_certificate(
         &self,
         token: &str,
@@ -906,6 +1098,11 @@ fn hex_sha256(value: &str) -> String {
 /// hostname is attached to a *different* bucket, which is a failure to report
 /// rather than a step to skip. Treating it as success ends in a hostname that
 /// resolves and serves 404 for every object.
+/// `10059 The CORS configuration does not exist.`, measured.
+fn cors_absent(errors: &[ApiError]) -> bool {
+    errors.iter().any(|error| error.code == 10059)
+}
+
 fn already_exists(errors: &[ApiError]) -> bool {
     errors.iter().any(|error| {
         let message = error.message.to_lowercase();

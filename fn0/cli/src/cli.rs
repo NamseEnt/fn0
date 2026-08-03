@@ -44,10 +44,6 @@ pub enum Commands {
         #[command(subcommand)]
         command: AdminCommands,
     },
-    Domain {
-        #[command(subcommand)]
-        command: DomainCommands,
-    },
     Env {
         #[command(subcommand)]
         command: EnvCommands,
@@ -66,13 +62,6 @@ pub enum EnvCommands {
     Unset {
         key: String,
     },
-}
-
-#[derive(Subcommand)]
-pub enum DomainCommands {
-    Add { domain: String },
-    Remove,
-    Status,
 }
 
 #[derive(Subcommand)]

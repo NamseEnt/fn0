@@ -43,11 +43,11 @@ pub async fn resolve_app_url(project_id: &str) -> Result<ResolvedAppUrl> {
             note: None,
         },
         Ok(DomainStatus::SelfHosted { domain, .. }) => ResolvedAppUrl::unresolved(format!(
-            "'{domain}' has no origin certificate yet; run `forte domain add {domain}`"
+            "'{domain}' has no origin certificate yet; run `forte cloud init`"
         )),
-        Ok(DomainStatus::NotConfigured) => ResolvedAppUrl::unresolved(
-            "no domain is attached; run `forte domain add <hostname>`".to_string(),
-        ),
+        Ok(DomainStatus::NotConfigured) => {
+            ResolvedAppUrl::unresolved("no domain is attached; run `forte cloud init`".to_string())
+        }
         Ok(DomainStatus::NotLoggedIn) => ResolvedAppUrl::unresolved(
             "control rejected the saved token; run `forte login` again".to_string(),
         ),
@@ -57,8 +57,8 @@ pub async fn resolve_app_url(project_id: &str) -> Result<ResolvedAppUrl> {
         Ok(DomainStatus::InternalError) => {
             ResolvedAppUrl::unresolved("control failed to report the domain".to_string())
         }
-        Err(e) => ResolvedAppUrl::unresolved(format!(
-            "could not reach control to check the domain: {e}"
-        )),
+        Err(e) => {
+            ResolvedAppUrl::unresolved(format!("could not reach control to check the domain: {e}"))
+        }
     })
 }

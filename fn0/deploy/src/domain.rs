@@ -1,186 +1,137 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
+use crate::cloudflare::CloudSetup;
 use crate::cloudflare_provision::Provisioner;
 
 #[derive(Serialize)]
-struct DomainAddInput<'a> {
+struct DomainSetInput<'a> {
     project_id: &'a str,
     domain: &'a str,
-    certificate_pem: Option<&'a str>,
-    private_key_pem: Option<&'a str>,
-    not_after_epoch_seconds: Option<i64>,
+    certificate_pem: &'a str,
+    private_key_pem: &'a str,
+    not_after_epoch_seconds: i64,
 }
 
 #[derive(Deserialize)]
 #[serde(tag = "t", rename_all_fields = "camelCase")]
-enum DomainAdd {
+enum DomainSet {
     Ok {
         origin_hostname: String,
-        needs_dns_record: bool,
+        replaced_domain: Option<String>,
     },
     NotLoggedIn,
     NotFound,
     InvalidDomain {
         message: String,
     },
-    CertificateFailed {
-        message: String,
-    },
     DomainTaken {
         existing_project_id: String,
-    },
-    AlreadyHasDomain {
-        current_domain: String,
     },
     InternalError,
 }
 
-/// Attaching a domain to a project on the owner's own Cloudflare account needs
-/// an origin certificate, and only a token with `SSL and Certificates -> Edit`
-/// can sign one. fn0 does not hold such a token by design, so the CLI signs the
-/// certificate here and uploads it. `account_id`/`zone_id`/`api_token` are the
-/// same ones used for `cloudflare connect`.
-pub struct OriginCertificateRequest<'a> {
-    pub account_id: &'a str,
-    pub zone_id: &'a str,
-    pub api_token: &'a str,
-    /// `true` when the token can only create tokens, so a signing token has to
-    /// be minted from it; `false` when it can sign directly.
-    pub mint_signing_token: bool,
+/// What the caller has to tell the user once the domain is registered.
+pub struct DomainOutcome {
+    /// The proxied CNAME target for the domain. Until that record exists, the
+    /// hostname resolves nowhere.
+    pub origin_hostname: String,
+    pub replaced_domain: Option<String>,
 }
 
-pub async fn domain_add(
-    project_id: &str,
-    domain: &str,
-    certificate: Option<OriginCertificateRequest<'_>>,
-) -> Result<()> {
+/// Points a project at a domain, replacing whatever it answered on before.
+///
+/// The origin certificate is signed here rather than by fn0: only a token with
+/// `SSL and Certificates -> Edit` can sign one, and fn0 holds no such token by
+/// design.
+///
+/// The CORS allowlist on the project's buckets is the app's own origin, so it
+/// is rewritten every time, even when the domain has not changed. Provisioning
+/// already wrote it for the domain a project is set up with, so the first write
+/// is redundant — but making it unconditional is what leaves a way to repair an
+/// allowlist that drifted, and re-running with an unchanged domain is how a
+/// user would expect to do that.
+pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
+    println!(
+        "signing an origin certificate for {} (this runs locally)...",
+        setup.domain
+    );
+    let issued = provisioner(setup)
+        .issue_origin_certificate(setup.domain, setup.mint_from_setup_token)
+        .await?;
+
     let creds = crate::credentials::require()?;
-
-    let issued = match certificate {
-        Some(request) => {
-            println!("signing an origin certificate for {domain} (this runs locally)...");
-            Some(
-                Provisioner::new(
-                    request.api_token.to_string(),
-                    request.account_id.to_string(),
-                    request.zone_id.to_string(),
-                )
-                .issue_origin_certificate(domain, request.mint_signing_token)
-                .await?,
-            )
-        }
-        None => None,
-    };
-
-    let client = reqwest::Client::new();
     let url = format!(
-        "{}/__forte_action/domain_add",
+        "{}/__forte_action/domain_set",
         creds.control_url.trim_end_matches('/')
     );
-    let resp = client
+    let project_id = setup.project_id;
+    let domain = setup.domain;
+    let response: DomainSet = reqwest::Client::new()
         .post(&url)
         .bearer_auth(&creds.token)
-        .json(&DomainAddInput {
+        .json(&DomainSetInput {
             project_id,
             domain,
-            certificate_pem: issued.as_ref().map(|i| i.certificate_pem.as_str()),
-            private_key_pem: issued.as_ref().map(|i| i.private_key_pem.as_str()),
-            not_after_epoch_seconds: issued.as_ref().map(|i| i.not_after_epoch_seconds),
+            certificate_pem: &issued.certificate_pem,
+            private_key_pem: &issued.private_key_pem,
+            not_after_epoch_seconds: issued.not_after_epoch_seconds,
         })
         .send()
         .await?
-        .error_for_status()?;
-    let raw: DomainAdd = resp.json().await?;
-    match raw {
-        DomainAdd::Ok {
+        .error_for_status()?
+        .json()
+        .await?;
+
+    let (origin_hostname, replaced_domain) = match response {
+        DomainSet::Ok {
             origin_hostname,
-            needs_dns_record,
-        } => {
-            println!("domain '{domain}' attached to project '{project_id}'");
-            if needs_dns_record {
-                println!();
-                println!("add this record in your Cloudflare dashboard, then you are done:");
-                println!("    CNAME   {domain}   {origin_hostname}   (proxied / orange cloud)");
-                println!();
-                println!(
-                    "it must stay proxied: the origin certificate is trusted by Cloudflare's \
-                     edge only, so turning the record grey breaks the hostname."
-                );
-            } else {
-                println!(
-                    "Cloudflare hostname registration is queued; run `forte domain status` to check."
-                );
-            }
-            Ok(())
+            replaced_domain,
+        } => (origin_hostname, replaced_domain),
+        DomainSet::NotLoggedIn => {
+            return Err(anyhow!("control rejected token; sign in again."));
         }
-        DomainAdd::CertificateFailed { message } => Err(anyhow!("{message}")),
-        DomainAdd::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        DomainAdd::NotFound => Err(anyhow!(
-            "project '{project_id}' not found or not owned by you."
-        )),
-        DomainAdd::InvalidDomain { message } => Err(anyhow!("invalid domain: {message}")),
-        DomainAdd::DomainTaken {
+        DomainSet::NotFound => {
+            return Err(anyhow!(
+                "project '{project_id}' not found or not owned by you."
+            ));
+        }
+        DomainSet::InvalidDomain { message } => {
+            return Err(anyhow!("invalid domain: {message}"));
+        }
+        DomainSet::DomainTaken {
             existing_project_id,
-        } => Err(anyhow!(
-            "domain '{domain}' already in use by project '{existing_project_id}'"
-        )),
-        DomainAdd::AlreadyHasDomain { current_domain } => Err(anyhow!(
-            "project '{project_id}' already has domain '{current_domain}'; remove it first"
-        )),
-        DomainAdd::InternalError => {
-            Err(anyhow!("domain_add: server error; check fn0-control logs"))
+        } => {
+            return Err(anyhow!(
+                "domain '{domain}' is already in use by project '{existing_project_id}'"
+            ));
         }
-    }
+        DomainSet::InternalError => {
+            return Err(anyhow!("domain_set: server error; check fn0-control logs"));
+        }
+    };
+
+    provisioner(setup)
+        .put_app_cors(project_id, &setup.app_origin(), setup.mint_from_setup_token)
+        .await?;
+
+    Ok(DomainOutcome {
+        origin_hostname,
+        replaced_domain,
+    })
+}
+
+fn provisioner(setup: &CloudSetup<'_>) -> Provisioner {
+    Provisioner::new(
+        setup.api_token.to_string(),
+        setup.account_id.to_string(),
+        setup.zone_id.to_string(),
+    )
 }
 
 #[derive(Serialize)]
 struct DomainProjectInput<'a> {
     project_id: &'a str,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "t", rename_all_fields = "camelCase")]
-enum DomainRemove {
-    Ok { removed_domain: String },
-    NotLoggedIn,
-    NotFound,
-    NoDomain,
-    InternalError,
-}
-
-pub async fn domain_remove(project_id: &str) -> Result<()> {
-    let creds = crate::credentials::require()?;
-    let client = reqwest::Client::new();
-    let url = format!(
-        "{}/__forte_action/domain_remove",
-        creds.control_url.trim_end_matches('/')
-    );
-    let resp = client
-        .post(&url)
-        .bearer_auth(&creds.token)
-        .json(&DomainProjectInput { project_id })
-        .send()
-        .await?
-        .error_for_status()?;
-    let raw: DomainRemove = resp.json().await?;
-    match raw {
-        DomainRemove::Ok { removed_domain } => {
-            println!("domain '{removed_domain}' detached from project '{project_id}'");
-            println!("Cloudflare hostname removal is queued.");
-            Ok(())
-        }
-        DomainRemove::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        DomainRemove::NotFound => Err(anyhow!(
-            "project '{project_id}' not found or not owned by you."
-        )),
-        DomainRemove::NoDomain => Err(anyhow!(
-            "no custom domain attached to project '{project_id}'."
-        )),
-        DomainRemove::InternalError => Err(anyhow!(
-            "domain_remove: server error; check fn0-control logs"
-        )),
-    }
 }
 
 #[derive(Deserialize)]
@@ -205,12 +156,11 @@ pub async fn fetch_domain_status(
     creds: &crate::credentials::Credentials,
     project_id: &str,
 ) -> Result<DomainStatus> {
-    let client = reqwest::Client::new();
     let url = format!(
         "{}/__forte_action/domain_status",
         creds.control_url.trim_end_matches('/')
     );
-    let resp = client
+    let resp = reqwest::Client::new()
         .post(&url)
         .bearer_auth(&creds.token)
         .json(&DomainProjectInput { project_id })
@@ -219,49 +169,3 @@ pub async fn fetch_domain_status(
         .error_for_status()?;
     Ok(resp.json().await?)
 }
-
-pub async fn domain_status(project_id: &str) -> Result<()> {
-    let creds = crate::credentials::require()?;
-    match fetch_domain_status(&creds, project_id).await? {
-        DomainStatus::NotConfigured => {
-            println!("project '{project_id}' has no custom domain configured.");
-            Ok(())
-        }
-        DomainStatus::SelfHosted {
-            domain,
-            origin_certificate_ready,
-            origin_certificate_expires_epoch_seconds,
-            origin_hostname,
-        } => {
-            println!("project '{project_id}' custom domain: {domain}");
-            println!("served from your own Cloudflare account.");
-            if origin_certificate_ready {
-                match origin_certificate_expires_epoch_seconds
-                    .and_then(|seconds| chrono::DateTime::from_timestamp(seconds, 0))
-                {
-                    Some(expires) => println!(
-                        "origin certificate: held by fn0, expires {}",
-                        expires.format("%Y-%m-%d")
-                    ),
-                    None => println!("origin certificate: held by fn0"),
-                }
-            } else {
-                println!(
-                    "origin certificate: missing — run `forte domain add {domain}` to issue one."
-                );
-            }
-            if !origin_hostname.is_empty() {
-                println!("point a proxied CNAME at {origin_hostname}.");
-            }
-            Ok(())
-        }
-        DomainStatus::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
-        DomainStatus::NotFound => Err(anyhow!(
-            "project '{project_id}' not found or not owned by you."
-        )),
-        DomainStatus::InternalError => Err(anyhow!(
-            "domain_status: server error; check fn0-control logs"
-        )),
-    }
-}
-

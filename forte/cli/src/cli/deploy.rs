@@ -1,13 +1,12 @@
 use anyhow::{Result, anyhow};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::build::{BuildOptions, run_build};
 use super::cron;
-use super::project_config::{read_optional_project_id, write_project_id};
+use super::project_config::{read_optional_domain, read_optional_project_id};
+use fn0_deploy::{CloudflareConnection, DomainStatus};
 
-pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
-    let existing_project_id = read_optional_project_id(&project_dir)?;
-
+pub async fn run(project_dir: PathBuf) -> Result<()> {
     let creds = fn0_deploy::credentials::load()?.ok_or_else(|| {
         anyhow!(
             "not signed in. Run `forte login` first (credentials at {}).",
@@ -16,29 +15,25 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
                 .unwrap_or_default()
         )
     })?;
-    let client = reqwest::Client::new();
 
-    let project_id = match existing_project_id {
-        Some(id) => id,
-        None => {
-            let project_name = match name_arg {
-                Some(n) => n,
-                None => prompt_project_name()?,
-            };
-            let mut maybe = None;
-            let id = fn0_deploy::ensure_project_id(
-                &client,
-                &creds.control_url,
-                &creds.token,
-                &project_name,
-                &mut maybe,
-            )
-            .await?;
-            write_project_id(&project_dir, &id)?;
-            println!("Saved project_id to Forte.toml");
-            id
+    let project_id = read_optional_project_id(&project_dir)?.ok_or_else(|| {
+        anyhow!("this project has not been set up yet. Run `forte cloud init` first.")
+    })?;
+    match fn0_deploy::fetch_cloudflare_connection(&project_id).await? {
+        CloudflareConnection::Connected { .. } => {}
+        CloudflareConnection::NotConnected => {
+            return Err(anyhow!(
+                "project '{project_id}' has no Cloudflare account behind it, so there is nowhere \
+                 to put its bundle or its assets. Run `forte cloud init`."
+            ));
         }
-    };
+        CloudflareConnection::NotFound => {
+            return Err(anyhow!(
+                "project '{project_id}' not found or not owned by you."
+            ));
+        }
+    }
+    check_domain_matches(&creds, &project_id, &project_dir).await?;
 
     let code_version: u64 = chrono::Utc::now()
         .timestamp_millis()
@@ -91,13 +86,31 @@ pub async fn run(project_dir: PathBuf, name_arg: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn prompt_project_name() -> Result<String> {
-    let name = inquire::Text::new("Project name:")
-        .with_help_message("Used as a display label in the control plane.")
-        .prompt()?;
-    let trimmed = name.trim().to_string();
-    if trimmed.is_empty() {
-        return Err(anyhow!("project name cannot be empty"));
+/// Forte.toml declares the domain; control decides it. They only drift if the
+/// file was hand-edited, and deploying past that would silently ship to the old
+/// hostname. Changing a domain means signing a certificate, which needs a
+/// Cloudflare token this command deliberately never asks for.
+async fn check_domain_matches(
+    creds: &fn0_deploy::credentials::Credentials,
+    project_id: &str,
+    project_dir: &Path,
+) -> Result<()> {
+    let Some(declared) = read_optional_domain(project_dir)? else {
+        return Ok(());
+    };
+    let live = match fn0_deploy::fetch_domain_status(creds, project_id).await? {
+        DomainStatus::SelfHosted { domain, .. } => Some(domain),
+        _ => None,
+    };
+    match live {
+        Some(live) if live == declared => Ok(()),
+        Some(live) => Err(anyhow!(
+            "Forte.toml says the domain is '{declared}', but project '{project_id}' answers on \
+             '{live}'. Run `forte cloud init` to move it."
+        )),
+        None => Err(anyhow!(
+            "Forte.toml says the domain is '{declared}', but project '{project_id}' has none. \
+             Run `forte cloud init`."
+        )),
     }
-    Ok(trimmed)
 }

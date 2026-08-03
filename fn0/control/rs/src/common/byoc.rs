@@ -57,7 +57,7 @@ impl ProjectStorage {
             Some(storage) => Ok(storage),
             None => anyhow::bail!(
                 "project {project_id} has no Cloudflare account connected; \
-                 run `forte cloudflare connect`"
+                 run `forte cloud init`"
             ),
         }
     }

@@ -3,6 +3,10 @@
 //! The account-wide token is used here and only here. It provisions the
 //! account, mints two narrow credentials, and goes out of scope; fn0 receives
 //! the narrow credentials and never the token that made them.
+//!
+//! Everything in this module is a step of `forte cloud init`. The command owns
+//! the prompting and the printing; these functions own the Cloudflare calls, so
+//! the CLI never handles a token or decides what to mint.
 
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -12,6 +16,35 @@ use crate::cloudflare_provision::{
     private_object_storage_bucket_name, public_object_storage_bucket_name,
     rendered_html_cache_bucket_name,
 };
+
+/// What the user chose and typed, carried between the steps of one setup.
+pub struct CloudSetup<'a> {
+    pub project_id: &'a str,
+    pub account_id: &'a str,
+    pub zone_id: &'a str,
+    /// Discarded when the command exits. fn0 never receives it.
+    pub api_token: &'a str,
+    /// `true` when the token carries only `API Tokens -> Edit`, so every
+    /// privileged call has to be made through a token minted from it.
+    pub mint_from_setup_token: bool,
+    pub domain: &'a str,
+}
+
+impl CloudSetup<'_> {
+    /// The one origin the project's own pages are served from, and so the only
+    /// origin allowed to read its buckets from a browser.
+    pub fn app_origin(&self) -> String {
+        format!("https://{}", self.domain)
+    }
+
+    fn provisioner(&self) -> Provisioner {
+        Provisioner::new(
+            self.api_token.to_string(),
+            self.account_id.to_string(),
+            self.zone_id.to_string(),
+        )
+    }
+}
 
 #[derive(Serialize)]
 struct ConnectInput<'a> {
@@ -50,25 +83,16 @@ enum Connect {
     },
 }
 
-/// One `API Tokens -> Edit` token; the CLI provisions and mints from it.
-pub async fn cloudflare_connect_managed(
-    project_id: &str,
-    account_id: &str,
-    zone_id: &str,
-    api_token: &str,
-) -> Result<()> {
-    println!("provisioning your Cloudflare account (this runs locally)...");
-    let provisioner = Provisioner::new(
-        api_token.to_string(),
-        account_id.to_string(),
-        zone_id.to_string(),
-    );
-    let (resources, credentials, minted) = provisioner.run_managed(project_id).await?;
-    print_resources(&resources);
-    println!("  minted two bucket-scoped R2 tokens and a purge-only token");
+/// The convenient path: one `API Tokens -> Edit` token. Provisions the account,
+/// mints the three credentials fn0 keeps, and hands them over.
+pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<ProvisionedResources> {
+    let provisioner = setup.provisioner();
+    let (resources, credentials, minted) = provisioner
+        .run_managed(setup.project_id, &setup.app_origin())
+        .await?;
 
-    match send_connect(project_id, account_id, zone_id, &resources, &credentials).await {
-        Ok(()) => Ok(()),
+    match send_connect(setup, &resources, &credentials).await {
+        Ok(()) => Ok(resources),
         // fn0 answered, and its answer proves it stored nothing. These two
         // credentials never expire, so leaving them would hand the account a
         // live R2 read-write pair for every failed attempt.
@@ -91,80 +115,36 @@ pub async fn cloudflare_connect_managed(
     }
 }
 
-/// A token that can provision but cannot create tokens. Provisions and stops;
-/// the user makes the two long-lived credentials themselves.
-pub async fn cloudflare_provision(
-    project_id: &str,
-    account_id: &str,
-    zone_id: &str,
-    api_token: &str,
-) -> Result<()> {
-    println!("provisioning your Cloudflare account (this runs locally)...");
-    let provisioner = Provisioner::new(
-        api_token.to_string(),
-        account_id.to_string(),
-        zone_id.to_string(),
-    );
-    let resources = provisioner.run_manual(project_id).await?;
-    print_resources(&resources);
-
-    println!();
-    println!("Now create the three credentials fn0 will keep. None can be minted for");
-    println!("you here, because this token deliberately cannot create tokens.");
-    println!();
-    println!("The first two are separate on purpose: only the worker one is handed to");
-    println!("the fleet, and only the frontend-asset one is used by the GC that deletes.");
-    println!("Scoping them apart is what keeps either from reaching the other's bucket.");
-    println!();
-    println!("1. R2 -> Manage API Tokens -> Create API token");
-    println!("     permission: Object Read & Write");
-    println!("     apply to specific buckets:");
-    println!("       {}", resources.private_object_storage_bucket);
-    println!("       {}", resources.public_object_storage_bucket);
-    println!("       {}", resources.rendered_html_cache_bucket);
-    println!("     the screen shows an Access Key ID and a Secret Access Key; keep both");
-    println!();
-    println!("2. R2 -> Manage API Tokens -> Create API token");
-    println!("     permission: Object Read & Write");
-    println!("     apply to specific buckets:");
-    println!("       {}", resources.frontend_asset_bucket);
-    println!();
-    println!("3. My Profile -> API Tokens -> Create Custom Token");
-    println!("     permission: Zone -> Cache Purge -> Purge");
-    println!("     zone resources: {} only", resources.zone_name);
-    println!();
-    println!("Then finish with:");
-    println!();
-    println!("    forte cloudflare connect \\");
-    println!("      --account-id {account_id} \\");
-    println!("      --zone-id {zone_id} \\");
-    println!("      --zone-name {} \\", resources.zone_name);
-    println!("      --worker-access-key-id <Access Key ID from 1> \\");
-    println!("      --worker-secret <Secret Access Key from 1> \\");
-    println!("      --frontend-asset-access-key-id <Access Key ID from 2> \\");
-    println!("      --frontend-asset-secret <Secret Access Key from 2> \\");
-    println!("      --purge-token <purge token from 3>");
-    println!();
-    println!("You can delete the token you just used once you have done that.");
-    Ok(())
+/// The careful path, first half: a token that can provision but cannot create
+/// tokens. Provisions and stops, so the caller can tell the user which three
+/// credentials to make by hand.
+pub async fn provision_only(setup: &CloudSetup<'_>) -> Result<ProvisionedResources> {
+    setup
+        .provisioner()
+        .run_manual(setup.project_id, &setup.app_origin())
+        .await
 }
 
-/// The second half of the careful path: credentials the user made by hand.
-#[allow(clippy::too_many_arguments)]
-pub async fn cloudflare_connect_manual(
-    project_id: &str,
-    account_id: &str,
-    zone_id: &str,
-    zone_name: &str,
-    worker_access_key_id: &str,
-    worker_secret: &str,
-    frontend_asset_access_key_id: &str,
-    frontend_asset_secret: &str,
-    purge_token: &str,
+/// The careful path, second half: credentials the user made themselves.
+pub async fn connect_with_own_credentials(
+    setup: &CloudSetup<'_>,
+    resources: &ProvisionedResources,
+    credentials: &ConnectCredentials,
 ) -> Result<()> {
+    // Nothing to revoke on failure: these credentials are the user's own, and
+    // fn0 holds no token that could revoke them anyway.
+    send_connect(setup, resources, credentials)
+        .await
+        .map_err(ConnectFailure::into_error)
+}
+
+/// Names the buckets a project's credentials have to be scoped to, before those
+/// buckets exist. The careful path prints them so the user can pick the right
+/// scopes in the dashboard.
+pub fn expected_resources(project_id: &str, zone_name: &str) -> ProvisionedResources {
     let frontend_asset_bucket = frontend_asset_bucket_name(project_id);
     let public_object_storage_bucket = public_object_storage_bucket_name(project_id);
-    let resources = ProvisionedResources {
+    ProvisionedResources {
         frontend_asset_hostname: format!("{frontend_asset_bucket}.{zone_name}"),
         public_object_storage_hostname: format!("{public_object_storage_bucket}.{zone_name}"),
         zone_name: zone_name.to_string(),
@@ -172,32 +152,7 @@ pub async fn cloudflare_connect_manual(
         public_object_storage_bucket,
         frontend_asset_bucket,
         rendered_html_cache_bucket: rendered_html_cache_bucket_name(project_id),
-    };
-    let credentials = ConnectCredentials {
-        worker_access_key_id: worker_access_key_id.to_string(),
-        worker_secret: worker_secret.to_string(),
-        frontend_asset_access_key_id: frontend_asset_access_key_id.to_string(),
-        frontend_asset_secret: frontend_asset_secret.to_string(),
-        purge_token: purge_token.to_string(),
-    };
-    // Nothing to revoke on failure: these credentials are the user's own, and
-    // fn0 holds no token that could revoke them anyway.
-    send_connect(project_id, account_id, zone_id, &resources, &credentials)
-        .await
-        .map_err(ConnectFailure::into_error)
-}
-
-fn print_resources(resources: &ProvisionedResources) {
-    println!("  zone:    {}", resources.zone_name);
-    println!("  buckets: {}", resources.private_object_storage_bucket);
-    println!("           {}", resources.public_object_storage_bucket);
-    println!("           {}", resources.frontend_asset_bucket);
-    println!("           {}", resources.rendered_html_cache_bucket);
-    println!("  assets:  https://{}", resources.frontend_asset_hostname);
-    println!(
-        "  public:  https://{}",
-        resources.public_object_storage_hostname
-    );
+    }
 }
 
 /// Why a connect did not succeed, split by what it says about fn0's state — the
@@ -221,9 +176,7 @@ impl ConnectFailure {
 }
 
 async fn send_connect(
-    project_id: &str,
-    account_id: &str,
-    zone_id: &str,
+    setup: &CloudSetup<'_>,
     provisioned: &ProvisionedResources,
     credentials: &ConnectCredentials,
 ) -> std::result::Result<(), ConnectFailure> {
@@ -232,14 +185,15 @@ async fn send_connect(
         "{}/__forte_action/cloudflare_connect",
         creds.control_url.trim_end_matches('/')
     );
+    let project_id = setup.project_id;
     let response = async {
         reqwest::Client::new()
             .post(&url)
             .bearer_auth(&creds.token)
             .json(&ConnectInput {
                 project_id,
-                account_id,
-                zone_id,
+                account_id: setup.account_id,
+                zone_id: setup.zone_id,
                 zone_name: &provisioned.zone_name,
                 frontend_asset_hostname: &provisioned.frontend_asset_hostname,
                 public_object_storage_hostname: &provisioned.public_object_storage_hostname,
@@ -263,13 +217,7 @@ async fn send_connect(
     .map_err(|error| ConnectFailure::Indeterminate(error.into()))?;
 
     match response {
-        Connect::Ok => {
-            println!();
-            println!("connected. the token you used was not sent to fn0 and is no longer");
-            println!("needed — you can delete it in the Cloudflare dashboard.");
-            println!("workers pick this up within a second; no redeploy needed.");
-            Ok(())
-        }
+        Connect::Ok => Ok(()),
         Connect::CredentialRejected { reason } => Err(ConnectFailure::Rejected(anyhow!(
             "fn0 rejected the credentials: {reason}"
         ))),
@@ -302,26 +250,21 @@ struct StatusInput<'a> {
 #[serde(tag = "t", rename_all_fields = "camelCase")]
 enum Status {
     NotConnected,
-    Connected {
-        account_id: String,
-        zone_name: String,
-        frontend_asset_hostname: String,
-        public_object_storage_hostname: String,
-        frontend_asset_bucket: String,
-        public_object_storage_bucket: String,
-        private_object_storage_bucket: String,
-        rendered_html_cache_bucket: String,
-        healthy: bool,
-        problem: Option<String>,
-    },
+    Connected { zone_name: String },
     NotLoggedIn,
     NotFound,
-    InternalError {
-        reason: String,
-    },
+    InternalError { reason: String },
 }
 
-pub async fn cloudflare_status(project_id: &str) -> Result<()> {
+/// Whether a project has an account behind it. `forte deploy` refuses on this,
+/// because a project without one has nowhere to put its bundle or its assets.
+pub enum CloudflareConnection {
+    Connected { zone_name: String },
+    NotConnected,
+    NotFound,
+}
+
+pub async fn fetch_cloudflare_connection(project_id: &str) -> Result<CloudflareConnection> {
     let creds = crate::credentials::require()?;
     let url = format!(
         "{}/__forte_action/cloudflare_status",
@@ -336,42 +279,10 @@ pub async fn cloudflare_status(project_id: &str) -> Result<()> {
         .error_for_status()?;
 
     match response.json::<Status>().await? {
-        Status::NotConnected => {
-            println!("project '{project_id}' has no Cloudflare account connected.");
-            println!("run `forte cloudflare connect` before deploying it.");
-            Ok(())
-        }
-        Status::Connected {
-            account_id,
-            zone_name,
-            frontend_asset_hostname,
-            public_object_storage_hostname,
-            frontend_asset_bucket,
-            public_object_storage_bucket,
-            private_object_storage_bucket,
-            rendered_html_cache_bucket,
-            healthy,
-            problem,
-        } => {
-            println!("account: {account_id}");
-            println!("zone:    {zone_name}");
-            println!("assets:  {frontend_asset_bucket} -> https://{frontend_asset_hostname}");
-            println!(
-                "public:  {public_object_storage_bucket} -> https://{public_object_storage_hostname}"
-            );
-            println!("private: {private_object_storage_bucket}");
-            println!("cache:   {rendered_html_cache_bucket}");
-            match (healthy, problem) {
-                (true, _) => println!("status:  ok"),
-                (false, Some(problem)) => println!("status:  degraded - {problem}"),
-                (false, None) => println!("status:  degraded"),
-            }
-            Ok(())
-        }
+        Status::Connected { zone_name } => Ok(CloudflareConnection::Connected { zone_name }),
+        Status::NotConnected => Ok(CloudflareConnection::NotConnected),
+        Status::NotFound => Ok(CloudflareConnection::NotFound),
         Status::NotLoggedIn => Err(anyhow!("control rejected token; sign in again.")),
-        Status::NotFound => Err(anyhow!(
-            "project '{project_id}' not found or not owned by you."
-        )),
         Status::InternalError { reason } => Err(anyhow!("cloudflare_status: {reason}")),
     }
 }

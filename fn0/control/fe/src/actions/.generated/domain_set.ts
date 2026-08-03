@@ -1,4 +1,4 @@
-// Auto-generated from src/actions/domain_add.rs
+// Auto-generated from src/actions/domain_set.rs
 
 import { z } from "zod";
 import { callAction } from "@forte/react";
@@ -6,16 +6,16 @@ import { callAction } from "@forte/react";
 const InputSchema = z.object({
     projectId: z.string(),
     domain: z.string(),
-    certificatePem: z.string().optional(),
-    privateKeyPem: z.string().optional(),
-    notAfterEpochSeconds: z.number().optional(),
+    certificatePem: z.string(),
+    privateKeyPem: z.string(),
+    notAfterEpochSeconds: z.number(),
   });
 
 const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
-    originIp: z.string(),
-    needsDnsRecord: z.boolean(),
+    originHostname: z.string(),
+    replacedDomain: z.string().optional(),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),
@@ -28,22 +28,14 @@ const OutputSchema = z.discriminatedUnion("t", [
     message: z.string(),
   }),
     z.object({
-    t: z.literal("CertificateFailed"),
-    message: z.string(),
-  }),
-    z.object({
     t: z.literal("DomainTaken"),
     existingProjectId: z.string(),
-  }),
-    z.object({
-    t: z.literal("AlreadyHasDomain"),
-    currentDomain: z.string(),
   }),
     z.object({
     t: z.literal("InternalError"),
   })
   ]);
 
-export function domainAdd(input: z.infer<typeof InputSchema>) {
-  return callAction("domain_add", input, OutputSchema);
+export function domainSet(input: z.infer<typeof InputSchema>) {
+  return callAction("domain_set", input, OutputSchema);
 }

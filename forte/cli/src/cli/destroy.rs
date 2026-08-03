@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 
-use super::project_config::{clear_project_id, read_project_id};
+use super::project_config::{clear_cloud_config, read_project_id};
 
 pub async fn run(project_dir: PathBuf, yes: bool) -> Result<()> {
     let project_id = read_project_id(&project_dir)?;
@@ -21,7 +21,7 @@ pub async fn run(project_dir: PathBuf, yes: bool) -> Result<()> {
 
     fn0_deploy::delete_project(&project_id).await?;
 
-    clear_project_id(&project_dir)?;
+    clear_cloud_config(&project_dir)?;
     println!("Removed project_id from Forte.toml (next `forte deploy` creates a new project)");
     println!("Teardown of '{project_id}' enqueued; resources are being deleted.");
     Ok(())

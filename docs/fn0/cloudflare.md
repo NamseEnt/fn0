@@ -18,6 +18,19 @@ at Cloudflare. Not just an account: an R2 custom domain has to live in a zone
 in the same account as the bucket, and that hostname is where your frontend
 assets get served from.
 
+## One command
+
+```sh
+forte cloud init
+```
+
+It asks everything it needs and takes no flags. You are never asked for an
+account id or a zone id: it reads the zones your token can reach and lets you
+pick one. The token is read hidden, so it does not land in your shell history
+or in `ps`, and it is never written to disk or sent to fn0.
+
+The first question is the one that matters.
+
 ## Two ways to set this up
 
 Setup has to create buckets, point a hostname at one, write two zone rules and
@@ -29,7 +42,6 @@ things. Pick who.
 | Tokens you create by hand | 1 | 3 |
 | Most powerful token you create | account-wide | can provision, cannot create tokens |
 | fn0 ever sees it | no | no |
-| Commands | 1 | 2 |
 
 Both end in the same place: fn0 holds a bucket-scoped R2 credential and a
 purge-only token, and nothing else. The difference is only what you have to
@@ -38,19 +50,12 @@ your own machine.
 
 ## Convenient: one token, the CLI does the rest
 
-Cloudflare dashboard → **My Profile → API Tokens → Create Token → Create
-Custom Token**. Give it exactly one permission:
+Pick **Let fn0 set it up**. Cloudflare dashboard → **My Profile → API Tokens →
+Create Token → Create Custom Token**. Give it exactly one permission:
 
 | Scope | Permission |
 | --- | --- |
 | User | API Tokens → Edit |
-
-```sh
-forte cloudflare connect \
-  --account-id <cloudflare account id> \
-  --zone-id <zone id> \
-  --api-token <the token you just made>
-```
 
 The CLI mints a short-lived provisioning token from it, provisions your
 account, mints the two credentials fn0 keeps, and revokes the provisioning
@@ -64,8 +69,8 @@ whole reason to consider the other path.
 
 ## Careful: you create every token yourself
 
-Nothing you make here can create tokens, so nothing you make here can widen
-itself.
+Pick **I create every credential myself**. Nothing you make here can create
+tokens, so nothing you make here can widen itself.
 
 **Step 1** — a provisioning token. My Profile → API Tokens → Create Custom
 Token:
@@ -78,15 +83,9 @@ Token:
 | Zone | Transform Rules → Edit |
 | Zone | SSL and Certificates → Edit |
 
-Restrict the zone scopes to the one zone. Then:
-
-```sh
-forte cloudflare provision \
-  --account-id <account id> --zone-id <zone id> --api-token <token>
-```
-
-This creates the buckets, the CDN hostname and the two zone rules, then stops
-and prints the exact names for step 2.
+Restrict the zone scopes to the one zone. Give it to `forte cloud init`; it
+creates the buckets, the CDN hostnames and the two zone rules, then stops and
+prints the exact names for step 2.
 
 **Step 2** — the three credentials fn0 keeps.
 
@@ -102,17 +101,8 @@ Access Key; keep all four values.
 My Profile → **API Tokens → Create Custom Token**, permission *Zone → Cache
 Purge → Purge*, restricted to your zone.
 
-```sh
-forte cloudflare connect \
-  --account-id <account id> --zone-id <zone id> --zone-name <your-domain> \
-  --worker-access-key-id <Access Key ID> \
-  --worker-secret <Secret Access Key> \
-  --frontend-asset-access-key-id <Access Key ID> \
-  --frontend-asset-secret <Secret Access Key> \
-  --purge-token <purge token>
-```
-
-Delete the provisioning token from step 1 once this succeeds.
+The command waits for those five values and then connects. Delete the
+provisioning token from step 1 once it succeeds.
 
 ## What the two stored credentials can do
 
@@ -158,54 +148,42 @@ leave browser copies of a replaced object that no purge can reach. Your other
 hostnames keep the zone setting.
 
 The **response header rule** removes `Vary: Origin`, which R2 attaches to every
-CORS response. The buckets allow `*`, so that header says nothing — but it makes
-Cloudflare keep one cache entry per requesting origin, and a purge by URL clears
-only the entry for a request that sent no `Origin`. Browsers send one, so
-without this rule a replaced object keeps serving its old bytes to browsers for
-the full year fn0 stores on public objects.
+CORS response. It makes Cloudflare keep one cache entry per requesting origin,
+and a purge by URL clears only the entry for a request that sent no `Origin`.
+Browsers send one, so without this rule a replaced object keeps serving its old
+bytes to browsers for the full year fn0 stores on public objects.
 
-Workers pick the change up within about a second; no redeploy is needed. Check
-with:
+The three buckets a browser can reach are also given a **CORS allowlist holding
+one origin: your project's own domain**. Cloudflare keys a separate cache entry
+per `Origin` value and `Origin` is not verified, so an allowlist of `*` would
+let any site on the web read every one of those entries and bill the misses to
+you. The allowlist moves with the domain, so changing the domain rewrites it.
 
-```sh
-forte cloudflare status
-```
+Workers pick a connection up within about a second; no redeploy is needed.
 
-**Connect before your project stores anything.** A project has nowhere to store
-and cannot serve a frontend until it is connected.
+**Set the project up before it stores anything.** A project has nowhere to
+store and cannot serve a frontend until it is connected.
 
 Connecting is first-time only, and there is no way back. Reconnecting, rotating
 a credential and moving to a different Cloudflare account are all unsupported —
-not merely undocumented, but refused by `connect`. If a stored credential is
-lost or revoked, the project cannot be repaired through the CLI. Treat the
-three credentials as things you do not lose.
+not merely undocumented, but refused. If a stored credential is lost or
+revoked, the project cannot be repaired through the CLI. Treat the three
+credentials as things you do not lose.
 
-## Custom domain (optional)
+## The domain
+
+Not optional: a project answers on the domain you gave `forte cloud init` and
+on nothing else. There is no `fn0.dev` fallback.
 
 Signing an origin certificate needs a permission fn0 deliberately does not
-hold, so this runs locally too.
+hold, so this runs locally too. The CLI generates a key pair, has Cloudflare
+sign the certificate through your own Origin CA, uploads the certificate and
+key, and prints the one thing left to do: add a **proxied** `CNAME` record for
+that hostname pointing at the printed origin hostname.
 
-With a provisioning token (the careful path's step 1 token, which already has
-SSL and Certificates → Edit):
-
-```sh
-forte domain add app.example.com \
-  --account-id <account id> --zone-id <zone id> --api-token <token>
-```
-
-With the one-permission setup token, add `--mint-signing-token` so the CLI
-mints a signing token, uses it and revokes it:
-
-```sh
-forte domain add app.example.com \
-  --account-id <account id> --zone-id <zone id> --api-token <token> \
-  --mint-signing-token
-```
-
-The CLI generates a key pair, has Cloudflare sign the certificate through your
-own Origin CA, uploads the certificate and key, and prints the one thing left
-to do: add a **proxied** `CNAME` record for that hostname pointing at the
-printed origin hostname.
+To change the domain later, run `forte cloud init` again. It skips everything
+already done and signs a certificate for the new hostname. The domain is also
+written to `Forte.toml`, and `forte deploy` refuses if the two disagree.
 
 The record must stay orange-clouded. An Origin CA certificate is not valid for
 a direct visitor connection, so switching the record to DNS-only breaks the
@@ -229,9 +207,9 @@ yours to remove.
 
 Deleting either R2 token in your Cloudflare dashboard breaks the project at
 request time — there is no grace period, because every request signs against
-it. `forte cloudflare status` probes both and reports which one failed.
+it.
 
-There is no recovery path. `connect` refuses a project that is already
-connected, and nothing else can replace a stored credential, so a revoked token
-means the project has to be recreated. Rotation is on the list; it is not
-built.
+There is no recovery path. A project that is already connected is refused a
+second connection, and nothing else can replace a stored credential, so a
+revoked token means the project has to be recreated. Rotation is on the list;
+it is not built.
