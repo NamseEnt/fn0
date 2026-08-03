@@ -33,7 +33,6 @@ database query, an upstream API call, a slow LLM response — costs nothing.
 | --- | --- | --- |
 | Projects | 1 | |
 | Custom domains | 1 | Automatic TLS — point a CNAME and you're done |
-| fn0.dev subdomain | Included | |
 
 ### Compute
 
@@ -130,7 +129,8 @@ there is no separate billing for them.
 ## Monthly quotas — free plan
 
 To be announced. The free plan targets trying things out: one project on a
-`*.fn0.dev` subdomain, with quotas sized for development traffic.
+custom domain from your own Cloudflare account, with quotas sized for
+development traffic.
 
 ## When you outgrow these
 

@@ -16,7 +16,7 @@ struct DomainAddInput<'a> {
 #[serde(tag = "t", rename_all_fields = "camelCase")]
 enum DomainAdd {
     Ok {
-        origin_ip: String,
+        origin_hostname: String,
         needs_dns_record: bool,
     },
     NotLoggedIn,
@@ -94,14 +94,14 @@ pub async fn domain_add(
     let raw: DomainAdd = resp.json().await?;
     match raw {
         DomainAdd::Ok {
-            origin_ip,
+            origin_hostname,
             needs_dns_record,
         } => {
             println!("domain '{domain}' attached to project '{project_id}'");
             if needs_dns_record {
                 println!();
                 println!("add this record in your Cloudflare dashboard, then you are done:");
-                println!("    A   {domain}   {origin_ip}   (proxied / orange cloud)");
+                println!("    CNAME   {domain}   {origin_hostname}   (proxied / orange cloud)");
                 println!();
                 println!(
                     "it must stay proxied: the origin certificate is trusted by Cloudflare's \
@@ -194,7 +194,7 @@ pub enum DomainStatus {
         domain: String,
         origin_certificate_ready: bool,
         origin_certificate_expires_epoch_seconds: Option<i64>,
-        origin_ip: String,
+        origin_hostname: String,
     },
     NotLoggedIn,
     NotFound,
@@ -231,7 +231,7 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
             domain,
             origin_certificate_ready,
             origin_certificate_expires_epoch_seconds,
-            origin_ip,
+            origin_hostname,
         } => {
             println!("project '{project_id}' custom domain: {domain}");
             println!("served from your own Cloudflare account.");
@@ -250,8 +250,8 @@ pub async fn domain_status(project_id: &str) -> Result<()> {
                     "origin certificate: missing — run `forte domain add {domain}` to issue one."
                 );
             }
-            if !origin_ip.is_empty() {
-                println!("point a proxied A record at {origin_ip}.");
+            if !origin_hostname.is_empty() {
+                println!("point a proxied CNAME at {origin_hostname}.");
             }
             Ok(())
         }

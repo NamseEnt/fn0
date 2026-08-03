@@ -548,22 +548,23 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   },
 });
 
-// *.fn0.dev wildcard → OCI NLB public IP. Cloudflare proxy (orange) stays in
-// front for TLS/edge; NLB does L4 forwarding into the worker pool with
-// health-aware backend selection. Lives here (not inside CloudflareDns)
+// fn0 cloud assumes bring-your-own-Cloudflare: every project runs behind the
+// owner's own zone, and that zone's DNS points here. This record is DNS-only
+// (grey cloud) on purpose — it is a CNAME target, not a proxied edge, so the
+// owner's zone is what terminates TLS/edge and the NLB IP stays a single
+// place to update if it ever changes. Lives here (not inside CloudflareDns)
 // because the NLB IP is an OciFn0WorkerSite output and a forward dependency
 // would create a cycle.
-new cloudflare.DnsRecord("worker-wildcard-a", {
+new cloudflare.DnsRecord("oci-ap-osaka-1-nlb-a", {
   zoneId,
-  name: pulumi.interpolate`*.${domain}`,
+  name: pulumi.interpolate`oci-ap-osaka-1-nlb.${domain}`,
   type: "A",
   content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
   ttl: 1,
-  proxied: true,
+  proxied: false,
 });
 
-// Apex fn0.dev → same worker NLB. The wildcard above never matches the bare
-// apex, so it needs its own record; the worker routes apex to the fn0-control
+// Apex fn0.dev → same worker NLB. The worker routes apex to the fn0-control
 // project via FN0_APEX_DOMAIN/FN0_APEX_PROJECT_ID.
 new cloudflare.DnsRecord("worker-apex-a", {
   zoneId,
@@ -575,13 +576,27 @@ new cloudflare.DnsRecord("worker-apex-a", {
 });
 
 // worker-lb.fn0.dev is the SaaS Custom Hostname fallback origin (see
-// CloudflareDns.saasFallbackLbHostname). The wildcard above would resolve it
-// implicitly, but the SaaS fallback record protection only attaches to
-// hostnames with an explicit A record, so we keep this here to make sure the
-// lock lands on this dedicated name (not on any human-touched hostname).
+// CloudflareDns.saasFallbackLbHostname). It needs its own explicit A record
+// because the SaaS fallback record protection only attaches to hostnames
+// with one (not any wildcard match), and there is no wildcard record left to
+// match it implicitly anyway.
 new cloudflare.DnsRecord("worker-lb-a", {
   zoneId,
   name: pulumi.interpolate`worker-lb.${domain}`,
+  type: "A",
+  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
+  ttl: 1,
+  proxied: true,
+});
+
+// fn0-control.fn0.dev is itself a project on the platform's own zone, so
+// unlike a BYOC custom domain it needs fn0 to provide its DNS presence too.
+// The wildcard used to cover this implicitly; now it needs its own explicit
+// proxied record for the Custom Hostname (control-custom-hostname) below to
+// have anything to route.
+new cloudflare.DnsRecord("control-a", {
+  zoneId,
+  name: pulumi.interpolate`fn0-control.${domain}`,
   type: "A",
   content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
   ttl: 1,
@@ -642,17 +657,14 @@ export const controlOwnerGithubId = config.requireNumber(
 );
 export const vaultCryptoEndpoint = ociGlobalVault.cryptoEndpoint;
 export const vaultKeyOcid = ociGlobalVault.keyOcid;
-// Appended here rather than inside the block above because the worker fleet,
-// and therefore its load balancer address, is created after everything else
-// control needs to know. Users point their own DNS at this address when they
-// attach a custom domain to a project on their own Cloudflare account.
+// Appended here rather than inside the block above because the worker fleet
+// is created after everything else control needs to know. Users CNAME their
+// custom domain at this hostname when they attach it to a project on their
+// own Cloudflare account; see the oci-ap-osaka-1-nlb DNS record above.
 export const controlBootstrapEnvYaml = pulumi.secret(
-  pulumi
-    .all([
-      controlEnvYamlBootstrap,
-      ociFn0WorkerSite.networkLoadBalancerPublicIp,
-    ])
-    .apply(([yaml, originIp]) => `${yaml}FN0_WORKER_ORIGIN_IP: ${originIp}\n`),
+  controlEnvYamlBootstrap.apply(
+    (yaml) => `${yaml}FN0_WORKER_ORIGIN_HOSTNAME: oci-ap-osaka-1-nlb.${domain}\n`,
+  ),
 );
 export const controlUrl = pulumi.interpolate`https://fn0-control.${domain}`;
 export const controlAdminTokenBase64 = pulumi.secret(controlAdminToken.base64);

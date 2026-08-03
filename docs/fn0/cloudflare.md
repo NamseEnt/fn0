@@ -6,7 +6,10 @@ fn0's. You keep R2's free tier, your own purge budget and your own bill; fn0
 runs the compute and holds no storage on your behalf.
 
 This is a one-time setup per project, and it is required before a project can
-serve a frontend.
+serve a frontend: fn0 Cloud has no way to meter object storage usage on an
+account it does not own, so bring-your-own-Cloudflare is the default premise
+for every project, not an opt-in. There is no `fn0.dev` fallback to fall back
+to — a project without a custom domain has no public URL.
 
 ## What you need
 
@@ -201,8 +204,8 @@ forte domain add app.example.com \
 
 The CLI generates a key pair, has Cloudflare sign the certificate through your
 own Origin CA, uploads the certificate and key, and prints the one thing left
-to do: add a **proxied** `A` record for that hostname pointing at the printed
-IP.
+to do: add a **proxied** `CNAME` record for that hostname pointing at the
+printed origin hostname.
 
 The record must stay orange-clouded. An Origin CA certificate is not valid for
 a direct visitor connection, so switching the record to DNS-only breaks the

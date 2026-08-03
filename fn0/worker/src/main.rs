@@ -682,11 +682,13 @@ async fn handle_user_request(
         Some(apex) if apex.domain == host_no_port => apex.project_id.clone(),
         _ => match cache.resolve_domain(&host_no_port).await {
             Some(sub) => sub,
-            None => host_no_port
-                .split('.')
-                .next()
-                .unwrap_or("unknown")
-                .to_string(),
+            None => {
+                fn0::telemetry::stage_duration("resolve_domain", resolve_start.elapsed());
+                return Ok(hyper::Response::builder()
+                    .status(404)
+                    .body(Full::new(Bytes::from("Not Found")))
+                    .unwrap());
+            }
         },
     };
     fn0::telemetry::stage_duration("resolve_domain", resolve_start.elapsed());

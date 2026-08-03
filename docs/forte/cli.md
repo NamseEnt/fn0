@@ -131,7 +131,7 @@ Print the deployed app's URL and open it in the default browser.
 | `-p, --project <dir>` | `.` | Project directory |
 | `--print` | off | Print the URL only, do not open a browser |
 
-The project is always reachable at `https://<project_id>.fn0.dev`. If a custom domain is attached and active, that domain is used instead. When the custom domain is not serving yet, or the lookup cannot be made, the default subdomain is used and the reason is printed to stderr.
+There is no default `fn0.dev` subdomain. A project answers only on the custom domain its owner attaches, so `forte open` prints that URL once the domain is attached and its origin certificate is held. Until then, it prints the reason instead.
 
 ```sh
 forte open

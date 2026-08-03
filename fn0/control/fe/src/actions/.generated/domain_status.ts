@@ -16,7 +16,7 @@ const OutputSchema = z.discriminatedUnion("t", [
     domain: z.string(),
     originCertificateReady: z.boolean(),
     originCertificateExpiresEpochSeconds: z.number().optional(),
-    originIp: z.string(),
+    originHostname: z.string(),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),

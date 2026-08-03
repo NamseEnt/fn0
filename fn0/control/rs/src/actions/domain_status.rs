@@ -17,7 +17,7 @@ pub enum Output {
         domain: String,
         origin_certificate_ready: bool,
         origin_certificate_expires_epoch_seconds: Option<i64>,
-        origin_ip: String,
+        origin_hostname: String,
     },
     NotLoggedIn,
     NotFound,
@@ -76,6 +76,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         origin_certificate_expires_epoch_seconds: cert
             .as_ref()
             .map(|cert| cert.not_after_epoch_seconds),
-        origin_ip: std::env::var("FN0_WORKER_ORIGIN_IP").unwrap_or_default(),
+        origin_hostname: std::env::var("FN0_WORKER_ORIGIN_HOSTNAME").unwrap_or_default(),
     }
 }

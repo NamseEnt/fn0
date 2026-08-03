@@ -93,8 +93,8 @@ export class CloudflareDns extends pulumi.ComponentResource {
 
     this.saasApiToken = cloudflareSaasApiToken.value;
 
-    // SaaS fallback origin points at a hostname that the wildcard A record
-    // (*.fn0.dev → NLB IP) already covers. Using a human-touched name (like
+    // SaaS fallback origin points at a dedicated hostname with its own
+    // explicit A record (see worker-lb-a). Using a human-touched name (like
     // fallback.fn0.dev) would lock that name's A records under CF's
     // SaaS-fallback record protection (delete-blocked even via API). A
     // dedicated name keeps the lock scoped to a record we never touch by hand.
