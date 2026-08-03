@@ -240,6 +240,9 @@ mint_r2_token() {
 }
 
 # mint_purge_token <cf_token> <zone_id> <name>
+# Echoes "<token_id> <token_value>". The id is not stored anywhere downstream —
+# only the value is, encrypted — so revoke_superseded_tokens has no other way to
+# tell this run's token from the ones it replaced.
 mint_purge_token() {
   local cf_token="$1" zone_id="$2" name="$3"
   local body code
@@ -252,7 +255,34 @@ mint_purge_token() {
   }')"
   code=$(__cf_call POST "/user/tokens" "$cf_token" "$body")
   __cf_expect "$code" "mint purge token ${name}" || return 1
-  jq -r '.result.value' < /tmp/__cf_resp.body
+  jq -r '"\(.result.id) \(.result.value)"' < /tmp/__cf_resp.body
+}
+
+# revoke_superseded_tokens <user_token> <name> <keep_id>
+# Every run mints a fresh credential under a fixed per-project name, so without
+# this the ones it replaced stay valid forever. Call only once the doc that
+# references <keep_id> is written: a crash before that point should leave the
+# superseded token usable rather than strand control with a credential that no
+# longer exists.
+revoke_superseded_tokens() {
+  local user_token="$1" name="$2" keep_id="$3"
+  local page=1 total_pages=1 code stale_ids="" id
+  # Collected across every page before the first delete: deleting mid-scan
+  # renumbers the pages that have not been read yet.
+  while (( page <= total_pages )); do
+    code=$(__cf_call GET "/user/tokens?per_page=200&page=${page}" "$user_token")
+    __cf_expect "$code" "list user tokens" || return 1
+    total_pages="$(jq -r '.result_info.total_pages // 1' < /tmp/__cf_resp.body)"
+    stale_ids+="$(jq -r --arg n "$name" --arg keep "$keep_id" \
+      '(.result // [])[] | select(.name == $n and .id != $keep) | .id' < /tmp/__cf_resp.body)"$'\n'
+    page=$((page + 1))
+  done
+  while read -r id; do
+    [[ -z "$id" ]] && continue
+    echo ">> revoke superseded token ${name} (${id})"
+    code=$(__cf_call DELETE "/user/tokens/${id}" "$user_token")
+    __cf_expect "$code" "revoke ${name} (${id})" || return 1
+  done <<<"$stale_ids"
 }
 
 # kms_encrypt <crypto_endpoint> <key_ocid> <plaintext>

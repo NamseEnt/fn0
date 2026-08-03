@@ -154,7 +154,8 @@ read -r worker_key_id worker_secret < <(mint_r2_token \
 read -r asset_key_id asset_secret < <(mint_r2_token \
   "$cf_user_token" "$cf_account_id" "fn0 frontend assets (${CONTROL_PROJECT_ID})" \
   "fn0-${CONTROL_PROJECT_ID}-frontend-asset")
-purge_token="$(mint_purge_token "$cf_user_token" "$cf_zone_id" "fn0 cache purge (${CONTROL_PROJECT_ID})")"
+read -r purge_token_id purge_token < <(mint_purge_token \
+  "$cf_user_token" "$cf_zone_id" "fn0 cache purge (${CONTROL_PROJECT_ID})")
 
 worker_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$worker_secret")"
 asset_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$asset_secret")"
@@ -211,5 +212,12 @@ seed_manifest_storage "$control_db_url" "$forte_group_token" "$CONTROL_PROJECT_I
 
 # Step 7 — seed the worker-agent's rollout target into the same control DB.
 seed_target_fn0_worker_config "$control_db_url" "$forte_group_token" "$worker_image_ref"
+
+# Step 8 — retire the credentials this run replaced. Last, because every doc
+# that names the new ones is written by now: until then the superseded token is
+# the one control is still serving with.
+revoke_superseded_tokens "$cf_user_token" "fn0 worker (${CONTROL_PROJECT_ID})" "$worker_key_id"
+revoke_superseded_tokens "$cf_user_token" "fn0 frontend assets (${CONTROL_PROJECT_ID})" "$asset_key_id"
+revoke_superseded_tokens "$cf_user_token" "fn0 cache purge (${CONTROL_PROJECT_ID})" "$purge_token_id"
 
 echo ">> bootstrap complete: project=${CONTROL_PROJECT_ID} domain=${CONTROL_CUSTOM_DOMAIN} code_version=${code_version}"
