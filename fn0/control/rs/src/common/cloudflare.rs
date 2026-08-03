@@ -3,6 +3,37 @@ use serde::{Deserialize, Serialize};
 
 const CLOUDFLARE_API_BASE: &str = "https://api.cloudflare.com/client/v4";
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum CachePurgeFile {
+    LegacyUrl(String),
+    Request(CachePurgeRequest),
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CachePurgeRequest {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<CachePurgeHeaders>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CachePurgeHeaders {
+    #[serde(rename = "Origin")]
+    pub origin: String,
+}
+
+impl CachePurgeFile {
+    pub fn from_url(url: String, origin: Option<&str>) -> Self {
+        Self::Request(CachePurgeRequest {
+            url,
+            headers: origin.map(|origin| CachePurgeHeaders {
+                origin: origin.to_string(),
+            }),
+        })
+    }
+}
+
 pub struct CloudflareClient {
     api_token: String,
     account_id: String,
@@ -229,12 +260,12 @@ impl CloudflareClient {
     ///
     /// Requires the zone's Cache Rule to match `PURGE`; without it the API still
     /// answers `success: true` while the edge keeps serving the old object.
-    pub async fn purge_cache_urls(&self, urls: &[String]) -> anyhow::Result<()> {
+    pub async fn purge_cache_urls(&self, files: &[CachePurgeFile]) -> anyhow::Result<()> {
         #[derive(Serialize)]
         struct Body<'a> {
-            files: &'a [String],
+            files: &'a [CachePurgeFile],
         }
-        let payload = serde_json::to_vec(&Body { files: urls })?;
+        let payload = serde_json::to_vec(&Body { files })?;
         let path = format!("/zones/{}/purge_cache", self.zone_id()?);
         let (status, body) = self.call("POST", &path, payload).await?;
         if (200..300).contains(&status) {

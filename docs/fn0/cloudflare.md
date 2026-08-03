@@ -49,7 +49,7 @@ argument is not needed.
 
 ## Setup credential
 
-Setup has to create buckets, point a hostname at one, write two zone rules and
+Setup has to create buckets, point a hostname at one, write one zone rule and
 sign a certificate. Create one reusable bootstrap token and provide it through
 `CLOUDFLARE_API_TOKEN`. Cloudflare dashboard → **My Profile → API Tokens →
 Create Token → Create Custom Token**. Give it exactly one permission:
@@ -98,7 +98,7 @@ The two public buckets answer on a hostname that is the bucket's own name in
 your zone, so a bucket and the address it serves from cannot drift apart. Each
 costs one DNS record.
 
-fn0 adds two rules to your zone and leaves your own rules in place. They match
+fn0 adds one rule to your zone and leaves your own rules in place. It matches
 `fn0-*-frontend-asset.<zone>` and
 `fn0-*-public-object-storage.<zone>`; the cache rule also matches the
 custom domains registered for fn0 projects. This covers every fn0 project you
@@ -111,12 +111,6 @@ origin's cache headers. Your other hostnames keep the zone setting.
 
 Smart Tiered Cache is enabled for the zone so a cache miss in an edge location
 can be filled by an upper tier instead of reaching the worker fleet directly.
-
-The **response header rule** removes `Vary: Origin`, which R2 attaches to every
-CORS response. It makes Cloudflare keep one cache entry per requesting origin,
-and a purge by URL clears only the entry for a request that sent no `Origin`.
-Browsers send one, so without this rule a replaced object keeps serving its old
-bytes to browsers for the full year fn0 stores on public objects.
 
 The two buckets a browser can reach are also given a **CORS allowlist holding
 one origin: your project's own domain**. Cloudflare keys a separate cache entry

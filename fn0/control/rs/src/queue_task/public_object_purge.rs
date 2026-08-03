@@ -1,4 +1,5 @@
 use crate::common::byoc::ProjectStorage;
+use crate::common::cloudflare::CachePurgeFile;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +12,7 @@ pub struct Input {
     /// projects could own their own zone; those are platform-zone purges.
     #[serde(default)]
     pub project_id: String,
-    pub urls: Vec<String>,
+    pub urls: Vec<CachePurgeFile>,
 }
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
@@ -32,17 +33,37 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
             .await
             .inspect_err(|error| {
                 tracing::warn!(
-                    urls = chunk.len(),
+                    files = chunk.len(),
                     duration_ms = started.elapsed().as_millis() as u64,
                     %error,
                     "public object purge failed"
                 )
             })?;
         tracing::info!(
-            urls = chunk.len(),
+            files = chunk.len(),
             duration_ms = started.elapsed().as_millis() as u64,
             "public object purge completed"
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CachePurgeFile, Input};
+    use serde_json::json;
+
+    #[test]
+    fn input_accepts_legacy_string_files() {
+        let input: Input = serde_json::from_value(json!({
+            "project_id": "project",
+            "urls": ["https://cdn.example/asset.js"]
+        }))
+        .unwrap();
+
+        assert!(matches!(
+            input.urls.as_slice(),
+            [CachePurgeFile::LegacyUrl(url)] if url == "https://cdn.example/asset.js"
+        ));
+    }
 }

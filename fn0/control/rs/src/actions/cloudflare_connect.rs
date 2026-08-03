@@ -21,7 +21,7 @@
 use crate::common::auth;
 use crate::common::aws_sign;
 use crate::common::byoc;
-use crate::common::cloudflare::CloudflareClient;
+use crate::common::cloudflare::{CachePurgeFile, CloudflareClient};
 use crate::common::vault;
 use crate::docs::*;
 use forte_sdk::*;
@@ -148,8 +148,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         "https://{}/__fn0_connect_probe",
         req.body.frontend_asset_hostname
     );
+    let probe_file = CachePurgeFile::from_url(probe_url, None);
     if let Err(error) =
-        prove(|| purge_client.purge_cache_urls(std::slice::from_ref(&probe_url))).await
+        prove(|| purge_client.purge_cache_urls(std::slice::from_ref(&probe_file))).await
     {
         tracing::warn!(%error, "cloudflare_connect purge probe failed");
         return Output::CredentialRejected {
