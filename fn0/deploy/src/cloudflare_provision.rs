@@ -66,6 +66,7 @@ const PROVISIONING_TOKEN_MINUTES: i64 = 10;
 const R2_STORAGE_WRITE: &str = "bf7481a1826f439697cb59a20b22293e";
 const ZONE_READ: &str = "c8fed203ed3043cba015a93ad1616f1f";
 const CACHE_SETTINGS_WRITE: &str = "9ff81cbbe65c400b97d92c3c1033cab6";
+const ZONE_SETTINGS_WRITE: &str = "3030687196b94b638145a3953da2b699";
 const ZONE_TRANSFORM_RULES_WRITE: &str = "0ac90a90249747bca6b047d97f0803e9";
 const SSL_AND_CERTIFICATES_WRITE: &str = "c03055bc037c4ea9afb9a9f104b7b721";
 
@@ -666,7 +667,7 @@ impl Provisioner {
             return Ok(());
         }
         Err(anyhow!(
-            "could not enable Smart Tiered Cache ({status}). The token needs Zone -> Cache Rules -> Edit. {}",
+            "could not enable Smart Tiered Cache ({status}). The token needs Zone -> Zone Settings -> Edit. {}",
             describe(&envelope.errors)
         ))
     }
@@ -818,6 +819,7 @@ impl Provisioner {
                         "permission_groups": [
                             { "id": ZONE_READ },
                             { "id": CACHE_SETTINGS_WRITE },
+                            { "id": ZONE_SETTINGS_WRITE },
                             { "id": ZONE_TRANSFORM_RULES_WRITE },
                             { "id": SSL_AND_CERTIFICATES_WRITE },
                         ],
