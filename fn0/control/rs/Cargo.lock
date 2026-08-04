@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-doc-db"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "anyhow",
  "bytes",
@@ -394,7 +394,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-shared-schema"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "fn0-doc-db",
@@ -460,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "bytes",
