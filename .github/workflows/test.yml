@@ -48,8 +48,12 @@ jobs:
           exit 1
 
       # doc-db and object-storage build their test targets for wasm32-wasip2
-      # from their own directories, so this cannot reach them and they keep
-      # their own steps below. forte-cli is covered by the forte-cli job.
+      # from their own directories, so the workspace-wide commands cannot reach
+      # them and they keep their own steps below. forte-cli is covered by the
+      # forte-cli job.
+      - name: Clippy workspace
+        run: cargo clippy --workspace --all-targets --exclude fn0-doc-db --exclude fn0-object-storage -- -D warnings
+
       - name: Test workspace
         run: cargo test --workspace --exclude fn0-doc-db --exclude fn0-object-storage --exclude forte-cli
 
@@ -57,17 +61,32 @@ jobs:
         working-directory: doc-db
         run: cargo test
 
+      - name: Clippy doc-db
+        working-directory: doc-db
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Test object-storage
         working-directory: object-storage
         run: cargo test
+
+      - name: Clippy object-storage
+        working-directory: object-storage
+        run: cargo clippy --all-targets -- -D warnings
 
       # Its own workspace root, so no workspace-wide command reaches it.
       - name: Test fn0-control
         working-directory: fn0/control/rs
         run: cargo test
 
-      - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
+      - name: Clippy fn0-control
+        working-directory: fn0/control/rs
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Also its own workspace root, and it carries no tests. Its
+      # rust-toolchain.toml pins a nightly that rustup installs on entry.
+      - name: Clippy forte-rs-to-ts
+        working-directory: forte/rs-to-ts
+        run: cargo clippy --all-targets -- -D warnings
 
   forte-cli:
     runs-on: ubuntu-22.04
