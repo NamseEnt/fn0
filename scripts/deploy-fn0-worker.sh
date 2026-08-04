@@ -10,7 +10,7 @@
 #      ensure_cwasm_pending(target) — builds the new cwasm-compiler lambda
 #      (idempotent), registers pending in control, fans out R2 sync compile
 #      until full coverage.
-#   4. Build & push fn0-worker image (idempotent — same digest skips push).
+#   4. Build & push fn0-worker image (idempotent — same source skips push).
 #   5. Write TargetFn0WorkerConfigDoc.image_ref = new ref.
 #   6. Wait until every live host's WorkerHostStatusDoc reports
 #      active_image_ref == new ref.

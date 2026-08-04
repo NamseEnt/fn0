@@ -6,7 +6,8 @@
 # Flow:
 #   1. Build / push the cwasm-compiler lambda for the workspace fn0-wasmtime
 #      version (no control dependency — uses ensure_cwasm_lambda).
-#   2. Build / push the fn0-worker image for the workspace fn0-worker version.
+#   2. Resolve the already-published fn0-worker image for the workspace
+#      fn0-worker version. scripts/deploy-fn0-worker.sh publishes it.
 #   3. forte build fn0/control, assemble bundle.raw.tar (manifest.json +
 #      backend.wasm + entry.js + env.yaml).
 #   4. Upload original/fn0-control.tar to the bundle-store R2 bucket.
@@ -88,14 +89,15 @@ echo ">> target fn0-wasmtime=${target_wasmtime} fn0-worker=${target_worker}"
 # Step 1 — cwasm-compiler lambda for target wasmtime.
 ensure_cwasm_lambda "$target_wasmtime"
 
-# Step 2 — fn0-worker image (idempotent — same digest skips push).
-build_and_push_fn0_worker
-worker_image_ref="$FN0_WORKER_PUSHED_IMAGE_REF"
+# Step 2 — resolve the fn0-worker image to seed the target with. Building and
+# pushing it belongs to scripts/deploy-fn0-worker.sh; a control-only change must
+# not wait on a worker image build, and must not be able to fail on one.
+resolve_fn0_worker_image_ref "$target_worker"
+worker_image_ref="$FN0_WORKER_IMAGE_REF"
 if [[ -z "$worker_image_ref" ]]; then
-  echo "build_and_push_fn0_worker did not set FN0_WORKER_PUSHED_IMAGE_REF" >&2
+  echo "resolve_fn0_worker_image_ref did not set FN0_WORKER_IMAGE_REF" >&2
   exit 1
 fi
-echo ">> worker image_ref=${worker_image_ref}"
 
 # Step 3 — build control raw bundle.
 work_dir="$(mktemp -d)"
