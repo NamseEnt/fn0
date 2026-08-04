@@ -12,8 +12,9 @@ pub mod presign_gate;
 pub mod public_storage_hijack;
 pub mod purge_gate;
 pub mod queue_hijack;
-pub mod rendered_html;
 mod self_invoke;
+pub mod static_page;
+pub mod static_page_cache_hijack;
 pub mod storage_target;
 pub mod telemetry;
 pub mod turso_hijack;
@@ -51,6 +52,7 @@ pub use public_storage_hijack::PublicStorageHijack;
 pub use purge_gate::PurgeGate;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
+pub use static_page_cache_hijack::StaticPageCacheHijack;
 pub use storage_target::{
     ObjectStorageResolver, PrivateObjectStorageTarget, PublicStorageResolver, PublicStorageTarget,
     R2Credentials, StaticResolver,
@@ -69,10 +71,10 @@ const CACHE_POLICY_ENDPOINT: &str = "/__fn0_cache_policy";
 const CACHE_POLICY_TARGET_PATH_HEADER: &str = "x-fn0-cache-path";
 const CACHE_POLICY_RESPONSE_HEADER: &str = "x-fn0-cache-policy";
 const CACHE_POLICY_STATIC_VALUE: &str = "static";
-/// The edge holds a static page for a year because the deploy-time `cache-tag`
-/// purge, not expiry, is what replaces it. A shorter TTL would only add origin
-/// hits that return the same bytes.
-const RENDERED_HTML_CDN_CACHE_CONTROL: &str = "public, max-age=31536000";
+/// The edge holds a static page for a year because purging, not expiry, is what
+/// replaces it — by `cache-tag` on deploy, by URL when an app invalidates one
+/// page. A shorter TTL would only add origin hits that return the same bytes.
+const STATIC_PAGE_CDN_CACHE_CONTROL: &str = "public, max-age=31536000";
 const EXECUTION_TIME_METRIC_KEY_HEADER: &str = "x-fn0-execution-time-metric-key";
 const FN0_HEADER_PREFIX: &str = "x-fn0-";
 
@@ -109,6 +111,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
     pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     pub(crate) public_storage_hijack: Option<Arc<PublicStorageHijack>>,
+    pub(crate) static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -125,6 +128,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             vault_hijack: None,
             object_storage_hijack: None,
             public_storage_hijack: None,
+            static_page_cache_hijack: None,
         }
     }
 
@@ -180,6 +184,14 @@ impl<C: BundleCache> ExecutionContext<C> {
         self
     }
 
+    pub fn with_static_page_cache_hijack(
+        mut self,
+        static_page_cache_hijack: Arc<StaticPageCacheHijack>,
+    ) -> Self {
+        self.static_page_cache_hijack = Some(static_page_cache_hijack);
+        self
+    }
+
     pub fn bundle_cache(&self) -> &C {
         &self.bundle_cache
     }
@@ -222,6 +234,10 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn public_storage_hijack(&self) -> Option<&Arc<PublicStorageHijack>> {
         self.public_storage_hijack.as_ref()
+    }
+
+    pub fn static_page_cache_hijack(&self) -> Option<&Arc<StaticPageCacheHijack>> {
+        self.static_page_cache_hijack.as_ref()
     }
 }
 
@@ -332,15 +348,15 @@ impl<C: BundleCache> CodeExecutor<C> {
         bundle: Arc<Bundle>,
         request: Request,
     ) -> Result<Response> {
-        if let Some(candidate) = rendered_html_candidate(&bundle, &request)
+        if let Some(candidate) = static_page_candidate(&bundle, &request)
             && self
-                .rendered_html_preflight(project_id, &bundle, &candidate, &request)
+                .static_page_preflight(project_id, &bundle, &candidate, &request)
                 .await
         {
-            rendered_html::record_result(
+            static_page::record_result(
                 project_id,
                 candidate.code_version,
-                &candidate.object_path,
+                &candidate.path_identifier,
                 "eligible",
             );
             let sanitized_request = sanitize_static_request(request, &candidate.normalized_path);
@@ -351,10 +367,10 @@ impl<C: BundleCache> CodeExecutor<C> {
             let result = self
                 .finish_static_response(project_id, &candidate, response, used_js)
                 .await;
-            rendered_html::record_generation_duration(
+            static_page::record_generation_duration(
                 project_id,
                 candidate.code_version,
-                &candidate.object_path,
+                &candidate.path_identifier,
                 generation_start.elapsed(),
             );
             return result;
@@ -369,11 +385,11 @@ impl<C: BundleCache> CodeExecutor<C> {
         Ok(response)
     }
 
-    async fn rendered_html_preflight(
+    async fn static_page_preflight(
         &self,
         project_id: &str,
         bundle: &Arc<Bundle>,
-        candidate: &RenderedHtmlCandidate,
+        candidate: &StaticPageCandidate,
         incoming: &Request,
     ) -> bool {
         // The guest rebuilds its URI as `{scheme}://{authority}{path}`, taking the
@@ -394,17 +410,17 @@ impl<C: BundleCache> CodeExecutor<C> {
         let request = match request {
             Ok(request) => request,
             Err(error) => {
-                rendered_html::record_result(
+                static_page::record_result(
                     project_id,
                     candidate.code_version,
-                    &candidate.object_path,
+                    &candidate.path_identifier,
                     "preflight_error",
                 );
                 tracing::warn!(
                     %error,
                     project_id,
                     code_version = candidate.code_version,
-                    path_identifier = %candidate.object_path,
+                    path_identifier = %candidate.path_identifier,
                     "failed to build static page preflight request"
                 );
                 return false;
@@ -423,26 +439,26 @@ impl<C: BundleCache> CodeExecutor<C> {
                 true
             }
             Ok(_) => {
-                rendered_html::record_result(
+                static_page::record_result(
                     project_id,
                     candidate.code_version,
-                    &candidate.object_path,
+                    &candidate.path_identifier,
                     "preflight_miss",
                 );
                 false
             }
             Err(error) => {
-                rendered_html::record_result(
+                static_page::record_result(
                     project_id,
                     candidate.code_version,
-                    &candidate.object_path,
+                    &candidate.path_identifier,
                     "preflight_error",
                 );
                 tracing::warn!(
                     %error,
                     project_id,
                     code_version = candidate.code_version,
-                    path_identifier = %candidate.object_path,
+                    path_identifier = %candidate.path_identifier,
                     "static page preflight failed; falling back to normal SSR"
                 );
                 false
@@ -488,7 +504,7 @@ impl<C: BundleCache> CodeExecutor<C> {
     async fn finish_static_response(
         &self,
         project_id: &str,
-        candidate: &RenderedHtmlCandidate,
+        candidate: &StaticPageCandidate,
         response: Response,
         used_js: bool,
     ) -> Result<Response> {
@@ -505,26 +521,26 @@ impl<C: BundleCache> CodeExecutor<C> {
             && !parts.headers.contains_key(SET_COOKIE);
 
         if safe {
-            rendered_html::record_result(
+            static_page::record_result(
                 project_id,
                 candidate.code_version,
-                &candidate.object_path,
+                &candidate.path_identifier,
                 "generated",
             );
-            rendered_html::record_result(
+            static_page::record_result(
                 project_id,
                 candidate.code_version,
-                &candidate.object_path,
+                &candidate.path_identifier,
                 "cdn_cacheable",
             );
             return Ok(static_html_response_from_parts(
                 project_id, candidate, parts, body,
             ));
         } else {
-            rendered_html::record_result(
+            static_page::record_result(
                 project_id,
                 candidate.code_version,
-                &candidate.object_path,
+                &candidate.path_identifier,
                 "unsafe_response",
             );
         }
@@ -733,6 +749,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let vault_hijack = ctx.vault_hijack.clone();
         let object_storage_hijack = ctx.object_storage_hijack.clone();
         let public_storage_hijack = ctx.public_storage_hijack.clone();
+        let static_page_cache_hijack = ctx.static_page_cache_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
         let driver = tokio::task::spawn_local(async move {
@@ -750,6 +767,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 vault_hijack,
                 object_storage_hijack,
                 public_storage_hijack,
+                static_page_cache_hijack,
             ))
             .catch_unwind()
             .await;
@@ -783,14 +801,14 @@ impl<C: BundleCache> CodeExecutor<C> {
     }
 }
 
-struct RenderedHtmlCandidate {
+struct StaticPageCandidate {
     code_version: u64,
     normalized_path: String,
-    object_path: String,
+    path_identifier: String,
     method: Method,
 }
 
-fn rendered_html_candidate(bundle: &Bundle, request: &Request) -> Option<RenderedHtmlCandidate> {
+fn static_page_candidate(bundle: &Bundle, request: &Request) -> Option<StaticPageCandidate> {
     if !bundle.static_cache_enabled
         || (request.method() != Method::GET && request.method() != Method::HEAD)
         || request.uri().query().is_some()
@@ -798,12 +816,12 @@ fn rendered_html_candidate(bundle: &Bundle, request: &Request) -> Option<Rendere
         return None;
     }
     let code_version = bundle.code_version?;
-    let normalized_path = rendered_html::normalize_path(request.uri().path()).ok()?;
-    let object_path = rendered_html::object_path_for(&normalized_path);
-    Some(RenderedHtmlCandidate {
+    let normalized_path = static_page::normalize_path(request.uri().path()).ok()?;
+    let path_identifier = static_page::path_identifier_for(&normalized_path);
+    Some(StaticPageCandidate {
         code_version,
         normalized_path,
-        object_path: object_path.clone(),
+        path_identifier: path_identifier.clone(),
         method: request.method().clone(),
     })
 }
@@ -829,7 +847,7 @@ fn sanitize_static_request(request: Request, normalized_path: &str) -> Request {
 
 fn static_html_response_from_parts(
     project_id: &str,
-    candidate: &RenderedHtmlCandidate,
+    candidate: &StaticPageCandidate,
     mut parts: hyper::http::response::Parts,
     body: Bytes,
 ) -> Response {
@@ -845,7 +863,7 @@ fn static_html_response_from_parts(
     );
     parts.headers.insert(
         "cloudflare-cdn-cache-control",
-        hyper::header::HeaderValue::from_static(RENDERED_HTML_CDN_CACHE_CONTROL),
+        hyper::header::HeaderValue::from_static(STATIC_PAGE_CDN_CACHE_CONTROL),
     );
     parts.headers.insert(
         "cache-tag",

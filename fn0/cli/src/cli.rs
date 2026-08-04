@@ -40,6 +40,14 @@ pub enum Commands {
         #[arg(short, long)]
         project: Option<String>,
     },
+    /// Invalidate the edge copy of `cache_static` pages
+    PurgePage {
+        /// Route paths as a visitor requests them, e.g. /episode/1
+        #[arg(required = true)]
+        paths: Vec<String>,
+        #[arg(short, long)]
+        project: Option<String>,
+    },
     Admin {
         #[command(subcommand)]
         command: AdminCommands,

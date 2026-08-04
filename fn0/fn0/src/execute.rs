@@ -3,6 +3,7 @@ use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::public_storage_hijack::PublicStorageHijack;
 use crate::self_invoke::{self, SELF_HOST, SelfInvokeHooks, call_service};
+use crate::static_page_cache_hijack::StaticPageCacheHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
@@ -129,6 +130,7 @@ pub(crate) fn build_store<C>(
     vault_hijack: Option<&crate::VaultHijack>,
     object_storage_hijack: Option<&ObjectStorageHijack>,
     public_storage_hijack: Option<&PublicStorageHijack>,
+    static_page_cache_hijack: Option<&StaticPageCacheHijack>,
 ) -> Store<ClientState<C>>
 where
     C: Clock,
@@ -159,6 +161,9 @@ where
             if public_storage_hijack.is_some()
                 && (key == "FN0_PUBLIC_STORAGE_URL" || key == "FN0_PUBLIC_STORAGE_BASE_URL")
             {
+                continue;
+            }
+            if static_page_cache_hijack.is_some() && key == "FN0_STATIC_PAGE_CACHE_URL" {
                 continue;
             }
             builder.env(key, value);
@@ -194,6 +199,9 @@ where
         {
             builder.env("FN0_PUBLIC_STORAGE_URL", hijack.placeholder_url());
             builder.env("FN0_PUBLIC_STORAGE_BASE_URL", base_url);
+        }
+        if let Some(hijack) = static_page_cache_hijack {
+            builder.env("FN0_STATIC_PAGE_CACHE_URL", hijack.placeholder_url());
         }
         builder.build()
     };
@@ -244,6 +252,7 @@ pub async fn run_wasm_instance_loop(
     vault_hijack: Option<Arc<crate::VaultHijack>>,
     object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     public_storage_hijack: Option<Arc<PublicStorageHijack>>,
+    static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -265,6 +274,7 @@ pub async fn run_wasm_instance_loop(
             vault_hijack.clone(),
             object_storage_hijack.clone(),
             public_storage_hijack.clone(),
+            static_page_cache_hijack.clone(),
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
@@ -273,6 +283,7 @@ pub async fn run_wasm_instance_loop(
         vault_hijack.as_deref(),
         object_storage_hijack.as_deref(),
         public_storage_hijack.as_deref(),
+        static_page_cache_hijack.as_deref(),
     );
 
     let instantiate_start = std::time::Instant::now();

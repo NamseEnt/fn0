@@ -347,6 +347,11 @@ pub async fn run(options: DevOptions) -> Result<()> {
         format!("http://localhost:{port}"),
     ));
 
+    let static_page_cache_placeholder = "fn0-static-page-cache.fn0.dev".to_string();
+    let static_page_cache_hijack = Arc::new(fn0::StaticPageCacheHijack::new_local(
+        static_page_cache_placeholder.clone(),
+    ));
+
     let public_storage_placeholder = "fn0-public-storage.fn0.dev".to_string();
     let public_storage_hijack = Arc::new(fn0::PublicStorageHijack::new_local(
         public_storage_placeholder.clone(),
@@ -376,6 +381,10 @@ pub async fn run(options: DevOptions) -> Result<()> {
             "FN0_PUBLIC_STORAGE_BASE_URL".to_string(),
             public_storage_hijack.dev_base_url().to_string(),
         ),
+        (
+            "FN0_STATIC_PAGE_CACHE_URL".to_string(),
+            format!("http://{static_page_cache_placeholder}"),
+        ),
     ];
 
     let env_vars = resolve_dev_env(&project_dir, &local_service_env)?;
@@ -390,6 +399,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
         queue_hijack: Some(queue_hijack),
         object_storage_hijack: Some(object_storage_hijack),
         public_storage_hijack: Some(public_storage_hijack),
+        static_page_cache_hijack: Some(static_page_cache_hijack),
     };
 
     let handle = server::run(config).await?;

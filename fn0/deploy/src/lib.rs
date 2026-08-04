@@ -13,6 +13,7 @@ mod name;
 mod project;
 mod public_purge;
 mod static_files;
+mod static_page_purge;
 
 pub use admin::*;
 pub use app_url::*;
@@ -25,3 +26,4 @@ pub use name::*;
 pub use project::*;
 pub use public_purge::*;
 pub use static_files::*;
+pub use static_page_purge::*;

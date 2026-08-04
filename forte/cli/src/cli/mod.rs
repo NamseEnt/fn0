@@ -13,6 +13,7 @@ pub mod login;
 pub mod open;
 pub mod project_config;
 pub mod purge;
+pub mod purge_page;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -77,6 +78,14 @@ pub enum Commands {
         /// Keys inside the project's public namespace, e.g. captures/1/0.mp4
         #[arg(required = true)]
         keys: Vec<String>,
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+    /// Invalidate the edge copy of `cache_static` pages
+    PurgePage {
+        /// Route paths as a visitor requests them, e.g. /episode/1
+        #[arg(required = true)]
+        paths: Vec<String>,
         #[arg(short, long)]
         project: Option<PathBuf>,
     },

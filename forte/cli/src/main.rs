@@ -73,6 +73,11 @@ async fn async_main() -> Result<()> {
             cli::purge::run(keys, project_dir).await?;
         }
 
+        Commands::PurgePage { paths, project } => {
+            let project_dir = project.unwrap_or_else(|| ".".into());
+            cli::purge_page::run(paths, project_dir).await?;
+        }
+
         Commands::Admin { command } => match command {
             AdminCommands::Run {
                 task,

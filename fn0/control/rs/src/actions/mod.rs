@@ -25,5 +25,6 @@ pub mod revoke_token;
 pub mod secrets_encrypt;
 pub mod secrets_init;
 pub mod set_pending_fn0_wasmtime;
+pub mod static_page_purge;
 pub mod waitlist_join;
 pub mod zombie_sweep;

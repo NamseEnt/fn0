@@ -7,7 +7,7 @@ struct ForteConfig {
     project_id: Option<String>,
 }
 
-fn load_project_id(project_dir: &std::path::Path) -> Result<String> {
+pub(crate) fn load_project_id(project_dir: &std::path::Path) -> Result<String> {
     let config_path = project_dir.join("Forte.toml");
     let content = std::fs::read_to_string(&config_path)
         .map_err(|_| anyhow!("Forte.toml not found. Are you in a Forte project directory?"))?;

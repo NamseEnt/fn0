@@ -7,4 +7,5 @@ pub mod init;
 pub mod local;
 pub mod login;
 pub mod purge;
+pub mod purge_page;
 pub mod rename;

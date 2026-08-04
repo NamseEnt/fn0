@@ -232,6 +232,7 @@ Lazy static caching has these constraints:
 - Unannotated paths continue to use SSR.
 - CDN caching is controlled by the response headers; a response that is not safe remains private SSR.
 - Deployments purge the project cache tag before and after code-version activation. Static responses remain disabled until the purge queue completes.
+- A page whose content comes from data the app writes at runtime must invalidate it itself — see [Invalidating a page without deploying](#invalidating-a-page-without-deploying).
 
 Only declare pages whose output is safe to share with every visitor. Request headers, authentication, cookies, and other per-user state are intentionally absent during generation.
 
@@ -245,15 +246,49 @@ cloudflare-cdn-cache-control: public, max-age=31536000
 cache-tag: fn0-project-<project_id>
 ```
 
-The edge TTL is a fixed year and is not configurable. Expiry is not the invalidation mechanism — `cache-tag` is what deploy-time purges target, so every static page of a project is invalidated together, and a shorter TTL would only add origin hits that return the same bytes.
+The edge TTL is a fixed year and is not configurable. Expiry is not the invalidation mechanism — `cache-tag` is what deploy-time purges target, so every static page of a project is invalidated together, and a shorter TTL would only add origin hits that return the same bytes. A single page is invalidated by URL instead, through `static_page_cache::purge`.
 
 The CDN consumes `cloudflare-cdn-cache-control` and `cache-tag` and does not forward them. `cache-control: no-cache` does reach the browser, which is what makes a deploy purge effective: the browser revalidates against the edge on every request, the edge serves the cached copy until a purge, and a purge is therefore visible to repeat visitors immediately. A CDN configured to override the browser TTL instead breaks that — purges cannot reach a browser cache, so returning visitors would keep the previous version until their local TTL expired.
 
 A dynamic SSR response carries `cache-control: private, no-store` and neither CDN header.
 
+### Invalidating a page without deploying
+
+A deploy replaces every static page of a project at once. A page whose content is a function of the deployed code needs nothing else. A page built from data the app writes at runtime does: publishing an episode, editing a title, and deleting a record all change what the page should say while the code stays put.
+
+`static_page_cache::purge` invalidates individual pages:
+
+```rust
+use forte_sdk::static_page_cache;
+
+pub async fn publish(episode_id: u32) -> anyhow::Result<()> {
+    store::write_episode(episode_id).await?;
+    static_page_cache::purge(&[&format!("/episode/{episode_id}"), "/episodes"]).await?;
+    Ok(())
+}
+```
+
+Paths are route paths as a visitor requests them, not object keys, and they are resolved against the project's own domain. Rules:
+
+- The same path rules as `cache_static`: leading `/`, no query string, fragment, backslash, or dot segment.
+- Percent-encoding must already be upper-case (`/docs/%7Euser`, not `/docs/%7euser`). The edge keys its entry on the URL the visitor requested, so a path is checked and passed through unchanged rather than normalized — purging a different spelling would clear an entry nobody has.
+- At most 100 paths per call.
+- Purges are budgeted per project per hour, shared with `object_storage::public` purges. Over the budget the call returns `Error::RateLimited`.
+- Eligibility is not re-checked. A path that `cache_static_eligible` now rejects is exactly the path that most needs purging — the record it described was just deleted.
+- The call returns once the invalidation is queued, not once the edge is consistent.
+
+A project with no domain has no edge holding its pages, and the purge is a no-op.
+
+The owner can do the same from the CLI without deploying:
+
+```sh
+forte purge-page /episode/1 /episodes
+fn0 purge-page --project <name> /episode/1
+```
+
 ### Local development
 
-`fn0 local` evaluates static pages on every request because there is no CDN in front of the local server. Cache policy and header emission behave as they do in production; deploy purges have no local equivalent.
+`fn0 local` evaluates static pages on every request because there is no CDN in front of the local server. Cache policy and header emission behave as they do in production; deploy purges have no local equivalent. `static_page_cache::purge` succeeds and does nothing, so a publish step runs unchanged against the dev server.
 
 ## Error Handling
 

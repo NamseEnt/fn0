@@ -48,6 +48,9 @@ async fn async_main() -> Result<()> {
         Commands::Purge { keys, project } => {
             commands::purge::run(keys, project).await?;
         }
+        Commands::PurgePage { paths, project } => {
+            commands::purge_page::run(paths, project).await?;
+        }
         Commands::Admin { command } => match command {
             AdminCommands::Run {
                 task,

@@ -6,6 +6,7 @@ pub(crate) mod otel;
 pub mod rand;
 pub mod runtime;
 pub mod serve;
+pub mod static_page_cache;
 #[cfg(feature = "test-harness")]
 pub mod test_harness;
 pub mod time_wasi;

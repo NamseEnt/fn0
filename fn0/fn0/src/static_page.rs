@@ -1,13 +1,15 @@
-//! Path and telemetry rules shared by everything that caches server-rendered
-//! HTML: which request paths are cacheable, and what rendering costs.
+//! Path and telemetry rules shared by everything that serves a `cache_static`
+//! page: which request paths are cacheable, and what rendering costs.
 
 use opentelemetry::{KeyValue, global};
 use sha2::{Digest, Sha256};
 
-pub const PAGE_DIRECTORY: &str = "__forte/pages";
+/// Kept from when this identifier was an object key, so the metric's label
+/// values stay comparable across the bucket's removal.
+const PATH_IDENTIFIER_PREFIX: &str = "__forte/pages";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RenderedHtmlPathError {
+pub enum StaticPagePathError {
     EmptyPath,
     MissingLeadingSlash,
     QueryOrFragment,
@@ -16,7 +18,7 @@ pub enum RenderedHtmlPathError {
     Backslash,
 }
 
-impl std::fmt::Display for RenderedHtmlPathError {
+impl std::fmt::Display for StaticPagePathError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyPath => write!(formatter, "path is empty"),
@@ -33,20 +35,20 @@ impl std::fmt::Display for RenderedHtmlPathError {
     }
 }
 
-impl std::error::Error for RenderedHtmlPathError {}
+impl std::error::Error for StaticPagePathError {}
 
-pub fn normalize_path(path: &str) -> Result<String, RenderedHtmlPathError> {
+pub fn normalize_path(path: &str) -> Result<String, StaticPagePathError> {
     if path.is_empty() {
-        return Err(RenderedHtmlPathError::EmptyPath);
+        return Err(StaticPagePathError::EmptyPath);
     }
     if !path.starts_with('/') {
-        return Err(RenderedHtmlPathError::MissingLeadingSlash);
+        return Err(StaticPagePathError::MissingLeadingSlash);
     }
     if path.contains(['?', '#']) {
-        return Err(RenderedHtmlPathError::QueryOrFragment);
+        return Err(StaticPagePathError::QueryOrFragment);
     }
     if path.contains('\\') {
-        return Err(RenderedHtmlPathError::Backslash);
+        return Err(StaticPagePathError::Backslash);
     }
 
     let bytes = path.as_bytes();
@@ -59,15 +61,15 @@ pub fn normalize_path(path: &str) -> Result<String, RenderedHtmlPathError> {
             continue;
         }
         if byte_offset + 2 >= bytes.len() {
-            return Err(RenderedHtmlPathError::InvalidPercentEncoding);
+            return Err(StaticPagePathError::InvalidPercentEncoding);
         }
-        let high = hex_value(bytes[byte_offset + 1])
-            .ok_or(RenderedHtmlPathError::InvalidPercentEncoding)?;
-        let low = hex_value(bytes[byte_offset + 2])
-            .ok_or(RenderedHtmlPathError::InvalidPercentEncoding)?;
+        let high =
+            hex_value(bytes[byte_offset + 1]).ok_or(StaticPagePathError::InvalidPercentEncoding)?;
+        let low =
+            hex_value(bytes[byte_offset + 2]).ok_or(StaticPagePathError::InvalidPercentEncoding)?;
         let decoded = high * 16 + low;
         if decoded == b'\\' {
-            return Err(RenderedHtmlPathError::Backslash);
+            return Err(StaticPagePathError::Backslash);
         }
         normalized_bytes.push(b'%');
         normalized_bytes.push(upper_hex_byte(high));
@@ -78,33 +80,38 @@ pub fn normalize_path(path: &str) -> Result<String, RenderedHtmlPathError> {
 
     for segment in normalized.split('/') {
         if is_dot_segment(segment) {
-            return Err(RenderedHtmlPathError::DotSegment);
+            return Err(StaticPagePathError::DotSegment);
         }
     }
 
     Ok(normalized)
 }
 
-pub fn object_path_for(normalized_path: &str) -> String {
+pub fn path_identifier_for(normalized_path: &str) -> String {
     let digest = Sha256::digest(normalized_path.as_bytes());
     let mut encoded = String::with_capacity(digest.len() * 2);
     for byte in digest {
         encoded.push(upper_hex(byte >> 4));
         encoded.push(upper_hex(byte & 0x0f));
     }
-    format!("{PAGE_DIRECTORY}/{encoded}.html")
+    format!("{PATH_IDENTIFIER_PREFIX}/{encoded}.html")
 }
 
-pub fn record_result(project_id: &str, code_version: u64, object_path: &str, result: &'static str) {
+pub fn record_result(
+    project_id: &str,
+    code_version: u64,
+    path_identifier: &str,
+    result: &'static str,
+) {
     global::meter("fn0")
-        .u64_counter("fn0.rendered_html_requests")
+        .u64_counter("fn0.static_page_requests")
         .build()
         .add(
             1,
             &[
                 KeyValue::new("project_id", project_id.to_string()),
                 KeyValue::new("code_version", code_version.to_string()),
-                KeyValue::new("path_identifier", object_path.to_string()),
+                KeyValue::new("path_identifier", path_identifier.to_string()),
                 KeyValue::new("result", result),
             ],
         );
@@ -113,18 +120,18 @@ pub fn record_result(project_id: &str, code_version: u64, object_path: &str, res
 pub fn record_generation_duration(
     project_id: &str,
     code_version: u64,
-    object_path: &str,
+    path_identifier: &str,
     duration: std::time::Duration,
 ) {
     global::meter("fn0")
-        .f64_histogram("fn0.rendered_html_generation_duration_seconds")
+        .f64_histogram("fn0.static_page_generation_duration_seconds")
         .build()
         .record(
             duration.as_secs_f64(),
             &[
                 KeyValue::new("project_id", project_id.to_string()),
                 KeyValue::new("code_version", code_version.to_string()),
-                KeyValue::new("path_identifier", object_path.to_string()),
+                KeyValue::new("path_identifier", path_identifier.to_string()),
             ],
         );
 }
@@ -197,11 +204,11 @@ mod tests {
     }
 
     #[test]
-    fn creates_deterministic_opaque_object_paths() {
+    fn creates_deterministic_opaque_path_identifiers() {
         assert_eq!(
-            object_path_for("/"),
+            path_identifier_for("/"),
             "__forte/pages/8A5EDAB282632443219E051E4ADE2D1D5BBC671C781051BF1437897CBDFEA0F1.html"
         );
-        assert_ne!(object_path_for("/docs"), object_path_for("/docs/"));
+        assert_ne!(path_identifier_for("/docs"), path_identifier_for("/docs/"));
     }
 }

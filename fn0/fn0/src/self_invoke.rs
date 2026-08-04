@@ -8,6 +8,7 @@ use crate::otlp_hijack::OtlpHijack;
 use crate::presign_gate::PresignDenied;
 use crate::public_storage_hijack::PublicStorageHijack;
 use crate::queue_hijack::QueueHijack;
+use crate::static_page_cache_hijack::StaticPageCacheHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::vault_hijack::VaultHijack;
 use crate::{Request, Response, telemetry};
@@ -89,6 +90,7 @@ pub(crate) struct SelfInvokeHooks {
     vault_hijack: Option<Arc<VaultHijack>>,
     object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     public_storage_hijack: Option<Arc<PublicStorageHijack>>,
+    static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
 }
 
 impl SelfInvokeHooks {
@@ -104,6 +106,7 @@ impl SelfInvokeHooks {
         vault_hijack: Option<Arc<VaultHijack>>,
         object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
         public_storage_hijack: Option<Arc<PublicStorageHijack>>,
+        static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
     ) -> Self {
         Self {
             project_id,
@@ -116,6 +119,7 @@ impl SelfInvokeHooks {
             vault_hijack,
             object_storage_hijack,
             public_storage_hijack,
+            static_page_cache_hijack,
         }
     }
 }
@@ -188,6 +192,17 @@ impl WasiHttpHooks for SelfInvokeHooks {
                 self.project_id.clone(),
                 request,
                 options,
+            );
+        }
+
+        if let Some(hijack) = self.static_page_cache_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return static_page_cache_send(
+                hijack,
+                self.queue_hijack.clone(),
+                self.project_id.clone(),
+                request,
             );
         }
 
@@ -563,6 +578,69 @@ fn public_storage_send(
         let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(send_io);
         Ok((res, send_io))
+    })
+}
+
+/// Hands a guest's page invalidation to control.
+///
+/// The paths are validated here rather than in control so a typo comes back to
+/// the app as a `400` on its own call. Resolving them to URLs stays in control,
+/// which knows which host serves the project and holds the Cloudflare token.
+fn static_page_cache_send(
+    hijack: Arc<StaticPageCacheHijack>,
+    queue_hijack: Option<Arc<QueueHijack>>,
+    project_id: String,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let (_parts, body) = request.into_parts();
+        let body_bytes = match body.collect().await {
+            Ok(collected) => collected.to_bytes(),
+            Err(error) => return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into()),
+        };
+
+        let paths = match hijack.parse_paths(&body_bytes) {
+            Ok(paths) => paths,
+            Err(message) => return Ok((text_response(400, message)?, empty_io())),
+        };
+        let Some(control_project_id) = hijack.control_project_id() else {
+            return Ok((accepted_response()?, empty_io()));
+        };
+        if paths.is_empty() {
+            return Ok((accepted_response()?, empty_io()));
+        }
+        if !hijack.allow_purge(&project_id) {
+            let resp = text_response(429, "purge refused: hourly limit reached".to_string())?;
+            return Ok((resp, empty_io()));
+        }
+
+        let Some(queue_hijack) = queue_hijack else {
+            tracing::warn!(
+                project_id,
+                "static page purge requested with no queue to purge through"
+            );
+            let resp = text_response(500, "purge queue is not configured".to_string())?;
+            return Ok((resp, empty_io()));
+        };
+        let payload = serde_json::json!({ "project_id": project_id, "paths": paths });
+        let action =
+            queue_hijack.build_platform_enqueue(control_project_id, "static_page_purge", payload);
+        match action {
+            Ok(crate::queue_hijack::HijackAction::Synthesized(_)) => {}
+            Ok(crate::queue_hijack::HijackAction::Forward(request)) => {
+                if let Err(error) = default_send_request(request, None).await {
+                    tracing::warn!(?error, "static page purge enqueue failed");
+                    let resp = text_response(500, "purge could not be queued".to_string())?;
+                    return Ok((resp, empty_io()));
+                }
+            }
+            Err(error) => {
+                tracing::warn!(?error, "static page purge enqueue could not be built");
+                let resp = text_response(500, "purge could not be queued".to_string())?;
+                return Ok((resp, empty_io()));
+            }
+        }
+        Ok((accepted_response()?, empty_io()))
     })
 }
 

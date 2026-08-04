@@ -18,7 +18,7 @@ use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
     ExecutionContext, MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, PresignGate,
-    PublicStorageHijack, PurgeGate, QueueHijack, TursoHijack, VaultHijack,
+    PublicStorageHijack, PurgeGate, QueueHijack, StaticPageCacheHijack, TursoHijack, VaultHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -164,6 +164,17 @@ fn build_public_storage_hijack(
     )
 }
 
+fn build_static_page_cache_hijack(purge_gate: Arc<PurgeGate>) -> Arc<StaticPageCacheHijack> {
+    let placeholder_host = std::env::var("FN0_STATIC_PAGE_CACHE_PLACEHOLDER_HOST")
+        .unwrap_or_else(|_| "fn0-static-page-cache.fn0.dev".to_string());
+    let control_project_id =
+        std::env::var("FN0_CONTROL_PROJECT_ID").expect("FN0_CONTROL_PROJECT_ID must be set");
+    Arc::new(
+        StaticPageCacheHijack::new(placeholder_host, control_project_id)
+            .with_purge_gate(purge_gate),
+    )
+}
+
 fn main() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     color_eyre::install()?;
@@ -278,8 +289,9 @@ async fn run() -> Result<()> {
             ))
             .with_public_storage_hijack(build_public_storage_hijack(
                 storage_resolver.clone(),
-                purge_gate,
-            )),
+                purge_gate.clone(),
+            ))
+            .with_static_page_cache_hijack(build_static_page_cache_hijack(purge_gate)),
     );
 
     // Recorded on the worker's own meter rather than stamped into guest
