@@ -46,9 +46,9 @@ async fn my_async_test() {
 
 These tests do not run under libtest — `forte-test-runner` discovers them through the `fn0:test-harness/harness` export and runs each in its own instance. The target must set `harness = false` and call `forte_sdk::test_main!()`; see [forte/testing.md](forte/testing.md) for the wiring and the reason.
 
-### doc-db integration tests
+### Crates whose tests compile to wasm32-wasip2
 
-`doc-db` and `object-storage` compile to `wasm32-wasip2` for tests (configured in their `.cargo/config.toml`). Two prerequisites:
+`doc-db`, `object-storage` and `fn0-control` build their tests for `wasm32-wasip2` (configured in their `.cargo/config.toml`), so `cargo test` runs them through `forte-test-runner`.
 
 1. **`forte-test-runner` in PATH** — the configured WASM test runner. Install from the monorepo:
 
@@ -56,7 +56,9 @@ These tests do not run under libtest — `forte-test-runner` discovers them thro
 cargo install --path forte/test-runner
 ```
 
-2. **Running libSQL server** — the `libsql-test` service, on `127.0.0.1:18123`. Override with `DOC_DB_TEST_URL`.
+Reinstall it after pulling changes to the WASI wit or to `forte/test-runner` itself. An installed runner older than the checkout that built the component fails to link it, and reports that as an unimplemented WASI import rather than as a version skew.
+
+2. **Running libSQL server** — for `doc-db` only: the `libsql-test` service, on `127.0.0.1:18123`. Override with `DOC_DB_TEST_URL`.
 
 ```sh
 docker compose up -d libsql-test
@@ -67,6 +69,7 @@ Then run the tests:
 ```sh
 cargo test -p fn0-doc-db
 cargo test -p fn0-object-storage
+cd fn0/control/rs && cargo test   # its own workspace, so -p from the root does not reach it
 ```
 
 `forte-sdk` and other non-WASM crates do not require the test runner and run with the default host target.

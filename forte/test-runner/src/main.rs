@@ -180,7 +180,16 @@ async fn run_component(component_path: String, forwarded: Vec<String>) -> Result
     wasmtime_wasi::p3::add_to_linker(&mut linker)?;
     wasmtime_wasi_http::p3::add_to_linker(&mut linker)?;
 
-    let instance_pre = linker.instantiate_pre(&component)?;
+    let instance_pre = linker
+        .instantiate_pre(&component)
+        .map_err(anyhow::Error::from)
+        .context(
+            "this runner provides no implementation for something the component imports. \
+             A WASI interface named below is usually a version skew rather than a missing \
+             feature: an installed `forte-test-runner` older than the checkout that built \
+             the component reports it this way. Rebuild it with \
+             `cargo install --path forte/test-runner` before reading further",
+        )?;
 
     let mut wasi_args = Vec::with_capacity(forwarded.len() + 1);
     wasi_args.push(component_path.clone());

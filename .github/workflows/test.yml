@@ -55,5 +55,10 @@ jobs:
         working-directory: object-storage
         run: cargo test
 
+      # Its own workspace root, so no workspace-wide command reaches it.
+      - name: Test fn0-control
+        working-directory: fn0/control/rs
+        run: cargo test
+
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
