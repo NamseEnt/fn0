@@ -1,6 +1,56 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static SCRATCH_PATH_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+struct ExtractedArchive {
+    root: PathBuf,
+}
+
+impl Drop for ExtractedArchive {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.root);
+    }
+}
+
+async fn download_and_extract(
+    dir: &Path,
+    name: &str,
+    download_url: &str,
+) -> Result<ExtractedArchive> {
+    let scratch_id = format!(
+        "{}-{}",
+        std::process::id(),
+        SCRATCH_PATH_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+    );
+    let archive_path = dir.join(format!("{name}-temp-{scratch_id}.tar.xz"));
+
+    let response = reqwest::get(download_url).await?.error_for_status()?;
+    let bytes = response.bytes().await?;
+    std::fs::write(&archive_path, &bytes)?;
+
+    let extract_root = dir.join(format!("{name}-temp-extract-{scratch_id}"));
+    std::fs::create_dir_all(&extract_root)?;
+    let extracted = ExtractedArchive { root: extract_root };
+
+    let status = Command::new("tar")
+        .arg("xf")
+        .arg(&archive_path)
+        .arg("-C")
+        .arg(&extracted.root)
+        .status()
+        .context("Failed to run tar")?;
+
+    std::fs::remove_file(&archive_path)?;
+
+    if !status.success() {
+        anyhow::bail!("Failed to extract {} archive", name);
+    }
+
+    Ok(extracted)
+}
 
 fn tools_dir() -> Result<PathBuf> {
     let home = std::env::var("HOME").context("HOME not set")?;
@@ -34,33 +84,9 @@ pub async fn ensure_github_tool(
 
     println!("Downloading {} {}...", name, version);
 
-    let response = reqwest::get(download_url).await?.error_for_status()?;
-    let bytes = response.bytes().await?;
-
-    let temp_archive = dir.join(format!("{}-temp.tar.xz", name));
-    std::fs::write(&temp_archive, &bytes)?;
-
-    let temp_extract = dir.join(format!("{}-temp_extract", name));
-    std::fs::create_dir_all(&temp_extract)?;
-
-    let status = Command::new("tar")
-        .arg("xf")
-        .arg(&temp_archive)
-        .arg("-C")
-        .arg(&temp_extract)
-        .status()
-        .context("Failed to run tar")?;
-
-    std::fs::remove_file(&temp_archive)?;
-
-    if !status.success() {
-        let _ = std::fs::remove_dir_all(&temp_extract);
-        anyhow::bail!("Failed to extract {} archive", name);
-    }
-
-    let extracted = find_binary(&temp_extract, binary_name)?;
-    std::fs::rename(&extracted, &path)?;
-    let _ = std::fs::remove_dir_all(&temp_extract);
+    let extracted = download_and_extract(&dir, name, download_url).await?;
+    let extracted_binary = find_binary(&extracted.root, binary_name)?;
+    std::fs::rename(&extracted_binary, &path)?;
 
     #[cfg(unix)]
     {
@@ -90,38 +116,18 @@ pub async fn ensure_github_tool_with_libs(
 
     println!("Downloading {} {}...", name, version);
 
-    let response = reqwest::get(download_url).await?.error_for_status()?;
-    let bytes = response.bytes().await?;
-
-    let temp_archive = dir.join(format!("{}-temp.tar.xz", name));
-    std::fs::write(&temp_archive, &bytes)?;
-
-    let temp_extract = dir.join(format!("{}-temp_extract", name));
-    std::fs::create_dir_all(&temp_extract)?;
-
-    let status = Command::new("tar")
-        .arg("xf")
-        .arg(&temp_archive)
-        .arg("-C")
-        .arg(&temp_extract)
-        .status()
-        .context("Failed to run tar")?;
-
-    std::fs::remove_file(&temp_archive)?;
-
-    if !status.success() {
-        let _ = std::fs::remove_dir_all(&temp_extract);
-        anyhow::bail!("Failed to extract {} archive", name);
-    }
-
-    let extracted_binary = find_binary(&temp_extract, binary_name)?;
+    let extracted = download_and_extract(&dir, name, download_url).await?;
+    let extracted_binary = find_binary(&extracted.root, binary_name)?;
     let extracted_dir = extracted_binary.parent().unwrap();
 
-    if install_dir.exists() {
-        std::fs::remove_dir_all(&install_dir)?;
+    if let Err(rename_error) = std::fs::rename(extracted_dir, &install_dir) {
+        if binary_path.exists() {
+            return Ok(binary_path);
+        }
+        copy_dir_recursive(extracted_dir, &install_dir).with_context(|| {
+            format!("Failed to install {name} after rename failed: {rename_error}")
+        })?;
     }
-    rename_dir(extracted_dir, &install_dir)?;
-    let _ = std::fs::remove_dir_all(&temp_extract);
 
     #[cfg(unix)]
     {
@@ -131,15 +137,6 @@ pub async fn ensure_github_tool_with_libs(
 
     println!("{} {} ready.", name, version);
     Ok(binary_path)
-}
-
-fn rename_dir(from: &Path, to: &Path) -> Result<()> {
-    if std::fs::rename(from, to).is_ok() {
-        return Ok(());
-    }
-    copy_dir_recursive(from, to)?;
-    std::fs::remove_dir_all(from)?;
-    Ok(())
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
