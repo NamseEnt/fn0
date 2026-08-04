@@ -3,10 +3,13 @@ use serde::{Deserialize, Serialize};
 
 const CLOUDFLARE_API_BASE: &str = "https://api.cloudflare.com/client/v4";
 
+/// One entry of Cloudflare's by-URL purge, which accepts either a bare URL or
+/// an object whose header values select which per-`Origin` cache entry to
+/// clear. A bare URL clears the entry for a request that carried no `Origin`.
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum CachePurgeFile {
-    LegacyUrl(String),
+    Url(String),
     Request(CachePurgeRequest),
 }
 
