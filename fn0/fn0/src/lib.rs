@@ -19,6 +19,7 @@ pub mod storage_target;
 pub mod telemetry;
 pub mod turso_hijack;
 pub mod vault_hijack;
+mod zstd_decode_body;
 
 pub use panic_util::panic_payload_string;
 

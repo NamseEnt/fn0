@@ -11,6 +11,7 @@ use crate::queue_hijack::QueueHijack;
 use crate::static_page_cache_hijack::StaticPageCacheHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::vault_hijack::VaultHijack;
+use crate::zstd_decode_body::ZstdDecodeBody;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
@@ -543,6 +544,16 @@ fn public_storage_send(
             return Ok((text_response(200, url)?, empty_io()));
         }
 
+        // `forte dev` has no edge, so the marker falls through to the local
+        // store and the app sees the same bytes it would in production.
+        if request.headers().contains_key("x-fn0-public-cdn-get") && !hijack.is_local() {
+            let Some(url) = hijack.public_url_for(&project_id, request.uri().path()) else {
+                let resp = text_response(500, "public storage is not configured".to_string())?;
+                return Ok((resp, empty_io()));
+            };
+            return public_cdn_get(url, options).await;
+        }
+
         let changes_content = matches!(
             request.method(),
             &http::Method::PUT | &http::Method::POST | &http::Method::DELETE
@@ -688,6 +699,61 @@ fn text_response(
 fn accepted_response()
 -> std::result::Result<http::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
     text_response(202, String::new())
+}
+
+/// Reads a public object from the CDN instead of the bucket, so an edge hit
+/// costs the project no bucket operation.
+///
+/// `zstd` is asked for on the app's behalf and decoded before the bytes reach
+/// it, because the app's contract is that a read returns what was stored — the
+/// encoding is an artefact of this hop. It is the only encoding offered: the
+/// edge compresses per request rather than caching a compressed copy, so a
+/// second algorithm would buy nothing and cost decode time.
+///
+/// An encoding that was never asked for means the bytes are encoded for some
+/// other reason — an object written out of band with its own `Content-Encoding`
+/// — and decoding it would hand back something other than what is stored, so it
+/// is refused rather than guessed at.
+async fn public_cdn_get(url: String, options: Option<RequestOptions>) -> HookResult {
+    let request = http::Request::builder()
+        .method(http::Method::GET)
+        .uri(&url)
+        .header("accept-encoding", "zstd")
+        .body(
+            http_body_util::Empty::<Bytes>::new()
+                .map_err(|never: std::convert::Infallible| match never {})
+                .boxed_unsync(),
+        )
+        .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
+
+    let send_start = std::time::Instant::now();
+    let (res, send_io) = default_send_request(request, options).await?;
+    telemetry::stage_duration("hijack_public_storage_cdn", send_start.elapsed());
+
+    let (mut parts, body) = res.into_parts();
+    let body = body.boxed_unsync();
+    let body = match parts.headers.get("content-encoding") {
+        None => body,
+        Some(encoding) if encoding.as_bytes().eq_ignore_ascii_case(b"zstd") => {
+            parts.headers.remove("content-encoding");
+            // The decoded length is not known until the stream ends, and a
+            // stale one would describe the compressed bytes.
+            parts.headers.remove("content-length");
+            ZstdDecodeBody::new(body)?.boxed_unsync()
+        }
+        Some(encoding) => {
+            let encoding = String::from_utf8_lossy(encoding.as_bytes()).into_owned();
+            let resp = text_response(
+                502,
+                format!("public object came back with unrequested encoding {encoding}"),
+            )?;
+            return Ok((resp, empty_io()));
+        }
+    };
+
+    let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+        Box::new(send_io);
+    Ok((http::Response::from_parts(parts, body), send_io))
 }
 
 /// Invalidates the edge copy of a public object the app just replaced.

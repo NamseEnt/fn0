@@ -162,6 +162,61 @@ mod tests {
     }
 
     #[forte_sdk::test]
+    async fn public_reads_return_the_stored_object() {
+        let bucket = public::memory();
+        bucket
+            .put("clips/intro.mp4", "video/mp4", &b"bytes"[..])
+            .await
+            .unwrap();
+
+        for object in [
+            bucket.get_from_origin("clips/intro.mp4").await.unwrap(),
+            bucket.get_from_cdn("clips/intro.mp4").await.unwrap(),
+        ] {
+            let object = object.unwrap();
+            assert_eq!(object.content_type.as_deref(), Some("video/mp4"));
+            assert_eq!(object.body.bytes().await.unwrap().as_ref(), b"bytes");
+        }
+    }
+
+    #[forte_sdk::test]
+    async fn public_reads_of_a_missing_key_are_none() {
+        let bucket = public::memory();
+        assert!(
+            bucket
+                .get_from_origin("never/written")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            bucket
+                .get_from_cdn("never/written")
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[forte_sdk::test]
+    async fn public_get_body_feeds_put() {
+        let bucket = public::memory();
+        bucket
+            .put("source.mp4", "video/mp4", &b"payload"[..])
+            .await
+            .unwrap();
+
+        let object = bucket.get_from_origin("source.mp4").await.unwrap().unwrap();
+        bucket
+            .put("copy.mp4", "video/mp4", object.body)
+            .await
+            .unwrap();
+
+        let copied = bucket.get_from_cdn("copy.mp4").await.unwrap().unwrap();
+        assert_eq!(copied.body.bytes().await.unwrap().as_ref(), b"payload");
+    }
+
+    #[forte_sdk::test]
     async fn public_url_needs_no_stored_object() {
         let bucket = public::memory();
         assert_eq!(bucket.url("never/written"), "memory://public/never/written");

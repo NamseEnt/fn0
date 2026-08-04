@@ -225,6 +225,44 @@ the edge may still serve the previous bytes.
 There is no `presigned_get_url` here — the object is already public, so signing
 access to it means nothing.
 
+### Reading: `get_from_origin` vs `get_from_cdn`
+
+Reading is split by which copy answers, because the two cannot be made to
+agree. Both return the same `Option<Object>` as `private::get`.
+
+```rust
+// The bucket. Always the bytes this app last wrote.
+let object = public.get_from_origin("clips/intro.mp4").await?;
+
+// The edge. Cheaper, and can be a version behind.
+let object = public.get_from_cdn("clips/intro.mp4").await?;
+```
+
+| | reads | sees its own `put` | costs a bucket read |
+|---|---|---|---|
+| `get_from_origin` | the bucket | always | yes |
+| `get_from_cdn` | the CDN edge | only after the invalidation drains | only on an edge miss |
+
+Use `get_from_origin` whenever the app must see its own write, and
+`get_from_cdn` for an object read far more often than it is written — an edge
+hit never reaches the bucket, so it costs no R2 class B operation.
+
+`get_from_cdn` can answer with a previous version after a `put`, a `delete`, or
+a presigned upload. A presigned upload is the worst case: nothing invalidates
+the edge on that path at all, so without an explicit `purge` the stale copy can
+survive for up to a year.
+
+`head` and `list` always read the bucket, so they can report an object that
+`get_from_cdn` is still serving the previous version of.
+
+The bytes travel compressed when the CDN can compress them — the runtime asks
+for `zstd` and decodes the stream before it reaches your app, so what you read
+is always the stored bytes. Content types the CDN does not compress (images,
+video, anything already compressed) simply travel as they are.
+
+In `forte dev` there is no edge: both calls read the local store, so
+`get_from_cdn` never returns a previous version there.
+
 ### Presigned uploads
 
 `presigned_put_url` hands out an upload URL so the bytes never pass through

@@ -50,10 +50,31 @@ impl HttpBucket {
     }
 
     pub(crate) async fn get(&self, key: &str) -> Result<Option<Object>> {
+        self.get_object(key, Vec::new()).await
+    }
+
+    /// Asks the public-storage hijack to read the object from the CDN rather
+    /// than the bucket. The marker header is the whole contract: a worker that
+    /// predates it signs and forwards the request to the bucket instead, which
+    /// answers with the same bytes, so an old worker degrades to a plain read
+    /// rather than an error.
+    pub(crate) async fn get_through_cdn(&self, key: &str) -> Result<Option<Object>> {
+        self.get_object(
+            key,
+            vec![("x-fn0-public-cdn-get".to_string(), "1".to_string())],
+        )
+        .await
+    }
+
+    async fn get_object(
+        &self,
+        key: &str,
+        headers: Vec<(String, String)>,
+    ) -> Result<Option<Object>> {
         let response = runtime::send(Request {
             method: "GET",
             url: self.object_url(key),
-            headers: Vec::new(),
+            headers,
             body: None,
         })
         .await?;

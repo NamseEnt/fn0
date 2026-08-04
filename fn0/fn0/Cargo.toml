@@ -16,6 +16,7 @@ dashmap = { workspace = true }
 fn0-wasmtime = { workspace = true }
 futures = { workspace = true }
 hmac = { workspace = true }
+http-body = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["server", "client", "http1", "http2"] }
 hyper-rustls = { workspace = true }
@@ -59,6 +60,7 @@ wasmtime = { workspace = true, features = [
 ] }
 wasmtime-wasi = { workspace = true, features = ["p3"] }
 wasmtime-wasi-http = { workspace = true, features = ["component-model-async", "p3", "default-send-request"] }
+zstd = { workspace = true }
 
 [dev-dependencies]
 h2 = { workspace = true }
