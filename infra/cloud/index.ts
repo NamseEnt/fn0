@@ -353,7 +353,7 @@ const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
     scriptName: pulumi.interpolate`fn0-bundle-store-r2-worker-${suffix}`,
     bucketName: bundleStoreR2.bucketName,
     queueId: bundleStoreR2.queueId,
-    controlUrl: pulumi.interpolate`https://fn0-control.${domain}`,
+    controlUrl: pulumi.interpolate`https://${domain}`,
     adminToken: controlAdminToken.base64,
   },
   {},
@@ -604,7 +604,7 @@ new cloudflare.DnsRecord("control-a", {
 });
 
 new fn0.EventBridgeCronTrigger("control-cron-trigger", {
-  controlUrl: pulumi.interpolate`https://fn0-control.${domain}`,
+  controlUrl: pulumi.interpolate`https://${domain}`,
   controlAdminToken: controlAdminToken.base64,
   awsRegion: cwasmCompilerRegion,
   suffix,
@@ -666,7 +666,7 @@ export const controlBootstrapEnvYaml = pulumi.secret(
     (yaml) => `${yaml}FN0_WORKER_ORIGIN_HOSTNAME: oci-ap-osaka-1-nlb.${domain}\n`,
   ),
 );
-export const controlUrl = pulumi.interpolate`https://fn0-control.${domain}`;
+export const controlUrl = pulumi.interpolate`https://${domain}`;
 export const controlAdminTokenBase64 = pulumi.secret(controlAdminToken.base64);
 export const bundleStoreR2AccountId = bundleStoreR2.accountId;
 export const bundleStoreR2BucketName = bundleStoreR2.bucketName;
