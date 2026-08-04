@@ -81,11 +81,14 @@ provision_control_cloudflare() {
     __cf_expect "$code" "create bucket ${bucket}" allow_exists || return 1
   done
 
-  # Origin "*" because these buckets serve publicly readable objects and no
-  # credentialed request crosses them.
+  # The one origin control answers on, matching `put_cors` in
+  # cloudflare_provision.rs. A wider allowlist is not just permissive: the
+  # purge in queue_task/public_object_purge.rs enumerates the entries a
+  # browser can build from these origins, and an unbounded set cannot be
+  # enumerated, so a stale entry would outlive every purge.
   for bucket in "$private_bucket" "$public_bucket" "$asset_bucket"; do
     echo ">> put R2 CORS on ${bucket}"
-    body='{"rules":[{"allowed":{"methods":["GET","PUT","HEAD"],"origins":["*"],"headers":["*"]},"exposeHeaders":["ETag"],"maxAgeSeconds":86400}]}'
+    body="$(jq -nc --arg origin "https://${app_hostname}" '{rules:[{allowed:{methods:["GET","PUT","HEAD"],origins:[$origin],headers:["*"]},exposeHeaders:["ETag"],maxAgeSeconds:86400}]}')"
     code=$(__cf_call PUT "/accounts/${account_id}/r2/buckets/${bucket}/cors" "$cf_token" "$body")
     __cf_expect "$code" "put CORS on ${bucket}" || return 1
   done
