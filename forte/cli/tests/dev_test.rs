@@ -1,8 +1,16 @@
 use assert_cmd::cargo;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Stdio};
-use std::sync::mpsc;
+use std::sync::{Mutex, MutexGuard, PoisonError, mpsc};
 use std::time::Duration;
+
+static ONLY_ONE_DEV_SERVER_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+fn take_the_only_dev_server_slot() -> MutexGuard<'static, ()> {
+    ONLY_ONE_DEV_SERVER_AT_A_TIME
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
 
 fn get_forte_bin_path() -> std::path::PathBuf {
     cargo::cargo_bin!("forte").to_path_buf()
@@ -48,9 +56,14 @@ impl DevServer {
             }
         });
 
-        let port = rx
-            .recv_timeout(Duration::from_secs(120))
-            .expect("Timeout waiting for server to start");
+        let port = match rx.recv_timeout(Duration::from_secs(600)) {
+            Ok(port) => port,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("Timeout waiting for server to start: {error}");
+            }
+        };
 
         Self {
             child,
@@ -93,6 +106,7 @@ fn install_npm_deps(project_dir: &std::path::Path) {
 
 #[test]
 fn test_dev_server_starts_and_responds() {
+    let _dev_server_slot = take_the_only_dev_server_slot();
     let temp = tempfile::tempdir().unwrap();
     let project_dir = init_project(temp.path(), "test-app");
 
@@ -148,6 +162,7 @@ fn test_dev_server_starts_and_responds() {
 
 #[test]
 fn test_dev_auto_selects_port_if_busy() {
+    let _dev_server_slot = take_the_only_dev_server_slot();
     let temp = tempfile::tempdir().unwrap();
     let project_dir = init_project(temp.path(), "test-app-2");
 
@@ -177,6 +192,7 @@ fn vite_ssr_server_running(project_dir: &std::path::Path) -> bool {
 
 #[test]
 fn test_vite_ssr_exits_when_forte_dies() {
+    let _dev_server_slot = take_the_only_dev_server_slot();
     let temp = tempfile::tempdir().unwrap();
     let project_dir = init_project(temp.path(), "test-app-vite-ssr-exit");
 

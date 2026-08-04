@@ -47,6 +47,12 @@ jobs:
           echo "libsql did not become healthy" >&2
           exit 1
 
+      # doc-db and object-storage build their test targets for wasm32-wasip2
+      # from their own directories, so this cannot reach them and they keep
+      # their own steps below. forte-cli is covered by the forte-cli job.
+      - name: Test workspace
+        run: cargo test --workspace --exclude fn0-doc-db --exclude fn0-object-storage --exclude forte-cli
+
       - name: Test doc-db
         working-directory: doc-db
         run: cargo test
@@ -62,3 +68,23 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
+
+  forte-cli:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        run: |
+          rustup update stable
+          rustup target add wasm32-wasip2
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Each test runs `forte init` and then a real `forte build` or `forte dev`
+      # in a temp project: npm install, vite, sqld and a full wasm app build.
+      # Kept off the unit gate so an npm registry outage cannot mask a real
+      # regression behind fail-fast.
+      - name: Test forte-cli
+        run: cargo test -p forte-cli

@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["fn0/*", "forte/*", "doc-db", "object-storage"]
-exclude = ["vendor/*", "forte/rs-to-ts", "fn0/control"]
+exclude = ["vendor", "forte/rs-to-ts", "fn0/control"]
 
 [workspace.package]
 edition = "2024"
