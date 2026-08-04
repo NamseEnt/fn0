@@ -26,14 +26,13 @@ pub async fn init(
     let zone_name = resolve_setting(requested_zone, config.zone, "--zone", has_project_id)?;
     validate_zone_name(&zone_name)?;
     let domain = derive_domain(&project_name, &zone_name)?;
-    if has_project_id {
-        if let Some(stored_domain) = config.domain.as_deref() {
-            if stored_domain != domain {
-                return Err(anyhow!(
-                    "Forte.toml domain '{stored_domain}' does not match the derived domain '{domain}'."
-                ));
-            }
-        }
+    if has_project_id
+        && let Some(stored_domain) = config.domain.as_deref()
+        && stored_domain != domain
+    {
+        return Err(anyhow!(
+            "Forte.toml domain '{stored_domain}' does not match the derived domain '{domain}'."
+        ));
     }
 
     let creds = fn0_deploy::credentials::load()?.ok_or_else(|| {
