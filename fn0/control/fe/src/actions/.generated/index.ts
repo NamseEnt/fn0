@@ -25,5 +25,6 @@ export { revokeToken } from "./revoke_token";
 export { secretsEncrypt } from "./secrets_encrypt";
 export { secretsInit } from "./secrets_init";
 export { setPendingFn0Wasmtime } from "./set_pending_fn0_wasmtime";
+export { staticPagePurge } from "./static_page_purge";
 export { waitlistJoin } from "./waitlist_join";
 export { zombieSweep } from "./zombie_sweep";
