@@ -146,22 +146,100 @@ trap 'revoke_provisioning_token "$cf_user_token" "$provisioning_token_id"; rm -r
 provision_control_cloudflare \
   "$cf_account_id" "$provisioning_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID" "$CONTROL_CUSTOM_DOMAIN"
 
-# Minted here rather than taken from the stack: these are the same narrow
-# credentials `forte cloudflare connect` produces, and pulumi no longer holds
-# an account-wide R2 token to hand out instead.
-read -r worker_key_id worker_secret < <(mint_r2_token \
-  "$cf_user_token" "$cf_account_id" "fn0 worker (${CONTROL_PROJECT_ID})" \
-  "fn0-${CONTROL_PROJECT_ID}-private-object-storage" \
-  "fn0-${CONTROL_PROJECT_ID}-public-object-storage")
-read -r asset_key_id asset_secret < <(mint_r2_token \
-  "$cf_user_token" "$cf_account_id" "fn0 frontend assets (${CONTROL_PROJECT_ID})" \
-  "fn0-${CONTROL_PROJECT_ID}-frontend-asset")
-read -r purge_token_id purge_token < <(mint_purge_token \
-  "$cf_user_token" "$cf_zone_id" "fn0 cache purge (${CONTROL_PROJECT_ID})")
+# These are the same narrow credentials `forte cloudflare connect` produces —
+# pulumi no longer holds an account-wide R2 token to hand out instead — but they
+# are minted only when this run has none it can use. Cloudflare hands a token's
+# value out once, at creation, so the stored ciphertext is the only copy; a run
+# that could not read it back had to replace all three, and each replacement is
+# a window where a consumer still holding the old one is locked out.
+forte_group_token="$(pulumi_pick forteDbGroupToken)"
+forte_host_suffix="$(pulumi_pick forteDbHostSuffix)"
+if [[ -z "$forte_group_token" || -z "$forte_host_suffix" ]]; then
+  echo "missing pulumi output: forteDbGroupToken / forteDbHostSuffix (add them to index.ts exports)" >&2
+  exit 1
+fi
+control_db_url="https://${CONTROL_PROJECT_ID}${forte_host_suffix}"
+ensure_docs_table "$control_db_url" "$forte_group_token"
 
-worker_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$worker_secret")"
-asset_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$asset_secret")"
-purge_token_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$purge_token")"
+stored_config="$(select_doc_data "$control_db_url" "$forte_group_token" \
+  "ProjectCloudflareConfigDoc/project_id=${CONTROL_PROJECT_ID}" "")"
+stored_pick() {
+  [[ -z "$stored_config" ]] && return 0
+  jq -r "(.${1} // empty)" <<<"$stored_config"
+}
+
+worker_buckets=(
+  "fn0-${CONTROL_PROJECT_ID}-private-object-storage"
+  "fn0-${CONTROL_PROJECT_ID}-public-object-storage"
+)
+asset_buckets=("fn0-${CONTROL_PROJECT_ID}-frontend-asset")
+
+# reuse_r2_credential <key_id_field> <ciphertext_field> <bucket>...
+# Echoes "<key_id> <secret> <ciphertext>" when the stored credential opens
+# every bucket, nothing otherwise.
+reuse_r2_credential() {
+  local key_id_field="$1" ciphertext_field="$2"
+  shift 2
+  local key_id ciphertext secret
+  key_id="$(stored_pick "$key_id_field")"
+  ciphertext="$(stored_pick "$ciphertext_field")"
+  [[ -z "$key_id" || -z "$ciphertext" ]] && return 0
+  secret="$(kms_decrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$ciphertext")" || return 0
+  [[ -z "$secret" ]] && return 0
+  r2_credential_usable "$cf_account_id" "$key_id" "$secret" "$@" || return 0
+  echo "${key_id} ${secret} ${ciphertext}"
+}
+
+worker_minted=0
+worker_key_id=""
+read -r worker_key_id worker_secret worker_secret_ct < <(reuse_r2_credential \
+  worker_access_key_id worker_secret_ciphertext "${worker_buckets[@]}") || true
+if [[ -z "${worker_key_id:-}" ]]; then
+  worker_minted=1
+  read -r worker_key_id worker_secret < <(mint_r2_token \
+    "$cf_user_token" "$cf_account_id" "fn0 worker (${CONTROL_PROJECT_ID})" \
+    "${worker_buckets[@]}")
+  worker_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$worker_secret")"
+  echo ">> minted a new worker R2 credential"
+else
+  echo ">> reusing the stored worker R2 credential"
+fi
+
+asset_minted=0
+asset_key_id=""
+read -r asset_key_id asset_secret asset_secret_ct < <(reuse_r2_credential \
+  frontend_asset_access_key_id frontend_asset_secret_ciphertext "${asset_buckets[@]}") || true
+if [[ -z "${asset_key_id:-}" ]]; then
+  asset_minted=1
+  read -r asset_key_id asset_secret < <(mint_r2_token \
+    "$cf_user_token" "$cf_account_id" "fn0 frontend assets (${CONTROL_PROJECT_ID})" \
+    "${asset_buckets[@]}")
+  asset_secret_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$asset_secret")"
+  echo ">> minted a new frontend asset R2 credential"
+else
+  echo ">> reusing the stored frontend asset R2 credential"
+fi
+
+# A purge token carries one zone, and `/user/tokens/verify` does not say which,
+# so a zone change has to be caught by comparing what the doc was written with.
+purge_minted=0
+purge_token=""
+purge_token_ct="$(stored_pick purge_token_ciphertext)"
+if [[ -n "$purge_token_ct" && "$(stored_pick zone_id)" == "$cf_zone_id" ]]; then
+  purge_token="$(kms_decrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$purge_token_ct")" || purge_token=""
+  if [[ -n "$purge_token" ]] && purge_token_usable "$purge_token"; then
+    echo ">> reusing the stored cache purge token"
+  else
+    purge_token=""
+  fi
+fi
+if [[ -z "$purge_token" ]]; then
+  purge_minted=1
+  read -r purge_token_id purge_token < <(mint_purge_token \
+    "$cf_user_token" "$cf_zone_id" "fn0 cache purge (${CONTROL_PROJECT_ID})")
+  purge_token_ct="$(kms_encrypt "$vault_crypto_endpoint" "$vault_key_ocid" "$purge_token")"
+  echo ">> minted a new cache purge token"
+fi
 
 static_bucket="fn0-${CONTROL_PROJECT_ID}-frontend-asset"
 build_id="$(uuidgen | tr 'A-Z' 'a-z')"
@@ -185,15 +263,9 @@ code_version="$(python3 -c 'import time; print(int(time.time() * 1000))')"
 upload_r2_original "$CONTROL_PROJECT_ID" "$code_version" "$bundle_path"
 compile_via_cwasm "$CONTROL_PROJECT_ID" "$code_version" "$target_wasmtime" "$CWASM_LAMBDA_FUNCTION_NAME"
 
-# Step 6 — seed the fn0-control turso DB.
-forte_group_token="$(pulumi_pick forteDbGroupToken)"
-forte_host_suffix="$(pulumi_pick forteDbHostSuffix)"
-if [[ -z "$forte_group_token" || -z "$forte_host_suffix" ]]; then
-  echo "missing pulumi output: forteDbGroupToken / forteDbHostSuffix (add them to index.ts exports)" >&2
-  exit 1
-fi
-control_db_url="https://${CONTROL_PROJECT_ID}${forte_host_suffix}"
-ensure_docs_table "$control_db_url" "$forte_group_token"
+# Step 6 — seed the fn0-control turso DB. The DB handle and the docs table are
+# already in hand: the credential step above reads this same document to decide
+# whether it has to mint anything.
 owner_github_id="$(pulumi_pick controlOwnerGithubId)"
 if [[ -z "$owner_github_id" ]]; then
   echo "missing pulumi output: controlOwnerGithubId" >&2
@@ -215,11 +287,19 @@ seed_manifest_storage "$control_db_url" "$forte_group_token" "$CONTROL_PROJECT_I
 # Step 7 — seed the worker-agent's rollout target into the same control DB.
 seed_target_fn0_worker_config "$control_db_url" "$forte_group_token" "$worker_image_ref"
 
-# Step 8 — retire the credentials this run replaced. Last, because every doc
-# that names the new ones is written by now: until then the superseded token is
-# the one control is still serving with.
-revoke_superseded_tokens "$cf_user_token" "fn0 worker (${CONTROL_PROJECT_ID})" "$worker_key_id"
-revoke_superseded_tokens "$cf_user_token" "fn0 frontend assets (${CONTROL_PROJECT_ID})" "$asset_key_id"
-revoke_superseded_tokens "$cf_user_token" "fn0 cache purge (${CONTROL_PROJECT_ID})" "$purge_token_id"
+# Step 8 — retire the credentials this run replaced, and only those: a reused
+# credential is the one every consumer is already holding, so sweeping tokens by
+# name around it would revoke the live one. Last, because every doc that names
+# the new ones is written by now — until then the superseded token is the one
+# control is still serving with.
+if (( worker_minted )); then
+  revoke_superseded_tokens "$cf_user_token" "fn0 worker (${CONTROL_PROJECT_ID})" "$worker_key_id"
+fi
+if (( asset_minted )); then
+  revoke_superseded_tokens "$cf_user_token" "fn0 frontend assets (${CONTROL_PROJECT_ID})" "$asset_key_id"
+fi
+if (( purge_minted )); then
+  revoke_superseded_tokens "$cf_user_token" "fn0 cache purge (${CONTROL_PROJECT_ID})" "$purge_token_id"
+fi
 
 echo ">> bootstrap complete: project=${CONTROL_PROJECT_ID} domain=${CONTROL_CUSTOM_DOMAIN} code_version=${code_version}"

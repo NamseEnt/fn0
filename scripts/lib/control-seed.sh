@@ -166,7 +166,7 @@ seed_worker_manifest() {
   https_url="${db_url/libsql:\/\//https://}"
   https_url="${https_url%/}"
 
-  existing_data="$(__select_doc_data "$https_url" "$db_token" "WorkerManifestDoc" "")"
+  existing_data="$(select_doc_data "$https_url" "$db_token" "WorkerManifestDoc" "")"
   if [[ -z "$existing_data" ]]; then
     existing_data='{"manifest_version":0,"project_manifests":{}}'
   fi
@@ -186,9 +186,9 @@ seed_worker_manifest() {
   __upsert_doc "$db_url" "$db_token" "WorkerManifestDoc" "" "$merged"
 }
 
-# __select_doc_data <https_url> <db_token> <pk> <sk>
+# select_doc_data <https_url> <db_token> <pk> <sk>
 # Echoes the doc's data column as utf-8 JSON, or empty string if no row.
-__select_doc_data() {
+select_doc_data() {
   local url="$1" token="$2" pk="$3" sk="$4"
   local sql="SELECT data FROM docs WHERE pk = ? AND sk = ?"
   local req resp_file http_code
@@ -208,7 +208,7 @@ __select_doc_data() {
   if [[ "$http_code" != "200" ]] || ! jq -e '.results[0].type == "ok"' <"$resp_file" >/dev/null 2>&1; then
     cat "$resp_file" >&2
     rm -f "$resp_file"
-    echo "__select_doc_data HTTP ${http_code}" >&2
+    echo "select_doc_data HTTP ${http_code}" >&2
     return 1
   fi
   local cell_type cell_value
@@ -299,7 +299,7 @@ seed_manifest_storage() {
   https_url="${db_url/libsql:\/\//https://}"
   https_url="${https_url%/}"
 
-  config="$(__select_doc_data "$https_url" "$db_token" \
+  config="$(select_doc_data "$https_url" "$db_token" \
     "ProjectCloudflareConfigDoc/project_id=${project_id}" "")"
   if [[ -z "$config" ]]; then
     echo "seed_manifest_storage: no ProjectCloudflareConfigDoc for ${project_id}" >&2
@@ -316,7 +316,7 @@ seed_manifest_storage() {
     config_version
   }' <<<"$config")"
 
-  existing="$(__select_doc_data "$https_url" "$db_token" "WorkerManifestDoc" "")"
+  existing="$(select_doc_data "$https_url" "$db_token" "WorkerManifestDoc" "")"
   if [[ -z "$existing" ]]; then
     echo "seed_manifest_storage: no WorkerManifestDoc; seed the manifest first" >&2
     return 1

@@ -299,3 +299,48 @@ kms_encrypt() {
     --plaintext "$(printf '%s' "$plaintext" | base64)" \
     --query 'data.ciphertext' --raw-output
 }
+
+# kms_decrypt <crypto_endpoint> <key_ocid> <ciphertext>
+# Recovers what kms_encrypt stored. Without this the bootstrap has no way to
+# learn a credential it already holds — Cloudflare hands a token's value out
+# once, at creation — so every run had to mint a replacement.
+kms_decrypt() {
+  local endpoint="$1" key_ocid="$2" ciphertext="$3"
+  oci kms crypto decrypt \
+    --endpoint "$endpoint" \
+    --key-id "$key_ocid" \
+    --ciphertext "$ciphertext" \
+    --query 'data.plaintext' --raw-output \
+    | base64 -d
+}
+
+# r2_credential_usable <account_id> <access_key_id> <secret_access_key> <bucket>...
+# True when the credential opens every bucket named, which is the same list
+# mint_r2_token would scope a new one to. Checking all of them is what makes a
+# widened policy re-mint on its own: an older token opens the buckets it was
+# minted for and fails the one that was added.
+r2_credential_usable() {
+  local account_id="$1" access_key_id="$2" secret_access_key="$3"
+  shift 3
+  local endpoint="https://${account_id}.r2.cloudflarestorage.com" bucket
+  for bucket in "$@"; do
+    if ! AWS_ACCESS_KEY_ID="$access_key_id" \
+         AWS_SECRET_ACCESS_KEY="$secret_access_key" \
+         AWS_DEFAULT_REGION=auto \
+         aws s3api head-bucket --endpoint-url "$endpoint" --bucket "$bucket" \
+         >/dev/null 2>&1; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+# purge_token_usable <token>
+# `/user/tokens/verify` reports whether the token is live but not which zone it
+# covers, so the caller has to compare the stored zone id itself.
+purge_token_usable() {
+  local token="$1" code
+  code=$(__cf_call GET "/user/tokens/verify" "$token")
+  [[ "$code" == "200" ]] && \
+    [[ "$(jq -r '.result.status // empty' < /tmp/__cf_resp.body)" == "active" ]]
+}
