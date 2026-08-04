@@ -589,35 +589,11 @@ new cloudflare.DnsRecord("worker-lb-a", {
   proxied: true,
 });
 
-// fn0-control.fn0.dev is itself a project on the platform's own zone, so
-// unlike a BYOC custom domain it needs fn0 to provide its DNS presence too.
-// The wildcard used to cover this implicitly; now it needs its own explicit
-// proxied record for the Custom Hostname (control-custom-hostname) below to
-// have anything to route.
-new cloudflare.DnsRecord("control-a", {
-  zoneId,
-  name: pulumi.interpolate`fn0-control.${domain}`,
-  type: "A",
-  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
-  ttl: 1,
-  proxied: true,
-});
-
 new fn0.EventBridgeCronTrigger("control-cron-trigger", {
   controlUrl: pulumi.interpolate`https://${domain}`,
   controlAdminToken: controlAdminToken.base64,
   awsRegion: cwasmCompilerRegion,
   suffix,
-});
-
-new cloudflare.CustomHostname("control-custom-hostname", {
-  zoneId,
-  hostname: pulumi.interpolate`fn0-control.${domain}`,
-  ssl: {
-    method: "http",
-    type: "dv",
-    settings: { minTlsVersion: "1.2" },
-  },
 });
 
 export const workerImageRegistries = pulumi.secret(
