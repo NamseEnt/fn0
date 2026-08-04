@@ -20,7 +20,10 @@ struct AdminRunInput<'a> {
 enum AdminRunResponse {
     Ok {
         status: u16,
-        body: serde_json::Value,
+        #[serde(default)]
+        content_type: Option<String>,
+        #[serde(default)]
+        body: String,
     },
     NotLoggedIn,
     NotFound,
@@ -28,7 +31,10 @@ enum AdminRunResponse {
     NotDeployed,
     UpstreamError {
         status: u16,
-        body: serde_json::Value,
+        #[serde(default)]
+        content_type: Option<String>,
+        #[serde(default)]
+        body: String,
     },
     InternalError {
         reason: String,
@@ -75,15 +81,23 @@ pub async fn admin_run(
         .await?;
 
     match raw {
-        AdminRunResponse::Ok { status, body } => Ok(AdminRunOutput {
+        AdminRunResponse::Ok {
             status,
-            content_type: Some("application/json".to_string()),
-            body: serde_json::to_vec(&body)?,
+            content_type,
+            body,
+        } => Ok(AdminRunOutput {
+            status,
+            content_type,
+            body: body.into_bytes(),
         }),
-        AdminRunResponse::UpstreamError { status, body } => Ok(AdminRunOutput {
+        AdminRunResponse::UpstreamError {
             status,
-            content_type: Some("application/json".to_string()),
-            body: serde_json::to_vec(&body)?,
+            content_type,
+            body,
+        } => Ok(AdminRunOutput {
+            status,
+            content_type,
+            body: body.into_bytes(),
         }),
         AdminRunResponse::NotLoggedIn => {
             Err(anyhow!("control rejected token; run `fn0 login` again."))

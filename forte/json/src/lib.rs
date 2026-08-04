@@ -1,3 +1,20 @@
+//! JSON codec for the Forte action wire format.
+//!
+//! It is not plain `serde_json`. Two rules shape every payload, and a client
+//! written against `serde_json`'s defaults will fail to decode a valid message:
+//!
+//! - **Keys are camelCase on the wire.** [`to_vec`]/[`to_stream`] convert Rust
+//!   `snake_case` field names on the way out; [`from_slice`]/[`from_str`]
+//!   convert them back before deserializing, so Rust types are declared in
+//!   `snake_case` on both ends.
+//! - **A struct field that serializes to `null` is omitted entirely.** This
+//!   covers `Option::None`, and equally any other type whose value happens to
+//!   serialize as `null` — `serde_json::Value::Null` is the one that surprises
+//!   people, because the field is not declared `Option` and so looks required.
+//!   Every such field must be declared `#[serde(default)]` on the Rust side and
+//!   `.optional()` on the TypeScript side; `rs-to-ts` does that automatically
+//!   for `Option<T>` and cannot see the `Value::Null` case.
+
 mod impossible;
 mod map_key;
 

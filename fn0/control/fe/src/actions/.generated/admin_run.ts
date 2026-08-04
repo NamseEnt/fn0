@@ -62,7 +62,8 @@ const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
     status: z.number(),
-    body: ValueSchema,
+    contentType: z.string().optional(),
+    body: z.string(),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),
@@ -79,7 +80,8 @@ const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("UpstreamError"),
     status: z.number(),
-    body: ValueSchema,
+    contentType: z.string().optional(),
+    body: z.string(),
   }),
     z.object({
     t: z.literal("InternalError"),

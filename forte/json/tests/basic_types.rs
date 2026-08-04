@@ -134,7 +134,41 @@ async fn test_struct_with_option() {
         optional: None,
     };
     let json = stream_to_string(&v2).await;
-    assert_eq!(json, r#"{"required":20,"optional":null}"#);
+    assert_eq!(json, r#"{"required":20}"#);
+}
+
+#[derive(Serialize)]
+struct NullValuedField {
+    required: i32,
+    value: serde_json::Value,
+}
+
+#[tokio::test]
+async fn test_struct_field_serializing_to_null_is_omitted() {
+    let value = NullValuedField {
+        required: 10,
+        value: serde_json::Value::Null,
+    };
+    let json = stream_to_string(&value).await;
+    assert_eq!(json, r#"{"required":10}"#);
+}
+
+#[derive(Serialize)]
+enum NullValuedVariant {
+    Variant {
+        required: i32,
+        value: serde_json::Value,
+    },
+}
+
+#[tokio::test]
+async fn test_struct_variant_field_serializing_to_null_is_omitted() {
+    let value = NullValuedVariant::Variant {
+        required: 10,
+        value: serde_json::Value::Null,
+    };
+    let json = stream_to_string(&value).await;
+    assert_eq!(json, r#"{"t":"Variant","required":10}"#);
 }
 
 #[derive(Serialize)]

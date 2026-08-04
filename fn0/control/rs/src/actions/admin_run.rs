@@ -14,7 +14,8 @@ pub struct Input {
 pub enum Output {
     Ok {
         status: u16,
-        body: serde_json::Value,
+        content_type: Option<String>,
+        body: String,
     },
     NotLoggedIn,
     NotFound,
@@ -22,7 +23,8 @@ pub enum Output {
     NotDeployed,
     UpstreamError {
         status: u16,
-        body: serde_json::Value,
+        content_type: Option<String>,
+        body: String,
     },
     InternalError {
         reason: String,
@@ -140,21 +142,25 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
 
     let status = response.status().as_u16();
-    let body_value: serde_json::Value = response
-        .into_body()
-        .json()
-        .await
-        .unwrap_or(serde_json::Value::Null);
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    let body_bytes = response.into_body().bytes().await;
+    let body = String::from_utf8_lossy(&body_bytes).into_owned();
 
     if (200..300).contains(&status) {
         Output::Ok {
             status,
-            body: body_value,
+            content_type,
+            body,
         }
     } else {
         Output::UpstreamError {
             status,
-            body: body_value,
+            content_type,
+            body,
         }
     }
 }
