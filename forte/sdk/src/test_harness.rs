@@ -50,9 +50,8 @@ impl RegisteredTest {
 inventory::collect!(RegisteredTest);
 
 pub fn registered_tests() -> Vec<&'static RegisteredTest> {
-    let mut tests: Vec<&'static RegisteredTest> = inventory::iter::<RegisteredTest>
-        .into_iter()
-        .collect();
+    let mut tests: Vec<&'static RegisteredTest> =
+        inventory::iter::<RegisteredTest>.into_iter().collect();
     tests.sort_by_key(|test| test.full_name());
     tests
 }

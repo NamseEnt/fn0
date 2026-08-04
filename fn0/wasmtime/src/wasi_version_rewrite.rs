@@ -54,9 +54,7 @@ pub fn rewrite_wasi_030_rc_names(wasm: &[u8]) -> Option<Vec<u8>> {
 }
 
 pub fn is_component(wasm: &[u8]) -> bool {
-    wasm.len() > COMPONENT_PREAMBLE_LEN
-        && wasm[0..4] == *b"\0asm"
-        && wasm[6..8] == COMPONENT_LAYER
+    wasm.len() > COMPONENT_PREAMBLE_LEN && wasm[0..4] == *b"\0asm" && wasm[6..8] == COMPONENT_LAYER
 }
 
 /// `None` when nothing inside changed, which keeps the rewrite idempotent: the

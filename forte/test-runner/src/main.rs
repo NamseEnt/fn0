@@ -157,8 +157,7 @@ fn failure_message(err: &wasmtime::Error) -> String {
 /// non-async function types among them), so a regression would stay invisible
 /// until a runtime bump.
 fn validate_against_current_spec(component_bytes: &[u8], path: &str) -> Result<()> {
-    let mut validator =
-        wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all());
+    let mut validator = wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all());
     validator
         .validate_all(component_bytes)
         .with_context(|| format!("{path} is not a valid component"))?;
@@ -281,7 +280,11 @@ fn selected(name: &str, options: &Options) -> bool {
     if options.only_ignored {
         return false;
     }
-    if options.skips.iter().any(|skip| matches(name, skip, options)) {
+    if options
+        .skips
+        .iter()
+        .any(|skip| matches(name, skip, options))
+    {
         return false;
     }
     options.filters.is_empty()

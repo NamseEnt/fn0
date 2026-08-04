@@ -202,8 +202,7 @@ impl Client {
         crate::runtime::spawn(async move {
             drop(res_trailers_writer);
         });
-        let (body_stream, _trailers) =
-            p3::Response::consume_body(wasi_resp, res_trailers_reader);
+        let (body_stream, _trailers) = p3::Response::consume_body(wasi_resp, res_trailers_reader);
 
         let mut builder = Response::builder().status(status);
         for (name, value) in header_list {

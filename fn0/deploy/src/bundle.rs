@@ -68,8 +68,7 @@ pub fn create_raw_bundle_forte(
 /// runtime bump. Validating at upload time keeps that failure at the developer's
 /// terminal instead of surfacing as a 500 after a fleet upgrade.
 fn validate_wasm(wasm_bytes: &[u8], source: &Path) -> Result<()> {
-    let mut validator =
-        wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all());
+    let mut validator = wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all());
     validator.validate_all(wasm_bytes).map_err(|e| {
         anyhow!(
             "{} is not a valid WebAssembly component: {e}\n\

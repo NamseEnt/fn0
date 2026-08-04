@@ -9,10 +9,20 @@ fn component_names(component: &[u8]) -> Vec<String> {
     for payload in wasmparser::Parser::new(0).parse_all(component) {
         match payload {
             Ok(wasmparser::Payload::ComponentImportSection(reader)) => {
-                names.extend(reader.into_iter().flatten().map(|i| i.name.name.to_string()));
+                names.extend(
+                    reader
+                        .into_iter()
+                        .flatten()
+                        .map(|i| i.name.name.to_string()),
+                );
             }
             Ok(wasmparser::Payload::ComponentExportSection(reader)) => {
-                names.extend(reader.into_iter().flatten().map(|e| e.name.name.to_string()));
+                names.extend(
+                    reader
+                        .into_iter()
+                        .flatten()
+                        .map(|e| e.name.name.to_string()),
+                );
             }
             _ => {}
         }
@@ -46,8 +56,8 @@ fn fixture_is_the_prerelease_shape_the_rewrite_targets() {
 
 #[test]
 fn rewrite_moves_every_wasi_name_to_the_ratified_version() {
-    let rewritten =
-        fn0_wasmtime::rewrite_wasi_030_rc_names(RC_NAMED_SERVICE).expect("fixture must be rewritten");
+    let rewritten = fn0_wasmtime::rewrite_wasi_030_rc_names(RC_NAMED_SERVICE)
+        .expect("fixture must be rewritten");
     assert_valid(&rewritten);
 
     let names = component_names(&rewritten);
