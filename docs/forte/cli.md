@@ -165,6 +165,27 @@ See [object-storage/overview.md](../object-storage/overview.md#presigned-uploads
 
 ---
 
+### `forte purge-page <path>... [options]`
+
+Invalidate the CDN edge copy of one or more `#[cache_static]` pages without deploying. Use this when page content changes because data was written at runtime (e.g. publishing a record) rather than because code changed.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-p, --project <dir>` | `.` | Project directory |
+
+`<path>...` is one or more route paths as a visitor requests them (e.g. `/episode/1`). Leading `/` is required; no query string, fragment, backslash, or dot segment.
+
+```sh
+forte purge-page /episode/1
+forte purge-page /episode/1 /episodes
+```
+
+Prints each queued invalidation path and a count of invalidations submitted. Subject to the same hourly purge quota as `forte purge`.
+
+See [forte/pages.md](pages.md#invalidating-a-page-without-deploying) for when to use this and for the programmatic API (`static_page_cache::purge`).
+
+---
+
 ### `forte add page <path>`
 
 Add a new page (Rust handler + React component).

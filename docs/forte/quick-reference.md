@@ -17,8 +17,9 @@ forte build           # verify production build
 forte login           # authenticate with fn0 Cloud
 forte deploy          # build + upload to fn0 Cloud
 forte open            # open the deployed app in the browser
-forte purge key1 key2 # invalidate CDN edge copy of public objects (presigned-upload path)
-forte destroy         # delete the deployed project and all its resources
+forte purge key1 key2        # invalidate CDN edge copy of public objects (presigned-upload path)
+forte purge-page /path /path # invalidate CDN edge copy of cache_static pages (runtime data changed)
+forte destroy                # delete the deployed project and all its resources
 ```
 
 ## Handler Types at a Glance
