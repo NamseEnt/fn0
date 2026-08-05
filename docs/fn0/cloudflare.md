@@ -51,8 +51,8 @@ argument is not needed.
 
 ## Setup credential
 
-Setup has to create buckets, point a hostname at one, write one zone rule and
-sign a certificate. Create one reusable bootstrap token and provide it through
+Setup has to create buckets, point a hostname at one, write one zone rule, add
+one DNS record and sign a certificate. Create one reusable bootstrap token and provide it through
 `CLOUDFLARE_API_TOKEN`. Cloudflare dashboard → **My Profile → API Tokens →
 Create Token → Create Custom Token**. Give it exactly one permission:
 
@@ -139,8 +139,21 @@ and zone, and on nothing else. There is no `fn0.dev` fallback.
 Signing an origin certificate needs a permission fn0 deliberately does not
 hold, so this runs locally too. The CLI generates a key pair, has Cloudflare
 sign the certificate through your own Origin CA, uploads the certificate and
-key, and prints the one thing left to do: add a **proxied** `CNAME` record for
-that hostname pointing at the printed origin hostname.
+key, and then writes the **proxied** `CNAME` for that hostname into your zone,
+pointing at the fn0 origin hostname. Nothing is left for you to add by hand.
+
+The record is written last, after fn0 holds the certificate and the zone
+carries the cache rule, so the hostname resolves nowhere until everything
+behind it is ready.
+
+A hostname that is already taken is not silently overwritten. An existing
+`CNAME` on that name is repointed — you named the hostname on the command line,
+so where it resolves is what you are asking to change — but an `A` or `AAAA`
+record there stops the command with an error instead. Changing a project's
+domain removes the old record, and only that record: if the `CNAME` fn0 wrote
+has since been edited, it is left in place and reported. A record still
+pointing at fn0 is worth removing — the next project to register that hostname
+inherits whatever reaches it.
 
 The derived hostname is written to `Forte.toml`, and `forte deploy` refuses if
 the stored project name, zone, and hostname disagree with the live project.

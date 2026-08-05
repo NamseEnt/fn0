@@ -33,8 +33,7 @@ enum DomainSet {
 
 /// What the caller has to tell the user once the domain is registered.
 pub struct DomainOutcome {
-    /// The proxied CNAME target for the domain. Until that record exists, the
-    /// hostname resolves nowhere.
+    /// What the domain's proxied CNAME was pointed at.
     pub origin_hostname: String,
     pub replaced_domain: Option<String>,
 }
@@ -51,6 +50,10 @@ pub struct DomainOutcome {
 /// is redundant — but making it unconditional is what leaves a way to repair an
 /// allowlist that drifted, and re-running with an unchanged domain is how a
 /// user would expect to do that.
+///
+/// The DNS record is written last, once fn0 holds the certificate and the zone
+/// carries the cache rule: until it exists the hostname resolves nowhere, so no
+/// visitor can reach a domain that is only half set up.
 pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
     println!(
         "signing an origin certificate for {} (this runs locally)...",
@@ -117,6 +120,14 @@ pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
     provisioner(setup)
         .ensure_app_cache(
             setup.domain,
+            replaced_domain.as_deref(),
+            setup.mint_from_setup_token,
+        )
+        .await?;
+    provisioner(setup)
+        .ensure_app_dns_record(
+            setup.domain,
+            &origin_hostname,
             replaced_domain.as_deref(),
             setup.mint_from_setup_token,
         )

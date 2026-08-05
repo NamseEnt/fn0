@@ -105,18 +105,15 @@ pub async fn init(
         None => println!("  domain {domain} registered"),
     }
 
-    println!();
-    println!("Add this proxied record in your Cloudflare DNS:");
-    println!();
     println!(
-        "    CNAME   {domain}   {}   (proxied / orange cloud)",
+        "  CNAME {domain} -> {} written to your zone (proxied / orange cloud)",
         outcome.origin_hostname
     );
     println!();
     println!("It must stay proxied: the origin certificate is trusted by Cloudflare's");
     println!("edge only, so turning the record grey breaks the hostname.");
     println!();
-    println!("Then: forte deploy");
+    println!("Next: forte deploy");
     Ok(())
 }
 

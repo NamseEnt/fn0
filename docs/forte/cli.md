@@ -286,7 +286,7 @@ What it does, in order:
 5. Hands fn0 the narrow project credentials it keeps
 6. Signs an origin certificate through your Origin CA **on your machine** —
    fn0 holds no token that can sign one — and registers the derived domain
-7. Prints the proxied `CNAME` you have to add
+7. Writes the proxied `CNAME` for the derived domain into your zone
 
 The bootstrap token is never sent to fn0. It is used locally to provision the
 account and create project-scoped credentials.

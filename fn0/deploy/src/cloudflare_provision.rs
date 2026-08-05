@@ -2,8 +2,9 @@
 //!
 //! This is the half of bring-your-own-Cloudflare that deliberately does not run
 //! on fn0's servers. Creating buckets, attaching a CDN hostname, writing a cache
-//! rule and signing origin certificates all need an account-wide token, and a
-//! token that can do those things can also delete every bucket in the account.
+//! rule, pointing the app hostname at the fleet and signing origin certificates
+//! all need an account-wide token, and a token that can do those things can also
+//! delete every bucket in the account.
 //! Measured, not assumed: an account-scoped `Workers R2 Storage Edit` token
 //! reaches every bucket in the account over the S3 API, `DeleteBucket`
 //! included.
@@ -65,6 +66,9 @@ const CERTIFICATE_REQUEST_TYPE: &str = "origin-ecc";
 const PROVISIONING_TOKEN_MINUTES: i64 = 10;
 const R2_STORAGE_WRITE: &str = "bf7481a1826f439697cb59a20b22293e";
 const ZONE_READ: &str = "c8fed203ed3043cba015a93ad1616f1f";
+/// `DNS Write`, not `Zone DNS Settings Write`: the latter carries the zone's DNS
+/// settings and cannot touch a record.
+const DNS_WRITE: &str = "4755a26eedb94da69e1066d98aa820be";
 const CACHE_SETTINGS_WRITE: &str = "9ff81cbbe65c400b97d92c3c1033cab6";
 const ZONE_SETTINGS_WRITE: &str = "3030687196b94b638145a3953da2b699";
 const SSL_AND_CERTIFICATES_WRITE: &str = "c03055bc037c4ea9afb9a9f104b7b721";
@@ -712,6 +716,218 @@ impl Provisioner {
         result
     }
 
+    /// Points the app hostname at the worker fleet and takes the record the
+    /// project used to answer on back out of the zone.
+    ///
+    /// The record is proxied. An Origin CA certificate is trusted by
+    /// Cloudflare's edge and by nothing else, so a grey-clouded record reaches
+    /// the fleet and fails the handshake.
+    ///
+    /// Removing the replaced record is not tidying: it points at fn0 by name,
+    /// and any project that registers that hostname next inherits the traffic.
+    pub async fn ensure_app_dns_record(
+        &self,
+        app_hostname: &str,
+        origin_hostname: &str,
+        replaced_app_hostname: Option<&str>,
+        mint_writing_token: bool,
+    ) -> Result<()> {
+        if !mint_writing_token {
+            return self
+                .write_app_dns_record(
+                    &self.setup_token,
+                    app_hostname,
+                    origin_hostname,
+                    replaced_app_hostname,
+                )
+                .await;
+        }
+
+        let writing = self.mint_provisioning_token(app_hostname).await?;
+        let result = self
+            .write_app_dns_record(
+                &writing.value,
+                app_hostname,
+                origin_hostname,
+                replaced_app_hostname,
+            )
+            .await;
+        if let Err(error) = self.revoke_token("DNS record", &writing.id).await {
+            eprintln!(
+                "warning: {error}. It expires by itself within \
+                 {PROVISIONING_TOKEN_MINUTES} minutes."
+            );
+        }
+        result
+    }
+
+    async fn write_app_dns_record(
+        &self,
+        token: &str,
+        app_hostname: &str,
+        origin_hostname: &str,
+        replaced_app_hostname: Option<&str>,
+    ) -> Result<()> {
+        let existing = self.dns_records(token, app_hostname).await?;
+        match decide_app_dns_record(&existing, origin_hostname) {
+            AppDnsRecordWrite::AlreadyPointed => {}
+            AppDnsRecordWrite::Create => {
+                self.create_app_dns_record(token, app_hostname, origin_hostname)
+                    .await?
+            }
+            AppDnsRecordWrite::Repoint { record_id } => {
+                self.repoint_app_dns_record(token, record_id, app_hostname, origin_hostname)
+                    .await?
+            }
+            AppDnsRecordWrite::Occupied { record_types } => {
+                return Err(anyhow!(
+                    "{app_hostname} already resolves through {record_types} record(s), and only a \
+                     CNAME can be repointed at {origin_hostname}. Delete them in the Cloudflare \
+                     dashboard, or set the project up under a name that is free."
+                ));
+            }
+        }
+
+        // Guarded rather than assumed: control reports a replaced domain only
+        // when it differs, and a version of it that ever reported the same one
+        // would have this delete the record just written.
+        if let Some(replaced_app_hostname) =
+            replaced_app_hostname.filter(|replaced| *replaced != app_hostname)
+        {
+            self.remove_replaced_app_dns_record(token, replaced_app_hostname, origin_hostname)
+                .await?;
+        }
+        Ok(())
+    }
+
+    /// Only the record this command itself would have written is removed.
+    /// Anything else on that hostname is the user's, and a domain change is no
+    /// reason to delete it for them.
+    async fn remove_replaced_app_dns_record(
+        &self,
+        token: &str,
+        replaced_app_hostname: &str,
+        origin_hostname: &str,
+    ) -> Result<()> {
+        let zone_name = self.zone_name(token).await?;
+        if !replaced_app_hostname.ends_with(&format!(".{zone_name}")) {
+            eprintln!(
+                "warning: {replaced_app_hostname} is not in {zone_name}, so its record still \
+                 points at fn0. Delete it in the zone that holds it."
+            );
+            return Ok(());
+        }
+
+        let records = self.dns_records(token, replaced_app_hostname).await?;
+        if records.is_empty() {
+            return Ok(());
+        }
+        let Some(written_here) = replaced_app_dns_record(&records, origin_hostname) else {
+            eprintln!(
+                "warning: left the DNS record for {replaced_app_hostname} in place: it is not the \
+                 proxied CNAME fn0 wrote. Read it, and remove it yourself if that hostname should \
+                 stop resolving."
+            );
+            return Ok(());
+        };
+        self.delete_dns_record(token, &written_here.id, replaced_app_hostname)
+            .await
+    }
+
+    /// `?name=` matches the whole name, measured against the live API: listing
+    /// `example.com` answers with the apex records alone rather than everything
+    /// under it.
+    async fn dns_records(&self, token: &str, hostname: &str) -> Result<Vec<DnsRecord>> {
+        let (status, envelope) = self
+            .call::<Vec<DnsRecord>>(
+                token,
+                reqwest::Method::GET,
+                &format!("/zones/{}/dns_records?name={hostname}", self.zone_id),
+                None,
+            )
+            .await?;
+        if envelope.success {
+            return Ok(envelope.result.unwrap_or_default());
+        }
+        Err(anyhow!(
+            "could not read the DNS records for {hostname} ({status}). The token needs Zone -> DNS -> Edit. {}",
+            describe(&envelope.errors)
+        ))
+    }
+
+    async fn create_app_dns_record(
+        &self,
+        token: &str,
+        app_hostname: &str,
+        origin_hostname: &str,
+    ) -> Result<()> {
+        let (status, envelope) = self
+            .call::<serde_json::Value>(
+                token,
+                reqwest::Method::POST,
+                &format!("/zones/{}/dns_records", self.zone_id),
+                Some(serde_json::json!({
+                    "type": "CNAME",
+                    "name": app_hostname,
+                    "content": origin_hostname,
+                    "proxied": true,
+                })),
+            )
+            .await?;
+        if envelope.success {
+            return Ok(());
+        }
+        Err(anyhow!(
+            "could not point {app_hostname} at {origin_hostname} ({status}). The token needs Zone -> DNS -> Edit. {}",
+            describe(&envelope.errors)
+        ))
+    }
+
+    async fn repoint_app_dns_record(
+        &self,
+        token: &str,
+        record_id: &str,
+        app_hostname: &str,
+        origin_hostname: &str,
+    ) -> Result<()> {
+        let (status, envelope) = self
+            .call::<serde_json::Value>(
+                token,
+                reqwest::Method::PATCH,
+                &format!("/zones/{}/dns_records/{record_id}", self.zone_id),
+                Some(serde_json::json!({
+                    "content": origin_hostname,
+                    "proxied": true,
+                })),
+            )
+            .await?;
+        if envelope.success {
+            return Ok(());
+        }
+        Err(anyhow!(
+            "could not repoint {app_hostname} at {origin_hostname} ({status}). The token needs Zone -> DNS -> Edit. {}",
+            describe(&envelope.errors)
+        ))
+    }
+
+    async fn delete_dns_record(&self, token: &str, record_id: &str, hostname: &str) -> Result<()> {
+        let (status, envelope) = self
+            .call::<serde_json::Value>(
+                token,
+                reqwest::Method::DELETE,
+                &format!("/zones/{}/dns_records/{record_id}", self.zone_id),
+                None,
+            )
+            .await?;
+        if envelope.success {
+            return Ok(());
+        }
+        Err(anyhow!(
+            "could not delete the DNS record for {hostname} ({status}). The token needs Zone -> DNS -> Edit. {}",
+            describe(&envelope.errors)
+        ))
+    }
+
     async fn mint_with_expiry(
         &self,
         name: &str,
@@ -747,6 +963,7 @@ impl Provisioner {
                             { "id": CACHE_SETTINGS_WRITE },
                             { "id": ZONE_SETTINGS_WRITE },
                             { "id": SSL_AND_CERTIFICATES_WRITE },
+                            { "id": DNS_WRITE },
                         ],
                     }),
                 ],
@@ -1132,6 +1349,72 @@ fn cache_rule_host_expression(zone_name: &str, app_hostnames: &BTreeSet<String>)
     host_expressions.join(" or ")
 }
 
+#[derive(Deserialize)]
+struct DnsRecord {
+    id: String,
+    #[serde(rename = "type")]
+    record_type: String,
+    content: String,
+    /// Absent on the record types that cannot be proxied at all.
+    #[serde(default)]
+    proxied: bool,
+}
+
+enum AppDnsRecordWrite<'a> {
+    AlreadyPointed,
+    Create,
+    Repoint {
+        record_id: &'a str,
+    },
+    /// Held by records a CNAME cannot join: Cloudflare refuses an A next to a
+    /// CNAME on one name, and refuses a second record of either kind.
+    Occupied {
+        record_types: String,
+    },
+}
+
+/// A CNAME already on the hostname is repointed rather than refused. The user
+/// named this hostname on the command line, so where it resolves is what they
+/// are asking to change; an address record of another type is a different
+/// enough thing to stop for.
+fn decide_app_dns_record<'a>(
+    records: &'a [DnsRecord],
+    origin_hostname: &str,
+) -> AppDnsRecordWrite<'a> {
+    let resolving: Vec<&DnsRecord> = records
+        .iter()
+        .filter(|record| matches!(record.record_type.as_str(), "A" | "AAAA" | "CNAME"))
+        .collect();
+    match resolving.as_slice() {
+        [] => AppDnsRecordWrite::Create,
+        [record] if record.record_type == "CNAME" => {
+            if record.content == origin_hostname && record.proxied {
+                AppDnsRecordWrite::AlreadyPointed
+            } else {
+                AppDnsRecordWrite::Repoint {
+                    record_id: &record.id,
+                }
+            }
+        }
+        _ => AppDnsRecordWrite::Occupied {
+            record_types: resolving
+                .iter()
+                .map(|record| record.record_type.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+        },
+    }
+}
+
+fn replaced_app_dns_record<'a>(
+    records: &'a [DnsRecord],
+    origin_hostname: &str,
+) -> Option<&'a DnsRecord> {
+    records.iter().find(|record| {
+        record.record_type == "CNAME" && record.proxied && record.content == origin_hostname
+    })
+}
+
 fn hex_sha256(value: &str) -> String {
     let digest = Sha256::digest(value.as_bytes());
     let mut out = String::with_capacity(digest.len() * 2);
@@ -1161,8 +1444,83 @@ fn already_exists(errors: &[ApiError]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{cache_rule_app_hostnames, cache_rule_host_expression};
+    use super::{
+        AppDnsRecordWrite, DnsRecord, cache_rule_app_hostnames, cache_rule_host_expression,
+        decide_app_dns_record, replaced_app_dns_record,
+    };
     use std::collections::BTreeSet;
+
+    const ORIGIN: &str = "worker.fn0.dev";
+
+    fn record(record_type: &str, content: &str, proxied: bool) -> DnsRecord {
+        DnsRecord {
+            id: format!("id-{record_type}-{content}"),
+            record_type: record_type.to_string(),
+            content: content.to_string(),
+            proxied,
+        }
+    }
+
+    #[test]
+    fn app_dns_record_is_created_when_the_hostname_is_free() {
+        assert!(matches!(
+            decide_app_dns_record(&[], ORIGIN),
+            AppDnsRecordWrite::Create
+        ));
+    }
+
+    #[test]
+    fn app_dns_record_already_pointed_is_left_alone() {
+        let records = [
+            record("CNAME", ORIGIN, true),
+            record("TXT", "some verification string", false),
+        ];
+
+        assert!(matches!(
+            decide_app_dns_record(&records, ORIGIN),
+            AppDnsRecordWrite::AlreadyPointed
+        ));
+    }
+
+    #[test]
+    fn app_dns_record_is_repointed_when_it_is_grey_or_aimed_elsewhere() {
+        for records in [
+            [record("CNAME", ORIGIN, false)],
+            [record("CNAME", "somewhere.example.com", true)],
+        ] {
+            let AppDnsRecordWrite::Repoint { record_id } = decide_app_dns_record(&records, ORIGIN)
+            else {
+                panic!("expected a repoint");
+            };
+            assert_eq!(record_id, records[0].id);
+        }
+    }
+
+    #[test]
+    fn app_dns_record_refuses_an_address_record_it_cannot_repoint() {
+        let records = [record("A", "203.0.113.7", true)];
+
+        let AppDnsRecordWrite::Occupied { record_types } = decide_app_dns_record(&records, ORIGIN)
+        else {
+            panic!("expected the hostname to read as occupied");
+        };
+        assert_eq!(record_types, "A");
+    }
+
+    #[test]
+    fn replaced_app_dns_record_matches_only_the_record_fn0_wrote() {
+        assert!(
+            replaced_app_dns_record(&[record("CNAME", ORIGIN, true)], ORIGIN)
+                .is_some_and(|found| found.content == ORIGIN)
+        );
+        for records in [
+            [record("CNAME", ORIGIN, false)],
+            [record("CNAME", "somewhere.example.com", true)],
+            [record("A", "203.0.113.7", true)],
+        ] {
+            assert!(replaced_app_dns_record(&records, ORIGIN).is_none());
+        }
+    }
 
     #[test]
     fn cache_rule_expression_contains_bucket_and_app_hosts() {
