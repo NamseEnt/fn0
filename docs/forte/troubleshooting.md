@@ -127,7 +127,7 @@ These crates compile to `wasm32-wasip2` for tests and require:
 1. `forte-test-runner` in PATH.
 2. A running libSQL server for `doc-db` tests:
    ```sh
-   docker-compose up -d
+   docker compose up -d libsql-test
    ```
 
 See [development.md](../development.md) for full prerequisites.
