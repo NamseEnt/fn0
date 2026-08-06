@@ -1763,7 +1763,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1967,7 +1967,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-ski"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -2001,7 +2001,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "aes-gcm",
  "anyhow",
