@@ -166,16 +166,32 @@ static RUNTIME_SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/RUNJS
 
 pub const JS_CALL_CPU_BUDGET_NANOS: u64 = 100_000_000;
 
+/// `execute_script` only evaluates the bundle's top level. Whatever the entry
+/// defers behind `import()` — the app module, the matched route's component and
+/// props schema — is instantiated inside the first call instead, and the
+/// renderer's first pass runs entirely uncompiled. That one-time cost is not
+/// request work, but it lands on whichever request arrives first, so charging
+/// it at `JS_CALL_CPU_BUDGET_NANOS` kills a cold instance on a page every later
+/// call renders in single-digit milliseconds.
+///
+/// It covers every call issued before the instance goes warm, not just the
+/// first one: the budget is checked against the isolate's cumulative CPU, so a
+/// request that merely arrives during the cold start is charged for the cold
+/// start too and would terminate the isolate out from under it.
+pub const JS_COLD_CALL_CPU_BUDGET_NANOS: u64 = 2_000_000_000;
+
 type DeadlineMap = std::sync::Mutex<std::collections::HashMap<u32, u64>>;
 
 pub struct SkiInstance {
     runtime: Rc<RefCell<JsRuntime>>,
     run_handler: v8::Global<v8::Function>,
     next_id: Cell<u32>,
+    warm: Rc<Cell<bool>>,
     driver_waker: Rc<Cell<Option<Waker>>>,
     deadlines: std::sync::Arc<DeadlineMap>,
     metrics: std::sync::Arc<CpuMetrics>,
     terminated: std::sync::Arc<tokio::sync::Notify>,
+    terminated_flag: std::sync::Arc<AtomicBool>,
     // Sole strong owner of this instance's WATCHDOG entry; dropped with the instance to unregister it.
     _watchdog_entry: std::sync::Arc<WatchdogEntry>,
 }
@@ -231,6 +247,7 @@ struct WatchdogEntry {
     deadlines: std::sync::Arc<DeadlineMap>,
     metrics: std::sync::Arc<CpuMetrics>,
     terminated: std::sync::Arc<tokio::sync::Notify>,
+    terminated_flag: std::sync::Arc<AtomicBool>,
 }
 
 static WATCHDOG: std::sync::OnceLock<std::sync::Mutex<Vec<std::sync::Weak<WatchdogEntry>>>> =
@@ -266,6 +283,7 @@ fn watchdog_loop() {
                 deadlines.values().any(|&d| total >= d)
             };
             if exceeded {
+                entry.terminated_flag.store(true, Ordering::Release);
                 entry.isolate.terminate_execution();
                 entry.terminated.notify_waiters();
             }
@@ -355,12 +373,14 @@ impl SkiInstance {
             std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
         let metrics = std::sync::Arc::new(CpuMetrics::new());
         let terminated = std::sync::Arc::new(tokio::sync::Notify::new());
+        let terminated_flag = std::sync::Arc::new(AtomicBool::new(false));
 
         let watchdog_entry = std::sync::Arc::new(WatchdogEntry {
             isolate: isolate_handle,
             deadlines: deadlines.clone(),
             metrics: metrics.clone(),
             terminated: terminated.clone(),
+            terminated_flag: terminated_flag.clone(),
         });
         watchdog_registry()
             .lock()
@@ -378,12 +398,21 @@ impl SkiInstance {
             runtime: Rc::new(RefCell::new(runtime)),
             run_handler,
             next_id: Cell::new(0),
+            warm: Rc::new(Cell::new(false)),
             driver_waker: Rc::new(Cell::new(None)),
             deadlines,
             metrics,
             terminated,
+            terminated_flag,
             _watchdog_entry: watchdog_entry,
         })
+    }
+
+    /// True once V8 has terminated this isolate — the watchdog cut a call that
+    /// outran its budget, or the event loop failed. Every later `call` on it
+    /// fails, so the caller must drop the instance and load a fresh one.
+    pub fn is_terminated(&self) -> bool {
+        self.terminated_flag.load(Ordering::Acquire)
     }
 
     pub fn call(&self, request: Request) -> Pin<Box<dyn Future<Output = Result<Response>>>> {
@@ -411,11 +440,14 @@ impl SkiInstance {
             f
         };
 
+        let warm = self.warm.clone();
+        let budget = if warm.get() {
+            JS_CALL_CPU_BUDGET_NANOS
+        } else {
+            JS_COLD_CALL_CPU_BUDGET_NANOS
+        };
         let baseline = metrics.cpu_nanos_used.load(Ordering::Acquire);
-        deadlines
-            .lock()
-            .unwrap()
-            .insert(id, baseline + JS_CALL_CPU_BUDGET_NANOS);
+        deadlines.lock().unwrap().insert(id, baseline + budget);
 
         if let Some(waker) = self.driver_waker.replace(None) {
             waker.wake();
@@ -427,6 +459,10 @@ impl SkiInstance {
                 _ = terminated.notified() => None,
             };
             deadlines.lock().unwrap().remove(&id);
+            // A finished call means the modules it pulled in are instantiated
+            // and the renderer has been through V8 once, so later calls pay
+            // request cost only.
+            warm.set(true);
             match outcome {
                 Some(r) => {
                     r.map_err(|e| anyhow!("js handler failed: {e:?}"))?;
@@ -473,6 +509,11 @@ impl SkiInstance {
                 Poll::Ready(Ok(())) => Poll::Pending,
                 Poll::Ready(Err(e)) => {
                     eprintln!("[ski] event loop error: {e:?}");
+                    // The driver stops here for good, so nothing will ever
+                    // advance this isolate again: flag it before waking the
+                    // callers so they discard the instance instead of retrying
+                    // into a runtime that can no longer make progress.
+                    self.terminated_flag.store(true, Ordering::Release);
                     self.terminated.notify_waiters();
                     Poll::Ready(())
                 }

@@ -25,6 +25,12 @@ on every plan.
 CPU time counts only time spent executing your code. Waiting on I/O — a
 database query, an upstream API call, a slow LLM response — costs nothing.
 
+The first request to reach a cold JavaScript instance runs on a much larger
+allowance, because it also pays for module instantiation and the renderer's
+first uncompiled pass — work later requests inherit for free. Requests that
+arrive while an instance is still cold get the same allowance. The limit above
+is what a warm instance is held to.
+
 ## Monthly quotas — one dollar plan
 
 ### Projects & domains

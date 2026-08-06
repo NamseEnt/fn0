@@ -626,6 +626,21 @@ impl<C: BundleCache> CodeExecutor<C> {
                 .catch_unwind()
                 .await;
             match outcome {
+                Ok(Err(err)) if ski.is_terminated() => {
+                    // V8 cut this isolate mid-call, so it is dead for every
+                    // later request too. Without the poison the slot is reused
+                    // forever and one over-budget render takes the project's
+                    // whole SSR down until the worker restarts.
+                    poisoned.set(true);
+                    tracing::error!(
+                        project_id,
+                        attempt,
+                        "js instance terminated; respawning: {err:#}"
+                    );
+                    if attempt >= 2 {
+                        return Err(err);
+                    }
+                }
                 Ok(result) => {
                     let mut response = result?;
                     if let Some(metric_key) = &metric_key {
@@ -666,7 +681,7 @@ impl<C: BundleCache> CodeExecutor<C> {
             let mut js_instances = self.js_instances.borrow_mut();
             if let Some(slot) = js_instances.get(project_id) {
                 let same_bundle = Arc::ptr_eq(&slot.bundle, bundle);
-                let poisoned = slot.poisoned.get();
+                let poisoned = slot.poisoned.get() || slot.instance.is_terminated();
                 if same_bundle && !poisoned {
                     return Ok((slot.instance.clone(), slot.poisoned.clone()));
                 }
