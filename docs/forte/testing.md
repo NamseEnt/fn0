@@ -169,11 +169,13 @@ runner = "forte-test-runner"
 Then install the runner and run:
 
 ```sh
-cargo install --path <monorepo>/forte/test-runner
+# Clone the fn0 repository if you don't already have it:
+git clone https://github.com/NamseEnt/fn0
+cargo install --path fn0/forte/test-runner
 cargo test
 ```
 
-> **Note:** `forte init` does not add the runner automatically. Without it, `cargo test` will build the WASM binary but fail to execute it.
+> **Note:** `forte init` does not add the runner automatically. `forte-test-runner` is not published to crates.io and must be built from the fn0 monorepo. Without it, `cargo test` will build the WASM binary but fail to execute it.
 
 ### From the monorepo workspace root
 

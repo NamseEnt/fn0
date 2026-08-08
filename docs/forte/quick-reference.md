@@ -262,7 +262,7 @@ Configure the WASM test runner in `rs/.cargo/config.toml`:
 runner = "forte-test-runner"
 ```
 
-Install: `cargo install --path <monorepo>/forte/test-runner`
+Install (not on crates.io — build from source): `git clone https://github.com/NamseEnt/fn0 && cargo install --path fn0/forte/test-runner`
 
 See [testing.md](testing.md) for full details.
 

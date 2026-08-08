@@ -50,11 +50,13 @@ These tests do not run under libtest — `forte-test-runner` discovers them thro
 
 `doc-db`, `object-storage` and `fn0-control` build their tests for `wasm32-wasip2` (configured in their `.cargo/config.toml`), so `cargo test` runs them through `forte-test-runner`.
 
-1. **`forte-test-runner` in PATH** — the configured WASM test runner. Install from the monorepo:
+1. **`forte-test-runner` in PATH** — the configured WASM test runner. Install from the monorepo root:
 
 ```sh
 cargo install --path forte/test-runner
 ```
+
+`forte-test-runner` is not published to crates.io. If you do not have the monorepo, clone it from `https://github.com/NamseEnt/fn0`.
 
 Reinstall it after pulling changes to the WASI wit or to `forte/test-runner` itself. An installed runner older than the checkout that built the component fails to link it, and reports that as an unimplemented WASI import rather than as a version skew.
 

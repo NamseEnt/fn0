@@ -112,10 +112,11 @@ target = "wasm32-wasip2"
 runner = "forte-test-runner"
 ```
 
-Install the runner from the monorepo:
+Install the runner from the fn0 monorepo (`forte-test-runner` is not on crates.io):
 
 ```sh
-cargo install --path <monorepo>/forte/test-runner
+git clone https://github.com/NamseEnt/fn0
+cargo install --path fn0/forte/test-runner
 ```
 
 `forte init` does not add the runner configuration automatically.
