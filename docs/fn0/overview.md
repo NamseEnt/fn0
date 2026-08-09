@@ -86,6 +86,7 @@ The fn0 CLI (`fn0/cli`) provides tooling for projects deployed directly to fn0 w
 
 - **Rust** — primary target; compiles to `wasm32-wasip2`
 - **JavaScript / TypeScript** — via the Ski runtime (WinterCG subset, no Node.js APIs)
+- **TypeScript / Hono** — via `fn0 init`; bundled with Rolldown, compiled to WASM via `jco componentize`. See [TypeScript / Hono](typescript.md).
 
 ## Supported Cloud Providers
 
