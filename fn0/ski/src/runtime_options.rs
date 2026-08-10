@@ -10,6 +10,7 @@ pub fn runtime_options() -> RuntimeOptions {
         extensions: vec![
             deno_webidl::deno_webidl::init(),
             deno_web::deno_web::init(Default::default()),
+            deno_crypto::deno_crypto::init(None),
             deno_fetch::deno_fetch::init(Default::default()),
             bootstrap::init(),
             request_response_extension::init(),

@@ -1,6 +1,6 @@
 [package]
 name = "fn0-ski"
-version = "0.1.10"
+version = "0.1.11"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,6 +10,7 @@ description = "Minimal Winter CG Compatible Runtime"
 base64 = { workspace = true }
 bytes = { workspace = true }
 deno_core = { workspace = true }
+deno_crypto = { package = "fn0-deno-crypto", version = "=0.255.0", path = "../../vendor/deno/ext/crypto" }
 deno_error = { workspace = true }
 deno_fetch = { package = "fn0-deno-fetch", version = "=0.250.0", path = "../../vendor/deno/ext/fetch" }
 deno_web = { package = "fn0-deno-web", version = "=0.257.0", path = "../../vendor/deno/ext/web" }
@@ -28,6 +29,7 @@ tokio-util = { workspace = true }
 
 [build-dependencies]
 deno_core = { workspace = true }
+deno_crypto = { package = "fn0-deno-crypto", version = "=0.255.0", path = "../../vendor/deno/ext/crypto" }
 deno_error = { workspace = true }
 deno_fetch = { package = "fn0-deno-fetch", version = "=0.250.0", path = "../../vendor/deno/ext/fetch" }
 deno_web = { package = "fn0-deno-web", version = "=0.257.0", path = "../../vendor/deno/ext/web" }

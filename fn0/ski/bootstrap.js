@@ -32,6 +32,8 @@ import * as messagePort from "ext:deno_web/13_message_port.js";
 import * as compression from "ext:deno_web/14_compression.js";
 import * as performance from "ext:deno_web/15_performance.js";
 
+import * as crypto from "ext:deno_crypto/00_crypto.js";
+
 import * as headers from "ext:deno_fetch/20_headers.js";
 import * as formData from "ext:deno_fetch/21_formdata.js";
 import * as request from "ext:deno_fetch/23_request.js";
@@ -449,6 +451,35 @@ Object.defineProperty(globalThis, "MessagePort", {
 Object.defineProperty(globalThis, "structuredClone", {
   value: messagePort.structuredClone,
   enumerable: true,
+  configurable: true,
+  writable: true,
+});
+
+// Web Crypto APIs
+Object.defineProperty(globalThis, "crypto", {
+  value: crypto.crypto,
+  enumerable: true,
+  configurable: true,
+  writable: true,
+});
+
+Object.defineProperty(globalThis, "Crypto", {
+  value: crypto.Crypto,
+  enumerable: false,
+  configurable: true,
+  writable: true,
+});
+
+Object.defineProperty(globalThis, "CryptoKey", {
+  value: crypto.CryptoKey,
+  enumerable: false,
+  configurable: true,
+  writable: true,
+});
+
+Object.defineProperty(globalThis, "SubtleCrypto", {
+  value: crypto.SubtleCrypto,
+  enumerable: false,
   configurable: true,
   writable: true,
 });
