@@ -6,7 +6,7 @@ pub(super) struct PageInfo {
     pub(super) route_segments: Vec<RouteSegment>,
     pub(super) path_params: Option<Vec<PathParamField>>,
     pub(super) search_params: Option<Vec<SearchParamField>>,
-    pub(super) is_redirect_only: bool,
+    pub(super) response_kind: HandlerResponseKind,
     pub(super) is_api: bool,
     pub(super) cache_static: bool,
     pub(super) has_cache_static_eligible: bool,
@@ -64,4 +64,12 @@ pub(super) enum HandlerType {
     None,
     Props,
     Redirect,
+    RawResponse,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) enum HandlerResponseKind {
+    PropsJson,
+    RedirectOnly,
+    RawResponse,
 }

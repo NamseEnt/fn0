@@ -27,7 +27,7 @@ forte destroy                # delete the deployed project and all its resources
 | Type | Directory | Route | Trigger |
 |---|---|---|---|
 | Page | `rs/src/pages/` | `GET /<path>` | Browser navigation; runs SSR → React |
-| API | `rs/src/apis/` | `/api/<path>` (any method) | Direct JSON; no React rendering |
+| API | `rs/src/apis/` | `/api/<path>` (any method) | Direct JSON; no React rendering. `pub type Props = ForteResponse;` gives full control of status/headers/body (see [apis.md](apis.md)) |
 | Action | `rs/src/actions/` | `POST /__forte_action/<name>` | Called from browser via typed TS client |
 | Hook | `rs/src/hooks/` | `POST /__self_invoke/<name>` | Called during SSR; result cached in HTML |
 | Queue task | `rs/src/queue_task/` | internal | Background job via `enqueue::<name>(input)` |

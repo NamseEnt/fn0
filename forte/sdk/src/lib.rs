@@ -47,3 +47,5 @@ pub struct ForteRequest<'a, Body = ()> {
     pub raw_body: &'a [u8],
     pub body: Body,
 }
+
+pub type ForteResponse = ::http::Response<http::Body>;

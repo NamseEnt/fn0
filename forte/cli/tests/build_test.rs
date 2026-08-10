@@ -136,6 +136,62 @@ fn test_build_cache_static_on_dynamic_route_without_validator_fails() {
         ));
 }
 
+const RAW_RESPONSE_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::http::{Body, Response};
+use forte_sdk::{ForteRequest, ForteResponse};
+
+pub type Props = ForteResponse;
+
+pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
+    if req.headers.get("x-webhook-signature").is_none() {
+        return Ok(Response::builder().status(401).body(Body::empty())?);
+    }
+    Ok(Response::builder()
+        .status(200)
+        .header("content-type", "application/json")
+        .header("x-fn0-next", "js")
+        .body(Body::from(serde_json::to_vec(
+            &serde_json::json!({ "type": 1 }),
+        )?))?)
+}
+"#;
+
+#[test]
+fn test_build_raw_response_api() {
+    let temp = tempfile::tempdir().unwrap();
+    let project_dir = setup_project(&temp);
+    let apis_dir = project_dir.join("rs/src/apis");
+    std::fs::create_dir_all(&apis_dir).unwrap();
+    std::fs::write(apis_dir.join("webhook.rs"), RAW_RESPONSE_API).unwrap();
+
+    cargo::cargo_bin_cmd!("forte")
+        .args(["build"])
+        .current_dir(&project_dir)
+        .assert()
+        .success();
+
+    let generated_routes =
+        std::fs::read_to_string(project_dir.join("rs/src/route_generated.rs")).unwrap();
+    assert!(generated_routes.contains("stripped_header_names"));
+}
+
+#[test]
+fn test_build_raw_response_on_page_fails() {
+    let temp = tempfile::tempdir().unwrap();
+    let project_dir = setup_project(&temp);
+    let page_dir = project_dir.join("rs/src/pages/raw");
+    std::fs::create_dir_all(&page_dir).unwrap();
+    std::fs::write(page_dir.join("mod.rs"), RAW_RESPONSE_API).unwrap();
+
+    cargo::cargo_bin_cmd!("forte")
+        .args(["build"])
+        .current_dir(&project_dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("only supported under src/apis/"));
+}
+
 #[test]
 fn test_build_fails_outside_project() {
     let temp = tempfile::tempdir().unwrap();

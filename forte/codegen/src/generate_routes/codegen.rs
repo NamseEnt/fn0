@@ -343,9 +343,8 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                 },
             };
 
-            // Different response handling for redirect-only pages vs props pages
-            let response_handling = if page.is_redirect_only {
-                quote! {
+            let response_handling = match page.response_kind {
+                HandlerResponseKind::RedirectOnly => quote! {
                     match #handler_call {
                         Ok(redirect) => {
                             Ok(build_response_with_cookies(
@@ -365,8 +364,42 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                                 .unwrap())
                         }
                     }
-                }
-            } else {
+                },
+                HandlerResponseKind::RawResponse => quote! {
+                    match #handler_call {
+                        Ok(mut forte_response) => {
+                            let stripped_header_names: Vec<forte_sdk::http::HeaderName> = forte_response
+                                .headers()
+                                .keys()
+                                .filter(|header_name| header_name.as_str().starts_with("x-fn0-"))
+                                .cloned()
+                                .collect();
+                            for header_name in stripped_header_names {
+                                forte_response.headers_mut().remove(&header_name);
+                            }
+                            Ok(build_response_with_cookies(forte_response, &cookie_jar))
+                        }
+                        Err(error) => {
+                            if let Some(redirect) = error.downcast_ref::<Redirect>() {
+                                Ok(build_response_with_cookies(
+                                    Response::builder()
+                                        .status(StatusCode::FOUND)
+                                        .header(LOCATION, redirect.to_path())
+                                        .body(Body::empty())
+                                        .unwrap(),
+                                    &cookie_jar,
+                                ))
+                            } else {
+                                eprintln!("Error at {}: {:?}", path, error);
+                                Ok(Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .body(Body::from("Internal Server Error"))
+                                    .unwrap())
+                            }
+                        }
+                    }
+                },
+                HandlerResponseKind::PropsJson => {
                 let ok_response = if page.is_api {
                     quote! {
                         Response::builder()
@@ -409,6 +442,7 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                             }
                         }
                     }
+                }
                 }
             };
 
@@ -1190,7 +1224,7 @@ fn generate_cache_policy_handler(pages: &[PageInfo]) -> TokenStream {
                 page.route_path
             );
         }
-        if page.is_redirect_only {
+        if page.response_kind == HandlerResponseKind::RedirectOnly {
             panic!(
                 "cache_static cannot be used on redirect route {}",
                 page.route_path

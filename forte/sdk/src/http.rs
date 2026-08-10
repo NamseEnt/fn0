@@ -1,6 +1,6 @@
 use std::fmt;
 
-use wit_bindgen::rt::async_support::StreamReader;
+use wit_bindgen::rt::async_support::{StreamReader, StreamWriter};
 
 use crate::bindings::wasi::http::client;
 use crate::bindings::wasi::http::types as p3;
@@ -75,6 +75,11 @@ pub type Result<T> = core::result::Result<T, Error>;
 impl Body {
     pub fn empty() -> Self {
         Body::Empty
+    }
+
+    pub fn channel() -> (StreamWriter<u8>, Body) {
+        let (writer, reader) = wit_stream::new::<u8>();
+        (writer, Body::Stream(reader))
     }
 
     pub async fn bytes(self) -> Bytes {

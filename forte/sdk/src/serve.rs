@@ -138,22 +138,18 @@ async fn http_response_to_p3(
         .collect();
     let fields = p3::Fields::from_list(&header_entries).map_err(ServeError::Headers)?;
 
-    let body_bytes = match body {
+    let contents_reader = match body {
         Body::Empty => None,
-        Body::Bytes(b) if b.is_empty() => None,
-        Body::Bytes(b) => Some(b),
-        Body::Stream(reader) => Some(reader.collect().await),
-    };
-
-    let contents_reader = if let Some(bytes) = body_bytes {
-        let (mut writer, reader) = wit_stream::new::<u8>();
-        crate::runtime::spawn(async move {
-            let _leftover = writer.write_all(bytes).await;
-            drop(writer);
-        });
-        Some(reader)
-    } else {
-        None
+        Body::Bytes(bytes) if bytes.is_empty() => None,
+        Body::Bytes(bytes) => {
+            let (mut writer, reader) = wit_stream::new::<u8>();
+            crate::runtime::spawn(async move {
+                let _leftover = writer.write_all(bytes).await;
+                drop(writer);
+            });
+            Some(reader)
+        }
+        Body::Stream(reader) => Some(reader),
     };
 
     let (trailers_writer, trailers_reader) =

@@ -286,8 +286,14 @@ fn get_handler_type(content: &str) -> HandlerType {
                 && let syn::ReturnType::Type(_, ty) = &func.sig.output
             {
                 let type_str = quote!(#ty).to_string();
+                if type_str.contains("Result") && type_str.contains("ForteResponse") {
+                    return HandlerType::RawResponse;
+                }
                 if type_str.contains("Result") && type_str.contains("Props") {
-                    if is_props_redirect(content) {
+                    if props_alias_contains(content, "ForteResponse") {
+                        return HandlerType::RawResponse;
+                    }
+                    if props_alias_contains(content, "Redirect") {
                         return HandlerType::Redirect;
                     }
                     return HandlerType::Props;
@@ -302,7 +308,7 @@ fn get_handler_type(content: &str) -> HandlerType {
     HandlerType::None
 }
 
-fn is_props_redirect(content: &str) -> bool {
+fn props_alias_contains(content: &str, target_type_name: &str) -> bool {
     let Ok(syntax_tree) = syn::parse_file(content) else {
         return false;
     };
@@ -311,8 +317,9 @@ fn is_props_redirect(content: &str) -> bool {
         if let syn::Item::Type(type_alias) = item
             && type_alias.ident == "Props"
         {
-            let type_str = quote!(#type_alias.ty).to_string();
-            return type_str.contains("Redirect");
+            let aliased_type = &type_alias.ty;
+            let type_str = quote!(#aliased_type).to_string();
+            return type_str.contains(target_type_name);
         }
     }
 
@@ -501,10 +508,19 @@ fn discover_endpoints_recursive(
             };
 
             let handler_type = get_handler_type(&content);
-            let is_redirect_only = match handler_type {
+            let response_kind = match handler_type {
                 HandlerType::None => continue,
-                HandlerType::Props => false,
-                HandlerType::Redirect => true,
+                HandlerType::Props => HandlerResponseKind::PropsJson,
+                HandlerType::Redirect => HandlerResponseKind::RedirectOnly,
+                HandlerType::RawResponse => {
+                    if !is_api {
+                        panic!(
+                            "ForteResponse handlers are only supported under src/apis/ — {} is a page route and must return Props for SSR",
+                            path.display()
+                        );
+                    }
+                    HandlerResponseKind::RawResponse
+                }
             };
 
             let relative_path = path.strip_prefix(base_dir).unwrap();
@@ -585,7 +601,7 @@ fn discover_endpoints_recursive(
                 route_segments: parsed_route_segments,
                 path_params,
                 search_params,
-                is_redirect_only,
+                response_kind,
                 is_api,
                 cache_static,
                 has_cache_static_eligible,

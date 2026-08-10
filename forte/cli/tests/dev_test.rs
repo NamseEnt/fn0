@@ -94,6 +94,16 @@ fn init_project(temp_dir: &std::path::Path, name: &str) -> std::path::PathBuf {
     temp_dir.join(name)
 }
 
+fn init_dev_project(temp_dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+    cargo::cargo_bin_cmd!("forte")
+        .args(["init", name, "--dev"])
+        .current_dir(temp_dir)
+        .assert()
+        .success();
+
+    temp_dir.join(name)
+}
+
 fn install_npm_deps(project_dir: &std::path::Path) {
     std::process::Command::new("npm")
         .arg("install")
@@ -178,6 +188,97 @@ fn test_dev_auto_selects_port_if_busy() {
 
     let response = reqwest::blocking::get(server.url());
     assert!(response.is_ok(), "Server should respond on alternate port");
+}
+
+const RAW_RESPONSE_WEBHOOK_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::http::{Body, Response};
+use forte_sdk::{ForteRequest, ForteResponse};
+
+pub type Props = ForteResponse;
+
+pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
+    if req.headers.get("x-webhook-signature").is_none() {
+        return Ok(Response::builder().status(401).body(Body::empty())?);
+    }
+    Ok(Response::builder()
+        .status(200)
+        .header("content-type", "application/json")
+        .header("x-fn0-next", "js")
+        .body(Body::from(serde_json::to_vec(
+            &serde_json::json!({ "type": 1 }),
+        )?))?)
+}
+"#;
+
+const RAW_RESPONSE_STREAM_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::http::{Body, Response};
+use forte_sdk::{ForteRequest, ForteResponse};
+
+pub type Props = ForteResponse;
+
+pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
+    let (mut writer, body) = Body::channel();
+    forte_sdk::runtime::spawn(async move {
+        let _leftover = writer.write_all(b"hello ".to_vec()).await;
+        let _leftover = writer.write_all(b"stream".to_vec()).await;
+        drop(writer);
+    });
+    Ok(Response::builder().status(200).body(body)?)
+}
+"#;
+
+#[test]
+fn test_dev_raw_response_api() {
+    let _dev_server_slot = take_the_only_dev_server_slot();
+    let temp = tempfile::tempdir().unwrap();
+    let project_dir = init_dev_project(temp.path(), "test-app-raw-response");
+
+    install_npm_deps(&project_dir);
+
+    let apis_dir = project_dir.join("rs/src/apis");
+    std::fs::create_dir_all(&apis_dir).unwrap();
+    std::fs::write(apis_dir.join("webhook.rs"), RAW_RESPONSE_WEBHOOK_API).unwrap();
+    std::fs::write(apis_dir.join("stream.rs"), RAW_RESPONSE_STREAM_API).unwrap();
+
+    let server = DevServer::start(&project_dir);
+
+    std::thread::sleep(Duration::from_secs(1));
+
+    let client = reqwest::blocking::Client::new();
+
+    let unauthorized = client
+        .get(format!("{}/api/webhook", server.url()))
+        .send()
+        .unwrap();
+    assert_eq!(unauthorized.status().as_u16(), 401);
+
+    let authorized = client
+        .get(format!("{}/api/webhook", server.url()))
+        .header("x-webhook-signature", "sig")
+        .send()
+        .unwrap();
+    assert_eq!(authorized.status().as_u16(), 200);
+    assert_eq!(
+        authorized
+            .headers()
+            .get("content-type")
+            .map(|value| value.to_str().unwrap().to_string()),
+        Some("application/json".to_string())
+    );
+    assert!(
+        authorized.headers().get("x-fn0-next").is_none(),
+        "x-fn0-* headers must be stripped from raw responses"
+    );
+    assert_eq!(authorized.text().unwrap(), "{\"type\":1}");
+
+    let streamed = client
+        .get(format!("{}/api/stream", server.url()))
+        .send()
+        .unwrap();
+    assert_eq!(streamed.status().as_u16(), 200);
+    assert_eq!(streamed.text().unwrap(), "hello stream");
 }
 
 fn vite_ssr_server_running(project_dir: &std::path::Path) -> bool {
