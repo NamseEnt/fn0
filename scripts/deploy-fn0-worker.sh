@@ -40,10 +40,10 @@ source "${REPO_ROOT}/scripts/lib/worker-target.sh"
 need pulumi
 need jq
 need cargo
-need docker
 need aws
 need oci
 need curl
+container_runtime_ensure_available
 
 load_pulumi_outputs
 

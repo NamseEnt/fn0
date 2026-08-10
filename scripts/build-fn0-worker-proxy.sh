@@ -10,11 +10,13 @@ need() {
 }
 need pulumi
 need jq
-need docker
 
 # shellcheck source=lib/pulumi-outputs.sh
 source "${REPO_ROOT}/scripts/lib/pulumi-outputs.sh"
+# shellcheck source=lib/container-runtime.sh
+source "${REPO_ROOT}/scripts/lib/container-runtime.sh"
 
+container_runtime_ensure_available
 load_pulumi_outputs
 
 REGISTRIES_JSON="$(pulumi_pick_json workerImageRegistries)"
@@ -23,38 +25,25 @@ if [[ -z "$REGISTRIES_JSON" || "$REGISTRIES_JSON" == "null" ]]; then
   exit 1
 fi
 
-IID_FILE="$(mktemp)"
-INSPECT_LOG="$(mktemp)"
 BUILD_LOG="$(mktemp)"
 BIN_DIR="$(mktemp -d)"
-cleanup() { rm -f "$IID_FILE" "$INSPECT_LOG" "$BUILD_LOG"; rm -rf "$BIN_DIR"; }
+cleanup() { rm -f "$BUILD_LOG"; rm -rf "$BIN_DIR"; }
 trap cleanup EXIT
 
 "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-worker-proxy "$BIN_DIR"
 
-echo ">> docker build runtime image"
+echo ">> build runtime image (${CONTAINER_RUNTIME_CLI})"
+container_runtime_build_image \
+  "${REPO_ROOT}/fn0/worker-proxy/Dockerfile" \
+  "$BIN_DIR" \
+  "$BUILD_LOG"
 
-DOCKER_BUILD_PIPESTATUS=0
-set +e
-docker build \
-  --file "${REPO_ROOT}/fn0/worker-proxy/Dockerfile" \
-  --iidfile "$IID_FILE" \
-  --progress=plain \
-  "$BIN_DIR" 2>&1 | tee "$BUILD_LOG"
-DOCKER_BUILD_PIPESTATUS=("${PIPESTATUS[@]}")
-set -e
-if [[ "${DOCKER_BUILD_PIPESTATUS[0]}" -ne 0 ]]; then
-  echo "docker build failed (exit ${DOCKER_BUILD_PIPESTATUS[0]})" >&2
-  exit "${DOCKER_BUILD_PIPESTATUS[0]}"
-fi
-
-LOCAL_IID="$(cat "$IID_FILE")"
-LOCAL_CONFIG_DIGEST="$(grep -oE 'exporting config sha256:[a-f0-9]+' "$BUILD_LOG" | head -1 | awk '{print $3}')"
-if [[ -z "$LOCAL_CONFIG_DIGEST" ]]; then
-  echo "failed to extract local image config digest from build log" >&2
+LOCAL_IDENTITY="$(container_runtime_built_image_identity "$BUILD_LOG")"
+if [[ -z "$LOCAL_IDENTITY" ]]; then
+  echo "failed to determine local image identity" >&2
   exit 1
 fi
-echo ">> Local image config digest: ${LOCAL_CONFIG_DIGEST}"
+echo ">> Local image identity: ${LOCAL_IDENTITY}"
 
 COUNT="$(jq length <<<"$REGISTRIES_JSON")"
 if (( COUNT == 0 )); then
@@ -71,38 +60,30 @@ for i in $(seq 0 $((COUNT - 1))); do
   REPO="${REPO_BASE}-proxy"
   LATEST_REF="${URL}/${REPO}:latest"
 
-  echo ">> Login ${URL}"
-  echo "$PASSWORD" | docker login "$URL" -u "$USERNAME" --password-stdin >/dev/null
-
   PUSH=1
-  if docker manifest inspect "$LATEST_REF" >"$INSPECT_LOG" 2>&1; then
-    if jq -e '.manifests' <"$INSPECT_LOG" >/dev/null 2>&1; then
-      ARM64_DIGEST="$(jq -r '.manifests[] | select(.platform.architecture == "arm64" and .platform.os == "linux") | .digest' <"$INSPECT_LOG" | head -1)"
-      if [[ -z "$ARM64_DIGEST" ]]; then
-        echo "ERROR: ${LATEST_REF} is a manifest list with no linux/arm64 entry" >&2
-        exit 1
-      fi
-      if ! docker manifest inspect "${URL}/${REPO}@${ARM64_DIGEST}" >"$INSPECT_LOG" 2>&1; then
-        cat "$INSPECT_LOG" >&2
-        echo "failed to inspect arm64 manifest of ${LATEST_REF}" >&2
-        exit 1
-      fi
-    fi
-    REMOTE_CONFIG_DIGEST="$(jq -r .config.digest <"$INSPECT_LOG")"
-    if [[ "$LOCAL_CONFIG_DIGEST" == "$REMOTE_CONFIG_DIGEST" ]]; then
+  if registry_inspect_manifest_exists "$URL" "$REPO" "latest" "$USERNAME" "$PASSWORD"; then
+    MANIFEST_STATUS=0
+  else
+    MANIFEST_STATUS=$?
+  fi
+  if [[ "$MANIFEST_STATUS" -eq 2 ]]; then
+    echo "failed to query ${LATEST_REF}" >&2
+    exit 1
+  fi
+  if [[ "$MANIFEST_STATUS" -eq 0 ]]; then
+    REMOTE_IDENTITY="$(container_runtime_remote_image_identity "$URL" "$REPO" "latest" "$USERNAME" "$PASSWORD")"
+    if [[ "$LOCAL_IDENTITY" == "$REMOTE_IDENTITY" ]]; then
       echo "   ${LATEST_REF}: match (skip push)"
       PUSH=0
     fi
-  elif ! grep -qiE "no such manifest|not found|manifest unknown" "$INSPECT_LOG"; then
-    cat "$INSPECT_LOG" >&2
-    echo "docker manifest inspect failed for ${LATEST_REF}" >&2
-    exit 1
   fi
 
   if [[ "$PUSH" -eq 1 ]]; then
+    echo ">> Login ${URL}"
+    echo "$PASSWORD" | container_runtime_registry_login "$URL" "$USERNAME"
     echo ">> Pushing ${LATEST_REF} (mutable; pulled on proxy restart)"
-    docker tag "$LOCAL_IID" "$LATEST_REF"
-    docker push "$LATEST_REF"
+    container_runtime_tag "$CONTAINER_RUNTIME_BUILT_IMAGE" "$LATEST_REF"
+    container_runtime_push "$LATEST_REF"
   fi
 done
 

@@ -17,6 +17,8 @@ __FN0_CWASM_COMPILER_LOADED=1
 
 # shellcheck source=r2.sh
 source "$(dirname "${BASH_SOURCE[0]}")/r2.sh"
+# shellcheck source=container-runtime.sh
+source "$(dirname "${BASH_SOURCE[0]}")/container-runtime.sh"
 
 CWASM_COMPILER_PARALLEL="${CWASM_COMPILER_PARALLEL:-20}"
 
@@ -69,19 +71,20 @@ ensure_cwasm_lambda() {
 
     local ecr_registry="${cwasm_ecr%%/*}"
     aws ecr get-login-password --region "$cwasm_region" \
-      | docker login --username AWS --password-stdin "$ecr_registry"
+      | container_runtime_registry_login "$ecr_registry" AWS
 
     "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$build_ctx"
     cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$build_ctx/"
 
-    docker buildx build \
-      --platform linux/arm64 \
-      --provenance=false \
-      --sbom=false \
-      --file "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
-      --tag "$image_uri" \
-      --push \
-      "$build_ctx"
+    # Lambda rejects multi-entry indexes and attestation manifests, so the
+    # image is built single-platform and pushed platform-filtered.
+    container_runtime_build_image \
+      "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
+      "$build_ctx" \
+      /dev/null \
+      --platform linux/arm64
+    container_runtime_tag "$CONTAINER_RUNTIME_BUILT_IMAGE" "$image_uri"
+    container_runtime_push "$image_uri" --platform linux/arm64
 
     local env_vars="Variables={BUCKET=${r2_bucket},XDG_CACHE_HOME=/tmp,HOME=/tmp,R2_ENDPOINT=${r2_endpoint},R2_ACCESS_KEY_ID=${r2_ak},R2_SECRET_ACCESS_KEY=${r2_sk}}"
 

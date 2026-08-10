@@ -7,11 +7,14 @@ PULUMI_DIR="${PULUMI_DIR:-${REPO_ROOT}/infra/cloud}"
 need() {
   command -v "$1" >/dev/null 2>&1 || { echo "required command not found: $1" >&2; exit 1; }
 }
+# shellcheck source=lib/container-runtime.sh
+source "${REPO_ROOT}/scripts/lib/container-runtime.sh"
+
 need pulumi
 need jq
 need cargo
-need docker
 need aws
+container_runtime_ensure_available
 
 echo ">> Reading Pulumi stack outputs from ${PULUMI_DIR}"
 OUT="$(cd "$PULUMI_DIR" && pulumi stack output --show-secrets --json)"
@@ -76,21 +79,22 @@ echo ">> Image URI: ${IMAGE_URI}"
 echo ">> Logging in to ECR"
 ECR_REGISTRY="${CWASM_ECR%%/*}"
 aws ecr get-login-password --region "$CWASM_REGION" \
-  | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+  | container_runtime_registry_login "$ECR_REGISTRY" AWS
 
 echo ">> Building fn0-wasmtime binary"
 "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$BUILD_CTX"
 cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$BUILD_CTX/"
 
 echo ">> Building & pushing image"
-docker buildx build \
-  --platform linux/arm64 \
-  --provenance=false \
-  --sbom=false \
-  --file "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
-  --tag "$IMAGE_URI" \
-  --push \
-  "$BUILD_CTX"
+# Lambda rejects multi-entry indexes and attestation manifests, so the image
+# is built single-platform and pushed platform-filtered.
+container_runtime_build_image \
+  "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
+  "$BUILD_CTX" \
+  /dev/null \
+  --platform linux/arm64
+container_runtime_tag "$CONTAINER_RUNTIME_BUILT_IMAGE" "$IMAGE_URI"
+container_runtime_push "$IMAGE_URI" --platform linux/arm64
 
 ENV_VARS="Variables={BUCKET=${CWASM_BUCKET},XDG_CACHE_HOME=/tmp,HOME=/tmp,R2_ENDPOINT=${R2_ENDPOINT},R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID},R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}}"
 

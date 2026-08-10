@@ -25,7 +25,8 @@
 # Re-running picks up where it stopped — same image_refs and same code_version
 # input means same R2 keys and same doc PKs.
 #
-# Required tools: pulumi, jq, cargo, docker, aws, oci, curl, forte, tar.
+# Required tools: pulumi, jq, cargo, a container runtime (docker, or
+# apple/container on macOS), aws, oci, curl, forte, tar.
 # Required env (used to address the control turso DB, which is not on the
 # stack output by default):
 #   - none directly; the script pulls forteDbGroupToken / forteDbHostSuffix
@@ -56,13 +57,13 @@ source "${REPO_ROOT}/scripts/lib/control-static-upload.sh"
 need pulumi
 need jq
 need cargo
-need docker
 need aws
 need oci
 need curl
 need tar
 need uuidgen
 need python3
+container_runtime_ensure_available
 
 load_pulumi_outputs
 

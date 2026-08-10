@@ -17,6 +17,9 @@ if [[ -n "${__FN0_WORKER_IMAGE_LOADED:-}" ]]; then
 fi
 __FN0_WORKER_IMAGE_LOADED=1
 
+# shellcheck source=container-runtime.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/container-runtime.sh"
+
 # Stamped on every image this script pushes, and the only thing the overwrite
 # guard compares. The built artifact cannot serve that role: fn0/ski/build.rs
 # bakes a V8 startup snapshot whose module-map ordering differs between builds,
@@ -68,11 +71,24 @@ fn0_worker_source_hash() {
 }
 
 fn0_worker_remote_source_label() {
-  local full_ref="$1"
-  docker buildx imagetools inspect "$full_ref" --format '{{json .Image}}' 2>/dev/null \
-    | jq -r --arg label "$FN0_WORKER_SOURCE_LABEL" '
-        (if has("config") then . else (to_entries[] | select(.key | endswith("linux/arm64")) | .value) end)
-        | .config.Labels[$label] // empty' 2>/dev/null
+  local reg="$1" tag="$2"
+  registry_inspect_image_label \
+    "$(jq -r .url <<<"$reg")" \
+    "$(jq -r .repository <<<"$reg")" \
+    "$tag" \
+    "$(jq -r .username <<<"$reg")" \
+    "$(jq -r .password <<<"$reg")" \
+    "$FN0_WORKER_SOURCE_LABEL"
+}
+
+fn0_worker_remote_manifest_exists() {
+  local reg="$1" tag="$2"
+  registry_inspect_manifest_exists \
+    "$(jq -r .url <<<"$reg")" \
+    "$(jq -r .repository <<<"$reg")" \
+    "$tag" \
+    "$(jq -r .username <<<"$reg")" \
+    "$(jq -r .password <<<"$reg")"
 }
 
 fn0_worker_registries_json() {
@@ -95,8 +111,8 @@ fn0_worker_registry_login() {
   url="$(jq -r .url <<<"$reg")"
   username="$(jq -r .username <<<"$reg")"
   password="$(jq -r .password <<<"$reg")"
-  echo ">> docker login ${url}"
-  echo "$password" | docker login "$url" -u "$username" --password-stdin >/dev/null
+  echo ">> ${CONTAINER_RUNTIME_CLI} login ${url}"
+  echo "$password" | container_runtime_registry_login "$url" "$username"
 }
 
 fn0_worker_version() {
@@ -118,8 +134,17 @@ resolve_fn0_worker_image_ref() {
   repo="$(jq -r .repository <<<"$reg")"
   full_ref="${url}/${repo}:${tag}"
 
-  fn0_worker_registry_login "$reg"
-  if ! docker manifest inspect "$full_ref" >/dev/null 2>&1; then
+  local manifest_status
+  if fn0_worker_remote_manifest_exists "$reg" "$tag"; then
+    manifest_status=0
+  else
+    manifest_status=$?
+  fi
+  if [[ "$manifest_status" -eq 2 ]]; then
+    echo "failed to query ${full_ref}" >&2
+    return 1
+  fi
+  if [[ "$manifest_status" -eq 1 ]]; then
     echo "no published fn0-worker image for version ${tag} at ${full_ref}." >&2
     echo "run scripts/deploy-fn0-worker.sh to build and roll it out first." >&2
     return 1
@@ -138,8 +163,8 @@ build_and_push_fn0_worker() {
   echo ">> fn0-worker version: ${version}"
   echo ">> fn0-worker source: ${source_hash}"
 
-  local count first_image_ref="" registry_index reg url repo full_ref remote_source
-  local -a refs_to_push=()
+  local count first_image_ref="" registry_index reg url repo full_ref remote_source manifest_status
+  local -a refs_to_push=() registries_to_push=()
   count="$(jq length <<<"$registries_json")"
   for registry_index in $(seq 0 $((count - 1))); do
     reg="$(jq -c ".[$registry_index]" <<<"$registries_json")"
@@ -150,14 +175,22 @@ build_and_push_fn0_worker() {
       first_image_ref="$full_ref"
     fi
 
-    fn0_worker_registry_login "$reg"
-
-    if ! docker manifest inspect "$full_ref" >/dev/null 2>&1; then
+    if fn0_worker_remote_manifest_exists "$reg" "$tag"; then
+      manifest_status=0
+    else
+      manifest_status=$?
+    fi
+    if [[ "$manifest_status" -eq 2 ]]; then
+      echo "failed to query ${full_ref}" >&2
+      return 1
+    fi
+    if [[ "$manifest_status" -eq 1 ]]; then
       refs_to_push+=("$full_ref")
+      registries_to_push+=("$reg")
       continue
     fi
 
-    remote_source="$(fn0_worker_remote_source_label "$full_ref")"
+    remote_source="$(fn0_worker_remote_source_label "$reg" "$tag")"
     if [[ "$remote_source" == "$source_hash" ]]; then
       echo "   ${full_ref}: same source (skip push)"
     elif [[ -z "$remote_source" ]]; then
@@ -178,12 +211,11 @@ build_and_push_fn0_worker() {
     return 0
   fi
 
-  local publish_log iid_file build_log bin_dir
+  local publish_log build_log bin_dir
   publish_log="$(mktemp)"
-  iid_file="$(mktemp)"
   build_log="$(mktemp)"
   bin_dir="$(mktemp -d)"
-  trap 'rm -f "$publish_log" "$iid_file" "$build_log"; rm -rf "$bin_dir"' RETURN
+  trap 'rm -f "$publish_log" "$build_log"; rm -rf "$bin_dir"' RETURN
 
   echo ">> cargo publish fn0-worker"
   if (cd "$REPO_ROOT" && cargo publish -p fn0-worker) 2>&1 | tee "$publish_log"; then
@@ -199,29 +231,24 @@ build_and_push_fn0_worker() {
 
   "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-worker "$bin_dir"
 
-  local docker_status
-  echo ">> docker build runtime image"
-  set +e
-  docker build \
-    --file "${REPO_ROOT}/fn0/worker/Dockerfile" \
-    --label "${FN0_WORKER_SOURCE_LABEL}=${source_hash}" \
-    --iidfile "$iid_file" \
-    --progress=plain \
-    "$bin_dir" 2>&1 | tee "$build_log"
-  docker_status=("${PIPESTATUS[@]}")
-  set -e
-  if [[ "${docker_status[0]}" -ne 0 ]]; then
-    echo "docker build failed (exit ${docker_status[0]})" >&2
-    return "${docker_status[0]}"
+  echo ">> build runtime image (${CONTAINER_RUNTIME_CLI})"
+  if ! container_runtime_build_image \
+    "${REPO_ROOT}/fn0/worker/Dockerfile" \
+    "$bin_dir" \
+    "$build_log" \
+    --label "${FN0_WORKER_SOURCE_LABEL}=${source_hash}"; then
+    echo "runtime image build failed" >&2
+    return 1
   fi
 
-  local local_iid
-  local_iid="$(cat "$iid_file")"
-
-  for full_ref in "${refs_to_push[@]}"; do
+  local push_index
+  for push_index in "${!refs_to_push[@]}"; do
+    full_ref="${refs_to_push[$push_index]}"
+    reg="${registries_to_push[$push_index]}"
+    fn0_worker_registry_login "$reg"
     echo ">> push ${full_ref}"
-    docker tag "$local_iid" "$full_ref"
-    docker push "$full_ref"
+    container_runtime_tag "$CONTAINER_RUNTIME_BUILT_IMAGE" "$full_ref"
+    container_runtime_push "$full_ref"
   done
 
   FN0_WORKER_PUSHED_IMAGE_REF="$first_image_ref"
