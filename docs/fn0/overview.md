@@ -122,6 +122,54 @@ For self-hosted fn0 worker deployments, configure the OTLP endpoint via environm
 
 The worker intercepts outgoing OTLP requests that target `FN0_OTLP_PLACEHOLDER_HOST` and rewrites them to `FN0_OTLP_TARGET_HOST` with the configured auth header.
 
+## Worker Environment Variables (Self-Hosting)
+
+When running `fn0-worker` yourself, set these environment variables on the binary:
+
+### Storage
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `CWASM_BUCKET` | Yes | — | S3 bucket name for pre-compiled `.cwasm` bundles |
+| `S3_ENDPOINT` | Yes | — | S3-compatible endpoint URL |
+| `S3_REGION` | Yes | — | S3 region (e.g. `us-east-1`) |
+| `AWS_ACCESS_KEY_ID` | Yes | — | S3 access key |
+| `AWS_SECRET_ACCESS_KEY` | Yes | — | S3 secret key |
+| `FN0_BUNDLE_CACHE_SIZE_BYTES` | No | `536870912` (512 MB) | In-memory bundle cache size |
+
+### Networking / TLS
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `HTTP_PORT` | No | `443` | Port for user HTTPS traffic |
+| `FN0_WORKER_OPS_PORT` | No | `9090` | Port for ops endpoints (`/ready`, `/drain`, `/status`, `/health`) |
+| `ORIGIN_CERT_PEM` | Yes | — | PEM-encoded TLS origin certificate (or use `ORIGIN_CERT_PEM_BASE64`) |
+| `ORIGIN_KEY_PEM` | Yes | — | PEM-encoded TLS private key (or use `ORIGIN_KEY_PEM_BASE64`) |
+| `FN0_APEX_DOMAIN` | No | — | Apex domain to route when no project hostname matches |
+| `FN0_APEX_PROJECT_ID` | No | — | Project ID to serve for `FN0_APEX_DOMAIN` requests |
+
+### Telemetry
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname |
+| `FN0_OTLP_TARGET_SCHEME` | Yes | — | URL scheme for OTLP collector: `http` or `https` |
+| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth (`user:token`); empty string for unauthenticated |
+| `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every OTLP request path |
+| `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname used inside WASM apps |
+| `OTLP_ENDPOINT` | No | — | Worker's own OTLP telemetry endpoint |
+| `OTLP_BASIC_AUTH` | No | — | Base64-encoded Basic auth for the worker's own OTLP telemetry |
+
+### Platform Services
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `TURSO_GROUP_TOKEN` | No | — | Auth token for the Turso group (used by `turso_hijack`) |
+| `TURSO_DB_HOST_SUFFIX` | No | — | Host suffix for Turso database URLs (e.g. `.turso.io`) |
+| `FN0_CONTROL_PROJECT_ID` | No | — | Used by public storage and static page cache hijacks to identify the control project |
+
+The byte-sniff on port `HTTP_PORT`: the first byte `0x16` (TLS ClientHello) routes to user traffic; anything else routes to health checks. Port `FN0_WORKER_OPS_PORT` serves the ops endpoints unconditionally.
+
 ## Hijack Architecture
 
 fn0 uses "hijack" components to inject platform services into the WASM execution environment without modifying the user's code:

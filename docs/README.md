@@ -33,8 +33,9 @@ Forte is the full-stack web framework built on fn0.
 
 ## fn0 Platform
 
-- [Overview](fn0/overview.md) — FaaS runtime, execution model, limits, cluster architecture
+- [Overview](fn0/overview.md) — FaaS runtime, execution model, limits, cluster architecture, worker environment variables for self-hosting
 - [Limits & Quotas](fn0/limits.md) — Per-request runtime limits and fn0 Cloud monthly quotas
+- [Bring Your Own Cloudflare](fn0/cloudflare.md) — How fn0 uses your Cloudflare account for storage, CDN, and custom domains
 
 ## Development
 

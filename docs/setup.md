@@ -17,6 +17,9 @@ rustup target add wasm32-wasip2
 Option A — `cargo binstall` (downloads a pre-built binary):
 
 ```sh
+# Install cargo-binstall if not already installed
+cargo install cargo-binstall
+
 cargo binstall forte-cli
 ```
 
@@ -35,6 +38,16 @@ cargo binstall fn0-cli
 # or from source:
 cargo install --path fn0/cli
 ```
+
+### Install forte-test-runner (optional, for backend unit tests in Forte projects)
+
+Forte project backends compile to `wasm32-wasip2` and require a custom test runner to execute tests. Install it from the monorepo (or wait until you need it — `forte dev` does not require it):
+
+```sh
+cargo install --path forte/test-runner
+```
+
+See [forte/testing.md](forte/testing.md) for how to configure the runner and write backend tests. Reinstall whenever you pull changes to the monorepo — a runner version that predates the WIT bindings in the checkout will fail at link time.
 
 ## Local Database (Turso/libSQL)
 
