@@ -86,6 +86,8 @@ impl<'tcx> TypeConverter<'tcx> {
                 {
                     let inner_ty = substs[0].expect_ty();
                     self.convert_type(inner_ty, context)
+                } else if self.is_serde_json_value(adt_def) {
+                    TsType::JsonValue
                 } else {
                     self.convert_adt(adt_def, substs, context)
                 }
@@ -127,6 +129,12 @@ impl<'tcx> TypeConverter<'tcx> {
             || def_path == format!("alloc::rc::{}", name)
             || def_path == format!("std::sync::{}", name)
             || def_path == format!("alloc::sync::{}", name)
+    }
+
+    fn is_serde_json_value(&self, adt_def: &AdtDef<'tcx>) -> bool {
+        let def_path = self.tcx.def_path(adt_def.did());
+        self.tcx.crate_name(def_path.krate).as_str() == "serde_json"
+            && self.tcx.item_name(adt_def.did()).as_str() == "Value"
     }
 
     fn convert_adt(

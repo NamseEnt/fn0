@@ -1,6 +1,6 @@
 use crate::name_resolution::{apply_name_resolution_to_type, resolve_type_names};
 use crate::rust_to_ts::TypeConverter;
-use crate::ts_codegen::{TsDefinition, TsType, format_definition, to_zod};
+use crate::ts_codegen::{TsDefinition, TsType, format_definition, order_definitions, to_zod};
 use rustc_driver::{Callbacks, Compilation};
 use rustc_hir::def::DefKind;
 use rustc_interface::interface::Compiler;
@@ -70,9 +70,11 @@ fn convert_rust_path_to_ts_path(rust_path: &str, ts_output_dir: &str) -> PathBuf
 
 fn generate_ts_file_content(
     rust_source_path: &str,
-    ts_type: &TsType,
-    definitions: &[TsDefinition],
+    ts_type: &mut TsType,
+    definitions: &mut Vec<TsDefinition>,
 ) -> String {
+    order_definitions(definitions, std::slice::from_mut(&mut &mut *ts_type));
+
     let mut file_content = String::new();
     file_content.push_str(&format!("// Auto-generated from {}\n\n", rust_source_path));
     file_content.push_str("import { z } from \"zod\";\n\n");
@@ -405,8 +407,11 @@ impl Analyzer {
             resolve_names(&mut converter, vec![&mut ts_type]);
             inline_root_reference(&mut converter.definitions, &mut ts_type);
 
-            let file_content =
-                generate_ts_file_content(&rust_source_path, &ts_type, &converter.definitions);
+            let file_content = generate_ts_file_content(
+                &rust_source_path,
+                &mut ts_type,
+                &mut converter.definitions,
+            );
 
             println!("self.ts_output_dir: {}", self.ts_output_dir);
 
@@ -493,9 +498,9 @@ impl Analyzer {
             let file_content = generate_hook_file_content(
                 &rust_source_path,
                 hook_name,
-                &input_ts_type,
-                &output_ts_type,
-                &converter.definitions,
+                &mut input_ts_type,
+                &mut output_ts_type,
+                &mut converter.definitions,
             );
 
             let mut output_path = PathBuf::from(&self.hooks_output_dir);
@@ -586,9 +591,9 @@ impl Analyzer {
             let file_content = generate_action_file_content(
                 &rust_source_path,
                 action_name,
-                &input_ts_type,
-                &output_ts_type,
-                &converter.definitions,
+                &mut input_ts_type,
+                &mut output_ts_type,
+                &mut converter.definitions,
             );
 
             let mut output_path = PathBuf::from(&self.actions_output_dir);
@@ -648,10 +653,13 @@ impl Callbacks for Analyzer {
 fn generate_hook_file_content(
     rust_source_path: &str,
     hook_name: &str,
-    input_type: &TsType,
-    output_type: &TsType,
-    definitions: &[TsDefinition],
+    input_type: &mut TsType,
+    output_type: &mut TsType,
+    definitions: &mut Vec<TsDefinition>,
 ) -> String {
+    let mut roots = [&mut *input_type, &mut *output_type];
+    order_definitions(definitions, &mut roots);
+
     let mut file_content = String::new();
     file_content.push_str(&format!("// Auto-generated from {}\n\n", rust_source_path));
     file_content.push_str("import { z } from \"zod\";\n");
@@ -690,10 +698,13 @@ fn generate_hook_file_content(
 fn generate_action_file_content(
     rust_source_path: &str,
     action_name: &str,
-    input_type: &TsType,
-    output_type: &TsType,
-    definitions: &[TsDefinition],
+    input_type: &mut TsType,
+    output_type: &mut TsType,
+    definitions: &mut Vec<TsDefinition>,
 ) -> String {
+    let mut roots = [&mut *input_type, &mut *output_type];
+    order_definitions(definitions, &mut roots);
+
     let mut file_content = String::new();
     file_content.push_str(&format!("// Auto-generated from {}\n\n", rust_source_path));
     file_content.push_str("import { z } from \"zod\";\n");
@@ -756,4 +767,34 @@ fn to_camel_case(snake_case: &str) -> String {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ts_codegen::{TsField, TsType};
+
+    #[test]
+    fn action_file_with_json_value_field_emits_z_json() {
+        let mut input = TsType::Object(vec![TsField {
+            name: "input".to_string(),
+            ty: TsType::JsonValue,
+            is_optional: false,
+        }]);
+        let mut output = TsType::Object(vec![]);
+        let mut definitions = Vec::new();
+
+        let content = generate_action_file_content(
+            "src/actions/admin_run.rs",
+            "admin_run",
+            &mut input,
+            &mut output,
+            &mut definitions,
+        );
+
+        assert!(content.contains("const InputSchema = z.object({\n    input: z.json(),\n  });"));
+        assert!(!content.contains("ValueSchema"));
+        assert!(!content.contains("MapSchema"));
+        assert!(!content.contains("z.lazy"));
+    }
 }

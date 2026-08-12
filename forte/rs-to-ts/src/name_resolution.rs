@@ -132,7 +132,7 @@ pub fn resolve_type_names(definitions: &[TsDefinition]) -> HashMap<String, Resol
 
 pub fn apply_name_resolution_to_type(ty: &mut TsType, name_map: &HashMap<String, ResolvedName>) {
     match ty {
-        TsType::Reference(name) => {
+        TsType::Reference(name) | TsType::LazyReference(name) => {
             if let Some(resolved) = name_map.get(name.as_str()) {
                 *name = resolved.reference();
             }
@@ -163,6 +163,7 @@ pub fn apply_name_resolution_to_type(ty: &mut TsType, name_map: &HashMap<String,
         }
         TsType::Primitive(_) => {}
         TsType::Date => {}
+        TsType::JsonValue => {}
         TsType::Literal(_) => {}
     }
 }
