@@ -27,6 +27,17 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # v8's build script skips its prebuilt-archive download whenever the
+      # checksum file matches, without verifying the archive exists. A cache
+      # restore can lose the ~130MB librusty_v8.a while keeping the checksum,
+      # which silently breaks the link; drop the checksum so it re-downloads.
+      - name: Repair v8 archive cache
+        run: |
+          find target -path '*/gn_out/obj/*.sum' -print0 |
+          while IFS= read -r -d '' sum; do
+            [ -f "${sum%.sum}" ] || rm -f "$sum"
+          done
+
       # Plain `cargo fmt` covers the workspace members only; `--all` is not
       # used because it also follows path dependencies and would reformat the
       # vendored deno crates. vendor/ is never checked; it keeps upstream
