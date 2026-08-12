@@ -192,6 +192,8 @@ fn0 uses "hijack" components to inject platform services into the WASM execution
 | `otlp_hijack` | Injects OpenTelemetry OTLP endpoint |
 | `queue_hijack` | Intercepts outgoing queue requests |
 | `vault_hijack` | Injects secrets (Vault integration) |
+| `websocket_hijack` | Dispatches WebSocket `send` and `disconnect` commands via QUIC |
+| `static_page_cache_hijack` | Routes `static_page_cache::purge` calls; shares the hourly purge budget with public storage purges |
 | `cross_project_enqueue_hijack` | Routes cross-project queue enqueue calls |
 | `cross_project_invoke_hijack` | Routes cross-project direct invocations |
 
@@ -206,5 +208,7 @@ let ctx = ExecutionContext::new(engine, linker, bundle_cache)
     .with_cross_project_invoke_hijack(invoke_hijack)
     .with_vault_hijack(vault_hijack)
     .with_object_storage_hijack(object_storage_hijack)
-    .with_public_storage_hijack(public_storage_hijack);
+    .with_public_storage_hijack(public_storage_hijack)
+    .with_websocket_hijack(websocket_hijack)
+    .with_static_page_cache_hijack(static_page_cache_hijack);
 ```
