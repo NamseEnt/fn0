@@ -7,10 +7,14 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-22.04
+    # The repo is public, so the default token is enough for the checkout
+    # and for the tag pushes below. The old RELEASE_PAT lost its repo scope
+    # when the repository path changed case and is no longer set.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.RELEASE_PAT }}
           persist-credentials: true
 
       - name: Install Rust
