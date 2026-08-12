@@ -173,20 +173,15 @@ fn is_page_path(path_str: &str) -> bool {
         return false;
     }
     let is_mod_rs = path_str.ends_with("mod.rs");
-    let is_single_page_rs =
-        !is_mod_rs && path_str.ends_with(".rs") && !path_str.contains("/api/");
+    let is_single_page_rs = !is_mod_rs && path_str.ends_with(".rs") && !path_str.contains("/api/");
     if !is_mod_rs && !is_single_page_rs {
         return false;
     }
-    path_str
-        .split('/')
-        .any(|segment| segment == "pages")
+    path_str.split('/').any(|segment| segment == "pages")
 }
 
 fn is_hook_path(path_str: &str) -> bool {
-    path_str.contains("src/hooks/")
-        && path_str.ends_with(".rs")
-        && !path_str.ends_with("mod.rs")
+    path_str.contains("src/hooks/") && path_str.ends_with(".rs") && !path_str.ends_with("mod.rs")
 }
 
 fn is_action_path(path_str: &str) -> bool {

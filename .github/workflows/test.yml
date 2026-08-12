@@ -27,6 +27,13 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # Plain `cargo fmt` covers the workspace members only; `--all` is not
+      # used because it also follows path dependencies and would reformat the
+      # vendored deno crates. vendor/ is never checked; it keeps upstream
+      # deno's style.
+      - name: Fmt workspace
+        run: cargo fmt --check
+
       # The crates under test build for wasm32-wasip2, so cargo runs their test
       # binaries through this runner rather than executing them directly. It is
       # built into the shared target dir instead of `cargo install`ing so the
@@ -82,11 +89,21 @@ jobs:
         working-directory: fn0/control/rs
         run: cargo clippy --all-targets -- -D warnings
 
+      # Runs after the control build because build.rs generates
+      # src/route_generated.rs, which rustfmt has to resolve as a module.
+      - name: Fmt fn0-control
+        working-directory: fn0/control/rs
+        run: cargo fmt --check
+
       # Also its own workspace root, and it carries no tests. Its
       # rust-toolchain.toml pins a nightly that rustup installs on entry.
       - name: Clippy forte-rs-to-ts
         working-directory: forte/rs-to-ts
         run: cargo clippy --all-targets -- -D warnings
+
+      - name: Fmt forte-rs-to-ts
+        working-directory: forte/rs-to-ts
+        run: cargo fmt --check
 
   forte-cli:
     runs-on: ubuntu-22.04

@@ -161,15 +161,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::InternalError;
     };
 
-    let key_ciphertext = match crate::common::vault::encrypt(req.body.private_key_pem.as_bytes())
-        .await
-    {
-        Ok(ciphertext) => ciphertext,
-        Err(e) => {
-            tracing::error!("domain_set key encrypt: {e}");
-            return Output::InternalError;
-        }
-    };
+    let key_ciphertext =
+        match crate::common::vault::encrypt(req.body.private_key_pem.as_bytes()).await {
+            Ok(ciphertext) => ciphertext,
+            Err(e) => {
+                tracing::error!("domain_set key encrypt: {e}");
+                return Output::InternalError;
+            }
+        };
 
     if let Err(e) = cert_manifest::put(
         &db,

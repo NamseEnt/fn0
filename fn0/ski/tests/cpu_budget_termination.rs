@@ -66,9 +66,8 @@ fn over_budget_call_marks_the_instance_terminated() {
     let local = LocalSet::new();
 
     local.block_on(&runtime, async {
-        let instance = Rc::new(
-            SkiInstance::load(user_js(), "/entry.js", Some(Arc::new(StubFetch))).unwrap(),
-        );
+        let instance =
+            Rc::new(SkiInstance::load(user_js(), "/entry.js", Some(Arc::new(StubFetch))).unwrap());
         let driver_instance = instance.clone();
         let driver = tokio::task::spawn_local(async move {
             driver_instance.drive_forever().await;

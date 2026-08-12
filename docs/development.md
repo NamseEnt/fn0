@@ -6,7 +6,8 @@
 - **Rust edition:** 2024
 - **Rust file layout:** `mod` declarations go at the very top of the file, then `use` statements below them. No blank lines between consecutive `mod` declarations, nor between consecutive `use` statements.
 - Run `cargo clippy` and fix all warnings before committing.
-- Run `cargo fmt` before committing.
+- Run `cargo fmt` before committing, and CI checks it. Run it per crate (`cargo fmt -p forte-sdk`) or plain from the workspace root, which covers every workspace member. Never run `cargo fmt --all`: it follows path dependencies into `vendor/` and reformats the vendored deno crates. `vendor/` is excluded from formatting and keeps upstream deno's style.
+- In `fn0/control/rs`, `cargo fmt` needs a build to have run first: `build.rs` generates `src/route_generated.rs`, which rustfmt must resolve as a module. `forte/rs-to-ts` is its own workspace root and formats with its pinned nightly toolchain.
 - Tests must pass.
 
 These rules apply across all crates in the workspace (see individual `CLAUDE.md` files in each crate).
