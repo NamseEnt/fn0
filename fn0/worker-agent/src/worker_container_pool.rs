@@ -14,6 +14,7 @@ const ADOPTION_TARGET_WAIT: Duration = Duration::from_secs(30);
 const CONTAINER_NAME_PREFIX: &str = "fn0-worker-";
 
 const OPS_PORT_OFFSET: u16 = 1;
+const QUIC_PORT_OFFSET: u16 = 2;
 const WORKER_BASE_PORT: u16 = 18443;
 
 pub async fn run(
@@ -22,6 +23,7 @@ pub async fn run(
     active_image_tx: watch::Sender<Option<String>>,
     active_addr_tx: watch::Sender<Option<SocketAddr>>,
     first_ready_tx: oneshot::Sender<()>,
+    private_ip: String,
 ) {
     info!("worker container pool started");
     let podman = Podman::from_env();
@@ -77,8 +79,10 @@ pub async fn run(
                 .map(|c| c.image_ref == image_ref)
                 .unwrap_or(false);
             if !already {
-                let (user_port, ops_port) = allocate_port_pair(&mut next_port);
-                match start_new_active(&podman, &env_file, &image_ref, user_port, ops_port).await {
+                let worker_ports = allocate_ports(&mut next_port);
+                match start_new_active(&podman, &env_file, &image_ref, worker_ports, &private_ip)
+                    .await
+                {
                     Ok(new_container) => {
                         if let Some(prev) = state.active.take() {
                             info!(
@@ -182,36 +186,52 @@ struct DrainingContainer {
     drain_confirmed: bool,
 }
 
-fn allocate_port_pair(next_port: &mut u16) -> (u16, u16) {
+#[derive(Clone, Copy)]
+struct WorkerPorts {
+    user: u16,
+    ops: u16,
+    quic: u16,
+}
+
+fn allocate_ports(next_port: &mut u16) -> WorkerPorts {
     let user_port = *next_port;
     let ops_port = user_port + OPS_PORT_OFFSET;
+    let quic_port = user_port + QUIC_PORT_OFFSET;
     *next_port = next_port
-        .checked_add(2)
+        .checked_add(3)
         .expect("worker port range exhausted");
-    (user_port, ops_port)
+    WorkerPorts {
+        user: user_port,
+        ops: ops_port,
+        quic: quic_port,
+    }
 }
 
 async fn start_new_active(
     podman: &Podman,
     env_file: &str,
     image_ref: &str,
-    user_port: u16,
-    ops_port: u16,
+    worker_ports: WorkerPorts,
+    private_ip: &str,
 ) -> Result<RunningContainer, PoolError> {
     let container_name = format!(
         "fn0-worker-{tag}-{port}",
         tag = sanitize(image_ref),
-        port = user_port,
+        port = worker_ports.user,
     );
     podman
         .pull_image(image_ref)
         .await
         .map_err(PoolError::Podman)?;
-    let user_port_str = user_port.to_string();
-    let ops_port_str = ops_port.to_string();
+    let user_port_str = worker_ports.user.to_string();
+    let ops_port_str = worker_ports.ops.to_string();
+    let quic_bind = format!("0.0.0.0:{}", worker_ports.quic);
+    let quic_endpoint = format!("{private_ip}:{}", worker_ports.quic);
     let env: &[(&str, &str)] = &[
         ("HTTP_PORT", &user_port_str),
         ("FN0_WORKER_OPS_PORT", &ops_port_str),
+        ("FN0_WEBSOCKET_QUIC_BIND", &quic_bind),
+        ("FN0_WEBSOCKET_QUIC_ENDPOINT", &quic_endpoint),
     ];
     podman
         .run_detached(RunArgs {
@@ -222,10 +242,10 @@ async fn start_new_active(
         })
         .await
         .map_err(PoolError::Podman)?;
-    let local_addr: SocketAddr = format!("127.0.0.1:{user_port}")
+    let local_addr: SocketAddr = format!("127.0.0.1:{}", worker_ports.user)
         .parse()
         .expect("loopback addr");
-    let ops_addr: SocketAddr = format!("127.0.0.1:{ops_port}")
+    let ops_addr: SocketAddr = format!("127.0.0.1:{}", worker_ports.ops)
         .parse()
         .expect("loopback addr");
     wait_until_ready(podman, &container_name, &ops_addr).await?;
@@ -432,7 +452,7 @@ async fn adopt_existing_containers(
     }
 
     if max_port >= WORKER_BASE_PORT {
-        *next_port = max_port.saturating_add(2);
+        *next_port = max_port.saturating_add(3);
     }
 
     if candidates.is_empty() {

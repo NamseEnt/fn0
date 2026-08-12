@@ -10,6 +10,7 @@ pub mod static_page_cache;
 #[cfg(feature = "test-harness")]
 pub mod test_harness;
 pub mod time_wasi;
+pub mod websocket;
 
 pub use anyhow;
 pub use chrono;

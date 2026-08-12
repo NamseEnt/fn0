@@ -90,3 +90,17 @@ pub struct WorkerHostStatusDoc {
     pub active_image_ref: Option<String>,
     pub reported_at: i64,
 }
+
+#[forte_doc]
+pub struct WebSocketConnectionDoc {
+    #[sk]
+    pub connection_id: String,
+    pub project_id: String,
+    pub worker_id: String,
+    pub endpoint: String,
+}
+
+#[forte_doc]
+pub struct WebSocketDirectoryGcCursorDoc {
+    pub after_connection_id: Option<String>,
+}

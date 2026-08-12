@@ -73,8 +73,30 @@ let data: MyType = resp.into_body().json::<MyType>().await?;
 ```
 
 Limitations:
-- Streaming request bodies are not supported (use `Body::Bytes`)
+- Streaming request bodies use `Body::Stream` or `Body::channel()`
 - Subject to fn0 Cloud subrequest limit (50 per request)
+
+## WebSockets
+
+`forte_sdk::websocket` exposes the connection event types and server-side command API:
+
+```rust
+pub async fn send(
+    connection_id: &ConnectionId,
+    message: WebSocketMessage,
+) -> Result<(), WebSocketSendError>;
+
+pub async fn disconnect(
+    connection_id: &ConnectionId,
+) -> Result<(), WebSocketDisconnectError>;
+```
+
+`WebSocketMessage` is `Text(Body)` or `Binary(Body)`, so both buffered and streaming bodies are
+accepted. `IncomingMessage` is `Text(String)` or `Binary(Vec<u8>)`. Send errors expose a
+`WebSocketDeliveryState` of `NotSent` or `Unknown`; Forte does not retry automatically.
+
+See [WebSockets](websockets.md) for route callbacks, acceptance headers, limits, and reconnect
+recovery.
 
 ## Cookie Signing
 

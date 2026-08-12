@@ -192,6 +192,77 @@ fn test_build_raw_response_on_page_fails() {
         .stderr(predicate::str::contains("only supported under src/apis/"));
 }
 
+const WEBSOCKET_ROUTE: &str = r#"
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::{
+    ConnectDecision, ConnectEvent, DisconnectEvent, MessageEvent,
+};
+
+pub async fn on_connect(_event: ConnectEvent) -> Result<ConnectDecision> {
+    Ok(ConnectDecision::accept())
+}
+
+pub async fn on_message(_event: MessageEvent) -> Result<()> {
+    Ok(())
+}
+
+pub async fn on_disconnect(_event: DisconnectEvent) -> Result<()> {
+    Ok(())
+}
+"#;
+
+const DYNAMIC_WEBSOCKET_ROUTE: &str = r#"
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::{ConnectDecision, ConnectEvent, MessageEvent};
+
+pub struct PathParams {
+    pub room_id: String,
+}
+
+pub async fn on_connect(
+    _event: ConnectEvent,
+    _path_params: PathParams,
+) -> Result<ConnectDecision> {
+    Ok(ConnectDecision::accept())
+}
+
+pub async fn on_message(_event: MessageEvent, _path_params: PathParams) -> Result<()> {
+    Ok(())
+}
+"#;
+
+#[test]
+fn test_build_websocket_route() {
+    let temp = tempfile::tempdir().unwrap();
+    let project_dir = setup_project(&temp);
+    let websocket_dir = project_dir.join("rs/src/websockets");
+    std::fs::create_dir_all(&websocket_dir).unwrap();
+    std::fs::write(websocket_dir.join("chat.rs"), WEBSOCKET_ROUTE).unwrap();
+    std::fs::write(websocket_dir.join("[room_id].rs"), DYNAMIC_WEBSOCKET_ROUTE).unwrap();
+
+    cargo::cargo_bin_cmd!("forte")
+        .args(["build"])
+        .current_dir(&project_dir)
+        .assert()
+        .success();
+
+    let generated_routes =
+        std::fs::read_to_string(project_dir.join("rs/src/route_generated.rs")).unwrap();
+    assert!(generated_routes.contains("handle_websocket_event"));
+    assert!(generated_routes.contains("websockets_chat::on_connect"));
+    assert!(generated_routes.contains("websockets_chat::on_message"));
+    assert!(generated_routes.contains("websockets__room_id_::on_connect"));
+    assert!(generated_routes.contains("let path_params = websockets__room_id_::PathParams"));
+    assert!(
+        generated_routes
+            .find("websockets_chat::on_connect")
+            .expect("static route")
+            < generated_routes
+                .find("websockets__room_id_::on_connect")
+                .expect("dynamic route")
+    );
+}
+
 #[test]
 fn test_build_fails_outside_project() {
     let temp = tempfile::tempdir().unwrap();

@@ -364,6 +364,7 @@ dependencies = [
  "forte-codegen",
  "forte-json",
  "forte-sdk",
+ "futures",
  "hmac",
  "http",
  "pulldown-cmark",
@@ -426,7 +427,7 @@ dependencies = [
 
 [[package]]
 name = "forte-codegen"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "forte-wit",
@@ -460,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "bytes",

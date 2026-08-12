@@ -9,3 +9,4 @@ pub mod github;
 pub mod project_name;
 pub mod r2_store;
 pub mod vault;
+pub mod websocket_directory_gc;

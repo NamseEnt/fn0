@@ -2,6 +2,7 @@ use super::model::*;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn generate_code(
     pages: &[PageInfo],
     hooks: &[HookInfo],
@@ -9,6 +10,7 @@ pub(super) fn generate_code(
     queue_tasks: &[QueueTaskInfo],
     admin_tasks: &[AdminTaskInfo],
     static_files: &[StaticFileInfo],
+    websockets: &[WebSocketRouteInfo],
     wit_dir: &str,
 ) -> TokenStream {
     let mut all_module_decls: Vec<(String, TokenStream)> = Vec::new();
@@ -19,6 +21,9 @@ pub(super) fn generate_code(
         all_module_decls.push((name, ts));
     }
     for (name, ts) in generate_action_module_declarations(actions) {
+        all_module_decls.push((name, ts));
+    }
+    for (name, ts) in generate_websocket_module_declarations(websockets) {
         all_module_decls.push((name, ts));
     }
     all_module_decls.sort_by(|(a, _), (b, _)| a.cmp(b));
@@ -35,6 +40,7 @@ pub(super) fn generate_code(
     let admin_task_handler = generate_admin_task_handler(admin_tasks);
     let classify_route_fn = generate_classify_route(pages);
     let cache_policy_handler = generate_cache_policy_handler(pages);
+    let websocket_handler = generate_websocket_handler(websockets);
 
     let static_file_chain = {
         let matches: Vec<TokenStream> = static_files
@@ -162,7 +168,8 @@ pub(super) fn generate_code(
         async fn dispatch_inner(request: Request<Vec<u8>>) -> Result<Response<Body>> {
             let (parts, body_bytes) = request.into_parts();
             let headers = parts.headers;
-            let path = parts.uri.path().to_string();
+            let uri = parts.uri;
+            let path = uri.path().to_string();
             let method = parts.method;
 
             if path == "/__fn0_cache_policy" {
@@ -171,7 +178,7 @@ pub(super) fn generate_code(
 
             let mut cookie_jar = make_cookie_jar(&headers);
 
-            let Some(uri_authority) = parts.uri.authority() else {
+            let Some(uri_authority) = uri.authority() else {
                 return Ok(Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .body(Body::from("Missing authority in request URI"))
@@ -196,6 +203,17 @@ pub(super) fn generate_code(
                 return handle_admin_task(task_name, &headers, &body_bytes).await;
             }
 
+            if headers.contains_key("x-fn0-internal-websocket-event") {
+                return handle_websocket_event(path, uri, headers, body_bytes).await;
+            }
+
+            if path == "/ws" || path.starts_with("/ws/") {
+                return Ok(Response::builder()
+                    .status(StatusCode::UPGRADE_REQUIRED)
+                    .body(Body::empty())
+                    .unwrap());
+            }
+
             #static_file_chain
 
             #route_chain
@@ -208,6 +226,8 @@ pub(super) fn generate_code(
         #queue_task_execute_handler
 
         #admin_task_handler
+
+        #websocket_handler
 
         fn make_cookie_jar(headers: &HeaderMap) -> cookie::CookieJar {
             let mut jar = cookie::CookieJar::new();
@@ -262,6 +282,306 @@ fn generate_module_declarations(pages: &[PageInfo]) -> Vec<(String, TokenStream)
         .collect()
 }
 
+fn generate_websocket_module_declarations(
+    websockets: &[WebSocketRouteInfo],
+) -> Vec<(String, TokenStream)> {
+    websockets
+        .iter()
+        .map(|websocket| {
+            let module_ident = format_ident!("{}", websocket.module_name);
+            let module_path = &websocket.module_path;
+            let allow_attribute = if has_dynamic_segments(&websocket.route_segments) {
+                quote! { #[allow(non_snake_case)] }
+            } else {
+                quote! {}
+            };
+            (
+                websocket.module_name.clone(),
+                quote! {
+                    #allow_attribute
+                    #[path = #module_path]
+                    mod #module_ident;
+                },
+            )
+        })
+        .collect()
+}
+
+fn generate_websocket_handler(websockets: &[WebSocketRouteInfo]) -> TokenStream {
+    if websockets.is_empty() {
+        return quote! {
+            async fn handle_websocket_event(
+                _path: &str,
+                _uri: forte_sdk::http::Uri,
+                _headers: HeaderMap,
+                _body_bytes: Vec<u8>,
+            ) -> Result<Response<Body>> {
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Body::empty())
+                    .unwrap())
+            }
+        };
+    }
+    let route_matches: Vec<TokenStream> = websockets
+        .iter()
+        .map(generate_websocket_route_match)
+        .collect();
+    let first_match = &route_matches[0];
+    let remaining_matches = &route_matches[1..];
+    let route_chain = quote! {
+        #first_match
+        #(else #remaining_matches)*
+        else {
+            Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::empty())
+                .unwrap())
+        }
+    };
+
+    quote! {
+        async fn handle_websocket_event(
+            path: &str,
+            uri: forte_sdk::http::Uri,
+            headers: HeaderMap,
+            body_bytes: Vec<u8>,
+        ) -> Result<Response<Body>> {
+            let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+            #route_chain
+        }
+
+        fn websocket_public_headers(headers: &HeaderMap) -> HeaderMap {
+            let mut public_headers = HeaderMap::new();
+            for (header_name, header_value) in headers {
+                if !header_name.as_str().starts_with("x-fn0-") {
+                    public_headers.append(header_name.clone(), header_value.clone());
+                }
+            }
+            public_headers
+        }
+
+        fn websocket_response_headers_valid(headers: &HeaderMap) -> bool {
+            headers.keys().all(|header_name| {
+                !matches!(
+                    header_name.as_str(),
+                    "connection"
+                        | "upgrade"
+                        | "sec-websocket-accept"
+                        | "sec-websocket-protocol"
+                        | "content-length"
+                        | "transfer-encoding"
+                ) && !header_name.as_str().starts_with("x-fn0-")
+                    && !header_name.as_str().starts_with("sec-websocket-")
+            })
+        }
+
+        fn websocket_error_response(status: StatusCode) -> Response<Body> {
+            Response::builder()
+                .status(status)
+                .body(Body::empty())
+                .unwrap()
+        }
+    }
+}
+
+fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream {
+    let module_name = format_ident!("{}", websocket.module_name);
+    let route_condition = if has_dynamic_segments(&websocket.route_segments) {
+        generate_dynamic_route_condition(&websocket.route_segments)
+    } else {
+        let route_path = &websocket.route_path;
+        quote! { path == #route_path }
+    };
+    let path_params_extraction = if let Some(path_params) = &websocket.path_params {
+        generate_path_params_extraction(&module_name, &websocket.route_segments, path_params)
+    } else {
+        quote! {}
+    };
+    let connect_call =
+        websocket_callback_call(&module_name, "on_connect", websocket.path_params.is_some());
+    let message_call =
+        websocket_callback_call(&module_name, "on_message", websocket.path_params.is_some());
+    let disconnect_call = if websocket.has_on_disconnect {
+        websocket_callback_call(
+            &module_name,
+            "on_disconnect",
+            websocket.path_params.is_some(),
+        )
+    } else {
+        quote! { Ok::<(), forte_sdk::anyhow::Error>(()) }
+    };
+
+    quote! {
+        if #route_condition {
+            #path_params_extraction
+            let Some(connection_id_value) = headers
+                .get("x-fn0-internal-websocket-connection-id")
+                .and_then(|value| value.to_str().ok())
+            else {
+                return Ok(websocket_error_response(StatusCode::BAD_REQUEST));
+            };
+            let connection_id = forte_sdk::websocket::ConnectionId::new(connection_id_value);
+            let Some(event_name) = headers
+                .get("x-fn0-internal-websocket-event")
+                .and_then(|value| value.to_str().ok())
+            else {
+                return Ok(websocket_error_response(StatusCode::BAD_REQUEST));
+            };
+            match event_name {
+                "connect" => {
+                    let requested_protocols = headers
+                        .get_all("sec-websocket-protocol")
+                        .iter()
+                        .filter_map(|value| value.to_str().ok())
+                        .flat_map(|value| value.split(','))
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_string)
+                        .collect();
+                    let client_address = headers
+                        .get("x-fn0-internal-websocket-client-address")
+                        .and_then(|value| value.to_str().ok())
+                        .map(str::to_string);
+                    let event = forte_sdk::websocket::ConnectEvent {
+                        connection_id,
+                        uri,
+                        headers: websocket_public_headers(&headers),
+                        client_address,
+                        requested_protocols,
+                    };
+                    match #connect_call {
+                        Ok(forte_sdk::websocket::ConnectDecision::Accept {
+                            protocol,
+                            headers: response_headers,
+                        }) => {
+                            if !websocket_response_headers_valid(&response_headers) {
+                                return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
+                            }
+                            let mut response = Response::builder()
+                                .status(StatusCode::NO_CONTENT)
+                                .body(Body::empty())
+                                .unwrap();
+                            *response.headers_mut() = response_headers;
+                            response.headers_mut().insert(
+                                "x-fn0-internal-websocket-decision",
+                                "accept".parse().unwrap(),
+                            );
+                            if let Some(protocol) = protocol {
+                                let Ok(protocol_header) = protocol.parse() else {
+                                    return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
+                                };
+                                response.headers_mut().insert(
+                                    "x-fn0-internal-websocket-protocol",
+                                    protocol_header,
+                                );
+                            }
+                            Ok(response)
+                        }
+                        Ok(forte_sdk::websocket::ConnectDecision::Reject {
+                            status,
+                            headers: response_headers,
+                        }) => {
+                            if status == StatusCode::SWITCHING_PROTOCOLS
+                                || !websocket_response_headers_valid(&response_headers)
+                            {
+                                return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
+                            }
+                            let mut response = Response::builder()
+                                .status(status)
+                                .body(Body::empty())
+                                .unwrap();
+                            *response.headers_mut() = response_headers;
+                            response.headers_mut().insert(
+                                "x-fn0-internal-websocket-decision",
+                                "reject".parse().unwrap(),
+                            );
+                            Ok(response)
+                        }
+                        Err(error) => {
+                            eprintln!("WebSocket on_connect error at {}: {:?}", path, error);
+                            Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                        }
+                    }
+                }
+                "message" => {
+                    let message = match headers
+                        .get("x-fn0-internal-websocket-message-kind")
+                        .and_then(|value| value.to_str().ok())
+                    {
+                        Some("text") => match String::from_utf8(body_bytes) {
+                            Ok(text) => forte_sdk::websocket::IncomingMessage::Text(text),
+                            Err(_) => return Ok(websocket_error_response(StatusCode::BAD_REQUEST)),
+                        },
+                        Some("binary") => forte_sdk::websocket::IncomingMessage::Binary(body_bytes),
+                        _ => return Ok(websocket_error_response(StatusCode::BAD_REQUEST)),
+                    };
+                    let event = forte_sdk::websocket::MessageEvent {
+                        connection_id,
+                        message,
+                    };
+                    match #message_call {
+                        Ok(()) => Ok(websocket_error_response(StatusCode::NO_CONTENT)),
+                        Err(error) => {
+                            eprintln!("WebSocket on_message error at {}: {:?}", path, error);
+                            Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                        }
+                    }
+                }
+                "disconnect" => {
+                    let close_code = headers
+                        .get("x-fn0-internal-websocket-close-code")
+                        .and_then(|value| value.to_str().ok())
+                        .and_then(|value| value.parse::<u16>().ok());
+                    let reason = headers
+                        .get("x-fn0-internal-websocket-close-reason")
+                        .and_then(|value| value.to_str().ok())
+                        .map(str::to_string);
+                    let cause = match headers
+                        .get("x-fn0-internal-websocket-disconnect-cause")
+                        .and_then(|value| value.to_str().ok())
+                    {
+                        Some("peer") => forte_sdk::websocket::DisconnectCause::Peer,
+                        Some("application") => forte_sdk::websocket::DisconnectCause::Application,
+                        Some("deployment") => forte_sdk::websocket::DisconnectCause::Deployment,
+                        Some("heartbeat-timeout") => forte_sdk::websocket::DisconnectCause::HeartbeatTimeout,
+                        Some("protocol-error") => forte_sdk::websocket::DisconnectCause::ProtocolError,
+                        Some("transport-error") => forte_sdk::websocket::DisconnectCause::TransportError,
+                        _ => forte_sdk::websocket::DisconnectCause::InternalError,
+                    };
+                    let event = forte_sdk::websocket::DisconnectEvent {
+                        connection_id,
+                        close_code,
+                        reason,
+                        cause,
+                    };
+                    match #disconnect_call {
+                        Ok(()) => Ok(websocket_error_response(StatusCode::NO_CONTENT)),
+                        Err(error) => {
+                            eprintln!("WebSocket on_disconnect error at {}: {:?}", path, error);
+                            Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                        }
+                    }
+                }
+                _ => Ok(websocket_error_response(StatusCode::BAD_REQUEST)),
+            }
+        }
+    }
+}
+
+fn websocket_callback_call(
+    module_name: &syn::Ident,
+    callback_name: &str,
+    has_path_params: bool,
+) -> TokenStream {
+    let callback_ident = format_ident!("{callback_name}");
+    if has_path_params {
+        quote! { #module_name::#callback_ident(event, path_params).await }
+    } else {
+        quote! { #module_name::#callback_ident(event).await }
+    }
+}
+
 fn has_dynamic_segments(segments: &[RouteSegment]) -> bool {
     segments
         .iter()
@@ -314,7 +634,7 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                     fields.iter().map(|f| format_ident!("{}", f.name)).collect();
                 quote! {
                     use std::collections::HashMap;
-                    let query = parts.uri.query().unwrap_or("");
+                    let query = uri.query().unwrap_or("");
                     let query_params: HashMap<String, String> = forte_sdk::form_urlencoded::parse(query.as_bytes())
                         .map(|(k, v)| (k.into_owned(), v.into_owned()))
                         .collect();

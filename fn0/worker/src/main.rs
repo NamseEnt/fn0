@@ -8,6 +8,9 @@ mod queue_consumer;
 mod storage_resolver;
 mod telemetry;
 mod vault_client;
+mod websocket;
+mod websocket_directory;
+mod websocket_quic;
 mod worker_pool;
 
 use base64::Engine;
@@ -19,6 +22,7 @@ use fn0::{
     CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
     ExecutionContext, MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, PresignGate,
     PublicStorageHijack, PurgeGate, QueueHijack, StaticPageCacheHijack, TursoHijack, VaultHijack,
+    WebSocketHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -40,7 +44,7 @@ pub type WorkerContext = ExecutionContext<S3BundleCache>;
 
 const DEFAULT_CACHE_SIZE_BYTES: usize = 512 * 1024 * 1024;
 const DEFAULT_OPS_PORT: u16 = 9090;
-const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
+const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(15);
 
 pub fn read_pem_env(name: &str) -> Option<String> {
     if let Ok(v) = std::env::var(name) {
@@ -107,12 +111,7 @@ impl CrossProjectInvokeDispatcher for WorkerCrossProjectInvokeDispatcher {
         req: fn0::Request,
     ) -> anyhow::Result<oneshot::Receiver<anyhow::Result<fn0::Response>>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let envelope = RequestEnvelope {
-            project_id: target_project_id,
-            req,
-            resp_tx,
-            enqueued_at: std::time::Instant::now(),
-        };
+        let envelope = RequestEnvelope::new(target_project_id, req, resp_tx);
         worker_pool::dispatch(&self.senders, envelope).map_err(|e| match e {
             DispatchError::Full => anyhow::anyhow!("worker pool full"),
             DispatchError::Closed => anyhow::anyhow!("worker pool closed"),
@@ -274,6 +273,7 @@ async fn run() -> Result<()> {
     let presign_gate = Arc::new(PresignGate::new());
     let purge_gate = Arc::new(PurgeGate::new());
     let metric_gate = Arc::new(MetricCardinalityGate::new());
+    let websocket_hijack = Arc::new(WebSocketHijack::from_env());
 
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
@@ -291,7 +291,8 @@ async fn run() -> Result<()> {
                 storage_resolver.clone(),
                 purge_gate.clone(),
             ))
-            .with_static_page_cache_hijack(build_static_page_cache_hijack(purge_gate)),
+            .with_static_page_cache_hijack(build_static_page_cache_hijack(purge_gate))
+            .with_websocket_hijack(websocket_hijack.clone()),
     );
 
     // Recorded on the worker's own meter rather than stamped into guest
@@ -330,6 +331,10 @@ async fn run() -> Result<()> {
     direct_hijack.set_dispatcher(Arc::new(WorkerCrossProjectInvokeDispatcher {
         senders: worker_senders.clone(),
     }));
+    let websocket_service = websocket::WebSocketService::new(worker_senders.clone())
+        .await
+        .map_err(|error| color_eyre::eyre::eyre!("websocket service init: {error:#}"))?;
+    websocket_hijack.set_dispatcher(websocket_service.clone());
 
     let manifest_db =
         manifest_poller::build_database_from_env().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
@@ -337,8 +342,16 @@ async fn run() -> Result<()> {
         let cache = cache.clone();
         let manifest_loaded = manifest_loaded.clone();
         let storage_resolver = storage_resolver.clone();
+        let websocket_service = websocket_service.clone();
         async move {
-            manifest_poller::run(manifest_db, cache, storage_resolver, manifest_loaded).await;
+            manifest_poller::run(
+                manifest_db,
+                cache,
+                storage_resolver,
+                manifest_loaded,
+                websocket_service,
+            )
+            .await;
         }
     });
 
@@ -369,6 +382,7 @@ async fn run() -> Result<()> {
         let cache = cache.clone();
         let drain_flag = drain_flag.clone();
         let cert_resolver = cert_resolver.clone();
+        let websocket_service = websocket_service.clone();
         async move {
             if let Err(err) = run_user_server(
                 user_port,
@@ -378,6 +392,7 @@ async fn run() -> Result<()> {
                 cache,
                 apex_route,
                 cert_resolver,
+                websocket_service,
             )
             .await
             {
@@ -390,9 +405,16 @@ async fn run() -> Result<()> {
         let manifest_loaded = manifest_loaded.clone();
         let instance_count = instance_count.clone();
         let drain_flag = drain_flag.clone();
+        let websocket_service = websocket_service.clone();
         async move {
-            if let Err(err) =
-                run_ops_server(ops_port, manifest_loaded, instance_count, drain_flag).await
+            if let Err(err) = run_ops_server(
+                ops_port,
+                manifest_loaded,
+                instance_count,
+                drain_flag,
+                websocket_service,
+            )
+            .await
             {
                 tracing::error!(%err, "ops server error");
             }
@@ -437,6 +459,7 @@ fn build_cert_resolver() -> Result<SniCertResolver> {
     Ok(SniCertResolver::new(fallback))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_user_server(
     port: u16,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
@@ -445,6 +468,7 @@ async fn run_user_server(
     cache: S3BundleCache,
     apex_route: Option<Arc<ApexRoute>>,
     cert_resolver: Arc<SniCertResolver>,
+    websocket_service: Arc<websocket::WebSocketService>,
 ) -> Result<()> {
     let tls_acceptor = {
         let config = rustls::ServerConfig::builder()
@@ -458,7 +482,7 @@ async fn run_user_server(
     tracing::info!(%addr, "user server listening (TLS)");
 
     loop {
-        let (socket, _peer_addr) = listener.accept().await?;
+        let (socket, peer_addr) = listener.accept().await?;
 
         let worker_senders = worker_senders.clone();
         let instance_count = instance_count.clone();
@@ -466,6 +490,7 @@ async fn run_user_server(
         let tls_acceptor = tls_acceptor.clone();
         let cache = cache.clone();
         let apex_route = apex_route.clone();
+        let websocket_service = websocket_service.clone();
 
         tokio::spawn(async move {
             // Sniff first byte to multiplex TLS user traffic (Cloudflare → NLB
@@ -498,6 +523,7 @@ async fn run_user_server(
                     let drain_flag = drain_flag.clone();
                     let cache = cache.clone();
                     let apex_route = apex_route.clone();
+                    let websocket_service = websocket_service.clone();
                     async move {
                         handle_user_request(
                             req,
@@ -506,6 +532,8 @@ async fn run_user_server(
                             drain_flag,
                             cache,
                             apex_route,
+                            websocket_service,
+                            peer_addr,
                         )
                         .await
                     }
@@ -515,6 +543,7 @@ async fn run_user_server(
                     Ok(tls_stream) => {
                         http1::Builder::new()
                             .serve_connection(TokioIo::new(tls_stream), service)
+                            .with_upgrades()
                             .await
                     }
                     Err(err) => {
@@ -544,6 +573,7 @@ async fn run_ops_server(
     manifest_loaded: Arc<AtomicBool>,
     instance_count: Arc<AtomicU64>,
     drain_flag: Arc<AtomicBool>,
+    websocket_service: Arc<websocket::WebSocketService>,
 ) -> Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
@@ -554,13 +584,24 @@ async fn run_ops_server(
         let manifest_loaded = manifest_loaded.clone();
         let instance_count = instance_count.clone();
         let drain_flag = drain_flag.clone();
+        let websocket_service = websocket_service.clone();
 
         tokio::spawn(async move {
             let service = service_fn(move |req| {
                 let manifest_loaded = manifest_loaded.clone();
                 let instance_count = instance_count.clone();
                 let drain_flag = drain_flag.clone();
-                async move { handle_ops_request(req, manifest_loaded, instance_count, drain_flag).await }
+                let websocket_service = websocket_service.clone();
+                async move {
+                    handle_ops_request(
+                        req,
+                        manifest_loaded,
+                        instance_count,
+                        drain_flag,
+                        websocket_service,
+                    )
+                    .await
+                }
             });
 
             if let Err(err) = http1::Builder::new()
@@ -608,6 +649,7 @@ async fn handle_ops_request(
     manifest_loaded: Arc<AtomicBool>,
     instance_count: Arc<AtomicU64>,
     drain_flag: Arc<AtomicBool>,
+    websocket_service: Arc<websocket::WebSocketService>,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     match (req.method(), req.uri().path()) {
         (&hyper::Method::GET, "/ready") => {
@@ -622,12 +664,16 @@ async fn handle_ops_request(
         }
         (&hyper::Method::POST, "/drain") => {
             drain_flag.store(true, Ordering::Relaxed);
+            websocket_service.close_all().await;
             tracing::info!("worker entered drain mode");
             Ok(hyper::Response::new(Full::new(Bytes::from("draining"))))
         }
         (&hyper::Method::GET, "/status") => {
+            let active_count = instance_count.load(Ordering::Relaxed)
+                + websocket_service.connection_count() as u64;
             let body = serde_json::json!({
-                "instances": instance_count.load(Ordering::Relaxed),
+                "instances": active_count,
+                "websocket_connections": websocket_service.connection_count(),
                 "draining": drain_flag.load(Ordering::Relaxed),
             });
             let s = serde_json::to_string(&body).unwrap();
@@ -650,13 +696,175 @@ async fn handle_ops_request(
     }
 }
 
+async fn handle_websocket_upgrade(
+    mut request: hyper::Request<hyper::body::Incoming>,
+    project_id: String,
+    websocket_service: Arc<websocket::WebSocketService>,
+    peer_addr: SocketAddr,
+) -> std::result::Result<HyperResponse, anyhow::Error> {
+    let capacity_guard = match websocket_service.reserve_capacity(&project_id) {
+        Ok(capacity_guard) => capacity_guard,
+        Err(websocket::CapacityError::Project) => {
+            return Ok(hyper::Response::builder()
+                .status(429)
+                .header("retry-after", "1")
+                .body(Full::new(Bytes::new()))
+                .unwrap());
+        }
+        Err(websocket::CapacityError::Worker) => {
+            return Ok(hyper::Response::builder()
+                .status(503)
+                .header("retry-after", "1")
+                .body(Full::new(Bytes::new()))
+                .unwrap());
+        }
+    };
+    let connection_id = websocket::WebSocketService::connection_id();
+    let request_headers = request.headers().clone();
+    let route_uri = websocket_route_uri(request.uri(), &request_headers)?;
+    let connect_response = match websocket_service
+        .invoke_connect(
+            &project_id,
+            &connection_id,
+            &route_uri,
+            &request_headers,
+            Some(peer_addr),
+        )
+        .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::warn!(%project_id, %error, "websocket on_connect failed");
+            return Ok(hyper::Response::builder()
+                .status(500)
+                .body(Full::new(Bytes::new()))
+                .unwrap());
+        }
+    };
+    let decision = connect_response
+        .headers()
+        .get("x-fn0-internal-websocket-decision")
+        .and_then(|value| value.to_str().ok());
+    if connect_response.status() != hyper::StatusCode::NO_CONTENT || decision != Some("accept") {
+        let mut response = hyper::Response::builder().status(connect_response.status());
+        for (header_name, header_value) in connect_response.headers() {
+            if websocket_handshake_header_allowed(header_name) {
+                response = response.header(header_name, header_value);
+            }
+        }
+        return Ok(response.body(Full::new(Bytes::new()))?);
+    }
+
+    let selected_protocol = connect_response
+        .headers()
+        .get("x-fn0-internal-websocket-protocol")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    if let Some(selected_protocol) = selected_protocol.as_deref()
+        && !requested_websocket_protocols(&request_headers)
+            .iter()
+            .any(|requested_protocol| requested_protocol == selected_protocol)
+    {
+        return Ok(hyper::Response::builder()
+            .status(500)
+            .body(Full::new(Bytes::new()))
+            .unwrap());
+    }
+
+    if let Err(error) = websocket_service
+        .publish_connection(&project_id, &connection_id)
+        .await
+    {
+        tracing::warn!(%project_id, %error, "websocket directory publish failed");
+        return Ok(hyper::Response::builder()
+            .status(503)
+            .header("retry-after", "1")
+            .body(Full::new(Bytes::new()))
+            .unwrap());
+    }
+
+    let (upgrade_response, upgrade_future) = match fastwebsockets::upgrade::upgrade(&mut request) {
+        Ok(upgrade) => upgrade,
+        Err(error) => {
+            websocket_service.unpublish_connection(&connection_id).await;
+            tracing::warn!(%project_id, %error, "invalid websocket upgrade request");
+            return Ok(hyper::Response::builder()
+                .status(400)
+                .body(Full::new(Bytes::new()))
+                .unwrap());
+        }
+    };
+    let (upgrade_parts, _) = upgrade_response.into_parts();
+    let mut response = hyper::Response::from_parts(upgrade_parts, Full::new(Bytes::new()));
+    for (header_name, header_value) in connect_response.headers() {
+        if websocket_handshake_header_allowed(header_name) {
+            response
+                .headers_mut()
+                .append(header_name.clone(), header_value.clone());
+        }
+    }
+    if let Some(selected_protocol) = selected_protocol {
+        response.headers_mut().insert(
+            hyper::header::SEC_WEBSOCKET_PROTOCOL,
+            selected_protocol.parse()?,
+        );
+    }
+    websocket_service.spawn_connection(
+        project_id,
+        connection_id,
+        route_uri,
+        upgrade_future,
+        capacity_guard,
+    );
+    Ok(response)
+}
+
+fn requested_websocket_protocols(headers: &hyper::HeaderMap) -> Vec<String> {
+    headers
+        .get_all(hyper::header::SEC_WEBSOCKET_PROTOCOL)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn websocket_route_uri(uri: &hyper::Uri, headers: &hyper::HeaderMap) -> anyhow::Result<hyper::Uri> {
+    if uri.authority().is_some() {
+        return Ok(uri.clone());
+    }
+    let host = headers
+        .get(hyper::header::HOST)
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| anyhow::anyhow!("websocket request missing host"))?;
+    Ok(format!("https://{host}{uri}").parse()?)
+}
+
+fn websocket_handshake_header_allowed(header_name: &hyper::header::HeaderName) -> bool {
+    !matches!(
+        header_name.as_str(),
+        "connection"
+            | "upgrade"
+            | "sec-websocket-accept"
+            | "sec-websocket-protocol"
+            | "content-length"
+            | "transfer-encoding"
+    ) && !header_name.as_str().starts_with("x-fn0-")
+        && !header_name.as_str().starts_with("sec-websocket-")
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn handle_user_request(
-    req: hyper::Request<hyper::body::Incoming>,
+    mut req: hyper::Request<hyper::body::Incoming>,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     instance_count: Arc<AtomicU64>,
     drain_flag: Arc<AtomicBool>,
     cache: S3BundleCache,
     apex_route: Option<Arc<ApexRoute>>,
+    websocket_service: Arc<websocket::WebSocketService>,
+    peer_addr: SocketAddr,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     if req.uri().path().starts_with("/__fn0_queue_task/") {
         return Ok(hyper::Response::builder()
@@ -674,6 +882,16 @@ async fn handle_user_request(
     }
 
     let _guard = InFlightGuard::new(instance_count);
+
+    let internal_headers: Vec<hyper::header::HeaderName> = req
+        .headers()
+        .keys()
+        .filter(|header_name| header_name.as_str().starts_with("x-fn0-internal-"))
+        .cloned()
+        .collect();
+    for header_name in internal_headers {
+        req.headers_mut().remove(header_name);
+    }
 
     let host = req
         .headers()
@@ -700,6 +918,10 @@ async fn handle_user_request(
     };
     fn0::telemetry::stage_duration("resolve_domain", resolve_start.elapsed());
 
+    if fastwebsockets::upgrade::is_upgrade_request(&req) {
+        return handle_websocket_upgrade(req, project_id, websocket_service, peer_addr).await;
+    }
+
     let mapped_req = req.map(|body| {
         UnsyncBoxBody::new(body)
             .map_err(|e: hyper::Error| anyhow::anyhow!(e))
@@ -707,12 +929,7 @@ async fn handle_user_request(
     });
 
     let (resp_tx, resp_rx) = oneshot::channel();
-    let envelope = RequestEnvelope {
-        project_id: project_id.clone(),
-        req: mapped_req,
-        resp_tx,
-        enqueued_at: std::time::Instant::now(),
-    };
+    let envelope = RequestEnvelope::new(project_id.clone(), mapped_req, resp_tx);
 
     if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
         match err {

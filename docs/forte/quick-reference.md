@@ -28,10 +28,33 @@ forte destroy                # delete the deployed project and all its resources
 |---|---|---|---|
 | Page | `rs/src/pages/` | `GET /<path>` | Browser navigation; runs SSR → React |
 | API | `rs/src/apis/` | `/api/<path>` (any method) | Direct JSON; no React rendering. `pub type Props = ForteResponse;` gives full control of status/headers/body (see [apis.md](apis.md)) |
+| WebSocket | `rs/src/websockets/` | `/ws/<path>` | `on_connect`, concurrent `on_message`, optional `on_disconnect` |
 | Action | `rs/src/actions/` | `POST /__forte_action/<name>` | Called from browser via typed TS client |
 | Hook | `rs/src/hooks/` | `POST /__self_invoke/<name>` | Called during SSR; result cached in HTML |
 | Queue task | `rs/src/queue_task/` | internal | Background job via `enqueue::<name>(input)` |
 | Admin task | `rs/src/admin/` | internal | `forte admin run <name>` |
+
+## WebSocket
+
+```rust
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::{ConnectDecision, ConnectEvent, MessageEvent, WebSocketMessage};
+
+pub async fn on_connect(_event: ConnectEvent) -> Result<ConnectDecision> {
+    Ok(ConnectDecision::accept())
+}
+
+pub async fn on_message(event: MessageEvent) -> Result<()> {
+    forte_sdk::websocket::send(
+        &event.connection_id,
+        WebSocketMessage::text("received"),
+    )
+    .await?;
+    Ok(())
+}
+```
+
+See [websockets.md](websockets.md) for subprotocols, streaming bodies, disconnects, and recovery.
 
 ## Page Handler
 

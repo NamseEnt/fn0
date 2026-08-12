@@ -1,5 +1,6 @@
 use crate::cache::S3BundleCache;
 use crate::storage_resolver::ManifestStorageResolver;
+use crate::websocket::WebSocketService;
 use doc_db::{Database, DbRequest};
 use fn0_shared_schema::{STATIC_CACHE_STATE_ACTIVE, WorkerManifestDocGet};
 use std::collections::HashMap;
@@ -23,6 +24,7 @@ pub async fn run(
     cache: S3BundleCache,
     storage_resolver: Arc<ManifestStorageResolver>,
     manifest_loaded: Arc<AtomicBool>,
+    websocket_service: Arc<WebSocketService>,
 ) {
     let mut last_version: Option<u64> = None;
     let mut known_projects: HashMap<String, u64> = HashMap::new();
@@ -66,6 +68,12 @@ pub async fn run(
             .await;
 
         for (project_id, project_manifest) in &manifest.project_manifests {
+            if known_projects
+                .get(project_id)
+                .is_some_and(|known_version| *known_version != project_manifest.code_version)
+            {
+                websocket_service.close_project(project_id).await;
+            }
             new_projects.insert(project_id.clone(), project_manifest.code_version);
             cache
                 .register(
@@ -82,6 +90,7 @@ pub async fn run(
 
         for project_id in known_projects.keys() {
             if !new_projects.contains_key(project_id) {
+                websocket_service.close_project(project_id).await;
                 cache.unregister(project_id).await;
             }
         }

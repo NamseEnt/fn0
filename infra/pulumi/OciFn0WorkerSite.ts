@@ -16,6 +16,7 @@ export interface OciFn0WorkerSiteArgs {
   memoryInGbs: pulumi.Input<number>;
   workerAgentForteDb: WorkerAgentForteDbArgs;
   worker: WorkerArgs;
+  websocketBearer: pulumi.Input<string>;
 }
 
 export interface WorkerAgentForteDbArgs {
@@ -187,7 +188,27 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
     this.queue = this.setupQueue(args, compartmentSuffix, compartment);
 
-    const metadata = this.buildInstanceMetadata(args);
+    const websocketPrivateKey = new tls.PrivateKey(
+      "websocket-quic-key",
+      { algorithm: "ECDSA", ecdsaCurve: "P256" },
+      { parent: this },
+    );
+    const websocketCertificate = new tls.SelfSignedCert(
+      "websocket-quic-certificate",
+      {
+        privateKeyPem: websocketPrivateKey.privateKeyPem,
+        subject: { commonName: "fn0-worker.internal" },
+        validityPeriodHours: 24 * 365 * 10,
+        allowedUses: ["key_encipherment", "digital_signature", "server_auth"],
+        dnsNames: ["fn0-worker.internal"],
+      },
+      { parent: this },
+    );
+    const metadata = this.buildInstanceMetadata(args, {
+      certificatePem: websocketCertificate.certPem,
+      privateKeyPem: websocketPrivateKey.privateKeyPem,
+      bearer: args.websocketBearer,
+    });
 
     const instanceConfiguration = this.setupInstanceConfiguration(
       args,
@@ -328,6 +349,16 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             protocol: "6",
             source: nlbSubnetCidr,
             tcpOptions: { min: 443, max: 443 },
+          },
+          {
+            protocol: "17",
+            source: workerSubnetCidr,
+            udpOptions: { min: 18445, max: 65535 },
+          },
+          {
+            protocol: "6",
+            source: workerSubnetCidr,
+            tcpOptions: { min: 18445, max: 65535 },
           },
         ],
         egressSecurityRules: [
@@ -880,6 +911,11 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
 
   private buildInstanceMetadata(
     args: OciFn0WorkerSiteArgs,
+    websocketTransport: {
+      certificatePem: pulumi.Input<string>;
+      privateKeyPem: pulumi.Input<string>;
+      bearer: pulumi.Input<string>;
+    },
   ): pulumi.Output<{ [k: string]: string }> {
     // Mutable tag: agent_image_pull_poller relies on `:latest` moving to a new
     // digest to self-update.
@@ -900,7 +936,12 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     });
 
     const agentEnv = buildWorkerAgentEnv(args.workerAgentForteDb);
-    const workerEnv = buildWorkerEnv(args.worker, this.cwasmBucket, this.queue);
+    const workerEnv = buildWorkerEnv(
+      args.worker,
+      this.cwasmBucket,
+      this.queue,
+      websocketTransport,
+    );
     const alloyConfig = pulumi
       .all([
         args.worker.hostObservability.prometheusUrl,
@@ -1117,6 +1158,11 @@ function buildWorkerEnv(
   worker: WorkerArgs,
   cwasmBucket: OciCwasmBucketInfo,
   queue: OciQueueInfo,
+  websocketTransport: {
+    certificatePem: pulumi.Input<string>;
+    privateKeyPem: pulumi.Input<string>;
+    bearer: pulumi.Input<string>;
+  },
 ): pulumi.Output<{ [k: string]: string }> {
   const vaultCredsEnv = pulumi
     .output(worker.vault.workerCredentials)
@@ -1184,6 +1230,15 @@ function buildWorkerEnv(
     FN0_OTLP_TARGET_SCHEME: "http",
     FN0_OTLP_TARGET_PATH_PREFIX: "",
     FN0_OTLP_AUTH: "",
+
+    FN0_WEBSOCKET_QUIC_CERT_PEM_BASE64: pulumi
+      .output(websocketTransport.certificatePem)
+      .apply((certificatePem) => Buffer.from(certificatePem, "utf8").toString("base64")),
+    FN0_WEBSOCKET_QUIC_KEY_PEM_BASE64: pulumi
+      .output(websocketTransport.privateKeyPem)
+      .apply((privateKeyPem) => Buffer.from(privateKeyPem, "utf8").toString("base64")),
+    FN0_WEBSOCKET_QUIC_SERVER_NAME: "fn0-worker.internal",
+    FN0_WEBSOCKET_QUIC_BEARER: websocketTransport.bearer,
   };
 
   return pulumi

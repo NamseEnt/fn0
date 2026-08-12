@@ -1,6 +1,7 @@
 use crate::actions::bundle_gc;
 use crate::actions::zombie_sweep;
 use crate::common::admin;
+use crate::common::websocket_directory_gc;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -125,6 +126,16 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     if let Err(err) = zombie_sweep::run_sweep().await {
         tracing::error!(?err, "zombie_sweep within cron_on_tick failed");
+    }
+
+    match websocket_directory_gc::run_gc().await {
+        Ok(stats) => tracing::info!(
+            scanned_connections_count = stats.scanned_connections,
+            deleted_connections_count = stats.deleted_connections,
+            unreachable_workers_count = stats.unreachable_workers,
+            "websocket directory GC completed",
+        ),
+        Err(err) => tracing::error!(?err, "websocket directory GC within cron_on_tick failed"),
     }
 
     if epoch_minute % 60 == 0 {

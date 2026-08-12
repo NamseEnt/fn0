@@ -25,11 +25,40 @@ on every plan.
 CPU time counts only time spent executing your code. Waiting on I/O — a
 database query, an upstream API call, a slow LLM response — costs nothing.
 
+The 100 MB request-body value is a transport-size limit, not an in-memory
+buffering allowance. Request and response bodies must remain backpressured
+streams end to end. Buffering a body is still subject to the 128 MB application
+memory limit, and every request remains subject to the CPU and duration limits.
+Presigned object-storage URLs are recommended for durable file uploads, but
+applications may stream large bodies through compute when needed. This contract
+is approved but not yet implemented; see the
+[HTTP body streaming design](../design/http-body-streaming.md) and
+[GitHub issue #108](https://github.com/NamseEnt/fn0/issues/108).
+
 The first request to reach a cold JavaScript instance runs on a much larger
 allowance, because it also pays for module instantiation and the renderer's
 first uncompiled pass — work later requests inherit for free. Requests that
 arrive while an instance is still cold get the same allowance. The limit above
 is what a warm instance is held to.
+
+## WebSocket limits
+
+| Limit | Value |
+| --- | --- |
+| Inbound message | No fn0 size limit |
+| Outbound message | No fn0 size limit |
+| Waiting inbound messages per connection | 4 |
+| Active outbound send per connection | 1 |
+| Waiting outbound sends per connection | 4 |
+| Active invocations per project per worker | 32 |
+| Waiting invocations per project per worker | 128 |
+| Connections per project per worker | 1,000, provisional |
+| Connections per worker process | 10,000, provisional |
+
+Outbound bodies stream without a declared length. Inbound and outbound messages remain subject to
+transport backpressure, available worker and application memory, and the invocation's remaining
+15-second duration. WebSocket delivery is at-most-once and not durable. Reconnecting clients
+synchronize authoritative state through HTTP.
 
 ## Monthly quotas — one dollar plan
 

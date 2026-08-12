@@ -54,6 +54,7 @@ async fn async_main() -> Result<()> {
     let public_ip = detect_public_ipv4()
         .await
         .expect("detect public ipv4 failed");
+    let private_ip = detect_private_ipv4().expect("detect private ipv4 failed");
 
     let (target_image_tx, target_image_rx) = watch::channel::<Option<String>>(None);
     let (active_image_tx, active_image_rx) = watch::channel::<Option<String>>(None);
@@ -68,6 +69,7 @@ async fn async_main() -> Result<()> {
         active_image_tx,
         active_addr_tx,
         worker_first_ready_tx,
+        private_ip,
     ));
     tasks.spawn(host_status_reporter::run(
         shutdown.clone(),
@@ -148,4 +150,10 @@ async fn detect_public_ipv4() -> Result<String> {
         return Err(eyre!("public IP probe returned empty body"));
     }
     Ok(ip)
+}
+
+fn detect_private_ipv4() -> Result<String> {
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0")?;
+    socket.connect("1.1.1.1:80")?;
+    Ok(socket.local_addr()?.ip().to_string())
 }

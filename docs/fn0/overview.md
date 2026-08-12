@@ -39,12 +39,22 @@ These limits apply to fn0 Cloud. Self-hosted deployments can remove them.
 | Max duration | 15 seconds |
 | Subrequests (external HTTP) | 50 per request |
 
+The request-body value is a transport limit. Applications can process bodies up
+to that limit with bounded memory only by streaming; buffering remains subject
+to the 128 MB memory limit. Durable file uploads should normally use presigned
+object-storage URLs, while streaming through compute remains supported for cases
+that require it. End-to-end request and response streaming is an approved design
+that is not yet implemented; see
+[HTTP Body Streaming](../design/http-body-streaming.md) and
+[GitHub issue #108](https://github.com/NamseEnt/fn0/issues/108).
+
 ### Cluster Architecture (Internal)
 
 - **Monolith architecture** — no microservices.
 - **Public ingress (OCI)**: Cloudflare (orange proxy) → OCI L4 Network Load Balancer (always-free) → worker pool. Workers run in an OCI InstancePool with AutoScaling; the NLB is the single entry.
 - **Intra-node dispatch**: Each worker node runs a pool of N OS threads (default = CPU count). Incoming requests are dispatched to a specific thread using a hash of the `project_id` modulo N, so a given project always lands on the same thread within a node. Thread queue capacity is 256 per thread; a full queue returns HTTP 503.
-- **Blue-green deploys**: `fn0-worker-agent` polls the control DB for the target worker image, starts the new container, waits for it to pass health checks, and then drains and stops the old one — all without host-to-host coordination. `fn0-worker-proxy` (a raw TCP forwarder on port 443) transparently reroutes connections to the active container address while the swap happens, so no live TCP connections are dropped.
+- **Blue-green deploys**: `fn0-worker-agent` polls the control DB for the target worker image, starts the new container, waits for it to pass health checks, and then drains and stops the old one. `fn0-worker-proxy` reroutes new TCP connections to the active container. Established WebSockets receive `1012` and the old container remains alive through their graceful close timeout.
+- **WebSocket routing**: The owning `fn0-worker` keeps the socket. The fn0-control Turso database stores connection ownership, and direct TLS-protected QUIC streams carry remote `send` and `disconnect` commands. Turso never carries message payloads; bounded control reconciliation removes confirmed stale records without leases or heartbeats.
 - WASM modules are cached in memory after the first download. On subsequent requests, the compiled bundle version is checked against the manifest; re-download only if the version changed.
 
 ## Packages

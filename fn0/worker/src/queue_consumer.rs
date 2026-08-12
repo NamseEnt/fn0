@@ -293,12 +293,7 @@ impl Consumer {
             .map_err(|e| anyhow!("queue req build: {e}"))?;
 
         let (resp_tx, resp_rx) = oneshot::channel();
-        let envelope = RequestEnvelope {
-            project_id: wrapped.project_id.clone(),
-            req,
-            resp_tx,
-            enqueued_at: std::time::Instant::now(),
-        };
+        let envelope = RequestEnvelope::new(wrapped.project_id.clone(), req, resp_tx);
 
         if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
             return match err {

@@ -19,6 +19,7 @@ pub mod storage_target;
 pub mod telemetry;
 pub mod turso_hijack;
 pub mod vault_hijack;
+pub mod websocket_hijack;
 mod zstd_decode_body;
 
 pub use panic_util::panic_payload_string;
@@ -61,6 +62,10 @@ pub use storage_target::{
 pub use turso_hijack::TursoHijack;
 pub use vault_hijack::VaultHijack;
 pub use wasmtime;
+pub use websocket_hijack::{
+    WebSocketCommandDispatcher, WebSocketCommandError, WebSocketCommandErrorKind,
+    WebSocketCommandFuture, WebSocketDeliveryState, WebSocketHijack, WebSocketMessageKind,
+};
 
 pub type WasmProxyPre = ServicePre<ClientState<SystemClock>>;
 pub type Body = UnsyncBoxBody<Bytes, anyhow::Error>;
@@ -113,6 +118,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     pub(crate) public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     pub(crate) static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
+    pub(crate) websocket_hijack: Option<Arc<WebSocketHijack>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -130,6 +136,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             object_storage_hijack: None,
             public_storage_hijack: None,
             static_page_cache_hijack: None,
+            websocket_hijack: None,
         }
     }
 
@@ -193,6 +200,11 @@ impl<C: BundleCache> ExecutionContext<C> {
         self
     }
 
+    pub fn with_websocket_hijack(mut self, websocket_hijack: Arc<WebSocketHijack>) -> Self {
+        self.websocket_hijack = Some(websocket_hijack);
+        self
+    }
+
     pub fn bundle_cache(&self) -> &C {
         &self.bundle_cache
     }
@@ -240,6 +252,10 @@ impl<C: BundleCache> ExecutionContext<C> {
     pub fn static_page_cache_hijack(&self) -> Option<&Arc<StaticPageCacheHijack>> {
         self.static_page_cache_hijack.as_ref()
     }
+
+    pub fn websocket_hijack(&self) -> Option<&Arc<WebSocketHijack>> {
+        self.websocket_hijack.as_ref()
+    }
 }
 
 struct JsSlot {
@@ -282,6 +298,9 @@ impl<C: BundleCache> CodeExecutor<C> {
         request: Request,
         _fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
+        let preserve_websocket_headers = request
+            .headers()
+            .contains_key("x-fn0-internal-websocket-event");
         let bundle_start = std::time::Instant::now();
         let bundle = self.ctx.bundle_cache.get(project_id).await?;
         telemetry::stage_duration("bundle_get", bundle_start.elapsed());
@@ -303,7 +322,13 @@ impl<C: BundleCache> CodeExecutor<C> {
             .map(|response| response.status().as_u16())
             .unwrap_or(500);
         telemetry::execution_time(project_id, &key, start.elapsed(), status_code);
-        result.map(strip_fn0_headers)
+        result.map(|response| {
+            if preserve_websocket_headers {
+                response
+            } else {
+                strip_fn0_headers(response)
+            }
+        })
     }
 
     pub async fn sweep_unregistered(&self) {
@@ -766,6 +791,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let object_storage_hijack = ctx.object_storage_hijack.clone();
         let public_storage_hijack = ctx.public_storage_hijack.clone();
         let static_page_cache_hijack = ctx.static_page_cache_hijack.clone();
+        let websocket_hijack = ctx.websocket_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
         let driver = tokio::task::spawn_local(async move {
@@ -784,6 +810,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 object_storage_hijack,
                 public_storage_hijack,
                 static_page_cache_hijack,
+                websocket_hijack,
             ))
             .catch_unwind()
             .await;

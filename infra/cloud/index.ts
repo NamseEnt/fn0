@@ -316,6 +316,11 @@ const controlAdminToken = new random.RandomBytes("fn0-control-admin-token", {
   length: 32,
 });
 
+const websocketBearer = new random.RandomPassword("websocket-bearer", {
+  length: 48,
+  special: false,
+});
+
 const bundleStoreR2 = new fn0.BundleStoreR2(
   "bundle-store-r2",
   {
@@ -390,6 +395,10 @@ const controlAdminTokenCt = pulumi
   .all([controlDek.plaintext, controlAdminToken.base64])
   .apply(([dek, token]) => aesGcmEncryptToBase64(dek, token));
 
+const controlWebsocketBearerCt = pulumi
+  .all([controlDek.plaintext, websocketBearer.result])
+  .apply(([dek, token]) => aesGcmEncryptToBase64(dek, token));
+
 const bundleStoreR2AccessKeyIdCt = pulumi
   .all([controlDek.plaintext, bundleStoreR2.accessKeyId])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
@@ -418,6 +427,7 @@ const controlEnvYamlBootstrap = pulumi
     controlTokenHmacCt,
     controlCookieSecretCt,
     controlAdminTokenCt,
+    controlWebsocketBearerCt,
     bundleStoreR2.accountId,
     bundleStoreR2.bucketName,
     bundleStoreR2AccessKeyIdCt,
@@ -437,6 +447,7 @@ const controlEnvYamlBootstrap = pulumi
       hmacCt,
       cookieCt,
       adminCt,
+      websocketBearerCt,
       r2AccountId,
       r2Bucket,
       r2KeyCt,
@@ -460,6 +471,8 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${cookieCt}`,
         "FN0_CONTROL_ADMIN_TOKEN:",
         `  secret: ${adminCt}`,
+        "FN0_WEBSOCKET_QUIC_BEARER:",
+        `  secret: ${websocketBearerCt}`,
         `FN0_BUNDLE_STORE_ACCOUNT_ID: ${r2AccountId}`,
         `FN0_BUNDLE_STORE_BUCKET: ${r2Bucket}`,
         "FN0_BUNDLE_STORE_ACCESS_KEY_ID:",
@@ -505,6 +518,7 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   shape: "VM.Standard.A1.Flex",
   ocpus: 1,
   memoryInGbs: 6,
+  websocketBearer: websocketBearer.result,
   workerAgentForteDb: {
     groupToken: forteDb.groupToken,
     hostSuffix: forteDb.hostSuffix,

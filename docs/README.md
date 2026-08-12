@@ -14,6 +14,7 @@ Forte is the full-stack web framework built on fn0.
 - [CLI Reference](forte/cli.md) — All `forte` commands (including login and cron jobs)
 - [Pages](forte/pages.md) — Page handlers, path/search params, redirects, cookies
 - [API Endpoints](forte/apis.md) — JSON API handlers under `/api/`, no SSR
+- [WebSockets](forte/websockets.md) — Connection callbacks, streaming sends, graceful disconnects
 - [Actions & Tasks](forte/actions.md) — Server actions, hooks, queue tasks, admin tasks
 - [Per-page Head](forte/head.md) — Per-page `<title>` and meta tags via `head` exports
 - [Frontend Runtime](forte/frontend.md) — `@forte/react` API, `__FORTE_BASE_URL__`, SSR/hydration lifecycle
@@ -36,6 +37,11 @@ Forte is the full-stack web framework built on fn0.
 - [Overview](fn0/overview.md) — FaaS runtime, execution model, limits, cluster architecture, worker environment variables for self-hosting
 - [Limits & Quotas](fn0/limits.md) — Per-request runtime limits and fn0 Cloud monthly quotas
 - [Bring Your Own Cloudflare](fn0/cloudflare.md) — How fn0 uses your Cloudflare account for storage, CDN, and custom domains
+
+## Designs
+
+- [Forte WebSockets](design/forte-websockets.md) — Host-owned connection and direct QUIC routing design
+- [HTTP Body Streaming](design/http-body-streaming.md) — Approved 100 MB streaming request and end-to-end response-body contract; not yet implemented
 
 ## Development
 

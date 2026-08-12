@@ -2,9 +2,10 @@ use crate::cache::Bundle;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::public_storage_hijack::PublicStorageHijack;
-use crate::self_invoke::{self, SELF_HOST, SelfInvokeHooks, call_service};
+use crate::self_invoke::{self, INVOCATION_DEADLINE, SELF_HOST, SelfInvokeHooks, call_service};
 use crate::static_page_cache_hijack::StaticPageCacheHijack;
 use crate::turso_hijack::TursoHijack;
+use crate::websocket_hijack::WebSocketHijack;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -131,6 +132,7 @@ pub(crate) fn build_store<C>(
     object_storage_hijack: Option<&ObjectStorageHijack>,
     public_storage_hijack: Option<&PublicStorageHijack>,
     static_page_cache_hijack: Option<&StaticPageCacheHijack>,
+    websocket_hijack: Option<&WebSocketHijack>,
 ) -> Store<ClientState<C>>
 where
     C: Clock,
@@ -164,6 +166,9 @@ where
                 continue;
             }
             if static_page_cache_hijack.is_some() && key == "FN0_STATIC_PAGE_CACHE_URL" {
+                continue;
+            }
+            if websocket_hijack.is_some() && key == "FN0_WEBSOCKET_URL" {
                 continue;
             }
             builder.env(key, value);
@@ -202,6 +207,9 @@ where
         }
         if let Some(hijack) = static_page_cache_hijack {
             builder.env("FN0_STATIC_PAGE_CACHE_URL", hijack.placeholder_url());
+        }
+        if let Some(hijack) = websocket_hijack {
+            builder.env("FN0_WEBSOCKET_URL", hijack.placeholder_url());
         }
         builder.build()
     };
@@ -253,6 +261,7 @@ pub async fn run_wasm_instance_loop(
     object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
+    websocket_hijack: Option<Arc<WebSocketHijack>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -275,6 +284,7 @@ pub async fn run_wasm_instance_loop(
             object_storage_hijack.clone(),
             public_storage_hijack.clone(),
             static_page_cache_hijack.clone(),
+            websocket_hijack.clone(),
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
@@ -284,6 +294,7 @@ pub async fn run_wasm_instance_loop(
         object_storage_hijack.as_deref(),
         public_storage_hijack.as_deref(),
         static_page_cache_hijack.as_deref(),
+        websocket_hijack.as_deref(),
     );
 
     let instantiate_start = std::time::Instant::now();
@@ -316,8 +327,10 @@ pub async fn run_wasm_instance_loop(
                                 let is_timeout = is_timeout.clone();
                                 pending.push(Box::pin(async move {
                                     let call_start = std::time::Instant::now();
-                                    let result = SELF_HOST
-                                        .scope(self_host, async move {
+                                    let invocation_deadline =
+                                        std::time::Instant::now() + Duration::from_secs(15);
+                                    let result = INVOCATION_DEADLINE
+                                        .scope(invocation_deadline, SELF_HOST.scope(self_host, async move {
                                             let req_http = req.map(|body| {
                                                 body.map_err(|err| {
                                                     ErrorCode::InternalError(Some(err.to_string()))
@@ -334,7 +347,7 @@ pub async fn run_wasm_instance_loop(
                                                 &is_timeout,
                                             )
                                             .await
-                                        })
+                                        }))
                                         .await;
                                     telemetry::stage_duration("wasm_call", call_start.elapsed());
                                     if resp_tx.send(result).is_err() {

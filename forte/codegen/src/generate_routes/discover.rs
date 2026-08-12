@@ -478,6 +478,167 @@ pub(super) fn discover_apis(apis_dir: &Path) -> Vec<PageInfo> {
     endpoints
 }
 
+pub(super) fn discover_websockets(websockets_dir: &Path) -> Vec<WebSocketRouteInfo> {
+    let mut routes = Vec::new();
+    if !websockets_dir.exists() {
+        return routes;
+    }
+    discover_websockets_recursive(websockets_dir, websockets_dir, &mut routes);
+    routes.sort_by(|left, right| {
+        for (left_segment, right_segment) in
+            left.route_segments.iter().zip(right.route_segments.iter())
+        {
+            match (left_segment, right_segment) {
+                (RouteSegment::Static(left_value), RouteSegment::Static(right_value)) => {
+                    let ordering = left_value.cmp(right_value);
+                    if !ordering.is_eq() {
+                        return ordering;
+                    }
+                }
+                (RouteSegment::Static(_), RouteSegment::Dynamic(_)) => {
+                    return std::cmp::Ordering::Less;
+                }
+                (RouteSegment::Dynamic(_), RouteSegment::Static(_)) => {
+                    return std::cmp::Ordering::Greater;
+                }
+                (RouteSegment::Dynamic(left_value), RouteSegment::Dynamic(right_value)) => {
+                    let ordering = left_value.cmp(right_value);
+                    if !ordering.is_eq() {
+                        return ordering;
+                    }
+                }
+            }
+        }
+        right.route_segments.len().cmp(&left.route_segments.len())
+    });
+    routes
+}
+
+fn discover_websockets_recursive(
+    base_dir: &Path,
+    current_dir: &Path,
+    routes: &mut Vec<WebSocketRouteInfo>,
+) {
+    let Ok(entries) = fs::read_dir(current_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            discover_websockets_recursive(base_dir, &path, routes);
+            continue;
+        }
+        if path.extension().is_none_or(|extension| extension != "rs") {
+            continue;
+        }
+        let Some(content) = fs::read_to_string(&path).ok() else {
+            continue;
+        };
+        let Some((has_on_connect, has_on_message, has_on_disconnect)) =
+            websocket_handlers(&content)
+        else {
+            continue;
+        };
+        if !has_on_connect || !has_on_message {
+            panic!(
+                "WebSocket route {} must define public async on_connect and on_message functions",
+                path.display()
+            );
+        }
+
+        let relative_path = path.strip_prefix(base_dir).unwrap();
+        let file_name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let parent_segments: Vec<String> = relative_path
+            .parent()
+            .map(|parent| {
+                parent
+                    .components()
+                    .map(|component| component.as_os_str().to_string_lossy().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut source_segments = parent_segments;
+        if file_name != "index" && file_name != "mod" {
+            source_segments.push(file_name);
+        }
+        if source_segments
+            .last()
+            .is_some_and(|segment| segment == "index")
+        {
+            source_segments.pop();
+        }
+        let mut route_segment_names = vec!["ws".to_string()];
+        route_segment_names.extend(source_segments.iter().cloned());
+        let module_suffix = if source_segments.is_empty() {
+            "index".to_string()
+        } else {
+            source_segments
+                .iter()
+                .map(|segment| {
+                    if segment.starts_with('[') && segment.ends_with(']') {
+                        format!("_{}_", &segment[1..segment.len() - 1])
+                    } else {
+                        segment.clone()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("_")
+        };
+        let route_segments = route_segment_names
+            .iter()
+            .map(|segment| {
+                if segment.starts_with('[') && segment.ends_with(']') {
+                    RouteSegment::Dynamic(segment[1..segment.len() - 1].to_string())
+                } else {
+                    RouteSegment::Static(segment.clone())
+                }
+            })
+            .collect();
+        routes.push(WebSocketRouteInfo {
+            module_name: format!("websockets_{module_suffix}"),
+            module_path: format!("websockets/{}", relative_path.to_string_lossy()),
+            route_path: format!("/{}", route_segment_names.join("/")),
+            route_segments,
+            path_params: parse_path_params(&content),
+            has_on_disconnect,
+        });
+    }
+}
+
+fn websocket_handlers(content: &str) -> Option<(bool, bool, bool)> {
+    let syntax_tree = syn::parse_file(content).ok()?;
+    let mut has_any = false;
+    let mut has_on_connect = false;
+    let mut has_on_message = false;
+    let mut has_on_disconnect = false;
+    for item in syntax_tree.items {
+        let syn::Item::Fn(function) = item else {
+            continue;
+        };
+        let is_public_async =
+            matches!(function.vis, syn::Visibility::Public(_)) && function.sig.asyncness.is_some();
+        if !is_public_async {
+            continue;
+        }
+        match function.sig.ident.to_string().as_str() {
+            "on_connect" => {
+                has_any = true;
+                has_on_connect = true;
+            }
+            "on_message" => {
+                has_any = true;
+                has_on_message = true;
+            }
+            "on_disconnect" => {
+                has_any = true;
+                has_on_disconnect = true;
+            }
+            _ => {}
+        }
+    }
+    has_any.then_some((has_on_connect, has_on_message, has_on_disconnect))
+}
+
 fn discover_endpoints_recursive(
     base_dir: &Path,
     current_dir: &Path,

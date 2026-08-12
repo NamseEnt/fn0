@@ -11,6 +11,7 @@ use crate::queue_hijack::QueueHijack;
 use crate::static_page_cache_hijack::StaticPageCacheHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::vault_hijack::VaultHijack;
+use crate::websocket_hijack::WebSocketHijack;
 use crate::zstd_decode_body::ZstdDecodeBody;
 use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
@@ -32,6 +33,7 @@ use wasmtime_wasi_http::p3::{RequestOptions, WasiHttpHooks, default_send_request
 
 tokio::task_local! {
     pub(crate) static SELF_HOST: String;
+    pub(crate) static INVOCATION_DEADLINE: std::time::Instant;
 }
 
 // Inject a request into the wasm instance loop (same project) and await its
@@ -92,6 +94,7 @@ pub(crate) struct SelfInvokeHooks {
     object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
+    websocket_hijack: Option<Arc<WebSocketHijack>>,
 }
 
 impl SelfInvokeHooks {
@@ -108,6 +111,7 @@ impl SelfInvokeHooks {
         object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
         public_storage_hijack: Option<Arc<PublicStorageHijack>>,
         static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
+        websocket_hijack: Option<Arc<WebSocketHijack>>,
     ) -> Self {
         Self {
             project_id,
@@ -121,6 +125,7 @@ impl SelfInvokeHooks {
             object_storage_hijack,
             public_storage_hijack,
             static_page_cache_hijack,
+            websocket_hijack,
         }
     }
 }
@@ -207,8 +212,33 @@ impl WasiHttpHooks for SelfInvokeHooks {
             );
         }
 
+        if let Some(hijack) = self.websocket_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            let remaining = INVOCATION_DEADLINE
+                .try_with(|deadline| deadline.saturating_duration_since(std::time::Instant::now()))
+                .unwrap_or_else(|_| std::time::Duration::from_secs(15));
+            return websocket_send(hijack, self.project_id.clone(), request, remaining);
+        }
+
         default_send(request, options)
     }
+}
+
+fn websocket_send(
+    hijack: Arc<WebSocketHijack>,
+    project_id: String,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    remaining: std::time::Duration,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let response = hijack
+            .handle_command(&project_id, request, remaining)
+            .await?;
+        let transmit: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+            Box::new(async { Ok(()) });
+        Ok((response, transmit))
+    })
 }
 
 fn self_invoke_send(

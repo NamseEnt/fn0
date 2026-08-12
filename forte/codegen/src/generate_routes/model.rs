@@ -60,6 +60,16 @@ pub(super) struct StaticFileInfo {
     pub(super) content_type: String,
 }
 
+#[derive(Debug)]
+pub(super) struct WebSocketRouteInfo {
+    pub(super) module_name: String,
+    pub(super) module_path: String,
+    pub(super) route_path: String,
+    pub(super) route_segments: Vec<RouteSegment>,
+    pub(super) path_params: Option<Vec<PathParamField>>,
+    pub(super) has_on_disconnect: bool,
+}
+
 pub(super) enum HandlerType {
     None,
     Props,

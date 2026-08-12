@@ -19,8 +19,10 @@ doc-db = { workspace = true }
 fn0 = { workspace = true }
 fn0-shared-schema = { workspace = true }
 futures = { workspace = true }
+fastwebsockets = { workspace = true, features = ["upgrade", "unstable-split"] }
 hmac = { workspace = true }
 http = { workspace = true }
+http-body = { workspace = true }
 http-body-util = { workspace = true }
 oci-rust-sdk = { workspace = true }
 hyper = { workspace = true, features = ["full"] }
@@ -32,6 +34,8 @@ opentelemetry-http = { workspace = true, features = ["reqwest"] }
 opentelemetry-otlp = { workspace = true, features = ["http-proto", "reqwest-client", "metrics", "logs"] }
 opentelemetry_sdk = { workspace = true, features = ["logs", "rt-tokio", "spec_unstable_metrics_views"] }
 reqwest = { workspace = true }
+quinn = { workspace = true, default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
+rand = { workspace = true }
 rustls = { workspace = true }
 rustls-pemfile = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -41,6 +45,7 @@ sha2 = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-rustls = { workspace = true }
+tokio-util = { workspace = true, features = ["io"] }
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }

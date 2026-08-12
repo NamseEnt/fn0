@@ -26,6 +26,7 @@ A Forte project created by `forte init <name>` has the following layout:
 │       │   └── index/
 │       │       └── mod.rs     # pub async fn handler(...)
 │       ├── apis/              # API endpoints (JSON, no SSR)
+│       ├── websockets/        # WebSocket lifecycle handlers mounted under /ws
 │       ├── actions/           # Server actions (called from frontend)
 │       │   └── mod.rs         # Auto-generated module declarations
 │       ├── hooks/             # Self-invoke hooks
@@ -102,7 +103,7 @@ mod db;          // e.g. database helpers shared by multiple handlers
 mod auth;        // e.g. session validation utilities
 ```
 
-Handler files inside `pages/`, `actions/`, `hooks/`, `queue_task/`, and `admin/` reference the crate root normally:
+Handler files inside `pages/`, `apis/`, `websockets/`, `actions/`, `hooks/`, `queue_task/`, and `admin/` reference the crate root normally:
 
 ```rust
 // rs/src/pages/index/mod.rs
