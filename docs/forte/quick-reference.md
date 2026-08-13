@@ -28,7 +28,8 @@ forte destroy                # delete the deployed project and all its resources
 |---|---|---|---|
 | Page | `rs/src/pages/` | `GET /<path>` | Browser navigation; runs SSR → React |
 | API | `rs/src/apis/` | `/api/<path>` (any method) | Direct JSON; no React rendering. `pub type Props = ForteResponse;` gives full control of status/headers/body (see [apis.md](apis.md)) |
-| WebSocket | `rs/src/websockets/` | `/ws/<path>` | `on_connect`, concurrent `on_message`, optional `on_disconnect` |
+| Inbound WebSocket | `rs/src/ws_in/` | `/ws/<path>` | `on_connect`, concurrent `on_message`, optional `on_disconnect` |
+| Outbound WebSocket | `rs/src/ws_out/` | generated `connect(url)` | `on_message`, optional `on_disconnect` |
 | Action | `rs/src/actions/` | `POST /__forte_action/<name>` | Called from browser via typed TS client |
 | Hook | `rs/src/hooks/` | `POST /__self_invoke/<name>` | Called during SSR; result cached in HTML |
 | Queue task | `rs/src/queue_task/` | internal | Background job via `enqueue::<name>(input)` |

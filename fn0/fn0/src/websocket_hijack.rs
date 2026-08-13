@@ -2,7 +2,7 @@ use crate::Body;
 use base64::Engine;
 use bytes::Bytes;
 use http_body_util::combinators::UnsyncBoxBody;
-use http_body_util::{BodyExt, Empty};
+use http_body_util::{BodyExt, Full};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
@@ -10,6 +10,8 @@ use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 
 const MESSAGE_KIND_HEADER: &str = "x-fn0-websocket-message-kind";
 const DELIVERY_STATE_HEADER: &str = "x-fn0-websocket-delivery-state";
+const CONNECT_URL_HEADER: &str = "x-fn0-websocket-connect-url";
+const CONNECT_PATH_HEADER: &str = "x-fn0-websocket-receive-path";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WebSocketMessageKind {
@@ -57,8 +59,25 @@ impl WebSocketCommandError {
 
 pub type WebSocketCommandFuture =
     Pin<Box<dyn Future<Output = Result<(), WebSocketCommandError>> + Send + 'static>>;
+pub type WebSocketConnectFuture =
+    Pin<Box<dyn Future<Output = Result<String, WebSocketCommandError>> + Send + 'static>>;
 
 pub trait WebSocketCommandDispatcher: Send + Sync {
+    fn connect(
+        &self,
+        caller_project_id: String,
+        url: String,
+        receive_path: String,
+        remaining: std::time::Duration,
+    ) -> WebSocketConnectFuture {
+        let _ = (caller_project_id, url, receive_path, remaining);
+        Box::pin(async {
+            Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ))
+        })
+    }
+
     fn send(
         &self,
         caller_project_id: String,
@@ -119,6 +138,41 @@ impl WebSocketHijack {
     ) -> Result<hyper::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
         if request.method() != hyper::Method::POST {
             return response(405, WebSocketDeliveryState::NotSent);
+        }
+        if request.uri().path() == "/connect" {
+            let Some(url) = request
+                .headers()
+                .get(CONNECT_URL_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            let Some(receive_path) = request
+                .headers()
+                .get(CONNECT_PATH_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            if !valid_receive_path(&receive_path) {
+                return response(400, WebSocketDeliveryState::NotSent);
+            }
+            let Some(dispatcher) = self.dispatcher.get() else {
+                return response(503, WebSocketDeliveryState::NotSent);
+            };
+            return match dispatcher
+                .connect(caller_project_id.to_string(), url, receive_path, remaining)
+                .await
+            {
+                Ok(connection_id) => response_with_body(
+                    201,
+                    WebSocketDeliveryState::NotSent,
+                    Bytes::from(connection_id),
+                ),
+                Err(error) => response(status_for(error.kind), error.delivery),
+            };
         }
         let Some((command, connection_id)) = command_and_connection(request.uri().path()) else {
             return response(404, WebSocketDeliveryState::NotSent);
@@ -201,6 +255,12 @@ fn valid_connection_id(connection_id: &str) -> bool {
         .is_ok_and(|decoded| decoded.len() == 32)
 }
 
+fn valid_receive_path(receive_path: &str) -> bool {
+    (receive_path == "/ws_out" || receive_path.starts_with("/ws_out/"))
+        && !receive_path.split('/').any(|segment| segment == "..")
+        && !receive_path.contains('?')
+}
+
 fn status_for(kind: WebSocketCommandErrorKind) -> u16 {
     match kind {
         WebSocketCommandErrorKind::ConnectionNotFound => 404,
@@ -216,11 +276,19 @@ fn response(
     status: u16,
     delivery: WebSocketDeliveryState,
 ) -> Result<hyper::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
+    response_with_body(status, delivery, Bytes::new())
+}
+
+fn response_with_body(
+    status: u16,
+    delivery: WebSocketDeliveryState,
+    body_bytes: Bytes,
+) -> Result<hyper::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
     let delivery_value = match delivery {
         WebSocketDeliveryState::NotSent => "not-sent",
         WebSocketDeliveryState::Unknown => "unknown",
     };
-    let body = Empty::<Bytes>::new()
+    let body = Full::new(body_bytes)
         .map_err(|never: std::convert::Infallible| match never {})
         .boxed_unsync();
     hyper::Response::builder()
@@ -241,6 +309,16 @@ mod tests {
     }
 
     impl WebSocketCommandDispatcher for RecordingDispatcher {
+        fn connect(
+            &self,
+            _caller_project_id: String,
+            _url: String,
+            _receive_path: String,
+            _remaining: std::time::Duration,
+        ) -> WebSocketConnectFuture {
+            Box::pin(async { Ok("v1.test".to_string()) })
+        }
+
         fn send(
             &self,
             caller_project_id: String,
@@ -321,5 +399,36 @@ mod tests {
             recorded_body.lock().expect("recorded body lock").as_slice(),
             b"hello"
         );
+    }
+
+    #[tokio::test]
+    async fn connect_returns_connection_id() {
+        let hijack = WebSocketHijack::new("fn0-websocket.test".to_string());
+        hijack.set_dispatcher(Arc::new(RecordingDispatcher {
+            body: Arc::new(Mutex::new(Vec::new())),
+        }));
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("http://fn0-websocket.test/connect")
+            .header(CONNECT_URL_HEADER, "wss://example.com/socket")
+            .header(CONNECT_PATH_HEADER, "/ws_out/slack")
+            .body(
+                Full::new(Bytes::new())
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .expect("request");
+        let response = hijack
+            .handle_command("project", request, std::time::Duration::from_secs(15))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), hyper::StatusCode::CREATED);
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("response body")
+            .to_bytes();
+        assert_eq!(body, Bytes::from_static(b"v1.test"));
     }
 }

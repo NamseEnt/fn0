@@ -21,6 +21,7 @@ pub struct RequestEnvelope {
     pub req: Request,
     pub resp_tx: oneshot::Sender<Result<Response>>,
     pub enqueued_at: std::time::Instant,
+    pub execution_deadline: std::time::Duration,
     admission: Option<ProjectAdmissionGuard>,
     started_sender: Option<oneshot::Sender<()>>,
 }
@@ -36,9 +37,15 @@ impl RequestEnvelope {
             req,
             resp_tx,
             enqueued_at: std::time::Instant::now(),
+            execution_deadline: PROJECT_EXECUTION_DEADLINE,
             admission: None,
             started_sender: None,
         }
+    }
+
+    pub fn with_execution_deadline(mut self, execution_deadline: std::time::Duration) -> Self {
+        self.execution_deadline = execution_deadline;
+        self
     }
 
     pub fn with_start_signal(mut self) -> (Self, oneshot::Receiver<()>) {
@@ -185,6 +192,7 @@ where
                     req,
                     resp_tx,
                     enqueued_at: _,
+                    execution_deadline,
                     admission,
                     started_sender,
                 } = env;
@@ -210,7 +218,7 @@ where
                     let _ = started_sender.send(());
                 }
                 let outcome = tokio::time::timeout(
-                    PROJECT_EXECUTION_DEADLINE,
+                    execution_deadline,
                     AssertUnwindSafe(executor.run(&project_id, "/", req, None)).catch_unwind(),
                 )
                 .await;

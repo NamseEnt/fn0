@@ -478,12 +478,26 @@ pub(super) fn discover_apis(apis_dir: &Path) -> Vec<PageInfo> {
     endpoints
 }
 
-pub(super) fn discover_websockets(websockets_dir: &Path) -> Vec<WebSocketRouteInfo> {
+pub(super) fn discover_websockets(ws_in_dir: &Path, ws_out_dir: &Path) -> Vec<WebSocketRouteInfo> {
     let mut routes = Vec::new();
-    if !websockets_dir.exists() {
-        return routes;
+    if ws_in_dir.exists() {
+        discover_websockets_recursive(
+            ws_in_dir,
+            ws_in_dir,
+            &mut routes,
+            WebSocketDirection::Inbound,
+            "ws_in",
+        );
     }
-    discover_websockets_recursive(websockets_dir, websockets_dir, &mut routes);
+    if ws_out_dir.exists() {
+        discover_websockets_recursive(
+            ws_out_dir,
+            ws_out_dir,
+            &mut routes,
+            WebSocketDirection::Outbound,
+            "ws_out",
+        );
+    }
     routes.sort_by(|left, right| {
         for (left_segment, right_segment) in
             left.route_segments.iter().zip(right.route_segments.iter())
@@ -518,6 +532,8 @@ fn discover_websockets_recursive(
     base_dir: &Path,
     current_dir: &Path,
     routes: &mut Vec<WebSocketRouteInfo>,
+    direction: WebSocketDirection,
+    module_root: &str,
 ) {
     let Ok(entries) = fs::read_dir(current_dir) else {
         return;
@@ -525,7 +541,7 @@ fn discover_websockets_recursive(
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            discover_websockets_recursive(base_dir, &path, routes);
+            discover_websockets_recursive(base_dir, &path, routes, direction, module_root);
             continue;
         }
         if path.extension().is_none_or(|extension| extension != "rs") {
@@ -539,11 +555,20 @@ fn discover_websockets_recursive(
         else {
             continue;
         };
-        if !has_on_connect || !has_on_message {
-            panic!(
-                "WebSocket route {} must define public async on_connect and on_message functions",
-                path.display()
-            );
+        match direction {
+            WebSocketDirection::Inbound if !has_on_connect || !has_on_message => {
+                panic!(
+                    "Inbound WebSocket route {} must define public async on_connect and on_message functions",
+                    path.display()
+                );
+            }
+            WebSocketDirection::Outbound if has_on_connect || !has_on_message => {
+                panic!(
+                    "Outbound WebSocket route {} must define public async on_message and must not define on_connect",
+                    path.display()
+                );
+            }
+            _ => {}
         }
 
         let relative_path = path.strip_prefix(base_dir).unwrap();
@@ -567,13 +592,31 @@ fn discover_websockets_recursive(
         {
             source_segments.pop();
         }
-        let mut route_segment_names = vec!["ws".to_string()];
+        if direction == WebSocketDirection::Outbound
+            && source_segments
+                .iter()
+                .any(|segment| segment.starts_with('[') && segment.ends_with(']'))
+        {
+            panic!(
+                "Outbound WebSocket route {} cannot use dynamic path segments",
+                path.display()
+            );
+        }
+        let route_prefix = match direction {
+            WebSocketDirection::Inbound => "ws",
+            WebSocketDirection::Outbound => "ws_out",
+        };
+        let module_prefix = match direction {
+            WebSocketDirection::Inbound => "ws_in",
+            WebSocketDirection::Outbound => "ws_out",
+        };
+        let mut route_segment_names = vec![route_prefix.to_string()];
         route_segment_names.extend(source_segments.iter().cloned());
         let module_suffix = if source_segments.is_empty() {
-            "index".to_string()
+            module_prefix.to_string()
         } else {
-            source_segments
-                .iter()
+            std::iter::once(module_prefix.to_string())
+                .chain(source_segments.iter().cloned())
                 .map(|segment| {
                     if segment.starts_with('[') && segment.ends_with(']') {
                         format!("_{}_", &segment[1..segment.len() - 1])
@@ -584,6 +627,14 @@ fn discover_websockets_recursive(
                 .collect::<Vec<_>>()
                 .join("_")
         };
+        let mut module_segments = vec![module_prefix.to_string()];
+        module_segments.extend(source_segments.iter().map(|segment| {
+            if segment.starts_with('[') && segment.ends_with(']') {
+                format!("_{}_", &segment[1..segment.len() - 1])
+            } else {
+                segment.clone()
+            }
+        }));
         let route_segments = route_segment_names
             .iter()
             .map(|segment| {
@@ -595,8 +646,10 @@ fn discover_websockets_recursive(
             })
             .collect();
         routes.push(WebSocketRouteInfo {
+            direction,
             module_name: format!("websockets_{module_suffix}"),
-            module_path: format!("websockets/{}", relative_path.to_string_lossy()),
+            module_path: format!("{module_root}/{}", relative_path.to_string_lossy()),
+            module_segments,
             route_path: format!("/{}", route_segment_names.join("/")),
             route_segments,
             path_params: parse_path_params(&content),

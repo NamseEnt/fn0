@@ -2,6 +2,8 @@ use crate::http::{Body, Client, HeaderMap, Method, Request, StatusCode, Uri};
 
 const MESSAGE_KIND_HEADER: &str = "x-fn0-websocket-message-kind";
 const DELIVERY_STATE_HEADER: &str = "x-fn0-websocket-delivery-state";
+const CONNECT_URL_HEADER: &str = "x-fn0-websocket-connect-url";
+const CONNECT_PATH_HEADER: &str = "x-fn0-websocket-receive-path";
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(transparent)]
@@ -181,6 +183,71 @@ impl std::fmt::Display for WebSocketDisconnectError {
 }
 
 impl std::error::Error for WebSocketDisconnectError {}
+
+#[derive(Debug)]
+pub enum WebSocketConnectError {
+    InvalidUrl,
+    DeadlineExceeded,
+    Transport,
+    Internal,
+}
+
+impl std::fmt::Display for WebSocketConnectError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidUrl => formatter.write_str("invalid websocket URL"),
+            Self::DeadlineExceeded => formatter.write_str("websocket connect deadline exceeded"),
+            Self::Transport => formatter.write_str("websocket connect transport failed"),
+            Self::Internal => formatter.write_str("websocket connect failed internally"),
+        }
+    }
+}
+
+impl std::error::Error for WebSocketConnectError {}
+
+pub async fn connect(
+    url: impl Into<String>,
+    receive_path: &str,
+) -> Result<ConnectionId, WebSocketConnectError> {
+    let endpoint =
+        std::env::var("FN0_WEBSOCKET_URL").map_err(|_| WebSocketConnectError::Internal)?;
+    let target_url = url.into();
+    if !target_url.starts_with("ws://") && !target_url.starts_with("wss://") {
+        return Err(WebSocketConnectError::InvalidUrl);
+    }
+    if receive_path != "/ws_out" && !receive_path.starts_with("/ws_out/") {
+        return Err(WebSocketConnectError::InvalidUrl);
+    }
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(format!("{}/connect", endpoint.trim_end_matches('/')))
+        .header(CONNECT_URL_HEADER, target_url)
+        .header(CONNECT_PATH_HEADER, receive_path)
+        .body(Body::empty())
+        .map_err(|_| WebSocketConnectError::Internal)?;
+    let response = Client::new()
+        .send(request)
+        .await
+        .map_err(|_| WebSocketConnectError::Transport)?;
+    match response.status() {
+        StatusCode::CREATED => {
+            let connection_id = String::from_utf8(response.into_body().bytes().await.to_vec())
+                .map_err(|_| WebSocketConnectError::Internal)?;
+            if connection_id.is_empty() {
+                return Err(WebSocketConnectError::Internal);
+            }
+            Ok(ConnectionId::new(connection_id))
+        }
+        StatusCode::BAD_REQUEST => Err(WebSocketConnectError::InvalidUrl),
+        StatusCode::REQUEST_TIMEOUT | StatusCode::GATEWAY_TIMEOUT => {
+            Err(WebSocketConnectError::DeadlineExceeded)
+        }
+        StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE => {
+            Err(WebSocketConnectError::Transport)
+        }
+        _ => Err(WebSocketConnectError::Internal),
+    }
+}
 
 pub async fn send(
     connection_id: &ConnectionId,

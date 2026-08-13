@@ -1,6 +1,7 @@
 use super::model::*;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use std::collections::BTreeMap;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn generate_code(
@@ -41,6 +42,7 @@ pub(super) fn generate_code(
     let classify_route_fn = generate_classify_route(pages);
     let cache_policy_handler = generate_cache_policy_handler(pages);
     let websocket_handler = generate_websocket_handler(websockets);
+    let websocket_path_module = generate_websocket_path_module(websockets);
 
     let static_file_chain = {
         let matches: Vec<TokenStream> = static_files
@@ -104,6 +106,7 @@ pub(super) fn generate_code(
         #(#module_declarations)*
         #(#hook_module_declarations)*
         #(#action_module_declarations)*
+        #websocket_path_module
 
         use forte_sdk::anyhow::Result;
         use forte_sdk::http::{Request, Response, StatusCode, body::Body, HeaderMap};
@@ -307,6 +310,64 @@ fn generate_websocket_module_declarations(
         .collect()
 }
 
+#[derive(Default)]
+struct WebSocketPathNode {
+    children: BTreeMap<String, WebSocketPathNode>,
+    route_path: Option<String>,
+}
+
+fn generate_websocket_path_module(websockets: &[WebSocketRouteInfo]) -> TokenStream {
+    if websockets.is_empty() {
+        return quote! {};
+    }
+
+    let mut root = WebSocketPathNode::default();
+    for websocket in websockets
+        .iter()
+        .filter(|websocket| matches!(websocket.direction, WebSocketDirection::Outbound))
+    {
+        let mut node = &mut root;
+        for module_segment in &websocket.module_segments {
+            node = node.children.entry(module_segment.clone()).or_default();
+        }
+        node.route_path = Some(websocket.route_path.clone());
+    }
+
+    let path_module_body = generate_websocket_path_node(&root);
+    path_module_body
+}
+
+fn generate_websocket_path_node(node: &WebSocketPathNode) -> TokenStream {
+    let children = node.children.iter().map(|(module_segment, child)| {
+        let module_ident = format_ident!("{}", module_segment);
+        let child_body = generate_websocket_path_node(child);
+        quote! {
+            pub mod #module_ident {
+                #child_body
+            }
+        }
+    });
+    let path_constant = node.route_path.as_ref().map(|route_path| {
+        quote! {
+            const PATH: &str = #route_path;
+
+            pub async fn connect(
+                url: impl Into<String>,
+            ) -> core::result::Result<
+                forte_sdk::websocket::ConnectionId,
+                forte_sdk::websocket::WebSocketConnectError,
+            > {
+                forte_sdk::websocket::connect(url, PATH).await
+            }
+        }
+    });
+
+    quote! {
+        #(#children)*
+        #path_constant
+    }
+}
+
 fn generate_websocket_handler(websockets: &[WebSocketRouteInfo]) -> TokenStream {
     if websockets.is_empty() {
         return quote! {
@@ -398,8 +459,16 @@ fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream
     } else {
         quote! {}
     };
-    let connect_call =
-        websocket_callback_call(&module_name, "on_connect", websocket.path_params.is_some());
+    let connect_branch = match websocket.direction {
+        WebSocketDirection::Inbound => {
+            generate_websocket_inbound_connect_branch(&module_name, websocket.path_params.is_some())
+        }
+        WebSocketDirection::Outbound => {
+            quote! {
+                "connect" => Ok(websocket_error_response(StatusCode::NOT_FOUND)),
+            }
+        }
+    };
     let message_call =
         websocket_callback_call(&module_name, "on_message", websocket.path_params.is_some());
     let disconnect_call = if websocket.has_on_disconnect {
@@ -429,81 +498,7 @@ fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream
                 return Ok(websocket_error_response(StatusCode::BAD_REQUEST));
             };
             match event_name {
-                "connect" => {
-                    let requested_protocols = headers
-                        .get_all("sec-websocket-protocol")
-                        .iter()
-                        .filter_map(|value| value.to_str().ok())
-                        .flat_map(|value| value.split(','))
-                        .map(str::trim)
-                        .filter(|value| !value.is_empty())
-                        .map(str::to_string)
-                        .collect();
-                    let client_address = headers
-                        .get("x-fn0-internal-websocket-client-address")
-                        .and_then(|value| value.to_str().ok())
-                        .map(str::to_string);
-                    let event = forte_sdk::websocket::ConnectEvent {
-                        connection_id,
-                        uri,
-                        headers: websocket_public_headers(&headers),
-                        client_address,
-                        requested_protocols,
-                    };
-                    match #connect_call {
-                        Ok(forte_sdk::websocket::ConnectDecision::Accept {
-                            protocol,
-                            headers: response_headers,
-                        }) => {
-                            if !websocket_response_headers_valid(&response_headers) {
-                                return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
-                            }
-                            let mut response = Response::builder()
-                                .status(StatusCode::NO_CONTENT)
-                                .body(Body::empty())
-                                .unwrap();
-                            *response.headers_mut() = response_headers;
-                            response.headers_mut().insert(
-                                "x-fn0-internal-websocket-decision",
-                                "accept".parse().unwrap(),
-                            );
-                            if let Some(protocol) = protocol {
-                                let Ok(protocol_header) = protocol.parse() else {
-                                    return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
-                                };
-                                response.headers_mut().insert(
-                                    "x-fn0-internal-websocket-protocol",
-                                    protocol_header,
-                                );
-                            }
-                            Ok(response)
-                        }
-                        Ok(forte_sdk::websocket::ConnectDecision::Reject {
-                            status,
-                            headers: response_headers,
-                        }) => {
-                            if status == StatusCode::SWITCHING_PROTOCOLS
-                                || !websocket_response_headers_valid(&response_headers)
-                            {
-                                return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
-                            }
-                            let mut response = Response::builder()
-                                .status(status)
-                                .body(Body::empty())
-                                .unwrap();
-                            *response.headers_mut() = response_headers;
-                            response.headers_mut().insert(
-                                "x-fn0-internal-websocket-decision",
-                                "reject".parse().unwrap(),
-                            );
-                            Ok(response)
-                        }
-                        Err(error) => {
-                            eprintln!("WebSocket on_connect error at {}: {:?}", path, error);
-                            Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
-                        }
-                    }
-                }
+                #connect_branch
                 "message" => {
                     let message = match headers
                         .get("x-fn0-internal-websocket-message-kind")
@@ -564,6 +559,90 @@ fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream
                     }
                 }
                 _ => Ok(websocket_error_response(StatusCode::BAD_REQUEST)),
+            }
+        }
+    }
+}
+
+fn generate_websocket_inbound_connect_branch(
+    module_name: &syn::Ident,
+    has_path_params: bool,
+) -> TokenStream {
+    let connect_call = websocket_callback_call(module_name, "on_connect", has_path_params);
+    quote! {
+        "connect" => {
+            let requested_protocols = headers
+                .get_all("sec-websocket-protocol")
+                .iter()
+                .filter_map(|value| value.to_str().ok())
+                .flat_map(|value| value.split(','))
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect();
+            let client_address = headers
+                .get("x-fn0-internal-websocket-client-address")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string);
+            let event = forte_sdk::websocket::ConnectEvent {
+                connection_id,
+                uri,
+                headers: websocket_public_headers(&headers),
+                client_address,
+                requested_protocols,
+            };
+            match #connect_call {
+                Ok(forte_sdk::websocket::ConnectDecision::Accept {
+                    protocol,
+                    headers: response_headers,
+                }) => {
+                    if !websocket_response_headers_valid(&response_headers) {
+                        return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
+                    }
+                    let mut response = Response::builder()
+                        .status(StatusCode::NO_CONTENT)
+                        .body(Body::empty())
+                        .unwrap();
+                    *response.headers_mut() = response_headers;
+                    response.headers_mut().insert(
+                        "x-fn0-internal-websocket-decision",
+                        "accept".parse().unwrap(),
+                    );
+                    if let Some(protocol) = protocol {
+                        let Ok(protocol_header) = protocol.parse() else {
+                            return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
+                        };
+                        response.headers_mut().insert(
+                            "x-fn0-internal-websocket-protocol",
+                            protocol_header,
+                        );
+                    }
+                    Ok(response)
+                }
+                Ok(forte_sdk::websocket::ConnectDecision::Reject {
+                    status,
+                    headers: response_headers,
+                }) => {
+                    if status == StatusCode::SWITCHING_PROTOCOLS
+                        || !websocket_response_headers_valid(&response_headers)
+                    {
+                        return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
+                    }
+                    let mut response = Response::builder()
+                        .status(status)
+                        .body(Body::empty())
+                        .unwrap();
+                    *response.headers_mut() = response_headers;
+                    response.headers_mut().insert(
+                        "x-fn0-internal-websocket-decision",
+                        "reject".parse().unwrap(),
+                    );
+                    Ok(response)
+                }
+                Err(error) => {
+                    eprintln!("WebSocket on_connect error at {}: {:?}", path, error);
+                    Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                }
             }
         }
     }

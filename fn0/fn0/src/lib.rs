@@ -64,7 +64,8 @@ pub use vault_hijack::VaultHijack;
 pub use wasmtime;
 pub use websocket_hijack::{
     WebSocketCommandDispatcher, WebSocketCommandError, WebSocketCommandErrorKind,
-    WebSocketCommandFuture, WebSocketDeliveryState, WebSocketHijack, WebSocketMessageKind,
+    WebSocketCommandFuture, WebSocketConnectFuture, WebSocketDeliveryState, WebSocketHijack,
+    WebSocketMessageKind,
 };
 
 pub type WasmProxyPre = ServicePre<ClientState<SystemClock>>;

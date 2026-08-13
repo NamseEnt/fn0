@@ -16,7 +16,7 @@ repository = "https://github.com/NamseEnt/fn0"
 
 [workspace.dependencies]
 fn0 = { path = "fn0/fn0", version = "=0.6.5" }
-fn0-shared-schema = { path = "fn0/shared-schema", version = "=0.2.2" }
+fn0-shared-schema = { path = "fn0/shared-schema", version = "=0.2.3" }
 fn0-deploy = { path = "fn0/deploy", version = "=0.3.1" }
 fn0-wasmtime = { path = "fn0/wasmtime", version = "=0.2.0" }
 ski = { package = "fn0-ski", path = "fn0/ski", version = "=0.1.11" }
@@ -120,6 +120,7 @@ wasmparser = "=0.252.0"
 wasmtime = { version = "=47.0.2", default-features = false }
 wasmtime-wasi = "=47.0.2"
 wasmtime-wasi-http = "=47.0.2"
+webpki-roots = "=1.0.9"
 wiremock = "=0.6.5"
 wit-bindgen = { version = "=0.60.0", features = ["default", "async-spawn", "inter-task-wakeup"] }
 zstd = "=0.13.3"

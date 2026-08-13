@@ -28,7 +28,8 @@ pub fn generate_routes() {
     let queue_task_dir = Path::new(&manifest_dir).join("src/queue_task");
     let admin_dir = Path::new(&manifest_dir).join("src/admin");
     let public_dir = Path::new(&manifest_dir).join("public");
-    let websockets_dir = Path::new(&manifest_dir).join("src/websockets");
+    let ws_in_dir = Path::new(&manifest_dir).join("src/ws_in");
+    let ws_out_dir = Path::new(&manifest_dir).join("src/ws_out");
     let output_path = Path::new(&manifest_dir).join("src/route_generated.rs");
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
@@ -39,7 +40,8 @@ pub fn generate_routes() {
     println!("cargo:rerun-if-changed=src/queue_task");
     println!("cargo:rerun-if-changed=src/admin");
     println!("cargo:rerun-if-changed=public");
-    println!("cargo:rerun-if-changed=src/websockets");
+    println!("cargo:rerun-if-changed=src/ws_in");
+    println!("cargo:rerun-if-changed=src/ws_out");
     // Also rerun when dependency versions change (e.g. forte-sdk bump),
     // because once any rerun-if-changed is declared Cargo stops doing
     // default change detection across the rest of the crate.
@@ -52,7 +54,10 @@ pub fn generate_routes() {
     let queue_tasks = discover_queue_tasks(&queue_task_dir);
     let admin_tasks = discover_admin_tasks(&admin_dir);
     let static_files = discover_public(&public_dir);
-    let websockets = discover_websockets(&websockets_dir);
+    let websockets = discover_websockets(&ws_in_dir, &ws_out_dir);
+    let has_ws_out = websockets
+        .iter()
+        .any(|websocket| matches!(websocket.direction, model::WebSocketDirection::Outbound));
     let tokens = generate_code(
         &pages,
         &hooks,
@@ -112,13 +117,19 @@ pub fn generate_routes() {
         !actions.is_empty(),
         !admin_tasks.is_empty(),
         !queue_tasks.is_empty(),
+        has_ws_out,
     );
 }
 
 const LIB_RS_MARKER_START: &str = "// === FORTE-MANAGED START ===";
 const LIB_RS_MARKER_END: &str = "// === FORTE-MANAGED END ===";
 
-fn render_managed_block(has_actions: bool, has_admin: bool, has_queue_tasks: bool) -> String {
+fn render_managed_block(
+    has_actions: bool,
+    has_admin: bool,
+    has_queue_tasks: bool,
+    has_ws_out: bool,
+) -> String {
     let mut lines = Vec::new();
     lines.push(LIB_RS_MARKER_START.to_string());
     lines.push(
@@ -137,6 +148,9 @@ fn render_managed_block(has_actions: bool, has_admin: bool, has_queue_tasks: boo
     if has_queue_tasks {
         lines.push("pub use route_generated::enqueue;".to_string());
     }
+    if has_ws_out {
+        lines.push("pub use route_generated::ws_out;".to_string());
+    }
     lines.push(LIB_RS_MARKER_END.to_string());
     lines.join("\n")
 }
@@ -146,8 +160,9 @@ fn update_lib_rs_managed_block(
     has_actions: bool,
     has_admin: bool,
     has_queue_tasks: bool,
+    has_ws_out: bool,
 ) {
-    let new_block = render_managed_block(has_actions, has_admin, has_queue_tasks);
+    let new_block = render_managed_block(has_actions, has_admin, has_queue_tasks, has_ws_out);
     let existing = fs::read_to_string(lib_rs_path).unwrap_or_default();
 
     let updated = match (

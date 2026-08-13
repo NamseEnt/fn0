@@ -39,9 +39,7 @@ impl CloudSetup<'_> {
     }
 
     pub async fn ensure_websockets(&self) -> Result<()> {
-        self.provisioner()
-            .ensure_websockets(self.mint_from_setup_token)
-            .await
+        self.provisioner().ensure_websockets().await
     }
 }
 

@@ -62,12 +62,20 @@ pub(super) struct StaticFileInfo {
 
 #[derive(Debug)]
 pub(super) struct WebSocketRouteInfo {
+    pub(super) direction: WebSocketDirection,
     pub(super) module_name: String,
     pub(super) module_path: String,
+    pub(super) module_segments: Vec<String>,
     pub(super) route_path: String,
     pub(super) route_segments: Vec<RouteSegment>,
     pub(super) path_params: Option<Vec<PathParamField>>,
     pub(super) has_on_disconnect: bool,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(super) enum WebSocketDirection {
+    Inbound,
+    Outbound,
 }
 
 pub(super) enum HandlerType {

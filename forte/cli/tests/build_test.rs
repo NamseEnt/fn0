@@ -231,14 +231,30 @@ pub async fn on_message(_event: MessageEvent, _path_params: PathParams) -> Resul
 }
 "#;
 
+const OUTBOUND_WEBSOCKET_ROUTE: &str = r#"
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::{DisconnectEvent, MessageEvent};
+
+pub async fn on_message(_event: MessageEvent) -> Result<()> {
+    Ok(())
+}
+
+pub async fn on_disconnect(_event: DisconnectEvent) -> Result<()> {
+    Ok(())
+}
+"#;
+
 #[test]
 fn test_build_websocket_route() {
     let temp = tempfile::tempdir().unwrap();
     let project_dir = setup_project(&temp);
-    let websocket_dir = project_dir.join("rs/src/websockets");
-    std::fs::create_dir_all(&websocket_dir).unwrap();
-    std::fs::write(websocket_dir.join("chat.rs"), WEBSOCKET_ROUTE).unwrap();
-    std::fs::write(websocket_dir.join("[room_id].rs"), DYNAMIC_WEBSOCKET_ROUTE).unwrap();
+    let ws_in_dir = project_dir.join("rs/src/ws_in");
+    let ws_out_dir = project_dir.join("rs/src/ws_out");
+    std::fs::create_dir_all(&ws_in_dir).unwrap();
+    std::fs::create_dir_all(&ws_out_dir).unwrap();
+    std::fs::write(ws_in_dir.join("chat.rs"), WEBSOCKET_ROUTE).unwrap();
+    std::fs::write(ws_in_dir.join("[room_id].rs"), DYNAMIC_WEBSOCKET_ROUTE).unwrap();
+    std::fs::write(ws_out_dir.join("slack.rs"), OUTBOUND_WEBSOCKET_ROUTE).unwrap();
 
     cargo::cargo_bin_cmd!("forte")
         .args(["build"])
@@ -248,17 +264,24 @@ fn test_build_websocket_route() {
 
     let generated_routes =
         std::fs::read_to_string(project_dir.join("rs/src/route_generated.rs")).unwrap();
+    let generated_lib = std::fs::read_to_string(project_dir.join("rs/src/lib.rs")).unwrap();
     assert!(generated_routes.contains("handle_websocket_event"));
-    assert!(generated_routes.contains("websockets_chat::on_connect"));
-    assert!(generated_routes.contains("websockets_chat::on_message"));
-    assert!(generated_routes.contains("websockets__room_id_::on_connect"));
-    assert!(generated_routes.contains("let path_params = websockets__room_id_::PathParams"));
+    assert!(generated_routes.contains("websockets_ws_in_chat::on_connect"));
+    assert!(generated_routes.contains("websockets_ws_in_chat::on_message"));
+    assert!(generated_routes.contains("websockets_ws_in__room_id_::on_connect"));
+    assert!(generated_routes.contains("let path_params = websockets_ws_in__room_id_::PathParams"));
+    assert!(generated_routes.contains("websockets_ws_out_slack::on_message"));
+    assert!(!generated_routes.contains("websockets_ws_out_slack::on_connect"));
+    assert!(generated_routes.contains("const PATH: &str = \"/ws_out/slack\";"));
+    assert!(generated_routes.contains("pub async fn connect"));
+    assert!(generated_routes.contains("pub mod ws_out"));
+    assert!(generated_lib.contains("pub use route_generated::ws_out;"));
     assert!(
         generated_routes
-            .find("websockets_chat::on_connect")
+            .find("websockets_ws_in_chat::on_connect")
             .expect("static route")
             < generated_routes
-                .find("websockets__room_id_::on_connect")
+                .find("websockets_ws_in__room_id_::on_connect")
                 .expect("dynamic route")
     );
 }

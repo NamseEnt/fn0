@@ -1,7 +1,8 @@
 # WebSockets
 
-Forte WebSockets use event callbacks while fn0 owns the network connection. Create route modules
-under `rs/src/websockets`; they are published below `/ws`.
+Forte WebSockets use event callbacks while fn0 owns the network connection. Create inbound route
+modules under `rs/src/ws_in`; they are published below `/ws`. Create outbound route modules under
+`rs/src/ws_out`; they receive messages from connections opened by the application.
 
 ## Route example
 
@@ -42,12 +43,35 @@ client. Use `forte_sdk::websocket::disconnect` for an application-requested grac
 
 | Module | URL |
 | --- | --- |
-| `websockets/index.rs` | `/ws` |
-| `websockets/chat.rs` | `/ws/chat` |
-| `websockets/rooms/[room_id].rs` | `/ws/rooms/:room_id` |
+| `ws_in/index.rs` | `/ws` |
+| `ws_in/chat.rs` | `/ws/chat` |
+| `ws_in/rooms/[room_id].rs` | `/ws/rooms/:room_id` |
 
 A dynamic module declares `PathParams` and receives it after the event argument, matching page and
 API routes.
+
+## Outbound routes
+
+Outbound routes do not accept inbound client connections. They define `on_message` and may define
+`on_disconnect`; `on_connect` is not allowed. Forte generates a route-bound `connect` function for
+each outbound route.
+
+| Module | Generated path |
+| --- | --- |
+| `ws_out/slack.rs` | `crate::ws_out::slack::connect(url)` |
+| `ws_out/index.rs` | `crate::ws_out::connect(url)` |
+
+The generated callback path for `ws_out/slack.rs` is `/ws_out/slack`. It is an internal callback
+route, not a public WebSocket endpoint.
+
+```rust
+let connection_id = crate::ws_out::slack::connect("wss://example.com/socket").await?;
+forte_sdk::websocket::send(
+    &connection_id,
+    forte_sdk::websocket::WebSocketMessage::text("hello"),
+)
+.await?;
+```
 
 ## Connect decisions
 

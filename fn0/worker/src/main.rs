@@ -45,6 +45,17 @@ pub type WorkerContext = ExecutionContext<S3BundleCache>;
 const DEFAULT_CACHE_SIZE_BYTES: usize = 512 * 1024 * 1024;
 const DEFAULT_OPS_PORT: u16 = 9090;
 const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(15);
+const CONTROL_PROJECT_ID: &str = "fn0-control";
+const DEPLOY_STATUS_PATH: &str = "/__forte_action/deploy_status";
+const CONTROL_DEPLOY_STATUS_DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
+
+fn select_request_deadline(project_id: &str, request_path: &str) -> std::time::Duration {
+    if project_id == CONTROL_PROJECT_ID && request_path == DEPLOY_STATUS_PATH {
+        CONTROL_DEPLOY_STATUS_DEADLINE
+    } else {
+        REQUEST_DEADLINE
+    }
+}
 
 pub fn read_pem_env(name: &str) -> Option<String> {
     if let Ok(v) = std::env::var(name) {
@@ -928,7 +939,9 @@ async fn handle_user_request(
     });
 
     let (resp_tx, resp_rx) = oneshot::channel();
-    let envelope = RequestEnvelope::new(project_id.clone(), mapped_req, resp_tx);
+    let selected_request_deadline = select_request_deadline(&project_id, &request_path);
+    let envelope = RequestEnvelope::new(project_id.clone(), mapped_req, resp_tx)
+        .with_execution_deadline(selected_request_deadline);
 
     if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
         match err {
@@ -949,7 +962,7 @@ async fn handle_user_request(
         }
     }
 
-    let run_result = match tokio::time::timeout(REQUEST_DEADLINE, resp_rx).await {
+    let run_result = match tokio::time::timeout(selected_request_deadline, resp_rx).await {
         Ok(Ok(r)) => r,
         Ok(Err(_)) => {
             tracing::error!(%project_id, "worker dropped response channel");
@@ -1016,5 +1029,29 @@ async fn handle_user_request(
                 .body(Full::new(Bytes::from("Bad Gateway")))
                 .unwrap())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        CONTROL_DEPLOY_STATUS_DEADLINE, DEPLOY_STATUS_PATH, REQUEST_DEADLINE,
+        select_request_deadline,
+    };
+
+    #[test]
+    fn deploy_status_gets_extended_deadline_only_for_control_project() {
+        assert_eq!(
+            select_request_deadline("fn0-control", DEPLOY_STATUS_PATH),
+            CONTROL_DEPLOY_STATUS_DEADLINE
+        );
+        assert_eq!(
+            select_request_deadline("fn0-control", "/__forte_action/other"),
+            REQUEST_DEADLINE
+        );
+        assert_eq!(
+            select_request_deadline("other-project", DEPLOY_STATUS_PATH),
+            REQUEST_DEADLINE
+        );
     }
 }

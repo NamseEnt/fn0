@@ -664,11 +664,7 @@ impl Provisioner {
         ))
     }
 
-    pub async fn ensure_websockets(&self, mint_writing_token: bool) -> Result<()> {
-        if !mint_writing_token {
-            return self.write_websockets(&self.setup_token).await;
-        }
-
+    pub async fn ensure_websockets(&self) -> Result<()> {
         let writing = self.mint_provisioning_token("WebSockets").await?;
         let result = self.write_websockets(&writing.value).await;
         if let Err(error) = self.revoke_token("WebSockets", &writing.id).await {

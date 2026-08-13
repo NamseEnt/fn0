@@ -1,5 +1,5 @@
 use crate::websocket_directory::{
-    ConnectionDirectory, ConnectionOwner, MemoryDirectory, WorkerIdentity, directory_from_env,
+    ConnectionDirectory, ConnectionOwner, WorkerIdentity, directory_from_env,
     worker_identity_from_env,
 };
 use crate::websocket_quic::QuicTransport;
@@ -7,20 +7,26 @@ use crate::worker_pool::{self, DispatchError, RequestEnvelope};
 use base64::Engine;
 use bytes::Bytes;
 use dashmap::DashMap;
+use fastwebsockets::handshake;
 use fastwebsockets::upgrade::UpgradeFut;
 use fastwebsockets::{Frame, OpCode, Payload, WebSocketError, WebSocketRead, WebSocketWrite};
 use fn0::{
     Body, WebSocketCommandDispatcher, WebSocketCommandError, WebSocketCommandErrorKind,
-    WebSocketCommandFuture, WebSocketDeliveryState, WebSocketMessageKind,
+    WebSocketCommandFuture, WebSocketConnectFuture, WebSocketDeliveryState, WebSocketMessageKind,
 };
 use http_body_util::{BodyExt, Empty, Full};
 use hyper_util::rt::TokioIo;
 use rand::RngCore;
+use rustls::pki_types::ServerName;
+use std::future::Future;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::Duration;
-use tokio::io::{ReadHalf, WriteHalf};
+use tokio::io::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
+use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot, watch};
+use tokio_rustls::TlsConnector;
+use url::Url;
 
 const PROJECT_CONNECTION_LIMIT: usize = 1_000;
 const WORKER_CONNECTION_LIMIT: usize = 10_000;
@@ -30,10 +36,32 @@ const CALLBACK_DEADLINE: Duration = Duration::from_secs(15);
 const CLOSE_HANDSHAKE_DEADLINE: Duration = Duration::from_secs(10);
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const PONG_DEADLINE: Duration = Duration::from_secs(15);
+const OUTBOUND_DIAL_TIMEOUT: Duration = Duration::from_secs(10);
 
 type UpgradedIo = TokioIo<hyper::upgrade::Upgraded>;
 type SocketReader = WebSocketRead<ReadHalf<UpgradedIo>>;
 type SocketWriter = WebSocketWrite<WriteHalf<UpgradedIo>>;
+
+struct OutboundExecutor;
+
+impl<Fut> hyper::rt::Executor<Fut> for OutboundExecutor
+where
+    Fut: Future + Send + 'static,
+    Fut::Output: Send + 'static,
+{
+    fn execute(&self, future: Fut) {
+        tokio::spawn(future);
+    }
+}
+
+fn outbound_tls_connector() -> anyhow::Result<TlsConnector> {
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let config = rustls::ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    Ok(TlsConnector::from(Arc::new(config)))
+}
 
 #[derive(Clone, Debug)]
 pub struct DisconnectInfo {
@@ -111,6 +139,13 @@ struct ConnectionEntry {
     control_sender: mpsc::UnboundedSender<WriterControl>,
 }
 
+struct RegisteredConnection {
+    command_receiver: mpsc::Receiver<SocketCommand>,
+    control_sender: mpsc::UnboundedSender<WriterControl>,
+    control_receiver: mpsc::UnboundedReceiver<WriterControl>,
+    closed_sender: watch::Sender<bool>,
+}
+
 enum SocketCommand {
     Send {
         message_kind: WebSocketMessageKind,
@@ -149,6 +184,7 @@ pub struct WebSocketService {
     directory: Arc<dyn ConnectionDirectory>,
     identity: WorkerIdentity,
     quic: OnceLock<Arc<QuicTransport>>,
+    self_reference: OnceLock<Weak<WebSocketService>>,
 }
 
 impl WebSocketService {
@@ -167,7 +203,12 @@ impl WebSocketService {
             directory,
             identity,
             quic: OnceLock::new(),
+            self_reference: OnceLock::new(),
         });
+        service
+            .self_reference
+            .set(Arc::downgrade(&service))
+            .map_err(|_| anyhow::anyhow!("websocket service self reference already initialized"))?;
         if let Some(quic) = QuicTransport::from_env(Arc::downgrade(&service))? {
             service
                 .quic
@@ -366,30 +407,8 @@ impl WebSocketService {
             reader.set_auto_close(false);
             reader.set_auto_pong(false);
             reader.set_max_message_size(usize::MAX);
-            let (command_sender, command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
-            let (control_sender, control_receiver) = mpsc::unbounded_channel();
-            let (closed_sender, closed_receiver) = watch::channel(false);
-            let entry = Arc::new(ConnectionEntry {
-                project_id: project_id.clone(),
-                command_sender,
-                closing: AtomicBool::new(false),
-                closed_receiver,
-                control_sender: control_sender.clone(),
-            });
-            service
-                .connections
-                .insert(connection_id.clone(), entry.clone());
-            if service.draining.load(Ordering::Acquire)
-                || capacity_guard.project_generation.load(Ordering::Acquire)
-                    != capacity_guard.reserved_generation
-            {
-                entry.closing.store(true, Ordering::Release);
-                let _ = entry.command_sender.try_send(SocketCommand::Close {
-                    code: 1012,
-                    info: DisconnectInfo::deployment(),
-                    response_sender: None,
-                });
-            }
+            let registered =
+                service.register_connection(&project_id, &connection_id, &capacity_guard);
             service
                 .run_connection(
                     project_id,
@@ -397,14 +416,241 @@ impl WebSocketService {
                     route_uri,
                     reader,
                     writer,
-                    command_receiver,
-                    control_sender,
-                    control_receiver,
-                    closed_sender,
+                    registered.command_receiver,
+                    registered.control_sender,
+                    registered.control_receiver,
+                    registered.closed_sender,
                     capacity_guard,
                 )
                 .await;
         });
+    }
+
+    async fn connect_outbound(
+        self: &Arc<Self>,
+        project_id: String,
+        url: String,
+        receive_path: String,
+        remaining: Duration,
+    ) -> Result<String, WebSocketCommandError> {
+        let deadline = tokio::time::Instant::now() + remaining;
+        let capacity_guard = self.reserve_capacity(&project_id).map_err(|_| {
+            WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Backpressure)
+        })?;
+        let connection_id = Self::connection_id();
+        let route_uri = format!("https://fn0-websocket.internal{receive_path}")
+            .parse::<hyper::Uri>()
+            .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
+        let parsed_url = Url::parse(&url)
+            .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
+        let scheme = parsed_url.scheme();
+        if scheme != "ws" && scheme != "wss" {
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ));
+        }
+        let host = parsed_url
+            .host_str()
+            .ok_or_else(|| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
+        let port = parsed_url
+            .port_or_known_default()
+            .ok_or_else(|| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
+        let authority = match parsed_url.host() {
+            Some(url::Host::Ipv6(address)) => format!("[{address}]:{port}"),
+            Some(url::Host::Ipv4(address)) => format!("{address}:{port}"),
+            Some(url::Host::Domain(domain)) => format!("{domain}:{port}"),
+            None => {
+                return Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::Internal,
+                ));
+            }
+        };
+        let request_path = if parsed_url.path().is_empty() {
+            "/"
+        } else {
+            parsed_url.path()
+        };
+        let request_path = match parsed_url.query() {
+            Some(query) => format!("{request_path}?{query}"),
+            None => request_path.to_string(),
+        };
+        let request = hyper::Request::builder()
+            .method(hyper::Method::GET)
+            .uri(format!("http://{authority}{request_path}"))
+            .header(hyper::header::HOST, &authority)
+            .header(hyper::header::UPGRADE, "websocket")
+            .header(hyper::header::CONNECTION, "Upgrade")
+            .header(
+                "Sec-WebSocket-Key",
+                fastwebsockets::handshake::generate_key(),
+            )
+            .header("Sec-WebSocket-Version", "13")
+            .body(Empty::<Bytes>::new())
+            .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
+        let stream = tokio::time::timeout_at(
+            deadline,
+            tokio::time::timeout(OUTBOUND_DIAL_TIMEOUT, TcpStream::connect((host, port))),
+        )
+        .await
+        .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded))?
+        .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?
+        .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?;
+        if scheme == "ws" {
+            tokio::time::timeout_at(
+                deadline,
+                self.finish_outbound_handshake(
+                    project_id,
+                    connection_id.clone(),
+                    route_uri,
+                    request,
+                    stream,
+                    capacity_guard,
+                ),
+            )
+            .await
+            .map_err(|_| {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded)
+            })??;
+        } else {
+            let tls_connector = outbound_tls_connector().map_err(|_| {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal)
+            })?;
+            let server_name = ServerName::try_from(host.to_string()).map_err(|_| {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal)
+            })?;
+            let tls_stream = tokio::time::timeout_at(
+                deadline,
+                tokio::time::timeout(
+                    OUTBOUND_DIAL_TIMEOUT,
+                    tls_connector.connect(server_name, stream),
+                ),
+            )
+            .await
+            .map_err(|_| {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded)
+            })?
+            .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?
+            .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?;
+            tokio::time::timeout_at(
+                deadline,
+                self.finish_outbound_handshake(
+                    project_id,
+                    connection_id.clone(),
+                    route_uri,
+                    request,
+                    tls_stream,
+                    capacity_guard,
+                ),
+            )
+            .await
+            .map_err(|_| {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded)
+            })??;
+        }
+        Ok(connection_id)
+    }
+
+    async fn finish_outbound_handshake<Stream>(
+        self: &Arc<Self>,
+        project_id: String,
+        connection_id: String,
+        route_uri: hyper::Uri,
+        request: hyper::Request<Empty<Bytes>>,
+        stream: Stream,
+        capacity_guard: CapacityGuard,
+    ) -> Result<(), WebSocketCommandError>
+    where
+        Stream: AsyncRead + AsyncWrite + Send + Unpin + 'static,
+    {
+        let (websocket, _response) = handshake::client(&OutboundExecutor, request, stream)
+            .await
+            .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?;
+        let (mut reader, writer) = websocket.split(tokio::io::split);
+        reader.set_auto_close(false);
+        reader.set_auto_pong(false);
+        reader.set_max_message_size(usize::MAX);
+        if self.draining.load(Ordering::Acquire)
+            || self
+                .project_generations
+                .get(&project_id)
+                .is_some_and(|generation| {
+                    generation.load(Ordering::Acquire) != capacity_guard.reserved_generation
+                })
+        {
+            drop(reader);
+            drop(writer);
+            drop(capacity_guard);
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Transport,
+            ));
+        }
+        let registered = self.register_connection(&project_id, &connection_id, &capacity_guard);
+        if self
+            .publish_connection(&project_id, &connection_id)
+            .await
+            .is_err()
+        {
+            self.connections.remove(&connection_id);
+            drop(capacity_guard);
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Transport,
+            ));
+        }
+        let service = self.clone();
+        tokio::spawn(async move {
+            service
+                .run_connection(
+                    project_id,
+                    connection_id,
+                    route_uri,
+                    reader,
+                    writer,
+                    registered.command_receiver,
+                    registered.control_sender,
+                    registered.control_receiver,
+                    registered.closed_sender,
+                    capacity_guard,
+                )
+                .await;
+        });
+        Ok(())
+    }
+
+    fn register_connection(
+        &self,
+        project_id: &str,
+        connection_id: &str,
+        capacity_guard: &CapacityGuard,
+    ) -> RegisteredConnection {
+        let (command_sender, command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
+        let (control_sender, control_receiver) = mpsc::unbounded_channel();
+        let (closed_sender, closed_receiver) = watch::channel(false);
+        let entry = Arc::new(ConnectionEntry {
+            project_id: project_id.to_string(),
+            command_sender,
+            closing: AtomicBool::new(false),
+            closed_receiver,
+            control_sender: control_sender.clone(),
+        });
+        self.connections
+            .insert(connection_id.to_string(), entry.clone());
+        if self.draining.load(Ordering::Acquire)
+            || capacity_guard.project_generation.load(Ordering::Acquire)
+                != capacity_guard.reserved_generation
+        {
+            entry.closing.store(true, Ordering::Release);
+            let _ = entry.command_sender.try_send(SocketCommand::Close {
+                code: 1012,
+                info: DisconnectInfo::deployment(),
+                response_sender: None,
+            });
+        }
+        RegisteredConnection {
+            command_receiver,
+            control_sender,
+            control_receiver,
+            closed_sender,
+        }
     }
 
     pub async fn close_project(&self, project_id: &str) {
@@ -573,6 +819,27 @@ impl WebSocketService {
 }
 
 impl WebSocketCommandDispatcher for WebSocketService {
+    fn connect(
+        &self,
+        caller_project_id: String,
+        url: String,
+        receive_path: String,
+        remaining: Duration,
+    ) -> WebSocketConnectFuture {
+        let Some(service) = self.self_reference.get().and_then(Weak::upgrade) else {
+            return Box::pin(async {
+                Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::Internal,
+                ))
+            });
+        };
+        Box::pin(async move {
+            service
+                .connect_outbound(caller_project_id, url, receive_path, remaining)
+                .await
+        })
+    }
+
     fn send(
         &self,
         caller_project_id: String,
@@ -1348,6 +1615,7 @@ fn unix_millis() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::websocket_directory::MemoryDirectory;
     use fn0::WebSocketCommandDispatcher;
     use std::convert::Infallible;
     use std::net::{SocketAddr, UdpSocket};
@@ -1495,7 +1763,12 @@ mod tests {
                 endpoint: endpoint.to_string(),
             },
             quic: OnceLock::new(),
+            self_reference: OnceLock::new(),
         });
+        service
+            .self_reference
+            .set(Arc::downgrade(&service))
+            .expect("set test websocket service self reference");
         let quic = QuicTransport::from_test_config(
             Arc::downgrade(&service),
             endpoint,

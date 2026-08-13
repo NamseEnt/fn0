@@ -18,16 +18,22 @@ state through the application's normal HTTP API.
 
 ## Application surface
 
-WebSocket modules are discovered recursively under `rs/src/websockets` and mounted below `/ws`.
+Inbound WebSocket modules are discovered recursively under `rs/src/ws_in` and mounted below `/ws`.
+Outbound WebSocket modules are discovered under `rs/src/ws_out` and are used as internal
+message callback routes.
 
 | Source | Route |
 | --- | --- |
-| `src/websockets/index.rs` | `/ws` |
-| `src/websockets/chat.rs` | `/ws/chat` |
-| `src/websockets/rooms/[room_id].rs` | `/ws/rooms/:room_id` |
+| `src/ws_in/index.rs` | `/ws` |
+| `src/ws_in/chat.rs` | `/ws/chat` |
+| `src/ws_in/rooms/[room_id].rs` | `/ws/rooms/:room_id` |
 
 `on_connect` and `on_message` are required public async functions. `on_disconnect` is optional.
 Dynamic routes use the existing `PathParams` convention.
+
+Outbound routes define `on_message` and may define `on_disconnect`; they do not define
+`on_connect`. Each route generates a `connect(url)` function that binds the internal callback path
+and is not a public upgrade endpoint.
 
 ```rust
 use forte_sdk::anyhow::Result;
