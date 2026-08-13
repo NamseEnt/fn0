@@ -152,7 +152,7 @@ seed_compiled_bundle() {
 }
 
 seed_worker_manifest() {
-  local db_url="$1" db_token="$2" project_id="$3" code_version="$4" custom_domain="$5"
+  local db_url="$1" db_token="$2" project_id="$3" code_version="$4" domain="$5"
   # Read existing manifest (if any), upsert this project's entry while
   # preserving every other project's entry, then write back. The previous
   # implementation overwrote the whole doc with a single-entry manifest, so
@@ -174,15 +174,15 @@ seed_worker_manifest() {
   merged="$(jq -c \
     --arg pid "$project_id" \
     --argjson cv "$code_version" \
-    --arg dom "$custom_domain" \
+    --arg dom "$domain" \
     --argjson floor "$code_version" '
-      .project_manifests[$pid] = ((.project_manifests[$pid] // {}) + {code_version:$cv, custom_domain:(if $dom == "" then null else $dom end), static_cache_state:"active", pending_code_version:null})
+      .project_manifests[$pid] = (((.project_manifests[$pid] // {}) | del(.custom_domain)) + {code_version:$cv, domain:$dom, static_cache_state:"active", pending_code_version:null})
       | .manifest_version = ([(.manifest_version // 0) + 1, $floor] | max)
     ' <<<"$existing_data")"
 
   local mv
   mv="$(jq -r '.manifest_version' <<<"$merged")"
-  echo ">> seed WorkerManifestDoc project=${project_id} domain=${custom_domain:-<none>} manifest_version=${mv} (siblings preserved)"
+  echo ">> seed WorkerManifestDoc project=${project_id} domain=${domain:-<none>} manifest_version=${mv} (siblings preserved)"
   __upsert_doc "$db_url" "$db_token" "WorkerManifestDoc" "" "$merged"
 }
 

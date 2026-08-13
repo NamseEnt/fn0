@@ -82,9 +82,13 @@ pub async fn run(
                     project_manifest.static_cache_state == STATIC_CACHE_STATE_ACTIVE,
                 )
                 .await;
-            if let Some(domain) = &project_manifest.custom_domain {
-                new_domains.insert(domain.clone(), project_id.clone());
-                cache.register_domain(domain, project_id).await;
+            // An empty domain is a pre-rename manifest row; such a project
+            // cannot receive a request and must not claim a route.
+            if !project_manifest.domain.is_empty() {
+                new_domains.insert(project_manifest.domain.clone(), project_id.clone());
+                cache
+                    .register_domain(&project_manifest.domain, project_id)
+                    .await;
             }
         }
 

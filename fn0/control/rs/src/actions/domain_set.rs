@@ -1,5 +1,5 @@
 use crate::common::auth;
-use crate::common::byoc::ProjectStorage;
+use crate::common::byoc::worker_storage_for;
 use crate::common::cert_manifest;
 use crate::docs::*;
 use forte_sdk::*;
@@ -57,10 +57,35 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let project_id = req.body.project_id.clone();
     let github_id = user.github_id;
 
+    // The manifest entry is written only for a connected project: the worker
+    // needs the storage target the moment it starts routing a domain, and this
+    // read is what refuses a project that connected nothing.
+    let db = doc_db::turso();
+    let storage = match (ProjectCloudflareConfigDocGet {
+        project_id: &project_id,
+    })
+    .send_with(&db)
+    .await
+    {
+        Ok(Some(config)) => worker_storage_for(&config),
+        Ok(None) => {
+            tracing::warn!(
+                project_id,
+                "domain_set refused: project has no connected Cloudflare account"
+            );
+            return Output::InternalError;
+        }
+        Err(e) => {
+            tracing::error!("domain_set ProjectCloudflareConfigDocGet: {e}");
+            return Output::InternalError;
+        }
+    };
+
     let result = doc_db::turso()
         .trx(|trx| {
             let project_id = project_id.clone();
             let domain = domain.clone();
+            let storage = storage.clone();
             async move {
                 let project = match trx
                     .get(ProjectDocGet {
@@ -83,11 +108,11 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                             project_id.clone(),
                             WorkerProjectManifest {
                                 code_version: 0,
-                                custom_domain: Some(domain.clone()),
+                                domain: domain.clone(),
                                 static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
                                     .to_string(),
                                 pending_code_version: None,
-                                storage: None,
+                                storage: Some(storage.clone()),
                             },
                         );
                         trx.create(WorkerManifestDoc {
@@ -102,7 +127,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     if other_project_id == &project_id {
                         continue;
                     }
-                    if other_manifest.custom_domain.as_deref() == Some(domain.as_str()) {
+                    if other_manifest.domain == domain {
                         return trx.cancel(Cancel::DomainTaken {
                             existing_project_id: other_project_id.clone(),
                         });
@@ -114,15 +139,18 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     .entry(project_id.clone())
                     .or_insert(WorkerProjectManifest {
                         code_version: 0,
-                        custom_domain: None,
+                        domain: domain.clone(),
                         static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
                             .to_string(),
                         pending_code_version: None,
-                        storage: None,
+                        storage: Some(storage.clone()),
                     });
-                let replaced = entry.custom_domain.replace(domain.clone());
+                let replaced = std::mem::replace(&mut entry.domain, domain.clone());
+                if entry.storage.is_none() {
+                    entry.storage = Some(storage.clone());
+                }
                 handle.manifest_version += 1;
-                trx.commit::<_, _>(replaced.filter(|previous| previous != &domain))
+                trx.commit::<_, _>(Some(replaced).filter(|previous| previous != &domain))
             }
         })
         .await;
@@ -146,15 +174,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             return Output::InternalError;
         }
     };
-
-    // Resolved only to refuse a project with no connected account: the worker
-    // answers a custom hostname with an origin certificate signed on the
-    // owner's own zone, and there is no zone to have signed one without it.
-    let db = doc_db::turso();
-    if let Err(e) = ProjectStorage::resolve(&db, &project_id).await {
-        tracing::error!("domain_set ProjectStorage::resolve: {e}");
-        return Output::InternalError;
-    }
 
     let Ok(origin_hostname) = std::env::var("FN0_WORKER_ORIGIN_HOSTNAME") else {
         tracing::error!("domain_set: FN0_WORKER_ORIGIN_HOSTNAME not set");

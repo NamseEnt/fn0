@@ -155,7 +155,9 @@ struct DomainProjectInput<'a> {
 #[derive(Deserialize)]
 #[serde(tag = "t", rename_all_fields = "camelCase")]
 pub enum DomainStatus {
-    NotConfigured,
+    /// The project has no registered domain, so the worker serves nothing for
+    /// it.
+    NoDomain,
     /// A project on its owner's own Cloudflare account. Their edge holds the
     /// visitor-facing certificate, so there is no fn0-side DV status to report;
     /// what fn0 holds is the origin certificate the worker presents.

@@ -7,7 +7,21 @@ pub use doc_db::DbRequest;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WorkerProjectManifest {
     pub code_version: u64,
-    pub custom_domain: Option<String>,
+    /// The project's registered domain. A project answers on it and nothing
+    /// else, so an entry without one cannot receive a request; the worker
+    /// serves nothing for an empty value.
+    ///
+    /// Deserialization tolerates the pre-rename shape (`custom_domain`, and
+    /// `null` from projects that never registered one) so a manifest written
+    /// before this field was required does not poison the whole document.
+    /// New control writes only `domain`, so roll the worker fleet out before
+    /// control: an old worker cannot read a manifest that new control wrote.
+    #[serde(
+        alias = "custom_domain",
+        default,
+        deserialize_with = "deserialize_domain"
+    )]
+    pub domain: String,
     #[serde(default = "default_static_cache_state")]
     pub static_cache_state: String,
     #[serde(default)]
@@ -54,6 +68,65 @@ pub const STATIC_CACHE_STATE_ACTIVATING: &str = "activating";
 
 fn default_static_cache_state() -> String {
     STATIC_CACHE_STATE_ACTIVE.to_string()
+}
+
+fn deserialize_domain<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct DomainVisitor;
+    impl<'de> serde::de::Visitor<'de> for DomainVisitor {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string or null")
+        }
+
+        fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<String, E> {
+            Ok(value.to_string())
+        }
+
+        fn visit_none<E: serde::de::Error>(self) -> Result<String, E> {
+            Ok(String::new())
+        }
+
+        fn visit_some<D: serde::Deserializer<'de>>(
+            self,
+            deserializer: D,
+        ) -> Result<String, D::Error> {
+            Deserialize::deserialize(deserializer)
+        }
+    }
+    deserializer.deserialize_option(DomainVisitor)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WorkerProjectManifest;
+
+    #[test]
+    fn domain_reads_the_legacy_custom_domain_key() {
+        let entry: WorkerProjectManifest =
+            serde_json::from_str(r#"{"code_version":0,"custom_domain":"app.example.com"}"#)
+                .unwrap();
+        assert_eq!(entry.domain, "app.example.com");
+    }
+
+    #[test]
+    fn null_legacy_domain_reads_as_empty() {
+        let entry: WorkerProjectManifest =
+            serde_json::from_str(r#"{"code_version":0,"custom_domain":null}"#).unwrap();
+        assert_eq!(entry.domain, "");
+    }
+
+    #[test]
+    fn domain_serializes_under_its_own_name() {
+        let entry: WorkerProjectManifest =
+            serde_json::from_str(r#"{"code_version":0,"domain":"app.example.com"}"#).unwrap();
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains(r#""domain":"app.example.com""#));
+        assert!(!json.contains("custom_domain"));
+    }
 }
 
 #[forte_doc]

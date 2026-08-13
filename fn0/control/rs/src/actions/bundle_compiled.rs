@@ -2,7 +2,6 @@ use crate::common::admin;
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct Input {
@@ -72,58 +71,42 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                         .map(|v| v.active.clone());
                     if active_fn0_wasmtime_version.as_deref() == Some(fn0_wasmtime_version.as_str())
                     {
-                        match &mut manifest {
-                            Some(manifest) => {
-                                let entry =
-                                    manifest
-                                        .project_manifests
-                                        .entry(project_id.clone())
-                                        .or_insert(WorkerProjectManifest {
-                                            code_version: 0,
-                                            custom_domain: None,
-                                            static_cache_state:
-                                                fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
-                                                    .to_string(),
-                                            pending_code_version: None,
-                                            storage: None,
-                                        });
-                                if (code_version > entry.code_version
-                                    || (code_version == entry.code_version
-                                        && entry.pending_code_version.is_none()))
-                                    && entry
-                                        .pending_code_version
-                                        .is_none_or(|pending| code_version > pending)
-                                {
-                                    if entry.code_version == 0 {
-                                        entry.code_version = code_version;
-                                    }
-                                    entry.static_cache_state =
-                                        fn0_shared_schema::STATIC_CACHE_STATE_PRE_PURGE.to_string();
-                                    entry.pending_code_version = Some(code_version);
-                                    manifest.manifest_version += 1;
-                                    should_enqueue = true;
-                                }
+                        // A manifest entry exists only once a project has a
+                        // registered domain; without one the worker serves
+                        // nothing and the deployment cannot be activated. The
+                        // compile is recorded either way, so bundle_gc keeps
+                        // the compiled object.
+                        let Some(manifest) = &mut manifest else {
+                            tracing::warn!(
+                                project_id,
+                                code_version,
+                                "bundle_compiled: no worker manifest; project has no registered domain, deployment not activated"
+                            );
+                            return trx.commit::<_, ()>(false);
+                        };
+                        let Some(entry) = manifest.project_manifests.get_mut(&project_id) else {
+                            tracing::warn!(
+                                project_id,
+                                code_version,
+                                "bundle_compiled: no manifest entry; project has no registered domain, deployment not activated"
+                            );
+                            return trx.commit::<_, ()>(false);
+                        };
+                        if (code_version > entry.code_version
+                            || (code_version == entry.code_version
+                                && entry.pending_code_version.is_none()))
+                            && entry
+                                .pending_code_version
+                                .is_none_or(|pending| code_version > pending)
+                        {
+                            if entry.code_version == 0 {
+                                entry.code_version = code_version;
                             }
-                            None => {
-                                let mut entries = HashMap::new();
-                                entries.insert(
-                                    project_id.clone(),
-                                    WorkerProjectManifest {
-                                        code_version,
-                                        custom_domain: None,
-                                        static_cache_state:
-                                            fn0_shared_schema::STATIC_CACHE_STATE_PRE_PURGE
-                                                .to_string(),
-                                        pending_code_version: Some(code_version),
-                                        storage: None,
-                                    },
-                                );
-                                trx.create(WorkerManifestDoc {
-                                    manifest_version: 1,
-                                    project_manifests: entries,
-                                })?;
-                                should_enqueue = true;
-                            }
+                            entry.static_cache_state =
+                                fn0_shared_schema::STATIC_CACHE_STATE_PRE_PURGE.to_string();
+                            entry.pending_code_version = Some(code_version);
+                            manifest.manifest_version += 1;
+                            should_enqueue = true;
                         }
                     }
                 }

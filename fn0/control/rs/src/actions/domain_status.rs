@@ -10,7 +10,9 @@ pub struct Input {
 
 #[derive(Serialize)]
 pub enum Output {
-    NotConfigured,
+    /// The project has no registered domain, so the worker serves nothing for
+    /// it.
+    NoDomain,
     /// The project runs on its owner's Cloudflare account: their edge holds the
     /// visitor-facing certificate, and fn0 only holds the origin certificate.
     SelfHosted {
@@ -49,19 +51,22 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     let manifest = match (WorkerManifestDocGet {}).send_with(&db).await {
         Ok(Some(m)) => m,
-        Ok(None) => return Output::NotConfigured,
+        Ok(None) => return Output::NoDomain,
         Err(e) => {
             tracing::error!("domain_status WorkerManifestDocGet: {e}");
             return Output::InternalError;
         }
     };
 
+    // The manifest entry is the only writer of a project's domain, and an
+    // entry without one predates the rename: such a project answers nowhere.
     let Some(entry) = manifest.project_manifests.get(&req.body.project_id) else {
-        return Output::NotConfigured;
+        return Output::NoDomain;
     };
-    let Some(domain) = entry.custom_domain.clone() else {
-        return Output::NotConfigured;
-    };
+    if entry.domain.is_empty() {
+        return Output::NoDomain;
+    }
+    let domain = entry.domain.clone();
 
     let cert = match (WorkerCertManifestDocGet {}).send_with(&db).await {
         Ok(manifest) => manifest.and_then(|manifest| manifest.certs.get(&domain).cloned()),

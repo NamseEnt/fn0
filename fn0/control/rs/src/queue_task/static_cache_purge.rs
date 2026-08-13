@@ -42,14 +42,16 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     }
 
     // The edge holding this project's cached pages is the owner's own, reached
-    // through the custom domain on their zone, and purged with their own token
-    // off their own budget.
-    let user_zone = match entry.custom_domain.clone() {
-        Some(domain) => Some((
+    // through the domain on their zone, and purged with their own token off
+    // their own budget. An empty domain is a pre-rename manifest row, which
+    // means no zone ever cached anything for it.
+    let user_zone = if entry.domain.is_empty() {
+        None
+    } else {
+        Some((
             ProjectStorage::resolve(&db, &input.project_id).await?,
-            domain,
-        )),
-        None => None,
+            entry.domain.clone(),
+        ))
     };
     if entry.static_cache_state == STATIC_CACHE_STATE_PRE_PURGE {
         purge_user_zone(user_zone.as_ref(), &input, "pre_purge").await?;
@@ -79,13 +81,13 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 }
 
 /// Invalidates the copy held by the owner's own zone, which exists only while
-/// the project has a custom domain there.
+/// the project has a domain there.
 async fn purge_user_zone(
     user_zone: Option<&(ProjectStorage, String)>,
     input: &Input,
     phase: &str,
 ) -> anyhow::Result<()> {
-    let Some((storage, custom_domain)) = user_zone else {
+    let Some((storage, domain)) = user_zone else {
         return Ok(());
     };
     let tag = format!("fn0-project-{}", input.project_id);
@@ -96,7 +98,7 @@ async fn purge_user_zone(
     tracing::info!(
         project_id = %input.project_id,
         code_version = input.code_version,
-        custom_domain,
+        domain,
         phase,
         "static cache purge completed on the project owner's zone"
     );

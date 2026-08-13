@@ -29,7 +29,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 
     let storage = ProjectStorage::resolve_if_connected(&db, &project_id).await?;
 
-    delete_custom_domain(&db, &project_id).await?;
+    delete_domain(&db, &project_id).await?;
     remove_routing_and_cron(&db, &project_id).await?;
     delete_bundle_store_objects(&project_id, now).await?;
     if let Some(storage) = &storage {
@@ -47,19 +47,22 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 // The hostname registration must go before the manifest entry: the domain name
 // only lives in the manifest, so deleting the entry first would strand the
 // hostname on a redelivered message.
-async fn delete_custom_domain(db: &doc_db::Database, project_id: &str) -> anyhow::Result<()> {
+async fn delete_domain(db: &doc_db::Database, project_id: &str) -> anyhow::Result<()> {
     let Some(manifest) = (WorkerManifestDocGet {}).send_with(db).await? else {
         return Ok(());
     };
     let Some(domain) = manifest
         .project_manifests
         .get(project_id)
-        .and_then(|entry| entry.custom_domain.clone())
+        .map(|entry| entry.domain.clone())
     else {
         return Ok(());
     };
+    if domain.is_empty() {
+        return Ok(());
+    }
     crate::common::cert_manifest::remove(db, &domain).await?;
-    tracing::info!(%project_id, %domain, "project_teardown: custom domain deleted");
+    tracing::info!(%project_id, %domain, "project_teardown: domain deleted");
     Ok(())
 }
 

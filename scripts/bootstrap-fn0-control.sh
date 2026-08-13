@@ -16,7 +16,7 @@
 #   6. Seed the fn0-control turso database with:
 #        - Fn0WasmtimeVersionDoc (active=<wasmtime>)
 #        - CompiledBundleDoc (project_id=fn0-control, code_version=<cv>)
-#        - WorkerManifestDoc (fn0-control mapped to its custom_domain, and its
+#        - WorkerManifestDoc (fn0-control mapped to its registered domain, and its
 #          storage target so workers can reach the buckets)
 #        - ProjectCloudflareConfigDoc (the buckets and credentials step 3a made)
 #   7. Seed the worker-agent turso database (fn0-doc-db) with

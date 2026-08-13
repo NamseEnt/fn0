@@ -45,7 +45,7 @@ pub async fn resolve_app_url(project_id: &str) -> Result<ResolvedAppUrl> {
         Ok(DomainStatus::SelfHosted { domain, .. }) => ResolvedAppUrl::unresolved(format!(
             "'{domain}' has no origin certificate yet; run `forte cloud init`"
         )),
-        Ok(DomainStatus::NotConfigured) => {
+        Ok(DomainStatus::NoDomain) => {
             ResolvedAppUrl::unresolved("no domain is attached; run `forte cloud init`".to_string())
         }
         Ok(DomainStatus::NotLoggedIn) => ResolvedAppUrl::unresolved(

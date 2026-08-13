@@ -9,7 +9,7 @@ const InputSchema = z.object({
 
 const OutputSchema = z.discriminatedUnion("t", [
     z.object({
-    t: z.literal("NotConfigured"),
+    t: z.literal("NoDomain"),
   }),
     z.object({
     t: z.literal("SelfHosted"),

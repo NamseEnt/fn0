@@ -163,22 +163,21 @@ pub enum ConnectOutcome {
     },
 }
 
-/// Stores the configuration and points workers at it in one transaction.
+/// Stores the configuration in one transaction.
 ///
-/// Two writes that can fail independently would let control believe a project
-/// is connected while the fleet still had no target for it, and the project
-/// could not be reconnected to repair it because a configuration would already
-/// exist. One transaction removes the state. It also settles two concurrent
-/// connects, since the existence check happens inside it.
+/// The worker manifest is deliberately untouched: a manifest entry is only
+/// written once the project has a registered domain, because that is the only
+/// thing a worker routes on. `domain_set` refuses unconnected projects, so a
+/// project that connects here and never registers a domain simply never
+/// reaches the manifest. One write also settles two concurrent connects, since
+/// the existence check happens inside the same transaction.
 pub async fn connect_project(
     db: &doc_db::Database,
     config: ProjectCloudflareConfigDoc,
 ) -> anyhow::Result<ConnectOutcome> {
-    let storage = worker_storage_for(&config);
     let result = db
         .trx(|trx| {
             let config = config.clone();
-            let storage = storage.clone();
             async move {
                 if let Some(existing) = trx
                     .get(ProjectCloudflareConfigDocGet {
@@ -194,30 +193,7 @@ pub async fn connect_project(
                     );
                 }
 
-                let project_id = config.project_id.clone();
                 trx.create(config)?;
-
-                let mut manifest = match trx.get(WorkerManifestDocGet {}).await? {
-                    Some(manifest) => manifest,
-                    None => trx.create(WorkerManifestDoc {
-                        manifest_version: 0,
-                        project_manifests: std::collections::HashMap::new(),
-                    })?,
-                };
-                let entry =
-                    manifest
-                        .project_manifests
-                        .entry(project_id)
-                        .or_insert(WorkerProjectManifest {
-                            code_version: 0,
-                            custom_domain: None,
-                            static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
-                                .to_string(),
-                            pending_code_version: None,
-                            storage: None,
-                        });
-                entry.storage = Some(storage);
-                manifest.manifest_version += 1;
                 trx.commit::<_, std::convert::Infallible>(ConnectOutcome::Connected)
             }
         })

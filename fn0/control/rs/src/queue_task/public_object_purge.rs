@@ -80,13 +80,14 @@ fn requested_urls(files: &[CachePurgeFile]) -> Vec<String> {
 }
 
 fn readable_origins(manifest: Option<&WorkerManifestDoc>, project_id: &str) -> Vec<Option<String>> {
-    let custom_domain = manifest
-        .and_then(|manifest| manifest.project_manifests.get(project_id))
-        .and_then(|entry| entry.custom_domain.as_deref());
-    match custom_domain {
-        Some(custom_domain) => vec![None, Some(format!("https://{custom_domain}"))],
-        None => vec![None],
+    let Some(entry) = manifest.and_then(|manifest| manifest.project_manifests.get(project_id))
+    else {
+        return vec![None];
+    };
+    if entry.domain.is_empty() {
+        return vec![None];
     }
+    vec![None, Some(format!("https://{}", entry.domain))]
 }
 
 fn expand_purge_files(urls: &[String], origins: &[Option<String>]) -> Vec<CachePurgeFile> {
@@ -107,13 +108,13 @@ mod tests {
     use serde_json::json;
     use std::collections::HashMap;
 
-    fn manifest_with_domain(custom_domain: Option<&str>) -> WorkerManifestDoc {
+    fn manifest_with_domain(domain: &str) -> WorkerManifestDoc {
         let mut project_manifests = HashMap::new();
         project_manifests.insert(
             "project".to_string(),
             WorkerProjectManifest {
                 code_version: 0,
-                custom_domain: custom_domain.map(str::to_string),
+                domain: domain.to_string(),
                 static_cache_state: STATIC_CACHE_STATE_ACTIVE.to_string(),
                 pending_code_version: None,
                 storage: None,
@@ -141,7 +142,7 @@ mod tests {
 
     #[test]
     fn purge_files_include_the_no_origin_and_project_origin_entries() {
-        let manifest = manifest_with_domain(Some("app.example"));
+        let manifest = manifest_with_domain("app.example");
         let origins = readable_origins(Some(&manifest), "project");
         let urls = vec!["https://cdn.example/clips/intro.mp4".to_string()];
 
@@ -159,7 +160,7 @@ mod tests {
 
     #[test]
     fn purge_files_include_only_the_no_origin_entry_without_a_project_domain() {
-        let manifest = manifest_with_domain(None);
+        let manifest = manifest_with_domain("");
         let origins = readable_origins(Some(&manifest), "project");
         let urls = vec!["https://cdn.example/clips/intro.mp4".to_string()];
 
@@ -171,7 +172,7 @@ mod tests {
 
     #[test]
     fn a_worker_enqueued_url_expands_the_same_as_an_action_enqueued_one() {
-        let manifest = manifest_with_domain(Some("app.example"));
+        let manifest = manifest_with_domain("app.example");
         let origins = readable_origins(Some(&manifest), "project");
         let from_worker: Input = serde_json::from_value(json!({
             "project_id": "project",

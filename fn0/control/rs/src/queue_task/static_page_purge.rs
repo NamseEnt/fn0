@@ -39,10 +39,11 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         return Ok(());
     };
     // No domain means no zone of the project's own, so nothing cached the page
-    // in the first place.
-    let Some(domain) = entry.custom_domain.as_deref() else {
+    // in the first place. An empty domain is a pre-rename manifest row.
+    if entry.domain.is_empty() {
         return Ok(());
-    };
+    }
+    let domain = &entry.domain;
 
     let files: Vec<CachePurgeFile> = input
         .paths

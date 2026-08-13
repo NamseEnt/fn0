@@ -69,7 +69,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             let has_domain = manifest
                 .project_manifests
                 .get(&req.body.project_id)
-                .is_some_and(|entry| entry.custom_domain.is_some());
+                .is_some_and(|entry| !entry.domain.is_empty());
             if !has_domain {
                 return Output::NoDomain;
             }
