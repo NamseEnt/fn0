@@ -34,6 +34,13 @@ cargo test -p forte-sdk
 cargo test -p fn0-doc-db
 ```
 
+### Distributed WebSocket delivery
+
+```sh
+cargo test -p fn0-worker distributed_send_reaches_connection_on_second_worker
+cargo test -p fn0-worker-agent worker_container_quic_env_uses_worker_port_and_private_ip
+```
+
 ### Async tests in forte-sdk / backend crates
 
 Use `#[forte_sdk::test]` (not `#[tokio::test]`) for async tests in WASM-compiled crates:

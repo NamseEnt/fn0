@@ -81,6 +81,10 @@ pub async fn init(
         domain: &domain,
     };
 
+    println!("  enabling Cloudflare WebSockets...");
+    setup.ensure_websockets().await?;
+    println!("  Cloudflare WebSockets enabled");
+
     match connection {
         CloudflareConnection::NotConnected => {
             println!("  provisioning your Cloudflare account (this runs locally)...");

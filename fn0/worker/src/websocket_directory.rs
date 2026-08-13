@@ -134,7 +134,7 @@ impl ConnectionDirectory for TursoDirectory {
 }
 
 #[derive(Default)]
-struct MemoryDirectory {
+pub(crate) struct MemoryDirectory {
     connections: DashMap<String, ConnectionOwner>,
 }
 

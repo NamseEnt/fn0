@@ -120,7 +120,7 @@ CLOUDFLARE_API_TOKEN=<your-token> forte cloud init \
   --zone example.com
 ```
 
-Registers the project with fn0 Cloud, provisions three R2 buckets in your Cloudflare account, and writes the proxied `CNAME` your app answers on into your zone. Requires `forte login` to have run first.
+Registers the project with fn0 Cloud, enables WebSockets for the selected zone, provisions three R2 buckets in your Cloudflare account, and writes the proxied `CNAME` your app answers on into your zone. Requires `forte login` to have run first.
 
 The token must have **User → API Tokens → Edit** permission. See [Bring Your Own Cloudflare](fn0/cloudflare.md) for token setup and what gets created in your account.
 

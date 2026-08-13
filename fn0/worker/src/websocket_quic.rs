@@ -132,6 +132,43 @@ impl QuicTransport {
         let bearer = std::env::var("FN0_WEBSOCKET_QUIC_BEARER")?;
         let server_name = std::env::var("FN0_WEBSOCKET_QUIC_SERVER_NAME")
             .unwrap_or_else(|_| "fn0-worker.internal".to_string());
+        Ok(Some(Self::from_parts(
+            service,
+            bind_address,
+            certificate_pem,
+            key_pem,
+            bearer,
+            server_name,
+        )?))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_test_config(
+        service: Weak<WebSocketService>,
+        bind_address: SocketAddr,
+        certificate_pem: String,
+        key_pem: String,
+        bearer: String,
+        server_name: String,
+    ) -> anyhow::Result<Arc<Self>> {
+        Self::from_parts(
+            service,
+            bind_address,
+            certificate_pem,
+            key_pem,
+            bearer,
+            server_name,
+        )
+    }
+
+    fn from_parts(
+        service: Weak<WebSocketService>,
+        bind_address: SocketAddr,
+        certificate_pem: String,
+        key_pem: String,
+        bearer: String,
+        server_name: String,
+    ) -> anyhow::Result<Arc<Self>> {
         let certificates: Vec<CertificateDer<'static>> =
             rustls_pemfile::certs(&mut certificate_pem.as_bytes()).collect::<Result<_, _>>()?;
         let private_key: PrivateKeyDer<'static> =
@@ -161,14 +198,14 @@ impl QuicTransport {
             QuicClientConfig::try_from(client_crypto)?,
         )));
 
-        Ok(Some(Arc::new(Self {
+        Ok(Arc::new(Self {
             service,
             endpoint,
             bearer,
             server_name,
             reconcile_bind_address: bind_address,
             connections: DashMap::new(),
-        })))
+        }))
     }
 
     pub fn spawn_server(self: &Arc<Self>) {

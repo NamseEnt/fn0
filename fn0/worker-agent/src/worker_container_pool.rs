@@ -225,19 +225,18 @@ async fn start_new_active(
         .map_err(PoolError::Podman)?;
     let user_port_str = worker_ports.user.to_string();
     let ops_port_str = worker_ports.ops.to_string();
-    let quic_bind = format!("0.0.0.0:{}", worker_ports.quic);
-    let quic_endpoint = format!("{private_ip}:{}", worker_ports.quic);
-    let env: &[(&str, &str)] = &[
-        ("HTTP_PORT", &user_port_str),
-        ("FN0_WORKER_OPS_PORT", &ops_port_str),
-        ("FN0_WEBSOCKET_QUIC_BIND", &quic_bind),
-        ("FN0_WEBSOCKET_QUIC_ENDPOINT", &quic_endpoint),
+    let (quic_bind, quic_endpoint) = websocket_quic_env(worker_ports, private_ip);
+    let env = [
+        ("HTTP_PORT", user_port_str.as_str()),
+        ("FN0_WORKER_OPS_PORT", ops_port_str.as_str()),
+        ("FN0_WEBSOCKET_QUIC_BIND", quic_bind.as_str()),
+        ("FN0_WEBSOCKET_QUIC_ENDPOINT", quic_endpoint.as_str()),
     ];
     podman
         .run_detached(RunArgs {
             container_name: &container_name,
             image_ref,
-            env,
+            env: &env,
             env_file,
         })
         .await
@@ -255,6 +254,13 @@ async fn start_new_active(
         local_addr,
         ops_addr,
     })
+}
+
+fn websocket_quic_env(worker_ports: WorkerPorts, private_ip: &str) -> (String, String) {
+    (
+        format!("0.0.0.0:{}", worker_ports.quic),
+        format!("{private_ip}:{}", worker_ports.quic),
+    )
 }
 
 async fn wait_until_ready(
@@ -542,4 +548,21 @@ enum PoolError {
     ReadyTimeout { container_name: String },
     #[error("container {container_name} exited before becoming ready")]
     ContainerExited { container_name: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn worker_container_quic_env_uses_worker_port_and_private_ip() {
+        let worker_ports = WorkerPorts {
+            user: 18443,
+            ops: 18444,
+            quic: 18445,
+        };
+        let (quic_bind, quic_endpoint) = websocket_quic_env(worker_ports, "127.0.0.2");
+        assert_eq!(quic_bind, "0.0.0.0:18445");
+        assert_eq!(quic_endpoint, "127.0.0.2:18445");
+    }
 }

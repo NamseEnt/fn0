@@ -34,6 +34,11 @@ they are absent. The token is not a command-line argument, and
 the CLI never prompts or reads standard input. If the variable or any required
 argument is missing, the command exits with an error.
 
+As part of initialization, the CLI enables WebSockets for the selected zone.
+This is required for Forte WebSocket routes to complete their upgrade through
+Cloudflare's proxy. It is safe to run repeatedly because the setting is
+written to `on` each time.
+
 `--zone` is the zone name, such as `example.com`. It is not the hexadecimal
 zone ID shown in Cloudflare's API details. The CLI resolves the exact zone
 named by the argument and never picks the first zone returned by the API.

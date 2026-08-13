@@ -1,5 +1,5 @@
 use crate::websocket_directory::{
-    ConnectionDirectory, ConnectionOwner, WorkerIdentity, directory_from_env,
+    ConnectionDirectory, ConnectionOwner, MemoryDirectory, WorkerIdentity, directory_from_env,
     worker_identity_from_env,
 };
 use crate::websocket_quic::QuicTransport;
@@ -1348,6 +1348,10 @@ fn unix_millis() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fn0::WebSocketCommandDispatcher;
+    use std::convert::Infallible;
+    use std::net::{SocketAddr, UdpSocket};
+    use tokio::time::timeout;
 
     #[test]
     fn utf8_validator_accepts_split_code_point() {
@@ -1372,5 +1376,145 @@ mod tests {
         let second = WebSocketService::connection_id();
         assert!(first.starts_with("v1."));
         assert_ne!(first, second);
+    }
+
+    #[tokio::test]
+    async fn distributed_send_reaches_connection_on_second_worker() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let certificate =
+            rcgen::generate_simple_self_signed(vec!["fn0-worker.internal".to_string()])
+                .expect("generate test certificate");
+        let certificate_pem = certificate.cert.pem();
+        let key_pem = certificate.signing_key.serialize_pem();
+        let bearer = "test-websocket-bearer".to_string();
+        let server_name = "fn0-worker.internal".to_string();
+        let source_endpoint = free_udp_address();
+        let target_endpoint = free_udp_address();
+        let shared_directory = Arc::new(MemoryDirectory::default());
+
+        let source_service = new_test_service(
+            shared_directory.clone(),
+            source_endpoint,
+            certificate_pem.clone(),
+            key_pem.clone(),
+            bearer.clone(),
+            server_name.clone(),
+        )
+        .await;
+        let target_service = new_test_service(
+            shared_directory,
+            target_endpoint,
+            certificate_pem,
+            key_pem,
+            bearer,
+            server_name,
+        )
+        .await;
+
+        let project_id = "distributed-websocket-test";
+        let connection_id = WebSocketService::connection_id();
+        let (command_sender, mut command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
+        let (_closed_sender, closed_receiver) = watch::channel(false);
+        let (control_sender, _control_receiver) = mpsc::unbounded_channel();
+        target_service.connections.insert(
+            connection_id.clone(),
+            Arc::new(ConnectionEntry {
+                project_id: project_id.to_string(),
+                command_sender,
+                closing: AtomicBool::new(false),
+                closed_receiver,
+                control_sender,
+            }),
+        );
+        target_service
+            .publish_connection(project_id, &connection_id)
+            .await
+            .expect("publish target connection");
+
+        let message = Bytes::from_static(b"cross-worker-delivery");
+        let body = Full::new(message.clone())
+            .map_err(|never: Infallible| match never {})
+            .boxed_unsync();
+        let send_task = tokio::spawn(source_service.send(
+            project_id.to_string(),
+            connection_id.clone(),
+            WebSocketMessageKind::Text,
+            body,
+            Duration::from_secs(5),
+        ));
+
+        let command = timeout(Duration::from_secs(5), command_receiver.recv())
+            .await
+            .expect("target worker did not receive command")
+            .expect("target worker command channel closed");
+        let SocketCommand::Send {
+            body,
+            ready_sender,
+            response_sender,
+            ..
+        } = command
+        else {
+            panic!("target worker received a non-send command");
+        };
+        ready_sender.send(()).expect("send ready signal");
+        let received_body = body
+            .collect()
+            .await
+            .expect("collect target worker body")
+            .to_bytes();
+        assert_eq!(received_body, message);
+        response_sender
+            .send(Ok(()))
+            .expect("send command completion");
+        send_task
+            .await
+            .expect("source worker send task panicked")
+            .expect("distributed send failed");
+
+        target_service.unpublish_connection(&connection_id).await;
+    }
+
+    async fn new_test_service(
+        directory: Arc<MemoryDirectory>,
+        endpoint: SocketAddr,
+        certificate_pem: String,
+        key_pem: String,
+        bearer: String,
+        server_name: String,
+    ) -> Arc<WebSocketService> {
+        let service = Arc::new(WebSocketService {
+            worker_senders: Arc::new(Vec::new()),
+            connections: DashMap::new(),
+            project_counts: DashMap::new(),
+            project_generations: DashMap::new(),
+            worker_count: Arc::new(AtomicUsize::new(0)),
+            draining: AtomicBool::new(false),
+            directory,
+            identity: WorkerIdentity {
+                worker_id: format!("test-worker-{endpoint}"),
+                endpoint: endpoint.to_string(),
+            },
+            quic: OnceLock::new(),
+        });
+        let quic = QuicTransport::from_test_config(
+            Arc::downgrade(&service),
+            endpoint,
+            certificate_pem,
+            key_pem,
+            bearer,
+            server_name,
+        )
+        .expect("create test QUIC transport");
+        assert!(service.quic.set(quic.clone()).is_ok());
+        quic.spawn_server();
+        tokio::task::yield_now().await;
+        service
+    }
+
+    fn free_udp_address() -> SocketAddr {
+        UdpSocket::bind("127.0.0.1:0")
+            .expect("allocate UDP port")
+            .local_addr()
+            .expect("read UDP address")
     }
 }

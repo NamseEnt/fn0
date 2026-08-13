@@ -2,6 +2,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
+import { gzipSync } from "node:zlib";
 import { CustomWorkerImage } from "./CustomWorkerImage";
 import {
   CLOUDFLARE_IPV4_RANGES,
@@ -973,7 +974,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         ),
       );
     const userData = cloudInit.apply((s) =>
-      Buffer.from(s, "utf8").toString("base64"),
+      gzipSync(Buffer.from(s, "utf8")).toString("base64"),
     );
 
     return pulumi
@@ -1137,7 +1138,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           },
         ],
       },
-      { parent: this, dependsOn: [instancePool] },
+      { parent: this, dependsOn: [instancePool], deleteBeforeReplace: true },
     );
 
     return instancePool;
@@ -1550,7 +1551,6 @@ mkdir -p /etc/fn0-worker-proxy
 chown opc:opc /etc/fn0-worker-proxy
 chmod 755 /etc/fn0-worker-proxy
 
-# Lingering must precede any opc user systemd / runtime dir use below.
 loginctl enable-linger opc
 
 opc_uid="$(id -u opc)"
@@ -1568,8 +1568,6 @@ ${agentSystemdUnit}EOF_AGENT_UNIT
 cat > /etc/systemd/system/fn0-worker-proxy.service <<'EOF_PROXY_UNIT'
 ${proxySystemdUnit}EOF_PROXY_UNIT
 
-# Kept non-fatal: without the mount alloy refuses to start (RequiresMountsFor)
-# and the host loses observability, but the worker itself must still serve.
 {
   for _ in $(seq 1 60); do
     if [ -b "${ALLOY_QUEUE_DEVICE}" ]; then break; fi
@@ -1600,9 +1598,6 @@ chmod 600 /etc/fn0-alloy/env
 cat > /etc/systemd/system/fn0-alloy.service <<'EOF_ALLOY_UNIT'
 ${alloySystemdUnit}EOF_ALLOY_UNIT
 
-# OL10 ships journald in volatile mode (no /var/log/journal), so alloy's
-# bind mount of that path fails statfs and crash-loops. Switch journald to
-# persistent + cap to keep the small boot volume safe.
 mkdir -p /etc/systemd/journald.conf.d
 cat > /etc/systemd/journald.conf.d/fn0.conf <<'EOF_JOURNALD'
 [Journal]
@@ -1614,14 +1609,10 @@ systemd-tmpfiles --create --prefix /var/log/journal
 systemctl restart systemd-journald
 journalctl --flush
 
-# Oracle Linux ships firewalld enabled by default, which blocks 443 even
-# though the OCI SecurityList allows it. Open the port through firewalld
-# (kept in sync with the SecurityList).
 firewall-cmd --permanent --add-port=443/tcp
+firewall-cmd --permanent --add-port=18445-65535/udp
 firewall-cmd --reload
 
-# Rootless containers can't bind <1024 via NET_BIND_SERVICE (user-ns caps
-# don't reach the host kernel); lower the unprivileged port floor instead.
 echo 'net.ipv4.ip_unprivileged_port_start=443' > /etc/sysctl.d/90-fn0-worker-proxy.conf
 sysctl -p /etc/sysctl.d/90-fn0-worker-proxy.conf
 

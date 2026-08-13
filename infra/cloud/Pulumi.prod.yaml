@@ -6,7 +6,7 @@ config:
   fn0Cloud:tursoOrganizationSlug: namse
   fn0Cloud:tursoLocation: aws-ap-northeast-1
   cloudflare:apiToken:
-    secure: AAABAFy7clr6FV1zeCCrXAFsV6J5gNklpViFj3d5rKQh90kRV9H3b72oCqzlUCqCr4yzksRSeMuoVXbW4/wEuitqygmKmDrJ
+    secure: AAABANUndFirvx0czw3BUzKji6j7G9si8anisffn6j/mu+Zynk13BTf/V5vdxmSh8731+uv/Fn2u906x6ySrSY5r7366ePc8eW9Vu87ZF0ieSKdI3Q==
   aws:region: ap-northeast-1
   aws:accessKey:
     secure: AAABAM+FQ/ia5w4dz1LZriP3a047U7dYBVpuDrnn+90q4lWwN5mxYY7TiPvAnBdxRuekBw==

@@ -43,6 +43,12 @@ impl CloudSetup<'_> {
             self.zone_id.to_string(),
         )
     }
+
+    pub async fn ensure_websockets(&self) -> Result<()> {
+        self.provisioner()
+            .ensure_websockets(self.mint_from_setup_token)
+            .await
+    }
 }
 
 #[derive(Serialize)]

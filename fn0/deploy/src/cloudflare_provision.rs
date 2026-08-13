@@ -675,6 +675,40 @@ impl Provisioner {
         ))
     }
 
+    pub async fn ensure_websockets(&self, mint_writing_token: bool) -> Result<()> {
+        if !mint_writing_token {
+            return self.write_websockets(&self.setup_token).await;
+        }
+
+        let writing = self.mint_provisioning_token("WebSockets").await?;
+        let result = self.write_websockets(&writing.value).await;
+        if let Err(error) = self.revoke_token("WebSockets", &writing.id).await {
+            eprintln!(
+                "warning: {error}. It expires by itself within \
+                 {PROVISIONING_TOKEN_MINUTES} minutes."
+            );
+        }
+        result
+    }
+
+    async fn write_websockets(&self, token: &str) -> Result<()> {
+        let (status, envelope) = self
+            .call::<serde_json::Value>(
+                token,
+                reqwest::Method::PATCH,
+                &format!("/zones/{}/settings/websockets", self.zone_id),
+                Some(serde_json::json!({ "value": "on" })),
+            )
+            .await?;
+        if envelope.success {
+            return Ok(());
+        }
+        Err(anyhow!(
+            "could not enable Cloudflare WebSockets ({status}). The token needs Zone -> Zone Settings -> Edit. {}",
+            describe(&envelope.errors)
+        ))
+    }
+
     pub async fn ensure_app_cache(
         &self,
         app_hostname: &str,
