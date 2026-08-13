@@ -142,7 +142,7 @@ When running `fn0-worker` yourself, set these environment variables on the binar
 |---|---|---|---|
 | `CWASM_BUCKET` | Yes | — | S3 bucket name for pre-compiled `.cwasm` bundles |
 | `S3_ENDPOINT` | Yes | — | S3-compatible endpoint URL |
-| `S3_REGION` | Yes | — | S3 region (e.g. `us-east-1`) |
+| `S3_REGION` | No | `us-east-1` | S3 region |
 | `AWS_ACCESS_KEY_ID` | Yes | — | S3 access key |
 | `AWS_SECRET_ACCESS_KEY` | Yes | — | S3 secret key |
 | `FN0_BUNDLE_CACHE_SIZE_BYTES` | No | `536870912` (512 MB) | In-memory bundle cache size |
@@ -156,28 +156,43 @@ When running `fn0-worker` yourself, set these environment variables on the binar
 | `ORIGIN_CERT_PEM` | Yes | — | PEM-encoded TLS origin certificate (or use `ORIGIN_CERT_PEM_BASE64`) |
 | `ORIGIN_KEY_PEM` | Yes | — | PEM-encoded TLS private key (or use `ORIGIN_KEY_PEM_BASE64`) |
 | `FN0_APEX_DOMAIN` | No | — | Apex domain to route when no project hostname matches |
-| `FN0_APEX_PROJECT_ID` | No | — | Project ID to serve for `FN0_APEX_DOMAIN` requests |
+| `FN0_APEX_PROJECT_ID` | No | — | Project ID to serve for `FN0_APEX_DOMAIN` requests; both must be set together |
+
+The first byte on `HTTP_PORT`: `0x16` (TLS ClientHello) routes to user traffic; anything else routes to health checks. `FN0_WORKER_OPS_PORT` serves ops endpoints unconditionally.
 
 ### Telemetry
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname |
-| `FN0_OTLP_TARGET_SCHEME` | Yes | — | URL scheme for OTLP collector: `http` or `https` |
-| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth (`user:token`); empty string for unauthenticated |
-| `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every OTLP request path |
-| `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname used inside WASM apps |
 | `OTLP_ENDPOINT` | Yes | — | Worker's own OTLP telemetry endpoint |
+| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname for guest (WASM) traces |
+| `FN0_OTLP_TARGET_SCHEME` | Yes | — | URL scheme for guest OTLP collector: `http` or `https` |
+| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth (`user:token`) for guest OTLP; empty string for unauthenticated |
+| `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every guest OTLP request path |
+| `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname intercepted inside WASM apps |
 
 ### Platform Services
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `TURSO_GROUP_TOKEN` | No | — | Auth token for the Turso group (used by `turso_hijack`) |
-| `TURSO_DB_HOST_SUFFIX` | No | — | Host suffix for Turso database URLs (e.g. `.turso.io`) |
-| `FN0_CONTROL_PROJECT_ID` | No | — | Used by public storage and static page cache hijacks to identify the control project |
+| `TURSO_GROUP_TOKEN` | Yes | — | Auth token for the Turso group (used by `turso_hijack`) |
+| `TURSO_DB_HOST_SUFFIX` | Yes | — | Host suffix for Turso database URLs (e.g. `.turso.io`) |
+| `TURSO_PLACEHOLDER_HOST` | No | `fn0-db.fn0.dev` | Placeholder hostname intercepted for Turso requests |
+| `FN0_CONTROL_PROJECT_ID` | Yes | — | Project ID of the fn0 control service; used by public storage and static page cache hijacks |
+| `FN0_OBJECT_STORAGE_PLACEHOLDER_HOST` | No | `fn0-object-storage.fn0.dev` | Placeholder hostname for private object storage requests |
+| `FN0_PUBLIC_STORAGE_PLACEHOLDER_HOST` | No | `fn0-public-storage.fn0.dev` | Placeholder hostname for public object storage requests |
+| `FN0_STATIC_PAGE_CACHE_PLACEHOLDER_HOST` | No | `fn0-static-page-cache.fn0.dev` | Placeholder hostname for static page cache purge requests |
 
-The byte-sniff on port `HTTP_PORT`: the first byte `0x16` (TLS ClientHello) routes to user traffic; anything else routes to health checks. Port `FN0_WORKER_OPS_PORT` serves the ops endpoints unconditionally.
+### OCI Vault
+
+| Variable | Required | Description |
+|---|---|---|
+| `FN0_VAULT_CRYPTO_ENDPOINT` | Yes | OCI Vault cryptographic endpoint URL |
+| `FN0_VAULT_KEY_OCID` | Yes | OCID of the encryption key |
+| `FN0_VAULT_OCI_TENANCY_ID` | Yes | OCI tenancy OCID |
+| `FN0_VAULT_OCI_USER_ID` | Yes | OCI user OCID |
+| `FN0_VAULT_OCI_FINGERPRINT` | Yes | API key fingerprint |
+| `FN0_VAULT_OCI_PRIVATE_KEY_BASE64` | Yes | Base64-encoded PEM private key for the OCI API signing key |
 
 ## Hijack Architecture
 

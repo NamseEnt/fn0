@@ -58,7 +58,7 @@ The `doc-db` crate connects to Turso/libSQL.
 **Running `doc-db` tests directly** (outside of `forte dev`) requires a separately running libSQL server:
 
 ```sh
-docker-compose up -d   # starts libsql on port 8080
+docker compose up -d   # starts libsql on port 8080
 cargo test -p doc-db
 ```
 
