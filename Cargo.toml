@@ -3,6 +3,12 @@ resolver = "3"
 members = ["fn0/*", "forte/*", "doc-db", "object-storage"]
 exclude = ["vendor", "forte/rs-to-ts", "fn0/control"]
 
+# deno_core is vendored because the upstream crate serializes the snapshot
+# module map in HashMap iteration order, which differs between processes and
+# makes fn0-ski builds non-reproducible.
+[patch.crates-io]
+deno_core = { path = "vendor/deno/core" }
+
 [workspace.package]
 edition = "2024"
 license = "AGPL-3.0-only"
