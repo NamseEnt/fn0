@@ -21,22 +21,14 @@
 //! frontend, and asset GC — which is the only thing that deletes on a schedule
 //! — holds a credential that cannot open a bucket holding user data.
 //!
-//! There are two ways in, because the convenient one asks for a permission not
-//! everyone should grant.
-//!
-//! [`Provisioner::run_managed`] takes a setup token carrying only
-//! `User -> API Tokens -> Edit` and mints everything else from it, including
-//! the short-lived token that does the provisioning. Cloudflare lets a token
-//! grant permissions it does not hold, so one checkbox is enough; it also
-//! refuses to let a minted token mint further tokens, so the provisioning token
-//! cannot widen itself. Both measured against the live API. The catch is that a
-//! token which can create tokens can create *any* token, so it is account-wide
-//! however short its list looks.
-//!
-//! [`Provisioner::run_manual`] takes a token that can provision but cannot
-//! create tokens, and mints nothing. The user makes the two long-lived
-//! credentials themselves. It is more work and it never puts a token capable of
-//! escalation on disk.
+//! The one way in is [`Provisioner::run_managed`], which takes a setup token
+//! carrying only `User -> API Tokens -> Edit` and mints everything else from
+//! it, including the short-lived token that does the provisioning. Cloudflare
+//! lets a token grant permissions it does not hold, so one checkbox is enough;
+//! it also refuses to let a minted token mint further tokens, so the
+//! provisioning token cannot widen itself. Both measured against the live API.
+//! The catch is that a token which can create tokens can create *any* token, so
+//! it is account-wide however short its list looks.
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -116,14 +108,11 @@ impl ZoneDiscovery {
     /// settles both ids.
     ///
     /// A setup token carries only `API Tokens -> Edit` and cannot read zones,
-    /// so `mint_reader` has it mint one that can and revokes it afterwards. The
+    /// so a reader token is minted for the call and revoked afterwards. The
     /// minted policy scopes `com.cloudflare.api.account.*` — a wildcard the
     /// tokens API accepts, and the only form available here, since the account
     /// id is the thing being discovered. Measured against the live API.
-    pub async fn list(&self, mint_reader: bool) -> Result<Vec<ReachableZone>> {
-        if !mint_reader {
-            return self.zones(&self.setup_token).await;
-        }
+    pub async fn list(&self) -> Result<Vec<ReachableZone>> {
         let expires_on = (chrono::Utc::now()
             + chrono::Duration::minutes(PROVISIONING_TOKEN_MINUTES))
         .format("%Y-%m-%dT%H:%M:%SZ")
@@ -713,21 +702,7 @@ impl Provisioner {
         &self,
         app_hostname: &str,
         replaced_app_hostname: Option<&str>,
-        mint_writing_token: bool,
     ) -> Result<()> {
-        if !mint_writing_token {
-            let zone_name = self.zone_name(&self.setup_token).await?;
-            self.ensure_tiered_cache(&self.setup_token).await?;
-            return self
-                .ensure_cache_rule(
-                    &self.setup_token,
-                    &zone_name,
-                    Some(app_hostname),
-                    replaced_app_hostname,
-                )
-                .await;
-        }
-
         let writing = self.mint_provisioning_token(app_hostname).await?;
         let result = async {
             let zone_name = self.zone_name(&writing.value).await?;
@@ -764,19 +739,7 @@ impl Provisioner {
         app_hostname: &str,
         origin_hostname: &str,
         replaced_app_hostname: Option<&str>,
-        mint_writing_token: bool,
     ) -> Result<()> {
-        if !mint_writing_token {
-            return self
-                .write_app_dns_record(
-                    &self.setup_token,
-                    app_hostname,
-                    origin_hostname,
-                    replaced_app_hostname,
-                )
-                .await;
-        }
-
         let writing = self.mint_provisioning_token(app_hostname).await?;
         let result = self
             .write_app_dns_record(
@@ -1046,20 +1009,6 @@ impl Provisioner {
         result
     }
 
-    /// The careful path: provision with the token as given, mint nothing. The
-    /// caller's token is expected to be unable to create tokens, which is the
-    /// whole reason to choose this.
-    pub async fn run_manual(
-        &self,
-        project_id: &str,
-        app_origin: &str,
-        app_hostname: &str,
-    ) -> Result<ProvisionedResources> {
-        self.verify().await?;
-        self.provision(&self.setup_token, project_id, app_origin, app_hostname)
-            .await
-    }
-
     async fn provision(
         &self,
         token: &str,
@@ -1150,15 +1099,23 @@ impl Provisioner {
             )
             .await?;
 
-        let (frontend_asset_access_key_id, frontend_asset_token) = self
+        let (frontend_asset_access_key_id, frontend_asset_token) = match self
             .mint_with_expiry(
                 &format!("fn0 frontend assets ({project_id})"),
                 vec![self.bucket_scope(&[&resources.frontend_asset_bucket])],
                 None,
             )
-            .await?;
+            .await
+        {
+            Ok(minted) => minted,
+            Err(error) => {
+                self.revoke_credential_tokens(&[("worker", &worker_access_key_id)])
+                    .await;
+                return Err(error);
+            }
+        };
 
-        let (purge_token_id, purge_token) = self
+        let (purge_token_id, purge_token) = match self
             .mint_with_expiry(
                 &format!("fn0 cache purge ({project_id})"),
                 vec![serde_json::json!({
@@ -1170,7 +1127,18 @@ impl Provisioner {
                 })],
                 None,
             )
-            .await?;
+            .await
+        {
+            Ok(minted) => minted,
+            Err(error) => {
+                self.revoke_credential_tokens(&[
+                    ("worker", &worker_access_key_id),
+                    ("frontend assets", &frontend_asset_access_key_id),
+                ])
+                .await;
+                return Err(error);
+            }
+        };
 
         let minted = MintedCredentialIds {
             worker: worker_access_key_id.clone(),
@@ -1193,11 +1161,18 @@ impl Provisioner {
     /// token these carry no expiry, so one left behind stays until the user
     /// finds it.
     pub async fn revoke_minted_credentials(&self, ids: &MintedCredentialIds) {
-        for (purpose, id) in [
+        self.revoke_credential_tokens(&[
             ("worker", &ids.worker),
             ("frontend assets", &ids.frontend_asset),
             ("cache purge", &ids.purge),
-        ] {
+        ])
+        .await;
+    }
+
+    /// [`mint_credentials`] revokes the subset of ids it had accumulated when
+    /// the next mint failed; the rest were never created.
+    async fn revoke_credential_tokens(&self, ids: &[(&str, &str)]) {
+        for (purpose, id) in ids {
             if let Err(error) = self.revoke_token(purpose, id).await {
                 eprintln!("warning: {error}. Delete it in the Cloudflare dashboard.");
             }
@@ -1211,17 +1186,8 @@ impl Provisioner {
     /// alongside the certificate, because the worker has to present it during
     /// the TLS handshake. Nothing that can sign another one is: the token that
     /// did the signing is revoked before this returns.
-    pub async fn issue_origin_certificate(
-        &self,
-        hostname: &str,
-        mint_signing_token: bool,
-    ) -> Result<IssuedCertificate> {
+    pub async fn issue_origin_certificate(&self, hostname: &str) -> Result<IssuedCertificate> {
         self.verify().await?;
-        if !mint_signing_token {
-            return self
-                .sign_origin_certificate(&self.setup_token, hostname)
-                .await;
-        }
         let signing = self.mint_provisioning_token(hostname).await?;
         let result = self.sign_origin_certificate(&signing.value, hostname).await;
         if let Err(error) = self.revoke_token("signing", &signing.id).await {
@@ -1236,24 +1202,12 @@ impl Provisioner {
     /// Repoints the buckets' CORS at a domain the project has moved to.
     /// Provisioning writes the same rules for the domain the project starts
     /// with; this is how they follow it afterwards.
-    pub async fn put_app_cors(
-        &self,
-        project_id: &str,
-        app_origin: &str,
-        mint_writing_token: bool,
-    ) -> Result<()> {
+    pub async fn put_app_cors(&self, project_id: &str, app_origin: &str) -> Result<()> {
         let buckets = [
             private_object_storage_bucket_name(project_id),
             public_object_storage_bucket_name(project_id),
             frontend_asset_bucket_name(project_id),
         ];
-        if !mint_writing_token {
-            for bucket in &buckets {
-                self.put_cors(&self.setup_token, bucket, Some(app_origin))
-                    .await?;
-            }
-            return Ok(());
-        }
         let writing = self.mint_provisioning_token(app_origin).await?;
         let result = async {
             for bucket in &buckets {

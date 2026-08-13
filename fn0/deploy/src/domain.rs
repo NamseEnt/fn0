@@ -60,7 +60,7 @@ pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
         setup.domain
     );
     let issued = provisioner(setup)
-        .issue_origin_certificate(setup.domain, setup.mint_from_setup_token)
+        .issue_origin_certificate(setup.domain)
         .await?;
 
     let creds = crate::credentials::require()?;
@@ -115,22 +115,13 @@ pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
     };
 
     provisioner(setup)
-        .put_app_cors(project_id, &setup.app_origin(), setup.mint_from_setup_token)
+        .put_app_cors(project_id, &setup.app_origin())
         .await?;
     provisioner(setup)
-        .ensure_app_cache(
-            setup.domain,
-            replaced_domain.as_deref(),
-            setup.mint_from_setup_token,
-        )
+        .ensure_app_cache(setup.domain, replaced_domain.as_deref())
         .await?;
     provisioner(setup)
-        .ensure_app_dns_record(
-            setup.domain,
-            &origin_hostname,
-            replaced_domain.as_deref(),
-            setup.mint_from_setup_token,
-        )
+        .ensure_app_dns_record(setup.domain, &origin_hostname, replaced_domain.as_deref())
         .await?;
 
     Ok(DomainOutcome {

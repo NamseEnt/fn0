@@ -45,7 +45,7 @@ pub async fn init(
     })?;
 
     println!("reading the zones this token can reach...");
-    let zones = ZoneDiscovery::new(api_token.clone()).list(true).await?;
+    let zones = ZoneDiscovery::new(api_token.clone()).list().await?;
     let zone = resolve_zone(zones, &zone_name)?;
 
     let mut project_id = config.project_id;
@@ -77,7 +77,6 @@ pub async fn init(
         account_id: &zone.account_id,
         zone_id: &zone.zone_id,
         api_token: &api_token,
-        mint_from_setup_token: true,
         domain: &domain,
     };
 

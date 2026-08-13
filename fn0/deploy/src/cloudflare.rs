@@ -11,10 +11,7 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
-use crate::cloudflare_provision::{
-    ConnectCredentials, ProvisionedResources, Provisioner, frontend_asset_bucket_name,
-    private_object_storage_bucket_name, public_object_storage_bucket_name,
-};
+use crate::cloudflare_provision::{ConnectCredentials, ProvisionedResources, Provisioner};
 
 /// What the user chose and typed, carried between the steps of one setup.
 pub struct CloudSetup<'a> {
@@ -23,9 +20,6 @@ pub struct CloudSetup<'a> {
     pub zone_id: &'a str,
     /// Discarded when the command exits. fn0 never receives it.
     pub api_token: &'a str,
-    /// `true` when the token carries only `API Tokens -> Edit`, so every
-    /// privileged call has to be made through a token minted from it.
-    pub mint_from_setup_token: bool,
     pub domain: &'a str,
 }
 
@@ -119,45 +113,6 @@ pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<Provisioned
     }
 }
 
-/// The careful path, first half: a token that can provision but cannot create
-/// tokens. Provisions and stops, so the caller can tell the user which three
-/// credentials to make by hand.
-pub async fn provision_only(setup: &CloudSetup<'_>) -> Result<ProvisionedResources> {
-    setup
-        .provisioner()
-        .run_manual(setup.project_id, &setup.app_origin(), setup.domain)
-        .await
-}
-
-/// The careful path, second half: credentials the user made themselves.
-pub async fn connect_with_own_credentials(
-    setup: &CloudSetup<'_>,
-    resources: &ProvisionedResources,
-    credentials: &ConnectCredentials,
-) -> Result<()> {
-    // Nothing to revoke on failure: these credentials are the user's own, and
-    // fn0 holds no token that could revoke them anyway.
-    send_connect(setup, resources, credentials)
-        .await
-        .map_err(ConnectFailure::into_error)
-}
-
-/// Names the buckets a project's credentials have to be scoped to, before those
-/// buckets exist. The careful path prints them so the user can pick the right
-/// scopes in the dashboard.
-pub fn expected_resources(project_id: &str, zone_name: &str) -> ProvisionedResources {
-    let frontend_asset_bucket = frontend_asset_bucket_name(project_id);
-    let public_object_storage_bucket = public_object_storage_bucket_name(project_id);
-    ProvisionedResources {
-        frontend_asset_hostname: format!("{frontend_asset_bucket}.{zone_name}"),
-        public_object_storage_hostname: format!("{public_object_storage_bucket}.{zone_name}"),
-        zone_name: zone_name.to_string(),
-        private_object_storage_bucket: private_object_storage_bucket_name(project_id),
-        public_object_storage_bucket,
-        frontend_asset_bucket,
-    }
-}
-
 /// Why a connect did not succeed, split by what it says about fn0's state — the
 /// caller has credentials to clean up and may only do so when nothing was
 /// stored.
@@ -168,14 +123,6 @@ enum ConnectFailure {
     /// The request or its answer did not complete. fn0 may or may not have
     /// stored the credentials.
     Indeterminate(anyhow::Error),
-}
-
-impl ConnectFailure {
-    fn into_error(self) -> anyhow::Error {
-        match self {
-            Self::Rejected(error) | Self::Indeterminate(error) => error,
-        }
-    }
 }
 
 async fn send_connect(
