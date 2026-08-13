@@ -167,8 +167,7 @@ When running `fn0-worker` yourself, set these environment variables on the binar
 | `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth (`user:token`); empty string for unauthenticated |
 | `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every OTLP request path |
 | `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname used inside WASM apps |
-| `OTLP_ENDPOINT` | No | — | Worker's own OTLP telemetry endpoint |
-| `OTLP_BASIC_AUTH` | No | — | Base64-encoded Basic auth for the worker's own OTLP telemetry |
+| `OTLP_ENDPOINT` | Yes | — | Worker's own OTLP telemetry endpoint |
 
 ### Platform Services
 

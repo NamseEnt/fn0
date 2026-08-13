@@ -9,7 +9,6 @@ use opentelemetry_sdk::metrics::{
     Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream,
 };
 use opentelemetry_sdk::trace::SdkTracerProvider;
-use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Handle;
 use tracing::info;
@@ -47,11 +46,7 @@ impl HttpClient for TokioHttpClient {
     }
 }
 
-pub fn setup(
-    endpoint: &str,
-    basic_auth: Option<&str>,
-) -> color_eyre::eyre::Result<TelemetryProviders> {
-    let headers = build_headers(basic_auth);
+pub fn setup(endpoint: &str) -> color_eyre::eyre::Result<TelemetryProviders> {
     let traces_endpoint = format!("{}/v1/traces", endpoint.trim_end_matches('/'));
     let metrics_endpoint = format!("{}/v1/metrics", endpoint.trim_end_matches('/'));
     let logs_endpoint = format!("{}/v1/logs", endpoint.trim_end_matches('/'));
@@ -66,7 +61,6 @@ pub fn setup(
         .with_http_client(http_client.clone())
         .with_endpoint(&traces_endpoint)
         .with_protocol(Protocol::HttpBinary)
-        .with_headers(headers.clone())
         .build()?;
 
     let tracer_provider = SdkTracerProvider::builder()
@@ -81,7 +75,6 @@ pub fn setup(
         .with_http_client(http_client.clone())
         .with_endpoint(&logs_endpoint)
         .with_protocol(Protocol::HttpBinary)
-        .with_headers(headers.clone())
         .build()?;
 
     let logger_provider = SdkLoggerProvider::builder()
@@ -107,7 +100,6 @@ pub fn setup(
         .with_http_client(http_client)
         .with_endpoint(&metrics_endpoint)
         .with_protocol(Protocol::HttpBinary)
-        .with_headers(headers)
         .build()?;
 
     let reader = PeriodicReader::builder(metric_exporter)
@@ -148,12 +140,4 @@ pub fn shutdown(
     meter_provider.shutdown()?;
     logger_provider.shutdown()?;
     Ok(())
-}
-
-fn build_headers(basic_auth: Option<&str>) -> HashMap<String, String> {
-    let mut headers = HashMap::new();
-    if let Some(auth) = basic_auth {
-        headers.insert("authorization".to_string(), format!("Basic {auth}"));
-    }
-    headers
 }

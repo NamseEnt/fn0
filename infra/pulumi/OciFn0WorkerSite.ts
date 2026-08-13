@@ -32,7 +32,6 @@ export interface WorkerArgs {
   crossProjectEnqueueAllowedCallerProjectId: pulumi.Input<string>;
   crossProjectInvokeAllowedCallerProjectId: pulumi.Input<string>;
   vault: WorkerVaultArgs;
-  otlp: WorkerOtlpArgs;
   hostObservability: WorkerHostObservabilityArgs;
   bundleStorage: WorkerBundleStorageArgs;
   controlProjectId: pulumi.Input<string>;
@@ -50,11 +49,6 @@ export interface WorkerBundleStorageArgs {
   region: pulumi.Input<string>;
   accessKeyId: pulumi.Input<string>;
   secretAccessKey: pulumi.Input<string>;
-}
-
-export interface WorkerOtlpArgs {
-  endpoint: pulumi.Input<string>;
-  basicAuth: pulumi.Input<string>;
 }
 
 export interface WorkerHostObservabilityArgs {
@@ -1165,6 +1159,12 @@ function buildWorkerEnv(
     bearer: pulumi.Input<string>;
   },
 ): pulumi.Output<{ [k: string]: string }> {
+  // The worker's own telemetry and the guest-app OTLP hijack both export to
+  // the Alloy sidecar that listens on this same host; its receiver takes no
+  // auth, so no credentials are attached here.
+  const LOCAL_ALLOY_OTLP_HOST = "127.0.0.1:4318";
+  const LOCAL_ALLOY_OTLP_SCHEME = "http";
+
   const vaultCredsEnv = pulumi
     .output(worker.vault.workerCredentials)
     .apply((c): { [k: string]: string } => ({
@@ -1225,10 +1225,9 @@ function buildWorkerEnv(
     FN0_VAULT_REGION: worker.vault.region,
     FN0_VAULT_ALLOWED_SUBDOMAIN: worker.vault.allowedSubdomain,
 
-    OTLP_ENDPOINT: "http://127.0.0.1:4318",
-    OTLP_BASIC_AUTH: worker.otlp.basicAuth,
-    FN0_OTLP_TARGET_HOST: "127.0.0.1:4318",
-    FN0_OTLP_TARGET_SCHEME: "http",
+    OTLP_ENDPOINT: `${LOCAL_ALLOY_OTLP_SCHEME}://${LOCAL_ALLOY_OTLP_HOST}`,
+    FN0_OTLP_TARGET_HOST: LOCAL_ALLOY_OTLP_HOST,
+    FN0_OTLP_TARGET_SCHEME: LOCAL_ALLOY_OTLP_SCHEME,
     FN0_OTLP_TARGET_PATH_PREFIX: "",
     FN0_OTLP_AUTH: "",
 

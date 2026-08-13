@@ -179,11 +179,10 @@ fn main() -> Result<()> {
     color_eyre::install()?;
 
     let otlp_endpoint = std::env::var("OTLP_ENDPOINT").expect("OTLP_ENDPOINT must be set");
-    let otlp_basic_auth = std::env::var("OTLP_BASIC_AUTH").expect("OTLP_BASIC_AUTH must be set");
 
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
-    let telemetry_providers = telemetry::setup(&otlp_endpoint, Some(&otlp_basic_auth))?;
+    let telemetry_providers = telemetry::setup(&otlp_endpoint)?;
     install_panic_hook();
 
     let result = rt.block_on(run());

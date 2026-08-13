@@ -498,16 +498,13 @@ const grafanaStack = grafana.cloud.getStackOutput({
 const grafanaCloudAccessPolicyToken = new pulumi.Config(
   "grafana",
 ).requireSecret("cloudAccessPolicyToken");
-const workerOtlpEndpoint = grafanaStack.otlpUrl.apply((url) => `${url}/otlp`);
-const workerOtlpBasicAuth = pulumi
-  .all([grafanaStack.id, grafanaCloudAccessPolicyToken])
-  .apply(([id, pw]) => Buffer.from(`${id}:${pw}`).toString("base64"));
+const grafanaOtlpEndpoint = grafanaStack.otlpUrl.apply((url) => `${url}/otlp`);
 const workerHostObservability = {
   prometheusUrl: grafanaStack.prometheusRemoteWriteEndpoint,
   prometheusUserId: grafanaStack.prometheusUserId.apply((id) => id.toString()),
   lokiUrl: grafanaStack.logsUrl,
   lokiUserId: grafanaStack.logsUserId.apply((id) => id.toString()),
-  otlpUrl: workerOtlpEndpoint,
+  otlpUrl: grafanaOtlpEndpoint,
   otlpUserId: grafanaStack.id.apply((id) => id.toString()),
   basicAuthPassword: grafanaCloudAccessPolicyToken,
 };
@@ -541,10 +538,6 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       region: ociGlobalVault.region,
       allowedSubdomain: ociGlobalVault.allowedSubdomain,
       workerCredentials: ociGlobalVault.workerCredentials,
-    },
-    otlp: {
-      endpoint: workerOtlpEndpoint,
-      basicAuth: workerOtlpBasicAuth,
     },
     hostObservability: workerHostObservability,
     bundleStorage: {
