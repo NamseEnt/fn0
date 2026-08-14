@@ -61,9 +61,9 @@ that is not yet implemented; see
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.6.4 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0` | 0.6.5 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
 | `fn0-cli` | 0.1.18 | Local development CLI |
-| `fn0-worker` | 0.4.7 | Worker binary (distributed execution node) |
+| `fn0-worker` | 0.4.9 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.6 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.0 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
 | `fn0-deploy` | 0.3.1 | fn0 Cloud deployment client |
