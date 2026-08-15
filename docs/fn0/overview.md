@@ -182,6 +182,7 @@ The first byte on `HTTP_PORT`: `0x16` (TLS ClientHello) routes to user traffic; 
 | `FN0_OBJECT_STORAGE_PLACEHOLDER_HOST` | No | `fn0-object-storage.fn0.dev` | Placeholder hostname for private object storage requests |
 | `FN0_PUBLIC_STORAGE_PLACEHOLDER_HOST` | No | `fn0-public-storage.fn0.dev` | Placeholder hostname for public object storage requests |
 | `FN0_STATIC_PAGE_CACHE_PLACEHOLDER_HOST` | No | `fn0-static-page-cache.fn0.dev` | Placeholder hostname for static page cache purge requests |
+| `FN0_WEBSOCKET_PLACEHOLDER_HOST` | No | `fn0-websocket.fn0.dev` | Placeholder hostname intercepted for WebSocket `send`, `disconnect`, and outbound `connect` requests |
 
 ### OCI Vault
 

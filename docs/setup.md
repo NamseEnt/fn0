@@ -55,21 +55,20 @@ The `doc-db` crate connects to Turso/libSQL.
 
 **Forte projects:** `forte dev` downloads and starts sqld automatically — no manual setup needed. The database file is stored in `.forte/data/` inside your project directory. `TURSO_URL` and `TURSO_AUTH_TOKEN` are injected automatically and do not need to be set for local development.
 
-**Running `doc-db` tests directly** (outside of `forte dev`) requires a separately running libSQL server:
+**Running `doc-db` tests directly** (outside of `forte dev`) requires the `libsql-test` service from `docker-compose.yml`, which listens on port 18123:
 
 ```sh
-docker compose up -d   # starts libsql on port 8080
+docker compose up -d libsql-test
 cargo test -p doc-db
 ```
 
-Environment variables for direct `doc-db` usage:
+The integration tests connect to `DOC_DB_TEST_URL` (default: `http://127.0.0.1:18123`). Override it to point at a different server:
 
 | Variable | Default | Description |
 |---|---|---|
-| `TURSO_URL` | `http://127.0.0.1:8080` | Database URL |
-| `TURSO_AUTH_TOKEN` | *(empty)* | Auth token (empty for local) |
+| `DOC_DB_TEST_URL` | `http://127.0.0.1:18123` | libSQL URL used by the integration test suite |
 
-For production, set these to your Turso cloud credentials.
+For production, `doc_db::turso()` reads `TURSO_URL` and `TURSO_AUTH_TOKEN` from the environment. Set these to your Turso cloud credentials.
 
 ## Environment Variables
 

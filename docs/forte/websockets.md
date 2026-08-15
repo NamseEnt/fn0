@@ -82,6 +82,45 @@ headers, or `ConnectDecision::Reject` with any non-101 status and response heade
 The selected protocol must be one the client requested. Forte controls the WebSocket handshake,
 transport, and every `x-fn0-*` header, so those response headers cannot be overridden.
 
+## Disconnect causes
+
+`DisconnectEvent` includes a `cause: DisconnectCause` field that explains why fn0 closed the
+connection:
+
+| Variant | Meaning |
+| --- | --- |
+| `Peer` | The client closed the connection |
+| `Application` | Your code called `forte_sdk::websocket::disconnect` |
+| `Deployment` | A deploy closed the connection (clients receive close code `1012`) |
+| `HeartbeatTimeout` | No ping/pong exchange within the keepalive window |
+| `ProtocolError` | A WebSocket protocol violation |
+| `TransportError` | A network-level error |
+| `InternalError` | An fn0-internal error |
+
+```rust
+use forte_sdk::websocket::{DisconnectCause, DisconnectEvent};
+
+pub async fn on_disconnect(event: DisconnectEvent) -> anyhow::Result<()> {
+    match event.cause {
+        DisconnectCause::Deployment => {
+            // client will reconnect automatically (1012)
+        }
+        DisconnectCause::Peer | DisconnectCause::Application => {
+            // intentional close — clean up session state
+        }
+        _ => {
+            tracing::warn!(
+                connection_id = %event.connection_id,
+                cause = ?event.cause,
+                close_code = ?event.close_code,
+                "unexpected disconnect"
+            );
+        }
+    }
+    Ok(())
+}
+```
+
 ## Sending
 
 `WebSocketMessage::Text(Body)` and `Binary(Body)` accept buffered or streaming HTTP bodies. A
