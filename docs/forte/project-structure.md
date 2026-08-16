@@ -85,6 +85,7 @@ pub mod admin;        // present only when src/admin/ has handlers
 pub mod queue_task;   // present only when src/queue_task/ has handlers
 mod route_generated;
 pub use route_generated::enqueue; // present only when queue tasks exist
+pub use route_generated::ws_out;  // present only when src/ws_out/ has routes
 // === FORTE-MANAGED END ===
 ```
 

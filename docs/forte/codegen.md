@@ -36,6 +36,8 @@ Cargo reruns the build script when any of these directories change:
 - `src/actions`
 - `src/queue_task`
 - `src/admin`
+- `src/ws_in`
+- `src/ws_out`
 - `public`
 - `Cargo.lock` (ensures the build script re-runs after dependency version changes, since declaring any `rerun-if-changed` disables Cargo's default file-based detection)
 
@@ -51,6 +53,8 @@ Each handler type is discovered by statically parsing the Rust source:
 | `src/actions/` | `.rs` file OR `<name>/mod.rs` directory module; both must have `struct Input`, `Output`, and `pub async fn handler` | Top-level only |
 | `src/queue_task/` | File has `struct Input` or `type Input = ()` and `pub async fn handle` | Top-level only (`.rs` files) |
 | `src/admin/` | Same as queue tasks | Top-level only (`.rs` files) |
+| `src/ws_in/` | File defines `pub async fn on_connect` and `pub async fn on_message`; `on_disconnect` optional | Recursive |
+| `src/ws_out/` | File defines `pub async fn on_message` (`on_connect` must be absent); `on_disconnect` optional; no dynamic path segments | Recursive |
 | `public/` | Every file (recursively); served verbatim at the file's relative path | Recursive (all files) |
 
 **Important:** `src/actions/` supports two layouts: flat `.rs` files (`user_login.rs`) or directory modules (`user_login/mod.rs`). Only the top level of `src/actions/` is scanned; nested paths like `user/login.rs` are not discovered. All other handler directories (`hooks/`, `queue_task/`, `admin/`) support only flat `.rs` files.
@@ -183,8 +187,13 @@ Struct variant fields are spread flat alongside `t` — there is no `v` wrapper.
 ```rust
 // === FORTE-MANAGED START ===
 // Auto-managed by `forte build`. Do not edit between the START/END markers.
+pub mod actions;      // present only when src/actions/ has handlers
+pub mod admin;        // present only when src/admin/ has handlers
+pub mod queue_task;   // present only when src/queue_task/ has handlers
 mod route_generated;
+pub use route_generated::enqueue; // present only when queue tasks exist
+pub use route_generated::ws_out;  // present only when src/ws_out/ has routes
 // === FORTE-MANAGED END ===
 ```
 
-`forte-codegen` replaces the content between the markers with the appropriate module declarations. If the markers are missing, the build panics with instructions to add them.
+`forte-codegen` replaces the content between the markers with the appropriate subset of declarations — only the lines for features actually present in the project are emitted. If the markers are missing, the build panics with instructions to add them.

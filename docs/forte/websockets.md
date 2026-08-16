@@ -54,7 +54,8 @@ API routes.
 
 Outbound routes do not accept inbound client connections. They define `on_message` and may define
 `on_disconnect`; `on_connect` is not allowed. Forte generates a route-bound `connect` function for
-each outbound route.
+each outbound route. Dynamic path segments (`[param]`) are not allowed in outbound route modules —
+the build panics if any are present.
 
 | Module | Generated path |
 | --- | --- |
