@@ -39,6 +39,18 @@ pub async fn on_disconnect(_event: DisconnectEvent) -> Result<()> {
 returned by `on_message` or `on_disconnect` is logged and metered but does not disconnect the
 client. Use `forte_sdk::websocket::disconnect` for an application-requested graceful close.
 
+`DisconnectEvent` carries `connection_id`, `close_code: Option<u16>`, `reason: Option<String>`, and `cause: DisconnectCause`:
+
+| Cause | Meaning |
+| --- | --- |
+| `Peer` | The client closed the connection |
+| `Application` | `websocket::disconnect` was called |
+| `Deployment` | The deploy replaced the running instance |
+| `HeartbeatTimeout` | The connection missed a heartbeat |
+| `ProtocolError` | WebSocket protocol violation |
+| `TransportError` | Network-level transport failure |
+| `InternalError` | Internal fn0 error |
+
 ## Mapping
 
 | Module | URL |

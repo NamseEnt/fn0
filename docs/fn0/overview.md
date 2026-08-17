@@ -89,6 +89,7 @@ The fn0 CLI (`fn0/cli`) provides tooling for projects deployed directly to fn0 w
 | `fn0 env list` | List env entries with their kind (plain / secret) |
 | `fn0 env unset <key>` | Remove an env entry |
 | `fn0 purge <key>...` | Invalidate the CDN edge copy of one or more public objects (needed after presigned PUT uploads; `public::put` already purges automatically) |
+| `fn0 purge-page <path>...` | Invalidate the CDN edge copy of one or more `cache_static` pages (use when runtime data changes; see [pages.md](../forte/pages.md#invalidating-a-page-without-deploying)) |
 
 > **Note:** Most Forte developers use `forte` CLI instead of `fn0` CLI. `fn0` CLI is for projects that use fn0 as a raw FaaS platform (e.g., Hono-based TypeScript apps).
 

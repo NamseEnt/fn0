@@ -92,11 +92,24 @@ pub async fn disconnect(
 ```
 
 `WebSocketMessage` is `Text(Body)` or `Binary(Body)`, so both buffered and streaming bodies are
-accepted. `IncomingMessage` is `Text(String)` or `Binary(Vec<u8>)`. Send errors expose a
-`WebSocketDeliveryState` of `NotSent` or `Unknown`; Forte does not retry automatically.
+accepted. `IncomingMessage` is `Text(String)` or `Binary(Vec<u8>)`.
 
-See [WebSockets](websockets.md) for route callbacks, acceptance headers, limits, and reconnect
-recovery.
+`WebSocketSendError` variants:
+
+| Variant | `delivery_state()` | Meaning |
+| --- | --- | --- |
+| `ConnectionNotFound` | `NotSent` | Connection ID does not exist or already closed |
+| `Backpressure` | `NotSent` | Per-connection send queue is full |
+| `DeadlineExceeded { delivery }` | inherited | Timeout before flush completed |
+| `Transport { delivery }` | inherited | Network failure during send |
+| `InvalidText { delivery }` | inherited | UTF-8 violation in a `Text` message |
+| `Internal { delivery }` | inherited | Internal fn0 error |
+
+`delivery_state()` returns `NotSent` when the message was definitely not delivered, `Unknown` when
+delivery is uncertain. Forte does not retry automatically.
+
+See [WebSockets](websockets.md) for route callbacks, acceptance headers, limits, reconnect
+recovery, and `DisconnectCause` variants.
 
 ## Cookie Signing
 
