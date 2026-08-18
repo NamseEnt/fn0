@@ -19,6 +19,7 @@ r2_list_objects() {
       out="$(AWS_ACCESS_KEY_ID="$r2_ak" \
              AWS_SECRET_ACCESS_KEY="$r2_sk" \
              AWS_DEFAULT_REGION=auto \
+             AWS_SESSION_TOKEN= \
              aws s3api list-objects-v2 \
                --endpoint-url "$r2_endpoint" \
                --bucket "$r2_bucket" \
@@ -29,6 +30,7 @@ r2_list_objects() {
       out="$(AWS_ACCESS_KEY_ID="$r2_ak" \
              AWS_SECRET_ACCESS_KEY="$r2_sk" \
              AWS_DEFAULT_REGION=auto \
+             AWS_SESSION_TOKEN= \
              aws s3api list-objects-v2 \
                --endpoint-url "$r2_endpoint" \
                --bucket "$r2_bucket" \
@@ -46,6 +48,7 @@ r2_get_object() {
   AWS_ACCESS_KEY_ID="$r2_ak" \
   AWS_SECRET_ACCESS_KEY="$r2_sk" \
   AWS_DEFAULT_REGION=auto \
+  AWS_SESSION_TOKEN= \
   aws s3api get-object \
     --endpoint-url "$r2_endpoint" \
     --bucket "$r2_bucket" \

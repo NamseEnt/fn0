@@ -29,6 +29,7 @@ upload_fe_dist() {
   AWS_ACCESS_KEY_ID="$access_key" \
   AWS_SECRET_ACCESS_KEY="$secret_key" \
   AWS_DEFAULT_REGION="auto" \
+  AWS_SESSION_TOKEN= \
     aws s3 cp --recursive --endpoint-url "$endpoint" \
       --cache-control "$STATIC_ASSET_CACHE_CONTROL" \
       "$fe_dist_dir" "s3://${bucket}/${build_id}/" \

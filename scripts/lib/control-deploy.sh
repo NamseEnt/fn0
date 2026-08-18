@@ -34,6 +34,7 @@ upload_r2_original() {
   AWS_ACCESS_KEY_ID="$r2_ak" \
   AWS_SECRET_ACCESS_KEY="$r2_sk" \
   AWS_DEFAULT_REGION=auto \
+  AWS_SESSION_TOKEN= \
   aws s3api put-object \
     --endpoint-url "$r2_endpoint" \
     --bucket "$r2_bucket" \

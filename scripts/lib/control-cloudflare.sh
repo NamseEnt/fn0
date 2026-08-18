@@ -327,6 +327,7 @@ r2_credential_usable() {
     if ! AWS_ACCESS_KEY_ID="$access_key_id" \
          AWS_SECRET_ACCESS_KEY="$secret_access_key" \
          AWS_DEFAULT_REGION=auto \
+         AWS_SESSION_TOKEN= \
          aws s3api head-bucket --endpoint-url "$endpoint" --bucket "$bucket" \
          >/dev/null 2>&1; then
       return 1
