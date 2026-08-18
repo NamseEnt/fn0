@@ -3,6 +3,7 @@ pub mod admin;
 pub mod build;
 pub mod cloud;
 pub mod cron;
+pub mod db;
 pub mod deploy;
 pub mod destroy;
 pub mod dev;
@@ -93,6 +94,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: AdminCommands,
     },
+    /// Run SQL against the project's cloud doc-db through control
+    Db {
+        #[command(subcommand)]
+        command: DbCommands,
+    },
     /// Set this project up on your own Cloudflare account
     Cloud {
         #[command(subcommand)]
@@ -138,6 +144,33 @@ pub enum CloudCommands {
             help = "Cloudflare zone name, not a zone ID; required for a new project"
         )]
         zone: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DbCommands {
+    /// Run one SQL statement and print its rows and row read/write counts
+    Query {
+        sql: String,
+        /// Bind a `?` placeholder; parsed as JSON, or taken as a plain string
+        #[arg(long = "arg")]
+        args: Vec<String>,
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long, default_value_t = 300)]
+        timeout_seconds: u64,
+    },
+    /// Run every statement of a SQL file as one transaction
+    Exec {
+        file: PathBuf,
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long, default_value_t = 300)]
+        timeout_seconds: u64,
     },
 }
 

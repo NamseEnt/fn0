@@ -11,6 +11,7 @@ pub mod cron_on_tick;
 pub mod delete_project;
 pub mod deploy;
 pub mod deploy_status;
+pub mod doc_query;
 pub mod domain_set;
 pub mod domain_status;
 pub mod issue_token;

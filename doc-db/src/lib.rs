@@ -62,6 +62,30 @@ pub struct CommitOutcome {
     pub conflict: Option<ConflictInfo>,
 }
 
+pub struct RawStatement {
+    pub sql: String,
+    pub args: Vec<Value>,
+}
+
+pub struct RawStatementResult {
+    pub column_names: Vec<String>,
+    pub rows: Vec<Vec<Value>>,
+    pub affected_row_count: u64,
+    pub rows_read: u64,
+    pub rows_written: u64,
+    pub query_duration_ms: f64,
+}
+
+pub enum RawTransactionOutcome {
+    Committed {
+        statement_results: Vec<RawStatementResult>,
+    },
+    RolledBack {
+        failed_statement_index: usize,
+        error_message: String,
+    },
+}
+
 pub struct ConflictInfo {
     pub step_index: usize,
     pub message: String,
@@ -223,6 +247,26 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_raw(sql, args, want_rows).await,
             DatabaseInner::Memory(db) => db.execute_raw(sql, args, want_rows).await,
+        }
+    }
+
+    /// Runs the statements as a single transaction (all-or-nothing) and
+    /// returns, per statement, the result rows together with the engine's own
+    /// `rows_read` / `rows_written` counters — the numbers Turso bills by.
+    /// A statement failure rolls the whole transaction back and is reported as
+    /// [`RawTransactionOutcome::RolledBack`], not as `Err`.
+    ///
+    /// Turso backend only; the in-memory test backend rejects it.
+    #[tracing::instrument(skip_all, fields(statements = statements.len()))]
+    pub async fn execute_raw_transactional(
+        &self,
+        statements: &[RawStatement],
+    ) -> Result<RawTransactionOutcome> {
+        match &self.inner {
+            DatabaseInner::Turso(db) => db.execute_raw_transactional(statements).await,
+            DatabaseInner::Memory(_) => {
+                anyhow::bail!("execute_raw_transactional is only supported on the Turso backend")
+            }
         }
     }
 

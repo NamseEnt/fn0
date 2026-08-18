@@ -860,6 +860,129 @@ impl TursoDatabase {
         Ok(vec![])
     }
 
+    pub(crate) async fn execute_raw_transactional(
+        &self,
+        statements: &[crate::RawStatement],
+    ) -> Result<crate::RawTransactionOutcome> {
+        use crate::{RawStatementResult, RawTransactionOutcome};
+
+        if statements.is_empty() {
+            return Ok(RawTransactionOutcome::Committed {
+                statement_results: vec![],
+            });
+        }
+
+        let stmts: Vec<Stmt> = statements
+            .iter()
+            .map(|statement| Stmt {
+                sql: Some(statement.sql.clone()),
+                sql_id: None,
+                args: statement.args.clone(),
+                named_args: vec![],
+                want_rows: Some(true),
+                replication_index: None,
+            })
+            .collect();
+
+        'attempts: for retry in 0..2 {
+            let batch = Batch::transactional(stmts.clone());
+            let response = self
+                .execute_pipeline(vec![
+                    StreamRequest::Batch(BatchStreamReq { batch }),
+                    StreamRequest::Close(CloseStreamReq {}),
+                ])
+                .await?;
+
+            let mut batch_result: Option<BatchResult> = None;
+            for result in response.results {
+                match result {
+                    StreamResult::Ok { response } => match response {
+                        StreamResponse::Batch(batch_resp) => {
+                            batch_result = Some(batch_resp.result);
+                        }
+                        StreamResponse::Close(_) => continue,
+                        _ => {}
+                    },
+                    StreamResult::Error { error } => {
+                        if retry == 0 && Self::is_schema_error(&error.message) {
+                            self.create_table().await?;
+                            continue 'attempts;
+                        }
+                        bail!("execute_raw_transactional error: {}", error.message);
+                    }
+                    StreamResult::None => {}
+                }
+            }
+
+            let Some(batch_result) = batch_result else {
+                bail!("execute_raw_transactional: no batch result in response");
+            };
+            let BatchResult {
+                step_results,
+                step_errors,
+                ..
+            } = batch_result;
+
+            // Batch::transactional step layout: 0 = BEGIN, 1..=N = the
+            // statements, N+1 = COMMIT, N+2 = ROLLBACK.
+            if let Some(error) = step_errors.first().and_then(|e| e.as_ref()) {
+                bail!("execute_raw_transactional BEGIN error: {}", error.message);
+            }
+
+            for statement_index in 0..statements.len() {
+                if let Some(error) = step_errors
+                    .get(statement_index + 1)
+                    .and_then(|e| e.as_ref())
+                {
+                    if retry == 0 && Self::is_schema_error(&error.message) {
+                        self.create_table().await?;
+                        continue 'attempts;
+                    }
+                    return Ok(RawTransactionOutcome::RolledBack {
+                        failed_statement_index: statement_index,
+                        error_message: error.message.clone(),
+                    });
+                }
+            }
+
+            if let Some(error) = step_errors
+                .get(statements.len() + 1)
+                .and_then(|e| e.as_ref())
+            {
+                bail!("execute_raw_transactional COMMIT error: {}", error.message);
+            }
+
+            let mut statement_results = Vec::with_capacity(statements.len());
+            for (statement_index, step_result) in step_results
+                .into_iter()
+                .skip(1)
+                .take(statements.len())
+                .enumerate()
+            {
+                let Some(stmt_result) = step_result else {
+                    bail!(
+                        "execute_raw_transactional: missing result for statement {statement_index}"
+                    );
+                };
+                statement_results.push(RawStatementResult {
+                    column_names: stmt_result
+                        .cols
+                        .into_iter()
+                        .map(|col| col.name.unwrap_or_default())
+                        .collect(),
+                    rows: stmt_result.rows.into_iter().map(|row| row.values).collect(),
+                    affected_row_count: stmt_result.affected_row_count,
+                    rows_read: stmt_result.rows_read,
+                    rows_written: stmt_result.rows_written,
+                    query_duration_ms: stmt_result.query_duration_ms,
+                });
+            }
+            return Ok(RawTransactionOutcome::Committed { statement_results });
+        }
+
+        bail!("execute_raw_transactional: retries exhausted")
+    }
+
     pub(crate) async fn transaction(&self) -> Result<TursoTransaction> {
         // Ensure table exists before starting transaction
         self.ensure_table().await?;

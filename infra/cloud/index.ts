@@ -419,6 +419,12 @@ const controlTursoApiTokenCt = pulumi
   .all([controlDek.plaintext, tursoApiToken])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
+// The doc_query action speaks hrana to any project's database on the owner's
+// behalf, so control needs the same group token workers hold.
+const controlForteDbGroupTokenCt = pulumi
+  .all([controlDek.plaintext, forteDb.groupToken])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const controlEnvYamlBootstrap = pulumi
   .all([
     controlDek.ciphertext,
@@ -438,6 +444,8 @@ const controlEnvYamlBootstrap = pulumi
     controlTursoApiTokenCt,
     pulumi.output(config.require("tursoOrganizationSlug")),
     forteDb.groupName,
+    controlForteDbGroupTokenCt,
+    forteDb.hostSuffix,
   ])
   .apply(
     ([
@@ -458,6 +466,8 @@ const controlEnvYamlBootstrap = pulumi
       tursoApiTokenCt,
       tursoOrgSlug,
       tursoGroupName,
+      forteDbGroupTokenCt,
+      forteDbHostSuffix,
     ]) =>
       [
         "__dek:",
@@ -488,6 +498,9 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${tursoApiTokenCt}`,
         `FN0_TURSO_ORG_SLUG: ${tursoOrgSlug}`,
         `FN0_TURSO_GROUP_NAME: ${tursoGroupName}`,
+        "FN0_TURSO_GROUP_TOKEN:",
+        `  secret: ${forteDbGroupTokenCt}`,
+        `FN0_TURSO_DB_HOST_SUFFIX: ${forteDbHostSuffix}`,
         "",
       ].join("\n"),
   );

@@ -368,6 +368,52 @@ Same as `run` but targets a locally-running `forte dev` server.
 | `--input <json>` | — | Input JSON as string |
 | `--timeout-seconds <n>` | 300 | Timeout |
 
+### `forte db query <sql> [options]`
+
+Run one SQL statement against the deployed project's document database, for
+one-off inspection or fixes. The query runs through the fn0 control plane —
+you never hold database credentials — and the output ends with the engine's
+row read/write counts for the statement.
+
+| Flag | Default | Description |
+|---|---|---|
+| `sql` | — | The SQL statement; use `?` placeholders for arguments |
+| `--arg <value>` | — | Bind one `?` placeholder (repeatable). Parsed as JSON (`42`, `1.5`, `null`, `"text"`); anything that is not valid JSON is bound as a plain string |
+| `-p, --project <dir>` | `.` | Project directory |
+| `--json` | off | Print results as JSON instead of a table |
+| `--timeout-seconds <n>` | 300 | Timeout |
+
+```sh
+forte db query 'SELECT pk, sk FROM docs LIMIT 10'
+forte db query 'SELECT data FROM docs WHERE pk = ?' --arg 'UserDoc/github_id=09223372036858010238'
+```
+
+### `forte db exec <file> [options]`
+
+Run every statement of a SQL file — a migration — as **one transaction**:
+either every statement commits or none does. A failing statement rolls the
+whole file back and reports which statement failed.
+
+| Flag | Default | Description |
+|---|---|---|
+| `file` | — | SQL file; statements separated by `;` |
+| `-p, --project <dir>` | `.` | Project directory |
+| `--json` | off | Print results as JSON instead of a table |
+| `--timeout-seconds <n>` | 300 | Timeout |
+
+```sh
+forte db exec migrations/2026-08-18-backfill.sql
+```
+
+Rules for writing directly to `docs`:
+
+- **Bump `version` on every `UPDATE` of `data`** — `SET data = ..., version =
+  version + 1`. The transaction layer uses `version` for conflict detection;
+  an update that leaves it unchanged can be silently overwritten by a
+  concurrently running app transaction.
+- A `SELECT` without `LIMIT` can read every row of a partition; the row read
+  count you see in the output is what a quota would charge for.
+
 ---
 
 ## Secrets

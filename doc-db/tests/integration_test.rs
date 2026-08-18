@@ -624,3 +624,104 @@ async fn test_execute_ops_mixed() {
     db.delete(pk, "sk_existing").await.expect("Cleanup failed");
     db.delete(pk, "sk_new").await.expect("Cleanup failed");
 }
+
+#[forte_sdk::test]
+async fn test_execute_raw_transactional_committed_with_row_counters() {
+    let db = create_test_db();
+    let pk = "raw_trx_pk";
+
+    db.put(pk, "sk_1", b"data_1").await.expect("Put failed");
+    db.put(pk, "sk_2", b"data_2").await.expect("Put failed");
+
+    let outcome = db
+        .execute_raw_transactional(&[
+            doc_db::RawStatement {
+                sql: "SELECT sk, data FROM docs WHERE pk = ? ORDER BY sk".to_string(),
+                args: vec![doc_db::text_value(pk)],
+            },
+            doc_db::RawStatement {
+                sql: "UPDATE docs SET data = ?, version = version + 1 WHERE pk = ? AND sk = ?"
+                    .to_string(),
+                args: vec![
+                    doc_db::Value::Blob {
+                        value: b"data_1_migrated".to_vec().into(),
+                    },
+                    doc_db::text_value(pk),
+                    doc_db::text_value("sk_1"),
+                ],
+            },
+        ])
+        .await
+        .expect("execute_raw_transactional failed");
+
+    let statement_results = match outcome {
+        doc_db::RawTransactionOutcome::Committed { statement_results } => statement_results,
+        doc_db::RawTransactionOutcome::RolledBack {
+            failed_statement_index,
+            error_message,
+        } => panic!("Unexpected rollback at {failed_statement_index}: {error_message}"),
+    };
+
+    assert_eq!(statement_results.len(), 2);
+
+    let select_result = &statement_results[0];
+    assert_eq!(select_result.column_names, vec!["sk", "data"]);
+    assert_eq!(select_result.rows.len(), 2);
+    assert!(select_result.rows_read >= 2);
+    assert_eq!(select_result.rows_written, 0);
+
+    let update_result = &statement_results[1];
+    assert_eq!(update_result.affected_row_count, 1);
+    assert!(update_result.rows_written >= 1);
+
+    let migrated = db.get(pk, "sk_1").await.expect("Get failed");
+    assert_eq!(migrated.unwrap().as_ref(), b"data_1_migrated");
+
+    db.delete(pk, "sk_1").await.expect("Cleanup failed");
+    db.delete(pk, "sk_2").await.expect("Cleanup failed");
+}
+
+#[forte_sdk::test]
+async fn test_execute_raw_transactional_rolls_back_on_statement_error() {
+    let db = create_test_db();
+    let pk = "raw_trx_rollback_pk";
+
+    db.put(pk, "sk_1", b"original").await.expect("Put failed");
+
+    let outcome = db
+        .execute_raw_transactional(&[
+            doc_db::RawStatement {
+                sql: "UPDATE docs SET data = ?, version = version + 1 WHERE pk = ? AND sk = ?"
+                    .to_string(),
+                args: vec![
+                    doc_db::Value::Blob {
+                        value: b"should_not_persist".to_vec().into(),
+                    },
+                    doc_db::text_value(pk),
+                    doc_db::text_value("sk_1"),
+                ],
+            },
+            doc_db::RawStatement {
+                sql: "SELECT broken_column FROM no_such_table_for_rollback".to_string(),
+                args: vec![],
+            },
+        ])
+        .await
+        .expect("execute_raw_transactional failed");
+
+    match outcome {
+        doc_db::RawTransactionOutcome::RolledBack {
+            failed_statement_index,
+            error_message,
+        } => {
+            assert_eq!(failed_statement_index, 1);
+            assert!(!error_message.is_empty());
+        }
+        doc_db::RawTransactionOutcome::Committed { .. } => panic!("Expected rollback"),
+    }
+
+    let unchanged = db.get(pk, "sk_1").await.expect("Get failed");
+    assert_eq!(unchanged.unwrap().as_ref(), b"original");
+
+    db.delete(pk, "sk_1").await.expect("Cleanup failed");
+}

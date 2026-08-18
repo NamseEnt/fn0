@@ -5,7 +5,7 @@ mod tools;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AddCommands, AdminCommands, Cli, CloudCommands, Commands, EnvCommands};
+use cli::{AddCommands, AdminCommands, Cli, CloudCommands, Commands, DbCommands, EnvCommands};
 
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -97,6 +97,28 @@ async fn async_main() -> Result<()> {
                 timeout_seconds,
             } => {
                 cli::admin::run_local(task, port, input_file, input, timeout_seconds).await?;
+            }
+        },
+
+        Commands::Db { command } => match command {
+            DbCommands::Query {
+                sql,
+                args,
+                project,
+                json,
+                timeout_seconds,
+            } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::db::query(sql, args, project_dir, json, timeout_seconds).await?;
+            }
+            DbCommands::Exec {
+                file,
+                project,
+                json,
+                timeout_seconds,
+            } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::db::exec(file, project_dir, json, timeout_seconds).await?;
             }
         },
 
