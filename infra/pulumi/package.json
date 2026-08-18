@@ -29,5 +29,8 @@
     "js-yaml": "^4.1.1",
     "oci-sdk": "^2.127.0",
     "ssh2": "^1.17.0"
+  },
+  "allowScripts": {
+    "file:sdks/b2": true
   }
 }
