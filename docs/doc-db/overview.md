@@ -294,3 +294,43 @@ db.clear_mocks();  // remove all remaining rules
 ```
 
 Builder types: `MockGetBuilder`, `MockPutBuilder`, `MockDeleteBuilder` (in `doc_db::mock`, used via the `Database` methods above).
+
+## CLI Access
+
+The `forte` CLI provides direct SQL access to the deployed project's database through the control plane, without needing database credentials.
+
+```sh
+# One-off query (table output)
+forte db query 'SELECT pk, sk FROM docs LIMIT 10'
+
+# Query with bind parameters
+forte db query 'SELECT data FROM docs WHERE pk = ?' \
+  --arg 'User/id=alice'
+
+# Run a SQL migration file as one atomic transaction
+forte db exec migrations/2026-08-18-backfill.sql
+```
+
+### `forte db query`
+
+Runs a single SQL statement and prints results as a table. Use `--json` for machine-readable output, `--arg` (repeatable) to bind `?` placeholders.
+
+**When writing directly to `docs` via raw SQL:**
+- Always increment `version` on every `UPDATE` of `data` — `SET data = ..., version = version + 1`. The optimistic-locking layer in `trx` uses `version` for conflict detection; an unchanged version can be silently overwritten.
+- A `SELECT` without `LIMIT` can scan every row; the row-read count in the output is what a quota would charge.
+
+### `forte db exec`
+
+Runs every statement in a `.sql` file as one transaction — all statements commit or none do. A failing statement rolls the whole file back and reports which statement failed. Use this for schema migrations.
+
+```sql
+-- migrations/2026-08-18-add-tags.sql
+INSERT INTO docs (pk, sk, data, version) VALUES ('Tag/id=foo', '', '{}', 1);
+INSERT INTO docs (pk, sk, data, version) VALUES ('Tag/id=bar', '', '{}', 1);
+```
+
+```sh
+forte db exec migrations/2026-08-18-add-tags.sql
+```
+
+See [`forte db` in the CLI reference](../forte/cli.md#forte-db-query-sql-options) for all flags.

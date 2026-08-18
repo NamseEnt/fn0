@@ -165,6 +165,24 @@ Scaling configuration: `scripts/scale-config.sh`
 
 Control reads its environment from `fn0/control/env.yaml`, which `forte deploy` ships. `infra/cloud/index.ts` builds the same set for the one-time bootstrap only, so a variable added there must be added to `env.yaml` as well or redeploys will not pick it up. Worker environment is written by cloud-init from `infra/pulumi/OciFn0WorkerSite.ts` and is only re-read when an instance is recreated — see the instance roll procedure before assuming a worker deploy applied it.
 
+## Database Migrations
+
+Run one-off SQL statements or migration files against the deployed database through the control plane — no credentials needed:
+
+```sh
+# Inspect data
+forte db query 'SELECT pk, sk FROM docs LIMIT 20'
+
+# Run a migration file as one atomic transaction
+forte db exec migrations/2026-08-18-backfill.sql
+```
+
+`forte db exec` wraps the whole file in one transaction: either every statement commits or none does. A failing statement rolls everything back and reports which statement failed.
+
+When writing raw SQL against `docs`, always increment `version` on every `UPDATE` of `data` (`SET data = ..., version = version + 1`); the `trx` optimistic-locking layer uses `version` for conflict detection.
+
+See [`forte db` in the CLI reference](forte/cli.md#forte-db-query-sql-options) for all flags and bind-parameter syntax.
+
 ## Local Database
 
 `forte dev` downloads and starts sqld automatically — no manual setup needed for Forte projects. For running `doc-db` tests directly, see [setup.md](setup.md#local-database-tursolibsql).
