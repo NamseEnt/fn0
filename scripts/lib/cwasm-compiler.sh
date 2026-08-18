@@ -69,22 +69,36 @@ ensure_cwasm_lambda() {
     export AWS_DEFAULT_REGION="$cwasm_region"
     unset AWS_SESSION_TOKEN AWS_PROFILE
 
-    local ecr_registry="${cwasm_ecr%%/*}"
-    aws ecr get-login-password --region "$cwasm_region" \
-      | container_runtime_registry_login "$ecr_registry" AWS
+    # The version tag is the artifact key: the same fn0-wasmtime version always
+    # means the same image, so an existing tag short-circuits build + push.
+    # This also dodges `container image push` hanging on macOS (observed
+    # 2026-08-19: 29 minutes at zero bytes; the apple/container push branch of
+    # the runtime abstraction is still unverified end-to-end).
+    local ecr_repository_name="${cwasm_ecr#*/}"
+    if aws ecr describe-images \
+      --region "$cwasm_region" \
+      --repository-name "$ecr_repository_name" \
+      --image-ids "imageTag=${new_fn0_wasmtime_version_dash}" \
+      >/dev/null 2>&1; then
+      echo ">> image ${image_uri} already in ECR; skipping build + push"
+    else
+      local ecr_registry="${cwasm_ecr%%/*}"
+      aws ecr get-login-password --region "$cwasm_region" \
+        | container_runtime_registry_login "$ecr_registry" AWS
 
-    "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$build_ctx"
-    cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$build_ctx/"
+      "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$build_ctx"
+      cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$build_ctx/"
 
-    # Lambda rejects multi-entry indexes and attestation manifests, so the
-    # image is built single-platform and pushed platform-filtered.
-    container_runtime_build_image \
-      "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
-      "$build_ctx" \
-      /dev/null \
-      --platform linux/arm64
-    container_runtime_tag "$CONTAINER_RUNTIME_BUILT_IMAGE" "$image_uri"
-    container_runtime_push "$image_uri" --platform linux/arm64
+      # Lambda rejects multi-entry indexes and attestation manifests, so the
+      # image is built single-platform and pushed platform-filtered.
+      container_runtime_build_image \
+        "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
+        "$build_ctx" \
+        /dev/null \
+        --platform linux/arm64
+      container_runtime_tag "$CONTAINER_RUNTIME_BUILT_IMAGE" "$image_uri"
+      container_runtime_push "$image_uri" --platform linux/arm64
+    fi
 
     local env_vars="Variables={BUCKET=${r2_bucket},XDG_CACHE_HOME=/tmp,HOME=/tmp,R2_ENDPOINT=${r2_endpoint},R2_ACCESS_KEY_ID=${r2_ak},R2_SECRET_ACCESS_KEY=${r2_sk}}"
 
