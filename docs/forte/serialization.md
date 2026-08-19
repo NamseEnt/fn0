@@ -103,6 +103,8 @@ Admin task output (printed to the terminal by the CLI) is also serialized with `
 | `Option<T>` | `T \| undefined` (optional in structs) |
 | `Vec<T>` | `T[]` |
 | `HashMap<String, V>` | `Record<string, V>` |
+| `chrono::DateTime<_>` | `Date` (Zod: `z.coerce.date()`) |
+| `serde_json::Value` | `unknown` (Zod: `z.json()`) |
 | unit enum variant | `{ t: "VariantName" }` |
 | tuple/newtype variant | `{ t: "VariantName"; v: T }` |
 | struct variant | `{ t: "VariantName"; fieldName: T; ... }` |

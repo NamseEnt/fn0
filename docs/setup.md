@@ -58,18 +58,17 @@ The `doc-db` crate connects to Turso/libSQL.
 **Running `doc-db` tests directly** (outside of `forte dev`) requires a separately running libSQL server:
 
 ```sh
-docker compose up -d   # starts libsql on port 8080
-cargo test -p doc-db
+docker compose up -d libsql-test   # starts libsql-test on port 18123
+cargo test -p fn0-doc-db
 ```
 
-Environment variables for direct `doc-db` usage:
+Environment variables for direct `doc-db` test usage:
 
 | Variable | Default | Description |
 |---|---|---|
-| `TURSO_URL` | `http://127.0.0.1:8080` | Database URL |
-| `TURSO_AUTH_TOKEN` | *(empty)* | Auth token (empty for local) |
+| `DOC_DB_TEST_URL` | `http://127.0.0.1:18123` | libSQL URL for tests (overrides default) |
 
-For production, set these to your Turso cloud credentials.
+For production, `TURSO_URL` and `TURSO_AUTH_TOKEN` are set by fn0 Cloud and injected into the WASM environment by the worker.
 
 ## Environment Variables
 
