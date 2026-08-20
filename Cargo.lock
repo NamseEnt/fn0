@@ -2052,7 +2052,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.6.5"
+version = "0.6.6"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2233,7 +2233,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-deploy"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2258,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-doc-db"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2274,7 +2274,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-object-storage"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "bytes",
  "forte-sdk",
@@ -2330,7 +2330,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2439,7 +2439,7 @@ dependencies = [
 
 [[package]]
 name = "forte-cli"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2477,7 +2477,7 @@ dependencies = [
 
 [[package]]
 name = "forte-codegen"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "forte-wit",
@@ -2513,7 +2513,7 @@ dependencies = [
 
 [[package]]
 name = "forte-sdk"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "bytes",
