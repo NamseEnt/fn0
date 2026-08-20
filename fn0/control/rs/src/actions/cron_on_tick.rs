@@ -138,6 +138,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         Err(err) => tracing::error!(?err, "websocket directory GC within cron_on_tick failed"),
     }
 
+    if let Err(err) = recover_expired_websocket_singletons().await {
+        tracing::error!(?err, "websocket singleton lease recovery failed");
+    }
+
     if epoch_minute % 60 == 0 {
         match bundle_gc::run_gc().await {
             Ok(stats) => tracing::info!(
@@ -155,6 +159,57 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         scanned_projects_count: scanned_projects,
         scanned_jobs_count: scanned_jobs,
     }
+}
+
+async fn recover_expired_websocket_singletons() -> anyhow::Result<()> {
+    let db = doc_db::turso();
+    let Some(manifest) = (WorkerManifestDocGet {}).send_with(&db).await? else {
+        return Ok(());
+    };
+    let current_time = now();
+    for (project_id, entry) in manifest.project_manifests {
+        let declarations = (WebSocketSingletonConfigDocGet {
+            project_id: project_id.as_str(),
+            code_version: entry.code_version,
+        })
+        .send_with(&db)
+        .await?
+        .map(|config| config.declarations)
+        .unwrap_or_default();
+        let mut reconnect = false;
+        for declaration in declarations {
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: project_id.as_str(),
+                singleton_id: declaration.singleton_id.as_str(),
+            })
+            .send_with(&db)
+            .await?;
+            if runtime_needs_reconnect(runtime.as_ref(), entry.code_version, current_time) {
+                reconnect = true;
+                break;
+            }
+        }
+        if reconnect {
+            crate::enqueue::deployment_activation(
+                crate::queue_task::deployment_activation::Input {
+                    project_id,
+                    code_version: entry.code_version,
+                },
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+fn runtime_needs_reconnect(
+    runtime: Option<&WebSocketSingletonRuntimeDoc>,
+    code_version: u64,
+    current_time: DateTime,
+) -> bool {
+    runtime.is_none_or(|runtime| {
+        runtime.code_version != code_version || runtime.lease_expires_at <= current_time
+    })
 }
 
 #[derive(Serialize)]
@@ -188,4 +243,40 @@ async fn enqueue_other_project_cron_task(
         anyhow::bail!("invoke queue status {}", resp.status());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod websocket_singleton_lease_tests {
+    use super::runtime_needs_reconnect;
+    use crate::docs::WebSocketSingletonRuntimeDoc;
+    use forte_sdk::{chrono, now};
+
+    #[test]
+    fn missing_expired_and_old_version_leases_reconnect() {
+        let current_time = now();
+        assert!(runtime_needs_reconnect(None, 42, current_time));
+        let expired = WebSocketSingletonRuntimeDoc {
+            project_id: "project".to_string(),
+            singleton_id: "feed".to_string(),
+            code_version: 42,
+            connection_id: "expired".to_string(),
+            lease_expires_at: current_time - chrono::Duration::seconds(1),
+        };
+        assert!(runtime_needs_reconnect(Some(&expired), 42, current_time));
+        let old_version = WebSocketSingletonRuntimeDoc {
+            lease_expires_at: current_time + chrono::Duration::seconds(60),
+            code_version: 41,
+            ..expired
+        };
+        assert!(runtime_needs_reconnect(
+            Some(&old_version),
+            42,
+            current_time
+        ));
+        let live = WebSocketSingletonRuntimeDoc {
+            code_version: 42,
+            ..old_version
+        };
+        assert!(!runtime_needs_reconnect(Some(&live), 42, current_time));
+    }
 }

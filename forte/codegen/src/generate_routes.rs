@@ -8,7 +8,7 @@ use codegen::{
 };
 use discover::{
     discover_actions, discover_admin_tasks, discover_apis, discover_hooks, discover_pages,
-    discover_public, discover_queue_tasks, discover_websockets,
+    discover_public, discover_queue_tasks, discover_websocket_singletons, discover_websockets,
 };
 use std::{env, fs, path::Path};
 
@@ -30,6 +30,7 @@ pub fn generate_routes() {
     let public_dir = Path::new(&manifest_dir).join("public");
     let ws_in_dir = Path::new(&manifest_dir).join("src/ws_in");
     let ws_out_dir = Path::new(&manifest_dir).join("src/ws_out");
+    let ws_singleton_dir = Path::new(&manifest_dir).join("src/ws_singleton");
     let output_path = Path::new(&manifest_dir).join("src/route_generated.rs");
     let fe_paths_output = Path::new(&manifest_dir).join("../fe/src/paths.generated.ts");
 
@@ -42,6 +43,7 @@ pub fn generate_routes() {
     println!("cargo:rerun-if-changed=public");
     println!("cargo:rerun-if-changed=src/ws_in");
     println!("cargo:rerun-if-changed=src/ws_out");
+    println!("cargo:rerun-if-changed=src/ws_singleton");
     // Also rerun when dependency versions change (e.g. forte-sdk bump),
     // because once any rerun-if-changed is declared Cargo stops doing
     // default change detection across the rest of the crate.
@@ -54,7 +56,9 @@ pub fn generate_routes() {
     let queue_tasks = discover_queue_tasks(&queue_task_dir);
     let admin_tasks = discover_admin_tasks(&admin_dir);
     let static_files = discover_public(&public_dir);
-    let websockets = discover_websockets(&ws_in_dir, &ws_out_dir);
+    let mut websockets = discover_websockets(&ws_in_dir, &ws_out_dir);
+    let singleton_routes = discover_websocket_singletons(&ws_singleton_dir);
+    websockets.extend(singleton_routes);
     let has_ws_out = websockets
         .iter()
         .any(|websocket| matches!(websocket.direction, model::WebSocketDirection::Outbound));
@@ -83,6 +87,8 @@ pub fn generate_routes() {
     if current_fe_paths != fe_paths_content {
         fs::write(&fe_paths_output, fe_paths_content).unwrap();
     }
+
+    write_singleton_manifest(Path::new(&manifest_dir), &websockets);
 
     if !queue_tasks.is_empty() {
         let queue_task_mod_path = Path::new(&manifest_dir).join("src/queue_task/mod.rs");
@@ -119,6 +125,30 @@ pub fn generate_routes() {
         !queue_tasks.is_empty(),
         has_ws_out,
     );
+}
+
+fn write_singleton_manifest(manifest_dir: &Path, websockets: &[model::WebSocketRouteInfo]) {
+    let declarations: Vec<serde_json::Value> = websockets
+        .iter()
+        .filter_map(|websocket| {
+            websocket.singleton_id.as_ref().map(|singleton_id| {
+                serde_json::json!({
+                    "singleton_id": singleton_id,
+                    "route_path": websocket.route_path,
+                })
+            })
+        })
+        .collect();
+    let forte_dir = manifest_dir
+        .parent()
+        .expect("Rust manifest directory has no project parent")
+        .join(".forte");
+    fs::create_dir_all(&forte_dir).unwrap();
+    let output_path = forte_dir.join("ws_singletons.json");
+    let content = serde_json::to_string_pretty(&declarations).unwrap() + "\n";
+    if fs::read_to_string(&output_path).unwrap_or_default() != content {
+        fs::write(output_path, content).unwrap();
+    }
 }
 
 const LIB_RS_MARKER_START: &str = "// === FORTE-MANAGED START ===";
@@ -205,5 +235,43 @@ fn run_rustfmt(input: &str) -> Option<String> {
         String::from_utf8(output.stdout).ok()
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod singleton_manifest_tests {
+    use super::*;
+
+    #[test]
+    fn writes_file_based_declarations_without_touching_forte_toml() {
+        let project = tempfile::tempdir().unwrap();
+        let rust_directory = project.path().join("rs");
+        let singleton_directory = rust_directory.join("src/ws_singleton");
+        fs::create_dir_all(&singleton_directory).unwrap();
+        fs::write(
+            singleton_directory.join("market_feed.rs"),
+            r#"
+pub async fn connect() -> Result<SingletonConnectionOptions> { todo!() }
+pub async fn on_message(event: MessageEvent) -> Result<()> { todo!() }
+"#,
+        )
+        .unwrap();
+        let forte_toml = project.path().join("Forte.toml");
+        fs::write(&forte_toml, "project_id = \"project\"\n").unwrap();
+        let routes = discover_websocket_singletons(&singleton_directory);
+        write_singleton_manifest(&rust_directory, &routes);
+        let manifest =
+            fs::read_to_string(project.path().join(".forte/ws_singletons.json")).unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&manifest).unwrap(),
+            serde_json::json!([{
+                "singleton_id": "market_feed",
+                "route_path": "/ws_singleton/market_feed"
+            }])
+        );
+        assert_eq!(
+            fs::read_to_string(forte_toml).unwrap(),
+            "project_id = \"project\"\n"
+        );
     }
 }

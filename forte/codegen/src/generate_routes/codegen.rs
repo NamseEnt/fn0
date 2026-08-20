@@ -447,6 +447,9 @@ fn generate_websocket_handler(websockets: &[WebSocketRouteInfo]) -> TokenStream 
 }
 
 fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream {
+    if websocket.direction == WebSocketDirection::Singleton {
+        return generate_websocket_singleton_route_match(websocket);
+    }
     let module_name = format_ident!("{}", websocket.module_name);
     let route_condition = if has_dynamic_segments(&websocket.route_segments) {
         generate_dynamic_route_condition(&websocket.route_segments)
@@ -468,6 +471,7 @@ fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream
                 "connect" => Ok(websocket_error_response(StatusCode::NOT_FOUND)),
             }
         }
+        WebSocketDirection::Singleton => unreachable!(),
     };
     let message_call =
         websocket_callback_call(&module_name, "on_message", websocket.path_params.is_some());
@@ -554,6 +558,146 @@ fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream
                         Ok(()) => Ok(websocket_error_response(StatusCode::NO_CONTENT)),
                         Err(error) => {
                             eprintln!("WebSocket on_disconnect error at {}: {:?}", path, error);
+                            Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                        }
+                    }
+                }
+                _ => Ok(websocket_error_response(StatusCode::BAD_REQUEST)),
+            }
+        }
+    }
+}
+
+fn generate_websocket_singleton_route_match(websocket: &WebSocketRouteInfo) -> TokenStream {
+    let module_name = format_ident!("{}", websocket.module_name);
+    let route_path = &websocket.route_path;
+    let initialize_call = quote! { #module_name::connect().await };
+    let connect_call = if websocket.has_on_connect {
+        quote! { #module_name::on_connect(event).await }
+    } else {
+        quote! { Ok::<(), forte_sdk::anyhow::Error>(()) }
+    };
+    let message_call = quote! { #module_name::on_message(event).await };
+    let disconnect_call = if websocket.has_on_disconnect {
+        quote! { #module_name::on_disconnect(event).await }
+    } else {
+        quote! { Ok::<(), forte_sdk::anyhow::Error>(()) }
+    };
+
+    quote! {
+        if path == #route_path {
+            let Some(event_name) = headers
+                .get("x-fn0-internal-websocket-event")
+                .and_then(|value| value.to_str().ok())
+            else {
+                return Ok(websocket_error_response(StatusCode::BAD_REQUEST));
+            };
+            if event_name == "initialize" {
+                return match #initialize_call {
+                    Ok(options) => {
+                        let mut serialized_headers = Vec::new();
+                        for (header_name, header_value) in &options.headers {
+                            let Ok(header_value) = header_value.to_str() else {
+                                return Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR));
+                            };
+                            serialized_headers.push((header_name.as_str(), header_value));
+                        }
+                        let body = forte_sdk::serde_json::to_vec(&forte_sdk::serde_json::json!({
+                            "url": options.url,
+                            "headers": serialized_headers,
+                            "protocols": options.protocols,
+                        }))?;
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header("content-type", "application/json")
+                            .body(Body::from(body))
+                            .unwrap())
+                    }
+                    Err(_) => {
+                        eprintln!("WebSocket singleton initialization failed at {}", path);
+                        Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                    }
+                };
+            }
+            let Some(connection_id_value) = headers
+                .get("x-fn0-internal-websocket-connection-id")
+                .and_then(|value| value.to_str().ok())
+            else {
+                return Ok(websocket_error_response(StatusCode::BAD_REQUEST));
+            };
+            let connection_id = forte_sdk::websocket::ConnectionId::new(connection_id_value);
+            match event_name {
+                "connect" => {
+                    let event = forte_sdk::websocket::SingletonConnectEvent {
+                        connection_id,
+                        protocol: headers
+                            .get("sec-websocket-protocol")
+                            .and_then(|value| value.to_str().ok())
+                            .map(str::to_string),
+                    };
+                    match #connect_call {
+                        Ok(()) => Ok(websocket_error_response(StatusCode::NO_CONTENT)),
+                        Err(error) => {
+                            eprintln!("WebSocket singleton on_connect failed at {}: {:?}", path, error);
+                            Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                        }
+                    }
+                }
+                "message" => {
+                    let message = match headers
+                        .get("x-fn0-internal-websocket-message-kind")
+                        .and_then(|value| value.to_str().ok())
+                    {
+                        Some("text") => match String::from_utf8(body_bytes) {
+                            Ok(text) => forte_sdk::websocket::IncomingMessage::Text(text),
+                            Err(_) => return Ok(websocket_error_response(StatusCode::BAD_REQUEST)),
+                        },
+                        Some("binary") => forte_sdk::websocket::IncomingMessage::Binary(body_bytes),
+                        _ => return Ok(websocket_error_response(StatusCode::BAD_REQUEST)),
+                    };
+                    let event = forte_sdk::websocket::MessageEvent {
+                        connection_id,
+                        message,
+                    };
+                    match #message_call {
+                        Ok(()) => Ok(websocket_error_response(StatusCode::NO_CONTENT)),
+                        Err(error) => {
+                            eprintln!("WebSocket singleton on_message failed at {}: {:?}", path, error);
+                            Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
+                        }
+                    }
+                }
+                "disconnect" => {
+                    let close_code = headers
+                        .get("x-fn0-internal-websocket-close-code")
+                        .and_then(|value| value.to_str().ok())
+                        .and_then(|value| value.parse::<u16>().ok());
+                    let reason = headers
+                        .get("x-fn0-internal-websocket-close-reason")
+                        .and_then(|value| value.to_str().ok())
+                        .map(str::to_string);
+                    let cause = match headers
+                        .get("x-fn0-internal-websocket-disconnect-cause")
+                        .and_then(|value| value.to_str().ok())
+                    {
+                        Some("peer") => forte_sdk::websocket::DisconnectCause::Peer,
+                        Some("application") => forte_sdk::websocket::DisconnectCause::Application,
+                        Some("deployment") => forte_sdk::websocket::DisconnectCause::Deployment,
+                        Some("heartbeat-timeout") => forte_sdk::websocket::DisconnectCause::HeartbeatTimeout,
+                        Some("protocol-error") => forte_sdk::websocket::DisconnectCause::ProtocolError,
+                        Some("transport-error") => forte_sdk::websocket::DisconnectCause::TransportError,
+                        _ => forte_sdk::websocket::DisconnectCause::InternalError,
+                    };
+                    let event = forte_sdk::websocket::DisconnectEvent {
+                        connection_id,
+                        close_code,
+                        reason,
+                        cause,
+                    };
+                    match #disconnect_call {
+                        Ok(()) => Ok(websocket_error_response(StatusCode::NO_CONTENT)),
+                        Err(error) => {
+                            eprintln!("WebSocket singleton on_disconnect failed at {}: {:?}", path, error);
                             Ok(websocket_error_response(StatusCode::INTERNAL_SERVER_ERROR))
                         }
                     }

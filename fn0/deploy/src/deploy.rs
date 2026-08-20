@@ -12,12 +12,19 @@ struct DeployInput<'a> {
     supports_static_asset_cache_control: bool,
     jobs: &'a [CronJob],
     cron_updated_at: &'a str,
+    websocket_singletons: &'a [WebSocketSingletonDeclaration],
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CronJob {
     pub function: String,
     pub every_minutes: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct WebSocketSingletonDeclaration {
+    pub singleton_id: String,
+    pub route_path: String,
 }
 
 #[derive(Serialize)]
@@ -38,6 +45,9 @@ enum Deploy {
         reason: String,
     },
     BadCodeVersion {
+        reason: String,
+    },
+    InvalidWebSocketSingleton {
         reason: String,
     },
     NotLoggedIn,
@@ -113,6 +123,7 @@ pub async fn deploy_wasm(
         bundle_size,
         jobs,
         cron_updated_at,
+        &[],
     )
     .await?;
 
@@ -140,6 +151,7 @@ pub async fn deploy_forte(
     bundle_tar_path: &Path,
     jobs: &[CronJob],
     cron_updated_at: &str,
+    websocket_singletons: &[WebSocketSingletonDeclaration],
 ) -> Result<()> {
     let client = reqwest::Client::new();
     println!("project_id: {project_id}");
@@ -173,6 +185,7 @@ pub async fn deploy_forte(
         bundle_size,
         jobs,
         cron_updated_at,
+        websocket_singletons,
     )
     .await?;
 
@@ -200,6 +213,7 @@ async fn request_deploy(
     bundle_size: u64,
     jobs: &[CronJob],
     cron_updated_at: &str,
+    websocket_singletons: &[WebSocketSingletonDeclaration],
 ) -> Result<DeployOk> {
     let deploy_url = format!(
         "{}/__forte_action/deploy",
@@ -216,6 +230,7 @@ async fn request_deploy(
             supports_static_asset_cache_control: true,
             jobs,
             cron_updated_at,
+            websocket_singletons,
         })
         .send()
         .await?
@@ -235,6 +250,9 @@ async fn request_deploy(
         }),
         Deploy::QuotaExceeded { reason } => Err(anyhow!("deploy quota exceeded: {reason}")),
         Deploy::BadCodeVersion { reason } => Err(anyhow!("deploy rejected code_version: {reason}")),
+        Deploy::InvalidWebSocketSingleton { reason } => {
+            Err(anyhow!("deploy rejected websocket singleton: {reason}"))
+        }
         Deploy::NotLoggedIn => Err(anyhow!("control rejected token; run `fn0 login` again.")),
         Deploy::NotFound => Err(anyhow!(
             "project '{project_id}' not found or not owned by you."
@@ -436,6 +454,10 @@ mod tests {
     // the header, so it must never go out false.
     #[test]
     fn deploy_input_carries_bundle_size_and_cache_control_support() {
+        let websocket_singletons = [WebSocketSingletonDeclaration {
+            singleton_id: "market-feed".to_string(),
+            route_path: "/ws_singleton/market-feed".to_string(),
+        }];
         let input = DeployInput {
             project_id: "proj",
             code_version: 42,
@@ -444,6 +466,7 @@ mod tests {
             supports_static_asset_cache_control: true,
             jobs: &[],
             cron_updated_at: "2026-07-21T00:00:00Z",
+            websocket_singletons: &websocket_singletons,
         };
         let value = serde_json::to_value(&input).unwrap();
         assert_eq!(value["bundle_size"], serde_json::json!(999));
@@ -451,5 +474,15 @@ mod tests {
             value["supports_static_asset_cache_control"],
             serde_json::json!(true)
         );
+        assert_eq!(
+            value["websocket_singletons"][0]["singleton_id"],
+            serde_json::json!("market-feed")
+        );
+        assert_eq!(
+            value["websocket_singletons"][0]["route_path"],
+            serde_json::json!("/ws_singleton/market-feed")
+        );
+        assert!(value["websocket_singletons"][0].get("url").is_none());
+        assert!(value["websocket_singletons"][0].get("headers").is_none());
     }
 }

@@ -77,6 +77,32 @@ pub struct CronConfigDoc {
     pub updated_at: DateTime,
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct WebSocketSingletonDeclaration {
+    pub singleton_id: String,
+    pub route_path: String,
+}
+
+#[forte_doc]
+pub struct WebSocketSingletonConfigDoc {
+    #[pk]
+    pub project_id: String,
+    #[sk]
+    pub code_version: u64,
+    pub declarations: Vec<WebSocketSingletonDeclaration>,
+}
+
+#[forte_doc]
+pub struct WebSocketSingletonRuntimeDoc {
+    #[pk]
+    pub project_id: String,
+    #[sk]
+    pub singleton_id: String,
+    pub code_version: u64,
+    pub connection_id: String,
+    pub lease_expires_at: DateTime,
+}
+
 #[forte_doc]
 pub struct WaitlistDoc {
     #[sk]

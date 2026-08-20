@@ -4,6 +4,9 @@ const MESSAGE_KIND_HEADER: &str = "x-fn0-websocket-message-kind";
 const DELIVERY_STATE_HEADER: &str = "x-fn0-websocket-delivery-state";
 const CONNECT_URL_HEADER: &str = "x-fn0-websocket-connect-url";
 const CONNECT_PATH_HEADER: &str = "x-fn0-websocket-receive-path";
+const SINGLETON_PROJECT_HEADER: &str = "x-fn0-websocket-singleton-project";
+const SINGLETON_ID_HEADER: &str = "x-fn0-websocket-singleton-id";
+const SINGLETON_ROUTE_HEADER: &str = "x-fn0-websocket-singleton-route";
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(transparent)]
@@ -57,6 +60,27 @@ pub struct ConnectEvent {
 pub struct MessageEvent {
     pub connection_id: ConnectionId,
     pub message: IncomingMessage,
+}
+
+pub struct SingletonConnectionOptions {
+    pub url: String,
+    pub headers: HeaderMap,
+    pub protocols: Vec<String>,
+}
+
+impl SingletonConnectionOptions {
+    pub fn new(url: impl Into<String>) -> Self {
+        Self {
+            url: url.into(),
+            headers: HeaderMap::new(),
+            protocols: Vec::new(),
+        }
+    }
+}
+
+pub struct SingletonConnectEvent {
+    pub connection_id: ConnectionId,
+    pub protocol: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -247,6 +271,102 @@ pub async fn connect(
         }
         _ => Err(WebSocketConnectError::Internal),
     }
+}
+
+#[doc(hidden)]
+pub async fn connect_singleton(
+    project_id: &str,
+    singleton_id: &str,
+    url: impl Into<String>,
+    route_path: &str,
+    headers: &HeaderMap,
+    protocols: &[String],
+    initial_lease_deadline: i64,
+) -> Result<ConnectionId, WebSocketConnectError> {
+    let endpoint =
+        std::env::var("FN0_WEBSOCKET_URL").map_err(|_| WebSocketConnectError::Internal)?;
+    let target_url = url.into();
+    if project_id.is_empty() || singleton_id.is_empty() {
+        return Err(WebSocketConnectError::Internal);
+    }
+    if !target_url.starts_with("ws://") && !target_url.starts_with("wss://") {
+        return Err(WebSocketConnectError::InvalidUrl);
+    }
+    if route_path != "/ws_singleton" && !route_path.starts_with("/ws_singleton/") {
+        return Err(WebSocketConnectError::InvalidUrl);
+    }
+    let mut serialized_headers = Vec::new();
+    for (header_name, header_value) in headers {
+        if singleton_system_header(header_name.as_str()) {
+            return Err(WebSocketConnectError::Internal);
+        }
+        let header_value = header_value
+            .to_str()
+            .map_err(|_| WebSocketConnectError::Internal)?;
+        serialized_headers.push((header_name.as_str(), header_value));
+    }
+    if protocols.iter().any(|protocol| {
+        protocol.is_empty() || protocol.contains(',') || protocol.chars().any(char::is_whitespace)
+    }) {
+        return Err(WebSocketConnectError::Internal);
+    }
+    let body = serde_json::to_vec(&serde_json::json!({
+        "url": target_url,
+        "headers": serialized_headers,
+        "protocols": protocols,
+        "initial_lease_deadline": initial_lease_deadline,
+    }))
+    .map_err(|_| WebSocketConnectError::Internal)?;
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(format!(
+            "{}/connect-singleton",
+            endpoint.trim_end_matches('/')
+        ))
+        .header(SINGLETON_PROJECT_HEADER, project_id)
+        .header(SINGLETON_ID_HEADER, singleton_id)
+        .header(SINGLETON_ROUTE_HEADER, route_path)
+        .header("content-type", "application/json")
+        .body(body)
+        .map_err(|_| WebSocketConnectError::Internal)?;
+    let response = Client::new()
+        .send(request)
+        .await
+        .map_err(|_| WebSocketConnectError::Transport)?;
+    match response.status() {
+        StatusCode::CREATED => {
+            let connection_id = String::from_utf8(response.into_body().bytes().await.to_vec())
+                .map_err(|_| WebSocketConnectError::Internal)?;
+            if connection_id.is_empty() {
+                return Err(WebSocketConnectError::Internal);
+            }
+            Ok(ConnectionId::new(connection_id))
+        }
+        StatusCode::BAD_REQUEST => Err(WebSocketConnectError::InvalidUrl),
+        StatusCode::REQUEST_TIMEOUT | StatusCode::GATEWAY_TIMEOUT => {
+            Err(WebSocketConnectError::DeadlineExceeded)
+        }
+        StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE => {
+            Err(WebSocketConnectError::Transport)
+        }
+        _ => Err(WebSocketConnectError::Internal),
+    }
+}
+
+fn singleton_system_header(header_name: &str) -> bool {
+    matches!(
+        header_name,
+        "host"
+            | "upgrade"
+            | "connection"
+            | "content-length"
+            | "transfer-encoding"
+            | "sec-websocket-key"
+            | "sec-websocket-version"
+            | "sec-websocket-extensions"
+            | "sec-websocket-accept"
+            | "sec-websocket-protocol"
+    ) || header_name.starts_with("x-fn0-")
 }
 
 pub async fn send(

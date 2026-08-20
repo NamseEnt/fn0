@@ -113,6 +113,7 @@ fn build_cross_project_invoke_hijack() -> Arc<CrossProjectInvokeHijack> {
 
 struct WorkerCrossProjectInvokeDispatcher {
     senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
+    cache: S3BundleCache,
 }
 
 impl CrossProjectInvokeDispatcher for WorkerCrossProjectInvokeDispatcher {
@@ -121,6 +122,39 @@ impl CrossProjectInvokeDispatcher for WorkerCrossProjectInvokeDispatcher {
         target_project_id: String,
         req: fn0::Request,
     ) -> anyhow::Result<oneshot::Receiver<anyhow::Result<fn0::Response>>> {
+        let expected_code_version = req
+            .headers()
+            .get("x-fn0-internal-expected-code-version")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<u64>().ok());
+        if let Some(expected_code_version) = expected_code_version {
+            let (response_sender, response_receiver) = oneshot::channel();
+            let senders = self.senders.clone();
+            let cache = self.cache.clone();
+            tokio::spawn(async move {
+                if cache.code_version(&target_project_id).await != Some(expected_code_version) {
+                    let _ = response_sender.send(Err(anyhow::anyhow!(
+                        "retryable target code version mismatch"
+                    )));
+                    return;
+                }
+                let (inner_sender, inner_receiver) = oneshot::channel();
+                let envelope = RequestEnvelope::new(target_project_id, req, inner_sender);
+                if let Err(error) = worker_pool::dispatch(&senders, envelope) {
+                    let message = match error {
+                        DispatchError::Full => "worker pool full",
+                        DispatchError::Closed => "worker pool closed",
+                    };
+                    let _ = response_sender.send(Err(anyhow::anyhow!(message)));
+                    return;
+                }
+                let result = inner_receiver
+                    .await
+                    .unwrap_or_else(|_| Err(anyhow::anyhow!("worker response dropped")));
+                let _ = response_sender.send(result);
+            });
+            return Ok(response_receiver);
+        }
         let (resp_tx, resp_rx) = oneshot::channel();
         let envelope = RequestEnvelope::new(target_project_id, req, resp_tx);
         worker_pool::dispatch(&self.senders, envelope).map_err(|e| match e {
@@ -340,6 +374,7 @@ async fn run() -> Result<()> {
 
     direct_hijack.set_dispatcher(Arc::new(WorkerCrossProjectInvokeDispatcher {
         senders: worker_senders.clone(),
+        cache: cache.clone(),
     }));
     let websocket_service = websocket::WebSocketService::new(worker_senders.clone())
         .await

@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Stdio;
 
+const WEBSOCKET_SINGLETON_MANIFEST: &str = ".forte/ws_singletons.json";
+
 #[derive(Debug)]
 pub struct BuildOptions {
     pub project_dir: PathBuf,
@@ -52,6 +54,7 @@ async fn ensure_forte_rs_to_ts() -> Result<PathBuf> {
 async fn run_codegen(project_dir: &Path) -> Result<()> {
     let rs_dir = project_dir.join("rs");
     if !rs_dir.exists() {
+        write_empty_websocket_singleton_manifest(project_dir)?;
         fe_runtime::ensure(project_dir)?;
         generate_frontend_routes(project_dir)?;
         return Ok(());
@@ -74,6 +77,25 @@ async fn run_codegen(project_dir: &Path) -> Result<()> {
     generate_frontend_routes(project_dir)?;
 
     Ok(())
+}
+
+fn write_empty_websocket_singleton_manifest(project_dir: &Path) -> Result<()> {
+    let path = project_dir.join(WEBSOCKET_SINGLETON_MANIFEST);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, "[]\n")?;
+    Ok(())
+}
+
+pub fn read_websocket_singletons(
+    project_dir: &Path,
+) -> Result<Vec<fn0_deploy::WebSocketSingletonDeclaration>> {
+    let path = project_dir.join(WEBSOCKET_SINGLETON_MANIFEST);
+    let content = fs::read_to_string(&path)
+        .with_context(|| format!("read generated singleton manifest {}", path.display()))?;
+    serde_json::from_str(&content)
+        .with_context(|| format!("parse generated singleton manifest {}", path.display()))
 }
 
 fn generate_frontend_routes(project_dir: &Path) -> Result<()> {

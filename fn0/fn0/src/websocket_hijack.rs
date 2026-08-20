@@ -12,6 +12,17 @@ const MESSAGE_KIND_HEADER: &str = "x-fn0-websocket-message-kind";
 const DELIVERY_STATE_HEADER: &str = "x-fn0-websocket-delivery-state";
 const CONNECT_URL_HEADER: &str = "x-fn0-websocket-connect-url";
 const CONNECT_PATH_HEADER: &str = "x-fn0-websocket-receive-path";
+const SINGLETON_PROJECT_HEADER: &str = "x-fn0-websocket-singleton-project";
+const SINGLETON_ID_HEADER: &str = "x-fn0-websocket-singleton-id";
+const SINGLETON_ROUTE_HEADER: &str = "x-fn0-websocket-singleton-route";
+
+#[derive(serde::Deserialize)]
+struct SingletonConnectInput {
+    url: String,
+    headers: Vec<(String, String)>,
+    protocols: Vec<String>,
+    initial_lease_deadline: i64,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WebSocketMessageKind {
@@ -78,6 +89,34 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
         })
     }
 
+    fn connect_singleton(
+        &self,
+        project_id: String,
+        singleton_id: String,
+        url: String,
+        route_path: String,
+        headers: Vec<(String, String)>,
+        protocols: Vec<String>,
+        initial_lease_deadline: i64,
+        remaining: std::time::Duration,
+    ) -> WebSocketConnectFuture {
+        let _ = (
+            project_id,
+            singleton_id,
+            url,
+            route_path,
+            headers,
+            protocols,
+            initial_lease_deadline,
+            remaining,
+        );
+        Box::pin(async {
+            Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ))
+        })
+    }
+
     fn send(
         &self,
         caller_project_id: String,
@@ -98,6 +137,7 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
 #[derive(Clone)]
 pub struct WebSocketHijack {
     placeholder_host: String,
+    control_project_id: String,
     dispatcher: Arc<OnceLock<Arc<dyn WebSocketCommandDispatcher>>>,
 }
 
@@ -105,6 +145,7 @@ impl WebSocketHijack {
     pub fn new(placeholder_host: String) -> Self {
         Self {
             placeholder_host,
+            control_project_id: "fn0-control".to_string(),
             dispatcher: Arc::new(OnceLock::new()),
         }
     }
@@ -112,7 +153,13 @@ impl WebSocketHijack {
     pub fn from_env() -> Self {
         let placeholder_host = std::env::var("FN0_WEBSOCKET_PLACEHOLDER_HOST")
             .unwrap_or_else(|_| "fn0-websocket.fn0.dev".to_string());
-        Self::new(placeholder_host)
+        let control_project_id =
+            std::env::var("FN0_CONTROL_PROJECT_ID").unwrap_or_else(|_| "fn0-control".to_string());
+        Self {
+            placeholder_host,
+            control_project_id,
+            dispatcher: Arc::new(OnceLock::new()),
+        }
     }
 
     pub fn placeholder_url(&self) -> String {
@@ -164,6 +211,84 @@ impl WebSocketHijack {
             };
             return match dispatcher
                 .connect(caller_project_id.to_string(), url, receive_path, remaining)
+                .await
+            {
+                Ok(connection_id) => response_with_body(
+                    201,
+                    WebSocketDeliveryState::NotSent,
+                    Bytes::from(connection_id),
+                ),
+                Err(error) => response(status_for(error.kind), error.delivery),
+            };
+        }
+        if request.uri().path() == "/connect-singleton" {
+            if caller_project_id != self.control_project_id {
+                return response(403, WebSocketDeliveryState::NotSent);
+            }
+            let Some(project_id) = request
+                .headers()
+                .get(SINGLETON_PROJECT_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            let Some(singleton_id) = request
+                .headers()
+                .get(SINGLETON_ID_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            let Some(route_path) = request
+                .headers()
+                .get(SINGLETON_ROUTE_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            if project_id.is_empty()
+                || singleton_id.is_empty()
+                || !valid_singleton_route(&route_path)
+            {
+                return response(400, WebSocketDeliveryState::NotSent);
+            }
+            let body = match request.into_body().collect().await {
+                Ok(body) => body.to_bytes(),
+                Err(_) => return response(400, WebSocketDeliveryState::NotSent),
+            };
+            let input: SingletonConnectInput = match serde_json::from_slice(&body) {
+                Ok(input) => input,
+                Err(_) => return response(400, WebSocketDeliveryState::NotSent),
+            };
+            if input
+                .headers
+                .iter()
+                .any(|(header_name, _)| singleton_system_header(header_name))
+                || input.protocols.iter().any(|protocol| {
+                    protocol.is_empty()
+                        || protocol.contains(',')
+                        || protocol.chars().any(char::is_whitespace)
+                })
+            {
+                return response(400, WebSocketDeliveryState::NotSent);
+            }
+            let Some(dispatcher) = self.dispatcher.get() else {
+                return response(503, WebSocketDeliveryState::NotSent);
+            };
+            return match dispatcher
+                .connect_singleton(
+                    project_id,
+                    singleton_id,
+                    input.url,
+                    route_path,
+                    input.headers,
+                    input.protocols,
+                    input.initial_lease_deadline,
+                    remaining,
+                )
                 .await
             {
                 Ok(connection_id) => response_with_body(
@@ -234,6 +359,29 @@ impl WebSocketHijack {
             Err(error) => response(status_for(error.kind), error.delivery),
         }
     }
+}
+
+fn valid_singleton_route(route_path: &str) -> bool {
+    route_path.starts_with("/ws_singleton/")
+        && !route_path.contains('?')
+        && !route_path.split('/').any(|segment| segment == "..")
+}
+
+fn singleton_system_header(header_name: &str) -> bool {
+    let header_name = header_name.to_ascii_lowercase();
+    matches!(
+        header_name.as_str(),
+        "host"
+            | "upgrade"
+            | "connection"
+            | "content-length"
+            | "transfer-encoding"
+            | "sec-websocket-key"
+            | "sec-websocket-version"
+            | "sec-websocket-extensions"
+            | "sec-websocket-accept"
+            | "sec-websocket-protocol"
+    ) || header_name.starts_with("x-fn0-")
 }
 
 fn command_and_connection(path: &str) -> Option<(&str, &str)> {
@@ -317,6 +465,32 @@ mod tests {
             _remaining: std::time::Duration,
         ) -> WebSocketConnectFuture {
             Box::pin(async { Ok("v1.test".to_string()) })
+        }
+
+        fn connect_singleton(
+            &self,
+            project_id: String,
+            singleton_id: String,
+            url: String,
+            route_path: String,
+            headers: Vec<(String, String)>,
+            protocols: Vec<String>,
+            initial_lease_deadline: i64,
+            _remaining: std::time::Duration,
+        ) -> WebSocketConnectFuture {
+            Box::pin(async move {
+                assert_eq!(project_id, "target-project");
+                assert_eq!(singleton_id, "market-feed");
+                assert_eq!(url, "wss://example.com/socket");
+                assert_eq!(route_path, "/ws_singleton/market-feed");
+                assert_eq!(
+                    headers,
+                    vec![("authorization".to_string(), "secret".to_string())]
+                );
+                assert_eq!(protocols, vec!["graphql-ws".to_string()]);
+                assert_eq!(initial_lease_deadline, 1234);
+                Ok("v1.singleton".to_string())
+            })
         }
 
         fn send(
@@ -430,5 +604,52 @@ mod tests {
             .expect("response body")
             .to_bytes();
         assert_eq!(body, Bytes::from_static(b"v1.test"));
+    }
+
+    #[tokio::test]
+    async fn singleton_connect_is_control_only() {
+        let hijack = WebSocketHijack::new("fn0-websocket.test".to_string());
+        hijack.set_dispatcher(Arc::new(RecordingDispatcher {
+            body: Arc::new(Mutex::new(Vec::new())),
+        }));
+        let request = || {
+            hyper::Request::builder()
+                .method(hyper::Method::POST)
+                .uri("http://fn0-websocket.test/connect-singleton")
+                .header(SINGLETON_PROJECT_HEADER, "target-project")
+                .header(SINGLETON_ID_HEADER, "market-feed")
+                .header(SINGLETON_ROUTE_HEADER, "/ws_singleton/market-feed")
+                .body(
+                    Full::new(Bytes::from_static(
+                        br#"{"url":"wss://example.com/socket","headers":[["authorization","secret"]],"protocols":["graphql-ws"],"initial_lease_deadline":1234}"#,
+                    ))
+                        .map_err(|never: std::convert::Infallible| match never {})
+                        .boxed_unsync(),
+                )
+                .expect("request")
+        };
+
+        let forbidden = hijack
+            .handle_command(
+                "other-project",
+                request(),
+                std::time::Duration::from_secs(15),
+            )
+            .await
+            .expect("response");
+        assert_eq!(forbidden.status(), hyper::StatusCode::FORBIDDEN);
+
+        let connected = hijack
+            .handle_command("fn0-control", request(), std::time::Duration::from_secs(15))
+            .await
+            .expect("response");
+        assert_eq!(connected.status(), hyper::StatusCode::CREATED);
+        let body = connected
+            .into_body()
+            .collect()
+            .await
+            .expect("response body")
+            .to_bytes();
+        assert_eq!(body, Bytes::from_static(b"v1.singleton"));
     }
 }

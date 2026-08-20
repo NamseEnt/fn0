@@ -53,6 +53,13 @@ impl RequestEnvelope {
         self.started_sender = Some(started_sender);
         (self, started_receiver)
     }
+
+    #[cfg(test)]
+    pub(crate) fn signal_started(&mut self) {
+        if let Some(started_sender) = self.started_sender.take() {
+            let _ = started_sender.send(());
+        }
+    }
 }
 
 #[derive(Debug)]

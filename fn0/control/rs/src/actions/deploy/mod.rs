@@ -38,6 +38,8 @@ pub struct Input {
     #[serde(default)]
     pub jobs: Vec<CronJob>,
     pub cron_updated_at: DateTime,
+    #[serde(default)]
+    pub websocket_singletons: Vec<WebSocketSingletonDeclaration>,
 }
 
 #[derive(Deserialize)]
@@ -57,6 +59,9 @@ pub enum Output {
         reason: String,
     },
     BadCodeVersion {
+        reason: String,
+    },
+    InvalidWebSocketSingleton {
         reason: String,
     },
     NotLoggedIn,
@@ -116,6 +121,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 quota::MAX_FILES_PER_BUILD
             ),
         };
+    }
+
+    if let Err(reason) = validate_websocket_singletons(&req.body.websocket_singletons) {
+        return Output::InvalidWebSocketSingleton { reason };
     }
     let total_size: u64 = req.body.files.iter().map(|f| f.size).sum();
     if total_size > quota::MAX_TOTAL_SIZE_PER_BUILD {
@@ -208,10 +217,95 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::InternalError;
     }
 
+    if let Err(e) = upsert_websocket_singleton_config(
+        &db,
+        req.body.project_id.clone(),
+        code_version,
+        req.body.websocket_singletons.clone(),
+    )
+    .await
+    {
+        tracing::error!("deploy upsert_websocket_singleton_config: {e}");
+        return Output::InternalError;
+    }
+
     Output::Ok {
         presigned_put_url,
         object_key,
         static_uploads,
+    }
+}
+
+fn validate_websocket_singletons(
+    declarations: &[WebSocketSingletonDeclaration],
+) -> Result<(), String> {
+    let mut singleton_ids = std::collections::HashSet::new();
+    for declaration in declarations {
+        if declaration.singleton_id.is_empty() {
+            return Err("singleton_id must not be empty".to_string());
+        }
+        if !singleton_ids.insert(declaration.singleton_id.as_str()) {
+            return Err(format!(
+                "duplicate singleton_id '{}'",
+                declaration.singleton_id
+            ));
+        }
+        if declaration.route_path != format!("/ws_singleton/{}", declaration.singleton_id)
+            || declaration.singleton_id.split('/').any(|segment| {
+                segment.is_empty()
+                    || segment == "."
+                    || segment == ".."
+                    || segment.starts_with('[')
+                    || segment.ends_with(']')
+            })
+        {
+            return Err(format!(
+                "invalid route_path for '{}'",
+                declaration.singleton_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn upsert_websocket_singleton_config(
+    db: &doc_db::Database,
+    project_id: String,
+    code_version: u64,
+    declarations: Vec<WebSocketSingletonDeclaration>,
+) -> Result<(), String> {
+    let result = db
+        .trx(|trx| {
+            let project_id = project_id.clone();
+            let declarations = declarations.clone();
+            async move {
+                match trx
+                    .get(WebSocketSingletonConfigDocGet {
+                        project_id: project_id.as_str(),
+                        code_version,
+                    })
+                    .await?
+                {
+                    Some(mut handle) => {
+                        handle.declarations = declarations;
+                    }
+                    None => {
+                        trx.create(WebSocketSingletonConfigDoc {
+                            project_id,
+                            code_version,
+                            declarations,
+                        })?;
+                    }
+                }
+                trx.commit::<_, ()>(())
+            }
+        })
+        .await;
+    match result {
+        doc_db::TrxResult::Committed(()) => Ok(()),
+        doc_db::TrxResult::Cancelled(()) => unreachable!(),
+        doc_db::TrxResult::Conflict(_) => Err("websocket singleton config conflict".to_string()),
+        doc_db::TrxResult::Err(error) => Err(error.to_string()),
     }
 }
 

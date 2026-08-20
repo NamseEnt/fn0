@@ -299,11 +299,23 @@ impl<C: BundleCache> CodeExecutor<C> {
         request: Request,
         _fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
+        let expected_code_version = request
+            .headers()
+            .get("x-fn0-internal-expected-code-version")
+            .map(|value| {
+                value
+                    .to_str()
+                    .map_err(anyhow::Error::from)?
+                    .parse::<u64>()
+                    .map_err(anyhow::Error::from)
+            })
+            .transpose()?;
         let preserve_websocket_headers = request
             .headers()
             .contains_key("x-fn0-internal-websocket-event");
         let bundle_start = std::time::Instant::now();
         let bundle = self.ctx.bundle_cache.get(project_id).await?;
+        verify_expected_code_version(bundle.code_version, expected_code_version)?;
         telemetry::stage_duration("bundle_get", bundle_start.elapsed());
 
         telemetry::function_invocation();
@@ -842,6 +854,29 @@ impl<C: BundleCache> CodeExecutor<C> {
         );
 
         tx
+    }
+}
+
+fn verify_expected_code_version(
+    loaded_code_version: Option<u64>,
+    expected_code_version: Option<u64>,
+) -> anyhow::Result<()> {
+    if expected_code_version.is_some() && loaded_code_version != expected_code_version {
+        anyhow::bail!("retryable target code version mismatch");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod expected_code_version_tests {
+    use super::verify_expected_code_version;
+
+    #[test]
+    fn exact_code_version_is_required_when_requested() {
+        assert!(verify_expected_code_version(Some(42), Some(42)).is_ok());
+        assert!(verify_expected_code_version(Some(41), Some(42)).is_err());
+        assert!(verify_expected_code_version(None, Some(42)).is_err());
+        assert!(verify_expected_code_version(Some(41), None).is_ok());
     }
 }
 

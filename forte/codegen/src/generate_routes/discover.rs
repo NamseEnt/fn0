@@ -528,6 +528,183 @@ pub(super) fn discover_websockets(ws_in_dir: &Path, ws_out_dir: &Path) -> Vec<We
     routes
 }
 
+pub(super) fn discover_websocket_singletons(singleton_dir: &Path) -> Vec<WebSocketRouteInfo> {
+    let mut routes = Vec::new();
+    if singleton_dir.exists() {
+        discover_websocket_singletons_recursive(singleton_dir, singleton_dir, &mut routes);
+    }
+    routes.sort_by(|left, right| left.route_path.cmp(&right.route_path));
+    routes
+}
+
+fn discover_websocket_singletons_recursive(
+    base_dir: &Path,
+    current_dir: &Path,
+    routes: &mut Vec<WebSocketRouteInfo>,
+) {
+    let entries = fs::read_dir(current_dir)
+        .unwrap_or_else(|error| panic!("Failed to read {}: {error}", current_dir.display()));
+    for entry in entries {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            discover_websocket_singletons_recursive(base_dir, &path, routes);
+            continue;
+        }
+        if path.extension().is_none_or(|extension| extension != "rs") {
+            continue;
+        }
+        let relative_path = path.strip_prefix(base_dir).unwrap();
+        let relative_without_extension = relative_path.with_extension("");
+        let source_segments: Vec<String> = relative_without_extension
+            .components()
+            .map(|component| component.as_os_str().to_string_lossy().to_string())
+            .collect();
+        if source_segments
+            .iter()
+            .any(|segment| segment.starts_with('[') && segment.ends_with(']'))
+        {
+            panic!(
+                "WebSocket singleton {} cannot use dynamic path segments",
+                path.display()
+            );
+        }
+        let content = fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("Failed to read {}: {error}", path.display()));
+        let handlers = singleton_handlers(&content).unwrap_or_else(|error| {
+            panic!("Invalid WebSocket singleton {}: {error}", path.display())
+        });
+        let singleton_id = source_segments.join("/");
+        let module_suffix = source_segments.join("_");
+        let mut route_segment_names = vec!["ws_singleton".to_string()];
+        route_segment_names.extend(source_segments.iter().cloned());
+        routes.push(WebSocketRouteInfo {
+            direction: WebSocketDirection::Singleton,
+            module_name: format!("websockets_singleton_{module_suffix}"),
+            module_path: format!("ws_singleton/{}", relative_path.to_string_lossy()),
+            module_segments: source_segments,
+            route_path: format!("/{}", route_segment_names.join("/")),
+            route_segments: route_segment_names
+                .into_iter()
+                .map(RouteSegment::Static)
+                .collect(),
+            path_params: None,
+            has_on_connect: handlers.has_on_connect,
+            has_on_disconnect: handlers.has_on_disconnect,
+            singleton_id: Some(singleton_id),
+        });
+    }
+}
+
+struct SingletonHandlers {
+    has_on_connect: bool,
+    has_on_disconnect: bool,
+}
+
+fn singleton_handlers(content: &str) -> Result<SingletonHandlers, String> {
+    let syntax_tree = syn::parse_file(content).map_err(|error| error.to_string())?;
+    let mut connect = None;
+    let mut on_connect = None;
+    let mut on_message = None;
+    let mut on_disconnect = None;
+    for item in syntax_tree.items {
+        let syn::Item::Fn(function) = item else {
+            continue;
+        };
+        match function.sig.ident.to_string().as_str() {
+            "connect" => connect = Some(function),
+            "on_connect" => on_connect = Some(function),
+            "on_message" => on_message = Some(function),
+            "on_disconnect" => on_disconnect = Some(function),
+            _ => {}
+        }
+    }
+    let connect = connect.ok_or_else(|| "missing required connect function".to_string())?;
+    validate_singleton_function(&connect, None, "SingletonConnectionOptions")?;
+    let on_message =
+        on_message.ok_or_else(|| "missing required on_message function".to_string())?;
+    validate_singleton_function(&on_message, Some("MessageEvent"), "()")?;
+    if let Some(function) = &on_connect {
+        validate_singleton_function(function, Some("SingletonConnectEvent"), "()")?;
+    }
+    if let Some(function) = &on_disconnect {
+        validate_singleton_function(function, Some("DisconnectEvent"), "()")?;
+    }
+    Ok(SingletonHandlers {
+        has_on_connect: on_connect.is_some(),
+        has_on_disconnect: on_disconnect.is_some(),
+    })
+}
+
+fn validate_singleton_function(
+    function: &syn::ItemFn,
+    expected_input: Option<&str>,
+    expected_result: &str,
+) -> Result<(), String> {
+    let function_name = function.sig.ident.to_string();
+    if !matches!(function.vis, syn::Visibility::Public(_)) || function.sig.asyncness.is_none() {
+        return Err(format!("{function_name} must be public and async"));
+    }
+    let expected_inputs = usize::from(expected_input.is_some());
+    if function.sig.inputs.len() != expected_inputs {
+        return Err(format!(
+            "{function_name} must accept {expected_inputs} argument(s)"
+        ));
+    }
+    if let Some(expected_input) = expected_input {
+        let Some(syn::FnArg::Typed(argument)) = function.sig.inputs.first() else {
+            return Err(format!("{function_name} must accept {expected_input}"));
+        };
+        if !type_is_named(&argument.ty, expected_input) {
+            return Err(format!("{function_name} must accept {expected_input}"));
+        }
+    }
+    let syn::ReturnType::Type(_, return_type) = &function.sig.output else {
+        return Err(format!(
+            "{function_name} must return Result<{expected_result}>"
+        ));
+    };
+    if !result_type_matches(return_type, expected_result) {
+        return Err(format!(
+            "{function_name} must return Result<{expected_result}>"
+        ));
+    }
+    Ok(())
+}
+
+fn type_is_named(rust_type: &syn::Type, expected: &str) -> bool {
+    let syn::Type::Path(type_path) = rust_type else {
+        return false;
+    };
+    type_path
+        .path
+        .segments
+        .last()
+        .is_some_and(|segment| segment.ident == expected)
+}
+
+fn result_type_matches(rust_type: &syn::Type, expected: &str) -> bool {
+    let syn::Type::Path(type_path) = rust_type else {
+        return false;
+    };
+    let Some(result_segment) = type_path.path.segments.last() else {
+        return false;
+    };
+    if result_segment.ident != "Result" {
+        return false;
+    }
+    let syn::PathArguments::AngleBracketed(arguments) = &result_segment.arguments else {
+        return false;
+    };
+    let Some(syn::GenericArgument::Type(success_type)) = arguments.args.first() else {
+        return false;
+    };
+    if expected == "()" {
+        matches!(success_type, syn::Type::Tuple(tuple) if tuple.elems.is_empty())
+    } else {
+        type_is_named(success_type, expected)
+    }
+}
+
 fn discover_websockets_recursive(
     base_dir: &Path,
     current_dir: &Path,
@@ -605,10 +782,12 @@ fn discover_websockets_recursive(
         let route_prefix = match direction {
             WebSocketDirection::Inbound => "ws",
             WebSocketDirection::Outbound => "ws_out",
+            WebSocketDirection::Singleton => unreachable!(),
         };
         let module_prefix = match direction {
             WebSocketDirection::Inbound => "ws_in",
             WebSocketDirection::Outbound => "ws_out",
+            WebSocketDirection::Singleton => unreachable!(),
         };
         let mut route_segment_names = vec![route_prefix.to_string()];
         route_segment_names.extend(source_segments.iter().cloned());
@@ -653,7 +832,9 @@ fn discover_websockets_recursive(
             route_path: format!("/{}", route_segment_names.join("/")),
             route_segments,
             path_params: parse_path_params(&content),
+            has_on_connect,
             has_on_disconnect,
+            singleton_id: None,
         });
     }
 }
@@ -855,4 +1036,67 @@ fn has_cache_static_attribute(content: &str) -> bool {
                     .is_some_and(|segment| segment.ident == "cache_static")
             })
     })
+}
+
+#[cfg(test)]
+mod websocket_singleton_tests {
+    use super::*;
+
+    const VALID_SINGLETON: &str = r#"
+pub async fn connect() -> Result<SingletonConnectionOptions> { todo!() }
+pub async fn on_connect(event: SingletonConnectEvent) -> Result<()> { todo!() }
+pub async fn on_message(event: MessageEvent) -> Result<()> { todo!() }
+pub async fn on_disconnect(event: DisconnectEvent) -> Result<()> { todo!() }
+"#;
+
+    #[test]
+    fn discovers_nested_singleton_id_and_route() {
+        let directory = tempfile::tempdir().unwrap();
+        let nested = directory.path().join("feeds/us");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("market.rs"), VALID_SINGLETON).unwrap();
+        let routes = discover_websocket_singletons(directory.path());
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].singleton_id.as_deref(), Some("feeds/us/market"));
+        assert_eq!(routes[0].route_path, "/ws_singleton/feeds/us/market");
+        assert!(routes[0].has_on_connect);
+        assert!(routes[0].has_on_disconnect);
+    }
+
+    #[test]
+    #[should_panic(expected = "missing required connect function")]
+    fn rejects_missing_connect() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(
+            directory.path().join("market.rs"),
+            "pub async fn on_message(event: MessageEvent) -> Result<()> { todo!() }",
+        )
+        .unwrap();
+        discover_websocket_singletons(directory.path());
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot use dynamic path segments")]
+    fn rejects_dynamic_paths() {
+        let directory = tempfile::tempdir().unwrap();
+        let dynamic = directory.path().join("[market]");
+        fs::create_dir_all(&dynamic).unwrap();
+        fs::write(dynamic.join("feed.rs"), VALID_SINGLETON).unwrap();
+        discover_websocket_singletons(directory.path());
+    }
+
+    #[test]
+    #[should_panic(expected = "on_message must accept MessageEvent")]
+    fn rejects_invalid_callback_shape() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(
+            directory.path().join("market.rs"),
+            r#"
+pub async fn connect() -> Result<SingletonConnectionOptions> { todo!() }
+pub async fn on_message(event: DisconnectEvent) -> Result<()> { todo!() }
+"#,
+        )
+        .unwrap();
+        discover_websocket_singletons(directory.path());
+    }
 }

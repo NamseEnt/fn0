@@ -125,12 +125,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     match result {
         doc_db::TrxResult::Committed(true) => {
-            if let Err(error) =
-                crate::enqueue::static_cache_purge(crate::queue_task::static_cache_purge::Input {
+            if let Err(error) = crate::enqueue::deployment_activation(
+                crate::queue_task::deployment_activation::Input {
                     project_id,
                     code_version,
-                })
-                .await
+                },
+            )
+            .await
             {
                 return Output::Error {
                     message: error.to_string(),

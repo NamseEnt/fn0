@@ -69,13 +69,16 @@ pub(super) struct WebSocketRouteInfo {
     pub(super) route_path: String,
     pub(super) route_segments: Vec<RouteSegment>,
     pub(super) path_params: Option<Vec<PathParamField>>,
+    pub(super) has_on_connect: bool,
     pub(super) has_on_disconnect: bool,
+    pub(super) singleton_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(super) enum WebSocketDirection {
     Inbound,
     Outbound,
+    Singleton,
 }
 
 pub(super) enum HandlerType {

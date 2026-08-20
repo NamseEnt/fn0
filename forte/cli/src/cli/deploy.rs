@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use std::path::{Path, PathBuf};
 
-use super::build::{BuildOptions, run_build};
+use super::build::{BuildOptions, read_websocket_singletons, run_build};
 use super::cron;
 use super::project_config::{read_optional_domain, read_optional_project_id};
 use fn0_deploy::{CloudflareConnection, DomainStatus};
@@ -46,12 +46,12 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
     println!("project_id: {project_id}");
     println!("code_version: {code_version}");
     println!("static base URL: {static_base_url}");
-
     run_build(BuildOptions {
         project_dir: project_dir.clone(),
         static_base_url: Some(static_base_url),
     })
     .await?;
+    let websocket_singletons = read_websocket_singletons(&project_dir)?;
 
     let dist_dir = project_dir.join("dist");
     let bundle_path = dist_dir.join("bundle.raw.tar");
@@ -71,6 +71,7 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
         &bundle_path,
         &jobs,
         &cron_updated_at,
+        &websocket_singletons,
     )
     .await?;
 
