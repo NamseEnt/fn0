@@ -867,19 +867,6 @@ fn verify_expected_code_version(
     Ok(())
 }
 
-#[cfg(test)]
-mod expected_code_version_tests {
-    use super::verify_expected_code_version;
-
-    #[test]
-    fn exact_code_version_is_required_when_requested() {
-        assert!(verify_expected_code_version(Some(42), Some(42)).is_ok());
-        assert!(verify_expected_code_version(Some(41), Some(42)).is_err());
-        assert!(verify_expected_code_version(None, Some(42)).is_err());
-        assert!(verify_expected_code_version(Some(41), None).is_ok());
-    }
-}
-
 struct StaticPageCandidate {
     code_version: u64,
     normalized_path: String,
@@ -1002,3 +989,16 @@ fn internal_error() -> Response {
 }
 
 pub use fn0_wasmtime::{VERSION as FN0_WASMTIME_VERSION, compile};
+
+#[cfg(test)]
+mod expected_code_version_tests {
+    use super::verify_expected_code_version;
+
+    #[test]
+    fn exact_code_version_is_required_when_requested() {
+        assert!(verify_expected_code_version(Some(42), Some(42)).is_ok());
+        assert!(verify_expected_code_version(Some(41), Some(42)).is_err());
+        assert!(verify_expected_code_version(None, Some(42)).is_err());
+        assert!(verify_expected_code_version(Some(41), None).is_ok());
+    }
+}

@@ -45,6 +45,7 @@ type SocketReader = WebSocketRead<ReadHalf<UpgradedIo>>;
 type SocketWriter = WebSocketWrite<WriteHalf<UpgradedIo>>;
 type SingletonKey = (String, String);
 type SingletonConnectSlot = tokio::sync::OnceCell<Result<String, WebSocketCommandError>>;
+type OutboundHandshakeRequest = (String, String, u16, hyper::Request<Empty<Bytes>>);
 
 #[derive(Clone)]
 struct SingletonBinding {
@@ -442,6 +443,7 @@ impl WebSocketService {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn connect_outbound(
         self: &Arc<Self>,
         project_id: String,
@@ -530,6 +532,7 @@ impl WebSocketService {
         Ok(connection_id)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn connect_singleton_outbound(
         self: &Arc<Self>,
         project_id: String,
@@ -588,6 +591,7 @@ impl WebSocketService {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn finish_outbound_handshake<Stream>(
         self: &Arc<Self>,
         project_id: String,
@@ -986,7 +990,7 @@ fn build_outbound_handshake_request(
     url: &str,
     handshake_headers: Vec<(String, String)>,
     protocols: &[String],
-) -> Result<(String, String, u16, hyper::Request<Empty<Bytes>>), WebSocketCommandError> {
+) -> Result<OutboundHandshakeRequest, WebSocketCommandError> {
     let parsed_url = Url::parse(url)
         .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
     let scheme = parsed_url.scheme().to_string();
@@ -1148,6 +1152,7 @@ impl WebSocketCommandDispatcher for WebSocketService {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn connect_singleton(
         &self,
         project_id: String,
@@ -1442,6 +1447,7 @@ fn synthetic_request(
     Ok(request)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn read_loop(
     service: Arc<WebSocketService>,
     project_id: String,

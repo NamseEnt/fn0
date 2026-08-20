@@ -89,6 +89,7 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn connect_singleton(
         &self,
         project_id: String,
