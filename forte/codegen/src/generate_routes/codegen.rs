@@ -333,8 +333,7 @@ fn generate_websocket_path_module(websockets: &[WebSocketRouteInfo]) -> TokenStr
         node.route_path = Some(websocket.route_path.clone());
     }
 
-    let path_module_body = generate_websocket_path_node(&root);
-    path_module_body
+    generate_websocket_path_node(&root)
 }
 
 fn generate_websocket_path_node(node: &WebSocketPathNode) -> TokenStream {
