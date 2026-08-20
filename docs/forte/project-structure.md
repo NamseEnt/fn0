@@ -28,6 +28,7 @@ A Forte project created by `forte init <name>` has the following layout:
 │       ├── apis/              # API endpoints (JSON, no SSR)
 │       ├── ws_in/              # Inbound WebSocket lifecycle handlers mounted under /ws
 │       ├── ws_out/             # Outbound WebSocket receive handlers
+│       ├── ws_singleton/       # One-connection-per-project outbound WebSockets (mounted under /ws_singleton)
 │       ├── actions/           # Server actions (called from frontend)
 │       │   └── mod.rs         # Auto-generated module declarations
 │       ├── hooks/             # Self-invoke hooks
@@ -65,7 +66,8 @@ A Forte project created by `forte init <name>` has the following layout:
 │   ├── backend.wasm           # Compiled Rust backend
 │   └── server.js              # SSR bundle
 │
-└── .forte/                    # Auto-managed by forte dev (do not edit; git-ignored)
+└── .forte/                    # Auto-managed by forte dev/build (do not edit; git-ignored)
+    ├── ws_singletons.json     # WebSocket singleton manifest (rewritten each build; read by forte deploy)
     └── data/
         ├── <sqld files>       # Local libSQL database
         └── objects/           # Local object storage (served as S3-compatible API)

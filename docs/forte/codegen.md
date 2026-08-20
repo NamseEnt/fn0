@@ -38,6 +38,7 @@ Cargo reruns the build script when any of these directories change:
 - `src/admin`
 - `src/ws_in`
 - `src/ws_out`
+- `src/ws_singleton`
 - `public`
 - `Cargo.lock` (ensures the build script re-runs after dependency version changes, since declaring any `rerun-if-changed` disables Cargo's default file-based detection)
 
@@ -55,6 +56,7 @@ Each handler type is discovered by statically parsing the Rust source:
 | `src/admin/` | Same as queue tasks | Top-level only (`.rs` files) |
 | `src/ws_in/` | File defines `pub async fn on_connect` and `pub async fn on_message`; `on_disconnect` optional | Recursive |
 | `src/ws_out/` | File defines `pub async fn on_message` (`on_connect` must be absent); `on_disconnect` optional; no dynamic path segments | Recursive |
+| `src/ws_singleton/` | File defines `pub async fn connect` returning `SingletonConnectionOptions` and `pub async fn on_message`; `on_connect` and `on_disconnect` optional; no dynamic path segments; also writes `.forte/ws_singletons.json` for `forte deploy` | Recursive |
 | `public/` | Every file (recursively); served verbatim at the file's relative path | Recursive (all files) |
 
 **Important:** `src/actions/` supports two layouts: flat `.rs` files (`user_login.rs`) or directory modules (`user_login/mod.rs`). Only the top level of `src/actions/` is scanned; nested paths like `user/login.rs` are not discovered. All other handler directories (`hooks/`, `queue_task/`, `admin/`) support only flat `.rs` files.

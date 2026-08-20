@@ -72,10 +72,13 @@ fn0 does not enforce statefulness — violating the stateless constraint causes 
 | API | `rs/src/apis/` | `/api/<path>` | Returns JSON directly; no React rendering; any HTTP method |
 | Action | `rs/src/actions/` | `POST /__forte_action/<name>` | Mutation or query called from the browser via the generated typed client |
 | Hook | `rs/src/hooks/` | `POST /__self_invoke/<name>` | Data fetch called during SSR; result is embedded in the HTML and rehydrated on the client |
+| WebSocket (inbound) | `rs/src/ws_in/` | `/ws/<path>` | Accept browser WebSocket connections |
+| WebSocket (outbound) | `rs/src/ws_out/` | internal | Receive messages from sockets the app opens with `ws_out::connect(url)` |
+| WebSocket (singleton) | `rs/src/ws_singleton/` | internal | One shared connection per project (market feed, upstream push channel) |
 | Queue task | `rs/src/queue_task/` | internal | Background job enqueued with `enqueue::<name>(input)` |
 | Admin task | `rs/src/admin/` | internal | One-off operation run via `forte admin run <name>` |
 
-See the full handler docs: [Pages](pages.md), [API Endpoints](apis.md), [Actions & Tasks](actions.md).
+See the full handler docs: [Pages](pages.md), [API Endpoints](apis.md), [Actions & Tasks](actions.md), [WebSockets](websockets.md).
 
 
 ## Workflow Overview

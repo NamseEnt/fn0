@@ -2,7 +2,9 @@
 
 Forte WebSockets use event callbacks while fn0 owns the network connection. Create inbound route
 modules under `rs/src/ws_in`; they are published below `/ws`. Create outbound route modules under
-`rs/src/ws_out`; they receive messages from connections opened by the application.
+`rs/src/ws_out`; they receive messages from connections opened by the application. Create singleton
+route modules under `rs/src/ws_singleton`; fn0 keeps exactly one connection per singleton alive
+project-wide and routes its messages to the same handler on any worker.
 
 ## Route example
 
@@ -123,6 +125,113 @@ application-level retry is safe. Forte does not retry automatically.
 WebSocket delivery is at-most-once and not durable. Deploys close affected project connections
 with `1012`. Clients reconnect, fetch authoritative state over HTTP, and only then resume applying
 live messages.
+
+## Singleton connections
+
+Singleton routes model **one shared outbound connection per project** — a market-data feed, a
+third-party push channel, a chat firehose. Every worker that handles a message for the project
+routes it into the same handler; fn0 opens the underlying socket at most once and re-opens it if
+it drops.
+
+Create modules under `rs/src/ws_singleton`. Dynamic path segments (`[param]`) are rejected at
+build time. `codegen` scans this directory recursively for `.rs` files, and derives the singleton
+id from the file path relative to `ws_singleton/`:
+
+| Module | Singleton id | Route |
+| --- | --- | --- |
+| `ws_singleton/market_feed.rs` | `market_feed` | `/ws_singleton/market_feed` |
+| `ws_singleton/feeds/us_market.rs` | `feeds/us_market` | `/ws_singleton/feeds/us_market` |
+
+Every discovered singleton is written to `.forte/ws_singletons.json` by the build (each entry has
+`singleton_id` and `route_path`). `forte deploy` reads the manifest and posts the declarations to
+control, which validates them and rejects the deploy if any `singleton_id` is empty, duplicated,
+or does not match `/ws_singleton/<singleton_id>`.
+
+### Handler shape
+
+Each singleton module defines `connect` (required), `on_message` (required), and optionally
+`on_connect` and `on_disconnect`. All are `pub async` and return `Result<...>`; `codegen` panics
+at build time otherwise.
+
+```rust
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::{
+    DisconnectEvent, IncomingMessage, MessageEvent, SingletonConnectEvent,
+    SingletonConnectionOptions, WebSocketMessage,
+};
+
+pub async fn connect() -> Result<SingletonConnectionOptions> {
+    Ok(SingletonConnectionOptions::new("wss://feed.example.com/market"))
+}
+
+pub async fn on_connect(event: SingletonConnectEvent) -> Result<()> {
+    tracing::info!(?event.connection_id, ?event.protocol, "singleton up");
+    Ok(())
+}
+
+pub async fn on_message(event: MessageEvent) -> Result<()> {
+    match event.message {
+        IncomingMessage::Text(text) => tracing::info!(%text, "tick"),
+        IncomingMessage::Binary(bytes) => tracing::info!(len = bytes.len(), "tick"),
+    }
+    Ok(())
+}
+
+pub async fn on_disconnect(_event: DisconnectEvent) -> Result<()> {
+    Ok(())
+}
+```
+
+`connect` is called by fn0 whenever the singleton needs to be (re-)established. It returns a
+`SingletonConnectionOptions` describing the target URL and optional per-connection headers or
+requested subprotocols. Add extras with the builder-style helpers:
+
+```rust
+let mut options = SingletonConnectionOptions::new("wss://feed.example.com/market");
+options.headers.insert("authorization", "Bearer ...".parse()?);
+options.protocols.push("market.v1".to_string());
+Ok(options)
+```
+
+The URL must be `ws://` or `wss://`. Reserved headers (`host`, `content-length`, `upgrade`,
+`connection`, `sec-websocket-*`, and anything starting with `x-fn0-`) are stripped; fn0 owns
+those. Protocols must be non-empty, must not contain whitespace, and must not contain commas.
+
+`on_connect` fires once each time the connection completes the WebSocket handshake and receives
+the selected `Sec-WebSocket-Protocol`, if any. `on_message` fires for every inbound frame.
+`on_disconnect` is best-effort, with the same `DisconnectCause` mapping as inbound routes; use
+`Deployment` and `TransportError` to distinguish an intentional restart from a wire drop.
+
+### Sending, disconnecting, and status
+
+Singletons are addressed by the `ConnectionId` fn0 assigns them. Use
+`forte_sdk::websocket::send` and `forte_sdk::websocket::disconnect` the same way as inbound routes;
+call them from anywhere in the backend that reaches the id (typically an action, a hook, or a
+queue task):
+
+```rust
+forte_sdk::websocket::send(
+    &connection_id,
+    WebSocketMessage::text("{\"op\":\"subscribe\",\"symbol\":\"AAPL\"}"),
+)
+.await?;
+```
+
+There is no public `connect_singleton` in the SDK — fn0 owns opening and re-opening the socket
+in response to the manifest declaration, so user code never calls it. The current status of a
+singleton (which worker owns it, when it last handshook, the last error, if any) is tracked by
+the fn0 control plane; a UI can pull it through the `websocket_singleton_status` admin action on
+control.
+
+### Lifecycle
+
+- Registered at deploy time from `.forte/ws_singletons.json`; a rename or removal takes effect on
+  the next `forte deploy`.
+- fn0 keeps at most one active connection per `(project, singleton_id)` at any time, even across
+  many worker instances. A new deploy closes the old connection before starting the new one.
+- Delivery is still at-most-once. A dropped message is not replayed.
+- Owner leases are renewed periodically; when a worker vanishes, control hands the singleton to
+  another worker and calls `connect` again there.
 
 See [Limits & Quotas](../fn0/limits.md) and the internal
 [WebSocket design](../design/forte-websockets.md) for queue, size, and lifecycle details.
