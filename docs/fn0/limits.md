@@ -54,6 +54,7 @@ is what a warm instance is held to.
 | Waiting invocations per project per worker | 128 |
 | Connections per project per worker | 1,000, provisional |
 | Connections per worker process | 10,000, provisional |
+| Singleton declarations per project | 1,000 |
 
 Outbound bodies stream without a declared length. Inbound and outbound messages remain subject to
 transport backpressure, available worker and application memory, and the invocation's remaining

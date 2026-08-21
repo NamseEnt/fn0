@@ -2,6 +2,9 @@
 
 Status: implemented
 
+Persistent outbound WebSockets are specified separately in [Forte Persistent Outbound WebSocket
+Design](./forte-websocket-singleton-connectors.md).
+
 ## Architecture
 
 `fn0-worker` owns each WebSocket from HTTP upgrade through final cleanup. Forte applications run

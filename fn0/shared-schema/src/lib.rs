@@ -65,6 +65,8 @@ pub struct WorkerProjectStorage {
 pub const STATIC_CACHE_STATE_ACTIVE: &str = "active";
 pub const STATIC_CACHE_STATE_PRE_PURGE: &str = "pre_purge";
 pub const STATIC_CACHE_STATE_ACTIVATING: &str = "activating";
+pub const MAX_WEBSOCKET_CONNECTIONS_PER_PROJECT: usize = 1_000;
+pub const MAX_WEBSOCKET_SINGLETONS_PER_PROJECT: usize = MAX_WEBSOCKET_CONNECTIONS_PER_PROJECT;
 
 fn default_static_cache_state() -> String {
     STATIC_CACHE_STATE_ACTIVE.to_string()

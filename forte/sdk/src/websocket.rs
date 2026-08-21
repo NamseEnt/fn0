@@ -274,6 +274,7 @@ pub async fn connect(
 }
 
 #[doc(hidden)]
+#[allow(clippy::too_many_arguments)]
 pub async fn connect_singleton(
     project_id: &str,
     singleton_id: &str,
@@ -281,12 +282,13 @@ pub async fn connect_singleton(
     route_path: &str,
     headers: &HeaderMap,
     protocols: &[String],
+    claim_token: &str,
     initial_lease_deadline: i64,
 ) -> Result<ConnectionId, WebSocketConnectError> {
     let endpoint =
         std::env::var("FN0_WEBSOCKET_URL").map_err(|_| WebSocketConnectError::Internal)?;
     let target_url = url.into();
-    if project_id.is_empty() || singleton_id.is_empty() {
+    if project_id.is_empty() || singleton_id.is_empty() || claim_token.is_empty() {
         return Err(WebSocketConnectError::Internal);
     }
     if !target_url.starts_with("ws://") && !target_url.starts_with("wss://") {
@@ -314,6 +316,7 @@ pub async fn connect_singleton(
         "url": target_url,
         "headers": serialized_headers,
         "protocols": protocols,
+        "claim_token": claim_token,
         "initial_lease_deadline": initial_lease_deadline,
     }))
     .map_err(|_| WebSocketConnectError::Internal)?;

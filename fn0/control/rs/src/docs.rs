@@ -99,8 +99,16 @@ pub struct WebSocketSingletonRuntimeDoc {
     #[sk]
     pub singleton_id: String,
     pub code_version: u64,
+    #[serde(default)]
+    pub claim_token: String,
     pub connection_id: String,
     pub lease_expires_at: DateTime,
+}
+
+#[forte_doc]
+pub struct WebSocketSingletonReconcileCursorDoc {
+    pub after_project_id: Option<String>,
+    pub after_singleton_id: Option<String>,
 }
 
 #[forte_doc]

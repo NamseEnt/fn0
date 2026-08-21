@@ -6,3 +6,4 @@ pub mod project_teardown;
 pub mod public_object_purge;
 pub mod static_cache_purge;
 pub mod static_page_purge;
+pub mod websocket_singleton_reconcile;

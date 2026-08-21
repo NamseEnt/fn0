@@ -7,7 +7,6 @@ use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-const LEASE_SECONDS: i64 = 60;
 const RUNTIME_QUERY_LIMIT: usize = 1_000;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -22,13 +21,6 @@ enum ActivationStage {
 pub struct Input {
     pub project_id: String,
     pub code_version: u64,
-}
-
-#[derive(Deserialize)]
-struct ConnectionOptions {
-    url: String,
-    headers: Vec<(String, String)>,
-    protocols: Vec<String>,
 }
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
@@ -82,7 +74,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         project_id: input.project_id.clone(),
     })
     .await?;
-    initialize_singletons(&db, &input).await
+    enqueue_singletons(&db, &input).await
 }
 
 fn activation_stage(
@@ -106,7 +98,7 @@ fn activation_stage(
     }
 }
 
-async fn initialize_singletons(db: &doc_db::Database, input: &Input) -> anyhow::Result<()> {
+async fn enqueue_singletons(db: &doc_db::Database, input: &Input) -> anyhow::Result<()> {
     let declarations = (WebSocketSingletonConfigDocGet {
         project_id: input.project_id.as_str(),
         code_version: input.code_version,
@@ -117,69 +109,16 @@ async fn initialize_singletons(db: &doc_db::Database, input: &Input) -> anyhow::
     .unwrap_or_default();
     remove_stale_runtime_records(db, &input.project_id, input.code_version, &declarations).await?;
     for declaration in declarations {
-        let options = invoke_singleton_connect(input, &declaration).await?;
-        let mut headers = http::HeaderMap::new();
-        for (header_name, header_value) in options.headers {
-            headers.append(
-                http::HeaderName::from_bytes(header_name.as_bytes())?,
-                http::HeaderValue::from_str(&header_value)?,
-            );
-        }
-        let lease_expires_at = now() + chrono::Duration::seconds(LEASE_SECONDS);
-        let connection_id = websocket::connect_singleton(
-            &input.project_id,
-            &declaration.singleton_id,
-            options.url,
-            &declaration.route_path,
-            &headers,
-            &options.protocols,
-            lease_expires_at.timestamp_millis(),
+        crate::enqueue::websocket_singleton_reconcile(
+            crate::queue_task::websocket_singleton_reconcile::Input {
+                project_id: input.project_id.clone(),
+                code_version: input.code_version,
+                singleton_id: declaration.singleton_id,
+            },
         )
-        .await?;
-        WebSocketSingletonRuntimeDocPut(WebSocketSingletonRuntimeDoc {
-            project_id: input.project_id.clone(),
-            singleton_id: declaration.singleton_id,
-            code_version: input.code_version,
-            connection_id: connection_id.to_string(),
-            lease_expires_at,
-        })
-        .send_with(db)
         .await?;
     }
     Ok(())
-}
-
-async fn invoke_singleton_connect(
-    input: &Input,
-    declaration: &WebSocketSingletonDeclaration,
-) -> anyhow::Result<ConnectionOptions> {
-    let placeholder_uri: http::Uri = std::env::var("FN0_CROSS_PROJECT_INVOKE_URL")?.parse()?;
-    let scheme = placeholder_uri.scheme_str().unwrap_or("http");
-    let placeholder_host = placeholder_uri
-        .host()
-        .ok_or_else(|| anyhow::anyhow!("cross-project invoke URL has no host"))?;
-    let target_url = format!(
-        "{scheme}://{}.{placeholder_host}{}",
-        input.project_id, declaration.route_path
-    );
-    let response = http::Client::new()
-        .send(
-            http::Request::builder()
-                .method("POST")
-                .uri(target_url)
-                .header("x-fn0-internal-websocket-event", "initialize")
-                .header("x-fn0-internal-expected-code-version", input.code_version)
-                .body(Vec::new())?,
-        )
-        .await?;
-    if !response.status().is_success() {
-        anyhow::bail!(
-            "singleton initialization returned status {}",
-            response.status()
-        );
-    }
-    let body = response.into_body().bytes().await;
-    Ok(serde_json::from_slice(&body)?)
 }
 
 async fn remove_stale_runtime_records(
@@ -201,12 +140,7 @@ async fn remove_stale_runtime_records(
     .await?;
     for runtime_record in runtime_records {
         if runtime_is_stale(&runtime_record, code_version, &declared) {
-            (WebSocketSingletonRuntimeDocDelete {
-                project_id,
-                singleton_id: runtime_record.singleton_id.as_str(),
-            })
-            .send_with(db)
-            .await?;
+            crate::actions::cron_on_tick::delete_runtime_if_unchanged(db, &runtime_record).await?;
         }
     }
     Ok(())
@@ -337,6 +271,7 @@ mod tests {
             project_id: "project".to_string(),
             singleton_id: "deleted".to_string(),
             code_version: 42,
+            claim_token: "claim".to_string(),
             connection_id: "connection".to_string(),
             lease_expires_at: now() + chrono::Duration::seconds(60),
         };

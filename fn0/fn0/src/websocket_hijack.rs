@@ -21,6 +21,7 @@ struct SingletonConnectInput {
     url: String,
     headers: Vec<(String, String)>,
     protocols: Vec<String>,
+    claim_token: String,
     initial_lease_deadline: i64,
 }
 
@@ -98,6 +99,7 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
         route_path: String,
         headers: Vec<(String, String)>,
         protocols: Vec<String>,
+        claim_token: String,
         initial_lease_deadline: i64,
         remaining: std::time::Duration,
     ) -> WebSocketConnectFuture {
@@ -108,6 +110,7 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
             route_path,
             headers,
             protocols,
+            claim_token,
             initial_lease_deadline,
             remaining,
         );
@@ -287,6 +290,7 @@ impl WebSocketHijack {
                     route_path,
                     input.headers,
                     input.protocols,
+                    input.claim_token,
                     input.initial_lease_deadline,
                     remaining,
                 )
@@ -476,6 +480,7 @@ mod tests {
             route_path: String,
             headers: Vec<(String, String)>,
             protocols: Vec<String>,
+            claim_token: String,
             initial_lease_deadline: i64,
             _remaining: std::time::Duration,
         ) -> WebSocketConnectFuture {
@@ -489,6 +494,7 @@ mod tests {
                     vec![("authorization".to_string(), "secret".to_string())]
                 );
                 assert_eq!(protocols, vec!["graphql-ws".to_string()]);
+                assert_eq!(claim_token, "claim-token");
                 assert_eq!(initial_lease_deadline, 1234);
                 Ok("v1.singleton".to_string())
             })
@@ -622,7 +628,7 @@ mod tests {
                 .header(SINGLETON_ROUTE_HEADER, "/ws_singleton/market-feed")
                 .body(
                     Full::new(Bytes::from_static(
-                        br#"{"url":"wss://example.com/socket","headers":[["authorization","secret"]],"protocols":["graphql-ws"],"initial_lease_deadline":1234}"#,
+                        br#"{"url":"wss://example.com/socket","headers":[["authorization","secret"]],"protocols":["graphql-ws"],"claim_token":"claim-token","initial_lease_deadline":1234}"#,
                     ))
                         .map_err(|never: std::convert::Infallible| match never {})
                         .boxed_unsync(),

@@ -239,6 +239,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 fn validate_websocket_singletons(
     declarations: &[WebSocketSingletonDeclaration],
 ) -> Result<(), String> {
+    if declarations.len() > fn0_shared_schema::MAX_WEBSOCKET_SINGLETONS_PER_PROJECT {
+        return Err(format!(
+            "websocket singleton count {} exceeds limit {}",
+            declarations.len(),
+            fn0_shared_schema::MAX_WEBSOCKET_SINGLETONS_PER_PROJECT
+        ));
+    }
     let mut singleton_ids = std::collections::HashSet::new();
     for declaration in declarations {
         if declaration.singleton_id.is_empty() {
@@ -429,4 +436,33 @@ fn database_already_exists(body: &[u8]) -> bool {
     }
 
     serde_json::from_slice::<TursoError>(body).is_ok_and(|parsed| parsed.error == ALREADY_EXISTS)
+}
+
+#[cfg(test)]
+mod websocket_singleton_validation_tests {
+    use super::validate_websocket_singletons;
+    use crate::docs::WebSocketSingletonDeclaration;
+
+    fn declarations(count: usize) -> Vec<WebSocketSingletonDeclaration> {
+        (0..count)
+            .map(|declaration_index| WebSocketSingletonDeclaration {
+                singleton_id: format!("feed-{declaration_index}"),
+                route_path: format!("/ws_singleton/feed-{declaration_index}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn accepts_singleton_limit() {
+        let declarations = declarations(fn0_shared_schema::MAX_WEBSOCKET_SINGLETONS_PER_PROJECT);
+        assert!(validate_websocket_singletons(&declarations).is_ok());
+    }
+
+    #[test]
+    fn rejects_more_than_singleton_limit() {
+        let declarations =
+            declarations(fn0_shared_schema::MAX_WEBSOCKET_SINGLETONS_PER_PROJECT + 1);
+        let error = validate_websocket_singletons(&declarations).unwrap_err();
+        assert!(error.contains("exceeds limit"));
+    }
 }

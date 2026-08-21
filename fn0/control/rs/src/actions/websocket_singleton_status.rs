@@ -8,6 +8,8 @@ const LEASE_SECONDS: i64 = 60;
 pub struct Input {
     pub project_id: String,
     pub singleton_id: String,
+    #[serde(default)]
+    pub claim_token: String,
     pub connection_id: String,
     pub status: Status,
 }
@@ -43,6 +45,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         &db,
         &req.body.project_id,
         &req.body.singleton_id,
+        &req.body.claim_token,
         &req.body.connection_id,
         disconnected,
         lease_expires_at,
@@ -64,12 +67,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         let Some(entry) = manifest.project_manifests.get(&req.body.project_id) else {
             return Output::Ignored;
         };
-        if let Err(error) =
-            crate::enqueue::deployment_activation(crate::queue_task::deployment_activation::Input {
+        if let Err(error) = crate::enqueue::websocket_singleton_reconcile(
+            crate::queue_task::websocket_singleton_reconcile::Input {
                 project_id: req.body.project_id.clone(),
                 code_version: entry.code_version,
-            })
-            .await
+                singleton_id: req.body.singleton_id.clone(),
+            },
+        )
+        .await
         {
             tracing::error!(%error, "websocket singleton reconnect enqueue failed");
             return Output::Error;
@@ -82,17 +87,20 @@ async fn update_runtime_status(
     db: &doc_db::Database,
     project_id: &str,
     singleton_id: &str,
+    claim_token: &str,
     connection_id: &str,
     disconnected: bool,
     lease_expires_at: DateTime,
 ) -> anyhow::Result<bool> {
     let project_id = project_id.to_string();
     let singleton_id = singleton_id.to_string();
+    let claim_token = claim_token.to_string();
     let connection_id = connection_id.to_string();
     let result = db
         .trx(|trx| {
             let project_id = project_id.clone();
             let singleton_id = singleton_id.clone();
+            let claim_token = claim_token.clone();
             let connection_id = connection_id.clone();
             async move {
                 let Some(mut runtime) = trx
@@ -102,9 +110,13 @@ async fn update_runtime_status(
                     })
                     .await?
                 else {
-                    return trx.commit::<_, ()>(disconnected);
+                    return trx.commit::<_, ()>(false);
                 };
-                if runtime.connection_id != connection_id {
+                let legacy_claim = runtime.claim_token.is_empty() && claim_token.is_empty();
+                if (!legacy_claim && runtime.claim_token != claim_token)
+                    || (!runtime.connection_id.is_empty() && runtime.connection_id != connection_id)
+                    || (!disconnected && runtime.connection_id.is_empty())
+                {
                     return trx.commit::<_, ()>(false);
                 }
                 if disconnected {
@@ -144,16 +156,24 @@ mod tests {
                 project_id: "project".to_string(),
                 singleton_id: "feed".to_string(),
                 code_version: 2,
+                claim_token: "replacement-claim".to_string(),
                 connection_id: "replacement".to_string(),
                 lease_expires_at,
             })
             .send_with(&db)
             .await
             .unwrap();
-            let accepted =
-                update_runtime_status(&db, "project", "feed", "old", true, lease_expires_at)
-                    .await
-                    .unwrap();
+            let accepted = update_runtime_status(
+                &db,
+                "project",
+                "feed",
+                "old-claim",
+                "old",
+                true,
+                lease_expires_at,
+            )
+            .await
+            .unwrap();
             assert!(!accepted);
             let runtime = (WebSocketSingletonRuntimeDocGet {
                 project_id: "project",
@@ -168,20 +188,21 @@ mod tests {
     }
 
     #[test]
-    fn disconnect_before_runtime_write_requests_reconnect() {
+    fn disconnect_without_claim_is_ignored() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
             let accepted = update_runtime_status(
                 &db,
                 "project",
                 "feed",
+                "claim",
                 "connection",
                 true,
                 now() + chrono::Duration::seconds(60),
             )
             .await
             .unwrap();
-            assert!(accepted);
+            assert!(!accepted);
         });
     }
 
@@ -193,6 +214,7 @@ mod tests {
                 &db,
                 "project",
                 "feed",
+                "claim",
                 "connection",
                 false,
                 now() + chrono::Duration::seconds(60),
@@ -200,6 +222,45 @@ mod tests {
             .await
             .unwrap();
             assert!(!accepted);
+        });
+    }
+
+    #[test]
+    fn disconnect_during_claim_releases_its_claim() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            let lease_expires_at = now() + chrono::Duration::seconds(60);
+            WebSocketSingletonRuntimeDocPut(WebSocketSingletonRuntimeDoc {
+                project_id: "project".to_string(),
+                singleton_id: "feed".to_string(),
+                code_version: 2,
+                claim_token: "claim".to_string(),
+                connection_id: String::new(),
+                lease_expires_at,
+            })
+            .send_with(&db)
+            .await
+            .unwrap();
+            let accepted = update_runtime_status(
+                &db,
+                "project",
+                "feed",
+                "claim",
+                "connection",
+                true,
+                lease_expires_at,
+            )
+            .await
+            .unwrap();
+            assert!(accepted);
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap();
+            assert!(runtime.is_none());
         });
     }
 }
