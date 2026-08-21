@@ -178,3 +178,24 @@ Secrets and env vars set via `forte env set` are stored in `env.yaml` and bundle
 - Each `function` must match a `rs/src/queue_task/<name>.rs` file.
 - That task's `Input` must be empty: `pub struct Input;`, `pub struct Input {}`, or `pub type Input = ()`.
 - Cron jobs are registered during `forte deploy`. Run `forte deploy` again after adding or changing `cron.yaml`.
+
+---
+
+## WebSocket Singleton
+
+### Singleton not connecting after deploy
+
+WebSocket singletons are registered during `forte deploy` from `.forte/ws_singletons.json`, which is written by `forte build`. If the singleton was added or renamed:
+
+1. Run `forte build` (or `forte dev`) to regenerate `.forte/ws_singletons.json`.
+2. Run `forte deploy` to register the updated manifest with the control plane.
+
+The singleton module must define `pub async fn connect` returning `Result<SingletonConnectionOptions>` and `pub async fn on_message`. Dynamic path segments (`[param]`) in the module path are rejected at build time.
+
+### Singleton reconnect after a deploy
+
+A deploy replaces the running singleton: the control plane closes the old connection before registering the new one. Your `on_disconnect` callback receives `DisconnectCause::Deployment`. The new connection is opened automatically — you do not need to call anything.
+
+### Checking singleton status
+
+The fn0 control plane tracks the current state (which worker owns the connection, when it last connected, the last error). Query it through the `websocket_singleton_status` admin action on the control project, or inspect the fn0 Cloud dashboard if available.

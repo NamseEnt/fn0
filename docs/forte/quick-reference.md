@@ -36,7 +36,7 @@ forte destroy                # delete the deployed project and all its resources
 | Queue task | `rs/src/queue_task/` | internal | Background job via `enqueue::<name>(input)` |
 | Admin task | `rs/src/admin/` | internal | `forte admin run <name>` |
 
-## WebSocket
+## WebSocket — Inbound (`rs/src/ws_in/`)
 
 ```rust
 use forte_sdk::anyhow::Result;
@@ -52,6 +52,41 @@ pub async fn on_message(event: MessageEvent) -> Result<()> {
         WebSocketMessage::text("received"),
     )
     .await?;
+    Ok(())
+}
+```
+
+## WebSocket — Outbound (`rs/src/ws_out/`)
+
+```rust
+// rs/src/ws_out/slack.rs  →  crate::ws_out::slack::connect(url)
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::MessageEvent;
+
+// no on_connect — outbound routes only receive messages
+pub async fn on_message(_event: MessageEvent) -> Result<()> {
+    Ok(())
+}
+```
+
+Open from anywhere in the backend:
+
+```rust
+let _connection_id = crate::ws_out::slack::connect("wss://example.com/socket").await?;
+```
+
+## WebSocket — Singleton (`rs/src/ws_singleton/`)
+
+```rust
+// rs/src/ws_singleton/market_feed.rs — fn0 keeps one connection alive project-wide
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::{MessageEvent, SingletonConnectionOptions};
+
+pub async fn connect() -> Result<SingletonConnectionOptions> {
+    Ok(SingletonConnectionOptions::new("wss://feed.example.com/market"))
+}
+
+pub async fn on_message(_event: MessageEvent) -> Result<()> {
     Ok(())
 }
 ```
