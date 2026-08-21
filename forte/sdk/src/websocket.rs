@@ -356,6 +356,81 @@ pub async fn connect_singleton(
     }
 }
 
+#[doc(hidden)]
+pub async fn activate_singleton(
+    project_id: &str,
+    singleton_id: &str,
+    claim_token: &str,
+    connection_id: &ConnectionId,
+) -> Result<(), WebSocketConnectError> {
+    singleton_lifecycle_command(
+        "activate-singleton",
+        project_id,
+        singleton_id,
+        claim_token,
+        connection_id,
+    )
+    .await
+}
+
+#[doc(hidden)]
+pub async fn abort_singleton(
+    project_id: &str,
+    singleton_id: &str,
+    claim_token: &str,
+    connection_id: &ConnectionId,
+) -> Result<(), WebSocketConnectError> {
+    singleton_lifecycle_command(
+        "abort-singleton",
+        project_id,
+        singleton_id,
+        claim_token,
+        connection_id,
+    )
+    .await
+}
+
+async fn singleton_lifecycle_command(
+    command: &str,
+    project_id: &str,
+    singleton_id: &str,
+    claim_token: &str,
+    connection_id: &ConnectionId,
+) -> Result<(), WebSocketConnectError> {
+    let endpoint =
+        std::env::var("FN0_WEBSOCKET_URL").map_err(|_| WebSocketConnectError::Internal)?;
+    if project_id.is_empty() || singleton_id.is_empty() || claim_token.is_empty() {
+        return Err(WebSocketConnectError::Internal);
+    }
+    let body = serde_json::to_vec(&serde_json::json!({
+        "claim_token": claim_token,
+        "connection_id": connection_id.as_str(),
+    }))
+    .map_err(|_| WebSocketConnectError::Internal)?;
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(format!("{}/{command}", endpoint.trim_end_matches('/')))
+        .header(SINGLETON_PROJECT_HEADER, project_id)
+        .header(SINGLETON_ID_HEADER, singleton_id)
+        .header("content-type", "application/json")
+        .body(body)
+        .map_err(|_| WebSocketConnectError::Internal)?;
+    let response = Client::new()
+        .send(request)
+        .await
+        .map_err(|_| WebSocketConnectError::Transport)?;
+    match response.status() {
+        StatusCode::NO_CONTENT => Ok(()),
+        StatusCode::REQUEST_TIMEOUT | StatusCode::GATEWAY_TIMEOUT => {
+            Err(WebSocketConnectError::DeadlineExceeded)
+        }
+        StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE => {
+            Err(WebSocketConnectError::Transport)
+        }
+        _ => Err(WebSocketConnectError::Internal),
+    }
+}
+
 fn singleton_system_header(header_name: &str) -> bool {
     matches!(
         header_name,

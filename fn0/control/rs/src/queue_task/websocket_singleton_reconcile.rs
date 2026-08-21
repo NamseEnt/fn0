@@ -33,6 +33,20 @@ struct ConnectRequest {
 #[allow(async_fn_in_trait)]
 trait SingletonConnector {
     async fn connect(&self, request: ConnectRequest) -> anyhow::Result<String>;
+    async fn activate(
+        &self,
+        project_id: &str,
+        singleton_id: &str,
+        claim_token: &str,
+        connection_id: &str,
+    ) -> anyhow::Result<()>;
+    async fn abort(
+        &self,
+        project_id: &str,
+        singleton_id: &str,
+        claim_token: &str,
+        connection_id: &str,
+    ) -> anyhow::Result<()>;
 }
 
 #[allow(async_fn_in_trait)]
@@ -62,6 +76,40 @@ impl SingletonConnector for WorkerConnector {
         .await?
         .to_string())
     }
+
+    async fn activate(
+        &self,
+        project_id: &str,
+        singleton_id: &str,
+        claim_token: &str,
+        connection_id: &str,
+    ) -> anyhow::Result<()> {
+        websocket::activate_singleton(
+            project_id,
+            singleton_id,
+            claim_token,
+            &websocket::ConnectionId::new(connection_id),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn abort(
+        &self,
+        project_id: &str,
+        singleton_id: &str,
+        claim_token: &str,
+        connection_id: &str,
+    ) -> anyhow::Result<()> {
+        websocket::abort_singleton(
+            project_id,
+            singleton_id,
+            claim_token,
+            &websocket::ConnectionId::new(connection_id),
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 impl SingletonInitializer for ProjectInitializer {
@@ -84,14 +132,26 @@ enum ClaimResult {
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
     let db = doc_db::turso();
-    reconcile_with(&db, input, &ProjectInitializer, &WorkerConnector).await
+    reconcile_with(
+        &db,
+        input,
+        &ProjectInitializer,
+        &WorkerConnector,
+        &mint_claim_token,
+    )
+    .await
 }
 
-async fn reconcile_with<Initializer: SingletonInitializer, Connector: SingletonConnector>(
+async fn reconcile_with<
+    Initializer: SingletonInitializer,
+    Connector: SingletonConnector,
+    ClaimTokenFactory: Fn() -> String,
+>(
     db: &doc_db::Database,
     input: Input,
     initializer: &Initializer,
     connector: &Connector,
+    claim_token_factory: &ClaimTokenFactory,
 ) -> anyhow::Result<()> {
     let Some(manifest) = (WorkerManifestDocGet {}).send_with(db).await? else {
         return Ok(());
@@ -119,7 +179,7 @@ async fn reconcile_with<Initializer: SingletonInitializer, Connector: SingletonC
     let Some(declaration) = declaration else {
         return Ok(());
     };
-    let claim_token = mint_claim_token();
+    let claim_token = claim_token_factory();
     let claim = acquire_claim(db, &input, claim_token, now()).await?;
     let ClaimResult::Acquired {
         claim_token,
@@ -173,14 +233,28 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
             lease_deadline_millis: lease_expires_at.timestamp_millis(),
         })
         .await?;
-    let finalized = finalize_claim(
+    let finalized = match finalize_claim(
         db,
         input,
         claim_token,
         connection_id.as_str(),
         now() + chrono::Duration::seconds(LEASE_SECONDS),
     )
-    .await?;
+    .await
+    {
+        Ok(finalized) => finalized,
+        Err(error) => {
+            let _ = connector
+                .abort(
+                    &input.project_id,
+                    &input.singleton_id,
+                    claim_token,
+                    &connection_id,
+                )
+                .await;
+            return Err(error);
+        }
+    };
     if !finalized {
         tracing::warn!(
             project_id = %input.project_id,
@@ -188,6 +262,39 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
             %connection_id,
             "websocket singleton claim was replaced before finalization"
         );
+        let abort_result = connector
+            .abort(
+                &input.project_id,
+                &input.singleton_id,
+                claim_token,
+                &connection_id,
+            )
+            .await;
+        release_claim(db, input, claim_token).await?;
+        abort_result?;
+        return Ok(());
+    }
+    if let Err(error) = connector
+        .activate(
+            &input.project_id,
+            &input.singleton_id,
+            claim_token,
+            &connection_id,
+        )
+        .await
+    {
+        let abort_result = connector
+            .abort(
+                &input.project_id,
+                &input.singleton_id,
+                claim_token,
+                &connection_id,
+            )
+            .await;
+        if abort_result.is_ok() {
+            release_finalized_connection(db, input, claim_token, &connection_id).await?;
+        }
+        return Err(error);
     }
     Ok(())
 }
@@ -325,6 +432,20 @@ async fn finalize_claim(
             let claim_token = claim_token.clone();
             let connection_id = connection_id.clone();
             async move {
+                let Some(manifest) = trx.get(WorkerManifestDocGet {}).await? else {
+                    return trx.commit::<_, ()>(false);
+                };
+                let active = manifest
+                    .project_manifests
+                    .get(&project_id)
+                    .is_some_and(|entry| {
+                        entry.code_version == code_version
+                            && entry.static_cache_state
+                                == fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
+                    });
+                if !active {
+                    return trx.commit::<_, ()>(false);
+                }
                 let Some(mut runtime) = trx
                     .get(WebSocketSingletonRuntimeDocGet {
                         project_id: project_id.as_str(),
@@ -395,11 +516,54 @@ async fn release_claim(
     }
 }
 
+async fn release_finalized_connection(
+    db: &doc_db::Database,
+    input: &Input,
+    claim_token: &str,
+    connection_id: &str,
+) -> anyhow::Result<()> {
+    let project_id = input.project_id.clone();
+    let singleton_id = input.singleton_id.clone();
+    let claim_token = claim_token.to_string();
+    let connection_id = connection_id.to_string();
+    let result = db
+        .trx(|trx| {
+            let project_id = project_id.clone();
+            let singleton_id = singleton_id.clone();
+            let claim_token = claim_token.clone();
+            let connection_id = connection_id.clone();
+            async move {
+                if let Some(runtime) = trx
+                    .get(WebSocketSingletonRuntimeDocGet {
+                        project_id: project_id.as_str(),
+                        singleton_id: singleton_id.as_str(),
+                    })
+                    .await?
+                    && runtime.claim_token == claim_token
+                    && runtime.connection_id == connection_id
+                {
+                    runtime.delete();
+                }
+                trx.commit::<_, ()>(())
+            }
+        })
+        .await;
+    match result {
+        doc_db::TrxResult::Committed(()) => Ok(()),
+        doc_db::TrxResult::Cancelled(()) => unreachable!(),
+        doc_db::TrxResult::Conflict(error) => {
+            anyhow::bail!("websocket singleton finalized connection release conflict: {error:?}")
+        }
+        doc_db::TrxResult::Err(error) => Err(error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         ClaimResult, ConnectRequest, ConnectionOptions, Input, SingletonConnector,
-        SingletonInitializer, acquire_claim, finalize_claim, reconcile_with, release_claim,
+        SingletonInitializer, acquire_claim, connect_claimed, finalize_claim, reconcile_with,
+        release_claim,
     };
     use crate::docs::{
         DbRequest, WebSocketSingletonConfigDoc, WebSocketSingletonConfigDocPut,
@@ -428,7 +592,14 @@ mod tests {
     }
 
     struct CountingConnector {
+        db: doc_db::Database,
         connection_count: Arc<AtomicUsize>,
+        activation_count: Arc<AtomicUsize>,
+    }
+
+    struct FailingActivationConnector {
+        abort_count: Arc<AtomicUsize>,
+        abort_succeeds: bool,
     }
 
     impl SingletonConnector for CountingConnector {
@@ -439,6 +610,71 @@ mod tests {
             let connection_number = self.connection_count.fetch_add(1, Ordering::AcqRel) + 1;
             Ok(format!("connection-{connection_number}"))
         }
+
+        async fn activate(
+            &self,
+            project_id: &str,
+            singleton_id: &str,
+            claim_token: &str,
+            connection_id: &str,
+        ) -> anyhow::Result<()> {
+            assert_eq!(project_id, "project");
+            assert_eq!(singleton_id, "feed");
+            assert!(!claim_token.is_empty());
+            assert_eq!(connection_id, "connection-1");
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id,
+                singleton_id,
+            })
+            .send_with(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("singleton runtime missing before activation"))?;
+            assert_eq!(runtime.claim_token, claim_token);
+            assert_eq!(runtime.connection_id, connection_id);
+            self.activation_count.fetch_add(1, Ordering::AcqRel);
+            Ok(())
+        }
+
+        async fn abort(
+            &self,
+            _project_id: &str,
+            _singleton_id: &str,
+            _claim_token: &str,
+            _connection_id: &str,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl SingletonConnector for FailingActivationConnector {
+        async fn connect(&self, _request: ConnectRequest) -> anyhow::Result<String> {
+            Ok("failed-connection".to_string())
+        }
+
+        async fn activate(
+            &self,
+            _project_id: &str,
+            _singleton_id: &str,
+            _claim_token: &str,
+            _connection_id: &str,
+        ) -> anyhow::Result<()> {
+            anyhow::bail!("activation failed")
+        }
+
+        async fn abort(
+            &self,
+            _project_id: &str,
+            _singleton_id: &str,
+            _claim_token: &str,
+            _connection_id: &str,
+        ) -> anyhow::Result<()> {
+            self.abort_count.fetch_add(1, Ordering::AcqRel);
+            if self.abort_succeeds {
+                Ok(())
+            } else {
+                anyhow::bail!("abort failed")
+            }
+        }
     }
 
     fn input() -> Input {
@@ -447,6 +683,25 @@ mod tests {
             code_version: 42,
             singleton_id: "feed".to_string(),
         }
+    }
+
+    async fn put_active_manifest(db: &doc_db::Database, code_version: u64) {
+        WorkerManifestDocPut(WorkerManifestDoc {
+            manifest_version: code_version,
+            project_manifests: HashMap::from([(
+                "project".to_string(),
+                WorkerProjectManifest {
+                    code_version,
+                    domain: "project.example.com".to_string(),
+                    static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE.to_string(),
+                    pending_code_version: None,
+                    storage: None,
+                },
+            )]),
+        })
+        .send_with(db)
+        .await
+        .unwrap();
     }
 
     #[test]
@@ -470,23 +725,7 @@ mod tests {
     fn duplicate_reconcile_connects_once() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
-            WorkerManifestDocPut(WorkerManifestDoc {
-                manifest_version: 1,
-                project_manifests: HashMap::from([(
-                    "project".to_string(),
-                    WorkerProjectManifest {
-                        code_version: 42,
-                        domain: "project.example.com".to_string(),
-                        static_cache_state: fn0_shared_schema::STATIC_CACHE_STATE_ACTIVE
-                            .to_string(),
-                        pending_code_version: None,
-                        storage: None,
-                    },
-                )]),
-            })
-            .send_with(&db)
-            .await
-            .unwrap();
+            put_active_manifest(&db, 42).await;
             WebSocketSingletonConfigDocPut(WebSocketSingletonConfigDoc {
                 project_id: "project".to_string(),
                 code_version: 42,
@@ -499,15 +738,36 @@ mod tests {
             .await
             .unwrap();
             let connection_count = Arc::new(AtomicUsize::new(0));
+            let activation_count = Arc::new(AtomicUsize::new(0));
             let connector = CountingConnector {
+                db: db.clone(),
                 connection_count: connection_count.clone(),
+                activation_count: activation_count.clone(),
             };
-            let first = reconcile_with(&db, input(), &FakeInitializer, &connector);
-            let second = reconcile_with(&db, input(), &FakeInitializer, &connector);
+            let claim_number = AtomicUsize::new(0);
+            let claim_token_factory = || {
+                let current_claim_number = claim_number.fetch_add(1, Ordering::AcqRel);
+                format!("claim-{current_claim_number}")
+            };
+            let first = reconcile_with(
+                &db,
+                input(),
+                &FakeInitializer,
+                &connector,
+                &claim_token_factory,
+            );
+            let second = reconcile_with(
+                &db,
+                input(),
+                &FakeInitializer,
+                &connector,
+                &claim_token_factory,
+            );
             let (first_result, second_result) = futures::join!(first, second);
             first_result.unwrap();
             second_result.unwrap();
             assert_eq!(connection_count.load(Ordering::Acquire), 1);
+            assert_eq!(activation_count.load(Ordering::Acquire), 1);
             let runtime = (WebSocketSingletonRuntimeDocGet {
                 project_id: "project",
                 singleton_id: "feed",
@@ -518,6 +778,98 @@ mod tests {
             .unwrap();
             assert_eq!(runtime.connection_id, "connection-1");
             assert!(!runtime.claim_token.is_empty());
+        });
+    }
+
+    #[test]
+    fn activation_failure_releases_finalized_connection_after_abort() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            put_active_manifest(&db, 42).await;
+            let singleton_input = input();
+            let ClaimResult::Acquired {
+                claim_token,
+                lease_expires_at,
+            } = acquire_claim(&db, &singleton_input, "claim".to_string(), now())
+                .await
+                .unwrap()
+            else {
+                panic!("claim should be acquired");
+            };
+            let abort_count = Arc::new(AtomicUsize::new(0));
+            let connector = FailingActivationConnector {
+                abort_count: abort_count.clone(),
+                abort_succeeds: true,
+            };
+            let result = connect_claimed(
+                &db,
+                &singleton_input,
+                WebSocketSingletonDeclaration {
+                    singleton_id: "feed".to_string(),
+                    route_path: "/ws_singleton/feed".to_string(),
+                },
+                &claim_token,
+                lease_expires_at,
+                &FakeInitializer,
+                &connector,
+            )
+            .await;
+            assert!(result.is_err());
+            assert_eq!(abort_count.load(Ordering::Acquire), 1);
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap();
+            assert!(runtime.is_none());
+        });
+    }
+
+    #[test]
+    fn activation_failure_preserves_finalized_connection_when_abort_fails() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            put_active_manifest(&db, 42).await;
+            let singleton_input = input();
+            let ClaimResult::Acquired {
+                claim_token,
+                lease_expires_at,
+            } = acquire_claim(&db, &singleton_input, "claim".to_string(), now())
+                .await
+                .unwrap()
+            else {
+                panic!("claim should be acquired");
+            };
+            let connector = FailingActivationConnector {
+                abort_count: Arc::new(AtomicUsize::new(0)),
+                abort_succeeds: false,
+            };
+            let result = connect_claimed(
+                &db,
+                &singleton_input,
+                WebSocketSingletonDeclaration {
+                    singleton_id: "feed".to_string(),
+                    route_path: "/ws_singleton/feed".to_string(),
+                },
+                &claim_token,
+                lease_expires_at,
+                &FakeInitializer,
+                &connector,
+            )
+            .await;
+            assert!(result.is_err());
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(runtime.claim_token, claim_token);
+            assert_eq!(runtime.connection_id, "failed-connection");
         });
     }
 
@@ -546,6 +898,7 @@ mod tests {
     fn stale_finalize_cannot_replace_new_claim() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
+            put_active_manifest(&db, 42).await;
             let current_time = now();
             acquire_claim(&db, &input(), "first".to_string(), current_time)
                 .await
@@ -577,6 +930,38 @@ mod tests {
             .unwrap()
             .unwrap();
             assert_eq!(runtime.claim_token, "second");
+            assert!(runtime.connection_id.is_empty());
+        });
+    }
+
+    #[test]
+    fn stale_code_version_cannot_finalize_claim() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            put_active_manifest(&db, 42).await;
+            let current_time = now();
+            acquire_claim(&db, &input(), "claim".to_string(), current_time)
+                .await
+                .unwrap();
+            put_active_manifest(&db, 43).await;
+            let finalized = finalize_claim(
+                &db,
+                &input(),
+                "claim",
+                "stale-connection",
+                current_time + chrono::Duration::seconds(60),
+            )
+            .await
+            .unwrap();
+            assert!(!finalized);
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap()
+            .unwrap();
             assert!(runtime.connection_id.is_empty());
         });
     }

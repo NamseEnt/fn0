@@ -18,6 +18,7 @@ use http_body_util::{BodyExt, Empty, Full};
 use hyper_util::rt::TokioIo;
 use rand::RngCore;
 use rustls::pki_types::ServerName;
+use sha1::{Digest, Sha1};
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
@@ -44,8 +45,25 @@ type UpgradedIo = TokioIo<hyper::upgrade::Upgraded>;
 type SocketReader = WebSocketRead<ReadHalf<UpgradedIo>>;
 type SocketWriter = WebSocketWrite<WriteHalf<UpgradedIo>>;
 type SingletonKey = (String, String, String);
-type SingletonConnectSlot = tokio::sync::OnceCell<Result<String, WebSocketCommandError>>;
-type OutboundHandshakeRequest = (String, String, u16, hyper::Request<Empty<Bytes>>);
+type SingletonConnectSlot =
+    tokio::sync::OnceCell<Result<Arc<PreparedSingleton>, WebSocketCommandError>>;
+type OutboundHandshakeRequest = (String, String, u16, hyper::Request<Empty<Bytes>>, String);
+
+struct PreparedSingleton {
+    connection_id: String,
+    project_id: String,
+    route_uri: hyper::Uri,
+    response_headers: hyper::HeaderMap,
+    lease_activation_sender: Mutex<Option<oneshot::Sender<()>>>,
+    message_ready_sender: Mutex<Option<oneshot::Sender<()>>>,
+    activated: Arc<AtomicBool>,
+    activation: tokio::sync::OnceCell<watch::Receiver<Option<Result<(), WebSocketCommandError>>>>,
+}
+
+enum OutboundConnectResult {
+    Active(String),
+    Prepared(Arc<PreparedSingleton>),
+}
 
 #[derive(Clone)]
 struct SingletonBinding {
@@ -54,6 +72,7 @@ struct SingletonBinding {
     singleton_id: String,
     claim_token: String,
     initial_lease_deadline: i64,
+    activated: Arc<AtomicBool>,
 }
 
 struct OutboundExecutor;
@@ -114,6 +133,14 @@ impl DisconnectInfo {
             close_code: None,
             reason: None,
             cause: "transport-error",
+        }
+    }
+
+    fn internal_error() -> Self {
+        Self {
+            close_code: Some(1011),
+            reason: None,
+            cause: "internal-error",
         }
     }
 
@@ -439,6 +466,7 @@ impl WebSocketService {
                     capacity_guard,
                     None,
                     None,
+                    None,
                 )
                 .await;
         });
@@ -454,7 +482,7 @@ impl WebSocketService {
         singleton_binding: Option<SingletonBinding>,
         handshake_headers: Vec<(String, String)>,
         protocols: Vec<String>,
-    ) -> Result<String, WebSocketCommandError> {
+    ) -> Result<OutboundConnectResult, WebSocketCommandError> {
         let deadline = tokio::time::Instant::now() + remaining;
         let capacity_guard = self.reserve_capacity(&project_id).map_err(|_| {
             WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Backpressure)
@@ -463,7 +491,7 @@ impl WebSocketService {
         let route_uri = format!("https://fn0-websocket.internal{receive_path}")
             .parse::<hyper::Uri>()
             .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
-        let (scheme, host, port, request) =
+        let (scheme, host, port, request, expected_accept) =
             build_outbound_handshake_request(&url, handshake_headers, &protocols)?;
         let stream = tokio::time::timeout_at(
             deadline,
@@ -476,7 +504,7 @@ impl WebSocketService {
         .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded))?
         .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?
         .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?;
-        if scheme == "ws" {
+        let result = if scheme == "ws" {
             tokio::time::timeout_at(
                 deadline,
                 self.finish_outbound_handshake(
@@ -487,12 +515,14 @@ impl WebSocketService {
                     stream,
                     capacity_guard,
                     singleton_binding,
+                    expected_accept,
+                    protocols,
                 ),
             )
             .await
             .map_err(|_| {
                 WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded)
-            })??;
+            })??
         } else {
             let tls_connector = outbound_tls_connector().map_err(|_| {
                 WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal)
@@ -523,14 +553,16 @@ impl WebSocketService {
                     tls_stream,
                     capacity_guard,
                     singleton_binding,
+                    expected_accept,
+                    protocols,
                 ),
             )
             .await
             .map_err(|_| {
                 WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded)
-            })??;
-        }
-        Ok(connection_id)
+            })??
+        };
+        Ok(result)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -561,7 +593,8 @@ impl WebSocketService {
         let slot_for_connect = slot.clone();
         let result = slot
             .get_or_init(move || async move {
-                service
+                let activated = Arc::new(AtomicBool::new(false));
+                let result = service
                     .connect_outbound(
                         project_id,
                         url,
@@ -573,22 +606,29 @@ impl WebSocketService {
                             singleton_id,
                             claim_token,
                             initial_lease_deadline,
+                            activated,
                         }),
                         headers,
                         protocols,
                     )
-                    .await
+                    .await?;
+                match result {
+                    OutboundConnectResult::Prepared(prepared) => Ok(prepared),
+                    OutboundConnectResult::Active(_) => Err(WebSocketCommandError::not_sent(
+                        WebSocketCommandErrorKind::Internal,
+                    )),
+                }
             })
             .await
             .clone();
         match result {
-            Ok(connection_id)
+            Ok(prepared)
                 if self
                     .connections
-                    .get(&connection_id)
+                    .get(&prepared.connection_id)
                     .is_some_and(|entry| !entry.closing.load(Ordering::Acquire)) =>
             {
-                Ok(connection_id)
+                Ok(prepared.connection_id.clone())
             }
             Ok(_) => {
                 self.singleton_connections
@@ -605,6 +645,201 @@ impl WebSocketService {
         }
     }
 
+    async fn activate_singleton_outbound(
+        self: &Arc<Self>,
+        singleton_key: SingletonKey,
+        connection_id: &str,
+    ) -> Result<(), WebSocketCommandError> {
+        let slot = self
+            .singleton_connections
+            .get(&singleton_key)
+            .map(|entry| entry.clone())
+            .ok_or_else(|| {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::ConnectionNotFound)
+            })?;
+        let prepared = match slot.get() {
+            Some(Ok(prepared)) if prepared.connection_id == connection_id => prepared.clone(),
+            _ => {
+                return Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::ConnectionNotFound,
+                ));
+            }
+        };
+        let service = self.clone();
+        let prepared_for_activation = prepared.clone();
+        let mut activation_receiver = prepared
+            .activation
+            .get_or_init(|| async move {
+                let (activation_sender, activation_receiver) = watch::channel(None);
+                tokio::spawn(async move {
+                    let result = service
+                        .activate_prepared_singleton(prepared_for_activation)
+                        .await;
+                    let _ = activation_sender.send(Some(result));
+                });
+                activation_receiver
+            })
+            .await
+            .clone();
+        loop {
+            if let Some(result) = *activation_receiver.borrow() {
+                return result;
+            }
+            activation_receiver.changed().await.map_err(|_| {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal)
+            })?;
+        }
+    }
+
+    async fn activate_prepared_singleton(
+        self: &Arc<Self>,
+        prepared: Arc<PreparedSingleton>,
+    ) -> Result<(), WebSocketCommandError> {
+        if self
+            .connections
+            .get(&prepared.connection_id)
+            .is_none_or(|entry| entry.closing.load(Ordering::Acquire))
+        {
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        prepared.activated.store(true, Ordering::Release);
+        let lease_activation_sender = prepared
+            .lease_activation_sender
+            .lock()
+            .expect("singleton lease activation lock")
+            .take();
+        let Some(lease_activation_sender) = lease_activation_sender else {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::internal_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ));
+        };
+        if lease_activation_sender.send(()).is_err() {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::internal_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        let callback_response = self
+            .invoke_connect(
+                &prepared.project_id,
+                &prepared.connection_id,
+                &prepared.route_uri,
+                &prepared.response_headers,
+                None,
+            )
+            .await;
+        if !matches!(callback_response, Ok(response) if response.status().is_success()) {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::internal_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ));
+        }
+        if self
+            .connections
+            .get(&prepared.connection_id)
+            .is_none_or(|entry| entry.closing.load(Ordering::Acquire))
+        {
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Transport,
+            ));
+        }
+        if self
+            .publish_connection(&prepared.project_id, &prepared.connection_id)
+            .await
+            .is_err()
+        {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::transport_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Transport,
+            ));
+        }
+        let message_ready_sender = prepared
+            .message_ready_sender
+            .lock()
+            .expect("singleton message activation lock")
+            .take();
+        let Some(message_ready_sender) = message_ready_sender else {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::internal_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ));
+        };
+        if message_ready_sender.send(()).is_err() {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::transport_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        Ok(())
+    }
+
+    fn abort_singleton_outbound(
+        &self,
+        singleton_key: &SingletonKey,
+        connection_id: &str,
+    ) -> Result<(), WebSocketCommandError> {
+        let Some(slot) = self
+            .singleton_connections
+            .get(singleton_key)
+            .map(|entry| entry.clone())
+        else {
+            return Ok(());
+        };
+        let Some(Ok(prepared)) = slot.get() else {
+            return Ok(());
+        };
+        if prepared.connection_id != connection_id {
+            return Ok(());
+        }
+        close_connection(
+            self,
+            &prepared.project_id,
+            &prepared.connection_id,
+            1011,
+            DisconnectInfo::internal_error(),
+        );
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     async fn finish_outbound_handshake<Stream>(
         self: &Arc<Self>,
@@ -615,13 +850,16 @@ impl WebSocketService {
         stream: Stream,
         capacity_guard: CapacityGuard,
         singleton_binding: Option<SingletonBinding>,
-    ) -> Result<(), WebSocketCommandError>
+        expected_accept: String,
+        requested_protocols: Vec<String>,
+    ) -> Result<OutboundConnectResult, WebSocketCommandError>
     where
         Stream: AsyncRead + AsyncWrite + Send + Unpin + 'static,
     {
         let (websocket, response) = handshake::client(&OutboundExecutor, request, stream)
             .await
             .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?;
+        validate_outbound_handshake(response.headers(), &expected_accept, &requested_protocols)?;
         let (mut reader, writer) = websocket.split(tokio::io::split);
         reader.set_auto_close(false);
         reader.set_auto_pong(false);
@@ -644,6 +882,15 @@ impl WebSocketService {
         let registered = self.register_connection(&project_id, &connection_id, &capacity_guard);
         let (message_ready_sender, message_ready_receiver) = oneshot::channel();
         let is_singleton = singleton_binding.is_some();
+        let singleton_activated = singleton_binding
+            .as_ref()
+            .map(|binding| binding.activated.clone());
+        let (lease_activation_sender, lease_activation_receiver) = if is_singleton {
+            let (sender, receiver) = oneshot::channel();
+            (Some(sender), Some(receiver))
+        } else {
+            (None, None)
+        };
         let service = self.clone();
         let spawned_project_id = project_id.clone();
         let spawned_connection_id = connection_id.clone();
@@ -663,29 +910,23 @@ impl WebSocketService {
                     capacity_guard,
                     singleton_binding,
                     Some(message_ready_receiver),
+                    lease_activation_receiver,
                 )
                 .await;
         });
         if is_singleton {
-            let callback_response = self
-                .invoke_connect(
-                    &project_id,
-                    &connection_id,
-                    &route_uri,
-                    response.headers(),
-                    None,
-                )
-                .await;
-            if !matches!(callback_response, Ok(response) if response.status().is_success()) {
-                let entry = self
-                    .connections
-                    .get(&connection_id)
-                    .map(|entry| entry.clone());
-                let _ = disconnect_entry(entry, &project_id).await;
-                return Err(WebSocketCommandError::not_sent(
-                    WebSocketCommandErrorKind::Internal,
-                ));
-            }
+            return Ok(OutboundConnectResult::Prepared(Arc::new(
+                PreparedSingleton {
+                    connection_id,
+                    project_id,
+                    route_uri,
+                    response_headers: response.headers().clone(),
+                    lease_activation_sender: Mutex::new(lease_activation_sender),
+                    message_ready_sender: Mutex::new(Some(message_ready_sender)),
+                    activated: singleton_activated.expect("singleton activation state"),
+                    activation: tokio::sync::OnceCell::new(),
+                },
+            )));
         }
         if self
             .connections
@@ -701,17 +942,19 @@ impl WebSocketService {
             .await
             .is_err()
         {
-            let entry = self
-                .connections
-                .get(&connection_id)
-                .map(|entry| entry.clone());
-            let _ = disconnect_entry(entry, &project_id).await;
+            close_connection(
+                self,
+                &project_id,
+                &connection_id,
+                1011,
+                DisconnectInfo::transport_error(),
+            );
             return Err(WebSocketCommandError::not_sent(
                 WebSocketCommandErrorKind::Transport,
             ));
         }
         let _ = message_ready_sender.send(());
-        Ok(())
+        Ok(OutboundConnectResult::Active(connection_id))
     }
 
     fn register_connection(
@@ -813,6 +1056,7 @@ impl WebSocketService {
         capacity_guard: CapacityGuard,
         singleton_binding: Option<SingletonBinding>,
         message_ready: Option<oneshot::Receiver<()>>,
+        lease_activation: Option<oneshot::Receiver<()>>,
     ) {
         let disconnect_info = Arc::new(Mutex::new(None));
         let singleton_id = singleton_binding
@@ -821,12 +1065,16 @@ impl WebSocketService {
         let singleton_claim_token = singleton_binding
             .as_ref()
             .map(|binding| binding.claim_token.clone());
+        let singleton_activated = singleton_binding
+            .as_ref()
+            .map(|binding| binding.activated.clone());
         let lease_handle = singleton_binding.as_ref().map(|binding| {
             tokio::spawn(singleton_lease_loop(
                 self.clone(),
                 project_id.clone(),
                 connection_id.clone(),
                 binding.clone(),
+                lease_activation.expect("singleton lease activation receiver"),
             ))
         });
         let reader_handle = tokio::spawn(read_loop(
@@ -865,8 +1113,15 @@ impl WebSocketService {
             .expect("disconnect info lock")
             .clone()
             .unwrap_or_else(DisconnectInfo::transport_error);
-        self.invoke_disconnect(&project_id, &connection_id, &route_uri, final_info);
-        if let (Some(singleton_id), Some(claim_token)) = (singleton_id, singleton_claim_token) {
+        let lifecycle_started = singleton_activated
+            .as_ref()
+            .is_none_or(|activated| activated.load(Ordering::Acquire));
+        if lifecycle_started {
+            self.invoke_disconnect(&project_id, &connection_id, &route_uri, final_info);
+        }
+        if lifecycle_started
+            && let (Some(singleton_id), Some(claim_token)) = (singleton_id, singleton_claim_token)
+        {
             let service = self.clone();
             tokio::spawn(async move {
                 let _ = service
@@ -1045,16 +1300,23 @@ fn build_outbound_handshake_request(
         Some(query) => format!("{request_path}?{query}"),
         None => request_path.to_string(),
     };
+    if protocols
+        .iter()
+        .any(|protocol| !valid_websocket_protocol(protocol))
+    {
+        return Err(WebSocketCommandError::not_sent(
+            WebSocketCommandErrorKind::Internal,
+        ));
+    }
+    let websocket_key = fastwebsockets::handshake::generate_key();
+    let expected_accept = websocket_accept(&websocket_key);
     let mut request_builder = hyper::Request::builder()
         .method(hyper::Method::GET)
         .uri(format!("http://{authority}{request_path}"))
         .header(hyper::header::HOST, &authority)
         .header(hyper::header::UPGRADE, "websocket")
         .header(hyper::header::CONNECTION, "Upgrade")
-        .header(
-            "Sec-WebSocket-Key",
-            fastwebsockets::handshake::generate_key(),
-        )
+        .header("Sec-WebSocket-Key", websocket_key)
         .header("Sec-WebSocket-Version", "13");
     for (header_name, header_value) in handshake_headers {
         if singleton_system_header(&header_name) {
@@ -1074,7 +1336,68 @@ fn build_outbound_handshake_request(
     let request = request_builder
         .body(Empty::<Bytes>::new())
         .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
-    Ok((scheme, host, port, request))
+    Ok((scheme, host, port, request, expected_accept))
+}
+
+fn websocket_accept(websocket_key: &str) -> String {
+    let mut digest = Sha1::new();
+    digest.update(websocket_key.as_bytes());
+    digest.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    base64::engine::general_purpose::STANDARD.encode(digest.finalize())
+}
+
+fn validate_outbound_handshake(
+    headers: &hyper::HeaderMap,
+    expected_accept: &str,
+    requested_protocols: &[String],
+) -> Result<(), WebSocketCommandError> {
+    let accept_values = headers
+        .get_all("sec-websocket-accept")
+        .iter()
+        .map(|value| {
+            value
+                .to_str()
+                .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let valid_accept = accept_values.as_slice() == [expected_accept];
+    if !valid_accept || headers.contains_key("sec-websocket-extensions") {
+        return Err(WebSocketCommandError::not_sent(
+            WebSocketCommandErrorKind::Transport,
+        ));
+    }
+    let selected_protocols = headers
+        .get_all("sec-websocket-protocol")
+        .iter()
+        .map(|value| {
+            value
+                .to_str()
+                .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if selected_protocols.len() > 1 {
+        return Err(WebSocketCommandError::not_sent(
+            WebSocketCommandErrorKind::Transport,
+        ));
+    }
+    if let Some(selected_protocol) = selected_protocols.first()
+        && (!valid_websocket_protocol(selected_protocol)
+            || !requested_protocols
+                .iter()
+                .any(|requested_protocol| requested_protocol == selected_protocol))
+    {
+        return Err(WebSocketCommandError::not_sent(
+            WebSocketCommandErrorKind::Transport,
+        ));
+    }
+    Ok(())
+}
+
+fn valid_websocket_protocol(protocol: &str) -> bool {
+    !protocol.is_empty()
+        && protocol.bytes().all(|byte| {
+            matches!(byte, b'!' | b'#'..=b'\'' | b'*' | b'+' | b'-' | b'.' | b'0'..=b'9' | b'A'..=b'Z' | b'^'..=b'z' | b'|' | b'~')
+        })
 }
 
 async fn singleton_lease_loop(
@@ -1082,6 +1405,7 @@ async fn singleton_lease_loop(
     project_id: String,
     connection_id: String,
     binding: SingletonBinding,
+    lease_activation: oneshot::Receiver<()>,
 ) {
     let current_epoch_millis = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1091,8 +1415,21 @@ async fn singleton_lease_loop(
         .initial_lease_deadline
         .saturating_sub(current_epoch_millis)
         .max(0) as u64;
-    let mut safety_deadline = tokio::time::Instant::now()
+    let pending_deadline = tokio::time::Instant::now()
         + SINGLETON_SAFETY_DEADLINE.min(Duration::from_millis(initial_remaining_millis));
+    tokio::select! {
+        activation = lease_activation => {
+            if activation.is_err() {
+                fence_singleton(&service, &project_id, &connection_id);
+                return;
+            }
+        }
+        _ = tokio::time::sleep_until(pending_deadline) => {
+            fence_singleton(&service, &project_id, &connection_id);
+            return;
+        }
+    }
+    let mut safety_deadline = tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE;
     loop {
         tokio::select! {
             _ = tokio::time::sleep(SINGLETON_HEARTBEAT_INTERVAL) => {}
@@ -1121,6 +1458,22 @@ async fn singleton_lease_loop(
 }
 
 fn fence_singleton(service: &WebSocketService, project_id: &str, connection_id: &str) {
+    close_connection(
+        service,
+        project_id,
+        connection_id,
+        1011,
+        DisconnectInfo::heartbeat_timeout(),
+    );
+}
+
+fn close_connection(
+    service: &WebSocketService,
+    project_id: &str,
+    connection_id: &str,
+    close_code: u16,
+    disconnect_info: DisconnectInfo,
+) {
     let entry = service
         .connections
         .get(connection_id)
@@ -1136,10 +1489,9 @@ fn fence_singleton(service: &WebSocketService, project_id: &str, connection_id: 
     {
         return;
     }
-    let _ = entry.control_sender.send(WriterControl::Close(
-        1011,
-        DisconnectInfo::heartbeat_timeout(),
-    ));
+    let _ = entry
+        .control_sender
+        .send(WriterControl::Close(close_code, disconnect_info));
 }
 
 impl WebSocketCommandDispatcher for WebSocketService {
@@ -1158,7 +1510,7 @@ impl WebSocketCommandDispatcher for WebSocketService {
             });
         };
         Box::pin(async move {
-            service
+            match service
                 .connect_outbound(
                     caller_project_id,
                     url,
@@ -1168,7 +1520,13 @@ impl WebSocketCommandDispatcher for WebSocketService {
                     Vec::new(),
                     Vec::new(),
                 )
-                .await
+                .await?
+            {
+                OutboundConnectResult::Active(connection_id) => Ok(connection_id),
+                OutboundConnectResult::Prepared(_) => Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::Internal,
+                )),
+            }
         })
     }
 
@@ -1206,6 +1564,60 @@ impl WebSocketCommandDispatcher for WebSocketService {
                     remaining,
                 )
                 .await
+        })
+    }
+
+    fn activate_singleton(
+        &self,
+        project_id: String,
+        singleton_id: String,
+        claim_token: String,
+        connection_id: String,
+        remaining: Duration,
+    ) -> WebSocketCommandFuture {
+        let Some(service) = self.self_reference.get().and_then(Weak::upgrade) else {
+            return Box::pin(async {
+                Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::Internal,
+                ))
+            });
+        };
+        Box::pin(async move {
+            let deadline = tokio::time::Instant::now() + remaining;
+            tokio::time::timeout_at(
+                deadline,
+                service.activate_singleton_outbound(
+                    (project_id, singleton_id, claim_token),
+                    &connection_id,
+                ),
+            )
+            .await
+            .unwrap_or_else(|_| {
+                Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::DeadlineExceeded,
+                ))
+            })
+        })
+    }
+
+    fn abort_singleton(
+        &self,
+        project_id: String,
+        singleton_id: String,
+        claim_token: String,
+        connection_id: String,
+        _remaining: Duration,
+    ) -> WebSocketCommandFuture {
+        let Some(service) = self.self_reference.get().and_then(Weak::upgrade) else {
+            return Box::pin(async {
+                Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::Internal,
+                ))
+            });
+        };
+        Box::pin(async move {
+            service
+                .abort_singleton_outbound(&(project_id, singleton_id, claim_token), &connection_id)
         })
     }
 
@@ -2054,7 +2466,7 @@ mod tests {
 
     #[test]
     fn singleton_handshake_preserves_query_headers_and_protocols() {
-        let (scheme, host, port, request) = build_outbound_handshake_request(
+        let (scheme, host, port, request, expected_accept) = build_outbound_handshake_request(
             "wss://example.com/stream?token=secret&mode=full",
             vec![
                 ("authorization".to_string(), "Bearer credential".to_string()),
@@ -2067,6 +2479,13 @@ mod tests {
         assert_eq!(host, "example.com");
         assert_eq!(port, 443);
         assert_eq!(
+            request.headers()["sec-websocket-key"]
+                .to_str()
+                .map(websocket_accept)
+                .unwrap(),
+            expected_accept
+        );
+        assert_eq!(
             request.uri().path_and_query().unwrap().as_str(),
             "/stream?token=secret&mode=full"
         );
@@ -2078,9 +2497,84 @@ mod tests {
         );
     }
 
+    #[test]
+    fn outbound_handshake_requires_matching_accept() {
+        assert_eq!(
+            websocket_accept("dGhlIHNhbXBsZSBub25jZQ=="),
+            "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+        );
+        let expected_accept = websocket_accept("test-key");
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            "sec-websocket-accept",
+            expected_accept.parse().expect("accept header"),
+        );
+        assert!(validate_outbound_handshake(&headers, &expected_accept, &[]).is_ok());
+
+        headers.insert(
+            "sec-websocket-accept",
+            "invalid".parse().expect("invalid accept header"),
+        );
+        assert!(validate_outbound_handshake(&headers, &expected_accept, &[]).is_err());
+
+        headers.append(
+            "sec-websocket-accept",
+            expected_accept.parse().expect("duplicate accept header"),
+        );
+        assert!(validate_outbound_handshake(&headers, &expected_accept, &[]).is_err());
+
+        headers.remove("sec-websocket-accept");
+        assert!(validate_outbound_handshake(&headers, &expected_accept, &[]).is_err());
+    }
+
+    #[test]
+    fn outbound_handshake_rejects_unrequested_protocol_and_extensions() {
+        let expected_accept = websocket_accept("test-key");
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            "sec-websocket-accept",
+            expected_accept.parse().expect("accept header"),
+        );
+        headers.insert(
+            "sec-websocket-protocol",
+            "market.v1".parse().expect("protocol header"),
+        );
+        assert!(validate_outbound_handshake(&headers, &expected_accept, &[]).is_err());
+        assert!(
+            validate_outbound_handshake(&headers, &expected_accept, &["market.v1".to_string()])
+                .is_ok()
+        );
+
+        headers.append(
+            "sec-websocket-protocol",
+            "market.v1".parse().expect("duplicate protocol header"),
+        );
+        assert!(
+            validate_outbound_handshake(&headers, &expected_accept, &["market.v1".to_string()])
+                .is_err()
+        );
+
+        headers.remove("sec-websocket-protocol");
+        headers.insert(
+            "sec-websocket-extensions",
+            "permessage-deflate".parse().expect("extension header"),
+        );
+        assert!(validate_outbound_handshake(&headers, &expected_accept, &[]).is_err());
+    }
+
+    #[test]
+    fn outbound_protocol_names_follow_rfc_token_rules() {
+        assert!(valid_websocket_protocol("graphql-transport-ws"));
+        assert!(valid_websocket_protocol("market.v1+json"));
+        assert!(!valid_websocket_protocol(""));
+        assert!(!valid_websocket_protocol("market v1"));
+        assert!(!valid_websocket_protocol("market,v1"));
+        assert!(!valid_websocket_protocol("market/v1"));
+    }
+
     #[tokio::test]
     async fn duplicate_singleton_initialization_runs_once() {
-        let slot = Arc::new(SingletonConnectSlot::new());
+        let slot = Arc::new(tokio::sync::OnceCell::<Result<String, WebSocketCommandError>>::new());
         let initialization_count = Arc::new(AtomicUsize::new(0));
         let mut tasks = Vec::new();
         for task_number in 0..8 {
@@ -2123,12 +2617,23 @@ mod tests {
                 }
                 request.extend_from_slice(&buffer[..bytes_read]);
             }
+            let request_text = String::from_utf8(request).unwrap();
+            let websocket_key = request_text
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("sec-websocket-key: ")
+                        .or_else(|| line.strip_prefix("Sec-WebSocket-Key: "))
+                })
+                .unwrap();
+            let websocket_accept = websocket_accept(websocket_key);
+            let handshake_response = format!(
+                "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {websocket_accept}\r\nSec-WebSocket-Protocol: market.v1\r\n\r\n"
+            );
             stream
-                .write_all(
-                    b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Protocol: market.v1\r\n\r\n\x81\x05hello",
-                )
+                .write_all(handshake_response.as_bytes())
                 .await
                 .unwrap();
+            stream.write_all(b"\x81\x05hello").await.unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
         });
 
@@ -2172,7 +2677,7 @@ mod tests {
             project_generations: DashMap::new(),
             worker_count: Arc::new(AtomicUsize::new(0)),
             draining: AtomicBool::new(false),
-            directory,
+            directory: directory.clone(),
             identity: WorkerIdentity {
                 worker_id: "worker".to_string(),
                 endpoint: String::new(),
@@ -2189,7 +2694,7 @@ mod tests {
             .unwrap()
             .as_millis() as i64
             + 60_000;
-        service
+        let connection_id = service
             .connect_singleton_outbound(
                 "project".to_string(),
                 "feed".to_string(),
@@ -2200,6 +2705,26 @@ mod tests {
                 "claim-token".to_string(),
                 initial_lease_deadline,
                 Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert!(callback_order.lock().unwrap().is_empty());
+        assert!(
+            directory
+                .lookup_connection(&connection_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        service
+            .activate_singleton_outbound(
+                (
+                    "project".to_string(),
+                    "feed".to_string(),
+                    "claim-token".to_string(),
+                ),
+                &connection_id,
             )
             .await
             .unwrap();
@@ -2377,6 +2902,7 @@ mod tests {
             "claim".to_string(),
         );
         let slot = Arc::new(SingletonConnectSlot::new());
+        let (_lease_activation_sender, lease_activation_receiver) = oneshot::channel();
         singleton_lease_loop(
             service,
             "project".to_string(),
@@ -2387,7 +2913,9 @@ mod tests {
                 singleton_id: "feed".to_string(),
                 claim_token: "claim".to_string(),
                 initial_lease_deadline: 0,
+                activated: Arc::new(AtomicBool::new(false)),
             },
+            lease_activation_receiver,
         )
         .await;
         let control = control_receiver.recv().await.unwrap();

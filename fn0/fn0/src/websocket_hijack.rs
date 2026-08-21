@@ -25,6 +25,12 @@ struct SingletonConnectInput {
     initial_lease_deadline: i64,
 }
 
+#[derive(serde::Deserialize)]
+struct SingletonActivationInput {
+    claim_token: String,
+    connection_id: String,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WebSocketMessageKind {
     Text,
@@ -112,6 +118,50 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
             protocols,
             claim_token,
             initial_lease_deadline,
+            remaining,
+        );
+        Box::pin(async {
+            Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ))
+        })
+    }
+
+    fn activate_singleton(
+        &self,
+        project_id: String,
+        singleton_id: String,
+        claim_token: String,
+        connection_id: String,
+        remaining: std::time::Duration,
+    ) -> WebSocketCommandFuture {
+        let _ = (
+            project_id,
+            singleton_id,
+            claim_token,
+            connection_id,
+            remaining,
+        );
+        Box::pin(async {
+            Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ))
+        })
+    }
+
+    fn abort_singleton(
+        &self,
+        project_id: String,
+        singleton_id: String,
+        claim_token: String,
+        connection_id: String,
+        remaining: std::time::Duration,
+    ) -> WebSocketCommandFuture {
+        let _ = (
+            project_id,
+            singleton_id,
+            claim_token,
+            connection_id,
             remaining,
         );
         Box::pin(async {
@@ -304,6 +354,74 @@ impl WebSocketHijack {
                 Err(error) => response(status_for(error.kind), error.delivery),
             };
         }
+        if matches!(
+            request.uri().path(),
+            "/activate-singleton" | "/abort-singleton"
+        ) {
+            let activate = request.uri().path() == "/activate-singleton";
+            if caller_project_id != self.control_project_id {
+                return response(403, WebSocketDeliveryState::NotSent);
+            }
+            let Some(project_id) = request
+                .headers()
+                .get(SINGLETON_PROJECT_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            let Some(singleton_id) = request
+                .headers()
+                .get(SINGLETON_ID_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            let body = match request.into_body().collect().await {
+                Ok(body) => body.to_bytes(),
+                Err(_) => return response(400, WebSocketDeliveryState::NotSent),
+            };
+            let input: SingletonActivationInput = match serde_json::from_slice(&body) {
+                Ok(input) => input,
+                Err(_) => return response(400, WebSocketDeliveryState::NotSent),
+            };
+            if project_id.is_empty()
+                || singleton_id.is_empty()
+                || input.claim_token.is_empty()
+                || !valid_connection_id(&input.connection_id)
+            {
+                return response(400, WebSocketDeliveryState::NotSent);
+            }
+            let Some(dispatcher) = self.dispatcher.get() else {
+                return response(503, WebSocketDeliveryState::NotSent);
+            };
+            let result = if activate {
+                dispatcher
+                    .activate_singleton(
+                        project_id,
+                        singleton_id,
+                        input.claim_token,
+                        input.connection_id,
+                        remaining,
+                    )
+                    .await
+            } else {
+                dispatcher
+                    .abort_singleton(
+                        project_id,
+                        singleton_id,
+                        input.claim_token,
+                        input.connection_id,
+                        remaining,
+                    )
+                    .await
+            };
+            return match result {
+                Ok(()) => response(204, WebSocketDeliveryState::NotSent),
+                Err(error) => response(status_for(error.kind), error.delivery),
+            };
+        }
         let Some((command, connection_id)) = command_and_connection(request.uri().path()) else {
             return response(404, WebSocketDeliveryState::NotSent);
         };
@@ -461,6 +579,10 @@ mod tests {
         body: Arc<Mutex<Vec<u8>>>,
     }
 
+    struct LifecycleDispatcher {
+        commands: Arc<Mutex<Vec<String>>>,
+    }
+
     impl WebSocketCommandDispatcher for RecordingDispatcher {
         fn connect(
             &self,
@@ -524,6 +646,72 @@ mod tests {
                 *recorded_body.lock().expect("recorded body lock") = bytes.to_vec();
                 Ok(())
             })
+        }
+
+        fn disconnect(
+            &self,
+            _caller_project_id: String,
+            _connection_id: String,
+            _remaining: std::time::Duration,
+        ) -> WebSocketCommandFuture {
+            Box::pin(async { Ok(()) })
+        }
+    }
+
+    impl WebSocketCommandDispatcher for LifecycleDispatcher {
+        fn activate_singleton(
+            &self,
+            project_id: String,
+            singleton_id: String,
+            claim_token: String,
+            connection_id: String,
+            _remaining: std::time::Duration,
+        ) -> WebSocketCommandFuture {
+            assert_eq!(project_id, "target-project");
+            assert_eq!(singleton_id, "market-feed");
+            assert_eq!(claim_token, "claim-token");
+            assert!(valid_connection_id(&connection_id));
+            let commands = self.commands.clone();
+            Box::pin(async move {
+                commands
+                    .lock()
+                    .expect("lifecycle commands lock")
+                    .push("activate".to_string());
+                Ok(())
+            })
+        }
+
+        fn abort_singleton(
+            &self,
+            project_id: String,
+            singleton_id: String,
+            claim_token: String,
+            connection_id: String,
+            _remaining: std::time::Duration,
+        ) -> WebSocketCommandFuture {
+            assert_eq!(project_id, "target-project");
+            assert_eq!(singleton_id, "market-feed");
+            assert_eq!(claim_token, "claim-token");
+            assert!(valid_connection_id(&connection_id));
+            let commands = self.commands.clone();
+            Box::pin(async move {
+                commands
+                    .lock()
+                    .expect("lifecycle commands lock")
+                    .push("abort".to_string());
+                Ok(())
+            })
+        }
+
+        fn send(
+            &self,
+            _caller_project_id: String,
+            _connection_id: String,
+            _message_kind: WebSocketMessageKind,
+            _body: Body,
+            _remaining: std::time::Duration,
+        ) -> WebSocketCommandFuture {
+            Box::pin(async { Ok(()) })
         }
 
         fn disconnect(
@@ -658,5 +846,56 @@ mod tests {
             .expect("response body")
             .to_bytes();
         assert_eq!(body, Bytes::from_static(b"v1.singleton"));
+    }
+
+    #[tokio::test]
+    async fn singleton_lifecycle_commands_are_control_only() {
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let hijack = WebSocketHijack::new("fn0-websocket.test".to_string());
+        hijack.set_dispatcher(Arc::new(LifecycleDispatcher {
+            commands: commands.clone(),
+        }));
+        let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([4_u8; 32]);
+        let request = |command: &str| {
+            hyper::Request::builder()
+                .method(hyper::Method::POST)
+                .uri(format!("http://fn0-websocket.test/{command}-singleton"))
+                .header(SINGLETON_PROJECT_HEADER, "target-project")
+                .header(SINGLETON_ID_HEADER, "market-feed")
+                .body(
+                    Full::new(Bytes::from(format!(
+                        r#"{{"claim_token":"claim-token","connection_id":"v1.{encoded}"}}"#
+                    )))
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+                )
+                .expect("request")
+        };
+
+        let forbidden = hijack
+            .handle_command(
+                "other-project",
+                request("activate"),
+                std::time::Duration::from_secs(15),
+            )
+            .await
+            .expect("response");
+        assert_eq!(forbidden.status(), hyper::StatusCode::FORBIDDEN);
+
+        for command in ["activate", "abort"] {
+            let response = hijack
+                .handle_command(
+                    "fn0-control",
+                    request(command),
+                    std::time::Duration::from_secs(15),
+                )
+                .await
+                .expect("response");
+            assert_eq!(response.status(), hyper::StatusCode::NO_CONTENT);
+        }
+        assert_eq!(
+            commands.lock().expect("lifecycle commands lock").as_slice(),
+            ["activate", "abort"]
+        );
     }
 }
