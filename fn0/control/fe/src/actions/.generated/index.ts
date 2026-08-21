@@ -11,6 +11,7 @@ export { cronOnTick } from "./cron_on_tick";
 export { deleteProject } from "./delete_project";
 export { deploy } from "./deploy";
 export { deployStatus } from "./deploy_status";
+export { docQuery } from "./doc_query";
 export { domainSet } from "./domain_set";
 export { domainStatus } from "./domain_status";
 export { issueToken } from "./issue_token";
