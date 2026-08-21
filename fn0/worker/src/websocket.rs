@@ -40,6 +40,8 @@ const PONG_DEADLINE: Duration = Duration::from_secs(15);
 const OUTBOUND_DIAL_TIMEOUT: Duration = Duration::from_secs(10);
 const SINGLETON_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const SINGLETON_SAFETY_DEADLINE: Duration = Duration::from_secs(30);
+const SINGLETON_RETRY_INITIAL_DELAY: Duration = Duration::from_millis(250);
+const SINGLETON_RETRY_MAX_DELAY: Duration = Duration::from_secs(5);
 
 type UpgradedIo = TokioIo<hyper::upgrade::Upgraded>;
 type SocketReader = WebSocketRead<ReadHalf<UpgradedIo>>;
@@ -63,6 +65,21 @@ struct PreparedSingleton {
 enum OutboundConnectResult {
     Active(String),
     Prepared(Arc<PreparedSingleton>),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SingletonStatusResponse {
+    Accepted,
+    Rejected,
+    Retryable,
+}
+
+#[derive(Clone, Copy)]
+struct SingletonLeaseTiming {
+    heartbeat_interval: Duration,
+    safety_deadline: Duration,
+    retry_initial_delay: Duration,
+    retry_max_delay: Duration,
 }
 
 #[derive(Clone)]
@@ -1217,7 +1234,7 @@ impl WebSocketService {
         claim_token: &str,
         connection_id: &str,
         status: &str,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<SingletonStatusResponse> {
         let body = serde_json::to_vec(&serde_json::json!({
             "project_id": project_id,
             "singleton_id": singleton_id,
@@ -1237,10 +1254,18 @@ impl WebSocketService {
             )?;
         let response = self.invoke("fn0-control", request).await?;
         if !response.status().is_success() {
-            return Ok(false);
+            return Ok(SingletonStatusResponse::Retryable);
         }
         let body = response.into_body().collect().await?.to_bytes();
-        Ok(body.as_ref() == b"\"Ok\"")
+        Ok(classify_singleton_status_response(&body))
+    }
+}
+
+fn classify_singleton_status_response(body: &[u8]) -> SingletonStatusResponse {
+    match body {
+        b"\"Ok\"" => SingletonStatusResponse::Accepted,
+        b"\"Ignored\"" | b"\"Unauthorized\"" => SingletonStatusResponse::Rejected,
+        _ => SingletonStatusResponse::Retryable,
     }
 }
 
@@ -1429,32 +1454,89 @@ async fn singleton_lease_loop(
             return;
         }
     }
-    let mut safety_deadline = tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE;
-    loop {
-        tokio::select! {
-            _ = tokio::time::sleep(SINGLETON_HEARTBEAT_INTERVAL) => {}
-            _ = tokio::time::sleep_until(safety_deadline) => {
-                fence_singleton(&service, &project_id, &connection_id);
-                return;
-            }
-        }
-        let heartbeat = tokio::time::timeout_at(
-            safety_deadline,
+    let lease_result = renew_singleton_lease(
+        SingletonLeaseTiming {
+            heartbeat_interval: SINGLETON_HEARTBEAT_INTERVAL,
+            safety_deadline: SINGLETON_SAFETY_DEADLINE,
+            retry_initial_delay: SINGLETON_RETRY_INITIAL_DELAY,
+            retry_max_delay: SINGLETON_RETRY_MAX_DELAY,
+        },
+        || {
             service.notify_singleton_status(
                 &project_id,
                 &binding.singleton_id,
                 &binding.claim_token,
                 &connection_id,
                 "heartbeat",
-            ),
-        )
-        .await;
-        if !matches!(heartbeat, Ok(Ok(true))) {
-            fence_singleton(&service, &project_id, &connection_id);
-            return;
+            )
+        },
+        singleton_retry_delay,
+    )
+    .await;
+    match lease_result {
+        SingletonStatusResponse::Rejected => {
+            tracing::warn!(%project_id, %connection_id, "websocket singleton ownership rejected");
         }
-        safety_deadline = tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE;
+        SingletonStatusResponse::Retryable => {
+            tracing::warn!(%project_id, %connection_id, "websocket singleton lease safety deadline expired");
+        }
+        SingletonStatusResponse::Accepted => unreachable!(),
     }
+    fence_singleton(&service, &project_id, &connection_id);
+}
+
+async fn renew_singleton_lease<Renew, RenewalFuture, RetryDelay>(
+    timing: SingletonLeaseTiming,
+    mut renew: Renew,
+    mut retry_delay: RetryDelay,
+) -> SingletonStatusResponse
+where
+    Renew: FnMut() -> RenewalFuture,
+    RenewalFuture: Future<Output = anyhow::Result<SingletonStatusResponse>>,
+    RetryDelay: FnMut(Duration) -> Duration,
+{
+    let mut safety_deadline = tokio::time::Instant::now() + timing.safety_deadline;
+    let mut next_attempt = tokio::time::Instant::now() + timing.heartbeat_interval;
+    let mut retry_backoff = timing.retry_initial_delay;
+    loop {
+        tokio::time::sleep_until(next_attempt.min(safety_deadline)).await;
+        if tokio::time::Instant::now() >= safety_deadline {
+            return SingletonStatusResponse::Retryable;
+        }
+        let renewal = tokio::time::timeout_at(safety_deadline, renew()).await;
+        match renewal {
+            Ok(Ok(SingletonStatusResponse::Accepted)) => {
+                safety_deadline = tokio::time::Instant::now() + timing.safety_deadline;
+                next_attempt = tokio::time::Instant::now() + timing.heartbeat_interval;
+                retry_backoff = timing.retry_initial_delay;
+            }
+            Ok(Ok(SingletonStatusResponse::Rejected)) => {
+                return SingletonStatusResponse::Rejected;
+            }
+            Ok(Ok(SingletonStatusResponse::Retryable)) | Ok(Err(_)) => {
+                let remaining =
+                    safety_deadline.saturating_duration_since(tokio::time::Instant::now());
+                if remaining.is_zero() {
+                    return SingletonStatusResponse::Retryable;
+                }
+                next_attempt =
+                    tokio::time::Instant::now() + retry_delay(retry_backoff).min(remaining);
+                retry_backoff = retry_backoff.saturating_mul(2).min(timing.retry_max_delay);
+            }
+            Err(_) => return SingletonStatusResponse::Retryable,
+        }
+    }
+}
+
+fn singleton_retry_delay(backoff: Duration) -> Duration {
+    let minimum = backoff / 2;
+    let jitter_range_millis = u64::try_from((backoff - minimum).as_millis()).unwrap_or(u64::MAX);
+    let jitter_millis = if jitter_range_millis == 0 {
+        0
+    } else {
+        rand::thread_rng().next_u64() % (jitter_range_millis + 1)
+    };
+    minimum + Duration::from_millis(jitter_millis)
 }
 
 fn fence_singleton(service: &WebSocketService, project_id: &str, connection_id: &str) {
@@ -2135,21 +2217,35 @@ async fn writer_loop(
                     WriterControl::PeerClose(payload, info) => {
                         store_disconnect_info(&disconnect_info, info);
                         if !close_sent {
-                            let _ = writer.write_frame(Frame::close_raw(Payload::Bytes(payload.into()))).await;
-                            let _ = writer.flush().await;
+                            let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
+                            let _ = write_close_frame_until(
+                                writer,
+                                Frame::close_raw(Payload::Bytes(payload.into())),
+                                close_deadline,
+                            )
+                            .await;
                         }
                         finish_close_response(close_response.take());
                         return;
                     }
                     WriterControl::Close(code, info) => {
                         store_disconnect_info(&disconnect_info, info);
-                        if writer.write_frame(Frame::close(code, &[])).await.is_err() {
+                        if close_sent {
+                            continue;
+                        }
+                        let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
+                        if !write_close_frame_until(
+                            writer,
+                            Frame::close(code, &[]),
+                            close_deadline,
+                        )
+                        .await
+                        {
                             finish_close_response(close_response.take());
                             return;
                         }
-                        let _ = writer.flush().await;
                         close_sent = true;
-                        close_timeout.as_mut().reset(tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE);
+                        close_timeout.as_mut().reset(close_deadline);
                     }
                     WriterControl::TransportLost(info) => {
                         store_disconnect_info(&disconnect_info, info);
@@ -2172,8 +2268,13 @@ async fn writer_loop(
                                 WebSocketCommandErrorKind::DeadlineExceeded,
                             )));
                             store_disconnect_info(&disconnect_info, DisconnectInfo::protocol_error(1013));
-                            let _ = writer.write_frame(Frame::close(1013, &[])).await;
-                            let _ = writer.flush().await;
+                            let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
+                            let _ = write_close_frame_until(
+                                writer,
+                                Frame::close(1013, &[]),
+                                close_deadline,
+                            )
+                            .await;
                             return;
                         }
                         let _ = ready_sender.send(());
@@ -2211,21 +2312,32 @@ async fn writer_loop(
                         let _ = response_sender.send(result);
                         if must_close {
                             store_disconnect_info(&disconnect_info, DisconnectInfo::protocol_error(close_code));
-                            let _ = writer.write_frame(Frame::close(close_code, &[])).await;
-                            let _ = writer.flush().await;
+                            let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
+                            let _ = write_close_frame_until(
+                                writer,
+                                Frame::close(close_code, &[]),
+                                close_deadline,
+                            )
+                            .await;
                             return;
                         }
                     }
                     SocketCommand::Close { code, info, response_sender } => {
                         store_disconnect_info(&disconnect_info, info);
                         close_response = response_sender;
-                        if writer.write_frame(Frame::close(code, &[])).await.is_err() {
+                        let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
+                        if !write_close_frame_until(
+                            writer,
+                            Frame::close(code, &[]),
+                            close_deadline,
+                        )
+                        .await
+                        {
                             finish_close_response(close_response.take());
                             return;
                         }
-                        let _ = writer.flush().await;
                         close_sent = true;
-                        close_timeout.as_mut().reset(tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE);
+                        close_timeout.as_mut().reset(close_deadline);
                     }
                 }
             }
@@ -2257,6 +2369,22 @@ async fn writer_loop(
             }
         }
     }
+}
+
+async fn write_close_frame_until<Writer>(
+    writer: &mut WebSocketWrite<Writer>,
+    frame: Frame<'static>,
+    deadline: tokio::time::Instant,
+) -> bool
+where
+    Writer: AsyncWrite + Unpin,
+{
+    tokio::time::timeout_at(deadline, async {
+        writer.write_frame(frame).await?;
+        writer.flush().await
+    })
+    .await
+    .is_ok_and(|result| result.is_ok())
 }
 
 async fn send_message(
@@ -2417,6 +2545,8 @@ mod tests {
     use fn0::WebSocketCommandDispatcher;
     use std::convert::Infallible;
     use std::net::{SocketAddr, UdpSocket};
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
     use tokio::time::timeout;
@@ -2462,6 +2592,118 @@ mod tests {
             control_lease - SINGLETON_SAFETY_DEADLINE
                 >= CALLBACK_DEADLINE + CLOSE_HANDSHAKE_DEADLINE
         );
+    }
+
+    #[test]
+    fn singleton_status_response_distinguishes_rejection_from_retryable_failure() {
+        assert_eq!(
+            classify_singleton_status_response(b"\"Ok\""),
+            SingletonStatusResponse::Accepted
+        );
+        assert_eq!(
+            classify_singleton_status_response(b"\"Ignored\""),
+            SingletonStatusResponse::Rejected
+        );
+        assert_eq!(
+            classify_singleton_status_response(b"\"Unauthorized\""),
+            SingletonStatusResponse::Rejected
+        );
+        assert_eq!(
+            classify_singleton_status_response(b"\"Error\""),
+            SingletonStatusResponse::Retryable
+        );
+    }
+
+    #[tokio::test]
+    async fn transient_singleton_heartbeat_failure_retries_before_fencing() {
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_count_for_renewal = attempt_count.clone();
+        let result = renew_singleton_lease(
+            SingletonLeaseTiming {
+                heartbeat_interval: Duration::from_millis(5),
+                safety_deadline: Duration::from_millis(100),
+                retry_initial_delay: Duration::from_millis(1),
+                retry_max_delay: Duration::from_millis(5),
+            },
+            move || {
+                let attempt_number = attempt_count_for_renewal.fetch_add(1, Ordering::AcqRel);
+                async move {
+                    Ok(match attempt_number {
+                        0 => SingletonStatusResponse::Retryable,
+                        1 => SingletonStatusResponse::Accepted,
+                        _ => SingletonStatusResponse::Rejected,
+                    })
+                }
+            },
+            |_| Duration::from_millis(1),
+        )
+        .await;
+        assert_eq!(result, SingletonStatusResponse::Rejected);
+        assert_eq!(attempt_count.load(Ordering::Acquire), 3);
+    }
+
+    #[tokio::test]
+    async fn singleton_heartbeat_failures_fence_at_safety_deadline() {
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_count_for_renewal = attempt_count.clone();
+        let result = renew_singleton_lease(
+            SingletonLeaseTiming {
+                heartbeat_interval: Duration::from_millis(1),
+                safety_deadline: Duration::from_millis(30),
+                retry_initial_delay: Duration::from_millis(1),
+                retry_max_delay: Duration::from_millis(5),
+            },
+            move || {
+                attempt_count_for_renewal.fetch_add(1, Ordering::AcqRel);
+                async { Ok(SingletonStatusResponse::Retryable) }
+            },
+            |backoff| backoff,
+        )
+        .await;
+        assert_eq!(result, SingletonStatusResponse::Retryable);
+        assert!(attempt_count.load(Ordering::Acquire) > 1);
+    }
+
+    struct PendingWriter;
+
+    impl AsyncWrite for PendingWriter {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _context: &mut Context<'_>,
+            _buffer: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            Poll::Pending
+        }
+
+        fn poll_flush(
+            self: Pin<&mut Self>,
+            _context: &mut Context<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            Poll::Pending
+        }
+
+        fn poll_shutdown(
+            self: Pin<&mut Self>,
+            _context: &mut Context<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            Poll::Pending
+        }
+    }
+
+    #[tokio::test]
+    async fn close_frame_write_is_bounded_by_close_deadline() {
+        let (_, mut writer) = fastwebsockets::after_handshake_split(
+            tokio::io::empty(),
+            PendingWriter,
+            fastwebsockets::Role::Server,
+        );
+        let result = write_close_frame_until(
+            &mut writer,
+            Frame::close(1011, &[]),
+            tokio::time::Instant::now() + Duration::from_millis(20),
+        )
+        .await;
+        assert!(!result);
     }
 
     #[test]
