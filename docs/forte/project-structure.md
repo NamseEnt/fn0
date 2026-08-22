@@ -174,29 +174,33 @@ Same YAML shape as `env.yaml`, but plaintext only — `secret:` entries are reje
 
 Encrypted `env.yaml` entries cannot be decrypted offline (that needs the vault, i.e. credentials and network), so `forte dev` leaves them unset and lists them on startup. Give any secret you need locally a plaintext value in `env.local.yaml`.
 
-## fe/src/app.tsx — Head Component
+## fe/src/app.tsx — Head and Metadata
 
-`app.tsx` exports a named `Head` function (no default export, no props) whose return value is rendered as the `<head>` content for every page. The SSR runtime calls `<Head />` once per request before writing the HTML stream.
+`app.tsx` provides app-wide `<head>` content via two exports:
+
+- `head` — an array of `HeadDescriptor` objects (title, meta tags, Open Graph). Per-page `head` exports merge over these defaults; matching keys are replaced.
+- `Head` — a React component for shared resources that pages never override (charset, favicon, font links). Do **not** put `<title>` or `<meta name>`/`<meta property>` tags here; they would duplicate page-provided ones and `forte dev` logs a warning when it detects this.
 
 `forte init` generates:
 
 ```tsx
 // fe/src/app.tsx
+export const head = [
+    { title: "Forte App" },
+    { name: "viewport", content: "width=device-width, initial-scale=1.0" },
+];
+
 export function Head() {
-    return (
-        <>
-            <meta charSet="utf-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>My App</title>
-        </>
-    );
+    return <meta charSet="utf-8" />;
 }
 ```
 
-Rules:
+Rules for `Head`:
 - Must be a named export `Head` (not a default export)
 - Must take no props
 - The return value is inserted inside `<head>…</head>` — do not return a `<head>` element itself
+
+See [head.md](head.md) for `HeadDescriptor` shapes, merge semantics, and per-page overrides.
 
 ## fe/forte.config.ts (optional)
 
@@ -300,4 +304,5 @@ Dependencies added by `forte init`:
 - `forte-json` — JSON serializer
 - `doc-db` (`fn0-doc-db` on crates.io) — database client
 - `object-storage` (`fn0-object-storage` on crates.io) — object storage client
+- `anyhow`, `cookie`, `serde`, `serde_json`, `http`, `tracing` — common Rust crates (re-exported by `forte-sdk`, but listed explicitly so you can use them directly)
 - `forte-codegen` (build-dependency) — code generation
