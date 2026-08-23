@@ -4,6 +4,7 @@
 
 - **No explanatory comments in code.** TODO comments are allowed.
 - **Rust edition:** 2024
+- **Rust toolchain:** pinned in `rust-toolchain.toml` (currently 1.97.1). `rustup` picks this up automatically — do not override it.
 - **Rust file layout:** `mod` declarations go at the very top of the file, then `use` statements below them. No blank lines between consecutive `mod` declarations, nor between consecutive `use` statements.
 - Run `cargo clippy` and fix all warnings before committing.
 - Run `cargo fmt` before committing, and CI checks it. Run it per crate (`cargo fmt -p forte-sdk`) or plain from the workspace root, which covers every workspace member. Never run `cargo fmt --all`: it follows path dependencies into `vendor/` and reformats the vendored deno crates. `vendor/` is excluded from formatting and keeps upstream deno's style.

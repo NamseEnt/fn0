@@ -6,6 +6,8 @@
 - **Node.js ≥ 20** and **npm** (for frontend builds; Vite 8 requires Node.js 20+)
 - **Docker** (optional, for local Turso/libSQL database)
 
+> **Monorepo contributors:** the monorepo itself pins its Rust toolchain in `rust-toolchain.toml` (currently 1.97.1). `rustup` picks this up automatically when you run any Cargo command inside the repo — no manual installation step needed beyond having `rustup` installed.
+
 ### Install Rust target
 
 ```sh
