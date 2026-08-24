@@ -42,12 +42,34 @@ pub enum Body {
 
 impl Body {
     pub fn empty() -> Self;
+    pub fn channel() -> (StreamWriter<u8>, Body);
     pub async fn bytes(self) -> Bytes;
     pub async fn json<T: DeserializeOwned>(self) -> Result<T>;
 }
 ```
 
 Converts from `Vec<u8>`, `&[u8]`, `String`, `&str`, `Bytes`, and `()`.
+
+`Body::channel()` returns a writer/body pair for producing a streaming body incrementally. Bytes written to the `StreamWriter<u8>` are consumed by the paired `Body::Stream`. Spawn a task to write bytes while the body is already in the response:
+
+```rust
+use forte_sdk::http::{Body, Response};
+use forte_sdk::runtime::spawn;
+
+let (mut writer, body) = Body::channel();
+spawn(async move {
+    for chunk in chunks {
+        writer.write(chunk).await;
+    }
+    // writer drop closes the stream
+});
+let response = Response::builder()
+    .status(200)
+    .header("content-type", "text/plain")
+    .body(body)?;
+```
+
+Use `Body::channel()` when you need to stream a response body without buffering the entire payload — for example, proxying an upstream streaming response or generating a long response incrementally. A response body from `http::Client::send` is already `Body::Stream` and can be forwarded directly without `channel()`.
 
 ## Outbound HTTP Client
 
@@ -72,9 +94,7 @@ let body = resp.into_body().bytes().await;
 let data: MyType = resp.into_body().json::<MyType>().await?;
 ```
 
-Limitations:
-- Streaming request bodies use `Body::Stream` or `Body::channel()`
-- Subject to fn0 Cloud subrequest limit (50 per request)
+Outbound requests are subject to the fn0 Cloud subrequest limit (50 per request). Streaming request bodies use `Body::channel()` — see the [Body section](#body) above.
 
 ## WebSockets
 

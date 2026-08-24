@@ -187,3 +187,25 @@ See [`forte db` in the CLI reference](forte/cli.md#forte-db-query-sql-options) f
 ## Local Database
 
 `forte dev` downloads and starts sqld automatically — no manual setup needed for Forte projects. For running `doc-db` tests directly, see [setup.md](setup.md#local-database-tursolibsql).
+
+## Developing Framework Changes
+
+When working on `forte-sdk`, `forte-codegen`, `forte-cli`, `doc-db`, or `object-storage`, use `forte init --dev` to create a test project that depends on the local monorepo instead of crates.io:
+
+```sh
+# From the monorepo root
+forte init --dev my-test-app
+cd my-test-app
+forte dev
+```
+
+`--dev` writes `path = "..."` dependencies pointing at the local crates in the monorepo. Changes to `forte-sdk` or `forte-codegen` are picked up on the next `cargo build` inside the test project. Changes to `forte-cli` require rebuilding the CLI itself first:
+
+```sh
+# From the monorepo root
+cargo build -p forte-cli
+# Then use the built CLI binary (target/debug/forte) directly, or reinstall:
+cargo install --path forte/cli
+```
+
+The `forte-rs-to-ts` binary is always downloaded from GitHub Releases — it cannot be pointed at the local source via `--dev` because it requires a nightly toolchain that `forte init --dev` does not manage. Build it from `forte/rs-to-ts` manually if you are developing that tool specifically.
