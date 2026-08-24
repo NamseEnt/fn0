@@ -340,8 +340,8 @@ async fn run() -> Result<()> {
     );
 
     // Recorded on the worker's own meter rather than stamped into guest
-    // payloads: this is operator-facing capacity data against the shared
-    // Grafana pool, not a project's own telemetry.
+    // payloads: this is operator-facing capacity data about the shared metrics
+    // node, not a project's own telemetry.
     let active_series_gate = metric_gate.clone();
     let _active_series_gauge = opentelemetry::global::meter("fn0-worker")
         .u64_observable_gauge("fn0.metric.active_series")

@@ -125,7 +125,7 @@ For self-hosted fn0 worker deployments, configure the OTLP endpoint via environm
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname (e.g. your Alloy or Grafana Cloud OTLP host) |
+| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname (the worker's local Alloy) |
 | `FN0_OTLP_TARGET_SCHEME` | Yes | — | URL scheme for the OTLP collector: `http` or `https` |
 | `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth credentials (`user:token`); use empty string for unauthenticated |
 | `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every OTLP request path |

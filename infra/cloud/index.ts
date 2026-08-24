@@ -3,7 +3,6 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as oci from "@pulumi/oci";
 import * as cloudflare from "@pulumi/cloudflare";
-import * as grafana from "@pulumiverse/grafana";
 import * as random from "@pulumi/random";
 import * as crypto from "node:crypto";
 
@@ -15,6 +14,32 @@ const domain = config.require("domain");
 
 const suffix = new fn0.Suffix("suffix").result;
 
+const bootstrapApiToken = new pulumi.Config("cloudflare").requireSecret(
+  "apiToken",
+);
+
+const cloudflareOperator = new fn0.CloudflareOperatorToken(
+  "cloudflare-operator",
+  {
+    accountId,
+    zoneId,
+    name: pulumi.interpolate`fn0-pulumi-operator-${suffix}`,
+  },
+  {},
+);
+const cloudflareOperatorProvider = new cloudflare.Provider(
+  "cloudflare-operator",
+  { apiToken: cloudflareOperator.value },
+);
+// Components take `providers` and plain resources take `provider`; passing the
+// wrong one is a hard error rather than a silent fallback to the default.
+const cloudflareOperatedComponent: pulumi.ComponentResourceOptions = {
+  providers: { cloudflare: cloudflareOperatorProvider },
+};
+const cloudflareOperatedResource: pulumi.CustomResourceOptions = {
+  provider: cloudflareOperatorProvider,
+};
+
 const envEncryptionKey = new random.RandomBytes("fn0-env-encryption-key", {
   length: 32,
 });
@@ -23,57 +48,74 @@ const adminSigningKey = new random.RandomBytes("fn0-admin-signing-key", {
   length: 32,
 });
 
-const dns = new fn0.CloudflareDns("cloudflare-dns", {
-  suffix,
-  accountId,
-  zoneId,
-  domain,
-});
+const dns = new fn0.CloudflareDns(
+  "cloudflare-dns",
+  {
+    tokenMintingApiToken: bootstrapApiToken,
+    suffix,
+    accountId,
+    zoneId,
+    domain,
+  },
+  cloudflareOperatedComponent,
+);
 
-new cloudflare.ZoneSetting("ssl-mode", {
-  zoneId,
-  settingId: "ssl",
-  value: "strict",
-});
+new cloudflare.ZoneSetting(
+  "ssl-mode",
+  {
+    zoneId,
+    settingId: "ssl",
+    value: "strict",
+  },
+  cloudflareOperatedResource,
+);
 
-new cloudflare.Ruleset("native-static-page-cache", {
-  zoneId,
-  name: "native-static-page-cache",
-  kind: "zone",
-  phase: "http_request_cache_settings",
-  rules: [
-    {
-      action: "set_cache_settings",
-      actionParameters: {
-        cache: true,
-        edgeTtl: {
-          mode: "bypass_by_default",
+new cloudflare.Ruleset(
+  "native-static-page-cache",
+  {
+    zoneId,
+    name: "native-static-page-cache",
+    kind: "zone",
+    phase: "http_request_cache_settings",
+    rules: [
+      {
+        action: "set_cache_settings",
+        actionParameters: {
+          cache: true,
+          edgeTtl: {
+            mode: "bypass_by_default",
+          },
+          // Cache purge cannot reach browsers, so the origin's `no-cache` must
+          // survive to the client or a deploy purge leaves repeat visitors on
+          // the previous version until their browser TTL expires.
+          browserTtl: {
+            mode: "respect_origin",
+          },
         },
-        // Cache purge cannot reach browsers, so the origin's `no-cache` must
-        // survive to the client or a deploy purge leaves repeat visitors on
-        // the previous version until their browser TTL expires.
-        browserTtl: {
-          mode: "respect_origin",
-        },
+        // `PURGE` is not client traffic: a Cache Rule that does not match during
+        // a single-file purge makes that purge silently no-op (it still returns
+        // `success: true`). Dropping it breaks by-URL invalidation with no error.
+        // https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/
+        expression:
+          'http.request.method in {"GET" "HEAD" "PURGE"} and not starts_with(http.request.uri.path, "/__fn0_queue_task/")',
       },
-      // `PURGE` is not client traffic: a Cache Rule that does not match during
-      // a single-file purge makes that purge silently no-op (it still returns
-      // `success: true`). Dropping it breaks by-URL invalidation with no error.
-      // https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/
-      expression:
-        'http.request.method in {"GET" "HEAD" "PURGE"} and not starts_with(http.request.uri.path, "/__fn0_queue_task/")',
-    },
-  ],
-});
+    ],
+  },
+  cloudflareOperatedResource,
+);
 
 // Cache misses in any colo fill from an upper-tier colo instead of the origin,
 // so a miss costs an R2 Class B operation once per upper tier rather than once
 // per edge location. Smart Topology is available on the Free plan.
 // https://developers.cloudflare.com/cache/how-to/tiered-cache/
-new cloudflare.TieredCache("smart-tiered-cache", {
-  zoneId,
-  value: "on",
-});
+new cloudflare.TieredCache(
+  "smart-tiered-cache",
+  {
+    zoneId,
+    value: "on",
+  },
+  cloudflareOperatedResource,
+);
 
 const forteDb = new fn0.ForteDb(
   "forte-db",
@@ -99,13 +141,14 @@ new fn0.ControlProjectBootstrap(
 const forteR2 = new fn0.ForteR2(
   "forte-r2",
   {
+    tokenMintingApiToken: bootstrapApiToken,
     accountId,
     zoneId,
     domain,
     staticHostname: `forte-static.${domain}`,
     bucketName: pulumi.interpolate`fn0-forte-static-${suffix}`,
   },
-  {},
+  cloudflareOperatedComponent,
 );
 
 const cwasmCompilerRegion = "ap-northeast-1";
@@ -324,19 +367,21 @@ const websocketBearer = new random.RandomPassword("websocket-bearer", {
 const bundleStoreR2 = new fn0.BundleStoreR2(
   "bundle-store-r2",
   {
+    tokenMintingApiToken: bootstrapApiToken,
     accountId,
     bucketName: pulumi.interpolate`fn0-bundle-store-${suffix}`,
   },
-  {},
+  cloudflareOperatedComponent,
 );
 
 const metricsBackupR2 = new fn0.MetricsBackupR2(
   "metrics-backup-r2",
   {
+    tokenMintingApiToken: bootstrapApiToken,
     accountId,
     bucketName: pulumi.interpolate`fn0-metrics-backup-${suffix}`,
   },
-  {},
+  cloudflareOperatedComponent,
 );
 
 // The metrics node's basic-auth credential is minted here rather than on the
@@ -351,6 +396,45 @@ const metricsBasicAuthSecret = new random.RandomBytes(
   { length: 24 },
 );
 
+const logsTracesStoreR2 = new fn0.LogsTracesStoreR2(
+  "logs-traces-store-r2",
+  {
+    tokenMintingApiToken: bootstrapApiToken,
+    accountId,
+    bucketName: pulumi.interpolate`fn0-logs-traces-store-${suffix}`,
+  },
+  cloudflareOperatedComponent,
+);
+
+// One tenant today: everything the platform itself emits. Per-project tenants
+// are what the edge gate's header rule would carry instead, and the engine
+// refuses any tenant outside its allowlist, so this value has to match what
+// the node is configured to accept.
+const telemetryTenant = "fn0";
+const telemetryHostname = config.require("telemetryHostname");
+const telemetryViewerHostname = config.require("telemetryViewerHostname");
+
+// Access already gates the viewer hostname, so this is the second lock rather
+// than the only one: a misconfigured Access policy should not leave every
+// project's logs readable to whoever finds the hostname.
+const telemetryViewerAdminSecret = new random.RandomBytes(
+  "fn0-telemetry-viewer-admin-password",
+  { length: 24 },
+);
+
+const telemetryEdgeGate = new fn0.TelemetryEdgeGate(
+  "telemetry-edge-gate",
+  {
+    accountId,
+    zoneId,
+    ingestHostname: telemetryHostname,
+    viewerHostname: telemetryViewerHostname,
+    viewerEmail: config.require("telemetryViewerEmail"),
+    tenant: telemetryTenant,
+  },
+  cloudflareOperatedComponent,
+);
+
 const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
   "bundle-store-r2-worker",
   {
@@ -361,7 +445,7 @@ const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
     controlUrl: pulumi.interpolate`https://${domain}`,
     adminToken: controlAdminToken.base64,
   },
-  {},
+  cloudflareOperatedComponent,
 );
 
 const githubClientId = config.require("githubClientId");
@@ -505,21 +589,14 @@ const controlEnvYamlBootstrap = pulumi
       ].join("\n"),
   );
 
-const grafanaStack = grafana.cloud.getStackOutput({
-  slug: config.require("grafanaSlug"),
-});
-const grafanaCloudAccessPolicyToken = new pulumi.Config(
-  "grafana",
-).requireSecret("cloudAccessPolicyToken");
-const grafanaOtlpEndpoint = grafanaStack.otlpUrl.apply((url) => `${url}/otlp`);
 const workerHostObservability = {
-  prometheusUrl: grafanaStack.prometheusRemoteWriteEndpoint,
-  prometheusUserId: grafanaStack.prometheusUserId.apply((id) => id.toString()),
-  lokiUrl: grafanaStack.logsUrl,
-  lokiUserId: grafanaStack.logsUserId.apply((id) => id.toString()),
-  otlpUrl: grafanaOtlpEndpoint,
-  otlpUserId: grafanaStack.id.apply((id) => id.toString()),
-  basicAuthPassword: grafanaCloudAccessPolicyToken,
+  metricsRemoteWriteUrl: `https://${metricsHostname}/api/v1/write`,
+  metricsOtlpUrl: `https://${metricsHostname}/opentelemetry`,
+  metricsBasicAuthUsername: metricsBasicAuthUsernameValue,
+  metricsBasicAuthPassword: metricsBasicAuthSecret.base64,
+  logsTracesOtlpUrl: `https://${telemetryHostname}`,
+  logsTracesAccessClientId: telemetryEdgeGate.serviceTokenClientId,
+  logsTracesAccessClientSecret: telemetryEdgeGate.serviceTokenClientSecret,
 };
 
 const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
@@ -575,39 +652,51 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
 // place to update if it ever changes. Lives here (not inside CloudflareDns)
 // because the NLB IP is an OciFn0WorkerSite output and a forward dependency
 // would create a cycle.
-new cloudflare.DnsRecord("oci-ap-osaka-1-nlb-a", {
-  zoneId,
-  name: pulumi.interpolate`oci-ap-osaka-1-nlb.${domain}`,
-  type: "A",
-  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
-  ttl: 1,
-  proxied: false,
-});
+new cloudflare.DnsRecord(
+  "oci-ap-osaka-1-nlb-a",
+  {
+    zoneId,
+    name: pulumi.interpolate`oci-ap-osaka-1-nlb.${domain}`,
+    type: "A",
+    content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
+    ttl: 1,
+    proxied: false,
+  },
+  cloudflareOperatedResource,
+);
 
 // Apex fn0.dev → same worker NLB. The worker routes apex to the fn0-control
 // project via FN0_APEX_DOMAIN/FN0_APEX_PROJECT_ID.
-new cloudflare.DnsRecord("worker-apex-a", {
-  zoneId,
-  name: domain,
-  type: "A",
-  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
-  ttl: 1,
-  proxied: true,
-});
+new cloudflare.DnsRecord(
+  "worker-apex-a",
+  {
+    zoneId,
+    name: domain,
+    type: "A",
+    content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
+    ttl: 1,
+    proxied: true,
+  },
+  cloudflareOperatedResource,
+);
 
 // worker-lb.fn0.dev is the SaaS Custom Hostname fallback origin (see
 // CloudflareDns.saasFallbackLbHostname). It needs its own explicit A record
 // because the SaaS fallback record protection only attaches to hostnames
 // with one (not any wildcard match), and there is no wildcard record left to
 // match it implicitly anyway.
-new cloudflare.DnsRecord("worker-lb-a", {
-  zoneId,
-  name: pulumi.interpolate`worker-lb.${domain}`,
-  type: "A",
-  content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
-  ttl: 1,
-  proxied: true,
-});
+new cloudflare.DnsRecord(
+  "worker-lb-a",
+  {
+    zoneId,
+    name: pulumi.interpolate`worker-lb.${domain}`,
+    type: "A",
+    content: ociFn0WorkerSite.networkLoadBalancerPublicIp,
+    ttl: 1,
+    proxied: true,
+  },
+  cloudflareOperatedResource,
+);
 
 new fn0.EventBridgeCronTrigger("control-cron-trigger", {
   controlUrl: pulumi.interpolate`https://${domain}`,
@@ -659,7 +748,8 @@ export const vaultKeyOcid = ociGlobalVault.keyOcid;
 // own Cloudflare account; see the oci-ap-osaka-1-nlb DNS record above.
 export const controlBootstrapEnvYaml = pulumi.secret(
   controlEnvYamlBootstrap.apply(
-    (yaml) => `${yaml}FN0_WORKER_ORIGIN_HOSTNAME: oci-ap-osaka-1-nlb.${domain}\n`,
+    (yaml) =>
+      `${yaml}FN0_WORKER_ORIGIN_HOSTNAME: oci-ap-osaka-1-nlb.${domain}\n`,
   ),
 );
 export const controlUrl = pulumi.interpolate`https://${domain}`;
@@ -698,4 +788,30 @@ export const metricsBackupR2AccessKeyId = pulumi.secret(
 );
 export const metricsBackupR2SecretAccessKey = pulumi.secret(
   metricsBackupR2.secretAccessKey,
+);
+// The telemetry node's setup script talks to Cloudflare directly (tunnel
+// ingress and the CNAMEs), so it needs the same credential the stack itself
+// runs on rather than the bootstrap one, which can only mint tokens.
+export const cloudflareOperatorApiToken = pulumi.secret(
+  cloudflareOperator.value,
+);
+export const telemetryIngestUrl = `https://${telemetryHostname}`;
+export const telemetryViewerUrl = `https://${telemetryViewerHostname}`;
+export const telemetryViewerAdminPassword = pulumi.secret(
+  telemetryViewerAdminSecret.base64,
+);
+export const telemetryTenantId = telemetryTenant;
+export const telemetryStoreR2BucketName = logsTracesStoreR2.bucketName;
+export const telemetryStoreR2Endpoint = logsTracesStoreR2.endpoint;
+export const telemetryStoreR2AccessKeyId = pulumi.secret(
+  logsTracesStoreR2.accessKeyId,
+);
+export const telemetryStoreR2SecretAccessKey = pulumi.secret(
+  logsTracesStoreR2.secretAccessKey,
+);
+export const telemetryAccessClientId = pulumi.secret(
+  telemetryEdgeGate.serviceTokenClientId,
+);
+export const telemetryAccessClientSecret = pulumi.secret(
+  telemetryEdgeGate.serviceTokenClientSecret,
 );

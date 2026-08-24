@@ -3,6 +3,7 @@ import * as tls from "@pulumi/tls";
 import * as cloudflare from "@pulumi/cloudflare";
 
 export interface CloudflareDnsArgs {
+  tokenMintingApiToken: pulumi.Input<string>;
   suffix: pulumi.Input<string>;
   accountId: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
@@ -18,7 +19,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
   constructor(
     name: string,
     args: CloudflareDnsArgs,
-    opts: pulumi.ComponentResourceOptions
+    opts: pulumi.ComponentResourceOptions,
   ) {
     super("pkg:index:cloudflare-dns", name, args, opts);
 
@@ -35,7 +36,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
         algorithm: "ECDSA",
         ecdsaCurve: "P384",
       },
-      { parent: this }
+      { parent: this },
     );
 
     this.privateKeyPem = privateKey.privateKeyPem;
@@ -49,7 +50,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
           organization: "fn0",
         },
       },
-      { parent: this }
+      { parent: this },
     );
 
     // Changing hostnames re-issues (replaces) this cert. Under Full (strict),
@@ -65,10 +66,21 @@ export class CloudflareDns extends pulumi.ComponentResource {
         hostnames: [pulumi.interpolate`*.${domain}`, domain],
         requestedValidity: 5475,
       },
-      { parent: this, retainOnDelete: true }
+      { parent: this, retainOnDelete: true },
     );
 
     this.certificate = originCaCert.certificate;
+
+    // Cloudflare refuses to mint a token that can mint tokens ("sub-token is not
+    // allowed to have permissions to manage other tokens"), so the operator
+    // token the rest of this stack runs on cannot create the one below. The
+    // bootstrap credential is the only thing that can, which is why it stays in
+    // play at runtime rather than being a first-run-only input.
+    const tokenMintingProvider = new cloudflare.Provider(
+      "token-minting",
+      { apiToken: args.tokenMintingApiToken },
+      { parent: this },
+    );
 
     const cloudflareSaasApiToken = new cloudflare.AccountToken(
       "cloudflare-saas-api-token",
@@ -88,7 +100,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
           },
         ],
       },
-      { parent: this }
+      { parent: this, provider: tokenMintingProvider },
     );
 
     this.saasApiToken = cloudflareSaasApiToken.value;
@@ -107,7 +119,7 @@ export class CloudflareDns extends pulumi.ComponentResource {
         zoneId,
         origin: workerLbHostname,
       },
-      { parent: this }
+      { parent: this },
     );
   }
 }

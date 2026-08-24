@@ -2,14 +2,23 @@ import * as pulumi from "@pulumi/pulumi";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as crypto from "crypto";
 
-export interface MetricsBackupR2Args {
+// Bucket naming follows the sibling stores: `fn0-<what-it-holds>-<suffix>`,
+// minted here and never renamed — the name is baked into loggytracy's
+// `LOGGYTRACY_OBJECT_STORE_URL` and into every object path already written.
+//
+// This bucket is the log/trace engine's source of truth, not a backup of one:
+// the node's local disk is a cache and a WAL, and everything older than the
+// unflushed window exists only here. Nothing may expire objects in it — no
+// lifecycle rule, no GC sweep — which is what separates it from
+// `MetricsBackupR2`, whose contents are rebuilt by the next backup run.
+export interface LogsTracesStoreR2Args {
   tokenMintingApiToken: pulumi.Input<string>;
   accountId: pulumi.Input<string>;
   bucketName: pulumi.Input<string>;
   location?: pulumi.Input<string>;
 }
 
-export class MetricsBackupR2 extends pulumi.ComponentResource {
+export class LogsTracesStoreR2 extends pulumi.ComponentResource {
   public readonly accountId: pulumi.Output<string>;
   public readonly bucketName: pulumi.Output<string>;
   public readonly endpoint: pulumi.Output<string>;
@@ -18,10 +27,10 @@ export class MetricsBackupR2 extends pulumi.ComponentResource {
 
   constructor(
     name: string,
-    args: MetricsBackupR2Args,
+    args: LogsTracesStoreR2Args,
     opts: pulumi.ComponentResourceOptions,
   ) {
-    super("pkg:index:metrics-backup-r2", name, args, opts);
+    super("pkg:index:logs-traces-store-r2", name, args, opts);
 
     const { accountId, bucketName, location } = args;
 
@@ -36,8 +45,8 @@ export class MetricsBackupR2 extends pulumi.ComponentResource {
     );
 
     const permissionGroups =
-      // No `parent` on this invoke, deliberately: the permission-group catalog
-      // is Cloudflare's own static list, and reading it through the component's
+      // No `parent` on this invoke, deliberately: the permission-group catalog is
+      // Cloudflare's own static list, and reading it through the component's
       // provider would make it depend on the operator token this stack is still
       // in the middle of creating. The default (bootstrap) provider can always
       // read it, so the lookup stays available on a first run.
@@ -79,7 +88,7 @@ export class MetricsBackupR2 extends pulumi.ComponentResource {
       "r2-token",
       {
         accountId,
-        name: pulumi.interpolate`fn0-metrics-backup-r2-${bucket.name}`,
+        name: pulumi.interpolate`fn0-logs-traces-store-r2-${bucket.name}`,
         policies: [
           {
             effect: "allow",

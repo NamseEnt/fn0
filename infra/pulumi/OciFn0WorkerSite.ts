@@ -51,14 +51,19 @@ export interface WorkerBundleStorageArgs {
   secretAccessKey: pulumi.Input<string>;
 }
 
+// Three signals, two backends, two kinds of credential. Metrics go to
+// VictoriaMetrics, which authenticates itself with basic auth. Logs and traces
+// go to the log/trace engine, which authenticates nothing — a Cloudflare Access
+// service token in front of it does, and the two header names below are that
+// token's wire form.
 export interface WorkerHostObservabilityArgs {
-  prometheusUrl: pulumi.Input<string>;
-  prometheusUserId: pulumi.Input<string>;
-  lokiUrl: pulumi.Input<string>;
-  lokiUserId: pulumi.Input<string>;
-  otlpUrl: pulumi.Input<string>;
-  otlpUserId: pulumi.Input<string>;
-  basicAuthPassword: pulumi.Input<string>;
+  metricsRemoteWriteUrl: pulumi.Input<string>;
+  metricsOtlpUrl: pulumi.Input<string>;
+  metricsBasicAuthUsername: pulumi.Input<string>;
+  metricsBasicAuthPassword: pulumi.Input<string>;
+  logsTracesOtlpUrl: pulumi.Input<string>;
+  logsTracesAccessClientId: pulumi.Input<string>;
+  logsTracesAccessClientSecret: pulumi.Input<string>;
 }
 
 export interface WorkerTlsOriginArgs {
@@ -939,20 +944,38 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
     );
     const alloyConfig = pulumi
       .all([
-        args.worker.hostObservability.prometheusUrl,
-        args.worker.hostObservability.prometheusUserId,
-        args.worker.hostObservability.lokiUrl,
-        args.worker.hostObservability.lokiUserId,
-        args.worker.hostObservability.otlpUrl,
-        args.worker.hostObservability.otlpUserId,
+        args.worker.hostObservability.metricsRemoteWriteUrl,
+        args.worker.hostObservability.metricsOtlpUrl,
+        args.worker.hostObservability.metricsBasicAuthUsername,
+        args.worker.hostObservability.logsTracesOtlpUrl,
+        args.worker.hostObservability.logsTracesAccessClientId,
       ])
-      .apply(([promUrl, promUser, lokiUrl, lokiUser, otlpUrl, otlpUser]) =>
-        renderAlloyConfig({ promUrl, promUser, lokiUrl, lokiUser, otlpUrl, otlpUser }),
+      .apply(
+        ([
+          metricsRemoteWriteUrl,
+          metricsOtlpUrl,
+          metricsBasicAuthUsername,
+          logsTracesOtlpUrl,
+          logsTracesAccessClientId,
+        ]) =>
+          renderAlloyConfig({
+            metricsRemoteWriteUrl,
+            metricsOtlpUrl,
+            metricsBasicAuthUsername,
+            logsTracesOtlpUrl,
+              logsTracesAccessClientId,
+          }),
       );
     const alloyEnvFile = pulumi
-      .output(args.worker.hostObservability.basicAuthPassword)
-      .apply((password) =>
-        renderEnvFile({ FN0_GRAFANA_PASSWORD: password }),
+      .all([
+        args.worker.hostObservability.metricsBasicAuthPassword,
+        args.worker.hostObservability.logsTracesAccessClientSecret,
+      ])
+      .apply(([metricsPassword, accessClientSecret]) =>
+        renderEnvFile({
+          FN0_METRICS_PASSWORD: metricsPassword,
+          FN0_TELEMETRY_ACCESS_CLIENT_SECRET: accessClientSecret,
+        }),
       );
 
     const cloudInit = pulumi
@@ -1271,12 +1294,11 @@ const ALLOY_OTLP_QUEUE_SIZE_IN_BYTES = 32 * 1024 * 1024 * 1024;
 const ALLOY_PROMETHEUS_WAL_MAX_KEEPALIVE = "168h";
 
 function renderAlloyConfig(args: {
-  promUrl: string;
-  promUser: string;
-  lokiUrl: string;
-  lokiUser: string;
-  otlpUrl: string;
-  otlpUser: string;
+  metricsRemoteWriteUrl: string;
+  metricsOtlpUrl: string;
+  metricsBasicAuthUsername: string;
+  logsTracesOtlpUrl: string;
+  logsTracesAccessClientId: string;
 }): string {
   // Each scrape target gets an instance=<ocid> label via discovery.relabel
   // because Prometheus external_labels do not override labels a target
@@ -1303,10 +1325,10 @@ prometheus.scrape "node" {
 
 prometheus.remote_write "default" {
   endpoint {
-    url = "${args.promUrl}"
+    url = "${args.metricsRemoteWriteUrl}"
     basic_auth {
-      username = "${args.promUser}"
-      password = sys.env("FN0_GRAFANA_PASSWORD")
+      username = "${args.metricsBasicAuthUsername}"
+      password = sys.env("FN0_METRICS_PASSWORD")
     }
   }
   external_labels = {
@@ -1318,7 +1340,7 @@ prometheus.remote_write "default" {
 }
 
 loki.source.journal "default" {
-  forward_to    = [loki.write.default.receiver]
+  forward_to    = [otelcol.receiver.loki.journal.receiver]
   relabel_rules = loki.relabel.journal.rules
   labels        = {
     fn0_role = "worker",
@@ -1343,13 +1365,17 @@ loki.relabel "journal" {
   }
 }
 
-loki.write "default" {
-  endpoint {
-    url = "${args.lokiUrl}/loki/api/v1/push"
-    basic_auth {
-      username = "${args.lokiUser}"
-      password = sys.env("FN0_GRAFANA_PASSWORD")
-    }
+// Journald logs leave as OTLP rather than through loki.write: the engine
+// accepts OTLP only, and routing them here also puts them on the same
+// disk-backed sending queue as everything else, so a backend outage defers
+// them instead of dropping them.
+//
+// Straight to batch, skipping fn0_stamping: that processor reads the project
+// id from a request header the guest OTLP path carries, and the host's own
+// journal has no project to attribute.
+otelcol.receiver.loki "journal" {
+  output {
+    logs = [otelcol.processor.batch.default.input]
   }
 }
 
@@ -1382,6 +1408,7 @@ otelcol.processor.attributes "fn0_stamping" {
   }
 }
 
+// Metrics only: VictoriaMetrics stores cumulative, the SDKs emit delta.
 otelcol.processor.deltatocumulative "default" {
   max_stale = "5m"
   output {
@@ -1391,31 +1418,55 @@ otelcol.processor.deltatocumulative "default" {
 
 otelcol.processor.batch "default" {
   output {
-    metrics = [otelcol.exporter.otlphttp.default.input]
-    logs    = [otelcol.exporter.otlphttp.default.input]
-    traces  = [otelcol.exporter.otlphttp.default.input]
+    metrics = [otelcol.exporter.otlphttp.metrics.input]
+    logs    = [otelcol.exporter.otlphttp.logs_traces.input]
+    traces  = [otelcol.exporter.otlphttp.logs_traces.input]
   }
 }
 
-otelcol.storage.file "queue" {
-  directory = "${ALLOY_STORAGE_PATH}/otlp-queue"
+otelcol.storage.file "metrics_queue" {
+  directory = "${ALLOY_STORAGE_PATH}/otlp-queue-metrics"
 }
 
-otelcol.exporter.otlphttp "default" {
+otelcol.storage.file "logs_traces_queue" {
+  directory = "${ALLOY_STORAGE_PATH}/otlp-queue-logs-traces"
+}
+
+otelcol.exporter.otlphttp "metrics" {
   client {
-    endpoint = "${args.otlpUrl}"
-    auth     = otelcol.auth.basic.grafana.handler
+    endpoint = "${args.metricsOtlpUrl}"
+    auth     = otelcol.auth.basic.metrics.handler
   }
   sending_queue {
-    storage    = otelcol.storage.file.queue.handler
+    storage    = otelcol.storage.file.metrics_queue.handler
     sizer      = "bytes"
     queue_size = ${ALLOY_OTLP_QUEUE_SIZE_IN_BYTES}
   }
 }
 
-otelcol.auth.basic "grafana" {
-  username = "${args.otlpUser}"
-  password = sys.env("FN0_GRAFANA_PASSWORD")
+otelcol.exporter.otlphttp "logs_traces" {
+  client {
+    endpoint = "${args.logsTracesOtlpUrl}"
+    // The engine does not decompress request bodies: it hands Content-Encoding
+    // gzip straight to the OTLP decoder, which rejects it as malformed. The
+    // exporter defaults to gzip, and a 400 is not retryable, so every batch was
+    // dropped rather than deferred. Uncompressed until the engine handles it.
+    compression = "none"
+    headers  = {
+      "CF-Access-Client-Id"     = "${args.logsTracesAccessClientId}",
+      "CF-Access-Client-Secret" = sys.env("FN0_TELEMETRY_ACCESS_CLIENT_SECRET"),
+    }
+  }
+  sending_queue {
+    storage    = otelcol.storage.file.logs_traces_queue.handler
+    sizer      = "bytes"
+    queue_size = ${ALLOY_OTLP_QUEUE_SIZE_IN_BYTES}
+  }
+}
+
+otelcol.auth.basic "metrics" {
+  username = "${args.metricsBasicAuthUsername}"
+  password = sys.env("FN0_METRICS_PASSWORD")
 }
 `;
 }
@@ -1507,7 +1558,8 @@ ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
   --security-opt label=disable \\
   --network host \\
   --env FN0_HOST_OCID \\
-  --env FN0_GRAFANA_PASSWORD \\
+  --env FN0_METRICS_PASSWORD \\
+  --env FN0_TELEMETRY_ACCESS_CLIENT_SECRET \\
   -v /:/host/root:ro,rslave \\
   -v /proc:/host/proc:ro \\
   -v /sys:/host/sys:ro \\

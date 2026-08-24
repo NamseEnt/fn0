@@ -3,17 +3,21 @@
 //!
 //! The gate caps how many distinct series a project may carry so one
 //! cardinality explosion (e.g. an unbounded label value) cannot monopolise the
-//! account-wide Grafana active-series pool that every project shares. It
-//! mirrors [`crate::presign_gate::PresignGate`]: worker-local state, enforced
-//! inline on the telemetry path. Grafana's own plan limit is the backstop;
-//! this is the early, per-project, owner-visible defense.
+//! shared metrics node, whose RAM is what every project's series compete for.
+//! It mirrors [`crate::presign_gate::PresignGate`]: worker-local state,
+//! enforced inline on the telemetry path.
+//!
+//! Self-hosting is what makes this gate load-bearing rather than an early
+//! warning. A purchased allowance has a bill at the end of it; a node that
+//! runs out of memory takes every other project's metrics down with it, and
+//! there is nothing behind this to refuse the write.
 //!
 //! Semantics are "keep existing, drop new": a series admitted once stays
 //! admitted while it keeps reporting, and only newly appearing series are
 //! refused once a cap is hit. Series go stale after [`STALE_WINDOW_SECS`]
 //! without a sample (matching Alloy's `deltatocumulative.max_stale`), freeing
-//! their slot, so the tracked set reflects *active* series the way Grafana
-//! bills them, not every series ever seen.
+//! their slot, so the tracked set reflects *active* series the way the
+//! backend counts them, not every series ever seen.
 
 use bytes::Bytes;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;

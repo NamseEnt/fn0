@@ -3,6 +3,7 @@ import * as cloudflare from "@pulumi/cloudflare";
 import * as crypto from "crypto";
 
 export interface ForteR2Args {
+  tokenMintingApiToken: pulumi.Input<string>;
   accountId: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
   domain: pulumi.Input<string>;
@@ -22,11 +23,12 @@ export class ForteR2 extends pulumi.ComponentResource {
   constructor(
     name: string,
     args: ForteR2Args,
-    opts: pulumi.ComponentResourceOptions
+    opts: pulumi.ComponentResourceOptions,
   ) {
     super("pkg:index:forte-r2", name, args, opts);
 
-    const { accountId, zoneId, domain, staticHostname, bucketName, location } = args;
+    const { accountId, zoneId, domain, staticHostname, bucketName, location } =
+      args;
 
     const bucket = new cloudflare.R2Bucket(
       "bucket",
@@ -35,7 +37,7 @@ export class ForteR2 extends pulumi.ComponentResource {
         name: bucketName,
         location: location ?? "apac",
       },
-      { parent: this }
+      { parent: this },
     );
 
     new cloudflare.R2CustomDomain(
@@ -48,7 +50,7 @@ export class ForteR2 extends pulumi.ComponentResource {
         enabled: true,
         minTls: "1.2",
       },
-      { parent: this, dependsOn: [bucket] }
+      { parent: this, dependsOn: [bucket] },
     );
 
     new cloudflare.R2BucketCors(
@@ -68,34 +70,48 @@ export class ForteR2 extends pulumi.ComponentResource {
           },
         ],
       },
-      { parent: this, dependsOn: [bucket] }
+      { parent: this, dependsOn: [bucket] },
     );
 
-    const permissionGroups = cloudflare.getAccountApiTokenPermissionGroupsListOutput(
-      {
+    const permissionGroups =
+      // No `parent` on this invoke, deliberately: the permission-group catalog
+      // is Cloudflare's own static list, and reading it through the component's
+      // provider would make it depend on the operator token this stack is still
+      // in the middle of creating. The default (bootstrap) provider can always
+      // read it, so the lookup stays available on a first run.
+      cloudflare.getAccountApiTokenPermissionGroupsListOutput({
         accountId,
         maxItems: 1000,
-      },
-      { parent: this }
-    );
+      });
 
     const r2PermissionIds = permissionGroups.apply((list) => {
       const groups = list.results ?? [];
       const read = groups.find(
-        (g) => g.name === "Workers R2 Storage Bucket Item Read"
+        (g) => g.name === "Workers R2 Storage Bucket Item Read",
       );
       const write = groups.find(
-        (g) => g.name === "Workers R2 Storage Bucket Item Write"
+        (g) => g.name === "Workers R2 Storage Bucket Item Write",
       );
       if (!read || !write) {
         throw new Error(
           `Could not find R2 permission groups; found names: ${groups
             .map((g) => g.name)
-            .join(", ")}`
+            .join(", ")}`,
         );
       }
       return [{ id: read.id }, { id: write.id }];
     });
+
+    // Cloudflare refuses to mint a token that can mint tokens ("sub-token is not
+    // allowed to have permissions to manage other tokens"), so the operator
+    // token the rest of this stack runs on cannot create the one below. The
+    // bootstrap credential is the only thing that can, which is why it stays in
+    // play at runtime rather than being a first-run-only input.
+    const tokenMintingProvider = new cloudflare.Provider(
+      "token-minting",
+      { apiToken: args.tokenMintingApiToken },
+      { parent: this },
+    );
 
     const token = new cloudflare.AccountToken(
       "r2-admin-token",
@@ -105,17 +121,19 @@ export class ForteR2 extends pulumi.ComponentResource {
         policies: [
           {
             effect: "allow",
-            resources: pulumi.all([accountId, bucket.name]).apply(
-              ([acct, name]) =>
+            resources: pulumi
+              .all([accountId, bucket.name])
+              .apply(([acct, name]) =>
                 JSON.stringify({
-                  [`com.cloudflare.edge.r2.bucket.${acct}_default_${name}`]: "*",
-                })
-            ),
+                  [`com.cloudflare.edge.r2.bucket.${acct}_default_${name}`]:
+                    "*",
+                }),
+              ),
             permissionGroups: r2PermissionIds,
           },
         ],
       },
-      { parent: this, dependsOn: [bucket] }
+      { parent: this, dependsOn: [bucket], provider: tokenMintingProvider },
     );
 
     this.bucketName = bucket.name;
@@ -125,8 +143,8 @@ export class ForteR2 extends pulumi.ComponentResource {
     this.accessKeyId = token.id;
     this.secretAccessKey = pulumi.secret(
       token.value.apply((v) =>
-        crypto.createHash("sha256").update(v).digest("hex")
-      )
+        crypto.createHash("sha256").update(v).digest("hex"),
+      ),
     );
   }
 }

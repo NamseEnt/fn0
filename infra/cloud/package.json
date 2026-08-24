@@ -14,7 +14,6 @@
     "@pulumi/pulumi": "^3.113.0",
     "@pulumi/random": "^4.19.2",
     "@pulumi/tls": "^5.3.1",
-    "@pulumiverse/grafana": "^2.18.0",
     "@types/node-fetch": "^2.6.13",
     "@types/ssh2": "^1.15.5",
     "oci-sdk": "^2.127.0",
