@@ -42,6 +42,7 @@ const SINGLETON_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const SINGLETON_SAFETY_DEADLINE: Duration = Duration::from_secs(30);
 const SINGLETON_RETRY_INITIAL_DELAY: Duration = Duration::from_millis(250);
 const SINGLETON_RETRY_MAX_DELAY: Duration = Duration::from_secs(5);
+const CONTROL_FRAME_WRITE_DEADLINE: Duration = Duration::from_secs(5);
 
 type UpgradedIo = TokioIo<hyper::upgrade::Upgraded>;
 type SocketReader = WebSocketRead<ReadHalf<UpgradedIo>>;
@@ -58,8 +59,124 @@ struct PreparedSingleton {
     response_headers: hyper::HeaderMap,
     lease_activation_sender: Mutex<Option<oneshot::Sender<()>>>,
     message_ready_sender: Mutex<Option<oneshot::Sender<()>>>,
-    activated: Arc<AtomicBool>,
+    activation_lifecycle: Arc<SingletonActivationLifecycle>,
     activation: tokio::sync::OnceCell<watch::Receiver<Option<Result<(), WebSocketCommandError>>>>,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum SingletonActivationState {
+    Prepared,
+    Activating,
+    CallbackRunning,
+    Active,
+    AbortRequested,
+    Aborted,
+    Failed,
+}
+
+struct SingletonActivationLifecycle {
+    state: Mutex<SingletonActivationState>,
+    activation_started: AtomicBool,
+    callback_started: AtomicBool,
+    terminal_sender: watch::Sender<bool>,
+}
+
+impl SingletonActivationLifecycle {
+    fn new() -> Self {
+        let (terminal_sender, _) = watch::channel(false);
+        Self {
+            state: Mutex::new(SingletonActivationState::Prepared),
+            activation_started: AtomicBool::new(false),
+            callback_started: AtomicBool::new(false),
+            terminal_sender,
+        }
+    }
+
+    fn begin(&self) -> bool {
+        let mut state = self.state.lock().expect("singleton activation state lock");
+        if *state != SingletonActivationState::Prepared {
+            return false;
+        }
+        *state = SingletonActivationState::Activating;
+        self.activation_started.store(true, Ordering::Release);
+        true
+    }
+
+    fn begin_callback(&self) -> bool {
+        let mut state = self.state.lock().expect("singleton activation state lock");
+        if *state != SingletonActivationState::Activating {
+            return false;
+        }
+        *state = SingletonActivationState::CallbackRunning;
+        self.callback_started.store(true, Ordering::Release);
+        true
+    }
+
+    fn commit_active(&self) -> bool {
+        let mut state = self.state.lock().expect("singleton activation state lock");
+        if *state != SingletonActivationState::CallbackRunning {
+            return false;
+        }
+        *state = SingletonActivationState::Active;
+        true
+    }
+
+    fn request_abort(&self) -> bool {
+        let terminal = {
+            let mut state = self.state.lock().expect("singleton activation state lock");
+            match *state {
+                SingletonActivationState::Prepared => {
+                    *state = SingletonActivationState::Aborted;
+                    true
+                }
+                SingletonActivationState::Activating
+                | SingletonActivationState::CallbackRunning
+                | SingletonActivationState::Active => {
+                    *state = SingletonActivationState::AbortRequested;
+                    false
+                }
+                SingletonActivationState::AbortRequested => false,
+                SingletonActivationState::Aborted | SingletonActivationState::Failed => true,
+            }
+        };
+        if terminal {
+            let _ = self.terminal_sender.send(true);
+        }
+        self.activation_started()
+    }
+
+    fn finish(&self, succeeded: bool) -> bool {
+        let active = {
+            let mut state = self.state.lock().expect("singleton activation state lock");
+            *state = match *state {
+                SingletonActivationState::AbortRequested | SingletonActivationState::Aborted => {
+                    SingletonActivationState::Aborted
+                }
+                SingletonActivationState::Active if succeeded => SingletonActivationState::Active,
+                _ => SingletonActivationState::Failed,
+            };
+            *state == SingletonActivationState::Active
+        };
+        let _ = self.terminal_sender.send(true);
+        active
+    }
+
+    fn activation_started(&self) -> bool {
+        self.activation_started.load(Ordering::Acquire)
+    }
+
+    fn callback_started(&self) -> bool {
+        self.callback_started.load(Ordering::Acquire)
+    }
+
+    fn is_active(&self) -> bool {
+        *self.state.lock().expect("singleton activation state lock")
+            == SingletonActivationState::Active
+    }
+
+    fn terminal_receiver(&self) -> watch::Receiver<bool> {
+        self.terminal_sender.subscribe()
+    }
 }
 
 enum OutboundConnectResult {
@@ -89,7 +206,7 @@ struct SingletonBinding {
     singleton_id: String,
     claim_token: String,
     initial_lease_deadline: i64,
-    activated: Arc<AtomicBool>,
+    activation_lifecycle: Arc<SingletonActivationLifecycle>,
 }
 
 struct OutboundExecutor;
@@ -195,6 +312,7 @@ struct ConnectionEntry {
     closing: AtomicBool,
     closed_receiver: watch::Receiver<bool>,
     control_sender: mpsc::UnboundedSender<WriterControl>,
+    force_close_sender: watch::Sender<bool>,
 }
 
 struct RegisteredConnection {
@@ -202,6 +320,7 @@ struct RegisteredConnection {
     control_sender: mpsc::UnboundedSender<WriterControl>,
     control_receiver: mpsc::UnboundedReceiver<WriterControl>,
     closed_sender: watch::Sender<bool>,
+    force_close_receiver: watch::Receiver<bool>,
 }
 
 enum SocketCommand {
@@ -480,6 +599,7 @@ impl WebSocketService {
                     registered.control_sender,
                     registered.control_receiver,
                     registered.closed_sender,
+                    registered.force_close_receiver,
                     capacity_guard,
                     None,
                     None,
@@ -610,7 +730,7 @@ impl WebSocketService {
         let slot_for_connect = slot.clone();
         let result = slot
             .get_or_init(move || async move {
-                let activated = Arc::new(AtomicBool::new(false));
+                let activation_lifecycle = Arc::new(SingletonActivationLifecycle::new());
                 let result = service
                     .connect_outbound(
                         project_id,
@@ -623,7 +743,7 @@ impl WebSocketService {
                             singleton_id,
                             claim_token,
                             initial_lease_deadline,
-                            activated,
+                            activation_lifecycle,
                         }),
                         headers,
                         protocols,
@@ -700,6 +820,11 @@ impl WebSocketService {
             .clone();
         loop {
             if let Some(result) = *activation_receiver.borrow() {
+                if result.is_ok() && !prepared.activation_lifecycle.is_active() {
+                    return Err(WebSocketCommandError::not_sent(
+                        WebSocketCommandErrorKind::ConnectionNotFound,
+                    ));
+                }
                 return result;
             }
             activation_receiver.changed().await.map_err(|_| {
@@ -721,7 +846,27 @@ impl WebSocketService {
                 WebSocketCommandErrorKind::ConnectionNotFound,
             ));
         }
-        prepared.activated.store(true, Ordering::Release);
+        if !prepared.activation_lifecycle.begin() {
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        let result = self
+            .activate_prepared_singleton_started(prepared.clone())
+            .await;
+        let active = prepared.activation_lifecycle.finish(result.is_ok());
+        if result.is_ok() && !active {
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        result
+    }
+
+    async fn activate_prepared_singleton_started(
+        self: &Arc<Self>,
+        prepared: Arc<PreparedSingleton>,
+    ) -> Result<(), WebSocketCommandError> {
         let lease_activation_sender = prepared
             .lease_activation_sender
             .lock()
@@ -740,6 +885,18 @@ impl WebSocketService {
             ));
         };
         if lease_activation_sender.send(()).is_err() {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::internal_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        if !prepared.activation_lifecycle.begin_callback() {
             close_connection(
                 self,
                 &prepared.project_id,
@@ -797,6 +954,19 @@ impl WebSocketService {
                 WebSocketCommandErrorKind::Transport,
             ));
         }
+        if !prepared.activation_lifecycle.commit_active() {
+            self.unpublish_connection(&prepared.connection_id).await;
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::internal_error(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
         let message_ready_sender = prepared
             .message_ready_sender
             .lock()
@@ -829,10 +999,11 @@ impl WebSocketService {
         Ok(())
     }
 
-    fn abort_singleton_outbound(
+    async fn abort_singleton_outbound(
         &self,
         singleton_key: &SingletonKey,
         connection_id: &str,
+        deadline: tokio::time::Instant,
     ) -> Result<(), WebSocketCommandError> {
         let Some(slot) = self
             .singleton_connections
@@ -847,13 +1018,31 @@ impl WebSocketService {
         if prepared.connection_id != connection_id {
             return Ok(());
         }
-        close_connection(
-            self,
-            &prepared.project_id,
-            &prepared.connection_id,
-            1011,
-            DisconnectInfo::internal_error(),
-        );
+        let mut activation_terminal_receiver = prepared.activation_lifecycle.terminal_receiver();
+        prepared.activation_lifecycle.request_abort();
+        let closed_receiver = self
+            .connections
+            .get(connection_id)
+            .map(|entry| entry.closed_receiver.clone());
+        if closed_receiver.is_some() {
+            close_connection(
+                self,
+                &prepared.project_id,
+                &prepared.connection_id,
+                1011,
+                DisconnectInfo::internal_error(),
+            );
+        }
+        let close_wait = async {
+            if let Some(mut closed_receiver) = closed_receiver {
+                wait_for_connection_close(&mut closed_receiver, deadline).await
+            } else {
+                Ok(())
+            }
+        };
+        let activation_wait =
+            wait_for_activation_terminal(&mut activation_terminal_receiver, deadline);
+        tokio::try_join!(close_wait, activation_wait)?;
         Ok(())
     }
 
@@ -899,9 +1088,9 @@ impl WebSocketService {
         let registered = self.register_connection(&project_id, &connection_id, &capacity_guard);
         let (message_ready_sender, message_ready_receiver) = oneshot::channel();
         let is_singleton = singleton_binding.is_some();
-        let singleton_activated = singleton_binding
+        let singleton_activation_lifecycle = singleton_binding
             .as_ref()
-            .map(|binding| binding.activated.clone());
+            .map(|binding| binding.activation_lifecycle.clone());
         let (lease_activation_sender, lease_activation_receiver) = if is_singleton {
             let (sender, receiver) = oneshot::channel();
             (Some(sender), Some(receiver))
@@ -924,6 +1113,7 @@ impl WebSocketService {
                     registered.control_sender,
                     registered.control_receiver,
                     registered.closed_sender,
+                    registered.force_close_receiver,
                     capacity_guard,
                     singleton_binding,
                     Some(message_ready_receiver),
@@ -940,7 +1130,8 @@ impl WebSocketService {
                     response_headers: response.headers().clone(),
                     lease_activation_sender: Mutex::new(lease_activation_sender),
                     message_ready_sender: Mutex::new(Some(message_ready_sender)),
-                    activated: singleton_activated.expect("singleton activation state"),
+                    activation_lifecycle: singleton_activation_lifecycle
+                        .expect("singleton activation lifecycle"),
                     activation: tokio::sync::OnceCell::new(),
                 },
             )));
@@ -983,12 +1174,14 @@ impl WebSocketService {
         let (command_sender, command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         let (control_sender, control_receiver) = mpsc::unbounded_channel();
         let (closed_sender, closed_receiver) = watch::channel(false);
+        let (force_close_sender, force_close_receiver) = watch::channel(false);
         let entry = Arc::new(ConnectionEntry {
             project_id: project_id.to_string(),
             command_sender,
             closing: AtomicBool::new(false),
             closed_receiver,
             control_sender: control_sender.clone(),
+            force_close_sender,
         });
         self.connections
             .insert(connection_id.to_string(), entry.clone());
@@ -1008,6 +1201,7 @@ impl WebSocketService {
             control_sender,
             control_receiver,
             closed_sender,
+            force_close_receiver,
         }
     }
 
@@ -1070,6 +1264,7 @@ impl WebSocketService {
         control_sender: mpsc::UnboundedSender<WriterControl>,
         control_receiver: mpsc::UnboundedReceiver<WriterControl>,
         closed_sender: watch::Sender<bool>,
+        mut force_close_receiver: watch::Receiver<bool>,
         capacity_guard: CapacityGuard,
         singleton_binding: Option<SingletonBinding>,
         message_ready: Option<oneshot::Receiver<()>>,
@@ -1082,9 +1277,9 @@ impl WebSocketService {
         let singleton_claim_token = singleton_binding
             .as_ref()
             .map(|binding| binding.claim_token.clone());
-        let singleton_activated = singleton_binding
+        let singleton_activation_lifecycle = singleton_binding
             .as_ref()
-            .map(|binding| binding.activated.clone());
+            .map(|binding| binding.activation_lifecycle.clone());
         let lease_handle = singleton_binding.as_ref().map(|binding| {
             tokio::spawn(singleton_lease_loop(
                 self.clone(),
@@ -1104,39 +1299,54 @@ impl WebSocketService {
             disconnect_info.clone(),
             message_ready,
         ));
-        writer_loop(
-            &mut writer,
-            command_receiver,
-            control_receiver,
-            disconnect_info.clone(),
-        )
-        .await;
+        tokio::select! {
+            _ = writer_loop(
+                &mut writer,
+                command_receiver,
+                control_receiver,
+                disconnect_info.clone(),
+            ) => {}
+            _ = wait_for_force_close(&mut force_close_receiver) => {}
+        }
+        drop(writer);
         reader_handle.abort();
+        let _ = reader_handle.await;
         if let Some(lease_handle) = lease_handle {
             lease_handle.abort();
+            let _ = lease_handle.await;
         }
         self.connections.remove(&connection_id);
+        self.unpublish_connection(&connection_id).await;
+        let _ = closed_sender.send(true);
+        drop(capacity_guard);
+        let activation_started = singleton_activation_lifecycle
+            .as_ref()
+            .is_some_and(|activation_lifecycle| activation_lifecycle.request_abort());
+        if activation_started
+            && let Some(activation_lifecycle) = singleton_activation_lifecycle.as_ref()
+        {
+            let mut activation_terminal_receiver = activation_lifecycle.terminal_receiver();
+            wait_for_activation_terminal_unbounded(&mut activation_terminal_receiver).await;
+        }
+        let callback_started = singleton_activation_lifecycle
+            .as_ref()
+            .is_some_and(|activation_lifecycle| activation_lifecycle.callback_started());
         if let Some(singleton_binding) = singleton_binding {
             self.singleton_connections
                 .remove_if(&singleton_binding.key, |_, current| {
                     Arc::ptr_eq(current, &singleton_binding.slot)
                 });
         }
-        self.unpublish_connection(&connection_id).await;
-        let _ = closed_sender.send(true);
-        drop(capacity_guard);
         let final_info = disconnect_info
             .lock()
             .expect("disconnect info lock")
             .clone()
             .unwrap_or_else(DisconnectInfo::transport_error);
-        let lifecycle_started = singleton_activated
-            .as_ref()
-            .is_none_or(|activated| activated.load(Ordering::Acquire));
-        if lifecycle_started {
+        let invoke_lifecycle = singleton_activation_lifecycle.is_none() || callback_started;
+        if invoke_lifecycle {
             self.invoke_disconnect(&project_id, &connection_id, &route_uri, final_info);
         }
-        if lifecycle_started
+        if callback_started
             && let (Some(singleton_id), Some(claim_token)) = (singleton_id, singleton_claim_token)
         {
             let service = self.clone();
@@ -1549,6 +1759,53 @@ fn fence_singleton(service: &WebSocketService, project_id: &str, connection_id: 
     );
 }
 
+async fn wait_for_connection_close(
+    closed_receiver: &mut watch::Receiver<bool>,
+    deadline: tokio::time::Instant,
+) -> Result<(), WebSocketCommandError> {
+    tokio::time::timeout_at(deadline, wait_for_true(closed_receiver))
+        .await
+        .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded))
+}
+
+async fn wait_for_activation_terminal(
+    activation_terminal_receiver: &mut watch::Receiver<bool>,
+    deadline: tokio::time::Instant,
+) -> Result<(), WebSocketCommandError> {
+    tokio::time::timeout_at(deadline, wait_for_true(activation_terminal_receiver))
+        .await
+        .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded))
+}
+
+async fn wait_for_activation_terminal_unbounded(
+    activation_terminal_receiver: &mut watch::Receiver<bool>,
+) {
+    wait_for_true(activation_terminal_receiver).await;
+}
+
+async fn wait_for_true(receiver: &mut watch::Receiver<bool>) {
+    while !*receiver.borrow() {
+        if receiver.changed().await.is_err() {
+            return;
+        }
+    }
+}
+
+async fn wait_for_force_close(force_close_receiver: &mut watch::Receiver<bool>) {
+    while !*force_close_receiver.borrow() {
+        if force_close_receiver.changed().await.is_err() {
+            return;
+        }
+    }
+}
+
+fn schedule_force_close(force_close_sender: watch::Sender<bool>, delay: Duration) {
+    tokio::spawn(async move {
+        tokio::time::sleep(delay).await;
+        let _ = force_close_sender.send(true);
+    });
+}
+
 fn close_connection(
     service: &WebSocketService,
     project_id: &str,
@@ -1571,6 +1828,8 @@ fn close_connection(
     {
         return;
     }
+    let force_close_sender = entry.force_close_sender.clone();
+    schedule_force_close(force_close_sender, CLOSE_HANDSHAKE_DEADLINE);
     let _ = entry
         .control_sender
         .send(WriterControl::Close(close_code, disconnect_info));
@@ -1688,7 +1947,7 @@ impl WebSocketCommandDispatcher for WebSocketService {
         singleton_id: String,
         claim_token: String,
         connection_id: String,
-        _remaining: Duration,
+        remaining: Duration,
     ) -> WebSocketCommandFuture {
         let Some(service) = self.self_reference.get().and_then(Weak::upgrade) else {
             return Box::pin(async {
@@ -1698,8 +1957,14 @@ impl WebSocketCommandDispatcher for WebSocketService {
             });
         };
         Box::pin(async move {
+            let deadline = tokio::time::Instant::now() + remaining;
             service
-                .abort_singleton_outbound(&(project_id, singleton_id, claim_token), &connection_id)
+                .abort_singleton_outbound(
+                    &(project_id, singleton_id, claim_token),
+                    &connection_id,
+                    deadline,
+                )
+                .await
         })
     }
 
@@ -2204,7 +2469,15 @@ async fn writer_loop(
             Some(control) = control_receiver.recv() => {
                 match control {
                     WriterControl::Ping(payload) => {
-                        if writer.write_frame(Frame::pong(Payload::Bytes(payload.into()))).await.is_err() {
+                        let write_deadline =
+                            tokio::time::Instant::now() + CONTROL_FRAME_WRITE_DEADLINE;
+                        if !write_frame_until(
+                            writer,
+                            Frame::pong(Payload::Bytes(payload.into())),
+                            write_deadline,
+                        )
+                        .await
+                        {
                             store_disconnect_info(&disconnect_info, DisconnectInfo::transport_error());
                             finish_close_response(close_response.take());
                             return;
@@ -2218,7 +2491,7 @@ async fn writer_loop(
                         store_disconnect_info(&disconnect_info, info);
                         if !close_sent {
                             let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
-                            let _ = write_close_frame_until(
+                            let _ = write_frame_until(
                                 writer,
                                 Frame::close_raw(Payload::Bytes(payload.into())),
                                 close_deadline,
@@ -2234,7 +2507,7 @@ async fn writer_loop(
                             continue;
                         }
                         let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
-                        if !write_close_frame_until(
+                        if !write_frame_until(
                             writer,
                             Frame::close(code, &[]),
                             close_deadline,
@@ -2269,7 +2542,7 @@ async fn writer_loop(
                             )));
                             store_disconnect_info(&disconnect_info, DisconnectInfo::protocol_error(1013));
                             let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
-                            let _ = write_close_frame_until(
+                            let _ = write_frame_until(
                                 writer,
                                 Frame::close(1013, &[]),
                                 close_deadline,
@@ -2313,7 +2586,7 @@ async fn writer_loop(
                         if must_close {
                             store_disconnect_info(&disconnect_info, DisconnectInfo::protocol_error(close_code));
                             let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
-                            let _ = write_close_frame_until(
+                            let _ = write_frame_until(
                                 writer,
                                 Frame::close(close_code, &[]),
                                 close_deadline,
@@ -2326,7 +2599,7 @@ async fn writer_loop(
                         store_disconnect_info(&disconnect_info, info);
                         close_response = response_sender;
                         let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
-                        if !write_close_frame_until(
+                        if !write_frame_until(
                             writer,
                             Frame::close(code, &[]),
                             close_deadline,
@@ -2343,15 +2616,18 @@ async fn writer_loop(
             }
             _ = ping_interval.tick(), if !close_sent && !awaiting_pong => {
                 let payload = Bytes::copy_from_slice(&unix_millis().to_be_bytes());
-                if writer
-                    .write_frame(Frame::new(true, OpCode::Ping, None, Payload::Bytes(payload.into())))
-                    .await
-                    .is_err()
+                let write_deadline =
+                    tokio::time::Instant::now() + CONTROL_FRAME_WRITE_DEADLINE;
+                if !write_frame_until(
+                    writer,
+                    Frame::new(true, OpCode::Ping, None, Payload::Bytes(payload.into())),
+                    write_deadline,
+                )
+                .await
                 {
                     store_disconnect_info(&disconnect_info, DisconnectInfo::transport_error());
                     return;
                 }
-                let _ = writer.flush().await;
                 awaiting_pong = true;
                 pong_timeout.as_mut().reset(tokio::time::Instant::now() + PONG_DEADLINE);
             }
@@ -2371,7 +2647,7 @@ async fn writer_loop(
     }
 }
 
-async fn write_close_frame_until<Writer>(
+async fn write_frame_until<Writer>(
     writer: &mut WebSocketWrite<Writer>,
     frame: Frame<'static>,
     deadline: tokio::time::Instant,
@@ -2697,13 +2973,140 @@ mod tests {
             PendingWriter,
             fastwebsockets::Role::Server,
         );
-        let result = write_close_frame_until(
+        let result = write_frame_until(
             &mut writer,
             Frame::close(1011, &[]),
             tokio::time::Instant::now() + Duration::from_millis(20),
         )
         .await;
         assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn pong_frame_write_is_bounded_by_control_deadline() {
+        let (_, mut writer) = fastwebsockets::after_handshake_split(
+            tokio::io::empty(),
+            PendingWriter,
+            fastwebsockets::Role::Server,
+        );
+        let result = write_frame_until(
+            &mut writer,
+            Frame::pong(Payload::Borrowed(b"ping")),
+            tokio::time::Instant::now() + Duration::from_millis(20),
+        )
+        .await;
+        assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn force_close_signal_is_delivered_after_deadline() {
+        let (force_close_sender, mut force_close_receiver) = watch::channel(false);
+        schedule_force_close(force_close_sender, Duration::from_millis(10));
+        timeout(
+            Duration::from_millis(100),
+            wait_for_force_close(&mut force_close_receiver),
+        )
+        .await
+        .unwrap();
+        assert!(*force_close_receiver.borrow());
+    }
+
+    #[test]
+    fn singleton_abort_fences_callback_start_and_active_commit() {
+        let activation_before_callback = SingletonActivationLifecycle::new();
+        assert!(activation_before_callback.begin());
+        assert!(activation_before_callback.request_abort());
+        assert!(!activation_before_callback.begin_callback());
+        assert!(!activation_before_callback.finish(false));
+
+        let activation_during_callback = SingletonActivationLifecycle::new();
+        assert!(activation_during_callback.begin());
+        assert!(activation_during_callback.begin_callback());
+        assert!(activation_during_callback.request_abort());
+        assert!(!activation_during_callback.commit_active());
+        assert!(!activation_during_callback.finish(false));
+    }
+
+    #[tokio::test]
+    async fn singleton_abort_waits_for_connection_and_activation_completion() {
+        let directory = Arc::new(MemoryDirectory::default());
+        let service = Arc::new(WebSocketService {
+            worker_senders: Arc::new(Vec::new()),
+            connections: DashMap::new(),
+            singleton_connections: DashMap::new(),
+            project_counts: DashMap::new(),
+            project_generations: DashMap::new(),
+            worker_count: Arc::new(AtomicUsize::new(0)),
+            draining: AtomicBool::new(false),
+            directory,
+            identity: WorkerIdentity {
+                worker_id: "worker".to_string(),
+                endpoint: String::new(),
+            },
+            quic: OnceLock::new(),
+            self_reference: OnceLock::new(),
+        });
+        service
+            .self_reference
+            .set(Arc::downgrade(&service))
+            .unwrap();
+        let singleton_key = (
+            "project".to_string(),
+            "feed".to_string(),
+            "claim".to_string(),
+        );
+        let slot = Arc::new(SingletonConnectSlot::new());
+        let activation_lifecycle = Arc::new(SingletonActivationLifecycle::new());
+        assert!(activation_lifecycle.begin());
+        let prepared = Arc::new(PreparedSingleton {
+            connection_id: "connection".to_string(),
+            project_id: "project".to_string(),
+            route_uri: "https://fn0-websocket.internal/ws_singleton/feed"
+                .parse()
+                .unwrap(),
+            response_headers: hyper::HeaderMap::new(),
+            lease_activation_sender: Mutex::new(None),
+            message_ready_sender: Mutex::new(None),
+            activation_lifecycle: activation_lifecycle.clone(),
+            activation: tokio::sync::OnceCell::new(),
+        });
+        assert!(slot.set(Ok(prepared)).is_ok());
+        service
+            .singleton_connections
+            .insert(singleton_key.clone(), slot);
+        let (command_sender, _command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
+        let (closed_sender, closed_receiver) = watch::channel(false);
+        let (control_sender, mut control_receiver) = mpsc::unbounded_channel();
+        let (force_close_sender, _force_close_receiver) = watch::channel(false);
+        service.connections.insert(
+            "connection".to_string(),
+            Arc::new(ConnectionEntry {
+                project_id: "project".to_string(),
+                command_sender,
+                closing: AtomicBool::new(false),
+                closed_receiver,
+                control_sender,
+                force_close_sender,
+            }),
+        );
+        let service_for_abort = service.clone();
+        let abort_task = tokio::spawn(async move {
+            service_for_abort
+                .abort_singleton_outbound(
+                    &singleton_key,
+                    "connection",
+                    tokio::time::Instant::now() + Duration::from_secs(1),
+                )
+                .await
+        });
+        let close_control = control_receiver.recv().await.unwrap();
+        assert!(matches!(close_control, WriterControl::Close(1011, _)));
+        assert!(!abort_task.is_finished());
+        closed_sender.send(true).unwrap();
+        tokio::task::yield_now().await;
+        assert!(!abort_task.is_finished());
+        activation_lifecycle.finish(false);
+        abort_task.await.unwrap().unwrap();
     }
 
     #[test]
@@ -3011,6 +3414,7 @@ mod tests {
             .unwrap();
         let (command_sender, mut command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         let (_closed_sender, closed_receiver) = watch::channel(false);
+        let (force_close_sender, _force_close_receiver) = watch::channel(false);
         let (control_sender, _control_receiver) = mpsc::unbounded_channel();
         service.connections.insert(
             "connection".to_string(),
@@ -3020,6 +3424,7 @@ mod tests {
                 closing: AtomicBool::new(false),
                 closed_receiver,
                 control_sender,
+                force_close_sender,
             }),
         );
         service.close_project("project").await;
@@ -3074,6 +3479,7 @@ mod tests {
                 .unwrap();
         }
         let (_closed_sender, closed_receiver) = watch::channel(false);
+        let (force_close_sender, _force_close_receiver) = watch::channel(false);
         let (control_sender, mut control_receiver) = mpsc::unbounded_channel();
         service.connections.insert(
             "connection".to_string(),
@@ -3083,6 +3489,7 @@ mod tests {
                 closing: AtomicBool::new(false),
                 closed_receiver,
                 control_sender,
+                force_close_sender,
             }),
         );
         fence_singleton(&service, "project", "connection");
@@ -3127,6 +3534,7 @@ mod tests {
             .unwrap();
         let (command_sender, _command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         let (_closed_sender, closed_receiver) = watch::channel(false);
+        let (force_close_sender, _force_close_receiver) = watch::channel(false);
         let (control_sender, mut control_receiver) = mpsc::unbounded_channel();
         service.connections.insert(
             "connection".to_string(),
@@ -3136,6 +3544,7 @@ mod tests {
                 closing: AtomicBool::new(false),
                 closed_receiver,
                 control_sender,
+                force_close_sender,
             }),
         );
         let singleton_key = (
@@ -3155,7 +3564,7 @@ mod tests {
                 singleton_id: "feed".to_string(),
                 claim_token: "claim".to_string(),
                 initial_lease_deadline: 0,
-                activated: Arc::new(AtomicBool::new(false)),
+                activation_lifecycle: Arc::new(SingletonActivationLifecycle::new()),
             },
             lease_activation_receiver,
         )
@@ -3205,6 +3614,7 @@ mod tests {
         let connection_id = WebSocketService::connection_id();
         let (command_sender, mut command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         let (_closed_sender, closed_receiver) = watch::channel(false);
+        let (force_close_sender, _force_close_receiver) = watch::channel(false);
         let (control_sender, _control_receiver) = mpsc::unbounded_channel();
         target_service.connections.insert(
             connection_id.clone(),
@@ -3214,6 +3624,7 @@ mod tests {
                 closing: AtomicBool::new(false),
                 closed_receiver,
                 control_sender,
+                force_close_sender,
             }),
         );
         target_service

@@ -130,6 +130,11 @@ enum ClaimResult {
     Live,
 }
 
+enum ClaimedFailure {
+    Release(anyhow::Error),
+    Retain(anyhow::Error),
+}
+
 pub async fn handle(input: Input) -> anyhow::Result<()> {
     let db = doc_db::turso();
     reconcile_with(
@@ -198,10 +203,14 @@ async fn reconcile_with<
         connector,
     )
     .await;
-    if result.is_err() {
-        release_claim(db, &input, claim_token.as_str()).await?;
+    match result {
+        Ok(()) => Ok(()),
+        Err(ClaimedFailure::Release(error)) => {
+            release_claim(db, &input, claim_token.as_str()).await?;
+            Err(error)
+        }
+        Err(ClaimedFailure::Retain(error)) => Err(error),
     }
-    result
 }
 
 async fn connect_claimed<Initializer: SingletonInitializer, Connector: SingletonConnector>(
@@ -212,13 +221,20 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
     lease_expires_at: DateTime,
     initializer: &Initializer,
     connector: &Connector,
-) -> anyhow::Result<()> {
-    let options = initializer.options(input, &declaration).await?;
+) -> Result<(), ClaimedFailure> {
+    let options = initializer
+        .options(input, &declaration)
+        .await
+        .map_err(ClaimedFailure::Release)?;
     let mut headers = http::HeaderMap::new();
     for (header_name, header_value) in options.headers {
         headers.append(
-            http::HeaderName::from_bytes(header_name.as_bytes())?,
-            http::HeaderValue::from_str(&header_value)?,
+            http::HeaderName::from_bytes(header_name.as_bytes())
+                .map_err(anyhow::Error::from)
+                .map_err(ClaimedFailure::Release)?,
+            http::HeaderValue::from_str(&header_value)
+                .map_err(anyhow::Error::from)
+                .map_err(ClaimedFailure::Release)?,
         );
     }
     let connection_id = connector
@@ -232,7 +248,8 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
             claim_token: claim_token.to_string(),
             lease_deadline_millis: lease_expires_at.timestamp_millis(),
         })
-        .await?;
+        .await
+        .map_err(ClaimedFailure::Retain)?;
     let finalized = match finalize_claim(
         db,
         input,
@@ -244,7 +261,7 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
     {
         Ok(finalized) => finalized,
         Err(error) => {
-            let _ = connector
+            let abort_result = connector
                 .abort(
                     &input.project_id,
                     &input.singleton_id,
@@ -252,7 +269,12 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
                     &connection_id,
                 )
                 .await;
-            return Err(error);
+            return match abort_result {
+                Ok(()) => Err(ClaimedFailure::Release(error)),
+                Err(abort_error) => Err(ClaimedFailure::Retain(anyhow::anyhow!(
+                    "websocket singleton finalize failed: {error:#}; abort failed: {abort_error:#}"
+                ))),
+            };
         }
     };
     if !finalized {
@@ -270,8 +292,10 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
                 &connection_id,
             )
             .await;
-        release_claim(db, input, claim_token).await?;
-        abort_result?;
+        abort_result.map_err(ClaimedFailure::Retain)?;
+        release_claim(db, input, claim_token)
+            .await
+            .map_err(ClaimedFailure::Release)?;
         return Ok(());
     }
     if let Err(error) = connector
@@ -292,9 +316,12 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
             )
             .await;
         if abort_result.is_ok() {
-            release_finalized_connection(db, input, claim_token, &connection_id).await?;
+            release_finalized_connection(db, input, claim_token, &connection_id)
+                .await
+                .map_err(ClaimedFailure::Retain)?;
+            return Err(ClaimedFailure::Release(error));
         }
-        return Err(error);
+        return Err(ClaimedFailure::Retain(error));
     }
     Ok(())
 }
@@ -576,6 +603,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct FakeInitializer;
+    struct FailingInitializer;
 
     impl SingletonInitializer for FakeInitializer {
         async fn options(
@@ -591,6 +619,16 @@ mod tests {
         }
     }
 
+    impl SingletonInitializer for FailingInitializer {
+        async fn options(
+            &self,
+            _input: &Input,
+            _declaration: &WebSocketSingletonDeclaration,
+        ) -> anyhow::Result<ConnectionOptions> {
+            anyhow::bail!("initialization failed")
+        }
+    }
+
     struct CountingConnector {
         db: doc_db::Database,
         connection_count: Arc<AtomicUsize>,
@@ -600,6 +638,10 @@ mod tests {
     struct FailingActivationConnector {
         abort_count: Arc<AtomicUsize>,
         abort_succeeds: bool,
+    }
+
+    struct FailingConnectConnector {
+        connection_count: Arc<AtomicUsize>,
     }
 
     impl SingletonConnector for CountingConnector {
@@ -677,6 +719,33 @@ mod tests {
         }
     }
 
+    impl SingletonConnector for FailingConnectConnector {
+        async fn connect(&self, _request: ConnectRequest) -> anyhow::Result<String> {
+            self.connection_count.fetch_add(1, Ordering::AcqRel);
+            anyhow::bail!("connect outcome unknown")
+        }
+
+        async fn activate(
+            &self,
+            _project_id: &str,
+            _singleton_id: &str,
+            _claim_token: &str,
+            _connection_id: &str,
+        ) -> anyhow::Result<()> {
+            unreachable!()
+        }
+
+        async fn abort(
+            &self,
+            _project_id: &str,
+            _singleton_id: &str,
+            _claim_token: &str,
+            _connection_id: &str,
+        ) -> anyhow::Result<()> {
+            unreachable!()
+        }
+    }
+
     fn input() -> Input {
         Input {
             project_id: "project".to_string(),
@@ -698,6 +767,20 @@ mod tests {
                     storage: None,
                 },
             )]),
+        })
+        .send_with(db)
+        .await
+        .unwrap();
+    }
+
+    async fn put_config(db: &doc_db::Database) {
+        WebSocketSingletonConfigDocPut(WebSocketSingletonConfigDoc {
+            project_id: "project".to_string(),
+            code_version: 42,
+            declarations: vec![WebSocketSingletonDeclaration {
+                singleton_id: "feed".to_string(),
+                route_path: "/ws_singleton/feed".to_string(),
+            }],
         })
         .send_with(db)
         .await
@@ -778,6 +861,65 @@ mod tests {
             .unwrap();
             assert_eq!(runtime.connection_id, "connection-1");
             assert!(!runtime.claim_token.is_empty());
+        });
+    }
+
+    #[test]
+    fn ambiguous_connect_failure_keeps_claim_until_lease_expiry() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            put_active_manifest(&db, 42).await;
+            put_config(&db).await;
+            let connection_count = Arc::new(AtomicUsize::new(0));
+            let connector = FailingConnectConnector {
+                connection_count: connection_count.clone(),
+            };
+            let first_result = reconcile_with(&db, input(), &FakeInitializer, &connector, &|| {
+                "claim-first".to_string()
+            })
+            .await;
+            assert!(first_result.is_err());
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(runtime.claim_token, "claim-first");
+            assert!(runtime.connection_id.is_empty());
+            let second_result = reconcile_with(&db, input(), &FakeInitializer, &connector, &|| {
+                "claim-second".to_string()
+            })
+            .await;
+            second_result.unwrap();
+            assert_eq!(connection_count.load(Ordering::Acquire), 1);
+        });
+    }
+
+    #[test]
+    fn initializer_failure_releases_claim_immediately() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            put_active_manifest(&db, 42).await;
+            put_config(&db).await;
+            let connector = FailingConnectConnector {
+                connection_count: Arc::new(AtomicUsize::new(0)),
+            };
+            let result = reconcile_with(&db, input(), &FailingInitializer, &connector, &|| {
+                "claim".to_string()
+            })
+            .await;
+            assert!(result.is_err());
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap();
+            assert!(runtime.is_none());
         });
     }
 
