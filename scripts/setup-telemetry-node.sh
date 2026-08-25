@@ -79,7 +79,7 @@ VM_LISTEN_ADDR="127.0.0.1:8428"
 # guide is explicit that `latest` is for typing, not for deployments, and a
 # telemetry backend that silently changes version is one that cannot be told
 # apart from the thing it is supposed to be observing.
-LOGGYTRACY_IMAGE="ghcr.io/namse/loggytracy:e93a9ce9127616b9ec57474bfd2f0a324c42e3e6"
+LOGGYTRACY_IMAGE="ghcr.io/namse/loggytracy:ac59184e77cfcfa7f0fe1c2d8adee6845239c4f6"
 LOGGYTRACY_DATA_DIR="/var/lib/loggytracy"
 LOGGYTRACY_CONFIG_DIR="/etc/loggytracy"
 LOGGYTRACY_ENV_FILE="${LOGGYTRACY_CONFIG_DIR}/loggytracy.env"
@@ -189,6 +189,17 @@ container_replace() {
     docker rm "$name" >/dev/null
   fi
   docker run -d --name "$name" "$@" >/dev/null
+}
+
+wait_for_loggytracy_ready() {
+  for _ in $(seq 1 24); do
+    if curl -fsS "http://127.0.0.1:${LOGGYTRACY_PORT}/ready" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+  done
+  echo "loggytracy did not become ready within 2 minutes; docker logs loggytracy" >&2
+  exit 1
 }
 
 echo "== 1/7 VictoriaMetrics ${VM_VERSION} =="
@@ -355,9 +366,6 @@ OBJECT_STORE_REGION=auto
 OBJECT_STORE_CONDITIONAL_PUT=etag
 AWS_ACCESS_KEY_ID=${FN0_TELEMETRY_R2_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${FN0_TELEMETRY_R2_SECRET_ACCESS_KEY}
-LOGGYTRACY_RETENTION_PERIOD=${retention}
-LOGGYTRACY_ALLOWED_TENANTS=${tenant}
-LOGGYTRACY_DEFAULT_TENANT=${tenant}
 EOF_LOGGYTRACY_ENV
 chmod 0600 "$LOGGYTRACY_ENV_FILE"
 
@@ -379,6 +387,25 @@ container_replace loggytracy \
   -v "${LOGGYTRACY_DATA_DIR}:/var/lib/loggytracy" \
   -p "127.0.0.1:${LOGGYTRACY_PORT}:3100" \
   "$LOGGYTRACY_IMAGE"
+
+wait_for_loggytracy_ready
+
+# The engine reads no tenant allowlist from its environment: the pushed
+# policies are the registry, and a tenant nobody pushed is refused with 403 on
+# ingest and query alike. So onboarding belongs to standing the node up rather
+# than to a separate manual step, and --retention is what the policy carries.
+# The body is the whole policy and not a patch, so every limit left out stays
+# unbounded — which is what this node had before it had policies at all.
+policy_response="$(curl -s -w $'\n%{http_code}' -X PUT \
+  -H 'Content-Type: application/json' \
+  --data "$(jq -n --arg retention "$retention" '{retention: $retention}')" \
+  "http://127.0.0.1:${LOGGYTRACY_PORT}/loggytracy/api/v1/admin/tenants/${tenant}/retention")"
+if [[ "${policy_response##*$'\n'}" != "200" ]]; then
+  echo "tenant policy push for ${tenant} returned ${policy_response##*$'\n'}" >&2
+  echo "${policy_response%$'\n'*}" >&2
+  exit 1
+fi
+echo "tenant ${tenant} onboarded with retention ${retention}"
 
 echo "== 5/7 cloudflared =="
 
@@ -506,18 +533,7 @@ if [[ "$unauth_code" != "401" ]]; then
 fi
 echo "victoria-metrics unauthenticated rejection: ok"
 
-loggytracy_ready=""
-for _ in $(seq 1 24); do
-  if curl -fsS "http://127.0.0.1:${LOGGYTRACY_PORT}/ready" >/dev/null 2>&1; then
-    loggytracy_ready=1
-    break
-  fi
-  sleep 5
-done
-if [[ -z "$loggytracy_ready" ]]; then
-  echo "loggytracy did not become ready within 2 minutes; docker logs loggytracy" >&2
-  exit 1
-fi
+wait_for_loggytracy_ready
 echo "loggytracy local ready: ok"
 
 write_ok=""
