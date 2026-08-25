@@ -2,7 +2,8 @@
 # Stand up the self-hosted telemetry node behind a Cloudflare Tunnel: metrics in
 # VictoriaMetrics (#59), logs and traces in loggytracy (#62). Run directly on the
 # target x86_64 Debian machine as root.
-# Ingest is OTLP only — the engine serves the Loki API for queries, not pushes.
+# Ingest is OTLP only — queries go through the engine's first-party API
+# (loggytracy docs/QUERY_API.md); the Loki and Tempo compatibility surfaces are gone.
 # Idempotent; safe to re-run.
 #
 # Prefer scripts/setup-telemetry-node-remote.sh, which pulls every input below
@@ -79,7 +80,7 @@ VM_LISTEN_ADDR="127.0.0.1:8428"
 # guide is explicit that `latest` is for typing, not for deployments, and a
 # telemetry backend that silently changes version is one that cannot be told
 # apart from the thing it is supposed to be observing.
-LOGGYTRACY_IMAGE="ghcr.io/namse/loggytracy:ac59184e77cfcfa7f0fe1c2d8adee6845239c4f6"
+LOGGYTRACY_IMAGE="ghcr.io/namse/loggytracy:0f22e7044c5c147a43bddd511484fb59afec6ae9"
 LOGGYTRACY_DATA_DIR="/var/lib/loggytracy"
 LOGGYTRACY_CONFIG_DIR="/etc/loggytracy"
 LOGGYTRACY_ENV_FILE="${LOGGYTRACY_CONFIG_DIR}/loggytracy.env"
@@ -580,7 +581,7 @@ echo "metrics public unauthenticated rejection: ok"
 # authentication, so if Access is not in front of the hostname then anyone who
 # learns it can write and read every tenant's logs.
 telemetry_unauth_code="$(curl -s -o /dev/null -w '%{http_code}' \
-  "https://${telemetry_hostname}/loki/api/v1/labels")"
+  "https://${telemetry_hostname}/loggytracy/api/v1/logs/attributes?start=-5m")"
 if [[ "$telemetry_unauth_code" != "401" && "$telemetry_unauth_code" != "403" ]]; then
   echo "expected 401/403 for unauthenticated telemetry query, got ${telemetry_unauth_code}" >&2
   echo "the Cloudflare Access application for ${telemetry_hostname} is missing or misconfigured" >&2
@@ -593,7 +594,7 @@ for _ in $(seq 1 24); do
   if curl -fsS \
     -H "CF-Access-Client-Id: ${FN0_TELEMETRY_ACCESS_CLIENT_ID}" \
     -H "CF-Access-Client-Secret: ${FN0_TELEMETRY_ACCESS_CLIENT_SECRET}" \
-    "https://${telemetry_hostname}/loki/api/v1/labels" >/dev/null 2>&1; then
+    "https://${telemetry_hostname}/loggytracy/api/v1/logs/attributes?start=-5m" >/dev/null 2>&1; then
     telemetry_auth_ok=1
     break
   fi
@@ -618,7 +619,7 @@ metrics basic auth   : ${basic_auth_username} (password in ${VM_PASSWORD_FILE})
 metrics backup       : ${metrics_backup_bucket}/${metrics_hostname}/latest, every 10 minutes
 
 logs/traces ingest   : https://${telemetry_hostname} (OTLP /v1/logs, /v1/traces)
-logs/traces query    : https://${telemetry_hostname} (Loki + Tempo APIs)
+logs query           : https://${telemetry_hostname} (first-party API, loggytracy docs/QUERY_API.md; traces are write-only until loggytracy M13)
 logs/traces auth     : Cloudflare Access service token; tenant ${tenant} stamped at the edge
 logs/traces store    : s3://${logs_traces_bucket}/loggytracy
 loggytracy image     : ${LOGGYTRACY_IMAGE}
