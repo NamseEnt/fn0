@@ -16,17 +16,10 @@ import * as cloudflare from "@pulumi/cloudflare";
 //      — after the firewall, immediately before the request goes to the
 //      origin — and uses `set` rather than `add`, because appending would send
 //      the engine two values and let it pick.
-//
-// The viewer hostname is the same trust boundary seen from the other side:
-// people rather than agents, so it authenticates by email with a one-time PIN
-// instead of a token, and needs no tenant header because queries carry their
-// own.
 export interface TelemetryEdgeGateArgs {
   accountId: pulumi.Input<string>;
   zoneId: pulumi.Input<string>;
   ingestHostname: pulumi.Input<string>;
-  viewerHostname: pulumi.Input<string>;
-  viewerEmail: pulumi.Input<string>;
   tenant: pulumi.Input<string>;
 }
 
@@ -41,14 +34,7 @@ export class TelemetryEdgeGate extends pulumi.ComponentResource {
   ) {
     super("pkg:index:telemetry-edge-gate", name, args, opts);
 
-    const {
-      accountId,
-      zoneId,
-      ingestHostname,
-      viewerHostname,
-      viewerEmail,
-      tenant,
-    } = args;
+    const { accountId, zoneId, ingestHostname, tenant } = args;
 
     const serviceToken = new cloudflare.ZeroTrustAccessServiceToken(
       "ingest-service-token",
@@ -76,25 +62,6 @@ export class TelemetryEdgeGate extends pulumi.ComponentResource {
             name: "alloy service token",
             decision: "non_identity",
             includes: [{ serviceToken: { tokenId: serviceToken.id } }],
-          },
-        ],
-      },
-      { parent: this },
-    );
-
-    new cloudflare.ZeroTrustAccessApplication(
-      "viewer-application",
-      {
-        accountId,
-        name: pulumi.interpolate`fn0 telemetry viewer (${viewerHostname})`,
-        type: "self_hosted",
-        domain: viewerHostname,
-        appLauncherVisible: true,
-        policies: [
-          {
-            name: "owner email",
-            decision: "allow",
-            includes: [{ email: { email: viewerEmail } }],
           },
         ],
       },

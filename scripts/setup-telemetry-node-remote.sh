@@ -5,12 +5,11 @@
 # prompts for its password on the allocated tty.
 #
 # Flow:
-#   1. Read every input from the fn0Cloud prod stack: the three hostnames, the
+#   1. Read every input from the fn0Cloud prod stack: both hostnames, the
 #      metrics basic-auth credential, the Cloudflare operator token (the
 #      bootstrap credential in config only mints tokens), account/zone id,
-#      both R2 credentials, the Access service token and the viewer's admin
-#      password. The stack owns all of them, so nothing is copied by hand in
-#      either direction.
+#      both R2 credentials and the Access service token. The stack owns all of
+#      them, so nothing is copied by hand in either direction.
 #   2. Generate a single self-contained file (secret exports + the full
 #      setup-telemetry-node.sh body) and scp it to the remote home directory
 #      with mode 0600, so no secret ever appears in ssh argv or process lists.
@@ -58,7 +57,6 @@ account_id="$(pulumi_config fn0Cloud:cloudflareAccountId)"
 zone_id="$(pulumi_config fn0Cloud:cloudflareZoneId)"
 metrics_hostname="$(pulumi_config fn0Cloud:metricsHostname)"
 telemetry_hostname="$(pulumi_config fn0Cloud:telemetryHostname)"
-viewer_hostname="$(pulumi_config fn0Cloud:telemetryViewerHostname)"
 basic_auth_username="$(pulumi_output metricsBasicAuthUsername)"
 basic_auth_password="$(pulumi_output metricsBasicAuthPassword)"
 metrics_backup_bucket="$(pulumi_output metricsBackupR2BucketName)"
@@ -70,7 +68,6 @@ telemetry_r2_secret_access_key="$(pulumi_output telemetryStoreR2SecretAccessKey)
 telemetry_access_client_id="$(pulumi_output telemetryAccessClientId)"
 telemetry_access_client_secret="$(pulumi_output telemetryAccessClientSecret)"
 tenant="$(pulumi_output telemetryTenantId)"
-viewer_admin_password="$(pulumi_output telemetryViewerAdminPassword)"
 
 payload="$(mktemp)"
 trap 'rm -f "$payload"' EXIT
@@ -85,7 +82,6 @@ chmod 0600 "$payload"
   printf 'export FN0_TELEMETRY_R2_SECRET_ACCESS_KEY=%q\n' "$telemetry_r2_secret_access_key"
   printf 'export FN0_TELEMETRY_ACCESS_CLIENT_ID=%q\n' "$telemetry_access_client_id"
   printf 'export FN0_TELEMETRY_ACCESS_CLIENT_SECRET=%q\n' "$telemetry_access_client_secret"
-  printf 'export FN0_VIEWER_ADMIN_PASSWORD=%q\n' "$viewer_admin_password"
   cat "${REPO_ROOT}/scripts/setup-telemetry-node.sh"
 } > "$payload"
 
@@ -99,7 +95,6 @@ ssh -t "$ssh_target" \
    && sudo bash ${remote_file} \
      --metrics-hostname $(printf '%q' "$metrics_hostname") \
      --telemetry-hostname $(printf '%q' "$telemetry_hostname") \
-     --viewer-hostname $(printf '%q' "$viewer_hostname") \
      --username $(printf '%q' "$basic_auth_username") \
      --tenant $(printf '%q' "$tenant") \
      --account-id $(printf '%q' "$account_id") \

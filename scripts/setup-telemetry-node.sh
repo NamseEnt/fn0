@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 # Stand up the self-hosted telemetry node behind a Cloudflare Tunnel: metrics in
-# VictoriaMetrics (#59), logs and traces in loggytracy (#62), and a Grafana to
-# read all three. Run directly on the target x86_64 Debian machine as root.
+# VictoriaMetrics (#59), logs and traces in loggytracy (#62). Run directly on the
+# target x86_64 Debian machine as root.
 # Ingest is OTLP only — the engine serves the Loki API for queries, not pushes.
 # Idempotent; safe to re-run.
 #
 # Prefer scripts/setup-telemetry-node-remote.sh, which pulls every input below
 # from the pulumi stack and runs this script over ssh.
 #
-# Three hostnames, one tunnel, three local listeners:
+# Two hostnames, one tunnel, two local listeners:
 #
 #   <metrics hostname>    -> 127.0.0.1:8428  VictoriaMetrics
 #   <telemetry hostname>  -> 127.0.0.1:3100  loggytracy (ingest + query)
-#   <viewer hostname>     -> 127.0.0.1:3000  Grafana
 #
 # The two backends are protected in different ways because they are built
 # differently. VictoriaMetrics authenticates itself (-httpAuth.* covers every
@@ -23,10 +22,6 @@
 # fn0Cloud stack, not here. That is why nothing on this machine terminates auth
 # for loggytracy and no reverse proxy is installed: the edge is the gateway, and
 # the listener is on loopback so nothing else can reach it.
-#
-# Grafana keeps its own admin login even though Access already gates its
-# hostname, so a misconfigured Access policy is not the only thing standing
-# between the internet and every project's logs.
 #
 # Durability is split the same way. VictoriaMetrics owns its data, so it takes
 # incremental vmbackup snapshots to R2 every 10 minutes. loggytracy's data lives
@@ -42,11 +37,9 @@
 #     FN0_TELEMETRY_R2_SECRET_ACCESS_KEY=... \
 #     FN0_TELEMETRY_ACCESS_CLIENT_ID=... \
 #     FN0_TELEMETRY_ACCESS_CLIENT_SECRET=... \
-#     FN0_VIEWER_ADMIN_PASSWORD=... \
 #     ./setup-telemetry-node.sh \
 #     --metrics-hostname metrics.fn0.dev \
 #     --telemetry-hostname telemetry.fn0.dev \
-#     --viewer-hostname grafana.fn0.dev \
 #     --username fn0 \
 #     --tenant fn0 \
 #     --account-id <cloudflare account id> \
@@ -95,21 +88,11 @@ LOGGYTRACY_ENV_FILE="${LOGGYTRACY_CONFIG_DIR}/loggytracy.env"
 LOGGYTRACY_UID=10001
 LOGGYTRACY_PORT=3100
 
-GRAFANA_IMAGE="grafana/grafana-oss:13.0.2"
-GRAFANA_DATA_DIR="/var/lib/fn0-grafana"
-GRAFANA_CONFIG_DIR="/etc/fn0-grafana"
-GRAFANA_UID=472
-# The image runs as 472:0 — uid grafana, gid root — so files it has to read are
-# grouped to 0 rather than to 472, which would look right and not be readable.
-GRAFANA_GID=0
-GRAFANA_PORT=3000
-
 CF_API="https://api.cloudflare.com/client/v4"
 
 retention="30d"
 metrics_hostname=""
 telemetry_hostname=""
-viewer_hostname=""
 basic_auth_username=""
 tenant=""
 account_id=""
@@ -121,7 +104,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --metrics-hostname) metrics_hostname="$2"; shift 2 ;;
     --telemetry-hostname) telemetry_hostname="$2"; shift 2 ;;
-    --viewer-hostname) viewer_hostname="$2"; shift 2 ;;
     --username) basic_auth_username="$2"; shift 2 ;;
     --tenant) tenant="$2"; shift 2 ;;
     --account-id) account_id="$2"; shift 2 ;;
@@ -133,9 +115,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for required in metrics_hostname telemetry_hostname viewer_hostname \
-  basic_auth_username tenant account_id zone_id metrics_backup_bucket \
-  logs_traces_bucket; do
+for required in metrics_hostname telemetry_hostname basic_auth_username \
+  tenant account_id zone_id metrics_backup_bucket logs_traces_bucket; do
   if [[ -z "${!required}" ]]; then
     echo "missing required argument for ${required//_/-}; see the usage comment at the top of this script" >&2
     exit 1
@@ -149,7 +130,6 @@ done
 : "${FN0_TELEMETRY_R2_SECRET_ACCESS_KEY:?FN0_TELEMETRY_R2_SECRET_ACCESS_KEY is required}"
 : "${FN0_TELEMETRY_ACCESS_CLIENT_ID:?FN0_TELEMETRY_ACCESS_CLIENT_ID is required}"
 : "${FN0_TELEMETRY_ACCESS_CLIENT_SECRET:?FN0_TELEMETRY_ACCESS_CLIENT_SECRET is required}"
-: "${FN0_VIEWER_ADMIN_PASSWORD:?FN0_VIEWER_ADMIN_PASSWORD is required}"
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "run as root" >&2
   exit 1
@@ -211,7 +191,7 @@ container_replace() {
   docker run -d --name "$name" "$@" >/dev/null
 }
 
-echo "== 1/8 VictoriaMetrics ${VM_VERSION} =="
+echo "== 1/7 VictoriaMetrics ${VM_VERSION} =="
 
 if [[ -x /usr/local/bin/victoria-metrics-prod ]] \
   && /usr/local/bin/victoria-metrics-prod --version 2>&1 | grep -qF "${VM_VERSION}"; then
@@ -256,7 +236,7 @@ systemctl daemon-reload
 systemctl enable victoria-metrics.service
 systemctl restart victoria-metrics.service
 
-echo "== 2/8 vmbackup + timer =="
+echo "== 2/7 vmbackup + timer =="
 
 if [[ -x /usr/local/bin/vmbackup-prod ]] \
   && /usr/local/bin/vmbackup-prod --version 2>&1 | grep -qF "${VM_VERSION}"; then
@@ -327,7 +307,7 @@ systemctl daemon-reload
 systemctl enable fn0-metrics-backup.timer
 systemctl restart fn0-metrics-backup.timer
 
-echo "== 3/8 docker =="
+echo "== 3/7 docker =="
 
 if ! command -v docker >/dev/null; then
   install -d -m 0755 /usr/share/keyrings
@@ -359,7 +339,7 @@ EOF_DOCKER_DAEMON
   systemctl restart docker
 fi
 
-echo "== 4/8 loggytracy =="
+echo "== 4/7 loggytracy =="
 
 install -d -o "$LOGGYTRACY_UID" -g "$LOGGYTRACY_UID" -m 0750 "$LOGGYTRACY_DATA_DIR"
 install -d -o root -g root -m 0700 "$LOGGYTRACY_CONFIG_DIR"
@@ -400,80 +380,7 @@ container_replace loggytracy \
   -p "127.0.0.1:${LOGGYTRACY_PORT}:3100" \
   "$LOGGYTRACY_IMAGE"
 
-echo "== 5/8 grafana =="
-
-install -d -o "$GRAFANA_UID" -g "$GRAFANA_GID" -m 0750 "$GRAFANA_DATA_DIR"
-install -d -o root -g root -m 0755 "${GRAFANA_CONFIG_DIR}/provisioning/datasources"
-# Grafana logs an error for every provisioning directory it cannot open, so
-# the ones it looks for exist even while they are empty.
-install -d -o root -g root -m 0755 "${GRAFANA_CONFIG_DIR}/provisioning/dashboards"
-install -d -o root -g root -m 0755 "${GRAFANA_CONFIG_DIR}/provisioning/plugins"
-install -d -o root -g root -m 0755 "${GRAFANA_CONFIG_DIR}/provisioning/alerting"
-
-# Grafana reaches both backends over loopback rather than through the tunnel:
-# it runs on the same machine, so going out to the edge and back would only add
-# a round trip and a second authentication. The tenant header is set here for
-# the same reason the edge sets it on ingest — loggytracy believes whatever it
-# is told, and a query with no tenant is a query against nothing.
-cat > "${GRAFANA_CONFIG_DIR}/provisioning/datasources/fn0.yaml" <<EOF_GRAFANA_DS
-apiVersion: 1
-datasources:
-  - name: fn0 metrics
-    type: prometheus
-    uid: fn0-metrics
-    access: proxy
-    url: http://127.0.0.1:8428
-    isDefault: true
-    basicAuth: true
-    basicAuthUser: ${basic_auth_username}
-    secureJsonData:
-      basicAuthPassword: ${FN0_METRICS_PASSWORD}
-  - name: fn0 logs
-    type: loki
-    uid: fn0-logs
-    access: proxy
-    url: http://127.0.0.1:${LOGGYTRACY_PORT}
-    jsonData:
-      httpHeaderName1: X-Scope-OrgID
-    secureJsonData:
-      httpHeaderValue1: ${tenant}
-  - name: fn0 traces
-    type: tempo
-    uid: fn0-traces
-    access: proxy
-    url: http://127.0.0.1:${LOGGYTRACY_PORT}
-    jsonData:
-      httpHeaderName1: X-Scope-OrgID
-    secureJsonData:
-      httpHeaderValue1: ${tenant}
-EOF_GRAFANA_DS
-# The file carries the metrics password, so it is not world-readable; it is
-# also read by Grafana rather than by root, so the group has to be the uid
-# the image runs as.
-chown "root:${GRAFANA_GID}" "${GRAFANA_CONFIG_DIR}/provisioning/datasources/fn0.yaml"
-chmod 0640 "${GRAFANA_CONFIG_DIR}/provisioning/datasources/fn0.yaml"
-
-docker pull "$GRAFANA_IMAGE" >/dev/null
-
-# Host networking so Grafana can reach both backends on loopback, and
-# GF_SERVER_HTTP_ADDR because of it: with --network host there is no published
-# port to bind to 127.0.0.1, so the process's own bind address is the only
-# thing keeping the viewer off the LAN.
-container_replace fn0-grafana \
-  --restart unless-stopped \
-  -e "GF_SECURITY_ADMIN_PASSWORD=${FN0_VIEWER_ADMIN_PASSWORD}" \
-  -e "GF_SERVER_ROOT_URL=https://${viewer_hostname}" \
-  -e "GF_SERVER_HTTP_ADDR=127.0.0.1" \
-  -e "GF_SERVER_HTTP_PORT=${GRAFANA_PORT}" \
-  -e "GF_USERS_ALLOW_SIGN_UP=false" \
-  -e "GF_ANALYTICS_REPORTING_ENABLED=false" \
-  -e "GF_ANALYTICS_CHECK_FOR_UPDATES=false" \
-  --network host \
-  -v "${GRAFANA_DATA_DIR}:/var/lib/grafana" \
-  -v "${GRAFANA_CONFIG_DIR}/provisioning:/etc/grafana/provisioning:ro" \
-  "$GRAFANA_IMAGE"
-
-echo "== 6/8 cloudflared =="
+echo "== 5/7 cloudflared =="
 
 if ! command -v cloudflared >/dev/null; then
   install -d -m 0755 /usr/share/keyrings
@@ -487,7 +394,7 @@ else
   echo "cloudflared already installed"
 fi
 
-echo "== 7/8 tunnel + DNS =="
+echo "== 6/7 tunnel + DNS =="
 
 # Named after the metrics hostname because that is what the tunnel was created
 # as; renaming it would orphan the existing tunnel and its credentials rather
@@ -512,12 +419,9 @@ cf_api PUT "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/configurations" \
     --arg metrics_service "http://${VM_LISTEN_ADDR}" \
     --arg telemetry_host "$telemetry_hostname" \
     --arg telemetry_service "http://127.0.0.1:${LOGGYTRACY_PORT}" \
-    --arg viewer_host "$viewer_hostname" \
-    --arg viewer_service "http://127.0.0.1:${GRAFANA_PORT}" \
     '{config: {ingress: [
        {hostname: $metrics_host, service: $metrics_service},
        {hostname: $telemetry_host, service: $telemetry_service},
-       {hostname: $viewer_host, service: $viewer_service},
        {service: "http_status:404"}
      ]}}')" \
   >/dev/null
@@ -541,7 +445,6 @@ upsert_cname() {
 
 upsert_cname "$metrics_hostname"
 upsert_cname "$telemetry_hostname"
-upsert_cname "$viewer_hostname"
 
 mkdir -p /etc/cloudflared
 tunnel_env_file="/etc/cloudflared/fn0-telemetry-tunnel.env"
@@ -581,7 +484,7 @@ systemctl daemon-reload
 systemctl enable fn0-telemetry-tunnel.service
 systemctl restart fn0-telemetry-tunnel.service
 
-echo "== 8/8 verification =="
+echo "== 7/7 verification =="
 
 vm_auth="${basic_auth_username}:$(cat "$VM_PASSWORD_FILE")"
 
@@ -616,20 +519,6 @@ if [[ -z "$loggytracy_ready" ]]; then
   exit 1
 fi
 echo "loggytracy local ready: ok"
-
-grafana_ready=""
-for _ in $(seq 1 24); do
-  if curl -fsS "http://127.0.0.1:${GRAFANA_PORT}/api/health" >/dev/null 2>&1; then
-    grafana_ready=1
-    break
-  fi
-  sleep 5
-done
-if [[ -z "$grafana_ready" ]]; then
-  echo "grafana did not become ready within 2 minutes; docker logs fn0-grafana" >&2
-  exit 1
-fi
-echo "grafana local health: ok"
 
 write_ok=""
 for _ in $(seq 1 24); do
@@ -700,13 +589,6 @@ if [[ -z "$telemetry_auth_ok" ]]; then
 fi
 echo "telemetry service-token query: ok"
 
-viewer_unauth_code="$(curl -s -o /dev/null -w '%{http_code}' "https://${viewer_hostname}/api/health")"
-if [[ "$viewer_unauth_code" != "302" && "$viewer_unauth_code" != "401" && "$viewer_unauth_code" != "403" ]]; then
-  echo "expected a redirect or 401/403 for the unauthenticated viewer, got ${viewer_unauth_code}" >&2
-  exit 1
-fi
-echo "viewer public unauthenticated rejection: ok"
-
 systemctl start fn0-metrics-backup.service
 echo "metrics backup to R2: ok"
 
@@ -724,8 +606,6 @@ logs/traces query    : https://${telemetry_hostname} (Loki + Tempo APIs)
 logs/traces auth     : Cloudflare Access service token; tenant ${tenant} stamped at the edge
 logs/traces store    : s3://${logs_traces_bucket}/loggytracy
 loggytracy image     : ${LOGGYTRACY_IMAGE}
-
-viewer               : https://${viewer_hostname} (Access, then Grafana admin login)
 
 These match the fn0Cloud stack outputs; nothing has to be copied back into pulumi.
 EOF_SUMMARY

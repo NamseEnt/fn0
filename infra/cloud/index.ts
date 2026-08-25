@@ -412,15 +412,6 @@ const logsTracesStoreR2 = new fn0.LogsTracesStoreR2(
 // the node is configured to accept.
 const telemetryTenant = "fn0";
 const telemetryHostname = config.require("telemetryHostname");
-const telemetryViewerHostname = config.require("telemetryViewerHostname");
-
-// Access already gates the viewer hostname, so this is the second lock rather
-// than the only one: a misconfigured Access policy should not leave every
-// project's logs readable to whoever finds the hostname.
-const telemetryViewerAdminSecret = new random.RandomBytes(
-  "fn0-telemetry-viewer-admin-password",
-  { length: 24 },
-);
 
 const telemetryEdgeGate = new fn0.TelemetryEdgeGate(
   "telemetry-edge-gate",
@@ -428,8 +419,6 @@ const telemetryEdgeGate = new fn0.TelemetryEdgeGate(
     accountId,
     zoneId,
     ingestHostname: telemetryHostname,
-    viewerHostname: telemetryViewerHostname,
-    viewerEmail: config.require("telemetryViewerEmail"),
     tenant: telemetryTenant,
   },
   cloudflareOperatedComponent,
@@ -796,10 +785,6 @@ export const cloudflareOperatorApiToken = pulumi.secret(
   cloudflareOperator.value,
 );
 export const telemetryIngestUrl = `https://${telemetryHostname}`;
-export const telemetryViewerUrl = `https://${telemetryViewerHostname}`;
-export const telemetryViewerAdminPassword = pulumi.secret(
-  telemetryViewerAdminSecret.base64,
-);
 export const telemetryTenantId = telemetryTenant;
 export const telemetryStoreR2BucketName = logsTracesStoreR2.bucketName;
 export const telemetryStoreR2Endpoint = logsTracesStoreR2.endpoint;

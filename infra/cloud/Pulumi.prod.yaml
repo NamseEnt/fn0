@@ -39,5 +39,3 @@ config:
   fn0Cloud:ociVaultRegion: ap-osaka-1
   fn0Cloud:metricsHostname: metrics.fn0.dev
   fn0Cloud:telemetryHostname: telemetry.fn0.dev
-  fn0Cloud:telemetryViewerHostname: grafana.fn0.dev
-  fn0Cloud:telemetryViewerEmail: skatpgusskat@gmail.com
