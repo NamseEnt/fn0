@@ -459,7 +459,7 @@ Place a `cron.yaml` file in the project root to schedule queue tasks. The file i
 ```
 
 Each entry:
-- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must be empty — either a unit struct (`pub struct Input;` or `pub struct Input {}`) or the type alias `pub type Input = ();`.
+- `function` — must match a file in `rs/src/queue_task/<name>.rs`, and that task's `Input` must be empty — either a unit struct (`pub struct Input;`, `pub struct Input {}`, or `pub struct Input()`) or the type alias `pub type Input = ();`.
 - `every_minutes` — run interval (must be ≥ 1).
 
 Cron jobs run locally during `forte dev`: the CLI ticks at each minute boundary, reads `cron.yaml`, and enqueues matching tasks through the loopback queue.
