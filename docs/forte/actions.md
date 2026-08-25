@@ -182,7 +182,7 @@ Queue task and admin task inputs are deserialized with standard `serde_json` (no
 
 ## Queue Tasks
 
-Background tasks live under `rs/src/queue_task/`. They have an `Input` type and a `pub async fn handle` (not `handler`) function. `Input` can be a struct (when the task takes arguments) or a type alias `pub type Input = ()` (for tasks that take no input, such as cron jobs):
+Background tasks live under `rs/src/queue_task/`. They have an `Input` type and a `pub async fn handle` (not `handler`) function. `Input` can be a struct (when the task takes arguments) or a unit type (for tasks that take no input, such as cron jobs). For cron tasks the validator accepts `pub struct Input;`, `pub struct Input {}`, `pub struct Input()`, or `pub type Input = ();`:
 
 ```rust
 // rs/src/queue_task/send_email.rs
