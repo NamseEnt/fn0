@@ -19,6 +19,7 @@ pub mod list_tokens;
 pub mod new_project;
 pub mod oauth_cli_exchange;
 pub mod project_asset_origin;
+pub mod project_logs;
 pub mod promote_pending_fn0_wasmtime;
 pub mod public_purge;
 pub mod rename_project;

@@ -3,6 +3,8 @@
 export const paths = {
   "/oauth/cli/authorize": () => "/oauth/cli/authorize",
   "/oauth/github/callback": () => "/oauth/github/callback",
+  "/projects": () => "/projects",
+  "/projects/:project_id/logs": ({project_id}: {project_id: string}) => `/projects/${project_id}/logs`,
   "/forte": () => "/forte",
   "/docs/:section/:page": ({section, page}: {section: string; page: string}) => `/docs/${section}/${page}`,
   "/docs/:page": ({page}: {page: string}) => `/docs/${page}`,
