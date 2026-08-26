@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Props } from "./.props";
 import { projectLogs } from "../../../../actions/.generated/project_logs";
+import { projectLogAttributeValues } from "../../../../actions/.generated/project_log_attribute_values";
 
 const PAGE_LIMIT = 200;
+const MAX_KEPT_ROWS = 1000;
+const TAIL_POLL_MILLISECONDS = 2000;
+const DEFAULT_START = "-1h";
 
 const START_PRESETS: Array<{ label: string; value: string }> = [
     { label: "15m", value: "-15m" },
@@ -19,6 +23,16 @@ type Row = {
 
 type Bucket = { bucketStart: string; bucketEnd: string; count: number };
 
+type Chip = { key: string; value: string };
+
+type SearchParams = {
+    start: string;
+    stream: string;
+    query: string;
+    useRegex: boolean;
+    chips: Chip[];
+};
+
 export default function ProjectLogsPage(props: Props) {
     if (props.t !== "Ok") {
         return (
@@ -34,35 +48,38 @@ export default function ProjectLogsPage(props: Props) {
 }
 
 function LogsView({ projectId, name }: { projectId: string; name: string }) {
-    const [start, setStart] = useState("-1h");
+    const [start, setStart] = useState(DEFAULT_START);
     const [stream, setStream] = useState("");
     const [query, setQuery] = useState("");
     const [useRegex, setUseRegex] = useState(false);
+    const [chips, setChips] = useState<Chip[]>([]);
+    const [live, setLive] = useState(false);
+    const [chipKey, setChipKey] = useState("");
+    const [chipValue, setChipValue] = useState("");
+    const [valueSuggestions, setValueSuggestions] = useState<string[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
     const [histogram, setHistogram] = useState<Bucket[] | null>(null);
-    const [expanded, setExpanded] = useState<Set<number>>(new Set());
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [hasMore, setHasMore] = useState(false);
+    const tailCursorRef = useRef("");
+    const tailBusyRef = useRef(false);
 
-    function filters() {
-        const text = query.trim();
-        return {
-            stream: stream || undefined,
-            contains: useRegex || !text ? undefined : text,
-            regex: useRegex && text ? text : undefined,
-        };
+    function currentParams(): SearchParams {
+        return { start, stream, query, useRegex, chips };
     }
 
-    async function search() {
+    async function runSearch(params: SearchParams): Promise<Row[]> {
+        syncUrl(params, false);
         setBusy(true);
         setError(null);
         const res = await projectLogs({
             projectId,
-            start,
+            start: params.start,
             limit: PAGE_LIMIT,
             includeHistogram: true,
-            ...filters(),
+            ...actionFilters(params),
         });
         setBusy(false);
         if (res.t === "Ok") {
@@ -70,9 +87,10 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
             setHistogram(res.histogram ?? null);
             setExpanded(new Set());
             setHasMore(res.rows.length === PAGE_LIMIT);
-        } else {
-            setError(errorMessage(res));
+            return res.rows;
         }
+        setError(errorMessage(res));
+        return [];
     }
 
     async function loadMore() {
@@ -85,7 +103,7 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
             limit: PAGE_LIMIT,
             includeHistogram: false,
             before,
-            ...filters(),
+            ...actionFilters(currentParams()),
         });
         setBusy(false);
         if (res.t === "Ok") {
@@ -97,22 +115,126 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
     }
 
     useEffect(() => {
-        search();
+        const initial = stateFromLocation();
+        setStart(initial.start);
+        setStream(initial.stream);
+        setQuery(initial.query);
+        setUseRegex(initial.useRegex);
+        setChips(initial.chips);
+        runSearch(initial).then((fetchedRows) => {
+            if (initial.live) {
+                tailCursorRef.current = fetchedRows[0]?.timestamp ?? nowNanoseconds();
+                setLive(true);
+                syncUrl(initial, true);
+            }
+        });
     }, []);
+
+    useEffect(() => {
+        if (!live) return;
+        let cancelled = false;
+        async function poll() {
+            if (cancelled || tailBusyRef.current) return;
+            if (document.visibilityState !== "visible") return;
+            tailBusyRef.current = true;
+            const res = await projectLogs({
+                projectId,
+                start,
+                after: tailCursorRef.current,
+                limit: PAGE_LIMIT,
+                includeHistogram: false,
+                ...actionFilters({ start, stream, query, useRegex, chips }),
+            });
+            tailBusyRef.current = false;
+            if (cancelled) return;
+            if (res.t !== "Ok") {
+                setError(errorMessage(res));
+                setLive(false);
+                return;
+            }
+            if (res.rows.length > 0) {
+                tailCursorRef.current = res.rows[res.rows.length - 1].timestamp;
+                setRows((prev) => mergeTailRows(prev, res.rows));
+            }
+        }
+        const interval = setInterval(poll, TAIL_POLL_MILLISECONDS);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [live, start, stream, query, useRegex, chips]);
+
+    function toggleLive() {
+        const next = !live;
+        if (next) {
+            tailCursorRef.current = rows[0]?.timestamp ?? nowNanoseconds();
+            setError(null);
+        }
+        setLive(next);
+        syncUrl(currentParams(), next);
+    }
 
     function onSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!busy) search();
+        if (!busy && !live) runSearch(currentParams());
     }
 
-    function toggle(index: number) {
+    function addChip() {
+        const key = chipKey.trim();
+        const value = chipValue.trim();
+        if (!key) return;
+        if (/[=!~<>]/.test(key)) {
+            setError(`attribute key ${JSON.stringify(key)} must not contain any of = ! ~ < >`);
+            return;
+        }
+        const nextChips = [...chips, { key, value }];
+        setChips(nextChips);
+        setChipKey("");
+        setChipValue("");
+        setValueSuggestions([]);
+        if (live) syncUrl({ ...currentParams(), chips: nextChips }, true);
+        else runSearch({ ...currentParams(), chips: nextChips });
+    }
+
+    function removeChip(chipIndex: number) {
+        const nextChips = chips.filter((_, index) => index !== chipIndex);
+        setChips(nextChips);
+        if (live) syncUrl({ ...currentParams(), chips: nextChips }, true);
+        else runSearch({ ...currentParams(), chips: nextChips });
+    }
+
+    async function loadValueSuggestions() {
+        const key = chipKey.trim();
+        if (!key || /[=!~<>]/.test(key)) return;
+        const res = await projectLogAttributeValues({
+            projectId,
+            key,
+            start,
+            attributes: chips,
+        });
+        if (res.t === "Ok") setValueSuggestions(res.values);
+    }
+
+    function toggle(rowIdentity: string) {
         setExpanded((prev) => {
             const next = new Set(prev);
-            if (next.has(index)) next.delete(index);
-            else next.add(index);
+            if (next.has(rowIdentity)) next.delete(rowIdentity);
+            else next.add(rowIdentity);
             return next;
         });
     }
+
+    const keySuggestions = useMemo(() => {
+        const keys = new Set<string>();
+        for (const row of rows) {
+            for (const attribute of row.attributes) keys.add(attribute.key);
+        }
+        keys.delete("project_id");
+        return [...keys].sort();
+    }, [rows]);
+
+    const terms = useRegex ? [] : parseSearchTerms(query);
+    const showInterpretation = !useRegex && (terms.length > 1 || query.includes('"'));
 
     return (
         <div style={container}>
@@ -157,10 +279,67 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
                         <option value="stderr">stderr</option>
                     </select>
                 </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    {chips.map((chip, chipIndex) => (
+                        <span key={`${chip.key}=${chip.value}-${chipIndex}`} style={chipStyle}>
+                            <span style={{ fontFamily: "ui-monospace, monospace" }}>
+                                {chip.key}={chip.value}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => removeChip(chipIndex)}
+                                aria-label={`remove filter ${chip.key}=${chip.value}`}
+                                style={chipRemove}
+                            >
+                                ×
+                            </button>
+                        </span>
+                    ))}
+                    <input
+                        type="text"
+                        list="log-attribute-keys"
+                        placeholder="attribute key"
+                        value={chipKey}
+                        onChange={(e) => setChipKey(e.target.value)}
+                        style={{ width: 160, padding: 6 }}
+                    />
+                    <datalist id="log-attribute-keys">
+                        {keySuggestions.map((key) => (
+                            <option key={key} value={key} />
+                        ))}
+                    </datalist>
+                    <input
+                        type="text"
+                        list="log-attribute-values"
+                        placeholder="value"
+                        value={chipValue}
+                        onFocus={loadValueSuggestions}
+                        onChange={(e) => setChipValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                addChip();
+                            }
+                        }}
+                        style={{ width: 160, padding: 6 }}
+                    />
+                    <datalist id="log-attribute-values">
+                        {valueSuggestions.map((value) => (
+                            <option key={value} value={value} />
+                        ))}
+                    </datalist>
+                    <button type="button" onClick={addChip} disabled={!chipKey.trim()}>
+                        Add filter
+                    </button>
+                </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input
                         type="text"
-                        placeholder={useRegex ? "regex over the line" : "text contained in the line"}
+                        placeholder={
+                            useRegex
+                                ? "regex over the line"
+                                : 'space-separated terms, "double quotes" for a phrase'
+                        }
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         style={{ flex: 1, padding: 6 }}
@@ -173,10 +352,23 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
                         />
                         regex
                     </label>
-                    <button type="submit" disabled={busy}>
+                    <button type="submit" disabled={busy || live}>
                         {busy ? "Searching…" : "Search"}
                     </button>
+                    <button
+                        type="button"
+                        onClick={toggleLive}
+                        style={live ? liveActive : preset_}
+                        title="poll for new rows every 2 seconds"
+                    >
+                        {live ? "● Live" : "○ Live"}
+                    </button>
                 </div>
+                {showInterpretation && (
+                    <p style={{ margin: 0, fontSize: 12, color: "#666" }}>
+                        line contains {terms.map((term) => JSON.stringify(term)).join(" and ")}
+                    </p>
+                )}
             </form>
 
             {histogram && histogram.length > 0 && <Histogram buckets={histogram} />}
@@ -184,16 +376,17 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
             {error && <p style={{ color: "crimson" }}>{error}</p>}
 
             {rows.length === 0 && !busy && !error ? (
-                <p>No logs in this range.</p>
+                <p>{live ? "Waiting for new logs…" : "No logs in this range."}</p>
             ) : (
                 <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 13 }}>
                     {rows.map((row, index) => {
                         const rowStream = attributeValue(row, "stream");
+                        const rowIdentity = `${row.timestamp} ${row.line}`;
                         return (
-                            <div key={`${row.timestamp}-${index}`} style={rowStyle}>
+                            <div key={`${rowIdentity}-${index}`} style={rowStyle}>
                                 <div
                                     style={{ display: "flex", gap: 8, cursor: "pointer" }}
-                                    onClick={() => toggle(index)}
+                                    onClick={() => toggle(rowIdentity)}
                                 >
                                     <span style={{ color: "#888", whiteSpace: "nowrap" }}>
                                         {formatTimestamp(row.timestamp)}
@@ -203,7 +396,7 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
                                         {row.line}
                                     </span>
                                 </div>
-                                {expanded.has(index) && (
+                                {expanded.has(rowIdentity) && (
                                     <table style={{ margin: "6px 0 6px 24px", borderCollapse: "collapse" }}>
                                         <tbody>
                                             {row.attributes.map((attribute) => (
@@ -223,13 +416,90 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
                 </div>
             )}
 
-            {hasMore && (
+            {hasMore && !live && (
                 <button onClick={loadMore} disabled={busy} style={{ marginTop: 12 }}>
                     {busy ? "Loading…" : "Load older"}
                 </button>
             )}
         </div>
     );
+}
+
+function actionFilters(params: SearchParams) {
+    const text = params.query.trim();
+    return {
+        stream: params.stream || undefined,
+        attributes: params.chips,
+        contains: params.useRegex || !text ? [] : parseSearchTerms(text),
+        regex: params.useRegex && text ? text : undefined,
+    };
+}
+
+// Space-separated terms AND together; double quotes group a phrase. The
+// interpretation line under the search box shows the result, so nobody guesses.
+function parseSearchTerms(text: string): string[] {
+    const terms: string[] = [];
+    const pattern = /"([^"]*)"|(\S+)/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+        const term = match[1] !== undefined ? match[1] : match[2];
+        if (term) terms.push(term);
+    }
+    return terms;
+}
+
+// Incoming tail rows are ascending and may repeat the cursor row; rows at the
+// boundary timestamp are deduplicated by line, newer rows are prepended, and
+// the kept list is capped so a long-running tail cannot grow without bound.
+function mergeTailRows(previous: Row[], incomingAscending: Row[]): Row[] {
+    const boundary = previous[0]?.timestamp ?? null;
+    const seenAtBoundary = new Set(
+        previous
+            .filter((row) => row.timestamp === boundary)
+            .map((row) => `${row.timestamp} ${row.line}`),
+    );
+    const fresh = incomingAscending.filter((row) => {
+        if (boundary === null) return true;
+        if (BigInt(row.timestamp) > BigInt(boundary)) return true;
+        if (BigInt(row.timestamp) < BigInt(boundary)) return false;
+        return !seenAtBoundary.has(`${row.timestamp} ${row.line}`);
+    });
+    return [...fresh.slice().reverse(), ...previous].slice(0, MAX_KEPT_ROWS);
+}
+
+function nowNanoseconds(): string {
+    return (BigInt(Date.now()) * 1_000_000n).toString();
+}
+
+type UrlState = SearchParams & { live: boolean };
+
+function stateFromLocation(): UrlState {
+    const params = new URLSearchParams(window.location.search);
+    const chips = params.getAll("attr").flatMap((entry) => {
+        const separator = entry.indexOf("=");
+        if (separator <= 0) return [];
+        return [{ key: entry.slice(0, separator), value: entry.slice(separator + 1) }];
+    });
+    return {
+        start: params.get("start") ?? DEFAULT_START,
+        stream: params.get("stream") ?? "",
+        query: params.get("q") ?? "",
+        useRegex: params.get("regex") === "1",
+        chips,
+        live: params.get("live") === "1",
+    };
+}
+
+function syncUrl(params: SearchParams, live: boolean) {
+    const urlParams = new URLSearchParams();
+    if (params.start !== DEFAULT_START) urlParams.set("start", params.start);
+    if (params.stream) urlParams.set("stream", params.stream);
+    if (params.query) urlParams.set("q", params.query);
+    if (params.useRegex) urlParams.set("regex", "1");
+    for (const chip of params.chips) urlParams.append("attr", `${chip.key}=${chip.value}`);
+    if (live) urlParams.set("live", "1");
+    const text = urlParams.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${text ? `?${text}` : ""}`);
 }
 
 function Histogram({ buckets }: { buckets: Bucket[] }) {
@@ -308,6 +578,26 @@ const rowStyle: React.CSSProperties = {
     borderBottom: "1px solid #f0f0f0",
 };
 
+const chipStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "2px 4px 2px 8px",
+    borderRadius: 12,
+    background: "#e6eef7",
+    color: "#246",
+    fontSize: 12,
+};
+
+const chipRemove: React.CSSProperties = {
+    border: "none",
+    background: "none",
+    cursor: "pointer",
+    color: "#246",
+    fontSize: 14,
+    padding: "0 4px",
+};
+
 const preset_: React.CSSProperties = {
     padding: "2px 8px",
     border: "1px solid #ccc",
@@ -320,4 +610,11 @@ const presetActive: React.CSSProperties = {
     background: "#246",
     color: "#fff",
     borderColor: "#246",
+};
+
+const liveActive: React.CSSProperties = {
+    ...preset_,
+    background: "#1a7f37",
+    color: "#fff",
+    borderColor: "#1a7f37",
 };

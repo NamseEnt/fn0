@@ -19,6 +19,7 @@ pub mod list_tokens;
 pub mod new_project;
 pub mod oauth_cli_exchange;
 pub mod project_asset_origin;
+pub mod project_log_attribute_values;
 pub mod project_logs;
 pub mod project_trace_spans;
 pub mod project_traces;

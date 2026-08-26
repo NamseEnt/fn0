@@ -1,6 +1,6 @@
 use crate::common::auth;
 use crate::common::telemetry::{
-    Direction, HistogramBucket, LogHistogram, LogRow, LogSearch, TelemetryClient,
+    AttributeEquals, Direction, HistogramBucket, LogHistogram, LogRow, LogSearch, TelemetryClient,
 };
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -11,17 +11,29 @@ use serde::{Deserialize, Serialize};
 const MAX_LIMIT: u32 = 500;
 
 #[derive(Deserialize)]
+pub struct AttributeEqualsInput {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Deserialize)]
 pub struct Input {
     pub project_id: String,
     pub start: String,
     pub end: Option<String>,
     pub stream: Option<String>,
-    pub contains: Option<String>,
+    pub attributes: Vec<AttributeEqualsInput>,
+    pub contains: Vec<String>,
     pub regex: Option<String>,
     pub limit: u32,
     /// Pagination cursor: the timestamp (nanoseconds, as a string) of the
     /// oldest row already shown. The next page is rows older than it.
     pub before: Option<String>,
+    /// Live-tail cursor: the timestamp (nanoseconds, as a string) of the newest
+    /// row already shown. Set, the query runs forward from it and returns rows
+    /// ascending in time; the cursor row itself can reappear, so the caller
+    /// deduplicates at the boundary. Wins over `before`/`end`.
+    pub after: Option<String>,
     pub include_histogram: bool,
 }
 
@@ -73,23 +85,40 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     let input = &req.body;
     let stream = normalize_stream(input.stream.as_deref());
-    let contains = non_empty(input.contains.as_deref());
+    let attribute_equals = match attribute_equals(&input.attributes) {
+        Ok(filters) => filters,
+        Err(message) => return Output::Error { message },
+    };
+    let contains: Vec<String> = input
+        .contains
+        .iter()
+        .filter(|term| !term.is_empty())
+        .cloned()
+        .collect();
     let regex = non_empty(input.regex.as_deref());
     let limit = input.limit.clamp(1, MAX_LIMIT);
-    let end = input.before.as_deref().or(input.end.as_deref());
+    let (start, end, direction) = match non_empty(input.after.as_deref()) {
+        Some(after) => (after, None, Direction::Forward),
+        None => (
+            input.start.as_str(),
+            input.before.as_deref().or(input.end.as_deref()),
+            Direction::Backward,
+        ),
+    };
 
     let client = TelemetryClient::from_env();
 
     let rows = match client
         .search_logs(LogSearch {
             project_id: &input.project_id,
-            start: &input.start,
+            start,
             end,
             stream,
-            contains,
+            attribute_equals: &attribute_equals,
+            contains: &contains,
             regex,
             limit,
-            direction: Direction::Backward,
+            direction,
         })
         .await
     {
@@ -104,7 +133,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 start: &input.start,
                 end: input.end.as_deref(),
                 stream,
-                contains,
+                attribute_equals: &attribute_equals,
+                contains: &contains,
                 regex,
             })
             .await
@@ -132,6 +162,13 @@ fn normalize_stream(stream: Option<&str>) -> Option<&str> {
 
 fn non_empty(value: Option<&str>) -> Option<&str> {
     value.filter(|v| !v.is_empty())
+}
+
+fn attribute_equals(inputs: &[AttributeEqualsInput]) -> Result<Vec<AttributeEquals>, String> {
+    inputs
+        .iter()
+        .map(|input| AttributeEquals::new(input.key.clone(), input.value.clone()))
+        .collect()
 }
 
 fn row_out(row: LogRow) -> LogRowOut {

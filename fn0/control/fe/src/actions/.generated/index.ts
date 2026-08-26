@@ -19,6 +19,7 @@ export { listTokens } from "./list_tokens";
 export { newProject } from "./new_project";
 export { oauthCliExchange } from "./oauth_cli_exchange";
 export { projectAssetOrigin } from "./project_asset_origin";
+export { projectLogAttributeValues } from "./project_log_attribute_values";
 export { projectLogs } from "./project_logs";
 export { projectTraceSpans } from "./project_trace_spans";
 export { projectTraces } from "./project_traces";

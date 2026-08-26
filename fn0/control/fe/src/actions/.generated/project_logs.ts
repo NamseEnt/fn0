@@ -3,6 +3,11 @@
 import { z } from "zod";
 import { callAction } from "@forte/react";
 
+const AttributeEqualsInputSchema = z.object({
+    key: z.string(),
+    value: z.string(),
+  });
+
 const AttributePairSchema = z.object({
     key: z.string(),
     value: z.string(),
@@ -25,10 +30,12 @@ const InputSchema = z.object({
     start: z.string(),
     end: z.string().optional(),
     stream: z.string().optional(),
-    contains: z.string().optional(),
+    attributes: z.array(AttributeEqualsInputSchema),
+    contains: z.array(z.string()),
     regex: z.string().optional(),
     limit: z.number(),
     before: z.string().optional(),
+    after: z.string().optional(),
     includeHistogram: z.boolean(),
   });
 

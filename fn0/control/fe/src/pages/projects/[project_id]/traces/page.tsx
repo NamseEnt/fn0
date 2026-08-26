@@ -3,6 +3,7 @@ import type { Props } from "./.props";
 import { projectTraces } from "../../../../actions/.generated/project_traces";
 
 const PAGE_LIMIT = 100;
+const DEFAULT_START = "-1h";
 
 const START_PRESETS: Array<{ label: string; value: string }> = [
     { label: "15m", value: "-15m" },
@@ -35,8 +36,16 @@ export default function ProjectTracesPage(props: Props) {
     return <TracesView projectId={props.projectId} name={props.name} />;
 }
 
+type SearchParams = {
+    start: string;
+    status: string;
+    minDuration: string;
+    query: string;
+    useRegex: boolean;
+};
+
 function TracesView({ projectId, name }: { projectId: string; name: string }) {
-    const [start, setStart] = useState("-1h");
+    const [start, setStart] = useState(DEFAULT_START);
     const [status, setStatus] = useState("");
     const [minDuration, setMinDuration] = useState("");
     const [query, setQuery] = useState("");
@@ -46,24 +55,29 @@ function TracesView({ projectId, name }: { projectId: string; name: string }) {
     const [busy, setBusy] = useState(false);
     const [hasMore, setHasMore] = useState(false);
 
-    function filters() {
-        const text = query.trim();
+    function currentParams(): SearchParams {
+        return { start, status, minDuration, query, useRegex };
+    }
+
+    function actionFilters(params: SearchParams) {
+        const text = params.query.trim();
         return {
-            status: status || undefined,
-            minDuration: minDuration.trim() || undefined,
-            nameContains: useRegex || !text ? undefined : text,
-            nameRegex: useRegex && text ? text : undefined,
+            status: params.status || undefined,
+            minDuration: params.minDuration.trim() || undefined,
+            nameContains: params.useRegex || !text ? undefined : text,
+            nameRegex: params.useRegex && text ? text : undefined,
         };
     }
 
-    async function search() {
+    async function runSearch(params: SearchParams) {
+        syncUrl(params);
         setBusy(true);
         setError(null);
         const res = await projectTraces({
             projectId,
-            start,
+            start: params.start,
             limit: PAGE_LIMIT,
-            ...filters(),
+            ...actionFilters(params),
         });
         setBusy(false);
         if (res.t === "Ok") {
@@ -83,7 +97,7 @@ function TracesView({ projectId, name }: { projectId: string; name: string }) {
             start,
             limit: PAGE_LIMIT,
             beforeStart,
-            ...filters(),
+            ...actionFilters(currentParams()),
         });
         setBusy(false);
         if (res.t === "Ok") {
@@ -98,12 +112,18 @@ function TracesView({ projectId, name }: { projectId: string; name: string }) {
     }
 
     useEffect(() => {
-        search();
+        const initial = stateFromLocation();
+        setStart(initial.start);
+        setStatus(initial.status);
+        setMinDuration(initial.minDuration);
+        setQuery(initial.query);
+        setUseRegex(initial.useRegex);
+        runSearch(initial);
     }, []);
 
     function onSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!busy) search();
+        if (!busy) runSearch(currentParams());
     }
 
     return (
@@ -230,6 +250,28 @@ function TracesView({ projectId, name }: { projectId: string; name: string }) {
             )}
         </div>
     );
+}
+
+function stateFromLocation(): SearchParams {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        start: params.get("start") ?? DEFAULT_START,
+        status: params.get("status") ?? "",
+        minDuration: params.get("min") ?? "",
+        query: params.get("q") ?? "",
+        useRegex: params.get("regex") === "1",
+    };
+}
+
+function syncUrl(params: SearchParams) {
+    const urlParams = new URLSearchParams();
+    if (params.start !== DEFAULT_START) urlParams.set("start", params.start);
+    if (params.status) urlParams.set("status", params.status);
+    if (params.minDuration.trim()) urlParams.set("min", params.minDuration.trim());
+    if (params.query) urlParams.set("q", params.query);
+    if (params.useRegex) urlParams.set("regex", "1");
+    const text = urlParams.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${text ? `?${text}` : ""}`);
 }
 
 function formatTimestamp(nanoseconds: string): string {

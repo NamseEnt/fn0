@@ -20,12 +20,36 @@ pub struct TelemetryClient {
     access_client_secret: String,
 }
 
+/// An attribute equality filter (`attr=key=value`). Only equality, and only
+/// through [`AttributeEquals::new`]: loggytracy reads the key as everything up
+/// to the first operator character, so a key carrying one would assemble into a
+/// different filter than the caller asked for.
+pub struct AttributeEquals {
+    key: String,
+    value: String,
+}
+
+impl AttributeEquals {
+    pub fn new(key: String, value: String) -> Result<Self, String> {
+        if key.is_empty() {
+            return Err("attribute filter key must not be empty".to_string());
+        }
+        if key.contains(['=', '!', '~', '<', '>']) {
+            return Err(format!(
+                "attribute filter key {key:?} must not contain any of = ! ~ < >"
+            ));
+        }
+        Ok(Self { key, value })
+    }
+}
+
 pub struct LogSearch<'a> {
     pub project_id: &'a str,
     pub start: &'a str,
     pub end: Option<&'a str>,
     pub stream: Option<&'a str>,
-    pub contains: Option<&'a str>,
+    pub attribute_equals: &'a [AttributeEquals],
+    pub contains: &'a [String],
     pub regex: Option<&'a str>,
     pub limit: u32,
     pub direction: Direction,
@@ -36,8 +60,17 @@ pub struct LogHistogram<'a> {
     pub start: &'a str,
     pub end: Option<&'a str>,
     pub stream: Option<&'a str>,
-    pub contains: Option<&'a str>,
+    pub attribute_equals: &'a [AttributeEquals],
+    pub contains: &'a [String],
     pub regex: Option<&'a str>,
+}
+
+pub struct LogAttributeValues<'a> {
+    pub project_id: &'a str,
+    pub key: &'a str,
+    pub start: &'a str,
+    pub end: Option<&'a str>,
+    pub attribute_equals: &'a [AttributeEquals],
 }
 
 #[derive(Clone, Copy)]
@@ -68,6 +101,11 @@ pub struct HistogramBucket {
     pub bucket_start: String,
     pub bucket_end: String,
     pub count: u64,
+}
+
+#[derive(Deserialize)]
+struct AttributeValueRow {
+    value: String,
 }
 
 pub struct TraceSearch<'a> {
@@ -148,7 +186,10 @@ impl TelemetryClient {
         if let Some(stream) = query.stream {
             params.push("attr", &format!("stream={stream}"));
         }
-        if let Some(contains) = query.contains {
+        for filter in query.attribute_equals {
+            params.push("attr", &format!("{}={}", filter.key, filter.value));
+        }
+        for contains in query.contains {
             params.push("contains", contains);
         }
         if let Some(regex) = query.regex {
@@ -163,10 +204,7 @@ impl TelemetryClient {
         parse_ndjson(&body)
     }
 
-    pub async fn histogram(
-        &self,
-        query: LogHistogram<'_>,
-    ) -> anyhow::Result<Vec<HistogramBucket>> {
+    pub async fn histogram(&self, query: LogHistogram<'_>) -> anyhow::Result<Vec<HistogramBucket>> {
         let mut params = QueryParams::new();
         params.push("start", query.start);
         if let Some(end) = query.end {
@@ -179,7 +217,10 @@ impl TelemetryClient {
         if let Some(stream) = query.stream {
             params.push("attr", &format!("stream={stream}"));
         }
-        if let Some(contains) = query.contains {
+        for filter in query.attribute_equals {
+            params.push("attr", &format!("{}={}", filter.key, filter.value));
+        }
+        for contains in query.contains {
             params.push("contains", contains);
         }
         if let Some(regex) = query.regex {
@@ -190,6 +231,37 @@ impl TelemetryClient {
             .get("/loggytracy/api/v1/logs/histogram", &params.encode())
             .await?;
         parse_ndjson(&body)
+    }
+
+    /// The values loggytracy has seen for one attribute key, project-scoped the
+    /// same way every log query is. The backend samples the newest rows in the
+    /// window rather than reading a catalog, so a rare or old value may be
+    /// absent — good enough for autocomplete, which is this method's only
+    /// caller.
+    pub async fn log_attribute_values(
+        &self,
+        query: LogAttributeValues<'_>,
+    ) -> anyhow::Result<Vec<String>> {
+        let mut params = QueryParams::new();
+        params.push("start", query.start);
+        if let Some(end) = query.end {
+            params.push("end", end);
+        }
+        params.push(
+            "attr",
+            &format!("{PROJECT_ID_ATTRIBUTE}={}", query.project_id),
+        );
+        for filter in query.attribute_equals {
+            params.push("attr", &format!("{}={}", filter.key, filter.value));
+        }
+
+        let path = format!(
+            "/loggytracy/api/v1/logs/attributes/{}/values",
+            percent_encode(query.key)
+        );
+        let body = self.get(&path, &params.encode()).await?;
+        let rows: Vec<AttributeValueRow> = parse_ndjson(&body)?;
+        Ok(rows.into_iter().map(|row| row.value).collect())
     }
 
     pub async fn search_traces(&self, query: TraceSearch<'_>) -> anyhow::Result<Vec<TraceSummary>> {
