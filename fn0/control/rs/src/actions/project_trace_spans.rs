@@ -100,9 +100,7 @@ fn event_out(event: TraceSpanEvent) -> SpanEventOut {
     }
 }
 
-fn attribute_pairs(
-    attributes: std::collections::BTreeMap<String, String>,
-) -> Vec<AttributePair> {
+fn attribute_pairs(attributes: std::collections::BTreeMap<String, String>) -> Vec<AttributePair> {
     attributes
         .into_iter()
         .map(|(key, value)| AttributePair { key, value })
