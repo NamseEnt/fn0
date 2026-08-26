@@ -472,6 +472,10 @@ const controlWebsocketBearerCt = pulumi
   .all([controlDek.plaintext, websocketBearer.result])
   .apply(([dek, token]) => aesGcmEncryptToBase64(dek, token));
 
+const controlTelemetryAccessClientSecretCt = pulumi
+  .all([controlDek.plaintext, telemetryEdgeGate.serviceTokenClientSecret])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
 const bundleStoreR2AccessKeyIdCt = pulumi
   .all([controlDek.plaintext, bundleStoreR2.accessKeyId])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
@@ -507,6 +511,9 @@ const controlEnvYamlBootstrap = pulumi
     controlCookieSecretCt,
     controlAdminTokenCt,
     controlWebsocketBearerCt,
+    pulumi.output(telemetryHostname),
+    telemetryEdgeGate.serviceTokenClientId,
+    controlTelemetryAccessClientSecretCt,
     bundleStoreR2.accountId,
     bundleStoreR2.bucketName,
     bundleStoreR2AccessKeyIdCt,
@@ -529,6 +536,9 @@ const controlEnvYamlBootstrap = pulumi
       cookieCt,
       adminCt,
       websocketBearerCt,
+      telemetryQueryHostname,
+      telemetryAccessClientId,
+      telemetryAccessClientSecretCt,
       r2AccountId,
       r2Bucket,
       r2KeyCt,
@@ -556,6 +566,10 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${adminCt}`,
         "FN0_WEBSOCKET_QUIC_BEARER:",
         `  secret: ${websocketBearerCt}`,
+        `FN0_TELEMETRY_QUERY_URL: https://${telemetryQueryHostname}`,
+        `FN0_TELEMETRY_ACCESS_CLIENT_ID: ${telemetryAccessClientId}`,
+        "FN0_TELEMETRY_ACCESS_CLIENT_SECRET:",
+        `  secret: ${telemetryAccessClientSecretCt}`,
         `FN0_BUNDLE_STORE_ACCOUNT_ID: ${r2AccountId}`,
         `FN0_BUNDLE_STORE_BUCKET: ${r2Bucket}`,
         "FN0_BUNDLE_STORE_ACCESS_KEY_ID:",
