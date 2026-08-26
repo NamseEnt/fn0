@@ -28,4 +28,5 @@ export { secretsInit } from "./secrets_init";
 export { setPendingFn0Wasmtime } from "./set_pending_fn0_wasmtime";
 export { staticPagePurge } from "./static_page_purge";
 export { waitlistJoin } from "./waitlist_join";
+export { websocketSingletonStatus } from "./websocket_singleton_status";
 export { zombieSweep } from "./zombie_sweep";

@@ -13,6 +13,11 @@ const CronJobSchema = z.object({
     everyMinutes: z.number(),
   });
 
+const WebSocketSingletonDeclarationSchema = z.object({
+    singletonId: z.string(),
+    routePath: z.string(),
+  });
+
 const StaticUploadSchema = z.object({
     path: z.string(),
     presignedUrl: z.string(),
@@ -27,6 +32,7 @@ const InputSchema = z.object({
     supportsStaticAssetCacheControl: z.boolean(),
     jobs: z.array(CronJobSchema),
     cronUpdatedAt: z.coerce.date(),
+    websocketSingletons: z.array(WebSocketSingletonDeclarationSchema),
   });
 
 const OutputSchema = z.discriminatedUnion("t", [
@@ -42,6 +48,10 @@ const OutputSchema = z.discriminatedUnion("t", [
   }),
     z.object({
     t: z.literal("BadCodeVersion"),
+    reason: z.string(),
+  }),
+    z.object({
+    t: z.literal("InvalidWebSocketSingleton"),
     reason: z.string(),
   }),
     z.object({
