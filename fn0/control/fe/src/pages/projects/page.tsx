@@ -30,6 +30,11 @@ export default function ProjectsPage(props: Props) {
                                         href={`/projects/${encodeURIComponent(project.projectId)}/logs`}
                                     >
                                         Logs
+                                    </a>{" "}
+                                    <a
+                                        href={`/projects/${encodeURIComponent(project.projectId)}/traces`}
+                                    >
+                                        Traces
                                     </a>
                                 </td>
                             </tr>

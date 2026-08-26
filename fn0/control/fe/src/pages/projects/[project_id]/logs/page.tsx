@@ -117,7 +117,8 @@ function LogsView({ projectId, name }: { projectId: string; name: string }) {
     return (
         <div style={container}>
             <p style={{ marginBottom: 4 }}>
-                <a href="/projects">Projects</a> / logs
+                <a href="/projects">Projects</a> / logs ·{" "}
+                <a href={`/projects/${encodeURIComponent(projectId)}/traces`}>traces</a>
             </p>
             <h1 style={{ margin: "0 0 16px" }}>
                 {name}{" "}

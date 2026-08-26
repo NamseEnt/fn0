@@ -20,6 +20,8 @@ export { newProject } from "./new_project";
 export { oauthCliExchange } from "./oauth_cli_exchange";
 export { projectAssetOrigin } from "./project_asset_origin";
 export { projectLogs } from "./project_logs";
+export { projectTraceSpans } from "./project_trace_spans";
+export { projectTraces } from "./project_traces";
 export { promotePendingFn0Wasmtime } from "./promote_pending_fn0_wasmtime";
 export { publicPurge } from "./public_purge";
 export { renameProject } from "./rename_project";
