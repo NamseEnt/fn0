@@ -80,7 +80,7 @@ VM_LISTEN_ADDR="127.0.0.1:8428"
 # guide is explicit that `latest` is for typing, not for deployments, and a
 # telemetry backend that silently changes version is one that cannot be told
 # apart from the thing it is supposed to be observing.
-LOGGYTRACY_IMAGE="ghcr.io/namse/loggytracy:0f22e7044c5c147a43bddd511484fb59afec6ae9"
+LOGGYTRACY_IMAGE="ghcr.io/namse/loggytracy:bf53ec796fa91770fe4dc623c60a917028511608"
 LOGGYTRACY_DATA_DIR="/var/lib/loggytracy"
 LOGGYTRACY_CONFIG_DIR="/etc/loggytracy"
 LOGGYTRACY_ENV_FILE="${LOGGYTRACY_CONFIG_DIR}/loggytracy.env"
