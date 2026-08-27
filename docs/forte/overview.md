@@ -37,6 +37,16 @@ Forte is a full-stack web framework built on top of [fn0](../fn0/overview.md). I
 
 For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no SSR step.
 
+### SSR pipeline detail
+
+When a page handler sets `x-fn0-next: js`, fn0 delegates to **fn0-ski** — a WinterCG-compatible JavaScript runtime built on V8 (via `deno_core`). fn0-ski executes `dist/server.js`, the Vite SSR bundle produced by `forte build`. That bundle re-imports React, the page component, and the `@forte/react` helpers, then calls `renderToString` with the `Props` JSON returned by the Rust handler. The resulting HTML is sent to the browser.
+
+Key properties of the SSR step:
+
+- **Hook fetches happen here.** During SSR, React components that call `useForteHook` from `@forte/react` trigger a `POST /__self_invoke/<name>` back into the same WASM component. Those results are embedded in `__FORTE_HOOK_CACHE__` in the HTML and reused by the client without a second network request.
+- **N isolates per thread, M threads model.** fn0-ski runs N V8 isolates per OS thread. A Forte request is pinned to one thread (by `project_id % thread_count`), so a given project always lands on the same thread's isolate pool.
+- **deno_core is vendored and patched.** `vendor/deno/core/` contains a patched copy of `deno_core` that serializes module maps in deterministic order, making the fn0-ski build reproducible. Do not replace it with the upstream crate.
+
 ## Key Packages
 
 | Package | Version | Crate | Purpose |

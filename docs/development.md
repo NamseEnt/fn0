@@ -121,6 +121,14 @@ The CLI downloads the correct pre-built version automatically on first use (`~/.
 
 **`fn0/control`** is a full Forte project (Rust backend + React frontend). Build it with `forte build` from inside `fn0/control/`, using a `forte` CLI built from the monorepo. Use `scripts/bootstrap-fn0-control.sh` for the initial platform deploy.
 
+### vendor/deno
+
+`vendor/deno/core/` is a patched copy of `deno_core` used by `fn0-ski`. The patch makes the module map serialization order deterministic, which is required for reproducible builds. The upstream crate iterates a `HashMap` in non-deterministic order.
+
+- **Never** replace `vendor/deno/core/` with the upstream crate — that breaks `fn0-ski` build reproducibility.
+- **Never** run `cargo fmt --all` — it reaches into `vendor/` and reformats the vendored code, breaking its diff from upstream. Use `cargo fmt` or `cargo fmt -p <crate>` instead.
+- To update `deno_core` to a newer upstream version: copy the new upstream source into `vendor/deno/core/`, re-apply the determinism patch (see the git diff for `vendor/deno/core/` on the commit that introduced it), and update the `[patch.crates-io]` entry in the workspace `Cargo.toml`.
+
 ## Code Generation (forte-codegen)
 
 Code generation runs as part of `cargo build` via `build.rs`. If `route_generated.rs` looks wrong after adding/removing pages or actions, run:

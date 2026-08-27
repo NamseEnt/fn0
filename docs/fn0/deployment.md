@@ -122,6 +122,6 @@ The platform's telemetry stack is self-hosted on one node behind a Cloudflare Tu
 
 loggytracy has no TLS or authentication of its own. A Cloudflare Access service token authenticates callers at the edge, and a Transform Rule overwrites `X-Scope-OrgID` there. Any change that exposes loggytracy's listener another way, or lets a caller's own tenant header survive the Transform Rule, is a security change — not a routing one.
 
-Judge platform health by probing the data plane directly. There is no read UI on the telemetry node (see GitHub issue #111).
+Platform health can be assessed through the fn0-control dashboard, which exposes per-project log and trace viewers that query the telemetry backends via their HTTP query APIs (`/loki/api/v1/query_range` on loggytracy and `/select/logsql/query` for log streams). The telemetry node itself has no directly attached viewer UI; all reads go through the control plane. For raw data plane probing, use the backend APIs directly.
 
 For setting up a new telemetry node: `scripts/setup-telemetry-node.sh` (or `scripts/setup-telemetry-node-remote.sh` for a remote node).
