@@ -1,6 +1,6 @@
 [package]
 name = "fn0-worker"
-version = "0.4.10"
+version = "0.4.11"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -27,6 +27,7 @@ http-body-util = { workspace = true }
 oci-rust-sdk = { workspace = true }
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
+mimalloc = { workspace = true }
 opendal = { workspace = true }
 opentelemetry = { workspace = true, features = ["logs", "metrics"] }
 opentelemetry-appender-tracing = { workspace = true }

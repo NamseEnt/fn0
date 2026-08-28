@@ -29,6 +29,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
+use mimalloc::MiMalloc;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -39,6 +40,9 @@ use tokio::sync::oneshot;
 use tokio_rustls::TlsAcceptor;
 use vault_client::VaultClient;
 use worker_pool::{DispatchError, RequestEnvelope};
+
+#[global_allocator]
+static GLOBAL_ALLOCATOR: MiMalloc = MiMalloc;
 
 pub type WorkerContext = ExecutionContext<S3BundleCache>;
 
