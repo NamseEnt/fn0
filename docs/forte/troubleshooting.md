@@ -176,7 +176,7 @@ Secrets and env vars set via `forte env set` are stored in `env.yaml` and bundle
 
 - Verify `cron.yaml` exists in the project root.
 - Each `function` must match a `rs/src/queue_task/<name>.rs` file.
-- That task's `Input` must be empty: `pub struct Input;`, `pub struct Input {}`, or `pub type Input = ()`.
+- That task's `Input` must be empty: `pub struct Input;`, `pub struct Input {}`, `pub struct Input()`, or `pub type Input = ()`.
 - Cron jobs are registered during `forte deploy`. Run `forte deploy` again after adding or changing `cron.yaml`.
 
 ---
