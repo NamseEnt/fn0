@@ -5,6 +5,7 @@ pub mod approve_cli_authorization;
 pub mod bundle_compiled;
 pub mod bundle_gc;
 pub mod bundle_uploaded;
+pub mod cloudflare_broker_authorize;
 pub mod cloudflare_connect;
 pub mod cloudflare_status;
 pub mod cron_on_tick;

@@ -98,7 +98,7 @@ See the full handler docs: [Pages](pages.md), [API Endpoints](apis.md), [Actions
 3. `forte add page <path>` / `forte add action <path>` — add handlers
 4. `forte build` — compile backend (WASM) + frontend (Vite)
 5. `forte login` — authenticate with fn0 Cloud (required before first deploy)
-6. `CLOUDFLARE_API_TOKEN=<token> forte cloud init --zone <zone> --project-name <name>` — connect your Cloudflare account (required before first deploy; one-time per project)
+6. `forte cloud init --zone <zone> --project-name <name>` — connect your Cloudflare account (required before first deploy; asks for a setup token once per Cloudflare account, then reuses it for every other project on that account)
 7. `forte deploy` — upload to fn0 Cloud
 
 See [cli.md](cli.md) for all commands and [fn0/cloudflare.md](../fn0/cloudflare.md) for the Cloudflare token setup.

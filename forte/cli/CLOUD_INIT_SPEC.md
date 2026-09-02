@@ -2,10 +2,10 @@
 
 Status: **Implemented**.
 
-This document defines the non-interactive Cloudflare setup contract for the
-Forte CLI. The command remains a single operation: it resolves the requested
-zone, registers the project, provisions its Cloudflare resources, creates the
-credentials Forte needs, and prints the DNS record that must be added.
+This document defines the Cloudflare setup contract for the Forte CLI. The
+command remains a single operation: it resolves the requested zone, registers
+the project, provisions its Cloudflare resources, creates the credentials Forte
+needs, and prints the DNS record that must be added.
 
 ## Invocation
 
@@ -16,12 +16,26 @@ forte cloud init \
   --zone example.com
 ```
 
-The Cloudflare setup token is supplied through `CLOUDFLARE_API_TOKEN`. It is
-not a command-line argument and the command never reads from standard input.
+The setup secret can later be replaced or removed with:
 
-If the environment variable or any required argument is missing, the command
-prints an error to stderr and exits with a non-zero status. It never prompts,
-waits for input, or selects a default value.
+```sh
+forte cloud rotate --project .
+forte cloud clear --project . --yes
+```
+
+On the first run, `forte cloud init` asks for the Cloudflare setup token through
+a masked prompt. It is never a command-line argument, environment variable,
+printed value, or project/local credential-store entry.
+
+The first run uses the token only during bootstrap of the per-account
+`fn0-broker` Worker. The token is saved as `FN0_SETUP_TOKEN` in the user's Cloudflare
+account-level Secrets Store with the `workers` scope, and the Worker receives
+it through a Secrets Store binding. Later runs use the broker URL already in
+`Forte.toml` and do not ask for the setup token again.
+
+For a new project directory, the same non-secret account ID and broker URL are
+also reused from Forte's user configuration. That file contains no Cloudflare
+token.
 
 ## Arguments
 
@@ -67,6 +81,8 @@ After successful setup, `Forte.toml` stores:
 - `project_name`
 - `zone`
 - `domain`
+- `cloudflare_account_id`
+- `cloudflare_broker_url`
 
 The `domain` value is derived from `project_name` and `zone`. On later runs,
 the stored values are checked against the requested values. A mismatch is
@@ -74,26 +90,39 @@ reported as an error instead of starting a reconfiguration flow.
 
 ## Authentication and secrets
 
-`CLOUDFLARE_API_TOKEN` is a bootstrap credential with the permissions needed
-to provision the account and create the narrower project credentials. The
-CLI keeps it local to the setup process, never sends it to fn0, never prints
-it, and never includes it in an error message.
+The setup token is a bootstrap credential with `User -> API Tokens -> Edit`.
+The first run creates a short-lived token with the account permissions needed
+to create or update the user's Secrets Store secret and deploy the broker
+Worker, then revokes that temporary token. The setup token itself is sent only
+to Cloudflare during bootstrap and is never sent to fn0-control or the broker
+API as a request value.
+
+The broker is the only component that reads `FN0_SETUP_TOKEN` after bootstrap.
+It accepts fixed operations only: exact zone lookup, project resource
+provisioning, WebSockets, origin certificate issuance, domain finalization, and
+cleanup of credentials from a rejected connection. Every request forwards the
+Forte control credential to fn0-control, which verifies login and project
+ownership before the broker uses the setup token.
 
 The bootstrap credential is reusable across projects. Project credentials are
 created with only the permissions and resource scope required by each project.
 
 ## Operation order
 
-1. Validate all local arguments and `CLOUDFLARE_API_TOKEN`.
-2. Resolve the exact Cloudflare zone name.
-3. Derive and validate `<project-name>.<zone>`.
-4. Create or resolve the Forte project identity.
-5. Write the four cloud fields to `Forte.toml` so a failed retry reuses the
-   same project identity.
-6. Provision or reuse the project's Cloudflare buckets and zone resources.
-7. Create or reuse the project's narrow credentials.
-8. Sign and register the origin certificate for the derived hostname.
-9. Print the required proxied CNAME record.
+1. Validate all local arguments.
+2. Load the saved broker configuration, or read the setup token and install the
+   user's account-level broker Worker and Secrets Store binding.
+3. Resolve the exact Cloudflare zone name through the broker.
+4. Derive and validate `<project-name>.<zone>`.
+5. Create or resolve the Forte project identity.
+6. Write the cloud fields, account ID, and broker URL to `Forte.toml` so a
+   failed retry reuses the same project identity and broker.
+7. Provision or reuse the project's Cloudflare buckets and zone resources
+   through the broker.
+8. Create or reuse the project's narrow credentials.
+9. Ask the broker to issue the origin certificate, register it with fn0, and
+   finalize CORS, cache, and DNS settings.
+10. Print the required proxied CNAME record.
 
 Every step must be safe to retry. Existing resources belonging to the same
 project are reused rather than duplicated.
@@ -106,8 +135,11 @@ exit status. JSON output is not required by this contract.
 The command must fail before making Cloudflare changes when local validation
 fails, including:
 
-- missing `CLOUDFLARE_API_TOKEN`
 - missing `--project-name` or `--zone` for a new project
 - invalid DNS label
 - inaccessible zone
 - a configuration mismatch on an existing project
+
+If the account has no saved broker configuration, an empty setup-token prompt
+is also an error. Token rotation also uses a masked prompt and never reads a
+local environment variable.

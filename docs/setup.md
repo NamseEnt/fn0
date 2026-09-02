@@ -115,11 +115,13 @@ Opens a browser for PKCE OAuth, exchanges the code for a token, and saves creden
 **2. Connect your Cloudflare account:**
 
 ```sh
-CLOUDFLARE_API_TOKEN=<your-token> forte cloud init \
+forte cloud init \
   --project . \
   --project-name my-app \
   --zone example.com
 ```
+
+The first time you run this for a Cloudflare account, it asks for a setup token through a masked prompt and uses it to install a small broker Worker in your own account — after that, the token is stored only in your Cloudflare account's Secrets Store, never on your machine or on fn0's servers, and every other project on the same account reuses the same broker without asking again.
 
 Registers the project with fn0 Cloud, enables WebSockets for the selected zone, provisions three R2 buckets in your Cloudflare account, and writes the proxied `CNAME` your app answers on into your zone. Requires `forte login` to have run first.
 

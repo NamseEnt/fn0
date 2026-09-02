@@ -276,9 +276,13 @@ forte cloud init \
   --zone example.com
 ```
 
-The command is non-interactive. It never prompts and never reads from standard
-input. The setup token must be available as `CLOUDFLARE_API_TOKEN`; if it is
-missing, the command exits immediately with an error.
+On the first run for a Cloudflare account, the command asks for a setup token
+through a masked prompt — never a command-line argument, an environment
+variable, or something it prints or saves anywhere in the clear. That first
+run uses the token to install a small broker Worker in your own Cloudflare
+account and stores the token only inside that Worker's Secrets Store. Every
+later run, for this project or any other project on the same account, reuses
+the broker and does not ask for the token again.
 
 `--zone` is a Cloudflare zone name such as `example.com`, not the internal
 hexadecimal zone ID. The CLI resolves the exact zone and must not choose one
@@ -299,23 +303,66 @@ no separate `--domain` argument in the default contract.
 
 What it does, in order:
 
-1. Validates all arguments and `CLOUDFLARE_API_TOKEN`
+1. Validates all arguments; installs the broker Worker first if this
+   Cloudflare account does not have one yet
 2. Resolves the requested zone and derives the app hostname
-3. Registers the project and writes `project_id`, `project_name`, `zone`, and
-   `domain` to `Forte.toml`
-4. Creates or reuses the buckets, CDN hostnames, and cache rule on your account
-5. Hands fn0 the narrow project credentials it keeps
-6. Signs an origin certificate through your Origin CA **on your machine** —
-   fn0 holds no token that can sign one — and registers the derived domain
+3. Registers the project and writes `project_id`, `project_name`, `zone`,
+   `domain`, `cloudflare_account_id`, and `cloudflare_broker_url` to
+   `Forte.toml`
+4. Creates or reuses the buckets, CDN hostnames, and cache rule on your
+   account, through the broker
+5. Hands fn0 the narrow project credentials the broker minted
+6. Has the broker sign an origin certificate through your Origin CA — fn0
+   holds no token that can sign one — and registers the derived domain
 7. Writes the proxied `CNAME` for the derived domain into your zone
 
-The bootstrap token is never sent to fn0. It is used locally to provision the
-account and create project-scoped credentials.
+The setup token is never sent to fn0. After the first run it is not sent
+anywhere at all — the broker Worker in your own account is the only thing
+that ever reads it again, to mint the short-lived, narrowly-scoped
+credentials each of these steps actually needs.
 
-The bootstrap token can be reused for multiple projects. Re-running setup for
-an existing project checks the stored project name, zone, and derived domain;
-it refuses mismatches rather than entering a prompt-driven reconfiguration
-flow. Moving a project to a different Cloudflare account is not supported.
+Re-running setup for an existing project checks the stored project name,
+zone, and derived domain; it refuses mismatches rather than entering a
+prompt-driven reconfiguration flow. Moving a project to a different
+Cloudflare account is not supported.
+
+#### `forte cloud rotate`
+
+```sh
+forte cloud rotate --project .
+```
+
+Replaces the setup token stored in the broker's Secrets Store. Asks for the
+new token through the same masked prompt as `init`, then has the broker save
+it and revoke the old one. Every project already connected through this
+broker keeps working — this only changes which token the broker itself holds.
+
+#### `forte cloud clear`
+
+```sh
+forte cloud clear --project . --yes
+```
+
+Deletes the setup token secret from the broker's Secrets Store and revokes
+it. The broker Worker and its Secrets Store are left in place, empty — this
+is for retiring a compromised or unwanted token, not for undoing `cloud
+init`. Without `--yes` this asks for confirmation first.
+
+#### `forte cloud destroy`
+
+```sh
+forte cloud destroy --project . --yes
+```
+
+Deletes the broker Worker, its Secrets Store, and the setup token stored in
+it — the full undo of a `cloud init` bootstrap for this Cloudflare account.
+This is account-scoped: a broker is meant to be shared by every project on
+the account that has run `cloud init`, and this command does not check
+whether another project still depends on it before tearing it down. Without
+`--yes` it asks you to type the Cloudflare account ID to confirm.
+
+This does not touch a project's own resources (buckets, DNS record, minted
+credentials) — that's `forte destroy`, run per project.
 
 ---
 

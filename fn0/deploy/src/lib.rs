@@ -4,7 +4,8 @@ mod asset_origin;
 mod bundle;
 pub mod cli_login;
 mod cloudflare;
-pub mod cloudflare_provision;
+pub mod cloudflare_broker;
+mod cloudflare_provision;
 pub mod credentials;
 mod deploy;
 mod doc_query;
@@ -21,6 +22,11 @@ pub use app_url::*;
 pub use asset_origin::*;
 pub use bundle::*;
 pub use cloudflare::*;
+pub use cloudflare_broker::*;
+pub use cloudflare_provision::{
+    ConnectCredentials, IssuedCertificate, MintedCredentialIds, ProvisionedResources,
+    ReachableZone, ZoneDiscovery,
+};
 pub use deploy::*;
 pub use doc_query::*;
 pub use domain::*;

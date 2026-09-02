@@ -5,6 +5,7 @@ export { approveCliAuthorization } from "./approve_cli_authorization";
 export { bundleCompiled } from "./bundle_compiled";
 export { bundleGc } from "./bundle_gc";
 export { bundleUploaded } from "./bundle_uploaded";
+export { cloudflareBrokerAuthorize } from "./cloudflare_broker_authorize";
 export { cloudflareConnect } from "./cloudflare_connect";
 export { cloudflareStatus } from "./cloudflare_status";
 export { cronOnTick } from "./cron_on_tick";

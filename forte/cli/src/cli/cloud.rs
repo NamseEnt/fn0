@@ -1,11 +1,10 @@
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 
-use super::project_config::{read_cloud_config, write_cloud_config};
-use fn0_deploy::cloudflare_provision::{ProvisionedResources, ReachableZone, ZoneDiscovery};
+use super::project_config::{clear_broker_config, read_cloud_config, write_cloud_config};
 use fn0_deploy::{
-    CloudSetup, CloudflareConnection, DomainStatus, fetch_cloudflare_connection,
-    provision_and_connect, set_domain,
+    BrokerClient, CloudSetup, CloudflareConnection, DomainStatus, ProvisionedResources,
+    ReachableZone, ZoneDiscovery, fetch_cloudflare_connection, provision_and_connect, set_domain,
 };
 
 pub async fn init(
@@ -13,7 +12,6 @@ pub async fn init(
     requested_project_name: Option<String>,
     requested_zone: Option<String>,
 ) -> Result<()> {
-    let api_token = read_cloudflare_token()?;
     let config = read_cloud_config(&project_dir)?;
     let has_project_id = config.project_id.is_some();
     let project_name = resolve_setting(
@@ -44,9 +42,48 @@ pub async fn init(
         )
     })?;
 
-    println!("reading the zones this token can reach...");
-    let zones = ZoneDiscovery::new(api_token.clone()).list().await?;
-    let zone = resolve_zone(zones, &zone_name)?;
+    let broker = match (
+        config.cloudflare_account_id.clone(),
+        config.cloudflare_broker_url.clone(),
+    ) {
+        (Some(account_id), Some(broker_url)) => BrokerClient::new(
+            broker_url,
+            creds.control_url.clone(),
+            creds.token.clone(),
+            account_id,
+        )?,
+        (None, None) => match fn0_deploy::load_broker_settings()? {
+            Some(settings) => BrokerClient::new(
+                settings.broker_url,
+                creds.control_url.clone(),
+                creds.token.clone(),
+                settings.account_id,
+            )?,
+            None => {
+                let setup_token = prompt_cloudflare_token()?;
+                println!("checking the Cloudflare account and installing the setup broker...");
+                let zones = ZoneDiscovery::new(setup_token.clone()).list().await?;
+                let zone = resolve_zone(zones, &zone_name)?;
+                BrokerClient::bootstrap(
+                    setup_token,
+                    zone.account_id,
+                    creds.control_url.clone(),
+                    creds.token.clone(),
+                )
+                .await?
+            }
+        },
+        (Some(_), None) | (None, Some(_)) => {
+            return Err(anyhow!(
+                "Forte.toml must contain both cloudflare_account_id and cloudflare_broker_url"
+            ));
+        }
+    };
+
+    fn0_deploy::save_broker_settings(&broker.settings())?;
+
+    println!("resolving the requested Cloudflare zone through the setup broker...");
+    let zone = broker.resolve_zone(&zone_name).await?;
 
     let mut project_id = config.project_id;
     let project_id = fn0_deploy::ensure_project_id(
@@ -63,6 +100,8 @@ pub async fn init(
         &project_name,
         &zone_name,
         &domain,
+        broker.account_id(),
+        broker.url(),
     )?;
 
     let connection = if has_project_id {
@@ -76,7 +115,8 @@ pub async fn init(
         project_id: &project_id,
         account_id: &zone.account_id,
         zone_id: &zone.zone_id,
-        api_token: &api_token,
+        zone_name: &zone.zone_name,
+        broker: &broker,
         domain: &domain,
     };
 
@@ -86,7 +126,7 @@ pub async fn init(
 
     match connection {
         CloudflareConnection::NotConnected => {
-            println!("  provisioning your Cloudflare account (this runs locally)...");
+            println!("  provisioning your Cloudflare account through the setup broker...");
             let resources = provision_and_connect(&setup).await?;
             print_resources(&resources);
             println!("  minted two bucket-scoped R2 tokens and a purge-only token");
@@ -120,15 +160,102 @@ pub async fn init(
     Ok(())
 }
 
-fn read_cloudflare_token() -> Result<String> {
-    let token = std::env::var("CLOUDFLARE_API_TOKEN").map_err(|_| {
-        anyhow!("CLOUDFLARE_API_TOKEN is required. Set it before running `forte cloud init`.")
-    })?;
+pub async fn rotate(project_dir: PathBuf) -> Result<()> {
+    let creds = fn0_deploy::credentials::require()?;
+    let broker = load_broker(&project_dir, &creds)?;
+    let replacement = prompt_cloudflare_token()?;
+    broker.rotate_setup_token(&replacement).await?;
+    println!("Cloudflare broker setup token rotated");
+    Ok(())
+}
+
+pub async fn clear(project_dir: PathBuf, confirmed: bool) -> Result<()> {
+    if !confirmed
+        && !inquire::Confirm::new(
+            "Remove the setup token from the Cloudflare broker and revoke it?",
+        )
+        .with_default(false)
+        .prompt()?
+    {
+        return Ok(());
+    }
+    let creds = fn0_deploy::credentials::require()?;
+    let broker = load_broker(&project_dir, &creds)?;
+    broker.clear_setup_token().await?;
+    clear_broker_config(&project_dir)?;
+    fn0_deploy::clear_broker_settings()?;
+    println!("Cloudflare broker setup token removed");
+    Ok(())
+}
+
+pub async fn destroy(project_dir: PathBuf, confirmed: bool) -> Result<()> {
+    let creds = fn0_deploy::credentials::require()?;
+    let broker = load_broker(&project_dir, &creds)?;
+    if !confirmed {
+        println!(
+            "This permanently deletes the Cloudflare broker for account {}:\n\
+             the fn0-broker Worker, its Secrets Store, and the setup token stored in it.\n\
+             \n\
+             A broker is shared by every project on this Cloudflare account that has run\n\
+             `forte cloud init`. This command cannot tell whether another project still\n\
+             depends on it — each one will need to bootstrap a new broker with a fresh\n\
+             setup token afterward.",
+            broker.account_id()
+        );
+        let answer = inquire::Text::new("Type the Cloudflare account id to confirm:").prompt()?;
+        if answer.trim() != broker.account_id() {
+            return Err(anyhow!(
+                "confirmation did not match '{}'; aborted.",
+                broker.account_id()
+            ));
+        }
+    }
+    broker.destroy_broker().await?;
+    clear_broker_config(&project_dir)?;
+    fn0_deploy::clear_broker_settings()?;
+    println!(
+        "Cloudflare broker for account {} destroyed",
+        broker.account_id()
+    );
+    Ok(())
+}
+
+fn load_broker(
+    project_dir: &std::path::Path,
+    creds: &fn0_deploy::credentials::Credentials,
+) -> Result<BrokerClient> {
+    let config = read_cloud_config(project_dir)?;
+    match (config.cloudflare_account_id, config.cloudflare_broker_url) {
+        (Some(account_id), Some(broker_url)) => BrokerClient::new(
+            broker_url,
+            creds.control_url.clone(),
+            creds.token.clone(),
+            account_id,
+        ),
+        (None, None) => {
+            let settings = fn0_deploy::load_broker_settings()?.ok_or_else(|| {
+                anyhow!("Cloudflare broker is not configured. Run `forte cloud init` first.")
+            })?;
+            BrokerClient::new(
+                settings.broker_url,
+                creds.control_url.clone(),
+                creds.token.clone(),
+                settings.account_id,
+            )
+        }
+        (Some(_), None) | (None, Some(_)) => Err(anyhow!(
+            "Forte.toml must contain both cloudflare_account_id and cloudflare_broker_url"
+        )),
+    }
+}
+
+fn prompt_cloudflare_token() -> Result<String> {
+    let token = inquire::Password::new("Cloudflare setup token")
+        .without_confirmation()
+        .prompt()?;
     let trimmed_token = token.trim();
     if trimmed_token.is_empty() {
-        return Err(anyhow!(
-            "CLOUDFLARE_API_TOKEN cannot be empty. Set it before running `forte cloud init`."
-        ));
+        return Err(anyhow!("Cloudflare setup token cannot be empty."));
     }
     Ok(trimmed_token.to_string())
 }
@@ -222,7 +349,7 @@ fn resolve_zone(zones: Vec<ReachableZone>, zone_name: &str) -> Result<ReachableZ
         .collect();
     match matching_zones.len() {
         0 => Err(anyhow!(
-            "Cloudflare zone '{zone_name}' was not found or is not accessible to CLOUDFLARE_API_TOKEN."
+            "Cloudflare zone '{zone_name}' was not found or is not accessible to the setup token."
         )),
         1 => matching_zones
             .into_iter()

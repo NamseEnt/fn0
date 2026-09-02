@@ -1,0 +1,8 @@
+{
+  "name": "fn0-deploy-worker-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/*.test.mjs"
+  }
+}

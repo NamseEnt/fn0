@@ -2,7 +2,6 @@ use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 use crate::cloudflare::CloudSetup;
-use crate::cloudflare_provision::Provisioner;
 
 #[derive(Serialize)]
 struct DomainSetInput<'a> {
@@ -56,11 +55,12 @@ pub struct DomainOutcome {
 /// visitor can reach a domain that is only half set up.
 pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
     println!(
-        "signing an origin certificate for {} (this runs locally)...",
+        "requesting an origin certificate through the Cloudflare setup broker for {}...",
         setup.domain
     );
-    let issued = provisioner(setup)
-        .issue_origin_certificate(setup.domain)
+    let issued = setup
+        .broker
+        .issue_origin_certificate(setup.project_id, setup.zone_id, setup.domain)
         .await?;
 
     let creds = crate::credentials::require()?;
@@ -114,28 +114,22 @@ pub async fn set_domain(setup: &CloudSetup<'_>) -> Result<DomainOutcome> {
         }
     };
 
-    provisioner(setup)
-        .put_app_cors(project_id, &setup.app_origin())
-        .await?;
-    provisioner(setup)
-        .ensure_app_cache(setup.domain, replaced_domain.as_deref())
-        .await?;
-    provisioner(setup)
-        .ensure_app_dns_record(setup.domain, &origin_hostname, replaced_domain.as_deref())
+    setup
+        .broker
+        .finalize_domain(
+            project_id,
+            setup.zone_id,
+            setup.zone_name,
+            setup.domain,
+            &origin_hostname,
+            replaced_domain.as_deref(),
+        )
         .await?;
 
     Ok(DomainOutcome {
         origin_hostname,
         replaced_domain,
     })
-}
-
-fn provisioner(setup: &CloudSetup<'_>) -> Provisioner {
-    Provisioner::new(
-        setup.api_token.to_string(),
-        setup.account_id.to_string(),
-        setup.zone_id.to_string(),
-    )
 }
 
 #[derive(Serialize)]

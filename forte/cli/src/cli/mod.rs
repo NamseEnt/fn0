@@ -145,6 +145,27 @@ pub enum CloudCommands {
         )]
         zone: Option<String>,
     },
+    #[command(about = "Replace the setup token stored by the Cloudflare broker")]
+    Rotate {
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+    },
+    #[command(about = "Delete the broker setup secret and revoke its token")]
+    Clear {
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
+    #[command(
+        about = "Delete the broker Worker, its Secrets Store, and the setup token stored in it"
+    )]
+    Destroy {
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]

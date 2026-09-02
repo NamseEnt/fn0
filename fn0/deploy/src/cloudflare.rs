@@ -11,15 +11,16 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
-use crate::cloudflare_provision::{ConnectCredentials, ProvisionedResources, Provisioner};
+use crate::cloudflare_broker::BrokerClient;
+use crate::cloudflare_provision::{ConnectCredentials, ProvisionedResources};
 
 /// What the user chose and typed, carried between the steps of one setup.
 pub struct CloudSetup<'a> {
     pub project_id: &'a str,
     pub account_id: &'a str,
     pub zone_id: &'a str,
-    /// Discarded when the command exits. fn0 never receives it.
-    pub api_token: &'a str,
+    pub zone_name: &'a str,
+    pub broker: &'a BrokerClient,
     pub domain: &'a str,
 }
 
@@ -30,16 +31,10 @@ impl CloudSetup<'_> {
         format!("https://{}", self.domain)
     }
 
-    fn provisioner(&self) -> Provisioner {
-        Provisioner::new(
-            self.api_token.to_string(),
-            self.account_id.to_string(),
-            self.zone_id.to_string(),
-        )
-    }
-
     pub async fn ensure_websockets(&self) -> Result<()> {
-        self.provisioner().ensure_websockets().await
+        self.broker
+            .ensure_websockets(self.project_id, self.zone_id)
+            .await
     }
 }
 
@@ -82,18 +77,31 @@ enum Connect {
 /// The convenient path: one `API Tokens -> Edit` token. Provisions the account,
 /// mints the three credentials fn0 keeps, and hands them over.
 pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<ProvisionedResources> {
-    let provisioner = setup.provisioner();
-    let (resources, credentials, minted) = provisioner
-        .run_managed(setup.project_id, &setup.app_origin(), setup.domain)
+    let provisioned = setup
+        .broker
+        .provision_project(
+            setup.project_id,
+            setup.zone_id,
+            &setup.app_origin(),
+            setup.domain,
+        )
         .await?;
 
-    match send_connect(setup, &resources, &credentials).await {
-        Ok(()) => Ok(resources),
+    match send_connect(setup, &provisioned.resources, &provisioned.credentials).await {
+        Ok(()) => Ok(provisioned.resources),
         // fn0 answered, and its answer proves it stored nothing. These two
         // credentials never expire, so leaving them would hand the account a
         // live R2 read-write pair for every failed attempt.
         Err(ConnectFailure::Rejected(error)) => {
-            provisioner.revoke_minted_credentials(&minted).await;
+            if let Err(cleanup_error) = setup
+                .broker
+                .revoke_project_credentials(setup.project_id, &provisioned.minted)
+                .await
+            {
+                eprintln!(
+                    "warning: could not revoke credentials after fn0 rejected them: {cleanup_error}"
+                );
+            }
             Err(error)
         }
         // No answer arrived, so whether fn0 stored them is unknown. Revoking
@@ -104,7 +112,9 @@ pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<Provisioned
                 "warning: could not tell whether fn0 stored the credentials. If it did not, \
                  revoke these in the Cloudflare dashboard: worker {}, frontend assets {}, \
                  cache purge {}.",
-                minted.worker, minted.frontend_asset, minted.purge
+                provisioned.minted.worker,
+                provisioned.minted.frontend_asset,
+                provisioned.minted.purge
             );
             Err(error)
         }

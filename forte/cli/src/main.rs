@@ -131,6 +131,18 @@ async fn async_main() -> Result<()> {
                 let project_dir = project.unwrap_or_else(|| ".".into());
                 cli::cloud::init(project_dir, project_name, zone).await?;
             }
+            CloudCommands::Rotate { project } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::cloud::rotate(project_dir).await?;
+            }
+            CloudCommands::Clear { project, yes } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::cloud::clear(project_dir, yes).await?;
+            }
+            CloudCommands::Destroy { project, yes } => {
+                let project_dir = project.unwrap_or_else(|| ".".into());
+                cli::cloud::destroy(project_dir, yes).await?;
+            }
         },
 
         Commands::Env { command } => match command {

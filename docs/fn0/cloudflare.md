@@ -27,12 +27,16 @@ forte cloud init \
   --zone example.com
 ```
 
-The command is non-interactive. Set `CLOUDFLARE_API_TOKEN` in the execution
-environment before running it. `forte login` must also be run first — the
-command loads fn0 credentials to register the project and fails immediately if
-they are absent. The token is not a command-line argument, and
-the CLI never prompts or reads standard input. If the variable or any required
-argument is missing, the command exits with an error.
+`forte login` must be run first — the command loads fn0 credentials to
+register the project and fails immediately if they are absent.
+
+The first time this runs for a Cloudflare account, it asks for the setup
+token through a masked prompt — never a command-line argument, an
+environment variable, or something printed or saved anywhere in the clear —
+and uses it once to install a small broker Worker in your own account. After
+that, the token lives only inside that Worker's Secrets Store; the CLI never
+holds it again, and later runs for this project or any other project on the
+same account reuse the broker without asking for the token a second time.
 
 As part of initialization, the CLI enables WebSockets for the selected zone.
 This is required for Forte WebSocket routes to complete their upgrade through
@@ -57,23 +61,30 @@ argument is not needed.
 ## Setup credential
 
 Setup has to create buckets, point a hostname at one, write one zone rule, add
-one DNS record and sign a certificate. Create one reusable bootstrap token and provide it through
-`CLOUDFLARE_API_TOKEN`. Cloudflare dashboard → **My Profile → API Tokens →
+one DNS record and sign a certificate. Create one reusable setup token.
+Cloudflare dashboard → **My Profile → API Tokens →
 Create Token → Create Custom Token**. Give it exactly one permission:
 
 | Scope | Permission |
 | --- | --- |
 | User | API Tokens → Edit |
 
-The CLI uses this token locally for every project. It creates a short-lived
-provisioning token when needed, provisions the account, creates the narrow
-credentials fn0 keeps, and revokes the short-lived token. The bootstrap token
-itself is not sent to fn0.
+Type it in once, at the masked prompt the first `forte cloud init` for this
+account shows. That first run uses it to install a broker Worker — a small
+Cloudflare Worker that lives in your own account — and stores the token as a
+secret in your account's own Secrets Store, bound only to that Worker. From
+then on, the broker is the only thing that ever reads the token: it mints a
+short-lived, narrowly-scoped provisioning token for each operation setup
+needs, does the work, and revokes it. The CLI itself never holds the setup
+token beyond that first prompt, and it is never sent to fn0.
 
 This token is powerful: a token that can create tokens can create any token
-allowed by the account. Store it in a secret manager or protected process
-environment and rotate it deliberately. Do not put its value in the command
-line, project files, or logs.
+allowed by the account. That's exactly why it never leaves your own
+Cloudflare account after the first run. If it's ever compromised or you just
+want a new one, `forte cloud rotate` replaces it in place; `forte cloud
+clear` removes it without replacing it; `forte cloud destroy` removes the
+whole broker, token included. See [`forte cloud`](../forte/cli.md#forte-cloud-init)
+for all three.
 
 ## What the stored credentials can do
 
@@ -130,11 +141,13 @@ Workers pick a connection up within about a second; no redeploy is needed.
 **Set the project up before it stores anything.** A project has nowhere to
 store and cannot serve a frontend until it is connected.
 
-Connecting is first-time only, and there is no way back. Reconnecting, rotating
-a credential and moving to a different Cloudflare account are all unsupported —
-not merely undocumented, but refused. If a stored credential is lost or
-revoked, the project cannot be repaired through the CLI. Treat the three
-credentials as things you do not lose.
+Connecting is first-time only, and there is no way back. Reconnecting a
+project, rotating its Worker/frontend-asset/purge credentials, and moving it
+to a different Cloudflare account are all unsupported — not merely
+undocumented, but refused. If one of those three credentials is lost or
+revoked, the project cannot be repaired through the CLI; treat them as things
+you do not lose. (This is about the project's own credentials, not the setup
+token — that one you can rotate. See [Setup credential](#setup-credential).)
 
 ## The domain
 
@@ -142,10 +155,12 @@ Not optional: a project answers on the hostname derived from its project name
 and zone, and on nothing else. There is no `fn0.dev` fallback.
 
 Signing an origin certificate needs a permission fn0 deliberately does not
-hold, so this runs locally too. The CLI generates a key pair, has Cloudflare
-sign the certificate through your own Origin CA, uploads the certificate and
-key, and then writes the **proxied** `CNAME` for that hostname into your zone,
-pointing at the fn0 origin hostname. Nothing is left for you to add by hand.
+hold. The CLI generates the key pair and the certificate request locally —
+the private key never leaves your machine — and has the broker submit that
+request to Cloudflare and sign it through your own Origin CA. The CLI then
+uploads the certificate and key to fn0, and the broker writes the
+**proxied** `CNAME` for that hostname into your zone, pointing at the fn0
+origin hostname. Nothing is left for you to add by hand.
 
 The record is written last, after fn0 holds the certificate and the zone
 carries the cache rule, so the hostname resolves nowhere until everything
@@ -188,7 +203,14 @@ Deleting either R2 token in your Cloudflare dashboard breaks the project at
 request time — there is no grace period, because every request signs against
 it.
 
-There is no recovery path. A project that is already connected is refused a
-second connection, and nothing else can replace a stored credential, so a
-revoked token means the project has to be recreated. Rotation is on the list;
-it is not built.
+There is no recovery path for a project's own credentials. A project that is
+already connected is refused a second connection, and nothing else can
+replace a stored credential, so a revoked Worker, frontend-asset, or purge
+token means the project has to be recreated.
+
+The setup token is different: it isn't tied to one project, so losing or
+revoking it doesn't touch anything already connected. `forte cloud rotate`
+replaces it in the broker's Secrets Store; `forte cloud clear` removes it
+without a replacement; `forte cloud destroy` removes the broker Worker and
+its Secrets Store entirely, for every project that shares this Cloudflare
+account.

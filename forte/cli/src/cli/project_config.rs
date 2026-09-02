@@ -10,6 +10,8 @@ pub struct CloudConfig {
     pub project_name: Option<String>,
     pub zone: Option<String>,
     pub domain: Option<String>,
+    pub cloudflare_account_id: Option<String>,
+    pub cloudflare_broker_url: Option<String>,
 }
 
 fn load(project_dir: &Path) -> Result<DocumentMut> {
@@ -40,6 +42,8 @@ pub fn read_cloud_config(project_dir: &Path) -> Result<CloudConfig> {
         project_name: read_optional_string(&document, "project_name"),
         zone: read_optional_string(&document, "zone"),
         domain: read_optional_string(&document, "domain"),
+        cloudflare_account_id: read_optional_string(&document, "cloudflare_account_id"),
+        cloudflare_broker_url: read_optional_string(&document, "cloudflare_broker_url"),
     })
 }
 
@@ -68,12 +72,16 @@ pub fn write_cloud_config(
     project_name: &str,
     zone: &str,
     domain: &str,
+    cloudflare_account_id: &str,
+    cloudflare_broker_url: &str,
 ) -> Result<()> {
     let mut document = load(project_dir)?;
     document["project_id"] = value(project_id);
     document["project_name"] = value(project_name);
     document["zone"] = value(zone);
     document["domain"] = value(domain);
+    document["cloudflare_account_id"] = value(cloudflare_account_id);
+    document["cloudflare_broker_url"] = value(cloudflare_broker_url);
     save(project_dir, &document)
 }
 
@@ -83,6 +91,15 @@ pub fn clear_cloud_config(project_dir: &Path) -> Result<()> {
     document.remove("project_name");
     document.remove("zone");
     document.remove("domain");
+    document.remove("cloudflare_account_id");
+    document.remove("cloudflare_broker_url");
+    save(project_dir, &document)
+}
+
+pub fn clear_broker_config(project_dir: &Path) -> Result<()> {
+    let mut document = load(project_dir)?;
+    document.remove("cloudflare_account_id");
+    document.remove("cloudflare_broker_url");
     save(project_dir, &document)
 }
 
@@ -109,11 +126,13 @@ mod tests {
             "my-app",
             "example.com",
             "my-app.example.com",
+            "0123456789abcdef0123456789abcdef",
+            "https://fn0-broker.example.workers.dev",
         )
         .unwrap();
         assert_eq!(
             read_back(&dir),
-            "# keep me\nother = \"value\"\nproject_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\n\n[table]\nnested = 1\n"
+            "# keep me\nother = \"value\"\nproject_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\ncloudflare_account_id = \"0123456789abcdef0123456789abcdef\"\ncloudflare_broker_url = \"https://fn0-broker.example.workers.dev\"\n\n[table]\nnested = 1\n"
         );
     }
 
@@ -126,6 +145,8 @@ mod tests {
             "my-app",
             "example.com",
             "my-app.example.com",
+            "0123456789abcdef0123456789abcdef",
+            "https://fn0-broker.example.workers.dev",
         )
         .unwrap();
         assert_eq!(
@@ -143,6 +164,8 @@ mod tests {
             "my-app",
             "example.com",
             "my-app.example.com",
+            "0123456789abcdef0123456789abcdef",
+            "https://fn0-broker.example.workers.dev",
         )
         .unwrap();
         assert_eq!(
@@ -152,6 +175,8 @@ mod tests {
                 project_name: Some("my-app".to_string()),
                 zone: Some("example.com".to_string()),
                 domain: Some("my-app.example.com".to_string()),
+                cloudflare_account_id: Some("0123456789abcdef0123456789abcdef".to_string()),
+                cloudflare_broker_url: Some("https://fn0-broker.example.workers.dev".to_string()),
             }
         );
     }
@@ -159,7 +184,7 @@ mod tests {
     #[test]
     fn clear_cloud_config_keeps_other_keys_and_formatting() {
         let dir = project_with(
-            "project_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\n# keep me\nother = \"value\"\n\n[table]\nnested = 1\n",
+            "project_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\ncloudflare_account_id = \"0123456789abcdef0123456789abcdef\"\ncloudflare_broker_url = \"https://fn0-broker.example.workers.dev\"\n# keep me\nother = \"value\"\n\n[table]\nnested = 1\n",
         );
         clear_cloud_config(dir.path()).unwrap();
         assert_eq!(
@@ -171,7 +196,7 @@ mod tests {
     #[test]
     fn clear_cloud_config_drops_the_comment_attached_to_the_id() {
         let dir = project_with(
-            "# about the id\nproject_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\nother = \"value\"\n",
+            "# about the id\nproject_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\ncloudflare_account_id = \"0123456789abcdef0123456789abcdef\"\ncloudflare_broker_url = \"https://fn0-broker.example.workers.dev\"\nother = \"value\"\n",
         );
         clear_cloud_config(dir.path()).unwrap();
         assert_eq!(read_back(&dir), "other = \"value\"\n");
