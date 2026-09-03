@@ -181,6 +181,34 @@ Secrets and env vars set via `forte env set` are stored in `env.yaml` and bundle
 
 ---
 
+## WebSocket Inbound
+
+### Inbound handler not discovered
+
+Codegen scans `rs/src/ws_in/` recursively for `.rs` files. A file is discovered when it defines
+`pub async fn on_connect` **and** `pub async fn on_message`. Check:
+
+- Both functions are present and are `pub async fn`.
+- `on_connect` returns `Result<ConnectDecision>`.
+- `on_message` returns `Result<()>`.
+- `on_connect` is **absent** in outbound (`ws_out/`) files — its presence there is an error.
+
+Run `cargo build` (from `rs/`) after adding the file; the route appears in `route_generated.rs`
+once the build succeeds.
+
+### Browser never connects — connection rejected at handshake
+
+`on_connect` runs before the WebSocket handshake completes. If it returns `ConnectDecision::reject(...)`, the browser receives the rejection status and the upgrade never happens. Check:
+
+- If the browser sends specific subprotocols (`Sec-WebSocket-Protocol`), verify `on_connect` accepts at least one via `ConnectDecision::accept_with_protocol`.
+- For a simple echo server that accepts any connection, use `ConnectDecision::accept()` with no protocol check.
+
+### Messages arriving out of order
+
+fn0 queues inbound messages per connection and invokes `on_message` one at a time in arrival order. Out-of-order delivery in the handler is not expected — if a client sends frames faster than the handler processes them, fn0 applies backpressure on the socket. The per-connection inbound queue limit is documented in [fn0/limits.md](../fn0/limits.md#websocket-limits).
+
+---
+
 ## WebSocket Singleton
 
 ### Singleton not connecting after deploy

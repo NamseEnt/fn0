@@ -12,6 +12,10 @@ forte dev             # start dev server (HMR + Rust rebuild on change)
 forte add page about          # add page at /about
 forte add page product/[id]   # add page at /product/:id
 forte add action user_login   # add server action
+# WebSocket, API, hook, queue-task, and admin handlers are created manually:
+#   rs/src/ws_in/<name>.rs  /  rs/src/ws_out/<name>.rs  /  rs/src/ws_singleton/<name>.rs
+#   rs/src/apis/<name>.rs  /  rs/src/hooks/<name>.rs
+#   rs/src/queue_task/<name>.rs  /  rs/src/admin/<name>.rs
 
 forte build           # verify production build
 forte login           # authenticate with fn0 Cloud

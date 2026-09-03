@@ -6,6 +6,9 @@ modules under `rs/src/ws_in`; they are published below `/ws`. Create outbound ro
 route modules under `rs/src/ws_singleton`; fn0 keeps exactly one connection per singleton alive
 project-wide and routes its messages to the same handler on any worker.
 
+> **There is no `forte add ws` command.** Create all WebSocket handler files manually. Codegen
+> picks them up automatically on the next build — no `mod` declaration needed in `lib.rs`.
+
 ## Route example
 
 ```rust
