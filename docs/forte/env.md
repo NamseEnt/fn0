@@ -56,7 +56,17 @@ fn0 env list
 fn0 env unset STRIPE_SECRET_KEY
 ```
 
-`forte env` implements only `set`. List and unset are provided by the `fn0` CLI (`cargo binstall fn0-cli`). Both CLIs operate on the same `env.yaml` file.
+`forte env` implements `set` and `migrate`. List and unset are provided by the `fn0` CLI (`cargo binstall fn0-cli`). Both CLIs operate on the same `env.yaml` file.
+
+### Migrating a legacy `.env` file
+
+Projects that previously used a `.env` file can convert it to `env.local.yaml`:
+
+```sh
+forte env migrate
+```
+
+Reads `.env` from the project root, writes each `KEY=value` entry into `env.local.yaml`, and prints the count of migrated entries. Refuses to run if `env.local.yaml` already exists — merge manually in that case. Leaves `.env` on disk for you to delete after verifying the output.
 
 ## Generated Rust accessors
 

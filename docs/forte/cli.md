@@ -383,6 +383,7 @@ Manage `env.yaml` entries for the project. Entries are bundled into the deploy a
 ```sh
 forte env set PUBLIC_API_URL https://api.example.com
 forte env set DATABASE_PASSWORD hunter2 --secret
+forte env migrate    # convert legacy .env to env.local.yaml
 ```
 
 ---
