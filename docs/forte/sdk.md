@@ -59,7 +59,7 @@ use forte_sdk::runtime::spawn;
 let (mut writer, body) = Body::channel();
 spawn(async move {
     for chunk in chunks {
-        writer.write(chunk).await;
+        let _ = writer.write_all(chunk).await;
     }
     // writer drop closes the stream
 });
