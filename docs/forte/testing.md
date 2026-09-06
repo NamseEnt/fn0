@@ -175,6 +175,8 @@ cargo test
 
 > **Note:** `forte init` does not add the runner automatically. Without it, `cargo test` will build the WASM binary but fail to execute it.
 
+> **Note:** `forte-test-runner` is not published to crates.io and has no pre-built binaries. You must clone the fn0 monorepo and install from source with `cargo install --path forte/test-runner`. Reinstall whenever you pull monorepo changes that touch WIT bindings — an out-of-date runner fails at link time with an "unimplemented WASI import" error, not a version message.
+
 ### From the monorepo workspace root
 
 ```sh

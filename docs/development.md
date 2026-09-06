@@ -2,7 +2,6 @@
 
 ## Code Style
 
-- **No explanatory comments in code.** TODO comments are allowed.
 - **Rust edition:** 2024
 - **Rust toolchain:** pinned in `rust-toolchain.toml` (currently 1.97.1). `rustup` picks this up automatically — do not override it.
 - **Rust file layout:** `mod` declarations go at the very top of the file, then `use` statements below them. No blank lines between consecutive `mod` declarations, nor between consecutive `use` statements.
@@ -12,6 +11,29 @@
 - Tests must pass.
 
 These rules apply across all crates in the workspace (see individual `CLAUDE.md` files in each crate).
+
+### Comments
+
+Write only what code and history tools cannot carry. Run every comment through these three filters — drop it if it fails any:
+
+1. Can it be expressed in code (renaming, types, structure)? → fix the code, not add a comment.
+2. Does git history (commit/blame) or the issue tracker already record it? → leave it there. No `// fixed #1425`, no change logs, no commented-out code.
+3. Would a competent teammate actually break something without this *why*? → if no, skip it even if the why is real.
+
+Worth keeping: non-obvious rationale, unidiomatic code that is intentionally correct, workarounds / perf trade-offs / system limits, links to external specs or standards, `// TODO`, math derivations.
+
+Never write: comments that restate the code (`i += 1; // add one`), syntax explanation, history/bugfix notes, stale comments, commented-out code.
+
+`//!` module-level doc comments are a separate category: they are `cargo doc` API documentation, not inline commentary, and the above filters do not gate them. Add a `//!` at the top of `lib.rs`/`main.rs` (crate purpose, setup, gotchas) and at the top of a non-obvious module file. First line is a one-line summary.
+
+### Naming
+
+A name states what the thing holds or does, and — when code branches on it — which kind it is.
+
+- **Avoid pure-category names.** `page`, `data`, `info`, `config`, `manager`, `handler` say what category the thing belongs to, not what it actually is. `private-object-storage` says what it holds and who may access it; `page` says neither. Where a distinction drives behavior, put the distinction in the name: a bucket that GC may empty and a bucket that holds irreplaceable user data must not read alike.
+- **No abbreviations or acronyms** outside a single function body. Spell names out. `ssr`, `cfg`, `req_id` are not acceptable in type, field, function, or module names.
+- If a comment is needed to explain what a name means, the name is wrong — rename and delete the comment.
+- **Names that escape the codebase** — R2 bucket names, hostnames, env var keys, doc/table field names, published crate items — cannot be renamed cheaply once they exist. Settle them before the first write, and state the naming convention in the module that mints them.
 
 ## Dev Cycle (Forte Project)
 

@@ -43,13 +43,15 @@ cargo install --path fn0/cli
 
 ### Install forte-test-runner (optional, for backend unit tests in Forte projects)
 
-Forte project backends compile to `wasm32-wasip2` and require a custom test runner to execute tests. Install it from the monorepo (or wait until you need it — `forte dev` does not require it):
+Forte project backends compile to `wasm32-wasip2` and require a custom test runner to execute tests. The runner is **not on crates.io** — install it from the fn0 monorepo:
 
 ```sh
+git clone https://github.com/NamseEnt/fn0.git
+cd fn0
 cargo install --path forte/test-runner
 ```
 
-See [forte/testing.md](forte/testing.md) for how to configure the runner and write backend tests. Reinstall whenever you pull changes to the monorepo — a runner version that predates the WIT bindings in the checkout will fail at link time.
+You can wait until you need it — `forte dev` does not require it. See [forte/testing.md](forte/testing.md) for how to configure the runner and write backend tests. Reinstall whenever you pull monorepo changes — a runner older than the WIT bindings in the checkout fails at link time.
 
 ## Local Database (Turso/libSQL)
 
