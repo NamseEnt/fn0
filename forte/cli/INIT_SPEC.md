@@ -114,8 +114,8 @@ Rationale: `/target` covers the case where the user runs `cargo` at the root; `/
 ```
 
 (Zero-byte file.) An empty file is valid before Cloudflare setup. `forte cloud init`
-writes `project_id`, `project_name`, `zone`, and the derived `domain` into this
-file before the first deploy.
+writes `project_id`, `project_name`, `zone`, the derived `domain`, and the
+resolved `origin_hostname` into this file before the first deploy.
 
 ### 4.3 `<name>/rs/.gitignore`
 

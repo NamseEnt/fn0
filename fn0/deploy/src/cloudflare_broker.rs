@@ -148,11 +148,10 @@ struct TeardownProjectInput<'a> {
 
 #[derive(Debug, Deserialize)]
 pub struct TeardownProjectOutcome {
-    /// Human-readable lines about anything the broker deliberately left alone
-    /// (a DNS record the owner edited, a bucket teardown had not finished
-    /// clearing). Empty on a clean run.
     #[serde(default)]
     pub notes: Vec<String>,
+    #[serde(default)]
+    pub pending: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -244,14 +243,57 @@ impl BrokerClient {
         cloudflare_api_base: &str,
         broker_readiness_attempts: u32,
     ) -> Result<Self> {
+        Self::install_with_cloudflare_api_base(
+            setup_token,
+            account_id,
+            control_url,
+            control_token,
+            cloudflare_api_base,
+            broker_readiness_attempts,
+            true,
+        )
+        .await
+    }
+
+    pub async fn reinstall(
+        setup_token: String,
+        account_id: String,
+        control_url: String,
+        control_token: String,
+    ) -> Result<Self> {
+        let control_url = normalize_https_url(&control_url, "control URL")?;
+        Self::install_with_cloudflare_api_base(
+            setup_token,
+            account_id,
+            control_url,
+            control_token,
+            API_BASE,
+            BROKER_READINESS_ATTEMPTS,
+            false,
+        )
+        .await
+    }
+
+    async fn install_with_cloudflare_api_base(
+        setup_token: String,
+        account_id: String,
+        control_url: String,
+        control_token: String,
+        cloudflare_api_base: &str,
+        broker_readiness_attempts: u32,
+        roll_setup_token: bool,
+    ) -> Result<Self> {
         validate_account_id(&account_id)?;
         let client = reqwest::Client::new();
         let setup_token_id = verify_setup_token(&client, cloudflare_api_base, &setup_token).await?;
         let owner_github_id =
             authorize_control_user(&client, &control_url, &control_token, &account_id).await?;
-        let setup_token =
+        let setup_token = if roll_setup_token {
             roll_setup_token_value(&client, cloudflare_api_base, &setup_token, &setup_token_id)
-                .await?;
+                .await?
+        } else {
+            setup_token
+        };
         let bootstrap =
             mint_bootstrap_token(&client, cloudflare_api_base, &setup_token, &account_id).await?;
         let result = async {
@@ -542,6 +584,11 @@ impl BrokerClient {
         let status = response.status();
         let text = response.text().await?;
         if !status.is_success() {
+            if status == reqwest::StatusCode::NOT_FOUND && path.starts_with("/v1/") {
+                return Err(anyhow!(
+                    "broker request {path} failed ({status}): the deployed setup broker does not support this command and may be older than the CLI; run `forte cloud rotate --project .` with a fresh setup token to republish it"
+                ));
+            }
             return Err(anyhow!("broker request {path} failed ({status}): {text}"));
         }
         serde_json::from_str(&text)
@@ -1665,6 +1712,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn old_broker_404_explains_how_to_republish_the_worker() {
+        install_crypto_provider();
+        let broker = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/resolve-zone"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(json!({ "error": "not found" })))
+            .mount(&broker)
+            .await;
+        let client = broker_client_for_test(broker.uri());
+
+        let error = client.resolve_zone("example.com").await.unwrap_err();
+        assert!(error.to_string().contains("forte cloud rotate --project ."));
+    }
+
+    #[tokio::test]
     async fn teardown_project_sends_its_inputs_and_returns_the_brokers_notes() {
         install_crypto_provider();
         let broker = MockServer::start().await;
@@ -1680,7 +1742,8 @@ mod tests {
             })))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "ok": true,
-                "notes": ["left bucket fn0-abcd1234-frontend-asset: still not empty"],
+                "notes": [],
+                "pending": ["left bucket fn0-abcd1234-frontend-asset: still not empty"],
             })))
             .mount(&broker)
             .await;
@@ -1698,7 +1761,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(outcome.notes.len(), 1);
+        assert!(outcome.notes.is_empty());
+        assert_eq!(outcome.pending.len(), 1);
     }
 
     #[tokio::test]

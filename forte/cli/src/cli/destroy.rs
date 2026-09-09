@@ -1,8 +1,17 @@
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 
-use super::project_config::{CloudConfig, clear_cloud_config, read_cloud_config};
-use fn0_deploy::{BrokerClient, DomainStatus, credentials::Credentials};
+use super::project_config::{
+    CloudConfig, clear_cloud_config, read_cloud_config, write_origin_hostname,
+};
+use fn0_deploy::{BrokerClient, DomainStatus, ReachableZone, credentials::Credentials};
+
+struct TeardownContext {
+    broker: BrokerClient,
+    zone: ReachableZone,
+    zone_name: String,
+    app_hostname: String,
+}
 
 pub async fn run(project_dir: PathBuf, yes: bool, delete_buckets: bool) -> Result<()> {
     let config = read_cloud_config(&project_dir)?;
@@ -30,51 +39,66 @@ pub async fn run(project_dir: PathBuf, yes: bool, delete_buckets: bool) -> Resul
     }
 
     let origin_hostname = expected_origin_hostname(&config, &project_id).await?;
+    if let Some(origin_hostname) = origin_hostname.as_deref() {
+        write_origin_hostname(&project_dir, origin_hostname)?;
+    }
+    let teardown_context = prepare_teardown(&config).await?;
 
-    // fn0-side teardown (routing, bundles, buckets emptied, database) runs on
-    // the control plane; the Cloudflare footprint it cannot reach is cleaned
-    // through the broker here.
     fn0_deploy::delete_project_if_present(&project_id).await?;
+    fn0_deploy::wait_for_project_teardown(&project_id).await?;
 
-    teardown_cloudflare(
-        &config,
-        &project_id,
-        origin_hostname.as_deref(),
-        delete_buckets,
-    )
-    .await?;
+    if let Some(teardown_context) = teardown_context {
+        teardown_cloudflare(
+            teardown_context,
+            &project_id,
+            origin_hostname.as_deref(),
+            delete_buckets,
+        )
+        .await?;
+    }
 
     clear_cloud_config(&project_dir)?;
     println!(
         "Removed cloud configuration from Forte.toml (next `forte deploy` creates a new project)"
     );
-    println!("Teardown of '{project_id}' enqueued; resources are being deleted.");
+    println!("Teardown of '{project_id}' completed.");
     Ok(())
 }
 
+async fn prepare_teardown(config: &CloudConfig) -> Result<Option<TeardownContext>> {
+    let (Some(zone_name), Some(app_hostname)) = (config.zone.as_deref(), config.domain.as_deref())
+    else {
+        return Ok(None);
+    };
+    let creds = fn0_deploy::credentials::require()?;
+    let broker = load_broker(config, &creds)?.ok_or_else(|| {
+        anyhow!(
+            "Cloudflare is configured but the setup broker is missing; run `forte cloud init` or restore the broker settings before destroying the project"
+        )
+    })?;
+    let zone = broker.resolve_zone(zone_name).await?;
+    Ok(Some(TeardownContext {
+        broker,
+        zone,
+        zone_name: zone_name.to_string(),
+        app_hostname: app_hostname.to_string(),
+    }))
+}
+
 async fn teardown_cloudflare(
-    config: &CloudConfig,
+    context: TeardownContext,
     project_id: &str,
     origin_hostname: Option<&str>,
     delete_buckets: bool,
 ) -> Result<()> {
-    let (Some(zone_name), Some(app_hostname)) = (config.zone.as_deref(), config.domain.as_deref())
-    else {
-        return Ok(());
-    };
-    let creds = fn0_deploy::credentials::require()?;
-    let Some(broker) = load_broker(config, &creds)? else {
-        return Ok(());
-    };
-
     println!("cleaning up the project's Cloudflare resources through the setup broker...");
-    let zone = broker.resolve_zone(zone_name).await?;
-    let outcome = broker
+    let outcome = context
+        .broker
         .teardown_project(
             project_id,
-            &zone.zone_id,
-            zone_name,
-            app_hostname,
+            &context.zone.zone_id,
+            &context.zone_name,
+            &context.app_hostname,
             origin_hostname,
             delete_buckets,
         )
@@ -90,6 +114,14 @@ async fn teardown_cloudflare(
     for note in &outcome.notes {
         println!("  note: {note}");
     }
+    if !outcome.pending.is_empty() {
+        for pending in &outcome.pending {
+            println!("  pending: {pending}");
+        }
+        return Err(anyhow!(
+            "Cloudflare teardown is incomplete; rerun `forte destroy` after the pending resources finish clearing"
+        ));
+    }
     Ok(())
 }
 
@@ -99,6 +131,9 @@ async fn expected_origin_hostname(
 ) -> Result<Option<String>> {
     if config.zone.is_none() || config.domain.is_none() {
         return Ok(None);
+    }
+    if let Some(origin_hostname) = config.origin_hostname.as_deref() {
+        return Ok(Some(origin_hostname.to_string()));
     }
     let creds = fn0_deploy::credentials::require()?;
     let configured_domain = config.domain.as_deref().unwrap_or_default();

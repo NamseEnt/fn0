@@ -92,6 +92,7 @@ After successful setup, `Forte.toml` stores:
 - `project_name`
 - `zone`
 - `domain`
+- `origin_hostname`
 - `cloudflare_account_id`
 - `cloudflare_broker_url`
 
@@ -116,7 +117,7 @@ in place (`PUT /user/tokens/{id}/value`) and stores the rolled value as
 string changes, and the string that passed through a prompt or the clipboard
 stops working the moment the roll lands. `forte cloud rotate
 --setup-token-from-clipboard` rolls the value the same way before handing it to
-the broker.
+the broker and republishes the current Worker.
 
 The broker is the only component that reads `FN0_SETUP_TOKEN` after bootstrap.
 It accepts fixed operations only: exact zone lookup, project resource
@@ -167,7 +168,8 @@ fails, including:
 - a configuration mismatch on an existing project
 
 If the account has no saved broker configuration, an empty setup-token prompt
-is also an error. Token rotation also uses a masked prompt and never reads a
-local environment variable. Both `init` and `rotate` accept
+is also an error. Token rotation republishes the current broker Worker, uses a
+masked prompt, and never reads a local environment variable. Both `init` and
+`rotate` accept
 `--setup-token-from-clipboard` instead; in that mode an unreachable clipboard,
 or no accepted token within the poll window, is an error.

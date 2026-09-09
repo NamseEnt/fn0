@@ -10,6 +10,7 @@ pub struct CloudConfig {
     pub project_name: Option<String>,
     pub zone: Option<String>,
     pub domain: Option<String>,
+    pub origin_hostname: Option<String>,
     pub cloudflare_account_id: Option<String>,
     pub cloudflare_broker_url: Option<String>,
 }
@@ -42,6 +43,7 @@ pub fn read_cloud_config(project_dir: &Path) -> Result<CloudConfig> {
         project_name: read_optional_string(&document, "project_name"),
         zone: read_optional_string(&document, "zone"),
         domain: read_optional_string(&document, "domain"),
+        origin_hostname: read_optional_string(&document, "origin_hostname"),
         cloudflare_account_id: read_optional_string(&document, "cloudflare_account_id"),
         cloudflare_broker_url: read_optional_string(&document, "cloudflare_broker_url"),
     })
@@ -85,12 +87,19 @@ pub fn write_cloud_config(
     save(project_dir, &document)
 }
 
+pub fn write_origin_hostname(project_dir: &Path, origin_hostname: &str) -> Result<()> {
+    let mut document = load(project_dir)?;
+    document["origin_hostname"] = value(origin_hostname);
+    save(project_dir, &document)
+}
+
 pub fn clear_cloud_config(project_dir: &Path) -> Result<()> {
     let mut document = load(project_dir)?;
     document.remove("project_id");
     document.remove("project_name");
     document.remove("zone");
     document.remove("domain");
+    document.remove("origin_hostname");
     document.remove("cloudflare_account_id");
     document.remove("cloudflare_broker_url");
     save(project_dir, &document)
@@ -156,6 +165,23 @@ mod tests {
     }
 
     #[test]
+    fn write_origin_hostname_is_read_and_cleared() {
+        let dir = project_with(
+            "project_id = \"abc123\"\nproject_name = \"my-app\"\nzone = \"example.com\"\ndomain = \"my-app.example.com\"\n",
+        );
+        write_origin_hostname(dir.path(), "oci-ap-osaka-1-nlb.fn0.dev").unwrap();
+        assert_eq!(
+            read_cloud_config(dir.path())
+                .unwrap()
+                .origin_hostname
+                .as_deref(),
+            Some("oci-ap-osaka-1-nlb.fn0.dev")
+        );
+        clear_cloud_config(dir.path()).unwrap();
+        assert_eq!(read_cloud_config(dir.path()).unwrap().origin_hostname, None);
+    }
+
+    #[test]
     fn read_cloud_config_reads_all_cloud_fields() {
         let dir = project_with("");
         write_cloud_config(
@@ -175,6 +201,7 @@ mod tests {
                 project_name: Some("my-app".to_string()),
                 zone: Some("example.com".to_string()),
                 domain: Some("my-app.example.com".to_string()),
+                origin_hostname: None,
                 cloudflare_account_id: Some("0123456789abcdef0123456789abcdef".to_string()),
                 cloudflare_broker_url: Some("https://fn0-broker.example.workers.dev".to_string()),
             }

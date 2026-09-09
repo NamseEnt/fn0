@@ -227,12 +227,14 @@ project_id = "some-unique-id"
 project_name = "my-app"
 zone = "example.com"
 domain = "my-app.example.com"
+origin_hostname = "oci-ap-osaka-1-nlb.fn0.dev"
 ```
 
-`project_id`, `project_name`, `zone`, and `domain` are recognized keys. The
-project name is a DNS label and the domain is derived from the project name and
-zone. `forte cloud init` refuses to continue if the saved values disagree with
-the requested project or the live Cloudflare connection.
+`project_id`, `project_name`, `zone`, `domain`, and `origin_hostname` are
+recognized keys. The project name is a DNS label and the domain is derived from
+the project name and zone. `origin_hostname` records the fn0 origin used for
+safe DNS cleanup. `forte cloud init` refuses to continue if the saved values
+disagree with the requested project or the live Cloudflare connection.
 
 `forte deploy` and `forte destroy` preserve the Cloudflare configuration.
 `forte destroy` removes the project identity and hostname keys so the next

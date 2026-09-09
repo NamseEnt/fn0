@@ -1,7 +1,9 @@
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 
-use super::project_config::{clear_broker_config, read_cloud_config, write_cloud_config};
+use super::project_config::{
+    clear_broker_config, read_cloud_config, write_cloud_config, write_origin_hostname,
+};
 use fn0_deploy::{
     BrokerClient, CloudSetup, CloudflareConnection, DomainStatus, ProvisionedResources,
     ReachableZone, ZoneDiscovery, fetch_cloudflare_connection, provision_and_connect, set_domain,
@@ -144,6 +146,7 @@ pub async fn init(
     }
 
     let outcome = set_domain(&setup).await?;
+    write_origin_hostname(&project_dir, &outcome.origin_hostname)?;
     match &outcome.replaced_domain {
         Some(replaced) => println!("  domain {domain} registered, replacing {replaced}"),
         None => println!("  domain {domain} registered"),
@@ -171,7 +174,15 @@ pub async fn rotate(project_dir: PathBuf, setup_token_from_clipboard: bool) -> R
         replacement
     };
     broker.rotate_setup_token(&replacement).await?;
-    println!("Cloudflare broker setup token rotated");
+    let broker = BrokerClient::reinstall(
+        replacement,
+        broker.account_id().to_string(),
+        creds.control_url,
+        creds.token,
+    )
+    .await?;
+    fn0_deploy::save_broker_settings(&broker.settings())?;
+    println!("Cloudflare broker setup token rotated and Worker republished");
     Ok(())
 }
 

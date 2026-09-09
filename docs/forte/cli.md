@@ -118,9 +118,9 @@ Runs against the project in the current directory only — the `project_id` is r
 
 fn0's control plane removes the routing, bundles, assets, and database and empties the three R2 buckets. The command then goes through the setup broker to remove the project's Cloudflare footprint control cannot reach: the app hostname's DNS record, the two public buckets' custom domains, the origin certificate, and the `fn0 worker/frontend assets/cache purge (<project_id>)` tokens. The app DNS record is removed only when it is still the single proxied CNAME pointing at fn0's origin; a record you have edited is left in place and reported.
 
-The three buckets are left standing (empty) unless `--delete-buckets` is passed — deleting a bucket needs a token minted from the setup token, so only the broker can do it, and only once control has emptied it. A bucket that is not empty yet is reported; re-running is safe.
+The three buckets are left standing (empty) unless `--delete-buckets` is passed — deleting a bucket needs a token minted from the setup token, so only the broker can do it, and only once control has emptied it. The command waits for the fn0-side teardown before revoking project credentials. A bucket that is not empty yet is reported as pending, and `Forte.toml` remains intact for a later retry.
 
-On success the `project_id`, `project_name`, `zone`, and `domain` keys are removed from `Forte.toml` (all other keys and formatting are preserved), so the next `forte cloud init` registers a new project. The fn0-side teardown is enqueued on the control plane and runs asynchronously. If broker cleanup fails, the command returns the error and leaves `Forte.toml` unchanged so the cleanup can be retried.
+On success the `project_id`, `project_name`, `zone`, `domain`, and `origin_hostname` keys are removed from `Forte.toml` (all other keys and formatting are preserved), so the next `forte cloud init` registers a new project. If either side of teardown fails or times out, the command returns the error and leaves `Forte.toml` unchanged so the cleanup can be retried.
 
 ```sh
 forte destroy
@@ -347,11 +347,12 @@ Cloudflare account is not supported.
 forte cloud rotate --project .
 ```
 
-Replaces the setup token stored in the broker's Secrets Store. Asks for the
-new token through the same masked prompt as `init` (or reads it from the
-clipboard with `--setup-token-from-clipboard`), then has the broker save it
-and revoke the old one. Every project already connected through this broker
-keeps working — this only changes which token the broker itself holds.
+Replaces the setup token stored in the broker's Secrets Store and republishes
+the current setup broker Worker. Asks for the new token through the same masked
+prompt as `init` (or reads it from the clipboard with
+`--setup-token-from-clipboard`), then has the broker save it, revoke the old
+one, and installs the current CLI's Worker script. Every project already
+connected through this broker keeps working.
 
 #### `forte cloud clear`
 

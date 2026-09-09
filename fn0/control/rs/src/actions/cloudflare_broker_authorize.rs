@@ -20,17 +20,20 @@ pub enum Output {
     InternalError,
 }
 
-const ALLOWED_OPERATIONS: [&str; 10] = [
+const ACCOUNT_OPERATIONS: [&str; 5] = [
     "resolve_zone",
+    "rotate_token",
+    "clear_token",
+    "destroy_broker",
+    "teardown_project",
+];
+
+const PROJECT_OPERATIONS: [&str; 5] = [
     "provision_project",
     "ensure_websockets",
     "issue_origin_certificate",
     "finalize_domain",
     "revoke_project_credentials",
-    "rotate_token",
-    "clear_token",
-    "destroy_broker",
-    "teardown_project",
 ];
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
@@ -54,11 +57,19 @@ async fn authorize(
     project_id: Option<&str>,
     github_id: i64,
 ) -> Output {
-    if account_id.is_empty() || !ALLOWED_OPERATIONS.contains(&operation) {
+    if account_id.is_empty()
+        || (!ACCOUNT_OPERATIONS.contains(&operation) && !PROJECT_OPERATIONS.contains(&operation))
+    {
         return Output::InvalidRequest;
     }
 
-    if let Some(project_id) = project_id {
+    if PROJECT_OPERATIONS.contains(&operation) && project_id.is_none() {
+        return Output::InvalidRequest;
+    }
+
+    if PROJECT_OPERATIONS.contains(&operation)
+        && let Some(project_id) = project_id
+    {
         let project = match (ProjectDocGet { project_id }).send_with(db).await {
             Ok(Some(project)) => project,
             Ok(None) => return Output::NotFound,
@@ -155,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn teardown_project_is_gated_on_project_ownership() {
+    fn teardown_project_remains_authorized_after_project_deletion() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
             ProjectDocPut(ProjectDoc {
@@ -173,8 +184,21 @@ mod tests {
             ));
             assert!(matches!(
                 authorize(&db, "teardown_project", ACCOUNT_ID, Some("abcd1234"), 9).await,
-                Output::NotFound
+                Output::Authorized { github_id: 9 }
             ));
+            assert!(matches!(
+                authorize(&db, "teardown_project", ACCOUNT_ID, Some("missing1"), 9).await,
+                Output::Authorized { github_id: 9 }
+            ));
+        });
+    }
+
+    #[test]
+    fn project_operations_require_a_project_id() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            let output = authorize(&db, "provision_project", ACCOUNT_ID, None, 7).await;
+            assert!(matches!(output, Output::InvalidRequest));
         });
     }
 }

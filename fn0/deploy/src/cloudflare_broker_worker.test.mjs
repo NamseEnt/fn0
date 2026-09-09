@@ -568,7 +568,7 @@ test("teardown-project removes the DNS record, custom domains, certificate, and 
   );
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, notes: [] });
+  assert.deepEqual(await response.json(), { ok: true, notes: [], pending: [] });
   const deletes = calls.filter((call) => call.method === "DELETE").map((call) => call.pathname);
   assert.ok(deletes.includes(`/zones/${TEARDOWN_ZONE_ID}/dns_records/cname-id`));
   assert.ok(deletes.includes("/certificates/cert-id"));
@@ -663,7 +663,7 @@ test("teardown-project tolerates a certificate lookup that 404s", async () => {
   );
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, notes: [] });
+  assert.deepEqual(await response.json(), { ok: true, notes: [], pending: [] });
 });
 
 // --delete-buckets: the three buckets are deleted once empty.
@@ -673,7 +673,7 @@ test("teardown-project deletes the buckets with delete_buckets", async () => {
   );
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, notes: [] });
+  assert.deepEqual(await response.json(), { ok: true, notes: [], pending: [] });
   const bucketDeletes = calls.filter(
     (call) => call.method === "DELETE" && /\/r2\/buckets\/fn0-abcd1234-[a-z-]+$/.test(call.pathname),
   );
@@ -692,9 +692,10 @@ test("teardown-project reports a bucket that is still not empty", async () => {
   );
 
   assert.equal(response.status, 200);
-  const { ok, notes } = await response.json();
+  const { ok, notes, pending } = await response.json();
   assert.equal(ok, true);
-  assert.equal(notes.length, 3);
-  assert.ok(notes.every((note) => /not empty/.test(note)));
+  assert.deepEqual(notes, []);
+  assert.equal(pending.length, 3);
+  assert.ok(pending.every((note) => /not empty/.test(note)));
   assert.ok(calls.some((call) => call.method === "DELETE" && call.pathname === "/certificates/cert-id"));
 });

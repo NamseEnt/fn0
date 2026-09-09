@@ -84,7 +84,8 @@ token beyond that first prompt, and it is never sent to fn0.
 This token is powerful: a token that can create tokens can create any token
 allowed by the account. That's exactly why it never leaves your own
 Cloudflare account after the first run. If it's ever compromised or you just
-want a new one, `forte cloud rotate` replaces it in place; `forte cloud
+want a new one, `forte cloud rotate` replaces it in place and republishes the
+current broker Worker; `forte cloud
 clear` removes it without replacing it; `forte cloud destroy` removes the
 whole broker, token included. See [`forte cloud`](../forte/cli.md#forte-cloud-init)
 for all three.
@@ -232,7 +233,9 @@ hostname immediately and visibly.
 
 `forte destroy` tears the project down on both sides. fn0's control plane
 removes the routing, the deployed bundles and static assets, the database, and
-empties the three R2 buckets. Through the setup broker it then removes the
+empties the three R2 buckets. The CLI waits for that asynchronous teardown to
+finish before the broker revokes project credentials. Through the setup broker
+it then removes the
 project's Cloudflare footprint: the app hostname's DNS record, the two public
 buckets' custom domains, the origin certificate, and the three minted
 R2/purge tokens.
@@ -241,10 +244,14 @@ The three **buckets themselves are left standing** — empty. fn0 holds only
 object-scoped credentials there by design; deleting a bucket needs a token
 minted from the setup token, which only the broker can do. `forte destroy
 --delete-buckets` has the broker delete them once control has emptied them; a
-bucket teardown has not finished clearing is reported, and re-running is safe.
+bucket teardown that has not finished clearing is reported as pending, and
+re-running is safe.
 
 An app DNS record you have edited (added an `A` record, turned the proxy off, or
 changed the CNAME target) is left in place and reported rather than deleted.
+The teardown request remains authorized by the broker owner's account identity
+after the fn0 project record has been removed, so a failed cleanup can be
+retried from the same project directory.
 
 ## Revoking
 
@@ -259,7 +266,8 @@ token means the project has to be recreated.
 
 The setup token is different: it isn't tied to one project, so losing or
 revoking it doesn't touch anything already connected. `forte cloud rotate`
-replaces it in the broker's Secrets Store; `forte cloud clear` removes it
+replaces it in the broker's Secrets Store and republishes the current Worker;
+`forte cloud clear` removes it
 without a replacement; `forte cloud destroy` removes the broker Worker and
 its Secrets Store entirely, for every project that shares this Cloudflare
 account.

@@ -1095,6 +1095,7 @@ async function teardownProject(setupToken, accountId, body) {
   }
   const buckets = bucketNames(projectId);
   const notes = [];
+  const pending = [];
 
   await withProvisioning(setupToken, accountId, zoneId, `teardown ${projectId}`, async (token) => {
     const dnsNote = await deleteAppDnsRecord(token, zoneId, appHostname, originHostname);
@@ -1118,7 +1119,7 @@ async function teardownProject(setupToken, accountId, body) {
       for (const bucketName of Object.values(buckets)) {
         const bucketNote = await deleteBucketShell(token, accountId, bucketName);
         if (bucketNote) {
-          notes.push(bucketNote);
+          pending.push(bucketNote);
         }
       }
     }
@@ -1126,7 +1127,7 @@ async function teardownProject(setupToken, accountId, body) {
 
   await revokeProjectCredentialsByName(setupToken, projectId);
 
-  return { ok: true, notes };
+  return { ok: true, notes, pending };
 }
 
 async function handleRequest(request, env) {

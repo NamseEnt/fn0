@@ -1,6 +1,10 @@
 use crate::name::MAX_PROJECT_NAME_LEN;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
+
+const PROJECT_TEARDOWN_TIMEOUT: Duration = Duration::from_secs(600);
+const PROJECT_TEARDOWN_POLL: Duration = Duration::from_secs(1);
 
 #[derive(Serialize)]
 struct NewProjectInput<'a> {
@@ -129,6 +133,33 @@ pub async fn delete_project_if_present(project_id: &str) -> Result<()> {
         DeleteProject::InternalError => Err(anyhow!(
             "delete_project: server error; check fn0-control logs"
         )),
+    }
+}
+
+pub async fn wait_for_project_teardown(project_id: &str) -> Result<()> {
+    let creds = crate::credentials::require()?;
+    let started = Instant::now();
+    loop {
+        match crate::domain::fetch_domain_status(&creds, project_id).await? {
+            crate::domain::DomainStatus::NotFound => return Ok(()),
+            crate::domain::DomainStatus::NoDomain
+            | crate::domain::DomainStatus::SelfHosted { .. } => {}
+            crate::domain::DomainStatus::NotLoggedIn => {
+                return Err(anyhow!("control rejected token; run `fn0 login` again."));
+            }
+            crate::domain::DomainStatus::InternalError => {
+                return Err(anyhow!(
+                    "domain_status: server error; check fn0-control logs"
+                ));
+            }
+        }
+        if started.elapsed() >= PROJECT_TEARDOWN_TIMEOUT {
+            return Err(anyhow!(
+                "project '{project_id}' teardown did not finish within {}s; rerun `forte destroy` to continue",
+                PROJECT_TEARDOWN_TIMEOUT.as_secs()
+            ));
+        }
+        tokio::time::sleep(PROJECT_TEARDOWN_POLL).await;
     }
 }
 

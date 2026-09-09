@@ -145,7 +145,16 @@ async fn empty_project_buckets(
             }
             Err(error) => {
                 let bucket = store.bucket();
-                tracing::warn!(%project_id, %bucket, %error, "project_teardown: bucket unreadable, skipping");
+                let detail = error.to_string();
+                if detail.contains("404")
+                    && (detail.contains("NoSuchBucket")
+                        || detail.contains("NoSuchKey")
+                        || detail.contains("not found"))
+                {
+                    tracing::info!(%project_id, %bucket, "project_teardown: bucket already absent");
+                } else {
+                    return Err(error);
+                }
             }
         }
     }
