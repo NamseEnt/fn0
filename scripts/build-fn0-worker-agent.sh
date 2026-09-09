@@ -80,7 +80,7 @@ for i in $(seq 0 $((COUNT - 1))); do
 
   if [[ "$PUSH" -eq 1 ]]; then
     echo ">> Login ${URL}"
-    echo "$PASSWORD" | container_runtime_registry_login "$URL" "$USERNAME"
+    container_runtime_registry_login "$URL" "$USERNAME" <<<"$PASSWORD"
     echo ">> Pushing ${LATEST_REF} (mutable; running agents poll this)"
     container_runtime_tag "$CONTAINER_RUNTIME_BUILT_IMAGE" "$LATEST_REF"
     container_runtime_push "$LATEST_REF"

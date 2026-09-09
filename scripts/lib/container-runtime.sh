@@ -13,6 +13,8 @@ if [[ -n "${__FN0_CONTAINER_RUNTIME_LOADED:-}" ]]; then
 fi
 __FN0_CONTAINER_RUNTIME_LOADED=1
 
+CONTAINER_RUNTIME_CRANE_CONFIG_DIR=""
+
 # shellcheck source=registry-inspect.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/registry-inspect.sh"
 
@@ -31,6 +33,10 @@ container_runtime_ensure_available() {
   fi
   case "$CONTAINER_RUNTIME_CLI" in
     container)
+      if ! command -v crane >/dev/null 2>&1; then
+        echo "required command not found: crane (brew install crane)" >&2
+        return 1
+      fi
       if ! container system status >/dev/null 2>&1; then
         echo ">> starting apple/container system service"
         container system start
@@ -87,16 +93,41 @@ container_runtime_set_full_host_resources() {
 }
 
 # container_runtime_registry_login <registry_url> <username>  (password on stdin)
+#
+# Call it with a redirect, never through a pipe: it exports DOCKER_CONFIG for
+# the pushes that follow, and the right-hand side of a pipe is a subshell whose
+# exports are discarded.
+#
+# Logs the runtime CLI in, and separately hands the same credential to crane,
+# which container_runtime_push uses. crane reads a docker config rather than
+# either runtime's credential store, and `crane auth login` cannot write one on
+# macOS because it delegates to docker-credential-osxkeychain, which is absent
+# on a machine with no docker. So the config is written here and pointed at
+# through DOCKER_CONFIG.
 container_runtime_registry_login() {
-  local registry_url="$1" username="$2"
+  local registry_url="$1" username="$2" password
+  password="$(cat)"
   case "$CONTAINER_RUNTIME_CLI" in
     container)
-      container registry login --username "$username" --password-stdin "$registry_url" >/dev/null
+      printf '%s' "$password" \
+        | container registry login --username "$username" --password-stdin "$registry_url" >/dev/null
       ;;
     docker)
-      docker login "$registry_url" -u "$username" --password-stdin >/dev/null
+      printf '%s' "$password" | docker login "$registry_url" -u "$username" --password-stdin >/dev/null
       ;;
   esac
+
+  if [[ -z "$CONTAINER_RUNTIME_CRANE_CONFIG_DIR" ]]; then
+    CONTAINER_RUNTIME_CRANE_CONFIG_DIR="$(mktemp -d)"
+    printf '{"auths":{}}' > "${CONTAINER_RUNTIME_CRANE_CONFIG_DIR}/config.json"
+  fi
+  local config_file="${CONTAINER_RUNTIME_CRANE_CONFIG_DIR}/config.json"
+  local encoded
+  encoded="$(printf '%s:%s' "$username" "$password" | base64 | tr -d '\n')"
+  jq --arg registry "$registry_url" --arg auth "$encoded" \
+    '.auths[$registry] = {auth: $auth}' "$config_file" > "${config_file}.new"
+  mv "${config_file}.new" "$config_file"
+  export DOCKER_CONFIG="$CONTAINER_RUNTIME_CRANE_CONFIG_DIR"
 }
 
 # container_runtime_build_image <dockerfile> <context_dir> <build_log> [--label key=value]... [--platform os/arch]
@@ -176,10 +207,56 @@ container_runtime_tag() {
   esac
 }
 
+# Rewrites an OCI layout whose index points at a nested single-platform index
+# so it points at the platform manifest directly. No-op on a layout that
+# already names a manifest.
+__container_runtime_flatten_oci_layout() {
+  local layout_dir="$1"
+  local index_file="${layout_dir}/index.json"
+  local entry_count entry_type inner_digest inner_file inner_count
+
+  entry_count="$(jq '.manifests | length' "$index_file")"
+  if [[ "$entry_count" != "1" ]]; then
+    echo "expected a single-platform image, found ${entry_count} entries in ${index_file}" >&2
+    return 1
+  fi
+
+  entry_type="$(jq -r '.manifests[0].mediaType' "$index_file")"
+  if [[ "$entry_type" != "application/vnd.oci.image.index.v1+json" ]]; then
+    return 0
+  fi
+
+  inner_digest="$(jq -r '.manifests[0].digest | sub("^sha256:"; "")' "$index_file")"
+  inner_file="${layout_dir}/blobs/sha256/${inner_digest}"
+  if [[ ! -f "$inner_file" ]]; then
+    echo "layout names ${inner_digest} but has no such blob" >&2
+    return 1
+  fi
+
+  inner_count="$(jq '.manifests | length' "$inner_file")"
+  if [[ "$inner_count" != "1" ]]; then
+    echo "expected a single-platform image, found ${inner_count} entries in ${inner_file}" >&2
+    return 1
+  fi
+
+  jq --slurpfile inner "$inner_file" '.manifests = $inner[0].manifests' "$index_file" \
+    > "${index_file}.new"
+  mv "${index_file}.new" "$index_file"
+}
+
 # container_runtime_push <reference> [--platform os/arch]
-# --platform narrows an apple/container push to one entry of its local OCI
-# index (Lambda rejects multi-entry indexes); docker-built images are
-# single-arch already, so it is a no-op there.
+#
+# Both runtimes leave the tag pointing at a single-platform image manifest, so
+# a consumer never has to know which one published it.
+#
+# docker does that on its own. apple/container always wraps the image in an OCI
+# index, even for one platform, and uploads the manifest that index references
+# as a plain blob rather than registering it (apple/container#1001), so a client
+# resolving the index gets a 404 and AWS Lambda refuses the image outright. It
+# offers no flag for this, so the image is saved, its layout is pointed at the
+# platform manifest, and crane publishes that.
+#
+# --platform narrows which entry of a multi-platform local image is saved.
 container_runtime_push() {
   local reference="$1"
   shift
@@ -198,11 +275,25 @@ container_runtime_push() {
   done
   case "$CONTAINER_RUNTIME_CLI" in
     container)
+      local save_dir push_status=0
+      save_dir="$(mktemp -d)"
       if [[ -n "$platform" ]]; then
-        container image push --platform "$platform" "$reference"
+        container image save --platform "$platform" "$reference" -o "${save_dir}/image.tar"
       else
-        container image push "$reference"
+        container image save "$reference" -o "${save_dir}/image.tar"
+      fi || push_status=$?
+      if [[ $push_status -eq 0 ]]; then
+        mkdir -p "${save_dir}/layout"
+        tar -xf "${save_dir}/image.tar" -C "${save_dir}/layout" || push_status=$?
       fi
+      if [[ $push_status -eq 0 ]]; then
+        __container_runtime_flatten_oci_layout "${save_dir}/layout" || push_status=$?
+      fi
+      if [[ $push_status -eq 0 ]]; then
+        crane push "${save_dir}/layout" "$reference" || push_status=$?
+      fi
+      rm -rf "$save_dir"
+      return $push_status
       ;;
     docker)
       docker push "$reference"

@@ -112,7 +112,7 @@ fn0_worker_registry_login() {
   username="$(jq -r .username <<<"$reg")"
   password="$(jq -r .password <<<"$reg")"
   echo ">> ${CONTAINER_RUNTIME_CLI} login ${url}"
-  echo "$password" | container_runtime_registry_login "$url" "$username"
+  container_runtime_registry_login "$url" "$username" <<<"$password"
 }
 
 fn0_worker_version() {

@@ -71,9 +71,6 @@ ensure_cwasm_lambda() {
 
     # The version tag is the artifact key: the same fn0-wasmtime version always
     # means the same image, so an existing tag short-circuits build + push.
-    # This also dodges `container image push` hanging on macOS (observed
-    # 2026-08-19: 29 minutes at zero bytes; the apple/container push branch of
-    # the runtime abstraction is still unverified end-to-end).
     local ecr_repository_name="${cwasm_ecr#*/}"
     if aws ecr describe-images \
       --region "$cwasm_region" \
@@ -83,14 +80,16 @@ ensure_cwasm_lambda() {
       echo ">> image ${image_uri} already in ECR; skipping build + push"
     else
       local ecr_registry="${cwasm_ecr%%/*}"
-      aws ecr get-login-password --region "$cwasm_region" \
-        | container_runtime_registry_login "$ecr_registry" AWS
+      local ecr_password
+      ecr_password="$(aws ecr get-login-password --region "$cwasm_region")"
+      container_runtime_registry_login "$ecr_registry" AWS <<<"$ecr_password"
 
       "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$build_ctx"
       cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$build_ctx/"
 
-      # Lambda rejects multi-entry indexes and attestation manifests, so the
-      # image is built single-platform and pushed platform-filtered.
+      # Lambda runs one architecture, so the image names one and the push
+      # narrows to it. That the published tag ends up a plain manifest rather
+      # than an index is container_runtime_push's guarantee, not this caller's.
       container_runtime_build_image \
         "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
         "$build_ctx" \
@@ -178,6 +177,16 @@ __cwasm_invoke_one() {
   entry="$1"
   pid="$(jq -r '.project_id' <<<"$entry")"
   code_version="$(jq -r '.code_version' <<<"$entry")"
+  # Without this the empty fields build `original//.tar`, and the compile comes
+  # back as a NoSuchKey from R2 that reads like a missing bundle rather than a
+  # todo entry that never parsed.
+  if [[ -z "$pid" || -z "$code_version" ]]; then
+    {
+      echo "[FAIL] unparsable todo entry: ${entry}"
+      echo "---"
+    } >> "$CWASM_INVOKE_FAIL_FILE"
+    return
+  fi
   input_key="original/${pid}/${code_version}.tar"
   output_key="compiled/${CWASM_INVOKE_NEW_FN0_WASMTIME_VERSION}/${pid}/${code_version}.tar.zst"
 
@@ -276,6 +285,9 @@ __cwasm_sync_compile_all() {
 
   if [[ "$todo_count" -gt 0 ]]; then
     echo ">> invoking lambda for ${todo_count} bundle(s) (parallel=${CWASM_COMPILER_PARALLEL})"
+    # The todo entries reach xargs NUL-delimited because xargs treats quotes as
+    # its own syntax and strips them, which turns each JSON line into something
+    # jq cannot parse.
     CWASM_INVOKE_NEW_FN0_WASMTIME_VERSION="$new_fn0_wasmtime_version" \
     CWASM_INVOKE_WORK_DIR="$work_dir" \
     CWASM_INVOKE_R2_BUCKET="$r2_bucket" \
@@ -285,8 +297,8 @@ __cwasm_sync_compile_all() {
     CWASM_INVOKE_REGION="$region" \
     CWASM_INVOKE_SUCCESS_FILE="$success_file" \
     CWASM_INVOKE_FAIL_FILE="$fail_file" \
-    xargs -I {} -P "$CWASM_COMPILER_PARALLEL" \
-      bash -c '__cwasm_invoke_one "$@"' _ {} < "$todo_file"
+    xargs -0 -I {} -P "$CWASM_COMPILER_PARALLEL" \
+      bash -c '__cwasm_invoke_one "$@"' _ {} < <(tr '\n' '\0' < "$todo_file")
   fi
 
   local success_count fail_count total_success

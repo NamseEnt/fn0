@@ -13,6 +13,10 @@ The following tools must be present in PATH before running any deploy script:
 - `oci` — OCI Vault and registry operations
 - `curl` — calls control plane actions
 - A container runtime (`docker` or `apple/container` on macOS)
+- `crane` — publishes images on macOS, where `apple/container` can only push an
+  OCI index and does not register the manifest it references
+  ([apple/container#1001](https://github.com/apple/container/issues/1001)); AWS
+  Lambda refuses such an image outright. `brew install crane`
 
 Scripts detect missing tools and exit early with a clear error.
 

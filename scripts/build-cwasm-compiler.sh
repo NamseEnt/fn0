@@ -78,16 +78,17 @@ echo ">> Image URI: ${IMAGE_URI}"
 
 echo ">> Logging in to ECR"
 ECR_REGISTRY="${CWASM_ECR%%/*}"
-aws ecr get-login-password --region "$CWASM_REGION" \
-  | container_runtime_registry_login "$ECR_REGISTRY" AWS
+ECR_PASSWORD="$(aws ecr get-login-password --region "$CWASM_REGION")"
+container_runtime_registry_login "$ECR_REGISTRY" AWS <<<"$ECR_PASSWORD"
 
 echo ">> Building fn0-wasmtime binary"
 "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-wasmtime "$BUILD_CTX"
 cp "${REPO_ROOT}/cwasm-compiler/package.json" "${REPO_ROOT}/cwasm-compiler/handler.mjs" "$BUILD_CTX/"
 
 echo ">> Building & pushing image"
-# Lambda rejects multi-entry indexes and attestation manifests, so the image
-# is built single-platform and pushed platform-filtered.
+# Lambda runs one architecture, so the image names one and the push narrows to
+# it. That the published tag ends up a plain manifest rather than an index is
+# container_runtime_push's guarantee, not this caller's.
 container_runtime_build_image \
   "${REPO_ROOT}/cwasm-compiler/Dockerfile" \
   "$BUILD_CTX" \
