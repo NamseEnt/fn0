@@ -186,13 +186,13 @@ pub enum Output { Ok { name: String }, Unauthorized }
 pub async fn handler(req: forte_sdk::ForteRequest<'_, Input>) -> Output { ... }
 ```
 
-Auto-generated React hook (`fe/src/hooks/.generated/UserSession.ts`):
+Auto-generated React hook (`fe/src/hooks/.generated/useUser_session.ts`):
 
 ```tsx
-import { useUserSession } from "../hooks/.generated/UserSession";
+import { useUser_session } from "../hooks/.generated/useUser_session";
 
 function Profile() {
-    const session = useUserSession({ sessionToken: getCookie("session") });
+    const session = useUser_session({ sessionToken: getCookie("session") });
     if (session.t !== "Ok") return null;
     return <div>{session.name}</div>;
 }
@@ -372,6 +372,6 @@ The page `head` merges over the app defaults — same `name`/`property` keys rep
 | `rs/src/env_generated.rs` | `generate_env()` in build.rs | when `env.yaml` / `env.local.yaml` changes |
 | `fe/src/pages/<path>/.props.ts` | `forte-rs-to-ts` | `forte build`/`forte dev` |
 | `fe/src/actions/.generated/<name>.ts` | same | same |
-| `fe/src/hooks/.generated/<Name>.ts` | same | same |
+| `fe/src/hooks/.generated/use<Name>.ts` | same | same |
 | `fe/src/paths.generated.ts` | `forte-codegen` | same as `route_generated.rs` |
 | `fe/.forte/` (entire dir) | `forte dev`/`forte build` | each run |
