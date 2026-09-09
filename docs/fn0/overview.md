@@ -59,10 +59,10 @@ that require it. Request and response streaming is implemented end to end; see
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.6.8 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
-| `fn0-cli` | 0.1.19 | Local development CLI |
-| `fn0-worker` | 0.4.12 | Worker binary (distributed execution node) |
-| `fn0-worker-agent` | 0.1.7 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
+| `fn0` | 0.6.9 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0-cli` | 0.1.20 | Local development CLI |
+| `fn0-worker` | 0.4.14 | Worker binary (distributed execution node) |
+| `fn0-worker-agent` | 0.1.8 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.1 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
 | `fn0-deploy` | 0.3.3 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.2.1 | Wasmtime wrapper with fn0-specific config |
