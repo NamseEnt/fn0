@@ -124,6 +124,12 @@ change to your account, so approve it before the final click.
 Claude Code users: run the `cloudflare-setup-token` skill, which drives this
 in the browser.
 
+Codex users: invoke the `$cloudflare-setup-token` skill. It opens the
+Cloudflare dashboard with Codex's browser controls, pauses for the user's
+login, two-factor authentication, and final creation approval, then clicks only
+the dashboard's **Copy** control. The token value never enters the agent's
+context; `forte` consumes it from the clipboard.
+
 ## What the stored credentials can do
 
 | Credential | What it can do |
