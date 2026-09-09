@@ -713,6 +713,43 @@ fn full_body(body_bytes: Bytes) -> fn0::Body {
         .boxed_unsync()
 }
 
+fn payload_too_large_response() -> HyperResponse {
+    hyper::Response::builder()
+        .status(413)
+        .header("connection", "close")
+        .body(full_body(Bytes::from("Payload Too Large")))
+        .unwrap()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum FailedRequest {
+    PayloadTooLarge,
+    NotDeployed,
+    BadGateway,
+}
+
+fn classify_failed_request(error: &anyhow::Error, body_too_large: bool) -> FailedRequest {
+    if body_too_large
+        || error
+            .chain()
+            .any(|cause| cause.downcast_ref::<RequestBodyTooLarge>().is_some())
+    {
+        return FailedRequest::PayloadTooLarge;
+    }
+    // Walk the chain: singleflight and the fetch path wrap this, and a wrapped
+    // NotFound answered 502 instead of 404, which reads as a broken deploy
+    // rather than an absent one.
+    if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<fn0::cache::Error>(),
+            Some(fn0::cache::Error::NotFound)
+        )
+    }) {
+        return FailedRequest::NotDeployed;
+    }
+    FailedRequest::BadGateway
+}
+
 type BodyBudgetPermitFuture =
     Pin<Box<dyn Future<Output = Result<OwnedSemaphorePermit, tokio::sync::AcquireError>> + Send>>;
 
@@ -819,7 +856,15 @@ where
         }
 
         match Pin::new(&mut self.inner).poll_frame(context) {
-            Poll::Pending => Poll::Pending,
+            // The budget bounds bytes this body is holding, so a stream waiting
+            // on the network must not occupy it. Keeping the permit here caps
+            // the whole worker at `AGGREGATE_REQUEST_BUFFER_SIZE /
+            // MAX_CONNECTION_BUFFER_SIZE` concurrent readers, and slow uploads
+            // then stall every other project's body on the same process.
+            Poll::Pending => {
+                self.budget_permit = None;
+                Poll::Pending
+            }
             Poll::Ready(Some(Ok(frame))) => {
                 let Some(data) = frame.data_ref() else {
                     self.budget_permit = None;
@@ -1334,11 +1379,7 @@ async fn handle_user_request(
     match run_result {
         Ok(resp) => {
             if body_too_large.load(Ordering::Acquire) {
-                return Ok(hyper::Response::builder()
-                    .status(413)
-                    .header("connection", "close")
-                    .body(full_body(Bytes::from("Payload Too Large")))
-                    .unwrap());
+                return Ok(payload_too_large_response());
             }
             let (parts, body) = resp.into_parts();
             cancellation_guard.disarm();
@@ -1351,46 +1392,26 @@ async fn handle_user_request(
             .boxed_unsync();
             Ok(hyper::Response::from_parts(parts, response_body))
         }
-        Err(err) => {
-            if body_too_large.load(Ordering::Acquire)
-                || err
-                    .chain()
-                    .any(|cause| cause.downcast_ref::<fn0::RequestBodyTooLarge>().is_some())
-                || err.to_string().contains("HttpRequestBodySize")
-            {
-                return Ok(hyper::Response::builder()
-                    .status(413)
-                    .header("connection", "close")
-                    .body(full_body(Bytes::from("Payload Too Large")))
-                    .unwrap());
+        Err(err) => match classify_failed_request(&err, body_too_large.load(Ordering::Acquire)) {
+            FailedRequest::PayloadTooLarge => Ok(payload_too_large_response()),
+            FailedRequest::NotDeployed => Ok(hyper::Response::builder()
+                .status(404)
+                .header("content-type", "text/plain; charset=utf-8")
+                .body(full_body(Bytes::from(
+                    "No application is deployed at this subdomain.",
+                )))
+                .unwrap()),
+            FailedRequest::BadGateway => {
+                // The cause goes in the message, not a field: the log pipeline
+                // forwards message bodies and drops structured fields, so a field
+                // here is invisible exactly when an outage makes it matter.
+                tracing::error!(%project_id, path = %request_path, "Failed to run fn0: {err:#}");
+                Ok(hyper::Response::builder()
+                    .status(502)
+                    .body(full_body(Bytes::from("Bad Gateway")))
+                    .unwrap())
             }
-            // Walk the chain: singleflight and the fetch path wrap this, and a
-            // wrapped NotFound answered 502 instead of 404, which reads as a
-            // broken deploy rather than an absent one.
-            let not_found = err.chain().any(|cause| {
-                matches!(
-                    cause.downcast_ref::<fn0::cache::Error>(),
-                    Some(fn0::cache::Error::NotFound)
-                )
-            });
-            if not_found {
-                return Ok(hyper::Response::builder()
-                    .status(404)
-                    .header("content-type", "text/plain; charset=utf-8")
-                    .body(full_body(Bytes::from(
-                        "No application is deployed at this subdomain.",
-                    )))
-                    .unwrap());
-            }
-            // The cause goes in the message, not a field: the log pipeline
-            // forwards message bodies and drops structured fields, so a field
-            // here is invisible exactly when an outage makes it matter.
-            tracing::error!(%project_id, path = %request_path, "Failed to run fn0: {err:#}");
-            Ok(hyper::Response::builder()
-                .status(502)
-                .body(full_body(Bytes::from("Bad Gateway")))
-                .unwrap())
-        }
+        },
     }
 }
 
@@ -1398,8 +1419,9 @@ async fn handle_user_request(
 mod tests {
     use super::{
         CONTROL_DEPLOY_STATUS_DEADLINE, CancellationBody, CancellationGuard, DEPLOY_STATUS_PATH,
-        InFlightGuard, LimitedRequestBody, MAX_REQUEST_BODY_SIZE, REQUEST_BODY_BUFFER_PERMITS,
-        REQUEST_BODY_CHUNK_SIZE, REQUEST_DEADLINE, declared_request_body_exceeds_limit,
+        FailedRequest, InFlightGuard, LimitedRequestBody, MAX_REQUEST_BODY_SIZE,
+        REQUEST_BODY_BUFFER_PERMITS, REQUEST_BODY_CHUNK_SIZE, REQUEST_DEADLINE,
+        RequestBodyTooLarge, classify_failed_request, declared_request_body_exceeds_limit,
         select_request_deadline,
     };
     use bytes::Bytes;
@@ -1443,6 +1465,33 @@ mod tests {
             (MAX_REQUEST_BODY_SIZE + 1).to_string().parse().unwrap(),
         );
         assert!(declared_request_body_exceeds_limit(&headers));
+    }
+
+    #[test]
+    fn a_failed_request_answers_413_from_the_received_byte_flag_or_a_typed_body_size_error() {
+        assert_eq!(
+            classify_failed_request(&anyhow::anyhow!("wasm trapped"), true),
+            FailedRequest::PayloadTooLarge
+        );
+        let guest_refused = anyhow::Error::new(RequestBodyTooLarge { limit: 1024 })
+            .context("wasm instance dispatch");
+        assert_eq!(
+            classify_failed_request(&guest_refused, false),
+            FailedRequest::PayloadTooLarge
+        );
+    }
+
+    #[test]
+    fn a_failed_request_separates_an_absent_deploy_from_a_broken_one() {
+        let absent = anyhow::Error::new(fn0::cache::Error::NotFound).context("singleflight fetch");
+        assert_eq!(
+            classify_failed_request(&absent, false),
+            FailedRequest::NotDeployed
+        );
+        assert_eq!(
+            classify_failed_request(&anyhow::anyhow!("wasm trapped"), false),
+            FailedRequest::BadGateway
+        );
     }
 
     #[tokio::test]
@@ -1578,6 +1627,43 @@ mod tests {
             .await
             .expect("waiting body frame")
             .expect("waiting body frame must succeed");
+    }
+
+    #[tokio::test]
+    async fn a_stream_waiting_on_the_network_releases_the_aggregate_budget() {
+        let budget = Arc::new(Semaphore::new(REQUEST_BODY_BUFFER_PERMITS as usize));
+        let idle_inner = StreamBody::new(stream::pending::<Result<Frame<Bytes>, std::io::Error>>());
+        let mut idle_body = LimitedRequestBody::new(
+            idle_inner,
+            budget.clone(),
+            Arc::new(AtomicBool::new(false)),
+            CancellationToken::new(),
+        );
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), idle_body.frame())
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            budget.available_permits(),
+            REQUEST_BODY_BUFFER_PERMITS as usize
+        );
+
+        let ready_inner = StreamBody::new(stream::iter([Ok::<_, Infallible>(Frame::data(
+            Bytes::from_static(b"chunk"),
+        ))]));
+        let mut ready_body = LimitedRequestBody::new(
+            ready_inner,
+            budget,
+            Arc::new(AtomicBool::new(false)),
+            CancellationToken::new(),
+        );
+        ready_body
+            .frame()
+            .await
+            .expect("ready body frame")
+            .expect("ready body frame must succeed");
     }
 
     #[tokio::test]

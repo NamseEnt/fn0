@@ -34,6 +34,10 @@ applications may stream large bodies through compute when needed. Request and
 response streaming is implemented end to end; see the
 [HTTP body streaming design](../design/http-body-streaming.md).
 
+A request larger than the limit is refused before your application runs. Through
+fn0's edge the refusal comes from the edge itself, so the 413 your client sees
+is an HTML page rather than the application's own response.
+
 The unlimited response-body value is a size limit, not a time allowance. A
 response streams under backpressure within the same 15-second duration, so a
 client that cannot read the whole body before the deadline has its response cut

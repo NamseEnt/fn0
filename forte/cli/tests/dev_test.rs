@@ -397,6 +397,22 @@ pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
 }
 "#;
 
+const RAW_REQUEST_BUFFER_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::http::{Body, Response};
+use forte_sdk::{ForteRequest, ForteResponse};
+
+pub type Props = ForteResponse;
+
+pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
+    let outcome = match req.body.bytes_limited(usize::MAX).await {
+        Ok(bytes) => format!("buffered:{}", bytes.len()),
+        Err(error) => format!("refused:{error}"),
+    };
+    Ok(Response::builder().status(200).body(Body::from(outcome))?)
+}
+"#;
+
 #[test]
 fn test_dev_raw_response_api() {
     let _dev_server_slot = take_the_only_dev_server_slot();
@@ -415,6 +431,7 @@ fn test_dev_raw_response_api() {
         RAW_LARGE_RESPONSE_STREAM_API,
     )
     .unwrap();
+    std::fs::write(apis_dir.join("buffer.rs"), RAW_REQUEST_BUFFER_API).unwrap();
 
     let server = DevServer::start(&project_dir);
 
@@ -470,6 +487,21 @@ fn test_dev_raw_response_api() {
     let largest_chunk = largest_chunk.parse::<usize>().unwrap();
     assert!(largest_chunk > 0);
     assert!(largest_chunk <= 64 * 1024);
+
+    // The same body the streaming handler just consumed, against a handler that
+    // asks for all of it at once: the invocation dies inside the 128 MB guest
+    // ceiling. This is what makes the assertion above evidence of streaming
+    // rather than of something further up quietly buffering.
+    let buffering = client
+        .post(format!("{}/api/buffer", server.url()))
+        .body(reqwest::blocking::Body::new(
+            std::io::repeat(0).take(upload_size),
+        ))
+        .send();
+    assert!(
+        buffering.is_err(),
+        "buffering a near-limit body must not complete: {buffering:?}"
+    );
 
     let mut large_stream = client
         .get(format!("{}/api/large_stream", server.url()))

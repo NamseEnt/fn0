@@ -895,9 +895,20 @@ pub(crate) async fn call_service<C: Clock>(
         }
         Ok(Err(ec)) => {
             telemetry::proxy_returns_error_code(&format!("{ec:?}"));
-            Err(anyhow!("proxy returned error code: {ec:?}"))
+            Err(guest_error(ec))
         }
         Err(error) => Err(classify_wasm_error(error, is_timeout)),
+    }
+}
+
+/// The worker decides 413 by downcasting this error, so a body-size code has to
+/// survive as a type rather than collapse into a message.
+fn guest_error(code: ErrorCode) -> anyhow::Error {
+    match code {
+        ErrorCode::HttpRequestBodySize(limit) => anyhow::Error::new(crate::RequestBodyTooLarge {
+            limit: limit.unwrap_or(crate::MAX_REQUEST_BODY_SIZE),
+        }),
+        other => anyhow!("proxy returned error code: {other:?}"),
     }
 }
 
@@ -918,5 +929,39 @@ pub(crate) fn classify_wasm_error(
             telemetry::canceled_unexpectedly(&format!("{error:?}"));
             anyhow!("wasm error: {error:?}")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ErrorCode, guest_error};
+    use crate::{MAX_REQUEST_BODY_SIZE, RequestBodyTooLarge};
+
+    #[test]
+    fn a_body_size_code_stays_downcastable_and_keeps_the_limit_the_guest_reported() {
+        let error = guest_error(ErrorCode::HttpRequestBodySize(Some(1024)));
+        assert_eq!(
+            error
+                .downcast_ref::<RequestBodyTooLarge>()
+                .expect("body size code must stay typed")
+                .limit,
+            1024
+        );
+
+        let error = guest_error(ErrorCode::HttpRequestBodySize(None));
+        assert_eq!(
+            error
+                .downcast_ref::<RequestBodyTooLarge>()
+                .expect("body size code must stay typed")
+                .limit,
+            MAX_REQUEST_BODY_SIZE
+        );
+    }
+
+    #[test]
+    fn every_other_code_stays_an_untyped_message() {
+        let error = guest_error(ErrorCode::ConnectionRefused);
+        assert!(error.downcast_ref::<RequestBodyTooLarge>().is_none());
+        assert!(error.to_string().contains("ConnectionRefused"));
     }
 }

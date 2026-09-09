@@ -38,10 +38,17 @@ pub enum BodyError {
 
 impl BodyError {
     pub fn is_too_large(&self) -> bool {
+        self.exceeded_limit().is_some()
+    }
+
+    /// `Some` when the body was refused for its size, carrying the limit that
+    /// refused it when one is known — the SDK's own buffering limit, or the
+    /// host's transport limit arriving through WASI.
+    pub fn exceeded_limit(&self) -> Option<Option<u64>> {
         match self {
-            BodyError::TooLarge { .. } => true,
-            BodyError::Wasi(p3::ErrorCode::HttpRequestBodySize(_)) => true,
-            BodyError::Wasi(_) | BodyError::Cancelled | BodyError::InvalidUtf8(_) => false,
+            BodyError::TooLarge { limit } => Some(Some(*limit as u64)),
+            BodyError::Wasi(p3::ErrorCode::HttpRequestBodySize(limit)) => Some(*limit),
+            BodyError::Wasi(_) | BodyError::Cancelled | BodyError::InvalidUtf8(_) => None,
         }
     }
 }

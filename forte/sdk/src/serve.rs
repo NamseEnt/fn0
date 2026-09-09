@@ -3,7 +3,7 @@ use std::future::Future;
 
 use crate::bindings::wasi::http::types as p3;
 use crate::bindings::{wit_future, wit_stream};
-use crate::http::Body;
+use crate::http::{Body, BodyError};
 use tracing::Instrument;
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ pub async fn serve<F, Fut, E>(
 where
     F: FnOnce(::http::Request<Body>) -> Fut,
     Fut: Future<Output = core::result::Result<::http::Response<Body>, E>>,
-    E: fmt::Debug,
+    E: Into<anyhow::Error>,
 {
     crate::otel::init_once();
 
@@ -64,18 +64,17 @@ where
     let http_resp = match dispatch(http_req).instrument(span.clone()).await {
         Ok(r) => r,
         Err(e) => {
-            tracing::error!(error = ?e, "dispatch failed");
+            let error: anyhow::Error = e.into();
+            tracing::error!(error = ?error, "dispatch failed");
             crate::metrics::flush();
-            let error_message = format!("{e:#?}");
-            if error_message.contains("request body exceeds") {
-                return Err(p3::ErrorCode::HttpRequestBodySize(Some(
-                    crate::http::DEFAULT_BODY_BUFFER_LIMIT as u64,
-                )));
+            if let Some(limit) = error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<crate::http::BodyError>())
+                .and_then(BodyError::exceeded_limit)
+            {
+                return Err(p3::ErrorCode::HttpRequestBodySize(limit));
             }
-            if error_message.contains("HttpRequestBodySize") {
-                return Err(p3::ErrorCode::HttpRequestBodySize(None));
-            }
-            return Err(p3::ErrorCode::InternalError(Some(error_message)));
+            return Err(p3::ErrorCode::InternalError(Some(format!("{error:#?}"))));
         }
     };
 
