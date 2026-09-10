@@ -2404,7 +2404,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "aes-gcm",
  "anyhow",
