@@ -25,7 +25,9 @@ forte cloud rotate --project <project-dir> --setup-token-from-clipboard
 ```
 
 The command polls the OS clipboard, verifies a candidate against Cloudflare,
-wipes it after acceptance, and continues the bootstrap or broker republish.
+wipes it after acceptance, and continues the bootstrap or broker republish. It
+accepts either the bare token or the bearer value in Cloudflare's copied cURL
+command without printing the secret.
 
 ## Dashboard procedure
 
@@ -44,7 +46,8 @@ Use the browser controls available in this Codex session. Open:
    **Create Token** until approval is given.
 6. After creation, click only the page's native **Copy** control. Do not read,
    extract, print, type, or screenshot the token value, and do not inspect the
-   result page text. The CLI receives the value from the clipboard.
+   result page text. The CLI receives the bare token or cURL copy from the
+   clipboard and handles it locally.
 7. Wait for the CLI to report success, then close the dashboard tab.
 
 ## Safety and failure handling

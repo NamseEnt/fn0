@@ -99,7 +99,9 @@ browser) create the token in the dashboard and click its **Copy** button, and
 the command picks it up, verifies it against Cloudflare, and wipes the
 clipboard. The token never becomes a command argument, an environment variable,
 or a file, and — when an agent does the clicking — it need not pass through the
-agent's own context: the agent only clicks the native Copy control.
+agent's own context: the agent only clicks the native Copy control. Cloudflare
+may copy a cURL command instead of the bare token; `forte` extracts its bearer
+value locally before verification and never prints it.
 
 During bootstrap `forte` rolls the token's secret in place — Cloudflare will
 not re-create a token that can manage tokens, so the secret is regenerated
@@ -115,7 +117,7 @@ The dashboard steps are the same whichever tool does them:
    offered there.)
 3. The form is pre-filled with `User | API Tokens | Edit`. **Continue to
    summary** → **Create Token**.
-4. Click **Copy**. `forte` takes it from there.
+4. Click **Copy**. `forte` takes the token or the copied cURL command from there.
 
 Signing in, two-factor auth, and any identity re-prompt are yours to do in the
 browser — an agent must not type credentials. Creating the token is a real
