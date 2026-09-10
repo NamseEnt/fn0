@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cloudflare setup token"
+  short_description: "Create a setup token through the dashboard"
+  default_prompt: "Use $cloudflare-setup-token to create a Cloudflare setup token for forte."
