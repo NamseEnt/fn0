@@ -8,7 +8,7 @@
 //! until a value appears that Cloudflare confirms is a live token, then
 //! overwrites the clipboard so the secret does not linger there.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
