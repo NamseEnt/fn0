@@ -1419,10 +1419,11 @@ async fn handle_user_request(
 mod tests {
     use super::{
         CONTROL_DEPLOY_STATUS_DEADLINE, CancellationBody, CancellationGuard, DEPLOY_STATUS_PATH,
-        FailedRequest, InFlightGuard, LimitedRequestBody, MAX_REQUEST_BODY_SIZE,
-        REQUEST_BODY_BUFFER_PERMITS, REQUEST_BODY_CHUNK_SIZE, REQUEST_DEADLINE,
-        RequestBodyTooLarge, classify_failed_request, declared_request_body_exceeds_limit,
-        select_request_deadline,
+        FailedRequest, HyperResponse, InFlightGuard, LimitedRequestBody,
+        MAX_CONNECTION_BUFFER_SIZE, MAX_REQUEST_BODY_SIZE, REQUEST_BODY_BUFFER_PERMITS,
+        REQUEST_BODY_CHUNK_SIZE, REQUEST_DEADLINE, RequestBodyTooLarge, TokioIo, UnsyncBoxBody,
+        classify_failed_request, declared_request_body_exceeds_limit, full_body, http1,
+        payload_too_large_response, select_request_deadline, service_fn,
     };
     use bytes::Bytes;
     use futures::{StreamExt, stream};
@@ -1433,8 +1434,129 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::time::Duration;
-    use tokio::sync::Semaphore;
+    use tokio::sync::{Notify, Semaphore};
     use tokio_util::sync::CancellationToken;
+
+    #[derive(Clone)]
+    struct TransportTestState {
+        limit: u64,
+        deadline: Duration,
+        stream_budget: Arc<Semaphore>,
+        started: Arc<Notify>,
+        invocations: Arc<AtomicU64>,
+        cancelled: Arc<AtomicBool>,
+    }
+
+    impl TransportTestState {
+        fn new(limit: u64, deadline: Duration) -> Self {
+            Self {
+                limit,
+                deadline,
+                stream_budget: Arc::new(Semaphore::new(REQUEST_BODY_BUFFER_PERMITS as usize)),
+                started: Arc::new(Notify::new()),
+                invocations: Arc::new(AtomicU64::new(0)),
+                cancelled: Arc::new(AtomicBool::new(false)),
+            }
+        }
+    }
+
+    async fn consume_test_request(
+        mut body: fn0::Body,
+        state: &TransportTestState,
+    ) -> anyhow::Result<()> {
+        state.invocations.fetch_add(1, Ordering::AcqRel);
+        state.started.notify_waiters();
+        while let Some(frame) = body.frame().await {
+            let frame = frame?;
+            if frame.data_ref().is_none() {
+                continue;
+            }
+        }
+        Ok(())
+    }
+
+    async fn test_transport_service(
+        req: hyper::Request<hyper::body::Incoming>,
+        state: TransportTestState,
+    ) -> Result<HyperResponse, Infallible> {
+        if declared_request_body_exceeds_limit(req.headers()) {
+            return Ok(payload_too_large_response());
+        }
+
+        let cancellation = CancellationToken::new();
+        let too_large = Arc::new(AtomicBool::new(false));
+        let body = UnsyncBoxBody::new(LimitedRequestBody::with_limit(
+            req.into_body(),
+            state.limit,
+            state.stream_budget.clone(),
+            too_large.clone(),
+            cancellation.clone(),
+        ))
+        .boxed_unsync();
+        let app_result = tokio::time::timeout(state.deadline, async {
+            tokio::select! {
+                _ = cancellation.cancelled() => Err(anyhow::anyhow!("request cancelled")),
+                result = consume_test_request(body, &state) => result,
+            }
+        })
+        .await;
+        if cancellation.is_cancelled() {
+            state.cancelled.store(true, Ordering::Release);
+        }
+
+        let response = match app_result {
+            Ok(Ok(())) => hyper::Response::builder()
+                .status(200)
+                .body(full_body(Bytes::from_static(b"ok")))
+                .unwrap(),
+            Ok(Err(_)) if too_large.load(Ordering::Acquire) => payload_too_large_response(),
+            Ok(Err(_)) => hyper::Response::builder()
+                .status(499)
+                .body(full_body(Bytes::from_static(b"cancelled")))
+                .unwrap(),
+            Err(_) => {
+                cancellation.cancel();
+                state.cancelled.store(true, Ordering::Release);
+                hyper::Response::builder()
+                    .status(504)
+                    .body(full_body(Bytes::from_static(b"deadline")))
+                    .unwrap()
+            }
+        };
+        Ok(response)
+    }
+
+    async fn test_transport_connection(
+        state: TransportTestState,
+    ) -> (
+        hyper::client::conn::http1::SendRequest<fn0::Body>,
+        tokio::task::JoinHandle<()>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        let (client_io, server_io) = tokio::io::duplex(256 * 1024);
+        let server_task = tokio::spawn(async move {
+            let service = service_fn(move |req| test_transport_service(req, state.clone()));
+            let _ = http1::Builder::new()
+                .max_buf_size(MAX_CONNECTION_BUFFER_SIZE)
+                .serve_connection(TokioIo::new(server_io), service)
+                .await;
+        });
+        let (sender, connection) = hyper::client::conn::http1::handshake(TokioIo::new(client_io))
+            .await
+            .expect("client handshake");
+        let connection_task = tokio::spawn(async move {
+            let _ = connection.await;
+        });
+        (sender, connection_task, server_task)
+    }
+
+    fn streaming_test_body() -> (futures::channel::mpsc::UnboundedSender<Bytes>, fn0::Body) {
+        let (sender, receiver) = futures::channel::mpsc::unbounded::<Bytes>();
+        let body = StreamBody::new(receiver.map(|chunk| Ok::<_, Infallible>(Frame::data(chunk))))
+            .map_err(|never| match never {})
+            .boxed_unsync();
+        (sender, body)
+    }
 
     #[test]
     fn deploy_status_gets_extended_deadline_only_for_control_project() {
@@ -1465,6 +1587,129 @@ mod tests {
             (MAX_REQUEST_BODY_SIZE + 1).to_string().parse().unwrap(),
         );
         assert!(declared_request_body_exceeds_limit(&headers));
+    }
+
+    #[tokio::test]
+    async fn http_content_length_over_limit_rejects_before_application_invocation() {
+        let state = TransportTestState::new(8, Duration::from_secs(1));
+        let (mut sender, connection_task, server_task) =
+            test_transport_connection(state.clone()).await;
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("/")
+            .header(
+                hyper::header::CONTENT_LENGTH,
+                (MAX_REQUEST_BODY_SIZE + 1).to_string(),
+            )
+            .body(full_body(Bytes::new()))
+            .expect("request");
+
+        let response = sender.send_request(request).await.expect("response");
+        assert_eq!(response.status(), hyper::StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(state.invocations.load(Ordering::Acquire), 0);
+
+        connection_task.abort();
+        server_task.abort();
+    }
+
+    #[tokio::test]
+    async fn chunked_body_crossing_limit_returns_413_and_cancels_application() {
+        let state = TransportTestState::new(8, Duration::from_secs(1));
+        let (mut sender, connection_task, server_task) =
+            test_transport_connection(state.clone()).await;
+        let (body_sender, body) = streaming_test_body();
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("/")
+            .body(body)
+            .expect("request");
+        let request_task = tokio::spawn(async move { sender.send_request(request).await });
+
+        body_sender
+            .unbounded_send(Bytes::from_static(b"1234"))
+            .expect("first body chunk");
+        body_sender
+            .unbounded_send(Bytes::from_static(b"56789"))
+            .expect("second body chunk");
+
+        let response = tokio::time::timeout(Duration::from_secs(1), request_task)
+            .await
+            .expect("chunked response timeout")
+            .expect("chunked request task")
+            .expect("chunked response");
+        assert_eq!(response.status(), hyper::StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(state.invocations.load(Ordering::Acquire), 1);
+        assert!(state.cancelled.load(Ordering::Acquire));
+
+        drop(body_sender);
+        connection_task.abort();
+        server_task.abort();
+    }
+
+    #[tokio::test]
+    async fn client_disconnect_cancels_application_through_http_connection() {
+        let state = TransportTestState::new(8, Duration::from_secs(1));
+        let (mut sender, connection_task, server_task) =
+            test_transport_connection(state.clone()).await;
+        let (body_sender, body) = streaming_test_body();
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("/")
+            .body(body)
+            .expect("request");
+        let started = state.started.notified();
+        let request_task = tokio::spawn(async move { sender.send_request(request).await });
+
+        tokio::time::timeout(Duration::from_secs(1), started)
+            .await
+            .expect("application start timeout");
+        request_task.abort();
+        connection_task.abort();
+        drop(body_sender);
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while !state.cancelled.load(Ordering::Acquire) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("disconnect cancellation timeout");
+        assert_eq!(state.invocations.load(Ordering::Acquire), 1);
+
+        server_task.abort();
+    }
+
+    #[tokio::test]
+    async fn slow_upload_deadline_cancels_application_and_returns_504() {
+        let state = TransportTestState::new(8, Duration::from_millis(50));
+        let (mut sender, connection_task, server_task) =
+            test_transport_connection(state.clone()).await;
+        let (body_sender, body) = streaming_test_body();
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("/")
+            .body(body)
+            .expect("request");
+        let started = state.started.notified();
+        let request_task = tokio::spawn(async move { sender.send_request(request).await });
+        body_sender
+            .unbounded_send(Bytes::from_static(b"first"))
+            .expect("initial body chunk");
+
+        tokio::time::timeout(Duration::from_secs(1), started)
+            .await
+            .expect("application start timeout");
+        let response = tokio::time::timeout(Duration::from_secs(1), request_task)
+            .await
+            .expect("deadline response timeout")
+            .expect("deadline request task")
+            .expect("deadline response");
+        assert_eq!(response.status(), hyper::StatusCode::GATEWAY_TIMEOUT);
+        assert!(state.cancelled.load(Ordering::Acquire));
+
+        drop(body_sender);
+        connection_task.abort();
+        server_task.abort();
     }
 
     #[test]
