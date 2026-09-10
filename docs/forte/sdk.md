@@ -66,6 +66,11 @@ buffered limit used by `bytes`, `json`, `text`, and `form` is 1 MiB. That defaul
 outbound client-response bodies as well as incoming request bodies, so reading a large upstream
 response needs `bytes_limited(usize::MAX)` or another explicit bound.
 
+For page and API handlers, an unhandled request-body buffer-limit error is returned to the
+runtime and becomes HTTP 413. Catch `BodyError` in the handler when a different response is
+needed. This application-level buffering limit is separate from the worker's 100 MB transport
+limit, which is enforced before the handler runs.
+
 Generated page and API handlers receive the streaming body in `req.body`. `raw_body` remains a
 legacy slice and is empty for those streaming handlers. Generated actions and hooks buffer their
 input through the 1 MiB convenience limit before deserializing it; this is independent of the

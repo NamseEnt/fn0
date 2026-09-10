@@ -413,6 +413,50 @@ pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
 }
 "#;
 
+const RAW_REQUEST_SIZE_LIMIT_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::http::{Body, Response};
+use forte_sdk::{ForteRequest, ForteResponse};
+
+pub type Props = ForteResponse;
+
+pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
+    let bytes = req.body.bytes_limited(1024 * 1024).await?;
+    Ok(Response::builder()
+        .status(200)
+        .body(Body::from(format!("buffered:{}", bytes.len())))?)
+}
+"#;
+
+const RAW_REQUEST_JSON_SIZE_LIMIT_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::http::{Body, Response};
+use forte_sdk::{ForteRequest, ForteResponse};
+
+pub type Props = ForteResponse;
+
+pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
+    let _value: serde_json::Value = req.body.json_limited(1024 * 1024).await?;
+    Ok(Response::builder().status(200).body(Body::empty())?)
+}
+"#;
+
+const PROPS_REQUEST_SIZE_LIMIT_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::ForteRequest;
+use serde::Serialize;
+
+#[derive(Serialize)]
+pub struct Props {
+    pub size: usize,
+}
+
+pub async fn handler(req: ForteRequest<'_>) -> Result<Props> {
+    let bytes = req.body.bytes_limited(1024 * 1024).await?;
+    Ok(Props { size: bytes.len() })
+}
+"#;
+
 #[test]
 fn test_dev_raw_response_api() {
     let _dev_server_slot = take_the_only_dev_server_slot();
@@ -432,6 +476,17 @@ fn test_dev_raw_response_api() {
     )
     .unwrap();
     std::fs::write(apis_dir.join("buffer.rs"), RAW_REQUEST_BUFFER_API).unwrap();
+    std::fs::write(apis_dir.join("limited.rs"), RAW_REQUEST_SIZE_LIMIT_API).unwrap();
+    std::fs::write(
+        apis_dir.join("json_limited.rs"),
+        RAW_REQUEST_JSON_SIZE_LIMIT_API,
+    )
+    .unwrap();
+    std::fs::write(
+        apis_dir.join("props_limited.rs"),
+        PROPS_REQUEST_SIZE_LIMIT_API,
+    )
+    .unwrap();
 
     let server = DevServer::start(&project_dir);
 
@@ -463,6 +518,38 @@ fn test_dev_raw_response_api() {
         "x-fn0-* headers must be stripped from raw responses"
     );
     assert_eq!(authorized.text().unwrap(), "{\"type\":1}");
+
+    let accepted = client
+        .post(format!("{}/api/limited", server.url()))
+        .body(vec![0_u8; 1024 * 1024])
+        .send()
+        .unwrap();
+    assert_eq!(accepted.status().as_u16(), 200);
+    assert_eq!(accepted.text().unwrap(), "buffered:1048576");
+
+    let refused = client
+        .post(format!("{}/api/limited", server.url()))
+        .body(vec![0_u8; 1024 * 1024 + 1])
+        .send()
+        .unwrap();
+    assert_eq!(refused.status().as_u16(), 413);
+    assert_eq!(refused.text().unwrap(), "Payload Too Large");
+
+    let nested_refused = client
+        .post(format!("{}/api/json_limited", server.url()))
+        .body(vec![0_u8; 1024 * 1024 + 1])
+        .send()
+        .unwrap();
+    assert_eq!(nested_refused.status().as_u16(), 413);
+    assert_eq!(nested_refused.text().unwrap(), "Payload Too Large");
+
+    let props_refused = client
+        .post(format!("{}/api/props_limited", server.url()))
+        .body(vec![0_u8; 1024 * 1024 + 1])
+        .send()
+        .unwrap();
+    assert_eq!(props_refused.status().as_u16(), 413);
+    assert_eq!(props_refused.text().unwrap(), "Payload Too Large");
 
     let streamed = client
         .get(format!("{}/api/stream", server.url()))

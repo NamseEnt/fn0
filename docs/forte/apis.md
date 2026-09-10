@@ -159,7 +159,8 @@ Key differences from Props handlers:
 - **Status and headers are yours.** Nothing is added or defaulted — set `content-type` yourself.
 - **The body bypasses `forte_json`.** Serialize with `serde_json` (re-exported by the SDK) when a protocol requires exact field names without camelCase or `t`-discriminant conversion.
 - **The body can stream.** `Body` supports empty, buffered, and streaming values. `Body::channel()` returns a writer/body pair for producing bytes incrementally, and a response from `forte_sdk::http::Client::send` already carries a streaming body, so an upstream response can be proxied straight through.
-- **Error handling is unchanged.** `Err` still becomes 302 for `Redirect` and 500 otherwise.
+- **Error handling.** `Err` becomes 302 for `Redirect`, 413 for an unhandled request-body
+  buffer-limit error, and 500 otherwise.
 
 `ForteResponse` handlers are only supported under `rs/src/apis/`. A page handler returning `ForteResponse` fails the build — pages must return `Props` for SSR. The declaration also works directly in the signature (`-> Result<ForteResponse>`) without the alias.
 

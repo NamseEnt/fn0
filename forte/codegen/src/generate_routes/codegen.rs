@@ -272,6 +272,14 @@ pub(super) fn generate_code(
             }
             response
         }
+
+        fn is_request_body_size_refusal(error: &forte_sdk::anyhow::Error) -> bool {
+            error.chain().any(|cause| {
+                cause
+                    .downcast_ref::<forte_sdk::http::BodyError>()
+                    .is_some_and(forte_sdk::http::BodyError::is_too_large)
+            })
+        }
     }
 }
 
@@ -914,6 +922,9 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                             ))
                         }
                         Err(e) => {
+                            if is_request_body_size_refusal(&e) {
+                                return Err(e);
+                            }
                             eprintln!("Error at {}: {:?}", path, e);
                             Ok(Response::builder()
                                 .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -942,10 +953,12 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                                     Response::builder()
                                         .status(StatusCode::FOUND)
                                         .header(LOCATION, redirect.to_path())
-                                        .body(Body::empty())
-                                        .unwrap(),
+                                    .body(Body::empty())
+                                    .unwrap(),
                                     &cookie_jar,
                                 ))
+                            } else if is_request_body_size_refusal(&error) {
+                                Err(error)
                             } else {
                                 eprintln!("Error at {}: {:?}", path, error);
                                 Ok(Response::builder()
@@ -990,6 +1003,8 @@ fn generate_route_matches(pages: &[PageInfo]) -> Vec<TokenStream> {
                                         .unwrap(),
                                     &cookie_jar,
                                 ))
+                            } else if is_request_body_size_refusal(&e) {
+                                Err(e)
                             } else {
                                 eprintln!("Error at {}: {:?}", path, e);
                                 Ok(Response::builder()

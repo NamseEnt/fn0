@@ -6,7 +6,7 @@ use anyhow::Result;
 pub use cache::SimpleCache;
 use fn0::{
     CodeExecutor, ExecutionContext, ObjectStorageHijack, PublicStorageHijack, QueueHijack,
-    StaticPageCacheHijack,
+    RequestBodyTooLarge, StaticPageCacheHijack,
 };
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
@@ -245,6 +245,14 @@ async fn handle_request(
         let backend_response = match executor.run_backend_only("app", mapped_req).await {
             Ok(resp) => resp,
             Err(e) => {
+                if e.chain()
+                    .any(|cause| cause.downcast_ref::<RequestBodyTooLarge>().is_some())
+                {
+                    return Ok(text_response(
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        "Payload Too Large",
+                    ));
+                }
                 eprintln!("Backend error: {:?}", e);
                 return Err(anyhow::anyhow!("Backend error: {:?}", e));
             }
