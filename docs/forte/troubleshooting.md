@@ -194,8 +194,13 @@ The singleton module must define `pub async fn connect` returning `Result<Single
 
 ### Singleton reconnect after a deploy
 
-A deploy replaces the running singleton: the control plane closes the old connection before registering the new one. Your `on_disconnect` callback receives `DisconnectCause::Deployment`. The new connection is opened automatically — you do not need to call anything.
+A deploy closes project connections when the worker adopts the new code version. Your `on_disconnect`
+callback receives `DisconnectCause::Deployment` when the old connection observes that close. The
+new connection is opened automatically from the active deployment declaration. A rolling deploy
+does not guarantee that the old close handshake completes before the replacement dial starts.
 
 ### Checking singleton status
 
-The fn0 control plane tracks the current state (which worker owns the connection, when it last connected, the last error). Query it through the `websocket_singleton_status` admin action on the control project, or inspect the fn0 Cloud dashboard if available.
+The current implementation does not expose a public singleton status query. The
+`websocket_singleton_status` action is an internal worker heartbeat and disconnect endpoint, not a
+read action. Use worker and control logs when diagnosing connection ownership or reconnects.

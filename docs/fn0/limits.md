@@ -72,8 +72,8 @@ is what a warm instance is held to.
 
 | Limit | Value |
 | --- | --- |
-| Inbound message | No fn0 size limit |
-| Outbound message | No fn0 size limit |
+| Inbound message | No explicit fn0 byte cap |
+| Outbound message | No explicit fn0 byte cap |
 | Waiting inbound messages per connection | 4 |
 | Active outbound send per connection | 1 |
 | Waiting outbound sends per connection | 4 |
@@ -84,9 +84,11 @@ is what a warm instance is held to.
 | Singleton declarations per project | 1,000 |
 
 Outbound bodies stream without a declared length. Inbound and outbound messages remain subject to
-transport backpressure, available worker and application memory, and the invocation's remaining
-15-second duration. WebSocket delivery is at-most-once and not durable. Reconnecting clients
-synchronize authoritative state through HTTP.
+transport backpressure, available worker and application memory, the per-connection queue limits,
+and the invocation's remaining 15-second duration. Inbound callback dispatch materializes a
+complete message before the application sees it. The absence of an explicit byte cap is not a
+promise of unlimited memory or bandwidth. WebSocket delivery is at-most-once and not durable.
+Reconnecting clients synchronize authoritative state through HTTP.
 
 ## Monthly quotas — one dollar plan
 

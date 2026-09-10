@@ -3,8 +3,10 @@
 Forte WebSockets use event callbacks while fn0 owns the network connection. Create inbound route
 modules under `rs/src/ws_in`; they are published below `/ws`. Create outbound route modules under
 `rs/src/ws_out`; they receive messages from connections opened by the application. Create singleton
-route modules under `rs/src/ws_singleton`; fn0 keeps exactly one connection per singleton alive
-project-wide and routes its messages to the same handler on any worker.
+route modules under `rs/src/ws_singleton`; fn0 maintains one current connection assignment per
+singleton and routes callbacks through the worker that owns the current physical connection.
+During lease expiry or a network partition, an old physical socket may overlap a replacement
+temporarily; the database assignment and fencing checks remain authoritative.
 
 ## Local development
 
@@ -147,10 +149,11 @@ live messages.
 
 ## Singleton connections
 
-Singleton routes model **one shared outbound connection per project** — a market-data feed, a
-third-party push channel, a chat firehose. Every worker that handles a message for the project
-routes it into the same handler; fn0 opens the underlying socket at most once and re-opens it if
-it drops.
+Singleton routes model **one named outbound connection assignment per project** — a market-data
+feed, a third-party push channel, or a chat firehose. The assignment is project-scoped and the
+singleton name is derived from the module path. fn0 opens the current physical socket and re-opens
+it when reconciliation finds that the assignment is missing or expired. A paused old worker can
+leave a temporary upstream duplicate until fencing and lease expiry take effect.
 
 Create modules under `rs/src/ws_singleton`. Dynamic path segments (`[param]`) are rejected at
 build time. `codegen` scans this directory recursively for `.rs` files, and derives the singleton
@@ -223,10 +226,10 @@ the selected `Sec-WebSocket-Protocol`, if any. `on_message` fires for every inbo
 
 ### Sending, disconnecting, and status
 
-Singletons are addressed by the `ConnectionId` fn0 assigns them. Use
-`forte_sdk::websocket::send` and `forte_sdk::websocket::disconnect` the same way as inbound routes;
-call them from anywhere in the backend that reaches the id (typically an action, a hook, or a
-queue task):
+The initial singleton implementation does not provide a public API that resolves a singleton name
+to its current physical connection. Singleton callbacks receive the `ConnectionId` for their
+current connection, and applications that retain that ID may use
+`forte_sdk::websocket::send` and `forte_sdk::websocket::disconnect` as with other WebSockets:
 
 ```rust
 forte_sdk::websocket::send(
@@ -237,20 +240,24 @@ forte_sdk::websocket::send(
 ```
 
 There is no public `connect_singleton` in the SDK — fn0 owns opening and re-opening the socket
-in response to the manifest declaration, so user code never calls it. The current status of a
-singleton (which worker owns it, when it last handshook, the last error, if any) is tracked by
-the fn0 control plane; a UI can pull it through the `websocket_singleton_status` admin action on
-control.
+in response to the manifest declaration, so user code never calls it. The internal
+`websocket_singleton_status` action accepts worker heartbeat and disconnect reports; it is not a
+public status query or a dashboard contract. The current runtime record contains the assignment
+version, claim token, physical connection ID, and lease expiry. It does not store a handshake
+timestamp or the last error.
 
 ### Lifecycle
 
 - Registered at deploy time from `.forte/ws_singletons.json`; a rename or removal takes effect on
   the next `forte deploy`.
-- fn0 keeps at most one active connection per `(project, singleton_id)` at any time, even across
-  many worker instances. A new deploy closes the old connection before starting the new one.
+- fn0 keeps one current database assignment per `(project, singleton_id)` even across many worker
+  instances. A paused old worker or a partition can leave a temporary physical overlap while the
+  old lease expires; no strict upstream-level exactly-one guarantee is made.
+- A new deploy closes project connections on the worker generation that adopts the new code. The
+  replacement connection may be established before every old close handshake has completed.
 - Delivery is still at-most-once. A dropped message is not replayed.
-- Owner leases are renewed periodically; when a worker vanishes, control hands the singleton to
-  another worker and calls `connect` again there.
+- Per-connector owner leases are renewed periodically; when a worker vanishes, control hands the
+  singleton to another worker and calls `connect` again there.
 
 See [Limits & Quotas](../fn0/limits.md) and the internal
 [WebSocket design](../design/forte-websockets.md) for queue, size, and lifecycle details.

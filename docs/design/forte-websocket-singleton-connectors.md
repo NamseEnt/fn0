@@ -1,10 +1,15 @@
 # Forte Persistent Outbound WebSocket Design
 
-Status: implemented
+Status: implemented for the initial declarative lifecycle
 
 This document defines project-scoped outbound WebSockets that Forte keeps connected without an
 application invocation calling `connect`. It extends the physical outbound transport in
 [Forte WebSocket Design](./forte-websockets.md).
+
+The implemented scope is deployment-time discovery, active-version registration, per-connector
+ownership claims, lease renewal, reconnect reconciliation, and callback delivery. A public logical
+singleton send API, a public singleton status query, runtime pause/resume, destination policy, and
+bandwidth quota are not part of this implementation.
 
 ## Application configuration
 
@@ -51,11 +56,17 @@ The logical identity is:
 (project_id, singleton_id)
 ```
 
-One worker normally owns one physical connection for that identity. A physical connection uses the
-existing opaque `connection_id`. Control uses an internal, short-lived `claim_token` to fence
-assignment attempts. The token is not application-visible and does not change the logical identity.
-The same claim is idempotent on a worker; a different singleton ID creates a different connection
-even when URL and receive path are equal.
+The control plane has one current, unexpired assignment for that identity under normal operation.
+One worker normally owns the current physical connection. A physical connection uses the existing
+opaque `connection_id`. Control uses an internal, short-lived `claim_token` to fence assignment
+attempts and late status updates. The token is not application-visible and does not change the
+logical identity. The same claim is idempotent on a worker; a different singleton ID creates a
+different connection even when URL and receive path are equal.
+
+The database assignment is the authority, not the number of sockets that an upstream server may
+temporarily observe. If an old worker is paused or partitioned, its socket can remain open until
+the local safety deadline and lease expiry allow replacement. The platform prevents stale database
+writes and stale local sends, but it cannot forcibly close a socket across a network partition.
 
 ## Deployment state
 
@@ -79,6 +90,8 @@ When a worker adopts a new project code version, it closes every WebSocket for t
 `1012 Service Restart`. Control does not reconnect a persistent WebSocket from the previous
 deployment. It uses the declaration shipped with the active deployment, so a renamed handler either
 produces the new path or fails deployment validation rather than reconnecting to a stale path.
+Rolling deployment does not promise that the old close handshake completes before a replacement
+dial starts.
 
 Deployments use the platform's rolling consistency model. HTTP requests, WebSocket callbacks, and
 queue work may briefly run on old and new code during rollout. Applications that cannot tolerate
@@ -98,7 +111,8 @@ record and reuses the existing URL-based outbound WebSocket transport.
 
 Control serializes assignment for one `(project_id, singleton_id)`. A committed, unexpired lease
 prevents another worker from receiving the same assignment. Network connection establishment occurs
-after the database transaction.
+after the database transaction. The lease is stored and renewed per connector; it is not a shared
+worker-session lease.
 
 ## Connection lease
 
@@ -119,7 +133,7 @@ The initial lease is 60 seconds. A worker renews substantially earlier and uses 
 deadline shorter than the control lease. If it cannot renew by that deadline, it stops admitting
 sends and callback dispatch, then closes the socket. Control assigns a replacement only after the
 stored lease expires. A crashed worker cannot send `disconnected`; lease expiry is its recovery
-path.
+path. The worker uses a 10-second heartbeat interval and a 30-second local safety deadline.
 
 ## Reconciliation
 
@@ -131,7 +145,9 @@ with the failed declaration. One project-level error also stopped the remaining 
 
 The control tick scans at most 64 projects and 256 declarations per invocation. It stores a
 `(project_id, singleton_id)` cursor, reads each project's runtime records in one query, and enqueues
-only missing, expired, or old-version singletons. For each targeted task it:
+only missing, expired, or old-version singletons. It enqueues one targeted reconcile task per
+candidate; there is no batch claim transaction or deployment-configurable claim count in the current
+implementation. For each targeted task it:
 
 1. skips an unexpired current connection or claim;
 2. claims the singleton in a short database transaction;
@@ -155,9 +171,24 @@ not retry ambiguous sends. `send` and `disconnect` continue to address the physi
 | --- | --- |
 | Duplicate control tick | One database claim wins; the other skips the singleton |
 | Duplicate worker request | The worker keeps the current singleton connection |
-| Upstream dial failure | The short claim expires and a later tick retries |
+| Upstream dial failure | The claim remains until its lease expires or is released by the task; queue redelivery or a later tick retries |
 | Worker crash | The socket disappears and control reassigns after lease expiry |
 | Worker cannot renew | The worker self-closes before control can reassign |
 | Late disconnect | Control ignores it when `connection_id` is no longer current |
 | Project deployment | Workers close project sockets; control uses only the new deployment declaration |
-| Declaration removed | Control stops reconciling it and closes the previous physical connection |
+| Declaration removed | Control stops reconciling it; the previous owner eventually self-closes when its lease renewal is rejected or expires |
+
+## Explicit non-goals and open follow-ups
+
+The current implementation does not promise a public API that resolves a singleton name to its
+current connection. Applications that need to send use the physical `connection_id` available in a
+callback or otherwise stored by the application. The internal status action accepts worker
+heartbeat and disconnect reports; it is not a read API for applications or a dashboard contract.
+
+The current implementation validates WebSocket URL syntax, reserved headers, and subprotocol shape.
+It does not establish a destination allowlist, DNS-rebinding policy, or bandwidth quota. Those
+requirements need a separate product and security decision before being described as guarantees.
+
+The current message contract remains online-only and at-most-once. It has no explicit fn0 byte cap;
+actual processing is bounded by transport backpressure, available memory, queue limits, and the
+invocation deadline described in [Forte WebSocket Design](./forte-websockets.md).

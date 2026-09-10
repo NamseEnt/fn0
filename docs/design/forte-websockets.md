@@ -174,15 +174,17 @@ HTTP, WebSocket callbacks, queue tasks, cron tasks, and cross-project invocation
 | Waiting inbound messages per connection | 4 |
 | Active outbound send per connection | 1 |
 | Waiting outbound sends per connection | 4 |
-| Inbound message | No fn0 size limit |
-| Outbound message | No fn0 size limit |
+| Inbound message | No explicit fn0 byte cap |
+| Outbound message | No explicit fn0 byte cap |
 | Connections per project per worker | 1,000, provisional |
 | Connections per worker process | 10,000, provisional |
 
-Inbound text is validated before callback dispatch and invalid text closes with `1007`. Message
-size is governed by transport backpressure, available worker and application memory, and the
-remaining 15-second invocation deadline. The current inbound callback surface materializes a
-complete `String` or `Vec<u8>` before application dispatch, while outbound bodies remain streamed.
+Inbound text is validated before callback dispatch and invalid text closes with `1007`. There is
+currently no explicit fn0 byte cap for a WebSocket message. Inbound callback dispatch materializes
+a complete `String` or `Vec<u8>` before application dispatch, while outbound bodies remain streamed.
+Both directions are still constrained by transport backpressure, available worker and application
+memory, the per-connection queue limits, and the remaining 15-second invocation deadline. This is
+an implementation description, not a promise of unlimited memory or bandwidth.
 
 A full or expired inbound queue closes that connection with `1013`. A full outbound queue rejects
 the send with `Backpressure` and closes the target connection with `1013`. Project connection
