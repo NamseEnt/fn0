@@ -1479,6 +1479,27 @@ mod tests {
         req: hyper::Request<hyper::body::Incoming>,
         state: TransportTestState,
     ) -> Result<HyperResponse, Infallible> {
+        if req.uri().path() == "/response" {
+            let (response_sender, response_receiver) = futures::channel::mpsc::unbounded();
+            tokio::spawn(async move {
+                let _ = response_sender.unbounded_send(Bytes::from_static(b"first"));
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                let _ = response_sender.unbounded_send(Bytes::from_static(b"second"));
+            });
+            let response_stream = StreamBody::new(
+                response_receiver.map(|chunk| Ok::<_, anyhow::Error>(Frame::data(chunk))),
+            )
+            .boxed_unsync();
+            let response_body = UnsyncBoxBody::new(CancellationBody::new(
+                response_stream,
+                CancellationToken::new(),
+                InFlightGuard::new(Arc::new(AtomicU64::new(0))),
+                tokio::time::Instant::now() + Duration::from_secs(1),
+            ))
+            .boxed_unsync();
+            return Ok(hyper::Response::new(response_body));
+        }
+
         if declared_request_body_exceeds_limit(req.headers()) {
             return Ok(payload_too_large_response());
         }
@@ -1708,6 +1729,32 @@ mod tests {
         assert!(state.cancelled.load(Ordering::Acquire));
 
         drop(body_sender);
+        connection_task.abort();
+        server_task.abort();
+    }
+
+    #[tokio::test]
+    async fn http_response_delivers_first_chunk_before_stream_completion() {
+        let state = TransportTestState::new(8, Duration::from_secs(1));
+        let (mut sender, connection_task, server_task) = test_transport_connection(state).await;
+        let request = hyper::Request::builder()
+            .method(hyper::Method::GET)
+            .uri("/response")
+            .body(full_body(Bytes::new()))
+            .expect("request");
+
+        let response = sender.send_request(request).await.expect("response");
+        assert_eq!(response.status(), hyper::StatusCode::OK);
+        let mut response_body = response.into_body();
+        let first_chunk = tokio::time::timeout(Duration::from_millis(50), response_body.frame())
+            .await
+            .expect("first response chunk timeout")
+            .expect("first response frame")
+            .expect("first response frame must succeed")
+            .into_data()
+            .expect("first response frame data");
+        assert_eq!(first_chunk, Bytes::from_static(b"first"));
+
         connection_task.abort();
         server_task.abort();
     }
