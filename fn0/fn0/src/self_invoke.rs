@@ -1,3 +1,7 @@
+use crate::body_limit::{
+    BodyLimitError, OTLP_BODY_LIMIT, QUEUE_BODY_LIMIT, STATIC_PAGE_CACHE_BODY_LIMIT,
+    VAULT_BODY_LIMIT, collect_body_limited, declared_content_length_exceeds_limit,
+};
 use crate::cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
 use crate::execute::{ClientState, WasmInjectEnvelope};
@@ -298,11 +302,27 @@ fn queue_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
+        if declared_content_length_exceeds_limit(request.headers(), QUEUE_BODY_LIMIT) {
+            return Ok((
+                text_response(413, body_limit_message(QUEUE_BODY_LIMIT))?,
+                empty_io(),
+            ));
+        }
         let (_parts, body) = request.into_parts();
-        let body_bytes = match body.collect().await {
-            Ok(c) => c.to_bytes(),
-            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        let limited_body = match collect_body_limited(body, QUEUE_BODY_LIMIT).await {
+            Ok(body) => body,
+            Err(BodyLimitError::TooLarge) => {
+                return Ok((
+                    text_response(413, body_limit_message(QUEUE_BODY_LIMIT))?,
+                    empty_io(),
+                ));
+            }
+            Err(BodyLimitError::Body(error)) => {
+                return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into());
+            }
         };
+        let body_bytes = limited_body.bytes;
+        let body_permit = limited_body.permit;
 
         let action = match hijack.handle_enqueue(&project_id, &body_bytes) {
             Ok(a) => a,
@@ -318,10 +338,15 @@ fn queue_send(
                 telemetry::stage_duration("hijack_queue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
-                    Box::new(io);
+                    Box::new(async move {
+                        let result = io.await;
+                        drop(body_permit);
+                        result
+                    });
                 Ok((res, io))
             }
             crate::queue_hijack::HijackAction::Synthesized(resp) => {
+                drop(body_permit);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
                     Box::new(async { Ok(()) });
                 Ok((resp, io))
@@ -337,11 +362,33 @@ fn cross_project_enqueue_send(
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
+        if project_id != hijack.allowed_caller_project_id() {
+            return Ok((
+                text_response(403, "cross project enqueue forbidden".to_string())?,
+                empty_io(),
+            ));
+        }
+        if declared_content_length_exceeds_limit(request.headers(), QUEUE_BODY_LIMIT) {
+            return Ok((
+                text_response(413, body_limit_message(QUEUE_BODY_LIMIT))?,
+                empty_io(),
+            ));
+        }
         let (_parts, body) = request.into_parts();
-        let body_bytes = match body.collect().await {
-            Ok(c) => c.to_bytes(),
-            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        let limited_body = match collect_body_limited(body, QUEUE_BODY_LIMIT).await {
+            Ok(body) => body,
+            Err(BodyLimitError::TooLarge) => {
+                return Ok((
+                    text_response(413, body_limit_message(QUEUE_BODY_LIMIT))?,
+                    empty_io(),
+                ));
+            }
+            Err(BodyLimitError::Body(error)) => {
+                return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into());
+            }
         };
+        let body_bytes = limited_body.bytes;
+        let body_permit = limited_body.permit;
 
         let action = match hijack.handle_enqueue(&project_id, &body_bytes) {
             Ok(a) => a,
@@ -355,10 +402,15 @@ fn cross_project_enqueue_send(
                 telemetry::stage_duration("hijack_cross_project_enqueue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
-                    Box::new(io);
+                    Box::new(async move {
+                        let result = io.await;
+                        drop(body_permit);
+                        result
+                    });
                 Ok((res, io))
             }
             crate::cross_project_enqueue_hijack::HijackAction::Synthesized(resp) => {
+                drop(body_permit);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
                     Box::new(async { Ok(()) });
                 Ok((resp, io))
@@ -393,17 +445,35 @@ fn vault_send(
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
         let (parts, body) = request.into_parts();
-        let body_bytes = match body.collect().await {
-            Ok(c) => c.to_bytes(),
-            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
-        };
-
         let method = parts.method.as_str();
         let path = parts
             .uri
             .path_and_query()
             .map(|pq| pq.path())
             .unwrap_or("/");
+        if let Err(error) = hijack.validate_request(&project_id, method, path) {
+            return Err(error.into());
+        }
+        if declared_content_length_exceeds_limit(&parts.headers, VAULT_BODY_LIMIT) {
+            return Ok((
+                text_response(413, body_limit_message(VAULT_BODY_LIMIT))?,
+                empty_io(),
+            ));
+        }
+        let limited_body = match collect_body_limited(body, VAULT_BODY_LIMIT).await {
+            Ok(body) => body,
+            Err(BodyLimitError::TooLarge) => {
+                return Ok((
+                    text_response(413, body_limit_message(VAULT_BODY_LIMIT))?,
+                    empty_io(),
+                ));
+            }
+            Err(BodyLimitError::Body(error)) => {
+                return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into());
+            }
+        };
+        let body_bytes = limited_body.bytes;
+        let body_permit = limited_body.permit;
 
         let signed = match hijack.build_signed_request(&project_id, method, path, &body_bytes) {
             Ok(req) => req,
@@ -414,7 +484,12 @@ fn vault_send(
         let (res, io) = default_send_request(signed, options).await?;
         telemetry::stage_duration("hijack_vault", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
-        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
+        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
+            Box::new(async move {
+                let result = io.await;
+                drop(body_permit);
+                result
+            });
         Ok((res, io))
     })
 }
@@ -431,10 +506,26 @@ fn otlp_send(
         }
 
         let (parts, body) = request.into_parts();
-        let body_bytes = match body.collect().await {
-            Ok(c) => c.to_bytes(),
-            Err(e) => return Err(ErrorCode::InternalError(Some(format!("{e:?}"))).into()),
+        if declared_content_length_exceeds_limit(&parts.headers, OTLP_BODY_LIMIT) {
+            return Ok((
+                text_response(413, body_limit_message(OTLP_BODY_LIMIT))?,
+                empty_io(),
+            ));
+        }
+        let limited_body = match collect_body_limited(body, OTLP_BODY_LIMIT).await {
+            Ok(body) => body,
+            Err(BodyLimitError::TooLarge) => {
+                return Ok((
+                    text_response(413, body_limit_message(OTLP_BODY_LIMIT))?,
+                    empty_io(),
+                ));
+            }
+            Err(BodyLimitError::Body(error)) => {
+                return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into());
+            }
         };
+        let body_bytes = limited_body.bytes;
+        let body_permit = limited_body.permit;
         let body_bytes = match hijack.metric_gate() {
             Some(gate) if parts.uri.path().ends_with("/v1/metrics") => {
                 metric_gate::enforce_request_bytes(gate, &project_id, body_bytes)
@@ -451,9 +542,11 @@ fn otlp_send(
             match default_send_request(forward_request, options).await {
                 Ok((_resp, io)) => {
                     let _ = io.await;
+                    drop(body_permit);
                     telemetry::stage_duration("hijack_otlp", send_start.elapsed());
                 }
                 Err(err) => {
+                    drop(body_permit);
                     tracing::warn!(?err, "otlp forward failed");
                 }
             }
@@ -641,11 +734,27 @@ fn static_page_cache_send(
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
+        if declared_content_length_exceeds_limit(request.headers(), STATIC_PAGE_CACHE_BODY_LIMIT) {
+            return Ok((
+                text_response(413, body_limit_message(STATIC_PAGE_CACHE_BODY_LIMIT))?,
+                empty_io(),
+            ));
+        }
         let (_parts, body) = request.into_parts();
-        let body_bytes = match body.collect().await {
-            Ok(collected) => collected.to_bytes(),
-            Err(error) => return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into()),
+        let limited_body = match collect_body_limited(body, STATIC_PAGE_CACHE_BODY_LIMIT).await {
+            Ok(body) => body,
+            Err(BodyLimitError::TooLarge) => {
+                return Ok((
+                    text_response(413, body_limit_message(STATIC_PAGE_CACHE_BODY_LIMIT))?,
+                    empty_io(),
+                ));
+            }
+            Err(BodyLimitError::Body(error)) => {
+                return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into());
+            }
         };
+        let body_bytes = limited_body.bytes;
+        let _body_permit = limited_body.permit;
 
         let paths = match hijack.parse_paths(&body_bytes) {
             Ok(paths) => paths,
@@ -731,6 +840,10 @@ fn text_response(
                 .boxed_unsync(),
         )
         .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))
+}
+
+fn body_limit_message(limit: usize) -> String {
+    format!("request body exceeds {limit} bytes")
 }
 
 fn accepted_response()

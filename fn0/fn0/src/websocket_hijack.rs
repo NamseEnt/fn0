@@ -1,4 +1,8 @@
 use crate::Body;
+use crate::body_limit::{
+    BodyLimitError, SINGLETON_ACTIVATION_BODY_LIMIT, SINGLETON_CONNECT_BODY_LIMIT,
+    collect_body_limited, declared_content_length_exceeds_limit,
+};
 use base64::Engine;
 use bytes::Bytes;
 use http_body_util::combinators::UnsyncBoxBody;
@@ -309,11 +313,36 @@ impl WebSocketHijack {
             {
                 return response(400, WebSocketDeliveryState::NotSent);
             }
-            let body = match request.into_body().collect().await {
-                Ok(body) => body.to_bytes(),
-                Err(_) => return response(400, WebSocketDeliveryState::NotSent),
+            if declared_content_length_exceeds_limit(
+                request.headers(),
+                SINGLETON_CONNECT_BODY_LIMIT,
+            ) {
+                return response_with_body(
+                    413,
+                    WebSocketDeliveryState::NotSent,
+                    Bytes::from(format!(
+                        "request body exceeds {SINGLETON_CONNECT_BODY_LIMIT} bytes"
+                    )),
+                );
+            }
+            let body = match collect_body_limited(request.into_body(), SINGLETON_CONNECT_BODY_LIMIT)
+                .await
+            {
+                Ok(body) => body,
+                Err(BodyLimitError::TooLarge) => {
+                    return response_with_body(
+                        413,
+                        WebSocketDeliveryState::NotSent,
+                        Bytes::from(format!(
+                            "request body exceeds {SINGLETON_CONNECT_BODY_LIMIT} bytes"
+                        )),
+                    );
+                }
+                Err(BodyLimitError::Body(_)) => {
+                    return response(400, WebSocketDeliveryState::NotSent);
+                }
             };
-            let input: SingletonConnectInput = match serde_json::from_slice(&body) {
+            let input: SingletonConnectInput = match serde_json::from_slice(&body.bytes) {
                 Ok(input) => input,
                 Err(_) => return response(400, WebSocketDeliveryState::NotSent),
             };
@@ -378,11 +407,37 @@ impl WebSocketHijack {
             else {
                 return response(400, WebSocketDeliveryState::NotSent);
             };
-            let body = match request.into_body().collect().await {
-                Ok(body) => body.to_bytes(),
-                Err(_) => return response(400, WebSocketDeliveryState::NotSent),
-            };
-            let input: SingletonActivationInput = match serde_json::from_slice(&body) {
+            if declared_content_length_exceeds_limit(
+                request.headers(),
+                SINGLETON_ACTIVATION_BODY_LIMIT,
+            ) {
+                return response_with_body(
+                    413,
+                    WebSocketDeliveryState::NotSent,
+                    Bytes::from(format!(
+                        "request body exceeds {SINGLETON_ACTIVATION_BODY_LIMIT} bytes"
+                    )),
+                );
+            }
+            let body =
+                match collect_body_limited(request.into_body(), SINGLETON_ACTIVATION_BODY_LIMIT)
+                    .await
+                {
+                    Ok(body) => body,
+                    Err(BodyLimitError::TooLarge) => {
+                        return response_with_body(
+                            413,
+                            WebSocketDeliveryState::NotSent,
+                            Bytes::from(format!(
+                                "request body exceeds {SINGLETON_ACTIVATION_BODY_LIMIT} bytes"
+                            )),
+                        );
+                    }
+                    Err(BodyLimitError::Body(_)) => {
+                        return response(400, WebSocketDeliveryState::NotSent);
+                    }
+                };
+            let input: SingletonActivationInput = match serde_json::from_slice(&body.bytes) {
                 Ok(input) => input,
                 Err(_) => return response(400, WebSocketDeliveryState::NotSent),
             };
@@ -846,6 +901,49 @@ mod tests {
             .expect("response body")
             .to_bytes();
         assert_eq!(body, Bytes::from_static(b"v1.singleton"));
+    }
+
+    #[tokio::test]
+    async fn singleton_connect_rejects_oversized_body() {
+        let hijack = WebSocketHijack::new("fn0-websocket.test".to_string());
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("http://fn0-websocket.test/connect-singleton")
+            .header(SINGLETON_PROJECT_HEADER, "target-project")
+            .header(SINGLETON_ID_HEADER, "market-feed")
+            .header(SINGLETON_ROUTE_HEADER, "/ws_singleton/market-feed")
+            .body(
+                Full::new(Bytes::from(vec![b'x'; SINGLETON_CONNECT_BODY_LIMIT + 1]))
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .expect("request");
+        let response = hijack
+            .handle_command("fn0-control", request, std::time::Duration::from_secs(15))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), hyper::StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn singleton_activation_rejects_oversized_body() {
+        let hijack = WebSocketHijack::new("fn0-websocket.test".to_string());
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("http://fn0-websocket.test/activate-singleton")
+            .header(SINGLETON_PROJECT_HEADER, "target-project")
+            .header(SINGLETON_ID_HEADER, "market-feed")
+            .body(
+                Full::new(Bytes::from(vec![b'x'; SINGLETON_ACTIVATION_BODY_LIMIT + 1]))
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .expect("request");
+        let response = hijack
+            .handle_command("fn0-control", request, std::time::Duration::from_secs(15))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), hyper::StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     #[tokio::test]

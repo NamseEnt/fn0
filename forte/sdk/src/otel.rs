@@ -38,10 +38,16 @@ impl SpanExporter for ForteOtlpExporter {
             .body(Body::Bytes(buf))
             .map_err(|e| OTelSdkError::InternalFailure(e.to_string()))?;
 
-        Client {}
+        let response = Client {}
             .send(req)
             .await
             .map_err(|e| OTelSdkError::InternalFailure(e.to_string()))?;
+        if !response.status().is_success() {
+            return Err(OTelSdkError::InternalFailure(format!(
+                "OTLP trace export returned {}",
+                response.status()
+            )));
+        }
         Ok(())
     }
 

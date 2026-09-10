@@ -125,6 +125,24 @@ impl VaultHijack {
         uri.host() == Some(self.placeholder_host.as_str())
     }
 
+    pub(crate) fn validate_request(
+        &self,
+        project_id: &str,
+        method: &str,
+        path: &str,
+    ) -> Result<(), ErrorCode> {
+        if project_id != self.allowed_project_id {
+            return Err(ErrorCode::HttpRequestDenied);
+        }
+        if method != hyper::Method::POST.as_str() {
+            return Err(ErrorCode::HttpRequestMethodInvalid);
+        }
+        if Op::from_path(path).is_none() {
+            return Err(ErrorCode::HttpRequestDenied);
+        }
+        Ok(())
+    }
+
     pub(crate) fn build_signed_request(
         &self,
         project_id: &str,
@@ -132,13 +150,8 @@ impl VaultHijack {
         path: &str,
         body_bytes: &[u8],
     ) -> Result<hyper::Request<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode> {
-        if project_id != self.allowed_project_id {
-            return Err(ErrorCode::HttpRequestDenied);
-        }
-        if method != hyper::Method::POST.as_str() {
-            return Err(ErrorCode::HttpRequestMethodInvalid);
-        }
-        let op = Op::from_path(path).ok_or(ErrorCode::HttpRequestDenied)?;
+        self.validate_request(project_id, method, path)?;
+        let op = Op::from_path(path).expect("validated vault operation");
 
         let oci_body = build_oci_body(op, &self.key_ocid, body_bytes)
             .map_err(|e| ErrorCode::InternalError(Some(format!("vault body build: {e}"))))?;

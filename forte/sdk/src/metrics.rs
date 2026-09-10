@@ -131,8 +131,14 @@ pub(crate) fn flush() {
                 return;
             }
         };
-        if let Err(e) = (Client {}).send(request).await {
-            tracing::warn!(?e, "otlp metrics export failed");
+        match (Client {}).send(request).await {
+            Ok(response) if response.status().is_success() => {}
+            Ok(response) => {
+                tracing::warn!(status = %response.status(), "otlp metrics export failed");
+            }
+            Err(error) => {
+                tracing::warn!(?error, "otlp metrics export failed");
+            }
         }
     });
 }

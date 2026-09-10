@@ -44,6 +44,24 @@ client that cannot read the whole body before the deadline has its response cut
 off. Serve downloads that need longer than that from object storage instead of
 through compute.
 
+Guest-to-host control requests have smaller buffering limits than the general
+transport limit. These are worker safety bounds rather than billing quotas;
+self-hosted operators can change them in the worker source.
+
+| Operation | Request body |
+| --- | ---: |
+| Queue enqueue and cross-project enqueue | 128 KiB |
+| Vault operations | 16 KiB |
+| Static page cache purge | 256 KiB |
+| WebSocket singleton connect | 256 KiB |
+| WebSocket singleton activation and abort | 16 KiB |
+| OTLP metrics, logs, and traces export | 8 MiB |
+
+The worker enforces these values while reading each body, including bodies
+without a declared length. An oversized control request receives HTTP 413 from
+the guest's outbound call. Object storage and regular WebSocket message bodies
+remain streamed and are not subject to these buffering limits.
+
 The first request to reach a cold JavaScript instance runs on a much larger
 allowance, because it also pays for module instantiation and the renderer's
 first uncompiled pass — work later requests inherit for free. Requests that
