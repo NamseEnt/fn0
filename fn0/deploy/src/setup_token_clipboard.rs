@@ -8,7 +8,7 @@
 //! until a value appears that Cloudflare confirms is a live token, then
 //! overwrites the clipboard so the secret does not linger there.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
@@ -57,11 +57,13 @@ pub async fn read_setup_token_from_clipboard() -> Result<String> {
 
 async fn next_clipboard_candidate(rejected: &HashSet<String>) -> Result<Option<String>> {
     let contents = read_clipboard().await?;
-    let trimmed = contents.trim();
-    if !looks_like_a_token(trimmed) || rejected.contains(trimmed) {
+    let Some(candidate) = extract_token_candidate(&contents) else {
+        return Ok(None);
+    };
+    if rejected.contains(&candidate) {
         return Ok(None);
     }
-    Ok(Some(trimmed.to_string()))
+    Ok(Some(candidate))
 }
 
 fn looks_like_a_token(candidate: &str) -> bool {
@@ -69,6 +71,23 @@ fn looks_like_a_token(candidate: &str) -> bool {
         && candidate
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-'))
+}
+
+fn extract_token_candidate(contents: &str) -> Option<String> {
+    let trimmed = contents.trim();
+    if looks_like_a_token(trimmed) {
+        return Some(trimmed.to_string());
+    }
+
+    let authorization_marker = "Authorization: Bearer ";
+    let marker_start = trimmed.find(authorization_marker)?;
+    let token_start = marker_start + authorization_marker.len();
+    let token = trimmed[token_start..]
+        .split(|character: char| {
+            character.is_whitespace() || matches!(character, '\\' | '"' | '\'')
+        })
+        .next()?;
+    looks_like_a_token(token).then(|| token.to_string())
 }
 
 async fn read_clipboard() -> Result<String> {
@@ -140,7 +159,7 @@ async fn verify_token(client: &reqwest::Client, token: &str) -> VerifyOutcome {
 
 #[cfg(test)]
 mod tests {
-    use super::looks_like_a_token;
+    use super::{extract_token_candidate, looks_like_a_token};
 
     #[test]
     fn accepts_a_classic_length_api_token() {
@@ -169,5 +188,26 @@ mod tests {
         assert!(!looks_like_a_token(
             &"x".repeat(super::MAXIMUM_TOKEN_LENGTH + 1)
         ));
+    }
+
+    #[test]
+    fn extracts_a_token_from_a_curl_authorization_header() {
+        let command = r#"curl "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+-H "Authorization: Bearer cfut_0123456789abcdefghijklmnopqrstuvwxyz""#;
+
+        assert_eq!(
+            extract_token_candidate(command),
+            Some("cfut_0123456789abcdefghijklmnopqrstuvwxyz".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_a_curl_command_without_a_token() {
+        assert_eq!(
+            extract_token_candidate(
+                r#"curl "https://api.cloudflare.com/client/v4/user/tokens/verify""#
+            ),
+            None
+        );
     }
 }
