@@ -396,34 +396,6 @@ const metricsBasicAuthSecret = new random.RandomBytes(
   { length: 24 },
 );
 
-const logsTracesStoreR2 = new fn0.LogsTracesStoreR2(
-  "logs-traces-store-r2",
-  {
-    tokenMintingApiToken: bootstrapApiToken,
-    accountId,
-    bucketName: pulumi.interpolate`fn0-logs-traces-store-${suffix}`,
-  },
-  cloudflareOperatedComponent,
-);
-
-// One tenant today: everything the platform itself emits. Per-project tenants
-// are what the edge gate's header rule would carry instead, and the engine
-// refuses any tenant outside its allowlist, so this value has to match what
-// the node is configured to accept.
-const telemetryTenant = "fn0";
-const telemetryHostname = config.require("telemetryHostname");
-
-const telemetryEdgeGate = new fn0.TelemetryEdgeGate(
-  "telemetry-edge-gate",
-  {
-    accountId,
-    zoneId,
-    ingestHostname: telemetryHostname,
-    tenant: telemetryTenant,
-  },
-  cloudflareOperatedComponent,
-);
-
 const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
   "bundle-store-r2-worker",
   {
@@ -472,10 +444,6 @@ const controlWebsocketBearerCt = pulumi
   .all([controlDek.plaintext, websocketBearer.result])
   .apply(([dek, token]) => aesGcmEncryptToBase64(dek, token));
 
-const controlTelemetryAccessClientSecretCt = pulumi
-  .all([controlDek.plaintext, telemetryEdgeGate.serviceTokenClientSecret])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
 const bundleStoreR2AccessKeyIdCt = pulumi
   .all([controlDek.plaintext, bundleStoreR2.accessKeyId])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
@@ -511,9 +479,6 @@ const controlEnvYamlBootstrap = pulumi
     controlCookieSecretCt,
     controlAdminTokenCt,
     controlWebsocketBearerCt,
-    pulumi.output(telemetryHostname),
-    telemetryEdgeGate.serviceTokenClientId,
-    controlTelemetryAccessClientSecretCt,
     bundleStoreR2.accountId,
     bundleStoreR2.bucketName,
     bundleStoreR2AccessKeyIdCt,
@@ -536,9 +501,6 @@ const controlEnvYamlBootstrap = pulumi
       cookieCt,
       adminCt,
       websocketBearerCt,
-      telemetryQueryHostname,
-      telemetryAccessClientId,
-      telemetryAccessClientSecretCt,
       r2AccountId,
       r2Bucket,
       r2KeyCt,
@@ -566,10 +528,6 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${adminCt}`,
         "FN0_WEBSOCKET_QUIC_BEARER:",
         `  secret: ${websocketBearerCt}`,
-        `FN0_TELEMETRY_QUERY_URL: https://${telemetryQueryHostname}`,
-        `FN0_TELEMETRY_ACCESS_CLIENT_ID: ${telemetryAccessClientId}`,
-        "FN0_TELEMETRY_ACCESS_CLIENT_SECRET:",
-        `  secret: ${telemetryAccessClientSecretCt}`,
         `FN0_BUNDLE_STORE_ACCOUNT_ID: ${r2AccountId}`,
         `FN0_BUNDLE_STORE_BUCKET: ${r2Bucket}`,
         "FN0_BUNDLE_STORE_ACCESS_KEY_ID:",
@@ -597,9 +555,6 @@ const workerHostObservability = {
   metricsOtlpUrl: `https://${metricsHostname}/opentelemetry`,
   metricsBasicAuthUsername: metricsBasicAuthUsernameValue,
   metricsBasicAuthPassword: metricsBasicAuthSecret.base64,
-  logsTracesOtlpUrl: `https://${telemetryHostname}`,
-  logsTracesAccessClientId: telemetryEdgeGate.serviceTokenClientId,
-  logsTracesAccessClientSecret: telemetryEdgeGate.serviceTokenClientSecret,
 };
 
 const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
@@ -797,20 +752,4 @@ export const metricsBackupR2SecretAccessKey = pulumi.secret(
 // runs on rather than the bootstrap one, which can only mint tokens.
 export const cloudflareOperatorApiToken = pulumi.secret(
   cloudflareOperator.value,
-);
-export const telemetryIngestUrl = `https://${telemetryHostname}`;
-export const telemetryTenantId = telemetryTenant;
-export const telemetryStoreR2BucketName = logsTracesStoreR2.bucketName;
-export const telemetryStoreR2Endpoint = logsTracesStoreR2.endpoint;
-export const telemetryStoreR2AccessKeyId = pulumi.secret(
-  logsTracesStoreR2.accessKeyId,
-);
-export const telemetryStoreR2SecretAccessKey = pulumi.secret(
-  logsTracesStoreR2.secretAccessKey,
-);
-export const telemetryAccessClientId = pulumi.secret(
-  telemetryEdgeGate.serviceTokenClientId,
-);
-export const telemetryAccessClientSecret = pulumi.secret(
-  telemetryEdgeGate.serviceTokenClientSecret,
 );

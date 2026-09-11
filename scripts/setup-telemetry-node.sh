@@ -1,52 +1,31 @@
 #!/usr/bin/env bash
-# Stand up the self-hosted telemetry node behind a Cloudflare Tunnel: metrics in
-# VictoriaMetrics (#59), logs and traces in loggytracy (#62). Run directly on the
-# target x86_64 Debian machine as root.
-# Ingest is OTLP only — queries go through the engine's first-party API
-# (loggytracy docs/QUERY_API.md); the Loki and Tempo compatibility surfaces are gone.
-# Idempotent; safe to re-run.
+# Stand up the self-hosted metrics node behind a Cloudflare Tunnel:
+# VictoriaMetrics (#59). Run directly on the target x86_64 Debian machine as
+# root. Idempotent; safe to re-run.
 #
 # Prefer scripts/setup-telemetry-node-remote.sh, which pulls every input below
 # from the pulumi stack and runs this script over ssh.
 #
-# Two hostnames, one tunnel, two local listeners:
+# One hostname, one tunnel, one local listener:
 #
 #   <metrics hostname>    -> 127.0.0.1:8428  VictoriaMetrics
-#   <telemetry hostname>  -> 127.0.0.1:3100  loggytracy (ingest + query)
 #
-# The two backends are protected in different ways because they are built
-# differently. VictoriaMetrics authenticates itself (-httpAuth.* covers every
-# endpoint since v1.86.0), so the tunnel points straight at it. loggytracy has
-# no TLS and no authentication at all — it reads X-Scope-OrgID and believes it —
-# so a Cloudflare Access service token authenticates its callers at the edge and
-# a Transform Rule overwrites the tenant header there. Both are created by the
-# fn0Cloud stack, not here. That is why nothing on this machine terminates auth
-# for loggytracy and no reverse proxy is installed: the edge is the gateway, and
-# the listener is on loopback so nothing else can reach it.
-#
-# Durability is split the same way. VictoriaMetrics owns its data, so it takes
-# incremental vmbackup snapshots to R2 every 10 minutes. loggytracy's data lives
-# in R2 already — the local disk is a WAL plus a cache — so it has no backup
-# cadence to design; losing the machine loses only the unflushed WAL window.
+# VictoriaMetrics authenticates itself (-httpAuth.* covers every endpoint since
+# v1.86.0), so the tunnel points straight at it and no reverse proxy is
+# installed. It owns its data, so it takes incremental vmbackup snapshots to R2
+# every 10 minutes.
 #
 # Usage:
 #   sudo CLOUDFLARE_API_TOKEN=... \
 #     FN0_METRICS_PASSWORD=... \
 #     FN0_METRICS_R2_ACCESS_KEY_ID=... \
 #     FN0_METRICS_R2_SECRET_ACCESS_KEY=... \
-#     FN0_TELEMETRY_R2_ACCESS_KEY_ID=... \
-#     FN0_TELEMETRY_R2_SECRET_ACCESS_KEY=... \
-#     FN0_TELEMETRY_ACCESS_CLIENT_ID=... \
-#     FN0_TELEMETRY_ACCESS_CLIENT_SECRET=... \
 #     ./setup-telemetry-node.sh \
 #     --metrics-hostname metrics.fn0.dev \
-#     --telemetry-hostname telemetry.fn0.dev \
 #     --username fn0 \
-#     --tenant fn0 \
 #     --account-id <cloudflare account id> \
 #     --zone-id <cloudflare zone id> \
 #     --metrics-backup-bucket <bucket> \
-#     --logs-traces-bucket <bucket> \
 #     [--retention 30d]
 #
 # Every input comes from the fn0Cloud stack, which owns them: the node stores no
@@ -62,7 +41,6 @@
 #     vmrestore-prod -customS3Endpoint="$FN0_METRICS_BACKUP_S3_ENDPOINT" \
 #     -src="$FN0_METRICS_BACKUP_DST" -storageDataPath=/var/lib/victoria-metrics'
 #   systemctl start victoria-metrics
-# loggytracy needs no equivalent: it restores its catalog from R2 on startup.
 #
 # Required tools: curl, jq, tar, sha256sum, openssl, apt-get, systemd.
 
@@ -76,48 +54,29 @@ VM_PASSWORD_FILE="${VM_CONFIG_DIR}/basic-auth-password"
 VM_BACKUP_ENV_FILE="${VM_CONFIG_DIR}/backup.env"
 VM_LISTEN_ADDR="127.0.0.1:8428"
 
-# Pinned by digest-bearing tag rather than `latest`: loggytracy's own deployment
-# guide is explicit that `latest` is for typing, not for deployments, and a
-# telemetry backend that silently changes version is one that cannot be told
-# apart from the thing it is supposed to be observing.
-LOGGYTRACY_IMAGE="ghcr.io/namse/loggytracy:bf53ec796fa91770fe4dc623c60a917028511608"
-LOGGYTRACY_DATA_DIR="/var/lib/loggytracy"
-LOGGYTRACY_CONFIG_DIR="/etc/loggytracy"
-LOGGYTRACY_ENV_FILE="${LOGGYTRACY_CONFIG_DIR}/loggytracy.env"
-# The image runs as uid 10001 and a bind mount carries the host's numbers
-# through untranslated, so the data directory has to be owned by that number.
-LOGGYTRACY_UID=10001
-LOGGYTRACY_PORT=3100
-
 CF_API="https://api.cloudflare.com/client/v4"
 
 retention="30d"
 metrics_hostname=""
-telemetry_hostname=""
 basic_auth_username=""
-tenant=""
 account_id=""
 zone_id=""
 metrics_backup_bucket=""
-logs_traces_bucket=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --metrics-hostname) metrics_hostname="$2"; shift 2 ;;
-    --telemetry-hostname) telemetry_hostname="$2"; shift 2 ;;
     --username) basic_auth_username="$2"; shift 2 ;;
-    --tenant) tenant="$2"; shift 2 ;;
     --account-id) account_id="$2"; shift 2 ;;
     --zone-id) zone_id="$2"; shift 2 ;;
     --metrics-backup-bucket) metrics_backup_bucket="$2"; shift 2 ;;
-    --logs-traces-bucket) logs_traces_bucket="$2"; shift 2 ;;
     --retention) retention="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 1 ;;
   esac
 done
 
-for required in metrics_hostname telemetry_hostname basic_auth_username \
-  tenant account_id zone_id metrics_backup_bucket logs_traces_bucket; do
+for required in metrics_hostname basic_auth_username \
+  account_id zone_id metrics_backup_bucket; do
   if [[ -z "${!required}" ]]; then
     echo "missing required argument for ${required//_/-}; see the usage comment at the top of this script" >&2
     exit 1
@@ -127,10 +86,6 @@ done
 : "${FN0_METRICS_PASSWORD:?FN0_METRICS_PASSWORD is required}"
 : "${FN0_METRICS_R2_ACCESS_KEY_ID:?FN0_METRICS_R2_ACCESS_KEY_ID is required}"
 : "${FN0_METRICS_R2_SECRET_ACCESS_KEY:?FN0_METRICS_R2_SECRET_ACCESS_KEY is required}"
-: "${FN0_TELEMETRY_R2_ACCESS_KEY_ID:?FN0_TELEMETRY_R2_ACCESS_KEY_ID is required}"
-: "${FN0_TELEMETRY_R2_SECRET_ACCESS_KEY:?FN0_TELEMETRY_R2_SECRET_ACCESS_KEY is required}"
-: "${FN0_TELEMETRY_ACCESS_CLIENT_ID:?FN0_TELEMETRY_ACCESS_CLIENT_ID is required}"
-: "${FN0_TELEMETRY_ACCESS_CLIENT_SECRET:?FN0_TELEMETRY_ACCESS_CLIENT_SECRET is required}"
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "run as root" >&2
   exit 1
@@ -177,33 +132,7 @@ vm_release_install() {
   rm -rf "$download_dir"
 }
 
-# A container that is already running has to be drained, not killed: loggytracy
-# force-flushes acknowledged writes on SIGTERM, and its writer fencing expects
-# the old instance to be fully gone before the next one claims the object-store
-# prefix. `docker stop` inherits the --stop-timeout=-1 set at creation, so it
-# waits rather than cutting the flush off at ten seconds.
-container_replace() {
-  local name="$1"
-  shift
-  if docker inspect "$name" >/dev/null 2>&1; then
-    docker stop "$name" >/dev/null
-    docker rm "$name" >/dev/null
-  fi
-  docker run -d --name "$name" "$@" >/dev/null
-}
-
-wait_for_loggytracy_ready() {
-  for _ in $(seq 1 24); do
-    if curl -fsS "http://127.0.0.1:${LOGGYTRACY_PORT}/ready" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 5
-  done
-  echo "loggytracy did not become ready within 2 minutes; docker logs loggytracy" >&2
-  exit 1
-}
-
-echo "== 1/7 VictoriaMetrics ${VM_VERSION} =="
+echo "== 1/5 VictoriaMetrics ${VM_VERSION} =="
 
 if [[ -x /usr/local/bin/victoria-metrics-prod ]] \
   && /usr/local/bin/victoria-metrics-prod --version 2>&1 | grep -qF "${VM_VERSION}"; then
@@ -248,7 +177,7 @@ systemctl daemon-reload
 systemctl enable victoria-metrics.service
 systemctl restart victoria-metrics.service
 
-echo "== 2/7 vmbackup + timer =="
+echo "== 2/5 vmbackup + timer =="
 
 if [[ -x /usr/local/bin/vmbackup-prod ]] \
   && /usr/local/bin/vmbackup-prod --version 2>&1 | grep -qF "${VM_VERSION}"; then
@@ -319,96 +248,7 @@ systemctl daemon-reload
 systemctl enable fn0-metrics-backup.timer
 systemctl restart fn0-metrics-backup.timer
 
-echo "== 3/7 docker =="
-
-if ! command -v docker >/dev/null; then
-  install -d -m 0755 /usr/share/keyrings
-  curl -fsSL https://download.docker.com/linux/debian/gpg \
-    -o /usr/share/keyrings/docker.asc
-  chmod a+r /usr/share/keyrings/docker.asc
-  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-    > /etc/apt/sources.list.d/docker.list
-  apt-get update -qq
-  apt-get install -y -qq docker-ce docker-ce-cli containerd.io
-else
-  echo "docker already installed"
-fi
-
-# The json-file driver rotates nothing by default, and a telemetry box that
-# fills its own root filesystem with container logs is a poor advertisement.
-# Set it on the daemon rather than per container so nothing has to remember.
-if [[ ! -f /etc/docker/daemon.json ]]; then
-  mkdir -p /etc/docker
-  cat > /etc/docker/daemon.json <<'EOF_DOCKER_DAEMON'
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "100m",
-    "max-file": "5"
-  }
-}
-EOF_DOCKER_DAEMON
-  systemctl restart docker
-fi
-
-echo "== 4/7 loggytracy =="
-
-install -d -o "$LOGGYTRACY_UID" -g "$LOGGYTRACY_UID" -m 0750 "$LOGGYTRACY_DATA_DIR"
-install -d -o root -g root -m 0700 "$LOGGYTRACY_CONFIG_DIR"
-
-# OBJECT_STORE_CONDITIONAL_PUT=etag is not optional: every catalog commit is a
-# compare-and-swap on one manifest object, and without conditional writes two
-# commits overwrite each other silently. Startup runs a preflight that verifies
-# a write which should be rejected is rejected, and refuses to start otherwise.
-cat > "$LOGGYTRACY_ENV_FILE" <<EOF_LOGGYTRACY_ENV
-LOGGYTRACY_OBJECT_STORE_URL=s3://${logs_traces_bucket}/loggytracy
-OBJECT_STORE_ENDPOINT=https://${account_id}.r2.cloudflarestorage.com
-OBJECT_STORE_REGION=auto
-OBJECT_STORE_CONDITIONAL_PUT=etag
-AWS_ACCESS_KEY_ID=${FN0_TELEMETRY_R2_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${FN0_TELEMETRY_R2_SECRET_ACCESS_KEY}
-EOF_LOGGYTRACY_ENV
-chmod 0600 "$LOGGYTRACY_ENV_FILE"
-
-docker pull "$LOGGYTRACY_IMAGE" >/dev/null
-
-# --stop-timeout=-1: on SIGTERM the engine stops accepting writes and
-# force-flushes everything it has acknowledged. Docker's default cuts that off
-# with a SIGKILL after ten seconds, which is the difference between a planned
-# restart and losing the last few seconds of every tenant's logs. Set at
-# creation so a plain `docker stop` inherits it.
-#
-# Only 3100 is published, and only on loopback. The gRPC listener is not
-# exposed because everything reaching this node arrives as OTLP over HTTP
-# through the tunnel, and a published port outranks the host firewall.
-container_replace loggytracy \
-  --restart unless-stopped \
-  --stop-timeout=-1 \
-  --env-file "$LOGGYTRACY_ENV_FILE" \
-  -v "${LOGGYTRACY_DATA_DIR}:/var/lib/loggytracy" \
-  -p "127.0.0.1:${LOGGYTRACY_PORT}:3100" \
-  "$LOGGYTRACY_IMAGE"
-
-wait_for_loggytracy_ready
-
-# The engine reads no tenant allowlist from its environment: the pushed
-# policies are the registry, and a tenant nobody pushed is refused with 403 on
-# ingest and query alike. So onboarding belongs to standing the node up rather
-# than to a separate manual step, and --retention is what the policy carries.
-# The body is the whole policy and not a patch, so every limit left out stays
-# unbounded — which is what this node had before it had policies at all.
-policy_response="$(curl -s -w $'\n%{http_code}' -X PUT \
-  -H 'Content-Type: application/json' \
-  --data "$(jq -n --arg retention "$retention" '{retention: $retention}')" \
-  "http://127.0.0.1:${LOGGYTRACY_PORT}/loggytracy/api/v1/admin/tenants/${tenant}/retention")"
-if [[ "${policy_response##*$'\n'}" != "200" ]]; then
-  echo "tenant policy push for ${tenant} returned ${policy_response##*$'\n'}" >&2
-  echo "${policy_response%$'\n'*}" >&2
-  exit 1
-fi
-echo "tenant ${tenant} onboarded with retention ${retention}"
-
-echo "== 5/7 cloudflared =="
+echo "== 3/5 cloudflared =="
 
 if ! command -v cloudflared >/dev/null; then
   install -d -m 0755 /usr/share/keyrings
@@ -422,7 +262,7 @@ else
   echo "cloudflared already installed"
 fi
 
-echo "== 6/7 tunnel + DNS =="
+echo "== 4/5 tunnel + DNS =="
 
 # Named after the metrics hostname because that is what the tunnel was created
 # as; renaming it would orphan the existing tunnel and its credentials rather
@@ -445,11 +285,8 @@ cf_api PUT "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/configurations" \
   "$(jq -n \
     --arg metrics_host "$metrics_hostname" \
     --arg metrics_service "http://${VM_LISTEN_ADDR}" \
-    --arg telemetry_host "$telemetry_hostname" \
-    --arg telemetry_service "http://127.0.0.1:${LOGGYTRACY_PORT}" \
     '{config: {ingress: [
        {hostname: $metrics_host, service: $metrics_service},
-       {hostname: $telemetry_host, service: $telemetry_service},
        {service: "http_status:404"}
      ]}}')" \
   >/dev/null
@@ -472,7 +309,6 @@ upsert_cname() {
 }
 
 upsert_cname "$metrics_hostname"
-upsert_cname "$telemetry_hostname"
 
 mkdir -p /etc/cloudflared
 tunnel_env_file="/etc/cloudflared/fn0-telemetry-tunnel.env"
@@ -512,7 +348,7 @@ systemctl daemon-reload
 systemctl enable fn0-telemetry-tunnel.service
 systemctl restart fn0-telemetry-tunnel.service
 
-echo "== 7/7 verification =="
+echo "== 5/5 verification =="
 
 vm_auth="${basic_auth_username}:$(cat "$VM_PASSWORD_FILE")"
 
@@ -533,9 +369,6 @@ if [[ "$unauth_code" != "401" ]]; then
   exit 1
 fi
 echo "victoria-metrics unauthenticated rejection: ok"
-
-wait_for_loggytracy_ready
-echo "loggytracy local ready: ok"
 
 write_ok=""
 for _ in $(seq 1 24); do
@@ -577,35 +410,6 @@ if [[ "$public_unauth_code" != "401" ]]; then
 fi
 echo "metrics public unauthenticated rejection: ok"
 
-# This is the check that matters most on this node: loggytracy itself has no
-# authentication, so if Access is not in front of the hostname then anyone who
-# learns it can write and read every tenant's logs.
-telemetry_unauth_code="$(curl -s -o /dev/null -w '%{http_code}' \
-  "https://${telemetry_hostname}/loggytracy/api/v1/logs/attributes?start=-5m")"
-if [[ "$telemetry_unauth_code" != "401" && "$telemetry_unauth_code" != "403" ]]; then
-  echo "expected 401/403 for unauthenticated telemetry query, got ${telemetry_unauth_code}" >&2
-  echo "the Cloudflare Access application for ${telemetry_hostname} is missing or misconfigured" >&2
-  exit 1
-fi
-echo "telemetry public unauthenticated rejection: ok"
-
-telemetry_auth_ok=""
-for _ in $(seq 1 24); do
-  if curl -fsS \
-    -H "CF-Access-Client-Id: ${FN0_TELEMETRY_ACCESS_CLIENT_ID}" \
-    -H "CF-Access-Client-Secret: ${FN0_TELEMETRY_ACCESS_CLIENT_SECRET}" \
-    "https://${telemetry_hostname}/loggytracy/api/v1/logs/attributes?start=-5m" >/dev/null 2>&1; then
-    telemetry_auth_ok=1
-    break
-  fi
-  sleep 5
-done
-if [[ -z "$telemetry_auth_ok" ]]; then
-  echo "authenticated telemetry query did not succeed within 2 minutes" >&2
-  exit 1
-fi
-echo "telemetry service-token query: ok"
-
 systemctl start fn0-metrics-backup.service
 echo "metrics backup to R2: ok"
 
@@ -617,12 +421,6 @@ metrics OTLP         : https://${metrics_hostname}/opentelemetry
 metrics query        : https://${metrics_hostname}
 metrics basic auth   : ${basic_auth_username} (password in ${VM_PASSWORD_FILE})
 metrics backup       : ${metrics_backup_bucket}/${metrics_hostname}/latest, every 10 minutes
-
-logs/traces ingest   : https://${telemetry_hostname} (OTLP /v1/logs, /v1/traces)
-logs query           : https://${telemetry_hostname} (first-party API, loggytracy docs/QUERY_API.md; traces are write-only until loggytracy M13)
-logs/traces auth     : Cloudflare Access service token; tenant ${tenant} stamped at the edge
-logs/traces store    : s3://${logs_traces_bucket}/loggytracy
-loggytracy image     : ${LOGGYTRACY_IMAGE}
 
 These match the fn0Cloud stack outputs; nothing has to be copied back into pulumi.
 EOF_SUMMARY

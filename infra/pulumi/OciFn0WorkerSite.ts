@@ -61,9 +61,6 @@ export interface WorkerHostObservabilityArgs {
   metricsOtlpUrl: pulumi.Input<string>;
   metricsBasicAuthUsername: pulumi.Input<string>;
   metricsBasicAuthPassword: pulumi.Input<string>;
-  logsTracesOtlpUrl: pulumi.Input<string>;
-  logsTracesAccessClientId: pulumi.Input<string>;
-  logsTracesAccessClientSecret: pulumi.Input<string>;
 }
 
 export interface WorkerTlsOriginArgs {
@@ -947,34 +944,20 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         args.worker.hostObservability.metricsRemoteWriteUrl,
         args.worker.hostObservability.metricsOtlpUrl,
         args.worker.hostObservability.metricsBasicAuthUsername,
-        args.worker.hostObservability.logsTracesOtlpUrl,
-        args.worker.hostObservability.logsTracesAccessClientId,
       ])
       .apply(
-        ([
-          metricsRemoteWriteUrl,
-          metricsOtlpUrl,
-          metricsBasicAuthUsername,
-          logsTracesOtlpUrl,
-          logsTracesAccessClientId,
-        ]) =>
+        ([metricsRemoteWriteUrl, metricsOtlpUrl, metricsBasicAuthUsername]) =>
           renderAlloyConfig({
             metricsRemoteWriteUrl,
             metricsOtlpUrl,
             metricsBasicAuthUsername,
-            logsTracesOtlpUrl,
-              logsTracesAccessClientId,
           }),
       );
     const alloyEnvFile = pulumi
-      .all([
-        args.worker.hostObservability.metricsBasicAuthPassword,
-        args.worker.hostObservability.logsTracesAccessClientSecret,
-      ])
-      .apply(([metricsPassword, accessClientSecret]) =>
+      .output(args.worker.hostObservability.metricsBasicAuthPassword)
+      .apply((metricsPassword) =>
         renderEnvFile({
           FN0_METRICS_PASSWORD: metricsPassword,
-          FN0_TELEMETRY_ACCESS_CLIENT_SECRET: accessClientSecret,
         }),
       );
 
@@ -1297,8 +1280,6 @@ function renderAlloyConfig(args: {
   metricsRemoteWriteUrl: string;
   metricsOtlpUrl: string;
   metricsBasicAuthUsername: string;
-  logsTracesOtlpUrl: string;
-  logsTracesAccessClientId: string;
 }): string {
   // Each scrape target gets an instance=<ocid> label via discovery.relabel
   // because Prometheus external_labels do not override labels a target
@@ -1339,46 +1320,9 @@ prometheus.remote_write "default" {
   }
 }
 
-loki.source.journal "default" {
-  forward_to    = [otelcol.receiver.loki.journal.receiver]
-  relabel_rules = loki.relabel.journal.rules
-  labels        = {
-    fn0_role = "worker",
-    instance = sys.env("FN0_HOST_OCID"),
-  }
-  path          = "/host/var/log/journal"
-}
-
-loki.relabel "journal" {
-  forward_to = []
-  rule {
-    source_labels = ["__journal__systemd_unit"]
-    target_label  = "unit"
-  }
-  rule {
-    source_labels = ["__journal__hostname"]
-    target_label  = "host"
-  }
-  rule {
-    source_labels = ["__journal_container_name"]
-    target_label  = "container"
-  }
-}
-
-// Journald logs leave as OTLP rather than through loki.write: the engine
-// accepts OTLP only, and routing them here also puts them on the same
-// disk-backed sending queue as everything else, so a backend outage defers
-// them instead of dropping them.
-//
-// Straight to batch, skipping fn0_stamping: that processor reads the project
-// id from a request header the guest OTLP path carries, and the host's own
-// journal has no project to attribute.
-otelcol.receiver.loki "journal" {
-  output {
-    logs = [otelcol.processor.batch.default.input]
-  }
-}
-
+// Metrics only. Logs and traces are accepted and dropped: the guest OTLP
+// hijack and the host's own exporters still emit all three signals, and an
+// unrouted signal is discarded at the receiver rather than erroring.
 otelcol.receiver.otlp "default" {
   http {
     endpoint         = "127.0.0.1:4318"
@@ -1390,8 +1334,6 @@ otelcol.receiver.otlp "default" {
   }
   output {
     metrics = [otelcol.processor.attributes.fn0_stamping.input]
-    logs    = [otelcol.processor.attributes.fn0_stamping.input]
-    traces  = [otelcol.processor.attributes.fn0_stamping.input]
   }
 }
 
@@ -1403,8 +1345,6 @@ otelcol.processor.attributes "fn0_stamping" {
   }
   output {
     metrics = [otelcol.processor.deltatocumulative.default.input]
-    logs    = [otelcol.processor.batch.default.input]
-    traces  = [otelcol.processor.batch.default.input]
   }
 }
 
@@ -1419,17 +1359,11 @@ otelcol.processor.deltatocumulative "default" {
 otelcol.processor.batch "default" {
   output {
     metrics = [otelcol.exporter.otlphttp.metrics.input]
-    logs    = [otelcol.exporter.otlphttp.logs_traces.input]
-    traces  = [otelcol.exporter.otlphttp.logs_traces.input]
   }
 }
 
 otelcol.storage.file "metrics_queue" {
   directory = "${ALLOY_STORAGE_PATH}/otlp-queue-metrics"
-}
-
-otelcol.storage.file "logs_traces_queue" {
-  directory = "${ALLOY_STORAGE_PATH}/otlp-queue-logs-traces"
 }
 
 otelcol.exporter.otlphttp "metrics" {
@@ -1439,26 +1373,6 @@ otelcol.exporter.otlphttp "metrics" {
   }
   sending_queue {
     storage    = otelcol.storage.file.metrics_queue.handler
-    sizer      = "bytes"
-    queue_size = ${ALLOY_OTLP_QUEUE_SIZE_IN_BYTES}
-  }
-}
-
-otelcol.exporter.otlphttp "logs_traces" {
-  client {
-    endpoint = "${args.logsTracesOtlpUrl}"
-    // The engine does not decompress request bodies: it hands Content-Encoding
-    // gzip straight to the OTLP decoder, which rejects it as malformed. The
-    // exporter defaults to gzip, and a 400 is not retryable, so every batch was
-    // dropped rather than deferred. Uncompressed until the engine handles it.
-    compression = "none"
-    headers  = {
-      "CF-Access-Client-Id"     = "${args.logsTracesAccessClientId}",
-      "CF-Access-Client-Secret" = sys.env("FN0_TELEMETRY_ACCESS_CLIENT_SECRET"),
-    }
-  }
-  sending_queue {
-    storage    = otelcol.storage.file.logs_traces_queue.handler
     sizer      = "bytes"
     queue_size = ${ALLOY_OTLP_QUEUE_SIZE_IN_BYTES}
   }
@@ -1540,7 +1454,7 @@ RestartSec=5
 WantedBy=multi-user.target
 `;
   // --security-opt label=disable: OL SELinux enforcing otherwise blocks the
-  // alloy container from reading host /var/log/journal, /sys, etc.
+  // alloy container from reading host /proc, /sys, etc.
   const alloySystemdUnit = `[Unit]
 Description=fn0 alloy host observability
 After=network-online.target
@@ -1559,11 +1473,9 @@ ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
   --network host \\
   --env FN0_HOST_OCID \\
   --env FN0_METRICS_PASSWORD \\
-  --env FN0_TELEMETRY_ACCESS_CLIENT_SECRET \\
   -v /:/host/root:ro,rslave \\
   -v /proc:/host/proc:ro \\
   -v /sys:/host/sys:ro \\
-  -v /var/log/journal:/host/var/log/journal:ro \\
   -v /etc/machine-id:/etc/machine-id:ro \\
   -v /etc/fn0-alloy:/etc/fn0-alloy:ro \\
   -v ${ALLOY_STORAGE_PATH}:${ALLOY_STORAGE_PATH} \\

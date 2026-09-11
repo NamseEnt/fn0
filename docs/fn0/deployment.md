@@ -32,7 +32,7 @@ The control plane (`fn0/control`) is a Forte application. Use the bootstrap scri
 scripts/bootstrap-fn0-control.sh
 ```
 
-> **Why not `forte deploy`?** `forte deploy` bundles the local `fn0/control/env.yaml`, which only holds developer-visible keys. The pulumi-managed variables (`FN0_TELEMETRY_*`, vault credentials, etc.) are not in that file, so a `forte deploy`-produced bundle ships an incomplete environment. Since 2026-08-26 this breaks every log/trace action with an env panic on startup.
+> **Why not `forte deploy`?** `forte deploy` bundles the local `fn0/control/env.yaml`, which only holds developer-visible keys. The pulumi-managed variables (vault credentials, etc.) are not in that file, so a `forte deploy`-produced bundle ships an incomplete environment. Since 2026-08-26 this breaks every action that reads one with an env panic on startup.
 
 The script is **idempotent** — it can be re-run from any failure point:
 
@@ -122,10 +122,10 @@ The platform's telemetry stack is self-hosted on one node behind a Cloudflare Tu
 | Signal | Backend | Auth |
 |---|---|---|
 | Metrics | VictoriaMetrics (`metricsHostname`) | Basic auth built into the worker binary |
-| Logs and traces | loggytracy (`telemetryHostname`) | Cloudflare Access service token at the edge |
+| Logs and traces | Not collected | — |
 
-loggytracy has no TLS or authentication of its own. A Cloudflare Access service token authenticates callers at the edge, and a Transform Rule overwrites `X-Scope-OrgID` there. Any change that exposes loggytracy's listener another way, or lets a caller's own tenant header survive the Transform Rule, is a security change — not a routing one.
+Logs and traces were stored in loggytracy, whose R2 store held every object forever by design; it was removed in 2026-09 when the storage bill outgrew the value of keeping it. The worker's Alloy receiver still accepts all three OTLP signals from guests so nothing has to change on the emitting side, but it routes only metrics and drops logs and traces.
 
-Platform health can be assessed through the fn0-control dashboard, which exposes per-project log and trace viewers that query the telemetry backends via their HTTP query APIs (`/loki/api/v1/query_range` on loggytracy and `/select/logsql/query` for log streams). The telemetry node itself has no directly attached viewer UI; all reads go through the control plane. For raw data plane probing, use the backend APIs directly.
+There is no viewer on the telemetry node. Judge platform health by probing the metrics data plane directly.
 
 For setting up a new telemetry node: `scripts/setup-telemetry-node.sh` (or `scripts/setup-telemetry-node-remote.sh` for a remote node).

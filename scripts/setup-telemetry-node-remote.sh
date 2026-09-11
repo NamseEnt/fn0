@@ -56,18 +56,11 @@ cloudflare_api_token="$(pulumi_output cloudflareOperatorApiToken)"
 account_id="$(pulumi_config fn0Cloud:cloudflareAccountId)"
 zone_id="$(pulumi_config fn0Cloud:cloudflareZoneId)"
 metrics_hostname="$(pulumi_config fn0Cloud:metricsHostname)"
-telemetry_hostname="$(pulumi_config fn0Cloud:telemetryHostname)"
 basic_auth_username="$(pulumi_output metricsBasicAuthUsername)"
 basic_auth_password="$(pulumi_output metricsBasicAuthPassword)"
 metrics_backup_bucket="$(pulumi_output metricsBackupR2BucketName)"
 metrics_r2_access_key_id="$(pulumi_output metricsBackupR2AccessKeyId)"
 metrics_r2_secret_access_key="$(pulumi_output metricsBackupR2SecretAccessKey)"
-logs_traces_bucket="$(pulumi_output telemetryStoreR2BucketName)"
-telemetry_r2_access_key_id="$(pulumi_output telemetryStoreR2AccessKeyId)"
-telemetry_r2_secret_access_key="$(pulumi_output telemetryStoreR2SecretAccessKey)"
-telemetry_access_client_id="$(pulumi_output telemetryAccessClientId)"
-telemetry_access_client_secret="$(pulumi_output telemetryAccessClientSecret)"
-tenant="$(pulumi_output telemetryTenantId)"
 
 payload="$(mktemp)"
 trap 'rm -f "$payload"' EXIT
@@ -78,10 +71,6 @@ chmod 0600 "$payload"
   printf 'export FN0_METRICS_PASSWORD=%q\n' "$basic_auth_password"
   printf 'export FN0_METRICS_R2_ACCESS_KEY_ID=%q\n' "$metrics_r2_access_key_id"
   printf 'export FN0_METRICS_R2_SECRET_ACCESS_KEY=%q\n' "$metrics_r2_secret_access_key"
-  printf 'export FN0_TELEMETRY_R2_ACCESS_KEY_ID=%q\n' "$telemetry_r2_access_key_id"
-  printf 'export FN0_TELEMETRY_R2_SECRET_ACCESS_KEY=%q\n' "$telemetry_r2_secret_access_key"
-  printf 'export FN0_TELEMETRY_ACCESS_CLIENT_ID=%q\n' "$telemetry_access_client_id"
-  printf 'export FN0_TELEMETRY_ACCESS_CLIENT_SECRET=%q\n' "$telemetry_access_client_secret"
   cat "${REPO_ROOT}/scripts/setup-telemetry-node.sh"
 } > "$payload"
 
@@ -94,13 +83,10 @@ ssh -t "$ssh_target" \
   "chmod 0600 ${remote_file} \
    && sudo bash ${remote_file} \
      --metrics-hostname $(printf '%q' "$metrics_hostname") \
-     --telemetry-hostname $(printf '%q' "$telemetry_hostname") \
      --username $(printf '%q' "$basic_auth_username") \
-     --tenant $(printf '%q' "$tenant") \
      --account-id $(printf '%q' "$account_id") \
      --zone-id $(printf '%q' "$zone_id") \
      --metrics-backup-bucket $(printf '%q' "$metrics_backup_bucket") \
-     --logs-traces-bucket $(printf '%q' "$logs_traces_bucket") \
      --retention $(printf '%q' "$retention"); \
    status=\$?; rm -f ${remote_file}; exit \$status" \
   || setup_status=$?

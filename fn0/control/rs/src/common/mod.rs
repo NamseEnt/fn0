@@ -8,6 +8,5 @@ pub mod docs_site;
 pub mod github;
 pub mod project_name;
 pub mod r2_store;
-pub mod telemetry;
 pub mod vault;
 pub mod websocket_directory_gc;

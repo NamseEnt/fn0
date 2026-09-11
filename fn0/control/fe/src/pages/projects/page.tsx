@@ -15,7 +15,6 @@ export default function ProjectsPage(props: Props) {
                         <tr>
                             <th style={cell}>Name</th>
                             <th style={cell}>Project ID</th>
-                            <th style={cell}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -24,18 +23,6 @@ export default function ProjectsPage(props: Props) {
                                 <td style={cell}>{project.name}</td>
                                 <td style={{ ...cell, fontFamily: "monospace" }}>
                                     {project.projectId}
-                                </td>
-                                <td style={cell}>
-                                    <a
-                                        href={`/projects/${encodeURIComponent(project.projectId)}/logs`}
-                                    >
-                                        Logs
-                                    </a>{" "}
-                                    <a
-                                        href={`/projects/${encodeURIComponent(project.projectId)}/traces`}
-                                    >
-                                        Traces
-                                    </a>
                                 </td>
                             </tr>
                         ))}
