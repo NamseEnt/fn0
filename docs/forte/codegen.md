@@ -14,6 +14,7 @@ Every Forte project's `build.rs` calls:
 ```rust
 fn main() {
     forte_codegen::generate_routes();
+    forte_codegen::generate_env();
 }
 ```
 

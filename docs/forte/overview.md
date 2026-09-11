@@ -52,7 +52,7 @@ Key properties of the SSR step:
 | Package | Version | Crate | Purpose |
 |---|---|---|---|
 | `forte-sdk` | 0.10.0 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
-| `forte-cli` | 0.6.6 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
+| `forte-cli` | 0.6.7 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
 | `forte-macros` | 0.6.0 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
 | `forte-json` | 0.1.3 | `forte/json` | Streaming JSON serializer used for Props serialization |
 | `forte-codegen` | 0.5.0 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
