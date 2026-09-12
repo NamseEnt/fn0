@@ -5,7 +5,12 @@ use std::time::{Duration, Instant};
 use tokio::sync::{oneshot, watch};
 use tracing::*;
 
-const TICK_INTERVAL: Duration = Duration::from_millis(500);
+// Steady-state liveness polling only: a target change wakes the loop through
+// `target_rx.changed()`, so this does not gate deploy latency. Each tick shells
+// out to the podman CLI, and podman's API socket logs every call — at 500ms
+// that was ~170k journal lines a day per host, which is what the log pipeline
+// then had to carry.
+const TICK_INTERVAL: Duration = Duration::from_secs(5);
 const READY_PROBE_INTERVAL: Duration = Duration::from_millis(500);
 const DRAIN_TIMEOUT_DEFAULT: Duration = Duration::from_secs(60);
 const READY_TIMEOUT: Duration = Duration::from_secs(300);
