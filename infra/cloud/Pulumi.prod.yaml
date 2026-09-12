@@ -38,4 +38,3 @@ config:
     secure: AAABAP7PZvea0YThoOZUK33gcuz6nSpCFJuNojAWsyq97Mos+Ly1i/yznPkZCZo8Wvcz+mKVR+VPdv7TSFgoIAW2JG8DW1V6IQXeiUxktiRjwECkRQ==
   fn0Cloud:ociVaultRegion: ap-osaka-1
   fn0Cloud:metricsHostname: metrics.fn0.dev
-  fn0Cloud:telemetryHostname: telemetry.fn0.dev
