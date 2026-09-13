@@ -326,7 +326,7 @@ If no instrument has been created during a request the flush is a no-op; there i
 
 **Serialization (Rust → JSON):**
 - Struct field names are converted to camelCase (`user_name` → `"userName"`)
-- **`Option::None` struct fields are omitted entirely** — they do not appear in the JSON output at all (not serialized as `null`). This differs from `serde_json` default behavior.
+- **Any struct field whose value serializes to `null` is omitted entirely** — it does not appear in the JSON output at all (not serialized as `null`). This covers `Option::None` and any other type that serializes as `null` (e.g. `serde_json::Value::Null`). This differs from `serde_json` default behavior.
 - Enum variants use a `t` discriminant field:
 
 | Variant kind | Rust | JSON |
@@ -337,7 +337,7 @@ If no instrument has been created during a request the flush is a no-op; there i
 
 For struct variants the fields are spread flat alongside `t`; there is no `v` wrapper.
 
-`Option::None` omission applies to struct and struct-variant fields only — a top-level `None` serializes as `null`. Generated TypeScript types use `fieldName?: T` (optional property) rather than `fieldName: T | null`.
+Null omission applies to struct and struct-variant fields only — a top-level `None` serializes as `null`. Generated TypeScript types use `fieldName?: T` (optional property) rather than `fieldName: T | null`. Note that `forte-rs-to-ts` only makes `Option<T>` fields optional automatically; a `serde_json::Value` field that may be `Null` at runtime will not be marked optional in the generated types — add `#[serde(default)]` on the Rust side and handle optionality in TypeScript manually for that case.
 
 **Deserialization (JSON → Rust):**
 - All object keys are converted to snake_case before deserializing (`"userName"` → `"user_name"`)

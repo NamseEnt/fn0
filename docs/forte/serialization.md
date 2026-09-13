@@ -47,7 +47,7 @@ The TypeScript generated types use `t` as the discriminant key for `z.discrimina
 
 ### `Option::None` omission
 
-`None` struct fields are **omitted entirely** from the JSON output — they do not appear as `null`.
+Any struct field whose value serializes to `null` is **omitted entirely** from the JSON output — it does not appear as `null`. This covers `Option::None` and any other type that serializes as `null`.
 
 ```rust
 pub struct Response {
@@ -59,6 +59,8 @@ pub struct Response {
 This means TypeScript optional fields should be typed `nickname?: string` (optional), not `nickname: string | null` (nullable). The generated `.props.ts` types already reflect this.
 
 A top-level `None` value (not inside a struct field) serializes as `null`.
+
+**`serde_json::Value::Null` trap:** a field typed as `serde_json::Value` (mapped to TypeScript `unknown`) is also omitted when its runtime value is `Value::Null`, even though the field is not declared `Option`. `forte-rs-to-ts` cannot infer this from the type alone, so the generated TypeScript type will not mark it optional automatically. If a `Value` field can be `Null`, declare it `#[serde(default)]` on the Rust side and add `.optional()` manually to the TypeScript type.
 
 ### API reference
 
