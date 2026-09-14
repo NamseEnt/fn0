@@ -60,8 +60,9 @@ the worker's 50 GiB volume and is the recovery buffer when Signy is unavailable.
 Signy declares a 2 GiB memory budget, an 8 GiB cache limit, a 1 GiB WAL
 backlog limit, a 4 GiB minimum free-disk floor, a 30-day `fn0` retention
 policy, and a 10 GiB tenant storage limit. Signy container logs rotate at five
-100 MiB files. The R2 bucket currently contains 1,281 objects using about 2.1
-MiB; this includes only the current rollout and verification data. VictoriaMetrics
+100 MiB files. At the verification time the R2 bucket contained 1,281 objects
+using about 2.1 MiB; this includes only the current rollout and verification
+data. VictoriaMetrics
 and its old backup/tunnel units are no longer part of the deployment.
 
 ## Verification record
