@@ -16,6 +16,7 @@ served through the Signy Tunnel.
   `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:249ba93f391d71db4bd4ae8826eac12cf5c80e57b878c6672cbb46014da86866`
 - Signy image:
   `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:4aca3acd27a49a7e9d617366c3e1c5d4bf77a69f53f09b77552d6e84c8e1b3a2`
+- Obsy source revision for these images: `406a55fca23c433a05c772510e96d9c6ebb5e0e4`
 - Alloy image: `docker.io/grafana/alloy:v1.10.2`
 - R2 bucket: `fn0-signy-u35twkcf`
 - R2 prefix: `fn0/signy`
