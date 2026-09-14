@@ -75,6 +75,7 @@ printf '%s\n' \
   "AWS_SECRET_ACCESS_KEY=${SIGNY_R2_SECRET_ACCESS_KEY}" \
   'SIGNY_LISTEN_ADDR=0.0.0.0:3100' \
   'SIGNY_LOG_FORMAT=json' \
+  'RUST_LOG=signy=warn' \
   'SIGNY_MEMORY_BUDGET=2147483648' \
   'SIGNY_MEMORY_ACCOUNT_BYTES=1073741824' \
   'SIGNY_CACHE_MAX_BYTES=8589934592' \
@@ -139,7 +140,7 @@ systemctl daemon-reload
 systemctl enable --now fn0-signy-tunnel.service
 
 for attempt in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:3100/ready >/dev/null; then
+  if curl -fsS http://127.0.0.1:3100/ready >/dev/null 2>&1; then
     break
   fi
   if [[ "$attempt" -eq 60 ]]; then

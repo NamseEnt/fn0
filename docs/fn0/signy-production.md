@@ -53,7 +53,8 @@ units, sets the `fn0` retention policy, and verifies R2 health.
 
 Collecty uses a 1 GiB queue cap per worker, 8 MiB segments, a two-second
 segment age, warning-level logs, a 30-second send timeout, and no journald
-collection. Host metrics are sampled once per minute. The queue is mounted on
+collection. Host metrics are sampled once per minute. Signy runs with
+`RUST_LOG=signy=warn`. The queue is mounted on
 the worker's 50 GiB volume and is the recovery buffer when Signy is unavailable.
 
 Signy declares a 2 GiB memory budget, an 8 GiB cache limit, a 1 GiB WAL
