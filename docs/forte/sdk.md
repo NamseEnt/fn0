@@ -290,6 +290,8 @@ OpenTelemetry is initialized once per instance on the first request via `otel::i
 
 The service name defaults to `"forte-app"` and can be overridden with the `OTEL_SERVICE_NAME` environment variable.
 
+In `forte dev`, tracing macro output (`tracing::info!`, `tracing::error!`, etc.) appears in the dev server terminal. OTLP span export is not available locally — `forte dev` does not intercept the `fn0-otel.fn0.dev` placeholder, so export attempts fail silently without affecting request handling.
+
 ## Metrics
 
 `forte_sdk::metrics` provides an OTLP metrics pipeline. Instruments created from the shared `Meter` are aggregated with **delta temporality** and flushed at the end of each request — the same path as traces. No background exporter is needed because a forte component only holds CPU during a request.
@@ -317,6 +319,8 @@ Instrument types re-exported from `forte_sdk::metrics`:
 Get the shared `Meter` with `forte_sdk::metrics::meter()`. Instruments survive across the process lifetime (module-level `LazyLock` is fine).
 
 Metrics are exported to `http://fn0-otel.fn0.dev/v1/metrics` (the fn0 Cloud collector). The service name defaults to `"forte-app"` and can be overridden with `OTEL_SERVICE_NAME`.
+
+In `forte dev`, OTLP metric export is not available — the placeholder hostname is not intercepted locally, so export attempts fail silently at the end of each request.
 
 If no instrument has been created during a request the flush is a no-op; there is no overhead for apps that don't use metrics.
 

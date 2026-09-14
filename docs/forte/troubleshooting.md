@@ -181,6 +181,18 @@ Secrets and env vars set via `forte env set` are stored in `env.yaml` and bundle
 
 ---
 
+## Telemetry
+
+### OTLP export warnings in `forte dev`
+
+**Symptom:** Warnings like `"otlp metrics export failed"` or `"OTLP trace export returned ..."` appear in the `forte dev` terminal.
+
+`forte dev` does not intercept the `fn0-otel.fn0.dev` placeholder hostname, so OTLP span and metric export attempts made by the WASM component at the end of each request fail with a connection error. These warnings are harmless and do not affect request handling.
+
+Tracing macro output (`tracing::info!`, `tracing::error!`, etc.) still appears in the dev server terminal as usual — only the OTLP export path is inactive locally. OTLP export is active in production (fn0 Cloud).
+
+---
+
 ## WebSocket Singleton
 
 ### Singleton not connecting after deploy
