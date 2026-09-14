@@ -15,7 +15,13 @@ config:
     type: string
   fn0Cloud:ociVaultRegion:
     type: string
-  fn0Cloud:metricsHostname:
+  fn0Cloud:signyHostname:
+    type: string
+  fn0Cloud:collectyImageRef:
+    type: string
+  fn0Cloud:signyImageRef:
+    type: string
+  fn0Cloud:telemetryConfigVersion:
     type: string
 packages:
   fn0: ../pulumi@0.0.0

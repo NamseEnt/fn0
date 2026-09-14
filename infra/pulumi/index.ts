@@ -6,7 +6,7 @@ export * as docDb from "./docDb";
 export { ControlProjectBootstrap } from "./ControlProjectBootstrap";
 export { ForteR2 } from "./ForteR2";
 export { BundleStoreR2 } from "./BundleStoreR2";
-export { MetricsBackupR2 } from "./MetricsBackupR2";
+export { SignyR2 } from "./SignyR2";
 export { CloudflareOperatorToken } from "./CloudflareOperatorToken";
 export { BundleStoreR2Worker } from "./BundleStoreR2Worker";
 export * as dns from "./dns";

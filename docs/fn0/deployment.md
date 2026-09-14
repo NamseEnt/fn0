@@ -117,15 +117,37 @@ When a deploy step requires a dependency crate to be published (e.g., `deploy-fn
 
 ## Telemetry
 
-The platform's telemetry stack is self-hosted on one node behind a Cloudflare Tunnel:
+The platform's telemetry stack is self-hosted on `192.168.0.10`. Each worker sends
+OTLP to its local Alloy gateway, which stamps `tenant.id=fn0` and forwards
+metrics, logs, and traces to the worker-local collecty durable queue. Collecty
+sends over HTTPS with Cloudflare Access to Signy, and Signy stores the durable
+catalog and parts in its dedicated R2 bucket:
 
 | Signal | Backend | Auth |
 |---|---|---|
-| Metrics | VictoriaMetrics (`metricsHostname`) | Basic auth built into the worker binary |
-| Logs and traces | Not collected | — |
+| Metrics, logs, traces | Alloy gateway → collecty → Signy → R2 | Cloudflare Access service token |
 
-Logs and traces were stored in loggytracy, whose R2 store held every object forever by design; it was removed in 2026-09 when the storage bill outgrew the value of keeping it. The worker's Alloy receiver still accepts all three OTLP signals from guests so nothing has to change on the emitting side, but it routes only metrics and drops logs and traces.
+Signy is exposed externally only as `https://signy.fn0.dev` through its
+Cloudflare Tunnel and Access application. The process itself listens on the
+node loopback interface. The R2 token is bucket-scoped, catalog writes use
+conditional ETags, and the catalog prefix has a seven-day Bucket Lock rule.
 
-There is no viewer on the telemetry node. Judge platform health by probing the metrics data plane directly.
+The production image references are immutable OCIR digests in Pulumi config.
+The worker image metadata pins collecty to the same digest on every host, and
+the Signy node setup pins the Signy digest. Update both deliberately and run
+the verification procedure before changing either reference.
 
-For setting up a new telemetry node: `scripts/setup-telemetry-node.sh` (or `scripts/setup-telemetry-node-remote.sh` for a remote node).
+Cost safety is part of the deployment: collecty uses warning-level JSON logs,
+does not enable journald collection, samples host metrics once per minute, and
+caps its durable queue at 1 GiB per worker. Signy has a 2 GiB declared memory
+budget, an 8 GiB local cache, a 1 GiB WAL backlog limit, a 4 GiB free-space
+floor, a 30-day `fn0` retention policy, and a 10 GiB tenant storage limit.
+Docker log rotation is capped at five 100 MiB files on the Signy node.
+
+Provision the permanent node from the Pulumi stack with
+`scripts/setup-signy-node-remote.sh --ssh namse@192.168.0.10`. The setup writes
+only root-readable secret files, replaces obsolete metrics tunnel units, and
+verifies Signy readiness, R2 health, and the tenant policy before returning.
+
+The production verification record and recovery evidence are in
+[signy-production.md](signy-production.md).

@@ -374,27 +374,105 @@ const bundleStoreR2 = new fn0.BundleStoreR2(
   cloudflareOperatedComponent,
 );
 
-const metricsBackupR2 = new fn0.MetricsBackupR2(
-  "metrics-backup-r2",
+const signyStoragePrefix = "fn0/signy";
+const signyR2 = new fn0.SignyR2(
+  "signy-r2",
   {
     tokenMintingApiToken: bootstrapApiToken,
     accountId,
-    bucketName: pulumi.interpolate`fn0-metrics-backup-${suffix}`,
+    bucketName: pulumi.interpolate`fn0-signy-${suffix}`,
+    storagePrefix: signyStoragePrefix,
   },
   cloudflareOperatedComponent,
 );
 
-// The metrics node's basic-auth credential is minted here rather than on the
-// node because every worker's Alloy has to present it, so it is a shared
-// credential either way. Keeping it in the stack also means rebuilding the
-// node (fresh machine + vmrestore) does not rotate it, so the workers stay
-// untouched.
-const metricsHostname = config.require("metricsHostname");
-const metricsBasicAuthUsernameValue = "fn0";
-const metricsBasicAuthSecret = new random.RandomBytes(
-  "fn0-metrics-basic-auth-password",
-  { length: 24 },
+const signyHostname = config.get("signyHostname") ?? `signy.${domain}`;
+const signyAccessServiceToken = new cloudflare.AccessServiceToken(
+  "signy-collecty-service-token",
+  {
+    zoneId,
+    name: pulumi.interpolate`fn0-signy-collecty-${suffix}`,
+    duration: "8760h",
+  },
+  cloudflareOperatedResource,
 );
+
+new cloudflare.AccessApplication(
+  "signy-access-application",
+  {
+    zoneId,
+    name: pulumi.interpolate`fn0 signy ${suffix}`,
+    domain: signyHostname,
+    type: "self_hosted",
+    sessionDuration: "24h",
+    serviceAuth401Redirect: true,
+    policies: [
+      {
+        name: "collecty service token",
+        decision: "non_identity",
+        includes: [
+          {
+            serviceToken: { tokenId: signyAccessServiceToken.id },
+          },
+        ],
+      },
+    ],
+  },
+  cloudflareOperatedResource,
+);
+
+const signyTunnel = new cloudflare.Tunnel(
+  "signy-tunnel",
+  {
+    accountId,
+    name: pulumi.interpolate`fn0-signy-${suffix}`,
+    configSrc: "cloudflare",
+  },
+  cloudflareOperatedResource,
+);
+
+new cloudflare.TunnelConfig(
+  "signy-tunnel-config",
+  {
+    accountId,
+    tunnelId: signyTunnel.id,
+    config: {
+      ingresses: [
+        {
+          hostname: signyHostname,
+          service: "http://127.0.0.1:3100",
+        },
+        { service: "http_status:404" },
+      ],
+    },
+  },
+  cloudflareOperatedResource,
+);
+
+new cloudflare.Record(
+  "signy-tunnel-dns",
+  {
+    zoneId,
+    name: signyHostname,
+    type: "CNAME",
+    content: pulumi.interpolate`${signyTunnel.id}.cfargotunnel.com`,
+    proxied: true,
+    ttl: 1,
+  },
+  cloudflareOperatedResource,
+);
+
+const collectyImageRef = config.require("collectyImageRef");
+const signyImageRef = config.require("signyImageRef");
+const telemetryConfigVersion = config.require("telemetryConfigVersion");
+const workerHostObservability = {
+  collectyImageRef,
+  signyUrl: `https://${signyHostname}`,
+  signyAccessClientId: signyAccessServiceToken.clientId,
+  signyAccessClientSecret: signyAccessServiceToken.clientSecret,
+  generatedTelemetryTenant: "fn0",
+  telemetryConfigVersion,
+};
 
 const bundleStoreR2Worker = new fn0.BundleStoreR2Worker(
   "bundle-store-r2-worker",
@@ -549,13 +627,6 @@ const controlEnvYamlBootstrap = pulumi
         "",
       ].join("\n"),
   );
-
-const workerHostObservability = {
-  metricsRemoteWriteUrl: `https://${metricsHostname}/api/v1/write`,
-  metricsOtlpUrl: `https://${metricsHostname}/opentelemetry`,
-  metricsBasicAuthUsername: metricsBasicAuthUsernameValue,
-  metricsBasicAuthPassword: metricsBasicAuthSecret.base64,
-};
 
 const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   region: config.require("ociComputeWorkerRegion"),
@@ -725,6 +796,7 @@ export const bundleStoreR2QueueId = bundleStoreR2.queueId;
 export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
 export const workerCompartmentId = ociFn0WorkerSite.compartmentId;
 export const workerBastionId = ociFn0WorkerSite.bastionId;
+export const workerInstancePoolId = ociFn0WorkerSite.instancePoolId;
 // The operator's own Cloudflare account and zone. fn0-control is a connected
 // project like any other, and `bootstrap-fn0-control.sh` provisions it here
 // because it cannot call `forte cloudflare connect` against a control plane
@@ -732,20 +804,22 @@ export const workerBastionId = ociFn0WorkerSite.bastionId;
 export const apexDomain = domain;
 export const cloudflareAccountId = accountId;
 export const cloudflareZoneId = zoneId;
-export const metricsWriteUrl = `https://${metricsHostname}/api/v1/write`;
-export const metricsQueryUrl = `https://${metricsHostname}`;
-export const metricsOtlpUrl = `https://${metricsHostname}/opentelemetry`;
-export const metricsBasicAuthUsername = metricsBasicAuthUsernameValue;
-export const metricsBasicAuthPassword = pulumi.secret(
-  metricsBasicAuthSecret.base64,
+export const signyHostnameOutput = signyHostname;
+export const signyUrl = `https://${signyHostname}`;
+export const signyImageRefOutput = signyImageRef;
+export const collectyImageRefOutput = collectyImageRef;
+export const signyTunnelId = signyTunnel.id;
+export const signyR2AccountId = signyR2.accountId;
+export const signyR2BucketName = signyR2.bucketName;
+export const signyR2StoragePrefix = signyR2.storagePrefix;
+export const signyR2Endpoint = signyR2.endpoint;
+export const signyR2AccessKeyId = pulumi.secret(signyR2.accessKeyId);
+export const signyR2SecretAccessKey = pulumi.secret(signyR2.secretAccessKey);
+export const signyAccessClientId = pulumi.secret(
+  signyAccessServiceToken.clientId,
 );
-export const metricsBackupR2BucketName = metricsBackupR2.bucketName;
-export const metricsBackupR2Endpoint = metricsBackupR2.endpoint;
-export const metricsBackupR2AccessKeyId = pulumi.secret(
-  metricsBackupR2.accessKeyId,
-);
-export const metricsBackupR2SecretAccessKey = pulumi.secret(
-  metricsBackupR2.secretAccessKey,
+export const signyAccessClientSecret = pulumi.secret(
+  signyAccessServiceToken.clientSecret,
 );
 // The telemetry node's setup script talks to Cloudflare directly (tunnel
 // ingress and the CNAMEs), so it needs the same credential the stack itself
