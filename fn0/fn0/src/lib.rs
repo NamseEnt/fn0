@@ -42,6 +42,7 @@ use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument;
 use wasmtime::Engine;
 use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
@@ -56,6 +57,7 @@ pub use public_storage_hijack::PublicStorageHijack;
 pub use purge_gate::PurgeGate;
 pub use queue_hijack::QueueHijack;
 pub use ski::{FetchHandler, FetchHandlerFuture};
+use static_page::StaticPageOutcome;
 pub use static_page_cache_hijack::StaticPageCacheHijack;
 pub use storage_target::{
     ObjectStorageResolver, PrivateObjectStorageTarget, PublicStorageResolver, PublicStorageTarget,
@@ -102,7 +104,7 @@ const CACHE_POLICY_STATIC_VALUE: &str = "static";
 /// replaces it — by `cache-tag` on deploy, by URL when an app invalidates one
 /// page. A shorter TTL would only add origin hits that return the same bytes.
 const STATIC_PAGE_CDN_CACHE_CONTROL: &str = "public, max-age=31536000";
-const EXECUTION_TIME_METRIC_KEY_HEADER: &str = "x-fn0-execution-time-metric-key";
+const METRIC_ROUTE_HEADER: &str = "x-fn0-execution-time-metric-key";
 const FN0_HEADER_PREFIX: &str = "x-fn0-";
 
 #[derive(Debug)]
@@ -311,7 +313,6 @@ impl<C: BundleCache> CodeExecutor<C> {
         &self.ctx
     }
 
-    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     pub async fn run(
         &self,
         project_id: &str,
@@ -319,6 +320,80 @@ impl<C: BundleCache> CodeExecutor<C> {
         request: Request,
         _fetch_handler: Option<Arc<dyn FetchHandler>>,
     ) -> Result<Response> {
+        let span = tracing::info_span!(
+            telemetry::REQUEST_SPAN_NAME,
+            otel.kind = "server",
+            fn0.project_tenant = %project_id,
+            http.request.method = %request.method(),
+            http.route = tracing::field::Empty,
+            http.response.status_code = tracing::field::Empty,
+            outcome = tracing::field::Empty,
+            otel.status_code = tracing::field::Empty,
+        );
+        let preserve_websocket_headers = request
+            .headers()
+            .contains_key("x-fn0-internal-websocket-event");
+        let start = std::time::Instant::now();
+        let result = self
+            .run_request(project_id, request)
+            .instrument(span.clone())
+            .await;
+        let duration = start.elapsed();
+
+        let route = result
+            .as_ref()
+            .ok()
+            .and_then(|response| response.headers().get(METRIC_ROUTE_HEADER))
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("unknown")
+            .to_string();
+        let status_code = result
+            .as_ref()
+            .ok()
+            .map(|response| response.status().as_u16());
+        let outcome = status_code
+            .map(telemetry::RequestOutcome::from_status)
+            .unwrap_or(telemetry::RequestOutcome::Failed);
+        telemetry::request_duration(project_id, &route, outcome, duration);
+        span.record("http.route", route.as_str());
+        span.record("outcome", outcome.as_str());
+        if let Some(status_code) = status_code {
+            span.record("http.response.status_code", status_code);
+        }
+        if outcome.is_error() {
+            span.record("otel.status_code", "ERROR");
+        }
+        let duration_ms = duration.as_millis() as u64;
+        if outcome == telemetry::RequestOutcome::ServerError {
+            tracing::warn!(
+                parent: &span,
+                project_id,
+                route,
+                status = status_code,
+                duration_ms,
+                "guest responded with a server error"
+            );
+        } else if duration >= telemetry::SLOW_REQUEST {
+            tracing::warn!(
+                parent: &span,
+                project_id,
+                route,
+                outcome = outcome.as_str(),
+                duration_ms,
+                "slow request"
+            );
+        }
+
+        result.map(|response| {
+            if preserve_websocket_headers {
+                response
+            } else {
+                strip_fn0_headers(response)
+            }
+        })
+    }
+
+    async fn run_request(&self, project_id: &str, request: Request) -> Result<Response> {
         let expected_code_version = request
             .headers()
             .get("x-fn0-internal-expected-code-version")
@@ -330,38 +405,12 @@ impl<C: BundleCache> CodeExecutor<C> {
                     .map_err(anyhow::Error::from)
             })
             .transpose()?;
-        let preserve_websocket_headers = request
-            .headers()
-            .contains_key("x-fn0-internal-websocket-event");
         let bundle_start = std::time::Instant::now();
         let bundle = self.ctx.bundle_cache.get(project_id).await?;
         verify_expected_code_version(bundle.code_version, expected_code_version)?;
         telemetry::stage_duration("bundle_get", bundle_start.elapsed());
 
-        telemetry::function_invocation();
-        let start = std::time::Instant::now();
-
-        let result = self.run_with_next(project_id, bundle, request).await;
-
-        let key = result
-            .as_ref()
-            .ok()
-            .and_then(|r| r.headers().get(EXECUTION_TIME_METRIC_KEY_HEADER))
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("unknown")
-            .to_string();
-        let status_code = result
-            .as_ref()
-            .map(|response| response.status().as_u16())
-            .unwrap_or(500);
-        telemetry::execution_time(project_id, &key, start.elapsed(), status_code);
-        result.map(|response| {
-            if preserve_websocket_headers {
-                response
-            } else {
-                strip_fn0_headers(response)
-            }
-        })
+        self.run_with_next(project_id, bundle, request).await
     }
 
     pub async fn sweep_unregistered(&self) {
@@ -394,45 +443,36 @@ impl<C: BundleCache> CodeExecutor<C> {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     pub async fn run_backend_only(&self, project_id: &str, request: Request) -> Result<Response> {
         let bundle = self.ctx.bundle_cache.get(project_id).await?;
         self.run_wasm(project_id, &bundle, request).await
     }
 
-    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     async fn run_with_next(
         &self,
         project_id: &str,
         bundle: Arc<Bundle>,
         request: Request,
     ) -> Result<Response> {
-        if let Some(candidate) = static_page_candidate(&bundle, &request)
-            && self
+        if let Some(candidate) = static_page_candidate(&bundle, &request) {
+            match self
                 .static_page_preflight(project_id, &bundle, &candidate, &request)
                 .await
-        {
-            static_page::record_result(
-                project_id,
-                candidate.code_version,
-                &candidate.path_identifier,
-                "eligible",
-            );
-            let sanitized_request = sanitize_static_request(request, &candidate.normalized_path);
-            let generation_start = std::time::Instant::now();
-            let (response, used_js) = self
-                .run_with_next_inner(project_id, bundle, sanitized_request)
-                .await?;
-            let result = self
-                .finish_static_response(project_id, &candidate, response, used_js)
-                .await;
-            static_page::record_generation_duration(
-                project_id,
-                candidate.code_version,
-                &candidate.path_identifier,
-                generation_start.elapsed(),
-            );
-            return result;
+            {
+                StaticPagePreflight::Static => {
+                    let sanitized_request =
+                        sanitize_static_request(request, &candidate.normalized_path);
+                    return self
+                        .generate_static_page(project_id, bundle, &candidate, sanitized_request)
+                        .await;
+                }
+                StaticPagePreflight::Dynamic => {
+                    static_page::record_outcome(project_id, StaticPageOutcome::PreflightMiss);
+                }
+                StaticPagePreflight::Failed => {
+                    static_page::record_outcome(project_id, StaticPageOutcome::Error);
+                }
+            }
         }
 
         let (response, used_js) = self
@@ -444,13 +484,56 @@ impl<C: BundleCache> CodeExecutor<C> {
         Ok(response)
     }
 
+    async fn generate_static_page(
+        &self,
+        project_id: &str,
+        bundle: Arc<Bundle>,
+        candidate: &StaticPageCandidate,
+        request: Request,
+    ) -> Result<Response> {
+        let generation_start = std::time::Instant::now();
+        let result = match self.run_with_next_inner(project_id, bundle, request).await {
+            Ok((response, used_js)) => {
+                self.finish_static_response(project_id, candidate, response, used_js)
+                    .await
+            }
+            Err(error) => Err(error),
+        };
+        let duration = generation_start.elapsed();
+        let outcome = match &result {
+            Ok((_, outcome)) => *outcome,
+            Err(_) => StaticPageOutcome::Error,
+        };
+        static_page::record_outcome(project_id, outcome);
+        static_page::record_generation_duration(project_id, outcome, duration);
+        if let Err(error) = &result {
+            tracing::warn!(
+                project_id,
+                code_version = candidate.code_version,
+                path_hash = %candidate.path_hash,
+                duration_ms = duration.as_millis() as u64,
+                "static page generation failed: {error:#}"
+            );
+        } else if duration >= static_page::SLOW_GENERATION {
+            tracing::warn!(
+                project_id,
+                code_version = candidate.code_version,
+                path_hash = %candidate.path_hash,
+                outcome = outcome.as_str(),
+                duration_ms = duration.as_millis() as u64,
+                "slow static page generation"
+            );
+        }
+        result.map(|(response, _)| response)
+    }
+
     async fn static_page_preflight(
         &self,
         project_id: &str,
         bundle: &Arc<Bundle>,
         candidate: &StaticPageCandidate,
         incoming: &Request,
-    ) -> bool {
+    ) -> StaticPagePreflight {
         // The guest rebuilds its URI as `{scheme}://{authority}{path}`, taking the
         // authority from Host when the p3 request carries none. Without Host the
         // synthesized preflight parses as an invalid URI and the guest traps.
@@ -469,20 +552,14 @@ impl<C: BundleCache> CodeExecutor<C> {
         let mut request = match request {
             Ok(request) => request,
             Err(error) => {
-                static_page::record_result(
-                    project_id,
-                    candidate.code_version,
-                    &candidate.path_identifier,
-                    "preflight_error",
-                );
                 tracing::warn!(
                     %error,
                     project_id,
                     code_version = candidate.code_version,
-                    path_identifier = %candidate.path_identifier,
+                    path_hash = %candidate.path_hash,
                     "failed to build static page preflight request"
                 );
-                return false;
+                return StaticPagePreflight::Failed;
             }
         };
         if let Some(cancellation) = incoming.extensions().get::<RequestCancellation>() {
@@ -498,32 +575,17 @@ impl<C: BundleCache> CodeExecutor<C> {
                         .and_then(|value| value.to_str().ok())
                         == Some(CACHE_POLICY_STATIC_VALUE) =>
             {
-                true
+                StaticPagePreflight::Static
             }
-            Ok(_) => {
-                static_page::record_result(
-                    project_id,
-                    candidate.code_version,
-                    &candidate.path_identifier,
-                    "preflight_miss",
-                );
-                false
-            }
+            Ok(_) => StaticPagePreflight::Dynamic,
             Err(error) => {
-                static_page::record_result(
-                    project_id,
-                    candidate.code_version,
-                    &candidate.path_identifier,
-                    "preflight_error",
-                );
                 tracing::warn!(
-                    %error,
                     project_id,
                     code_version = candidate.code_version,
-                    path_identifier = %candidate.path_identifier,
-                    "static page preflight failed; falling back to normal SSR"
+                    path_hash = %candidate.path_hash,
+                    "static page preflight failed; falling back to normal SSR: {error:#}"
                 );
-                false
+                StaticPagePreflight::Failed
             }
         }
     }
@@ -569,7 +631,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         candidate: &StaticPageCandidate,
         response: Response,
         used_js: bool,
-    ) -> Result<Response> {
+    ) -> Result<(Response, StaticPageOutcome)> {
         let (mut parts, body) = response.into_parts();
         let body = body.collect().await?.to_bytes();
         let content_type = parts
@@ -583,29 +645,21 @@ impl<C: BundleCache> CodeExecutor<C> {
             && !parts.headers.contains_key(SET_COOKIE);
 
         if safe {
-            static_page::record_result(
-                project_id,
-                candidate.code_version,
-                &candidate.path_identifier,
-                "generated",
-            );
-            static_page::record_result(
-                project_id,
-                candidate.code_version,
-                &candidate.path_identifier,
-                "cdn_cacheable",
-            );
-            return Ok(static_html_response_from_parts(
-                project_id, candidate, parts, body,
+            return Ok((
+                static_html_response_from_parts(project_id, candidate, parts, body),
+                StaticPageOutcome::Cacheable,
             ));
-        } else {
-            static_page::record_result(
-                project_id,
-                candidate.code_version,
-                &candidate.path_identifier,
-                "unsafe_response",
-            );
         }
+        tracing::warn!(
+            project_id,
+            code_version = candidate.code_version,
+            path_hash = %candidate.path_hash,
+            used_js,
+            status = parts.status.as_u16(),
+            content_type,
+            sets_cookie = parts.headers.contains_key(SET_COOKIE),
+            "static page response is not cacheable"
+        );
 
         parts.headers.remove("cloudflare-cdn-cache-control");
         parts.headers.remove("cache-tag");
@@ -613,10 +667,9 @@ impl<C: BundleCache> CodeExecutor<C> {
             CACHE_CONTROL,
             hyper::header::HeaderValue::from_static("private, no-store"),
         );
-        Ok(build_response(parts, body))
+        Ok((build_response(parts, body), StaticPageOutcome::Unsafe))
     }
 
-    #[tracing::instrument(skip_all, fields(project_id = %project_id))]
     async fn run_wasm(
         &self,
         project_id: &str,
@@ -658,10 +711,7 @@ impl<C: BundleCache> CodeExecutor<C> {
             return Ok(internal_error());
         }
         // body is buffered up-front: a retry rebuilds the js request from it.
-        let metric_key = wasm_resp
-            .headers()
-            .get(EXECUTION_TIME_METRIC_KEY_HEADER)
-            .cloned();
+        let metric_key = wasm_resp.headers().get(METRIC_ROUTE_HEADER).cloned();
         let wasm_set_cookies: Vec<_> = wasm_resp
             .headers()
             .get_all(hyper::header::SET_COOKIE)
@@ -719,7 +769,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                     if let Some(metric_key) = &metric_key {
                         response
                             .headers_mut()
-                            .insert(EXECUTION_TIME_METRIC_KEY_HEADER, metric_key.clone());
+                            .insert(METRIC_ROUTE_HEADER, metric_key.clone());
                     }
                     for cookie in &wasm_set_cookies {
                         response
@@ -730,7 +780,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 }
                 Err(panic) => {
                     poisoned.set(true);
-                    telemetry::panicked();
+                    telemetry::failure(telemetry::FailureComponent::Executor, "panic");
                     let msg = panic_util::panic_payload_string(&panic);
                     tracing::error!(project_id, attempt, "js instance panicked: {msg}");
                     if attempt >= 2 {
@@ -869,7 +919,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 }
                 Err(panic) => {
                     let panic_msg = panic_util::panic_payload_string(&panic);
-                    telemetry::panicked();
+                    telemetry::failure(telemetry::FailureComponent::Executor, "panic");
                     tracing::error!(
                         project_id = %project_id_for_log,
                         panic = %panic_msg,
@@ -905,8 +955,14 @@ fn verify_expected_code_version(
 struct StaticPageCandidate {
     code_version: u64,
     normalized_path: String,
-    path_identifier: String,
+    path_hash: String,
     method: Method,
+}
+
+enum StaticPagePreflight {
+    Static,
+    Dynamic,
+    Failed,
 }
 
 fn static_page_candidate(bundle: &Bundle, request: &Request) -> Option<StaticPageCandidate> {
@@ -918,11 +974,11 @@ fn static_page_candidate(bundle: &Bundle, request: &Request) -> Option<StaticPag
     }
     let code_version = bundle.code_version?;
     let normalized_path = static_page::normalize_path(request.uri().path()).ok()?;
-    let path_identifier = static_page::path_identifier_for(&normalized_path);
+    let path_hash = static_page::path_hash_for(&normalized_path);
     Some(StaticPageCandidate {
         code_version,
         normalized_path,
-        path_identifier: path_identifier.clone(),
+        path_hash,
         method: request.method().clone(),
     })
 }

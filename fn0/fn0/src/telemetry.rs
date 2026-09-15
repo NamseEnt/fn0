@@ -2,159 +2,222 @@ use opentelemetry::{KeyValue, global};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
+use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
+
+pub const REQUEST_SPAN_NAME: &str = "fn0.request";
+/// Marks a span or data point as the named project's own telemetry. The
+/// worker's exporter moves everything carrying it into that project's tenant
+/// and removes the attribute; everything without it stays in the platform
+/// tenant. The request span sets it under this literal name, so the two must
+/// not drift apart.
+pub const PROJECT_TENANT_ATTRIBUTE: &str = "fn0.project_tenant";
+pub const SLOW_REQUEST: Duration = Duration::from_secs(1);
+pub const REQUEST_DURATION_METRIC: &str = "fn0.request.duration";
+pub const CPU_TIME_METRIC: &str = "fn0.cpu_time";
+pub const MAX_ROUTES_PER_PROJECT: usize = 40;
 
 const SECONDS_BUCKETS: [f64; 7] = [0.005, 0.025, 0.1, 0.5, 1.0, 5.0, 30.0];
 const UNKNOWN_ROUTE: &str = "unknown";
-pub const MAX_ROUTES_PER_PROJECT: usize = 40;
 
 static PROJECT_ROUTES: OnceLock<Mutex<HashMap<String, HashSet<String>>>> = OnceLock::new();
 
-pub fn wasmtime_error(func: &'static str, error: &str) {
-    let counter = global::meter("fn0").u64_counter("wasmtime_error").build();
-    counter.add(
-        1,
-        &[
-            KeyValue::new("func", func),
-            KeyValue::new("error", error.to_string()),
-        ],
-    );
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailureComponent {
+    Instantiate,
+    RunConcurrent,
+    ResponseIntoHttp,
+    GuestHandler,
+    Executor,
+    ResponseChannel,
 }
 
-pub fn oneshot_drop_before_response() {
-    let counter = global::meter("fn0")
-        .u64_counter("oneshot_drop_before_response")
-        .build();
-    counter.add(1, &[]);
-}
-
-pub fn proxy_returns_error_code(error_code: &str) {
-    let counter = global::meter("fn0")
-        .u64_counter("proxy_returns_error_code")
-        .build();
-    counter.add(1, &[KeyValue::new("error_code", error_code.to_string())]);
-}
-
-pub fn request_task_join_error(error: &str) {
-    let counter = global::meter("fn0")
-        .u64_counter("request_task_join_error")
-        .build();
-    counter.add(1, &[KeyValue::new("error", error.to_string())]);
-}
-
-pub fn cpu_time(project_id: &str, cpu_time: Duration) {
-    let histogram = global::meter("fn0")
-        .f64_histogram("cpu_time_seconds")
-        .with_boundaries(SECONDS_BUCKETS.to_vec())
-        .build();
-    histogram.record(
-        cpu_time.as_secs_f64(),
-        &[KeyValue::new("fn0.project_id", project_id.to_string())],
-    );
-}
-
-pub fn cpu_timeout(project_id: &str, cpu_time: Duration) {
-    let counter = global::meter("fn0").u64_counter("cpu_timeout").build();
-    counter.add(
-        1,
-        &[KeyValue::new("fn0.project_id", project_id.to_string())],
-    );
-
-    let histogram = global::meter("fn0")
-        .f64_histogram("cpu_timeout_seconds")
-        .with_boundaries(SECONDS_BUCKETS.to_vec())
-        .build();
-    histogram.record(
-        cpu_time.as_secs_f64(),
-        &[KeyValue::new("fn0.project_id", project_id.to_string())],
-    );
-}
-
-pub fn trapped(trap: &str) {
-    let counter = global::meter("fn0").u64_counter("trapped").build();
-    counter.add(1, &[KeyValue::new("trap", trap.to_string())]);
-}
-
-pub fn canceled_unexpectedly(error: &str) {
-    let counter = global::meter("fn0")
-        .u64_counter("canceled_unexpectedly")
-        .build();
-    counter.add(1, &[KeyValue::new("error", error.to_string())]);
-}
-
-pub fn create_instance() {
-    let counter = global::meter("fn0").u64_counter("create_instance").build();
-    counter.add(1, &[]);
-}
-
-pub fn proxy_cache_error(error: &str) {
-    let counter = global::meter("fn0")
-        .u64_counter("proxy_cache_error")
-        .build();
-    counter.add(1, &[KeyValue::new("error", error.to_string())]);
-}
-
-pub fn project_id_parse_error() {
-    let counter = global::meter("fn0")
-        .u64_counter("project_id_parse_error")
-        .build();
-    counter.add(1, &[]);
-}
-
-pub fn function_invocation() {
-    let counter = global::meter("fn0")
-        .u64_counter("function_invocation")
-        .build();
-    counter.add(1, &[]);
-}
-
-pub fn execution_time(project_id: &str, route: &str, duration: Duration, status_code: u16) {
-    let route = bounded_route(project_id, route);
-    let histogram = global::meter("fn0")
-        .f64_histogram("execution_time_seconds")
-        .with_boundaries(SECONDS_BUCKETS.to_vec())
-        .build();
-    histogram.record(
-        duration.as_secs_f64(),
-        &[
-            KeyValue::new("fn0.project_id", project_id.to_string()),
-            KeyValue::new("route", route.clone()),
-        ],
-    );
-
-    if let Some(status_class) = error_status_class(status_code) {
-        let counter = global::meter("fn0").u64_counter("request_errors").build();
-        counter.add(
-            1,
-            &[
-                KeyValue::new("fn0.project_id", project_id.to_string()),
-                KeyValue::new("route", route),
-                KeyValue::new("status_class", status_class),
-            ],
-        );
+impl FailureComponent {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Instantiate => "instantiate",
+            Self::RunConcurrent => "run_concurrent",
+            Self::ResponseIntoHttp => "response_into_http",
+            Self::GuestHandler => "guest_handler",
+            Self::Executor => "executor",
+            Self::ResponseChannel => "response_channel",
+        }
     }
 }
 
-pub fn panicked() {
-    let counter = global::meter("fn0").u64_counter("panicked").build();
-    counter.add(1, &[]);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RequestOutcome {
+    Ok,
+    ClientError,
+    ServerError,
+    Failed,
 }
 
-pub fn request_deadline_exceeded() {
-    let counter = global::meter("fn0")
-        .u64_counter("request_deadline_exceeded")
-        .build();
-    counter.add(1, &[]);
+impl RequestOutcome {
+    pub fn from_status(status_code: u16) -> Self {
+        match status_code {
+            400..=499 => Self::ClientError,
+            500..=599 => Self::ServerError,
+            _ => Self::Ok,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::ClientError => "client_error",
+            Self::ServerError => "server_error",
+            Self::Failed => "failed",
+        }
+    }
+
+    pub fn is_error(self) -> bool {
+        matches!(self, Self::ServerError | Self::Failed)
+    }
+}
+
+/// `error_type` is `&'static str` so that no caller can put a formatted error
+/// message into a metric attribute; the message belongs in a log.
+pub fn failure(component: FailureComponent, error_type: &'static str) {
+    global::meter("fn0")
+        .u64_counter("fn0.failures")
+        .build()
+        .add(
+            1,
+            &[
+                KeyValue::new("component", component.as_str()),
+                KeyValue::new("error.type", error_type),
+            ],
+        );
+}
+
+pub fn trap_error_type(trap: &wasmtime::Trap) -> &'static str {
+    match trap {
+        wasmtime::Trap::StackOverflow => "stack_overflow",
+        wasmtime::Trap::MemoryOutOfBounds => "memory_out_of_bounds",
+        wasmtime::Trap::TableOutOfBounds => "table_out_of_bounds",
+        wasmtime::Trap::IndirectCallToNull => "indirect_call_to_null",
+        wasmtime::Trap::BadSignature => "bad_signature",
+        wasmtime::Trap::IntegerOverflow => "integer_overflow",
+        wasmtime::Trap::IntegerDivisionByZero => "integer_division_by_zero",
+        wasmtime::Trap::BadConversionToInteger => "bad_conversion_to_integer",
+        wasmtime::Trap::UnreachableCodeReached => "unreachable_code_reached",
+        wasmtime::Trap::Interrupt => "interrupt",
+        wasmtime::Trap::OutOfFuel => "out_of_fuel",
+        wasmtime::Trap::AllocationTooLarge => "allocation_too_large",
+        _ => "other_trap",
+    }
+}
+
+pub fn error_code_error_type(error_code: &ErrorCode) -> &'static str {
+    match error_code {
+        ErrorCode::DnsTimeout => "dns_timeout",
+        ErrorCode::DnsError(_) => "dns_error",
+        ErrorCode::DestinationNotFound => "destination_not_found",
+        ErrorCode::DestinationUnavailable => "destination_unavailable",
+        ErrorCode::DestinationIpProhibited => "destination_ip_prohibited",
+        ErrorCode::DestinationIpUnroutable => "destination_ip_unroutable",
+        ErrorCode::ConnectionRefused => "connection_refused",
+        ErrorCode::ConnectionTerminated => "connection_terminated",
+        ErrorCode::ConnectionTimeout => "connection_timeout",
+        ErrorCode::ConnectionReadTimeout => "connection_read_timeout",
+        ErrorCode::ConnectionWriteTimeout => "connection_write_timeout",
+        ErrorCode::ConnectionLimitReached => "connection_limit_reached",
+        ErrorCode::TlsProtocolError => "tls_protocol_error",
+        ErrorCode::TlsCertificateError => "tls_certificate_error",
+        ErrorCode::TlsAlertReceived(_) => "tls_alert_received",
+        ErrorCode::HttpRequestDenied => "http_request_denied",
+        ErrorCode::HttpRequestLengthRequired => "http_request_length_required",
+        ErrorCode::HttpRequestBodySize(_) => "http_request_body_size",
+        ErrorCode::HttpRequestMethodInvalid => "http_request_method_invalid",
+        ErrorCode::HttpRequestUriInvalid => "http_request_uri_invalid",
+        ErrorCode::HttpRequestUriTooLong => "http_request_uri_too_long",
+        ErrorCode::HttpRequestHeaderSectionSize(_) => "http_request_header_section_size",
+        ErrorCode::HttpRequestHeaderSize(_) => "http_request_header_size",
+        ErrorCode::HttpRequestTrailerSectionSize(_) => "http_request_trailer_section_size",
+        ErrorCode::HttpRequestTrailerSize(_) => "http_request_trailer_size",
+        ErrorCode::HttpResponseIncomplete => "http_response_incomplete",
+        ErrorCode::HttpResponseHeaderSectionSize(_) => "http_response_header_section_size",
+        ErrorCode::HttpResponseHeaderSize(_) => "http_response_header_size",
+        ErrorCode::HttpResponseBodySize(_) => "http_response_body_size",
+        ErrorCode::HttpResponseTrailerSectionSize(_) => "http_response_trailer_section_size",
+        ErrorCode::HttpResponseTrailerSize(_) => "http_response_trailer_size",
+        ErrorCode::HttpResponseTransferCoding(_) => "http_response_transfer_coding",
+        ErrorCode::HttpResponseContentCoding(_) => "http_response_content_coding",
+        ErrorCode::HttpResponseTimeout => "http_response_timeout",
+        ErrorCode::HttpUpgradeFailed => "http_upgrade_failed",
+        ErrorCode::HttpProtocolError => "http_protocol_error",
+        ErrorCode::LoopDetected => "loop_detected",
+        ErrorCode::ConfigurationError => "configuration_error",
+        ErrorCode::InternalError(_) => "internal_error",
+    }
+}
+
+pub fn cpu_time(project_id: &str, cpu_time: Duration) {
+    global::meter("fn0")
+        .f64_histogram(CPU_TIME_METRIC)
+        .with_unit("s")
+        .with_boundaries(SECONDS_BUCKETS.to_vec())
+        .build()
+        .record(
+            cpu_time.as_secs_f64(),
+            &[KeyValue::new(
+                PROJECT_TENANT_ATTRIBUTE,
+                project_id.to_string(),
+            )],
+        );
+}
+
+pub fn cpu_timeout(project_id: &str) {
+    global::meter("fn0")
+        .u64_counter("fn0.cpu_timeouts")
+        .build()
+        .add(
+            1,
+            &[KeyValue::new(
+                PROJECT_TENANT_ATTRIBUTE,
+                project_id.to_string(),
+            )],
+        );
+}
+
+pub fn create_instance() {
+    global::meter("fn0")
+        .u64_counter("fn0.instances_created")
+        .build()
+        .add(1, &[]);
+}
+
+pub fn request_duration(
+    project_id: &str,
+    route: &str,
+    outcome: RequestOutcome,
+    duration: Duration,
+) {
+    global::meter("fn0")
+        .f64_histogram(REQUEST_DURATION_METRIC)
+        .with_unit("s")
+        .with_boundaries(SECONDS_BUCKETS.to_vec())
+        .build()
+        .record(
+            duration.as_secs_f64(),
+            &[
+                KeyValue::new(PROJECT_TENANT_ATTRIBUTE, project_id.to_string()),
+                KeyValue::new("route", bounded_route(project_id, route)),
+                KeyValue::new("outcome", outcome.as_str()),
+            ],
+        );
 }
 
 pub fn stage_duration(stage: &'static str, duration: Duration) {
-    let histogram = global::meter("fn0")
-        .f64_histogram("stage_duration_seconds")
+    global::meter("fn0")
+        .f64_histogram("fn0.stage.duration")
+        .with_unit("s")
         .with_boundaries(SECONDS_BUCKETS.to_vec())
-        .build();
-    histogram.record(duration.as_secs_f64(), &[KeyValue::new("stage", stage)]);
+        .build()
+        .record(duration.as_secs_f64(), &[KeyValue::new("stage", stage)]);
 }
 
-fn bounded_route(project_id: &str, route: &str) -> String {
+pub fn bounded_route(project_id: &str, route: &str) -> String {
     if route == UNKNOWN_ROUTE {
         return UNKNOWN_ROUTE.to_string();
     }
@@ -175,17 +238,9 @@ fn bounded_route(project_id: &str, route: &str) -> String {
     UNKNOWN_ROUTE.to_string()
 }
 
-fn error_status_class(status_code: u16) -> Option<&'static str> {
-    match status_code {
-        400..=499 => Some("4xx"),
-        500..=599 => Some("5xx"),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{MAX_ROUTES_PER_PROJECT, bounded_route, error_status_class};
+    use super::{MAX_ROUTES_PER_PROJECT, RequestOutcome, bounded_route};
 
     #[test]
     fn bounds_routes_per_project() {
@@ -201,12 +256,27 @@ mod tests {
     }
 
     #[test]
-    fn classifies_error_statuses() {
-        assert_eq!(error_status_class(399), None);
-        assert_eq!(error_status_class(400), Some("4xx"));
-        assert_eq!(error_status_class(499), Some("4xx"));
-        assert_eq!(error_status_class(500), Some("5xx"));
-        assert_eq!(error_status_class(599), Some("5xx"));
-        assert_eq!(error_status_class(600), None);
+    fn classifies_request_outcomes_by_status() {
+        assert_eq!(RequestOutcome::from_status(200), RequestOutcome::Ok);
+        assert_eq!(RequestOutcome::from_status(399), RequestOutcome::Ok);
+        assert_eq!(
+            RequestOutcome::from_status(400),
+            RequestOutcome::ClientError
+        );
+        assert_eq!(
+            RequestOutcome::from_status(499),
+            RequestOutcome::ClientError
+        );
+        assert_eq!(
+            RequestOutcome::from_status(500),
+            RequestOutcome::ServerError
+        );
+        assert_eq!(
+            RequestOutcome::from_status(599),
+            RequestOutcome::ServerError
+        );
+        assert!(!RequestOutcome::ClientError.is_error());
+        assert!(RequestOutcome::ServerError.is_error());
+        assert!(RequestOutcome::Failed.is_error());
     }
 }

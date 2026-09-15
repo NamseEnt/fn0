@@ -1,16 +1,21 @@
 use crate::http::{Body, Client, Method, Request};
 use opentelemetry::KeyValue;
+use opentelemetry::propagation::{Extractor, TextMapPropagator};
 use opentelemetry::trace::SpanId;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::error::{OTelSdkError, OTelSdkResult};
-use opentelemetry_sdk::trace::{SdkTracerProvider, Span, SpanData, SpanExporter, SpanProcessor};
+use opentelemetry_sdk::propagation::TraceContextPropagator;
+use opentelemetry_sdk::trace::{
+    Sampler, SdkTracerProvider, Span, SpanData, SpanExporter, SpanProcessor,
+};
 use prost::Message;
 use std::sync::{Arc, Mutex, OnceLock};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 const ENDPOINT: &str = "http://fn0-otel.fn0.dev/v1/traces";
+const SAMPLED_ROOT_RATIO: f64 = 0.01;
 
 #[derive(Debug, Clone)]
 struct ForteOtlpExporter {
@@ -71,10 +76,10 @@ impl SpanProcessor for BufferedAsyncProcessor {
     fn on_start(&self, _span: &mut Span, _cx: &opentelemetry::Context) {}
 
     fn on_end(&self, span: SpanData) {
-        let is_root = span.parent_span_id == SpanId::INVALID;
+        let is_local_root = span.parent_span_id == SpanId::INVALID || span.parent_span_is_remote;
         if let Ok(mut buf) = self.buffer.lock() {
             buf.push(span);
-            if is_root {
+            if is_local_root {
                 let batch: Vec<SpanData> = buf.drain(..).collect();
                 drop(buf);
                 let exporter = self.exporter.clone();
@@ -125,6 +130,9 @@ pub(crate) fn init_once() {
         };
         let provider = SdkTracerProvider::builder()
             .with_span_processor(processor)
+            .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+                SAMPLED_ROOT_RATIO,
+            ))))
             .with_resource(resource)
             .build();
         let tracer = opentelemetry::trace::TracerProvider::tracer(&provider, service_name);
@@ -142,4 +150,23 @@ pub(crate) fn init_once() {
             .try_init();
         opentelemetry::global::set_tracer_provider(provider);
     });
+}
+
+struct HeaderExtractor<'a>(&'a http::HeaderMap);
+
+impl Extractor for HeaderExtractor<'_> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).and_then(|value| value.to_str().ok())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        self.0.keys().map(|name| name.as_str()).collect()
+    }
+}
+
+/// Makes `span` a child of the trace named in the request's `traceparent`, so
+/// the request keeps the sampling decision fn0 already made for it.
+pub(crate) fn continue_trace(span: &tracing::Span, headers: &http::HeaderMap) {
+    let parent_context = TraceContextPropagator::new().extract(&HeaderExtractor(headers));
+    let _ = tracing_opentelemetry::OpenTelemetrySpanExt::set_parent(span, parent_context);
 }

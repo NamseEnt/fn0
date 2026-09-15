@@ -2,10 +2,11 @@
 
 The fn0 production telemetry path is:
 
-`fn0 workload -> worker OTLP -> Alloy gateway -> collecty durable queue -> Signy -> Cloudflare R2`
+`fn0 workload -> worker OTLP -> collecty durable queue -> Signy -> Cloudflare R2`
 
-The active worker pool has one worker. Its Alloy receiver listens on loopback
-ports `4317` and `4318`; collecty listens on `127.0.0.1:14318`. Signy listens
+The active worker pool has one worker. Collecty listens on `127.0.0.1:4318`,
+and the worker exports its own telemetry and every forwarded guest export
+there. Signy listens
 on `127.0.0.1:3100` on `192.168.0.10`. External access is
 `https://signy.fn0.dev`, protected by a Cloudflare Access service token and
 served through the Signy Tunnel.
@@ -17,7 +18,6 @@ served through the Signy Tunnel.
 - Signy image:
   `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:4aca3acd27a49a7e9d617366c3e1c5d4bf77a69f53f09b77552d6e84c8e1b3a2`
 - Obsy source revision for these images: `406a55fca23c433a05c772510e96d9c6ebb5e0e4`
-- Alloy image: `docker.io/grafana/alloy:v1.10.2`
 - R2 bucket: `fn0-signy-u35twkcf`
 - R2 prefix: `fn0/signy`
 - R2 catalog lock: seven days
@@ -58,8 +58,23 @@ collection. Host metrics are sampled once per minute. Signy runs with
 the worker's 50 GiB volume and is the recovery buffer when Signy is unavailable.
 
 Signy declares a 2 GiB memory budget, an 8 GiB cache limit, a 1 GiB WAL
-backlog limit, a 4 GiB minimum free-disk floor, a 30-day `fn0` retention
-policy, and a 10 GiB tenant storage limit. Signy container logs rotate at five
+backlog limit, a 4 GiB minimum free-disk floor, and a 10 GiB tenant storage
+limit. The `fn0` retention policy keeps metrics 30 days, logs 14 days, and
+traces 3 days.
+
+Signy flushes at most once a minute (`SIGNY_FLUSH_MAX_INTERVAL=60s`), so data
+reaches R2 up to a minute after it is written to the local WAL. Fewer flushes
+mean fewer parts and fewer catalog commits. Trace parts are compacted by size
+tier like metric parts. Orphaned part objects are collected every hour
+(`SIGNY_ORPHAN_GC_INTERVAL=1h`) whether or not retention expired anything, and
+catalog commits and snapshots older than eight days
+(`SIGNY_CATALOG_PRUNE_MIN_AGE=8d`, one day past the seven-day Bucket Lock) are
+deleted once two newer snapshots verify.
+
+On the worker, 1% of requests are traced and background loops are never traced.
+Server errors and requests slower than one second are always logged instead.
+Request metrics carry the project, the route template, and a bounded outcome;
+raw paths and raw error messages go to logs only. Signy container logs rotate at five
 100 MiB files. At the verification time the R2 bucket contained 1,281 objects
 using about 2.1 MiB; this includes only the current rollout and verification
 data. VictoriaMetrics
@@ -71,7 +86,7 @@ The production checks completed on 2026-09-14:
 
 1. `https://signy.fn0.dev/ready` returned `401` without Access headers and
    `200` with the configured service token.
-2. The worker services `fn0-alloy`, `fn0-collecty`, `fn0-worker-agent`, and
+2. The worker services `fn0-collecty`, `fn0-worker-agent`, and
    `fn0-worker-proxy` were all active. Collecty ran the pinned digest above.
 3. Requests to `https://fn0.dev` generated records queried from Signy with
    `X-Tenant-Id: fn0`; returned records carried `project_id=fn0-control` and

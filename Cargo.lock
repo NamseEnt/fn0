@@ -2122,7 +2122,7 @@ dependencies = [
 
 [[package]]
 name = "fn0"
-version = "0.6.9"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2404,7 +2404,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-worker"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2432,7 +2432,9 @@ dependencies = [
  "opentelemetry-appender-tracing",
  "opentelemetry-http",
  "opentelemetry-otlp",
+ "opentelemetry-proto",
  "opentelemetry_sdk",
+ "prost 0.14.3",
  "quinn",
  "rand 0.8.5",
  "rcgen",

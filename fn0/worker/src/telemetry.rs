@@ -1,5 +1,6 @@
 use bytes::Bytes;
-use opentelemetry::{global, trace::TracerProvider};
+use opentelemetry::trace::{Link, SamplingDecision, SamplingResult, SpanKind, TraceId, TraceState};
+use opentelemetry::{Context, KeyValue, global, trace::TracerProvider};
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_http::{HttpClient, HttpError};
 use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig};
@@ -8,7 +9,7 @@ use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::metrics::{
     Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream,
 };
-use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::trace::{Sampler, SdkTracerProvider, ShouldSample};
 use std::time::Duration;
 use tokio::runtime::Handle;
 use tracing::info;
@@ -18,10 +19,60 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 pub type TelemetryProviders = (SdkTracerProvider, SdkMeterProvider, SdkLoggerProvider);
 
+const SERVICE_NAME: &str = "fn0-worker";
+const TENANT_ATTRIBUTE: &str = "tenant.id";
+const SAMPLED_REQUEST_RATIO: f64 = 0.01;
+
+/// Decides a trace at its root: a request is kept at [`SAMPLED_REQUEST_RATIO`],
+/// and any other root — a manifest poll, a cache sweep — is dropped, because
+/// nothing asks a question of a successful background loop that its logs and
+/// metrics do not already answer.
+#[derive(Clone, Debug)]
+struct RequestRootSampler;
+
+impl ShouldSample for RequestRootSampler {
+    fn should_sample(
+        &self,
+        parent_context: Option<&Context>,
+        trace_id: TraceId,
+        name: &str,
+        span_kind: &SpanKind,
+        attributes: &[KeyValue],
+        links: &[Link],
+    ) -> SamplingResult {
+        if name == fn0::telemetry::REQUEST_SPAN_NAME {
+            return Sampler::TraceIdRatioBased(SAMPLED_REQUEST_RATIO).should_sample(
+                parent_context,
+                trace_id,
+                name,
+                span_kind,
+                attributes,
+                links,
+            );
+        }
+        SamplingResult {
+            decision: SamplingDecision::Drop,
+            attributes: Vec::new(),
+            trace_state: TraceState::default(),
+        }
+    }
+}
+
+fn resource(platform_tenant_id: &str) -> Resource {
+    Resource::builder()
+        .with_service_name(SERVICE_NAME)
+        .with_attribute(KeyValue::new(
+            TENANT_ATTRIBUTE,
+            platform_tenant_id.to_string(),
+        ))
+        .build()
+}
+
 #[derive(Debug, Clone)]
 struct TokioHttpClient {
     client: reqwest::Client,
     handle: Handle,
+    platform_tenant_id: String,
 }
 
 #[async_trait::async_trait]
@@ -31,6 +82,18 @@ impl HttpClient for TokioHttpClient {
         request: http::Request<Bytes>,
     ) -> Result<http::Response<Bytes>, HttpError> {
         let client = self.client.clone();
+        let request = match crate::project_tenant::route_export(
+            request.uri().path(),
+            request.body(),
+            &self.platform_tenant_id,
+        ) {
+            Some(routed_body) => {
+                let (mut parts, _) = request.into_parts();
+                parts.headers.remove(http::header::CONTENT_LENGTH);
+                http::Request::from_parts(parts, Bytes::from(routed_body))
+            }
+            None => request,
+        };
         self.handle
             .spawn(async move {
                 let request = request.try_into()?;
@@ -46,7 +109,10 @@ impl HttpClient for TokioHttpClient {
     }
 }
 
-pub fn setup(endpoint: &str) -> color_eyre::eyre::Result<TelemetryProviders> {
+pub fn setup(
+    endpoint: &str,
+    platform_tenant_id: &str,
+) -> color_eyre::eyre::Result<TelemetryProviders> {
     let traces_endpoint = format!("{}/v1/traces", endpoint.trim_end_matches('/'));
     let metrics_endpoint = format!("{}/v1/metrics", endpoint.trim_end_matches('/'));
     let logs_endpoint = format!("{}/v1/logs", endpoint.trim_end_matches('/'));
@@ -54,6 +120,7 @@ pub fn setup(endpoint: &str) -> color_eyre::eyre::Result<TelemetryProviders> {
     let http_client = TokioHttpClient {
         client: reqwest::Client::builder().build()?,
         handle: Handle::current(),
+        platform_tenant_id: platform_tenant_id.to_string(),
     };
 
     let tracer_exporter = opentelemetry_otlp::SpanExporter::builder()
@@ -64,8 +131,10 @@ pub fn setup(endpoint: &str) -> color_eyre::eyre::Result<TelemetryProviders> {
         .build()?;
 
     let tracer_provider = SdkTracerProvider::builder()
+        .with_span_processor(crate::project_tenant::ProjectTenantSpanProcessor::default())
         .with_batch_exporter(tracer_exporter)
-        .with_resource(Resource::builder().with_service_name("fn0-worker").build())
+        .with_sampler(Sampler::ParentBased(Box::new(RequestRootSampler)))
+        .with_resource(resource(platform_tenant_id))
         .build();
 
     global::set_tracer_provider(tracer_provider.clone());
@@ -79,12 +148,12 @@ pub fn setup(endpoint: &str) -> color_eyre::eyre::Result<TelemetryProviders> {
 
     let logger_provider = SdkLoggerProvider::builder()
         .with_batch_exporter(log_exporter)
-        .with_resource(Resource::builder().with_service_name("fn0-worker").build())
+        .with_resource(resource(platform_tenant_id))
         .build();
 
     let log_bridge = OpenTelemetryTracingBridge::new(&logger_provider);
 
-    let tracer = tracer_provider.tracer("fn0-worker-tracer");
+    let tracer = tracer_provider.tracer(SERVICE_NAME);
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::new("info,hyper=warn,hyper_util=warn,reqwest=warn,h2=warn,tower=warn")
     });
@@ -107,11 +176,11 @@ pub fn setup(endpoint: &str) -> color_eyre::eyre::Result<TelemetryProviders> {
         .build();
 
     let meter_provider = SdkMeterProvider::builder()
-        .with_resource(Resource::builder().with_service_name("fn0-worker").build())
+        .with_resource(resource(platform_tenant_id))
         .with_view(|instrument: &Instrument| {
             if matches!(
                 instrument.name(),
-                "execution_time_seconds" | "cpu_time_seconds"
+                fn0::telemetry::REQUEST_DURATION_METRIC | fn0::telemetry::CPU_TIME_METRIC
             ) {
                 return Stream::builder()
                     .with_aggregation(Aggregation::Base2ExponentialHistogram {

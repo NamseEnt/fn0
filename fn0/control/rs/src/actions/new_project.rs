@@ -65,7 +65,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         .await;
 
     match result {
-        doc_db::TrxResult::Committed(()) => Output::Ok { project_id },
+        doc_db::TrxResult::Committed(()) => {
+            // Not a failure of the project: the cron reconcile registers any
+            // project this push missed before its first deploy is likely to
+            // export anything.
+            if let Err(e) = crate::common::signy_tenant::register_project(&project_id).await {
+                tracing::error!(%project_id, "new_project signy tenant registration: {e}");
+            }
+            Output::Ok { project_id }
+        }
         doc_db::TrxResult::Cancelled(()) => unreachable!(),
         doc_db::TrxResult::Conflict(d) => {
             tracing::error!("new_project trx conflict: {d:?}");

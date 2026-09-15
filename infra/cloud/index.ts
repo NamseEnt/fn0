@@ -397,6 +397,19 @@ const signyAccessServiceToken = new cloudflare.AccessServiceToken(
   cloudflareOperatedResource,
 );
 
+// Control registers every project as a Signy tenant through the admin API.
+// A token of its own rather than collecty's, so the credential every worker
+// host carries for ingest is not also the one that decides retention.
+const signyControlAccessServiceToken = new cloudflare.AccessServiceToken(
+  "signy-control-service-token",
+  {
+    zoneId,
+    name: pulumi.interpolate`fn0-signy-control-${suffix}`,
+    duration: "8760h",
+  },
+  cloudflareOperatedResource,
+);
+
 new cloudflare.AccessApplication(
   "signy-access-application",
   {
@@ -413,6 +426,15 @@ new cloudflare.AccessApplication(
         includes: [
           {
             serviceToken: { tokenId: signyAccessServiceToken.id },
+          },
+        ],
+      },
+      {
+        name: "control service token",
+        decision: "non_identity",
+        includes: [
+          {
+            serviceToken: { tokenId: signyControlAccessServiceToken.id },
           },
         ],
       },
@@ -470,7 +492,7 @@ const workerHostObservability = {
   signyUrl: `https://${signyHostname}`,
   signyAccessClientId: signyAccessServiceToken.clientId,
   signyAccessClientSecret: signyAccessServiceToken.clientSecret,
-  generatedTelemetryTenant: "fn0",
+  platformTelemetryTenant: "fn0",
   telemetryConfigVersion,
 };
 
@@ -513,6 +535,14 @@ const controlTokenHmacCt = pulumi
 const controlCookieSecretCt = pulumi
   .all([controlDek.plaintext, controlCookieSecret.base64])
   .apply(([dek, secret]) => aesGcmEncryptToBase64(dek, secret));
+
+const controlSignyAccessClientIdCt = pulumi
+  .all([controlDek.plaintext, signyControlAccessServiceToken.clientId])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
+
+const controlSignyAccessClientSecretCt = pulumi
+  .all([controlDek.plaintext, signyControlAccessServiceToken.clientSecret])
+  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
 const controlAdminTokenCt = pulumi
   .all([controlDek.plaintext, controlAdminToken.base64])
@@ -569,6 +599,8 @@ const controlEnvYamlBootstrap = pulumi
     forteDb.groupName,
     controlForteDbGroupTokenCt,
     forteDb.hostSuffix,
+    controlSignyAccessClientIdCt,
+    controlSignyAccessClientSecretCt,
   ])
   .apply(
     ([
@@ -591,6 +623,8 @@ const controlEnvYamlBootstrap = pulumi
       tursoGroupName,
       forteDbGroupTokenCt,
       forteDbHostSuffix,
+      signyAccessClientIdCt,
+      signyAccessClientSecretCt,
     ]) =>
       [
         "__dek:",
@@ -624,6 +658,11 @@ const controlEnvYamlBootstrap = pulumi
         "FN0_TURSO_GROUP_TOKEN:",
         `  secret: ${forteDbGroupTokenCt}`,
         `FN0_TURSO_DB_HOST_SUFFIX: ${forteDbHostSuffix}`,
+        `FN0_SIGNY_URL: https://${signyHostname}`,
+        "FN0_SIGNY_ACCESS_CLIENT_ID:",
+        `  secret: ${signyAccessClientIdCt}`,
+        "FN0_SIGNY_ACCESS_CLIENT_SECRET:",
+        `  secret: ${signyAccessClientSecretCt}`,
         "",
       ].join("\n"),
   );

@@ -59,12 +59,15 @@ where
         http.request.method = %method_str,
         url.path = %path_str,
         http.response.status_code = tracing::field::Empty,
+        otel.status_code = tracing::field::Empty,
     );
+    crate::otel::continue_trace(&span, http_req.headers());
 
     let http_resp = match dispatch(http_req).instrument(span.clone()).await {
         Ok(r) => r,
         Err(e) => {
             let error: anyhow::Error = e.into();
+            span.record("otel.status_code", "ERROR");
             tracing::error!(error = ?error, "dispatch failed");
             crate::metrics::flush();
             if let Some(limit) = error
@@ -79,6 +82,9 @@ where
     };
 
     span.record("http.response.status_code", http_resp.status().as_u16());
+    if http_resp.status().is_server_error() {
+        span.record("otel.status_code", "ERROR");
+    }
     crate::metrics::flush();
 
     http_response_to_p3(http_resp)

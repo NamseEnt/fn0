@@ -56,7 +56,7 @@ export interface WorkerHostObservabilityArgs {
   signyUrl: pulumi.Input<string>;
   signyAccessClientId: pulumi.Input<string>;
   signyAccessClientSecret: pulumi.Input<string>;
-  generatedTelemetryTenant: pulumi.Input<string>;
+  platformTelemetryTenant: pulumi.Input<string>;
   telemetryConfigVersion: pulumi.Input<string>;
 }
 
@@ -937,14 +937,13 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       this.queue,
       websocketTransport,
     );
-    const telemetryGatewayConfig = renderTelemetryGatewayConfig();
     const collectyEnvFile = pulumi
       .all([
         args.worker.hostObservability.collectyImageRef,
         args.worker.hostObservability.signyUrl,
         args.worker.hostObservability.signyAccessClientId,
         args.worker.hostObservability.signyAccessClientSecret,
-        args.worker.hostObservability.generatedTelemetryTenant,
+        args.worker.hostObservability.platformTelemetryTenant,
         args.worker.hostObservability.telemetryConfigVersion,
       ])
       .apply(
@@ -959,7 +958,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           renderEnvFile({
             COLLECTY_IMAGE_REF: collectyImageRef,
             FN0_TELEMETRY_CONFIG_VERSION: configVersion,
-            COLLECTY_LISTEN_ADDR: "127.0.0.1:14318",
+            COLLECTY_LISTEN_ADDR: COLLECTY_LISTEN_ADDRESS,
             COLLECTY_SIGNY_URL: signyUrl,
             COLLECTY_SIGNY_ACCESS_CLIENT_ID: accessClientId,
             COLLECTY_SIGNY_ACCESS_CLIENT_SECRET: accessClientSecret,
@@ -984,7 +983,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         proxyImageRef,
         agentEnv,
         workerEnv,
-        telemetryGatewayConfig,
         collectyEnvFile,
       ])
       .apply(
@@ -993,7 +991,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
           proxyImageRef,
           agentEnv,
           workerEnv,
-          telemetryGatewayConfig,
           collectyEnvFile,
         ]) =>
           renderCloudInit(
@@ -1001,7 +998,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             proxyImageRef,
             agentEnv,
             workerEnv,
-            telemetryGatewayConfig,
             collectyEnvFile,
           ),
       );
@@ -1209,12 +1205,6 @@ function buildWorkerEnv(
     bearer: pulumi.Input<string>;
   },
 ): pulumi.Output<{ [k: string]: string }> {
-  // The worker's own telemetry and the guest-app OTLP hijack both export to
-  // the Alloy sidecar that listens on this same host; its receiver takes no
-  // auth, so no credentials are attached here.
-  const LOCAL_ALLOY_OTLP_HOST = "127.0.0.1:4318";
-  const LOCAL_ALLOY_OTLP_SCHEME = "http";
-
   const vaultCredsEnv = pulumi
     .output(worker.vault.workerCredentials)
     .apply((c): { [k: string]: string } => ({
@@ -1275,11 +1265,11 @@ function buildWorkerEnv(
     FN0_VAULT_REGION: worker.vault.region,
     FN0_VAULT_ALLOWED_SUBDOMAIN: worker.vault.allowedSubdomain,
 
-    OTLP_ENDPOINT: `${LOCAL_ALLOY_OTLP_SCHEME}://${LOCAL_ALLOY_OTLP_HOST}`,
-    FN0_OTLP_TARGET_HOST: LOCAL_ALLOY_OTLP_HOST,
-    FN0_OTLP_TARGET_SCHEME: LOCAL_ALLOY_OTLP_SCHEME,
-    FN0_OTLP_TARGET_PATH_PREFIX: "",
-    FN0_OTLP_AUTH: "",
+    // The worker's own telemetry and the guest-app OTLP hijack both export to
+    // collecty on this host. Its listener takes no auth, so it binds loopback.
+    OTLP_ENDPOINT: `http://${COLLECTY_LISTEN_ADDRESS}`,
+    FN0_PLATFORM_TELEMETRY_TENANT_ID:
+      worker.hostObservability.platformTelemetryTenant,
 
     FN0_WEBSOCKET_QUIC_CERT_PEM_BASE64: pulumi
       .output(websocketTransport.certificatePem)
@@ -1310,89 +1300,16 @@ function resolveEnvMap(m: {
   });
 }
 
-const ALLOY_IMAGE_REF = "docker.io/grafana/alloy:v1.10.2";
+const COLLECTY_LISTEN_ADDRESS = "127.0.0.1:4318";
 const TELEMETRY_QUEUE_VOLUME_SIZE_IN_GBS = 50;
 const TELEMETRY_QUEUE_DEVICE = "/dev/oracleoci/oraclevdb";
 const COLLECTY_STORAGE_PATH = "/var/lib/collecty";
-
-function renderTelemetryGatewayConfig(): string {
-  return `otelcol.receiver.otlp "default" {
-  http {
-    endpoint         = "127.0.0.1:4318"
-    include_metadata = true
-  }
-  grpc {
-    endpoint         = "127.0.0.1:4317"
-    include_metadata = true
-  }
-  output {
-    metrics = [otelcol.processor.transform.fn0_tenant.input]
-    logs    = [otelcol.processor.transform.fn0_tenant.input]
-    traces  = [otelcol.processor.transform.fn0_tenant.input]
-  }
-}
-
-otelcol.processor.transform "fn0_tenant" {
-  error_mode = "ignore"
-  metric_statements {
-    context = "resource"
-    statements = ["set(attributes[\\\"tenant.id\\\"], \\\"fn0\\\")"]
-  }
-  log_statements {
-    context = "resource"
-    statements = ["set(attributes[\\\"tenant.id\\\"], \\\"fn0\\\")"]
-  }
-  trace_statements {
-    context = "resource"
-    statements = ["set(attributes[\\\"tenant.id\\\"], \\\"fn0\\\")"]
-  }
-  output {
-    metrics = [otelcol.processor.attributes.fn0_stamping.input]
-    logs    = [otelcol.processor.attributes.fn0_stamping.input]
-    traces  = [otelcol.processor.attributes.fn0_stamping.input]
-  }
-}
-
-otelcol.processor.attributes "fn0_stamping" {
-  action {
-    key          = "fn0.project_id"
-    action       = "upsert"
-    from_context = "X-Fn0-Project-Id"
-  }
-  output {
-    metrics = [otelcol.processor.batch.default.input]
-    logs    = [otelcol.processor.batch.default.input]
-    traces  = [otelcol.processor.batch.default.input]
-  }
-}
-
-otelcol.processor.batch "default" {
-  output {
-    metrics = [otelcol.exporter.otlphttp.collecty.input]
-    logs    = [otelcol.exporter.otlphttp.collecty.input]
-    traces  = [otelcol.exporter.otlphttp.collecty.input]
-  }
-}
-
-otelcol.exporter.otlphttp "collecty" {
-  encoding = "proto"
-  client {
-  endpoint = "http://127.0.0.1:14318"
-  compression = "none"
-  }
-  sending_queue {
-    queue_size = 2048
-  }
-}
-`;
-}
 
 function renderCloudInit(
   agentImageRef: string,
   proxyImageRef: string,
   agentEnv: { [k: string]: string },
   workerEnv: { [k: string]: string },
-  telemetryGatewayConfig: string,
   collectyEnvFile: string,
 ): string {
   const agentEnvFile = renderEnvFile({
@@ -1448,30 +1365,6 @@ ExecStart=/usr/bin/podman run --name fn0-proxy --rm \\
 ExecStop=/usr/bin/podman stop -t 10 fn0-proxy
 Restart=always
 RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`;
-  const alloySystemdUnit = `[Unit]
-Description=fn0 telemetry gateway
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-Restart=on-failure
-RestartSec=5
-MemoryMax=256M
-MemoryHigh=128M
-EnvironmentFile=/etc/fn0-telemetry/env
-ExecStartPre=-/usr/bin/podman rm -f fn0-alloy
-ExecStartPre=/usr/bin/podman pull ${ALLOY_IMAGE_REF}
-ExecStart=/usr/bin/podman run --name fn0-alloy --rm \\
-  --security-opt label=disable \\
-  --network host \\
-  -v /etc/fn0-telemetry:/etc/fn0-telemetry:ro \\
-  ${ALLOY_IMAGE_REF} run --stability.level=experimental --server.http.listen-addr=127.0.0.1:12345 /etc/fn0-telemetry/config.alloy
-ExecStop=/usr/bin/podman stop fn0-alloy
 
 [Install]
 WantedBy=multi-user.target
@@ -1570,22 +1463,10 @@ ${proxySystemdUnit}EOF_PROXY_UNIT
   chown 10002:10002 ${COLLECTY_STORAGE_PATH}
 } || echo "collecty queue volume setup failed; collecty will not start" >&2
 
-mkdir -p /etc/fn0-telemetry
-cat > /etc/fn0-telemetry/config.alloy <<'EOF_TELEMETRY_CFG'
-${telemetryGatewayConfig}EOF_TELEMETRY_CFG
-chmod 600 /etc/fn0-telemetry/config.alloy
-
-cat > /etc/fn0-telemetry/env <<'EOF_TELEMETRY_ENV'
-EOF_TELEMETRY_ENV
-chmod 600 /etc/fn0-telemetry/env
-
 mkdir -p /etc/fn0-collecty
 cat > /etc/fn0-collecty/env <<'EOF_COLLECTY_ENV'
 ${collectyEnvFile}EOF_COLLECTY_ENV
 chmod 600 /etc/fn0-collecty/env
-
-cat > /etc/systemd/system/fn0-alloy.service <<'EOF_ALLOY_UNIT'
-${alloySystemdUnit}EOF_ALLOY_UNIT
 
 cat > /etc/systemd/system/fn0-collecty.service <<'EOF_COLLECTY_UNIT'
 ${collectySystemdUnit}EOF_COLLECTY_UNIT
@@ -1611,7 +1492,6 @@ sysctl -p /etc/sysctl.d/90-fn0-worker-proxy.conf
 systemctl daemon-reload
 systemctl enable --now fn0-worker-proxy.service
 systemctl enable --now fn0-worker-agent.service
-systemctl enable --now fn0-alloy.service
 systemctl enable --now fn0-collecty.service
 `;
 }

@@ -118,14 +118,18 @@ When a deploy step requires a dependency crate to be published (e.g., `deploy-fn
 ## Telemetry
 
 The platform's telemetry stack is self-hosted on `192.168.0.10`. Each worker sends
-OTLP to its local Alloy gateway, which stamps `tenant.id=fn0` and forwards
-metrics, logs, and traces to the worker-local collecty durable queue. Collecty
-sends over HTTPS with Cloudflare Access to Signy, and Signy stores the durable
-catalog and parts in its dedicated R2 bucket:
+metrics, logs, and traces over OTLP/HTTP protobuf straight to the worker-local
+collecty durable queue. Each project is its own Signy tenant: the worker decodes
+every guest export and sets `tenant.id` on each resource to the calling
+project's id, and moves its own request spans and per-project request metrics
+to that project's tenant. The rest of the worker's telemetry, and collecty's
+host metrics, go to the platform tenant `fn0`.
+Collecty sends over HTTPS with Cloudflare Access to Signy, and Signy stores the
+durable catalog and parts in its dedicated R2 bucket:
 
 | Signal | Backend | Auth |
 |---|---|---|
-| Metrics, logs, traces | Alloy gateway → collecty → Signy → R2 | Cloudflare Access service token |
+| Metrics, logs, traces | worker → collecty → Signy → R2 | Cloudflare Access service token |
 
 Signy is exposed externally only as `https://signy.fn0.dev` through its
 Cloudflare Tunnel and Access application. The process itself listens on the
@@ -141,7 +145,10 @@ Cost safety is part of the deployment: collecty uses warning-level JSON logs,
 does not enable journald collection, samples host metrics once per minute, and
 caps its durable queue at 1 GiB per worker. Signy has a 2 GiB declared memory
 budget, an 8 GiB local cache, a 1 GiB WAL backlog limit, a 4 GiB free-space
-floor, a 30-day `fn0` retention policy, and a 10 GiB tenant storage limit.
+floor, a `fn0` retention policy of 30 days for metrics, 14 days for logs, and 3
+days for traces, and a 10 GiB tenant storage limit. Signy flushes at most once a
+minute, compacts trace parts, collects orphaned objects hourly, and prunes
+catalog history older than eight days.
 Docker log rotation is capped at five 100 MiB files on the Signy node.
 
 Provision the permanent node from the Pulumi stack with

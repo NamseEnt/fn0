@@ -1,7 +1,7 @@
 //! Owner-initiated project deletion. Verifies ownership, then enqueues the
 //! `project_teardown` queue task which removes every resource the project
-//! accretes (routing, cron, bundles, static assets, object storage, turso
-//! database, docs). Deletion is asynchronous: `Ok` means teardown is
+//! accretes (routing, cron, telemetry, bundles, static assets, object
+//! storage, turso database, docs). Deletion is asynchronous: `Ok` means teardown is
 //! enqueued, not finished.
 
 use crate::common::auth;

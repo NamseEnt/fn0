@@ -1,6 +1,7 @@
 use crate::actions::bundle_gc;
 use crate::actions::zombie_sweep;
 use crate::common::admin;
+use crate::common::signy_tenant;
 use crate::common::websocket_directory_gc;
 use crate::docs::*;
 use forte_sdk::*;
@@ -25,6 +26,7 @@ pub enum Output {
 }
 
 const QUERY_PAGE_LIMIT: usize = 256;
+const SIGNY_TENANT_RECONCILE_EVERY_MINUTES: i64 = 10;
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     if !admin::verify(req.headers) {
@@ -142,6 +144,16 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         tracing::error!(?err, "websocket singleton lease recovery failed");
     }
 
+    if epoch_minute % SIGNY_TENANT_RECONCILE_EVERY_MINUTES == 0 {
+        match reconcile_signy_tenants().await {
+            Ok(stats) => tracing::info!(
+                registered_projects_count = stats.registered_projects,
+                "signy tenant reconcile completed",
+            ),
+            Err(err) => tracing::error!(?err, "signy tenant reconcile within cron_on_tick failed"),
+        }
+    }
+
     if epoch_minute % 60 == 0 {
         match bundle_gc::run_gc().await {
             Ok(stats) => tracing::info!(
@@ -159,6 +171,21 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         scanned_projects_count: scanned_projects,
         scanned_jobs_count: scanned_jobs,
     }
+}
+
+/// Every project the workers route to is a project that can export
+/// telemetry, so the manifest is the set that has to be registered.
+async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStats> {
+    let Some(manifest) = (WorkerManifestDocGet {})
+        .send_with(&doc_db::turso())
+        .await?
+    else {
+        return Ok(signy_tenant::ReconcileStats {
+            registered_projects: 0,
+        });
+    };
+    let project_ids: Vec<String> = manifest.project_manifests.keys().cloned().collect();
+    signy_tenant::reconcile_projects(&project_ids).await
 }
 
 async fn recover_expired_websocket_singletons() -> anyhow::Result<()> {

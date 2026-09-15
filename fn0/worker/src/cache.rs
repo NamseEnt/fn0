@@ -75,7 +75,6 @@ impl S3BundleCache {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(project_id = %project_id, code_version))]
     pub async fn register(&self, project_id: &str, code_version: u64, static_cache_enabled: bool) {
         let mut inner = self.inner.lock().await;
         let next = ProjectRuntimeState {

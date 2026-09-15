@@ -258,13 +258,19 @@ where
                     Ok(Ok(result)) => {
                         if resp_tx.send(result).is_err() {
                             cancellation.cancel();
-                            fn0::telemetry::oneshot_drop_before_response();
+                            fn0::telemetry::failure(
+                                fn0::telemetry::FailureComponent::ResponseChannel,
+                                "receiver_dropped",
+                            );
                         }
                     }
                     Ok(Err(panic)) => {
                         cancellation.cancel();
                         let panic_msg = panic_payload_string(&panic);
-                        fn0::telemetry::panicked();
+                        fn0::telemetry::failure(
+                            fn0::telemetry::FailureComponent::Executor,
+                            "panic",
+                        );
                         tracing::error!(
                             %project_id,
                             panic = %panic_msg,
@@ -273,7 +279,10 @@ where
                     }
                     Err(_) => {
                         cancellation.cancel();
-                        fn0::telemetry::request_deadline_exceeded();
+                        fn0::telemetry::failure(
+                            fn0::telemetry::FailureComponent::Executor,
+                            "deadline_exceeded",
+                        );
                         let _ = resp_tx
                             .send(Err(anyhow::anyhow!("request execution deadline exceeded")));
                     }

@@ -12,6 +12,8 @@ use crate::{Request, Response, telemetry};
 use anyhow::{Result, anyhow};
 use futures::stream::{FuturesUnordered, StreamExt};
 use http_body_util::BodyExt;
+use opentelemetry::propagation::{Injector, TextMapPropagator};
+use opentelemetry_sdk::propagation::TraceContextPropagator;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
@@ -24,6 +26,7 @@ use std::time::Duration;
 use tokio::io::AsyncWrite;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use wasmtime::{Engine, Store, component::Linker};
 use wasmtime_wasi::cli::AsyncStdoutStream;
 use wasmtime_wasi::*;
@@ -31,6 +34,9 @@ use wasmtime_wasi_http::{
     WasiHttpCtx,
     p3::{Request as P3Request, WasiHttpCtxView, WasiHttpView, bindings::http::types::ErrorCode},
 };
+
+const TRACEPARENT_HEADER: &str = "traceparent";
+const TRACESTATE_HEADER: &str = "tracestate";
 
 struct TracingWriter {
     project_id: String,
@@ -236,7 +242,7 @@ where
         let state = context.data();
         let cpu_time = state.time_tracker.duration();
         if cpu_time > Duration::from_millis(1000) {
-            telemetry::cpu_timeout(&project_id_for_timeout, cpu_time);
+            telemetry::cpu_timeout(&project_id_for_timeout);
             state.is_timeout.store(true, Ordering::Relaxed);
             return Ok(wasmtime::UpdateDeadline::Interrupt);
         }
@@ -254,14 +260,38 @@ pub struct WasmInjectEnvelope {
 
 impl WasmInjectEnvelope {
     pub fn new(
-        request: Request,
+        mut request: Request,
         response_sender: oneshot::Sender<Result<Response>>,
         cancellation: CancellationToken,
     ) -> Self {
+        propagate_trace_context(request.headers_mut());
         Self {
             request,
             response_sender,
             cancellation,
+        }
+    }
+}
+
+/// The guest continues the worker's trace and inherits its sampling decision.
+/// A `traceparent` that arrived from outside is removed first: honouring it
+/// would let any visitor mark their own requests as sampled.
+fn propagate_trace_context(headers: &mut hyper::HeaderMap) {
+    headers.remove(TRACEPARENT_HEADER);
+    headers.remove(TRACESTATE_HEADER);
+    let context = tracing::Span::current().context();
+    TraceContextPropagator::new().inject_context(&context, &mut HeaderInjector(headers));
+}
+
+struct HeaderInjector<'a>(&'a mut hyper::HeaderMap);
+
+impl Injector for HeaderInjector<'_> {
+    fn set(&mut self, key: &str, value: String) {
+        if let (Ok(name), Ok(value)) = (
+            hyper::header::HeaderName::from_bytes(key.as_bytes()),
+            hyper::header::HeaderValue::from_str(&value),
+        ) {
+            self.0.insert(name, value);
         }
     }
 }
@@ -324,7 +354,7 @@ pub async fn run_wasm_instance_loop(
         .instantiate_async(&mut store)
         .await
         .map_err(|error| {
-            telemetry::wasmtime_error("instantiate_async", &format!("{error:?}"));
+            telemetry::failure(telemetry::FailureComponent::Instantiate, "wasmtime_error");
             anyhow!("instantiate_async failed: {error:?}")
         })?;
     telemetry::stage_duration("instantiate", instantiate_start.elapsed());
@@ -398,7 +428,10 @@ pub async fn run_wasm_instance_loop(
                                     };
                                     telemetry::stage_duration("wasm_call", call_start.elapsed());
                                     if response_sender.send(result).is_err() {
-                                        telemetry::oneshot_drop_before_response();
+                                        telemetry::failure(
+                                            telemetry::FailureComponent::ResponseChannel,
+                                            "receiver_dropped",
+                                        );
                                     }
                                 }));
                             }
@@ -420,7 +453,7 @@ pub async fn run_wasm_instance_loop(
     match run_result {
         Ok(inner) => inner,
         Err(error) => {
-            telemetry::wasmtime_error("run_concurrent", &format!("{error:?}"));
+            telemetry::failure(telemetry::FailureComponent::RunConcurrent, "wasmtime_error");
             Err(anyhow!("run_concurrent failed: {error:?}"))
         }
     }

@@ -4,6 +4,7 @@ mod cert_resolver;
 mod env_crypto;
 mod env_yaml;
 mod manifest_poller;
+mod project_tenant;
 mod queue_consumer;
 mod storage_resolver;
 mod telemetry;
@@ -91,31 +92,13 @@ pub fn read_pem_env(name: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
-fn build_otlp_hijack(metric_gate: Arc<MetricCardinalityGate>) -> Arc<OtlpHijack> {
-    let target_host =
-        std::env::var("FN0_OTLP_TARGET_HOST").expect("FN0_OTLP_TARGET_HOST must be set");
-    let target_scheme: hyper::http::uri::Scheme = std::env::var("FN0_OTLP_TARGET_SCHEME")
-        .expect("FN0_OTLP_TARGET_SCHEME must be set")
-        .parse()
-        .expect("FN0_OTLP_TARGET_SCHEME must be 'http' or 'https'");
-    let auth_raw = std::env::var("FN0_OTLP_AUTH").expect("FN0_OTLP_AUTH must be set");
-    let auth = if auth_raw.is_empty() {
-        None
-    } else {
-        Some(auth_raw)
-    };
-    let target_path_prefix =
-        std::env::var("FN0_OTLP_TARGET_PATH_PREFIX").unwrap_or_else(|_| "".to_string());
+fn build_otlp_hijack(
+    otlp_endpoint: &str,
+    metric_gate: Arc<MetricCardinalityGate>,
+) -> Arc<OtlpHijack> {
     let placeholder_host = std::env::var("FN0_OTLP_PLACEHOLDER_HOST")
         .unwrap_or_else(|_| "fn0-otel.fn0.dev".to_string());
-    Arc::new(OtlpHijack {
-        placeholder_host,
-        target_scheme,
-        target_host,
-        target_path_prefix,
-        auth,
-        metric_gate: Some(metric_gate),
-    })
+    Arc::new(OtlpHijack::new(placeholder_host, otlp_endpoint).with_metric_gate(metric_gate))
 }
 
 fn build_queue_hijack() -> Arc<QueueHijack> {
@@ -247,13 +230,15 @@ fn main() -> Result<()> {
     color_eyre::install()?;
 
     let otlp_endpoint = std::env::var("OTLP_ENDPOINT").expect("OTLP_ENDPOINT must be set");
+    let platform_telemetry_tenant_id = std::env::var("FN0_PLATFORM_TELEMETRY_TENANT_ID")
+        .expect("FN0_PLATFORM_TELEMETRY_TENANT_ID must be set");
 
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
-    let telemetry_providers = telemetry::setup(&otlp_endpoint)?;
+    let telemetry_providers = telemetry::setup(&otlp_endpoint, &platform_telemetry_tenant_id)?;
     install_panic_hook();
 
-    let result = rt.block_on(run());
+    let result = rt.block_on(run(&otlp_endpoint));
 
     telemetry::shutdown(telemetry_providers)?;
     result
@@ -285,7 +270,7 @@ fn install_panic_hook() {
     }));
 }
 
-async fn run() -> Result<()> {
+async fn run(otlp_endpoint: &str) -> Result<()> {
     let cwasm_bucket = std::env::var("CWASM_BUCKET").expect("CWASM_BUCKET is required");
     let s3_endpoint = std::env::var("S3_ENDPOINT").expect("S3_ENDPOINT is required");
     let s3_region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
@@ -349,7 +334,7 @@ async fn run() -> Result<()> {
             .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
             .with_cross_project_invoke_hijack(direct_hijack.clone())
             .with_vault_hijack(build_vault_hijack())
-            .with_otlp_hijack(build_otlp_hijack(metric_gate.clone()))
+            .with_otlp_hijack(build_otlp_hijack(otlp_endpoint, metric_gate.clone()))
             .with_object_storage_hijack(build_object_storage_hijack(
                 storage_resolver.clone(),
                 presign_gate.clone(),
@@ -378,7 +363,7 @@ async fn run() -> Result<()> {
             for (project_id, count) in active_series_gate.snapshot(now) {
                 observer.observe(
                     count as u64,
-                    &[opentelemetry::KeyValue::new("project_id", project_id)],
+                    &[opentelemetry::KeyValue::new("fn0.project_id", project_id)],
                 );
             }
         })
@@ -1366,7 +1351,10 @@ async fn handle_user_request(
                 .unwrap());
         }
         Err(_) => {
-            fn0::telemetry::request_deadline_exceeded();
+            fn0::telemetry::failure(
+                fn0::telemetry::FailureComponent::Executor,
+                "deadline_exceeded",
+            );
             tracing::error!(%project_id, "request exceeded deadline");
             return Ok(hyper::Response::builder()
                 .status(504)

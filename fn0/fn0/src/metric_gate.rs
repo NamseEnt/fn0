@@ -15,18 +15,15 @@
 //! Semantics are "keep existing, drop new": a series admitted once stays
 //! admitted while it keeps reporting, and only newly appearing series are
 //! refused once a cap is hit. Series go stale after [`STALE_WINDOW_SECS`]
-//! without a sample (matching Alloy's `deltatocumulative.max_stale`), freeing
-//! their slot, so the tracked set reflects *active* series the way the
-//! backend counts them, not every series ever seen.
+//! without a sample, freeing their slot, so the tracked set reflects *active*
+//! series, not every series ever seen.
 
-use bytes::Bytes;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value};
 use opentelemetry_proto::tonic::metrics::v1::{
     ExponentialHistogramDataPoint, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics,
     ScopeMetrics, Sum, SummaryDataPoint, metric, number_data_point,
 };
-use prost::Message;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -211,9 +208,9 @@ fn any_value_to_key(value: &Option<AnyValue>) -> String {
     }
 }
 
-/// Appends the drop count to the project's own payload so Alloy stamps
-/// `fn0.project_id` on it from the trusted hijack header, making the
-/// throttling visible to the project owner rather than only to operators.
+/// Appends the drop count to the project's own payload, which the OTLP hijack
+/// then files under the project's tenant, so the throttling is visible to the
+/// project owner rather than only to operators.
 pub fn inject_dropped_metric(
     request: &mut ExportMetricsServiceRequest,
     dropped: u64,
@@ -244,25 +241,20 @@ pub fn inject_dropped_metric(
     resource.scope_metrics[0].metrics.push(metric);
 }
 
-/// Enforces the per-project caps on a raw OTLP metrics payload, returning the
-/// bytes to forward. Undecodable payloads pass through untouched rather than
-/// failing the export: the gate is a cost guard, not a validator, and the
-/// collector is entitled to reject what it cannot parse.
-pub fn enforce_request_bytes(
+/// Enforces the per-project caps on a decoded OTLP metrics export, recording
+/// what was dropped inside the export itself.
+pub fn enforce_request(
     gate: &MetricCardinalityGate,
     project_id: &str,
-    bytes: Bytes,
-) -> Bytes {
-    let Ok(mut request) = ExportMetricsServiceRequest::decode(bytes.as_ref()) else {
-        return bytes;
-    };
+    request: &mut ExportMetricsServiceRequest,
+) {
     let now_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0);
-    let dropped = gate.enforce(project_id, &mut request, now_secs);
+    let dropped = gate.enforce(project_id, request, now_secs);
     if dropped == 0 {
-        return bytes;
+        return;
     }
     tracing::warn!(
         project_id,
@@ -270,15 +262,10 @@ pub fn enforce_request_bytes(
         "otlp metrics dropped by cardinality cap"
     );
     inject_dropped_metric(
-        &mut request,
+        request,
         dropped,
         (now_secs as u64).saturating_mul(1_000_000_000),
     );
-    let mut buf = Vec::with_capacity(request.encoded_len());
-    if request.encode(&mut buf).is_err() {
-        return bytes;
-    }
-    Bytes::from(buf)
 }
 
 impl MetricCardinalityGate {
@@ -468,19 +455,16 @@ mod tests {
     }
 
     #[test]
-    fn enforce_request_bytes_roundtrip() {
+    fn enforce_request_injects_dropped_count() {
         let gate = MetricCardinalityGate::new();
-        let request = gauge_request(
+        let mut decoded = gauge_request(
             "m",
             (0..METRIC_ACTIVE_SERIES_PER_PROJECT + 10)
                 .map(point_combo)
                 .collect(),
         );
-        let mut buf = Vec::new();
-        request.encode(&mut buf).unwrap();
 
-        let out = enforce_request_bytes(&gate, "p", Bytes::from(buf));
-        let decoded = ExportMetricsServiceRequest::decode(out.as_ref()).unwrap();
+        enforce_request(&gate, "p", &mut decoded);
 
         let total_points: usize = decoded
             .resource_metrics

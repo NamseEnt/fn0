@@ -47,7 +47,6 @@ per-user caps by dividing pools.
 | Custom hostname (CF for SaaS) | $0.10/mo, first 100 free | CF for SaaS plans |
 | Block volume (OCI, Lower Cost 0 VPU) | $0.025/GB-mo, 2 IOPS/GB | OCI list |
 | Metrics (self-hosted VictoriaMetrics on A1) | ~$0.0000073/series-mo — see below | derived |
-| Metrics (Grafana Cloud, rejected) | 10k active series included, then $6.50/1k series-mo **plus $19/mo Pro platform fee** | grafana.com/pricing |
 
 R2 chosen over OCI Object Storage ($0.0255/GB-mo) for price and free egress.
 
@@ -150,8 +149,7 @@ Series-per-histogram is measured, not assumed: at `max_size=8` the OTel SDK
 raises its scale to fit the data and lands on 5–7 populated buckets across
 latency distributions from tight (σ=0.15) to wide (σ=0.9), plus `_sum` and
 `_count`. VictoriaMetrics stores each populated bucket as one `vmrange` series,
-so there is no bucket discount to claim — unlike Grafana Cloud, which bills
-native-histogram buckets at 0.25x.
+so there is no bucket discount to claim.
 
 Exponential over explicit buckets because explicit boundaries have to be picked
 in advance and degrade without warning when a project's latency sits outside
@@ -181,10 +179,11 @@ Per project: **$0.0036 compute + $0.0005 disk = ~$0.004/month**, doubled to
 byte per sample on a Lower Cost (0 VPU) volume — VM is documented to run on 35
 IOPS, so the 2 IOPS/GB tier is roughly an order of magnitude more than it needs.
 
-That is **1.0–2.4% of the $0.35–0.80 infra budget**. The same 500 series on
-Grafana Cloud list price would be $3.25/project/month — ~390x more, and over
-three times the plan's entire revenue. Self-hosting is what makes a per-project metrics
-dashboard fit inside a $1 plan at all; see `#57` for the viewing side.
+That is **1.0–2.4% of the $0.35–0.80 infra budget**. The same 500 series at a
+hosted metrics service's list price of $6.50/1k series-mo would be
+$3.25/project/month — ~390x more, and over three times the plan's entire
+revenue. Self-hosting is what makes a per-project metrics dashboard fit inside
+a $1 plan at all; see `#57` for the viewing side.
 
 What the per-project cap protects is no longer a purchased allowance but the
 **shared node**: one project putting an unbounded value in a label (user ID,
@@ -195,13 +194,12 @@ so one tenant cannot take the whole node, monitored in aggregate rather than
 divided up front.
 
 Enforcement is inline in the worker's OTLP hijack (`fn0/fn0/src/metric_gate.rs`),
-the same trust boundary that stamps `fn0.project_id`. Semantics are keep
+the same trust boundary that sets each project's `tenant.id`. Semantics are keep
 existing / drop new, so a project at its cap keeps every series it already had
 and loses only newly appearing ones; the drop count rides back on the
 project's own payload as `fn0.metrics.dropped` so the owner sees the
-throttling. Series idle for 5 minutes free their slot, matching Alloy's
-`deltatocumulative.max_stale`, so the count tracks active series the way the
-backend holds them.
+throttling. Series idle for 5 minutes free their slot, so the count tracks
+active series rather than every series ever seen.
 
 The gate governs the **user custom** line only. Platform-emitted series are
 recorded on the worker's own meter, never pass through the OTLP hijack, and are
@@ -226,9 +224,8 @@ document.
 series at $0.0065/month. At $6.50/1k series-mo the correct figure is $6.50 —
 the per-series price was written as the total, a 1000x error. Under that
 mistake the metrics line looked like the cheapest quota in the plan; corrected,
-it was the single largest, at 6.5x the plan's own revenue, and it also omitted
-Grafana Cloud's $19/month Pro platform fee that the first series over the free
-10k triggers. Self-hosting was chosen off the corrected numbers.
+it was the single largest, at 6.5x the plan's own revenue, before any platform
+fee. Self-hosting was chosen off the corrected numbers.
 
 ### Queue and cron
 

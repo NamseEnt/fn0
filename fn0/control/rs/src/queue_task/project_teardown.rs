@@ -31,6 +31,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 
     delete_domain(&db, &project_id).await?;
     remove_routing_and_cron(&db, &project_id).await?;
+    crate::common::signy_tenant::delete_project(&project_id).await?;
     delete_bundle_store_objects(&project_id, now).await?;
     if let Some(storage) = &storage {
         empty_project_buckets(&project_id, storage, now).await?;

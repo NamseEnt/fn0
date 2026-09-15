@@ -1,6 +1,6 @@
 [package]
 name = "fn0-worker"
-version = "0.4.15"
+version = "0.4.16"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -33,7 +33,9 @@ opentelemetry = { workspace = true, features = ["logs", "metrics"] }
 opentelemetry-appender-tracing = { workspace = true }
 opentelemetry-http = { workspace = true, features = ["reqwest"] }
 opentelemetry-otlp = { workspace = true, features = ["http-proto", "reqwest-client", "metrics", "logs"] }
+opentelemetry-proto = { workspace = true, features = ["gen-tonic-messages", "metrics", "trace"] }
 opentelemetry_sdk = { workspace = true, features = ["logs", "rt-tokio", "spec_unstable_metrics_views"] }
+prost = { workspace = true }
 reqwest = { workspace = true }
 quinn = { workspace = true, default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
 rand = { workspace = true }
@@ -56,4 +58,5 @@ webpki-roots = { workspace = true }
 zstd = { workspace = true }
 
 [dev-dependencies]
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
 rcgen = { workspace = true }

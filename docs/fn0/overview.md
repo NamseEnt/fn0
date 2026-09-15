@@ -119,17 +119,19 @@ fn0 has built-in OpenTelemetry support:
 
 For Forte apps running on fn0 Cloud, traces are exported to `http://fn0-otel.fn0.dev/v1/traces`. The service name is controlled via the `OTEL_SERVICE_NAME` environment variable (defaults to `"forte-app"`).
 
-For self-hosted fn0 worker deployments, configure the OTLP endpoint via environment variables on the worker binary:
+For self-hosted fn0 worker deployments, configure the OTLP collector via environment variables on the worker binary:
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname (the worker's local Alloy) |
-| `FN0_OTLP_TARGET_SCHEME` | Yes | — | URL scheme for the OTLP collector: `http` or `https` |
-| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth credentials (`user:token`); use empty string for unauthenticated |
-| `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every OTLP request path |
+| `OTLP_ENDPOINT` | Yes | — | Base URL of an OTLP/HTTP protobuf collector, such as the worker-local collecty (`http://127.0.0.1:4318`) |
+| `FN0_PLATFORM_TELEMETRY_TENANT_ID` | Yes | — | Signy tenant for the worker's own telemetry that belongs to no single project |
 | `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname used inside WASM apps |
 
-The worker intercepts outgoing OTLP requests that target `FN0_OTLP_PLACEHOLDER_HOST` and rewrites them to `FN0_OTLP_TARGET_HOST` with the configured auth header.
+The worker intercepts outgoing OTLP requests that target `FN0_OTLP_PLACEHOLDER_HOST`. It accepts only uncompressed `application/x-protobuf` exports on `/v1/traces`, `/v1/metrics`, and `/v1/logs`, sets `tenant.id` on every resource to the calling project's id, applies the metric cardinality caps, and forwards the result to `OTLP_ENDPOINT`.
+
+Each project is its own Signy tenant. The worker's request spans, and the request, static page, and CPU metrics it records for a project, go to that project's tenant as well. The worker's logs, failure counters, and capacity metrics go to the platform tenant named by `FN0_PLATFORM_TELEMETRY_TENANT_ID`. Signy drops data for a tenant that has no pushed policy, so control registers each project with Signy.
+
+Trace sampling is decided once, by the worker, when a request arrives: 1% of requests are traced, and background loops such as manifest polling are never traced. The worker passes its decision to the guest in a `traceparent` header, and an incoming `traceparent` from a visitor is discarded. Server errors and requests slower than one second are always written as logs instead.
 
 ## Worker Environment Variables (Self-Hosting)
 
@@ -163,11 +165,8 @@ The first byte on `HTTP_PORT`: `0x16` (TLS ClientHello) routes to user traffic; 
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OTLP_ENDPOINT` | Yes | — | Worker's own OTLP telemetry endpoint |
-| `FN0_OTLP_TARGET_HOST` | Yes | — | OTLP collector hostname for guest (WASM) traces |
-| `FN0_OTLP_TARGET_SCHEME` | Yes | — | URL scheme for guest OTLP collector: `http` or `https` |
-| `FN0_OTLP_AUTH` | Yes | — | Base64-encoded Basic auth (`user:token`) for guest OTLP; empty string for unauthenticated |
-| `FN0_OTLP_TARGET_PATH_PREFIX` | No | `""` | Path prefix prepended to every guest OTLP request path |
+| `OTLP_ENDPOINT` | Yes | — | OTLP/HTTP protobuf collector for the worker's own telemetry and forwarded guest exports |
+| `FN0_PLATFORM_TELEMETRY_TENANT_ID` | Yes | — | Signy tenant for the worker's own telemetry that belongs to no single project |
 | `FN0_OTLP_PLACEHOLDER_HOST` | No | `fn0-otel.fn0.dev` | Placeholder hostname intercepted inside WASM apps |
 
 ### Platform Services

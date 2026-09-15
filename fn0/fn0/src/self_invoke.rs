@@ -6,9 +6,8 @@ use crate::cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
 use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
-use crate::metric_gate;
 use crate::object_storage_hijack::ObjectStorageHijack;
-use crate::otlp_hijack::OtlpHijack;
+use crate::otlp_hijack::{self, OtlpHijack, OtlpSignal};
 use crate::presign_gate::PresignDenied;
 use crate::public_storage_hijack::PublicStorageHijack;
 use crate::queue_hijack::QueueHijack;
@@ -497,15 +496,47 @@ fn vault_send(
 fn otlp_send(
     hijack: Arc<OtlpHijack>,
     project_id: String,
-    mut request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
     options: Option<RequestOptions>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
-        if let Err(e) = hijack.rewrite(&mut request, &project_id) {
-            return Err(e.into());
-        }
-
         let (parts, body) = request.into_parts();
+        let Some(signal) = OtlpSignal::from_path(parts.uri.path()) else {
+            return Ok((
+                text_response(
+                    404,
+                    "OTLP exports go to /v1/traces, /v1/metrics or /v1/logs".to_string(),
+                )?,
+                empty_io(),
+            ));
+        };
+        let is_protobuf = parts
+            .headers
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.split(';').next())
+            .is_some_and(|media_type| {
+                media_type
+                    .trim()
+                    .eq_ignore_ascii_case(otlp_hijack::PROTOBUF_CONTENT_TYPE)
+            });
+        let is_uncompressed = parts
+            .headers
+            .get(http::header::CONTENT_ENCODING)
+            .and_then(|value| value.to_str().ok())
+            .is_none_or(|encoding| encoding.trim().eq_ignore_ascii_case("identity"));
+        if !is_protobuf || !is_uncompressed {
+            return Ok((
+                text_response(
+                    415,
+                    format!(
+                        "an OTLP export must be uncompressed {}",
+                        otlp_hijack::PROTOBUF_CONTENT_TYPE
+                    ),
+                )?,
+                empty_io(),
+            ));
+        }
         if declared_content_length_exceeds_limit(&parts.headers, OTLP_BODY_LIMIT) {
             return Ok((
                 text_response(413, body_limit_message(OTLP_BODY_LIMIT))?,
@@ -524,30 +555,48 @@ fn otlp_send(
                 return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into());
             }
         };
-        let body_bytes = limited_body.bytes;
         let body_permit = limited_body.permit;
-        let body_bytes = match hijack.metric_gate() {
-            Some(gate) if parts.uri.path().ends_with("/v1/metrics") => {
-                metric_gate::enforce_request_bytes(gate, &project_id, body_bytes)
+        let stamped_body = match hijack.stamp_export(signal, &project_id, &limited_body.bytes) {
+            Ok(stamped_body) => stamped_body,
+            Err(error) => {
+                return Ok((
+                    text_response(400, format!("the OTLP export does not decode: {error}"))?,
+                    empty_io(),
+                ));
             }
-            _ => body_bytes,
         };
-        let forward_body = http_body_util::Full::new(body_bytes)
-            .map_err(|never: std::convert::Infallible| match never {})
-            .boxed_unsync();
-        let forward_request = http::Request::from_parts(parts, forward_body);
+        let forward_request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri(hijack.collector_uri(signal))
+            .header(
+                http::header::CONTENT_TYPE,
+                otlp_hijack::PROTOBUF_CONTENT_TYPE,
+            )
+            .body(
+                http_body_util::Full::new(stamped_body)
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .map_err(|error| ErrorCode::InternalError(Some(error.to_string())))?;
 
         tokio::task::spawn_local(async move {
             let send_start = std::time::Instant::now();
             match default_send_request(forward_request, options).await {
-                Ok((_resp, io)) => {
+                Ok((response, io)) => {
                     let _ = io.await;
                     drop(body_permit);
                     telemetry::stage_duration("hijack_otlp", send_start.elapsed());
+                    if !response.status().is_success() {
+                        tracing::warn!(
+                            status = response.status().as_u16(),
+                            signal = signal.path(),
+                            "the collector refused an OTLP export"
+                        );
+                    }
                 }
-                Err(err) => {
+                Err(error) => {
                     drop(body_permit);
-                    tracing::warn!(?err, "otlp forward failed");
+                    tracing::warn!(?error, "otlp forward failed");
                 }
             }
         });
@@ -560,9 +609,7 @@ fn otlp_send(
                     .boxed_unsync(),
             )
             .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
-        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
-            Box::new(async { Ok(()) });
-        Ok((response, io))
+        Ok((response, empty_io()))
     })
 }
 
@@ -998,7 +1045,10 @@ pub(crate) async fn call_service<C: Clock>(
             let http_resp = accessor
                 .with(|mut access| resp.into_http(access.as_context_mut(), req_io))
                 .map_err(|error| {
-                    telemetry::wasmtime_error("response_into_http", &format!("{error:?}"));
+                    telemetry::failure(
+                        telemetry::FailureComponent::ResponseIntoHttp,
+                        "wasmtime_error",
+                    );
                     anyhow!("response into_http failed: {error:?}")
                 })?;
             Ok(http_resp.map(|body| {
@@ -1007,7 +1057,10 @@ pub(crate) async fn call_service<C: Clock>(
             }))
         }
         Ok(Err(ec)) => {
-            telemetry::proxy_returns_error_code(&format!("{ec:?}"));
+            telemetry::failure(
+                telemetry::FailureComponent::GuestHandler,
+                telemetry::error_code_error_type(&ec),
+            );
             Err(guest_error(ec))
         }
         Err(error) => Err(classify_wasm_error(error, is_timeout)),
@@ -1031,7 +1084,10 @@ pub(crate) fn classify_wasm_error(
 ) -> anyhow::Error {
     match error.downcast::<wasmtime::Trap>() {
         Ok(trap) => {
-            telemetry::trapped(&format!("{trap:?}"));
+            telemetry::failure(
+                telemetry::FailureComponent::GuestHandler,
+                telemetry::trap_error_type(&trap),
+            );
             if is_timeout.load(Ordering::Relaxed) {
                 anyhow!("CPU time limit exceeded (trapped: {trap:?})")
             } else {
@@ -1039,7 +1095,7 @@ pub(crate) fn classify_wasm_error(
             }
         }
         Err(error) => {
-            telemetry::canceled_unexpectedly(&format!("{error:?}"));
+            telemetry::failure(telemetry::FailureComponent::GuestHandler, "non_trap_error");
             anyhow!("wasm error: {error:?}")
         }
     }

@@ -33,7 +33,7 @@ const ACCOUNT_PERMISSIONS: { name: string; because: string }[] = [
   { name: "Access: Apps and Policies Write", because: "the telemetry gate" },
   {
     name: "Access: Service Tokens Write",
-    because: "Alloy's ingest credential",
+    because: "collecty's credential for Signy",
   },
   {
     name: "Cloudflare One Connectors Write",

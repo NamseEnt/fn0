@@ -4,9 +4,9 @@
 use opentelemetry::{KeyValue, global};
 use sha2::{Digest, Sha256};
 
-/// Kept from when this identifier was an object key, so the metric's label
-/// values stay comparable across the bucket's removal.
-const PATH_IDENTIFIER_PREFIX: &str = "__forte/pages";
+pub const SLOW_GENERATION: std::time::Duration = std::time::Duration::from_secs(1);
+
+const GENERATION_SECONDS_BUCKETS: [f64; 5] = [0.05, 0.25, 1.0, 5.0, 30.0];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StaticPagePathError {
@@ -87,51 +87,69 @@ pub fn normalize_path(path: &str) -> Result<String, StaticPagePathError> {
     Ok(normalized)
 }
 
-pub fn path_identifier_for(normalized_path: &str) -> String {
+pub fn path_hash_for(normalized_path: &str) -> String {
     let digest = Sha256::digest(normalized_path.as_bytes());
     let mut encoded = String::with_capacity(digest.len() * 2);
     for byte in digest {
         encoded.push(upper_hex(byte >> 4));
         encoded.push(upper_hex(byte & 0x0f));
     }
-    format!("{PATH_IDENTIFIER_PREFIX}/{encoded}.html")
+    encoded
 }
 
-pub fn record_result(
-    project_id: &str,
-    code_version: u64,
-    path_identifier: &str,
-    result: &'static str,
-) {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StaticPageOutcome {
+    PreflightMiss,
+    Cacheable,
+    Unsafe,
+    Error,
+}
+
+impl StaticPageOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::PreflightMiss => "preflight_miss",
+            Self::Cacheable => "cacheable",
+            Self::Unsafe => "unsafe",
+            Self::Error => "error",
+        }
+    }
+}
+
+pub fn record_outcome(project_id: &str, outcome: StaticPageOutcome) {
     global::meter("fn0")
-        .u64_counter("fn0.static_page_requests")
+        .u64_counter("fn0.static_page.requests")
         .build()
         .add(
             1,
             &[
-                KeyValue::new("project_id", project_id.to_string()),
-                KeyValue::new("code_version", code_version.to_string()),
-                KeyValue::new("path_identifier", path_identifier.to_string()),
-                KeyValue::new("result", result),
+                KeyValue::new(
+                    crate::telemetry::PROJECT_TENANT_ATTRIBUTE,
+                    project_id.to_string(),
+                ),
+                KeyValue::new("outcome", outcome.as_str()),
             ],
         );
 }
 
 pub fn record_generation_duration(
     project_id: &str,
-    code_version: u64,
-    path_identifier: &str,
+    outcome: StaticPageOutcome,
     duration: std::time::Duration,
 ) {
     global::meter("fn0")
-        .f64_histogram("fn0.static_page_generation_duration_seconds")
+        .f64_histogram("fn0.static_page.generation.duration")
+        .with_unit("s")
+        .with_boundaries(GENERATION_SECONDS_BUCKETS.to_vec())
         .build()
         .record(
             duration.as_secs_f64(),
             &[
-                KeyValue::new("project_id", project_id.to_string()),
-                KeyValue::new("code_version", code_version.to_string()),
-                KeyValue::new("path_identifier", path_identifier.to_string()),
+                KeyValue::new(
+                    crate::telemetry::PROJECT_TENANT_ATTRIBUTE,
+                    project_id.to_string(),
+                ),
+                KeyValue::new("outcome", outcome.as_str()),
             ],
         );
 }
@@ -204,11 +222,11 @@ mod tests {
     }
 
     #[test]
-    fn creates_deterministic_opaque_path_identifiers() {
+    fn creates_deterministic_opaque_path_hashes() {
         assert_eq!(
-            path_identifier_for("/"),
-            "__forte/pages/8A5EDAB282632443219E051E4ADE2D1D5BBC671C781051BF1437897CBDFEA0F1.html"
+            path_hash_for("/"),
+            "8A5EDAB282632443219E051E4ADE2D1D5BBC671C781051BF1437897CBDFEA0F1"
         );
-        assert_ne!(path_identifier_for("/docs"), path_identifier_for("/docs/"));
+        assert_ne!(path_hash_for("/docs"), path_hash_for("/docs/"));
     }
 }

@@ -290,6 +290,8 @@ OpenTelemetry is initialized once per instance on the first request via `otel::i
 
 The service name defaults to `"forte-app"` and can be overridden with the `OTEL_SERVICE_NAME` environment variable.
 
+Each request's span continues the trace named in the incoming `traceparent` header, so on fn0 Cloud the app follows the worker's sampling decision (1% of requests). A request that arrives without one starts its own trace, sampled at the same 1%. Spans are exported when the request's local root span ends.
+
 In `forte dev`, tracing macro output (`tracing::info!`, `tracing::error!`, etc.) appears in the dev server terminal. OTLP span export is not available locally — `forte dev` does not intercept the `fn0-otel.fn0.dev` placeholder, so export attempts fail silently without affecting request handling.
 
 ## Metrics
