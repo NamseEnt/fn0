@@ -16,8 +16,10 @@ served through the Signy Tunnel.
 - collecty image:
   `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:249ba93f391d71db4bd4ae8826eac12cf5c80e57b878c6672cbb46014da86866`
 - Signy image:
-  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:4aca3acd27a49a7e9d617366c3e1c5d4bf77a69f53f09b77552d6e84c8e1b3a2`
-- Obsy source revision for these images: `406a55fca23c433a05c772510e96d9c6ebb5e0e4`
+  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:a9b8bdd994295b9c069e28480d333189b9740714a2ff5d342198f18f4128e842`
+- Obsy source revision for the collecty image: `406a55fca23c433a05c772510e96d9c6ebb5e0e4`
+- Obsy source revision for the Signy image: `35f2541de94a81c37e270ddae16d86c5ba8588a8`
+  (built on the x86_64 Signy node from `signy/Dockerfile`)
 - R2 bucket: `fn0-signy-u35twkcf`
 - R2 prefix: `fn0/signy`
 - R2 catalog lock: seven days
