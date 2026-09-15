@@ -4,7 +4,6 @@ import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
 import { gzipSync } from "node:zlib";
 import { CustomWorkerImage } from "./CustomWorkerImage";
-import { OciWorkerTelemetryVolumeCleanup } from "./OciWorkerTelemetryVolumeCleanup";
 import {
   CLOUDFLARE_IPV4_RANGES,
   CLOUDFLARE_IPV6_RANGES,
@@ -232,26 +231,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       backendSet,
     );
     this.instancePoolId = instancePool.id;
-
-    new OciWorkerTelemetryVolumeCleanup(
-      "worker-telemetry-volume-cleanup",
-      {
-        region: args.region,
-        compartmentId: compartment.id,
-        instancePoolId: instancePool.id,
-        instanceConfigurationId: instanceConfiguration.id,
-        expectedAttachedVolumeCount: args.count,
-        volumeDisplayNames: [
-          "fn0-worker-collecty-queue",
-          "fn0-worker-alloy-queue",
-        ],
-        managedByTagKey: "managed_by",
-        managedByTagValue: MANAGED_BY_TAG_VALUE,
-        roleTagKey: "fn0_role",
-        roleTagValue: "worker",
-      },
-      { parent: this, dependsOn: [instancePool] },
-    );
 
     // customWorkerImage referenced to avoid unused-variable lint; imageId is
     // already its primary output.
@@ -1121,6 +1100,18 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         instanceConfigurationId: instanceConfiguration.id,
         displayName: name,
         size: args.count,
+        lifecycleManagement: {
+          lifecycleActions: {
+            preTermination: {
+              isEnabled: true,
+              timeout: 0,
+              onTimeout: {
+                preserveBlockVolumeMode: "DELETE_ALWAYS",
+                preserveBootVolumeMode: "DELETE_ALWAYS",
+              },
+            },
+          },
+        },
         placementConfigurations: [
           {
             availabilityDomain,
@@ -1153,7 +1144,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         compartmentId: compartment.id,
         displayName: `${name}-autoscaling`,
         coolDownInSeconds: 300,
-        isEnabled: false,
+        isEnabled: true,
         autoScalingResources: {
           id: instancePool.id,
           type: "instancePool",

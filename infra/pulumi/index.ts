@@ -1,7 +1,6 @@
 export { EventBridgeCronTrigger } from "./EventBridgeCronTrigger";
 export { OciFn0WorkerSite } from "./OciFn0WorkerSite";
 export { OciGlobalVault } from "./OciGlobalVault";
-export { OciWorkerTelemetryVolumeCleanup } from "./OciWorkerTelemetryVolumeCleanup";
 export { B2CloudflareStaticCdn } from "./B2CloudflareStaticCdn";
 export * as docDb from "./docDb";
 export { ControlProjectBootstrap } from "./ControlProjectBootstrap";
