@@ -2,12 +2,15 @@ mod body_limit;
 pub mod cache;
 pub mod cross_project_enqueue_hijack;
 pub mod cross_project_invoke_hijack;
+pub mod egress;
 pub mod execute;
 mod js;
 pub mod measure_cpu_time;
 pub mod metric_gate;
 pub mod object_storage_hijack;
 pub mod otlp_hijack;
+pub mod outbound_destination;
+pub mod outbound_http;
 mod panic_util;
 pub mod presign_gate;
 pub mod public_storage_hijack;
@@ -49,9 +52,14 @@ use wasmtime_wasi_http::p3::bindings::ServicePre;
 
 pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 pub use cross_project_invoke_hijack::{CrossProjectInvokeDispatcher, CrossProjectInvokeHijack};
+pub use egress::{EgressBudget, EgressChargeFuture, EgressDenied, EgressMeteredBody};
 pub use metric_gate::MetricCardinalityGate;
 pub use object_storage_hijack::{DevReadResult, ObjectStorageHijack};
 pub use otlp_hijack::OtlpHijack;
+pub use outbound_destination::{
+    DestinationResolver, OutboundDialError, OutboundDialer, PrivateDestinationAccess,
+};
+pub use outbound_http::GuestOutboundHttp;
 pub use presign_gate::PresignGate;
 pub use public_storage_hijack::PublicStorageHijack;
 pub use purge_gate::PurgeGate;
@@ -142,6 +150,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     pub(crate) static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
     pub(crate) websocket_hijack: Option<Arc<WebSocketHijack>>,
+    pub(crate) guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -160,6 +169,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             public_storage_hijack: None,
             static_page_cache_hijack: None,
             websocket_hijack: None,
+            guest_outbound_http: None,
         }
     }
 
@@ -225,6 +235,13 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn with_websocket_hijack(mut self, websocket_hijack: Arc<WebSocketHijack>) -> Self {
         self.websocket_hijack = Some(websocket_hijack);
+        self
+    }
+
+    /// Without this, application HTTP requests use wasmtime's default sender, which neither
+    /// checks destinations nor charges egress. `forte dev` relies on that.
+    pub fn with_guest_outbound_http(mut self, guest_outbound_http: Arc<GuestOutboundHttp>) -> Self {
+        self.guest_outbound_http = Some(guest_outbound_http);
         self
     }
 
@@ -824,7 +841,11 @@ impl<C: BundleCache> CodeExecutor<C> {
 
         let wasm_sender = self.wasm_instance_sender(project_id, bundle);
         let fetch_handler: std::sync::Arc<dyn ski::FetchHandler> =
-            std::sync::Arc::new(js::WasmForwardingFetchHandler::new(wasm_sender));
+            std::sync::Arc::new(js::WasmForwardingFetchHandler::new(
+                wasm_sender,
+                project_id.to_string(),
+                self.ctx.guest_outbound_http.clone(),
+            ));
 
         let instance = std::rc::Rc::new(ski::SkiInstance::load(
             js_code,
@@ -890,6 +911,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let public_storage_hijack = ctx.public_storage_hijack.clone();
         let static_page_cache_hijack = ctx.static_page_cache_hijack.clone();
         let websocket_hijack = ctx.websocket_hijack.clone();
+        let guest_outbound_http = ctx.guest_outbound_http.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
         let driver = tokio::task::spawn_local(async move {
@@ -909,6 +931,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                 public_storage_hijack,
                 static_page_cache_hijack,
                 websocket_hijack,
+                guest_outbound_http,
             ))
             .catch_unwind()
             .await;

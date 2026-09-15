@@ -140,7 +140,8 @@ async fn remove_stale_runtime_records(
     .await?;
     for runtime_record in runtime_records {
         if runtime_is_stale(&runtime_record, code_version, &declared) {
-            crate::actions::cron_on_tick::delete_runtime_if_unchanged(db, &runtime_record).await?;
+            crate::actions::cron_on_tick::retire_runtime_if_unchanged(db, &runtime_record, now())
+                .await?;
         }
     }
     Ok(())
@@ -274,6 +275,7 @@ mod tests {
             claim_token: "claim".to_string(),
             connection_id: "connection".to_string(),
             lease_expires_at: now() + chrono::Duration::seconds(60),
+            state: crate::docs::WebSocketSingletonRuntimeState::Active,
         };
         assert!(runtime_is_stale(&runtime, 42, &HashSet::new()));
         let declared = HashSet::from(["deleted"]);

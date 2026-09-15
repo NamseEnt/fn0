@@ -238,6 +238,14 @@ async fn delete_identity_docs(db: &doc_db::Database, project_id: &str) -> anyhow
                     }
                     None => None,
                 };
+                if let Some(egress_quota) = trx
+                    .get(ProjectEgressQuotaDocGet {
+                        project_id: &project_id,
+                    })
+                    .await?
+                {
+                    egress_quota.delete();
+                }
                 if let Some(github_id) = owner_github_id
                     && let Some(mut user) = trx.get(UserDocGet { github_id }).await?
                     && user.projects.iter().any(|e| e.project_id == project_id)

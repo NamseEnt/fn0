@@ -33,6 +33,7 @@ opentelemetry-proto = { workspace = true, features = ["gen-tonic-messages", "log
 prost = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = ["rt-tokio", "trace"] }
 reqwest = { workspace = true, features = ["http2"] }
+rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -42,6 +43,7 @@ sonic-rs = { workspace = true }
 struson = { workspace = true }
 sysinfo = { workspace = true }
 tokio = { workspace = true }
+tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
 tower = { workspace = true, features = ["timeout", "util"] }
 tower-http = { workspace = true, features = ["timeout"] }
@@ -60,12 +62,11 @@ wasmtime = { workspace = true, features = [
 ] }
 wasmtime-wasi = { workspace = true, features = ["p3"] }
 wasmtime-wasi-http = { workspace = true, features = ["component-model-async", "p3", "default-send-request"] }
+webpki-roots = { workspace = true }
 zstd = { workspace = true }
 
 [dev-dependencies]
 h2 = { workspace = true }
 rcgen = { workspace = true }
-rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync", "test-util"] }
-tokio-rustls = { workspace = true }

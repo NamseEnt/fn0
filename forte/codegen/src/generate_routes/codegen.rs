@@ -43,6 +43,7 @@ pub(super) fn generate_code(
     let cache_policy_handler = generate_cache_policy_handler(pages);
     let websocket_handler = generate_websocket_handler(websockets);
     let websocket_path_module = generate_websocket_path_module(websockets);
+    let websocket_singleton_module = generate_websocket_singleton_module(websockets);
 
     let static_file_chain = {
         let matches: Vec<TokenStream> = static_files
@@ -107,6 +108,7 @@ pub(super) fn generate_code(
         #(#hook_module_declarations)*
         #(#action_module_declarations)*
         #websocket_path_module
+        #websocket_singleton_module
 
         use forte_sdk::anyhow::Result;
         use forte_sdk::http::{Request, Response, StatusCode, body::Body, HeaderMap};
@@ -390,6 +392,62 @@ fn generate_websocket_path_node(node: &WebSocketPathNode) -> TokenStream {
     }
 }
 
+#[derive(Default)]
+struct WebSocketSingletonNode {
+    children: BTreeMap<String, WebSocketSingletonNode>,
+    singleton_id: Option<String>,
+}
+
+fn generate_websocket_singleton_module(websockets: &[WebSocketRouteInfo]) -> TokenStream {
+    let mut root = WebSocketSingletonNode::default();
+    for websocket in websockets
+        .iter()
+        .filter(|websocket| matches!(websocket.direction, WebSocketDirection::Singleton))
+    {
+        let mut node = &mut root;
+        for module_segment in &websocket.module_segments {
+            node = node.children.entry(module_segment.clone()).or_default();
+        }
+        node.singleton_id = websocket.singleton_id.clone();
+    }
+    if root.children.is_empty() {
+        return quote! {};
+    }
+    let root_body = generate_websocket_singleton_node(&root);
+    quote! {
+        pub mod ws_singleton {
+            #root_body
+        }
+    }
+}
+
+fn generate_websocket_singleton_node(node: &WebSocketSingletonNode) -> TokenStream {
+    let children = node.children.iter().map(|(module_segment, child)| {
+        let module_ident = format_ident!("{}", module_segment);
+        let child_body = generate_websocket_singleton_node(child);
+        quote! {
+            pub mod #module_ident {
+                #child_body
+            }
+        }
+    });
+    let send_function = node.singleton_id.as_ref().map(|singleton_id| {
+        quote! {
+            const SINGLETON_ID: &str = #singleton_id;
+
+            pub async fn send(
+                message: forte_sdk::websocket::WebSocketMessage,
+            ) -> core::result::Result<(), forte_sdk::websocket::WebSocketSendError> {
+                forte_sdk::websocket::send_singleton(SINGLETON_ID, message).await
+            }
+        }
+    });
+    quote! {
+        #(#children)*
+        #send_function
+    }
+}
+
 fn generate_websocket_handler(websockets: &[WebSocketRouteInfo]) -> TokenStream {
     if websockets.is_empty() {
         return quote! {
@@ -566,6 +624,7 @@ fn generate_websocket_route_match(websocket: &WebSocketRouteInfo) -> TokenStream
                         Some("application") => forte_sdk::websocket::DisconnectCause::Application,
                         Some("deployment") => forte_sdk::websocket::DisconnectCause::Deployment,
                         Some("heartbeat-timeout") => forte_sdk::websocket::DisconnectCause::HeartbeatTimeout,
+                        Some("egress-quota-exceeded") => forte_sdk::websocket::DisconnectCause::EgressQuotaExceeded,
                         Some("protocol-error") => forte_sdk::websocket::DisconnectCause::ProtocolError,
                         Some("transport-error") => forte_sdk::websocket::DisconnectCause::TransportError,
                         _ => forte_sdk::websocket::DisconnectCause::InternalError,
@@ -706,6 +765,7 @@ fn generate_websocket_singleton_route_match(websocket: &WebSocketRouteInfo) -> T
                         Some("application") => forte_sdk::websocket::DisconnectCause::Application,
                         Some("deployment") => forte_sdk::websocket::DisconnectCause::Deployment,
                         Some("heartbeat-timeout") => forte_sdk::websocket::DisconnectCause::HeartbeatTimeout,
+                        Some("egress-quota-exceeded") => forte_sdk::websocket::DisconnectCause::EgressQuotaExceeded,
                         Some("protocol-error") => forte_sdk::websocket::DisconnectCause::ProtocolError,
                         Some("transport-error") => forte_sdk::websocket::DisconnectCause::TransportError,
                         _ => forte_sdk::websocket::DisconnectCause::InternalError,

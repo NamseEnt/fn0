@@ -211,6 +211,28 @@ callback receives `DisconnectCause::Deployment` when the old connection observes
 new connection is opened automatically from the active deployment declaration. A rolling deploy
 does not guarantee that the old close handshake completes before the replacement dial starts.
 
+### Named singleton send returns `ConnectionNotFound`
+
+`crate::ws_singleton::<module>::send` looks up the singleton's current connection once. It fails
+with `ConnectionNotFound` when the singleton is still connecting, when its lease has expired, when
+the active deployment differs from the connection's deployment, or when the owner was replaced
+between the lookup and the write. The message is not retried on the replacement connection;
+retry from application code if the protocol allows it. Named send is not available in
+`forte dev`, which does not open singletons.
+
+### Outbound connection refused with `DestinationForbidden`
+
+The URL resolved only to addresses that are not on the public internet, such as `localhost`,
+private networks, or `169.254.169.254`. The same policy refuses Rust HTTP requests with
+`destination-IP-prohibited` and JavaScript `fetch` with status `403`. See
+[Outbound destinations](../fn0/limits.md#outbound-destinations).
+
+### `429 Monthly egress quota exhausted`
+
+The project used its monthly compute egress. WebSocket sends fail with `EgressQuotaExceeded` and
+the connection closes with `DisconnectCause::EgressQuotaExceeded` (close code `1008`). See
+[Limits & Quotas](../fn0/limits.md#network).
+
 ### Singleton status is unavailable
 
 Forte intentionally does not expose public singleton status, pause, or resume operations. The

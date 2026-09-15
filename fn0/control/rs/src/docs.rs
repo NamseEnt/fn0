@@ -83,6 +83,20 @@ pub struct WebSocketSingletonDeclaration {
     pub route_path: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WebSocketSingletonRuntimeState {
+    Preparing,
+    Active,
+    Terminating,
+}
+
+impl Default for WebSocketSingletonRuntimeState {
+    fn default() -> Self {
+        Self::Active
+    }
+}
+
 #[forte_doc]
 pub struct WebSocketSingletonConfigDoc {
     #[pk]
@@ -103,12 +117,41 @@ pub struct WebSocketSingletonRuntimeDoc {
     pub claim_token: String,
     pub connection_id: String,
     pub lease_expires_at: DateTime,
+    #[serde(default)]
+    pub state: WebSocketSingletonRuntimeState,
 }
 
 #[forte_doc]
 pub struct WebSocketSingletonReconcileCursorDoc {
     pub after_project_id: Option<String>,
     pub after_singleton_id: Option<String>,
+}
+
+/// Monthly compute egress a project may send. Operators change it by editing this document in
+/// the control database; `new_project` writes the platform default. A project without this
+/// document is refused all egress.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MonthlyEgressLimit {
+    Bytes(u64),
+    Unlimited,
+}
+
+#[forte_doc]
+pub struct ProjectEgressQuotaDoc {
+    #[pk]
+    pub project_id: String,
+    pub monthly_egress_limit: MonthlyEgressLimit,
+}
+
+/// Bytes handed to workers as egress credit in one UTC calendar month (`YYYY-MM`). Credit is
+/// charged when it is granted, so a worker that exits with unused credit still counts it.
+#[forte_doc]
+pub struct ProjectEgressUsageDoc {
+    #[pk]
+    pub project_id: String,
+    #[sk]
+    pub month: String,
+    pub granted_bytes: u64,
 }
 
 #[forte_doc]

@@ -84,6 +84,13 @@ pub type FetchHandlerFuture = Pin<Box<dyn Future<Output = Option<Response>> + Se
 
 pub trait FetchHandler: Send + Sync + 'static {
     fn handle(&self, request: Request) -> FetchHandlerFuture;
+
+    /// When `false`, the handler answers every `http:` and `https:` fetch itself, so the
+    /// runtime's built-in network fetch is refused. The refusal also covers
+    /// `Deno.core.ops.op_fetch`, which user code can reach without going through `fetch`.
+    fn allows_native_network_fetch(&self) -> bool {
+        true
+    }
 }
 
 pub struct FetchHandlerHolder(pub Option<Arc<dyn FetchHandler>>);
@@ -340,7 +347,13 @@ impl SkiInstance {
             loader.register(&script_url, sm);
         }
 
-        let mut options = runtime_options::runtime_options();
+        let native_network_fetch = match &fetch_handler {
+            Some(handler) if !handler.allows_native_network_fetch() => {
+                runtime_options::NativeNetworkFetch::Refused
+            }
+            _ => runtime_options::NativeNetworkFetch::Allowed,
+        };
+        let mut options = runtime_options::runtime_options(native_network_fetch);
         options.startup_snapshot = Some(RUNTIME_SNAPSHOT);
         options.extensions.push(fetch_intercept_extension::init());
         options.module_loader = Some(loader);

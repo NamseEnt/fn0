@@ -1,6 +1,7 @@
 mod cache;
 mod cert_poller;
 mod cert_resolver;
+mod egress_budget;
 mod env_crypto;
 mod env_yaml;
 mod manifest_poller;
@@ -21,8 +22,9 @@ use cert_resolver::SniCertResolver;
 use color_eyre::eyre::Result;
 use fn0::{
     CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
-    ExecutionContext, MAX_REQUEST_BODY_SIZE, MetricCardinalityGate, ObjectStorageHijack,
-    OtlpHijack, PresignGate, PublicStorageHijack, PurgeGate, QueueHijack, RequestBodyTooLarge,
+    EgressBudget, EgressMeteredBody, ExecutionContext, GuestOutboundHttp, MAX_REQUEST_BODY_SIZE,
+    MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, OutboundDialer, PresignGate,
+    PrivateDestinationAccess, PublicStorageHijack, PurgeGate, QueueHijack, RequestBodyTooLarge,
     RequestCancellation, StaticPageCacheHijack, TursoHijack, VaultHijack, WebSocketHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
@@ -326,6 +328,19 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     let purge_gate = Arc::new(PurgeGate::new());
     let metric_gate = Arc::new(MetricCardinalityGate::new());
     let websocket_hijack = Arc::new(WebSocketHijack::from_env());
+    let outbound_dialer = OutboundDialer::system(PrivateDestinationAccess::from_env());
+    tracing::info!(
+        private_destination_access = ?outbound_dialer.private_destination_access(),
+        "outbound destination policy"
+    );
+    let egress_grant_source = Arc::new(egress_budget::ControlEgressGrantSource::new(
+        websocket_hijack.control_project_id().to_string(),
+    ));
+    let egress_budget: Arc<dyn EgressBudget> = Arc::new(egress_budget::ControlEgressBudget::new(
+        websocket_hijack.control_project_id().to_string(),
+        egress_grant_source.clone(),
+        Arc::new(egress_budget::SystemUtcMonthClock),
+    ));
 
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
@@ -344,7 +359,12 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
                 purge_gate.clone(),
             ))
             .with_static_page_cache_hijack(build_static_page_cache_hijack(purge_gate))
-            .with_websocket_hijack(websocket_hijack.clone()),
+            .with_websocket_hijack(websocket_hijack.clone())
+            .with_guest_outbound_http(Arc::new(GuestOutboundHttp::new(
+                outbound_dialer.clone(),
+                egress_budget.clone(),
+                websocket_hijack.control_project_id().to_string(),
+            ))),
     );
 
     // Recorded on the worker's own meter rather than stamped into guest
@@ -379,14 +399,19 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
         num_workers,
     ));
     tracing::info!(threads = num_workers, "worker threads started");
+    egress_grant_source.set_worker_senders(worker_senders.clone());
 
     direct_hijack.set_dispatcher(Arc::new(WorkerCrossProjectInvokeDispatcher {
         senders: worker_senders.clone(),
         cache: cache.clone(),
     }));
-    let websocket_service = websocket::WebSocketService::new(worker_senders.clone())
-        .await
-        .map_err(|error| color_eyre::eyre::eyre!("websocket service init: {error:#}"))?;
+    let websocket_service = websocket::WebSocketService::new(
+        worker_senders.clone(),
+        outbound_dialer,
+        egress_budget.clone(),
+    )
+    .await
+    .map_err(|error| color_eyre::eyre::eyre!("websocket service init: {error:#}"))?;
     websocket_hijack.set_dispatcher(websocket_service.clone());
 
     let manifest_db =
@@ -436,6 +461,7 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
         let drain_flag = drain_flag.clone();
         let cert_resolver = cert_resolver.clone();
         let websocket_service = websocket_service.clone();
+        let egress_budget = egress_budget.clone();
         async move {
             if let Err(err) = run_user_server(
                 user_port,
@@ -446,6 +472,7 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
                 apex_route,
                 cert_resolver,
                 websocket_service,
+                egress_budget,
             )
             .await
             {
@@ -522,6 +549,7 @@ async fn run_user_server(
     apex_route: Option<Arc<ApexRoute>>,
     cert_resolver: Arc<SniCertResolver>,
     websocket_service: Arc<websocket::WebSocketService>,
+    egress_budget: Arc<dyn EgressBudget>,
 ) -> Result<()> {
     let tls_acceptor = {
         let config = rustls::ServerConfig::builder()
@@ -548,6 +576,7 @@ async fn run_user_server(
         let apex_route = apex_route.clone();
         let websocket_service = websocket_service.clone();
         let stream_budget = stream_budget.clone();
+        let egress_budget = egress_budget.clone();
 
         tokio::spawn(async move {
             // Sniff first byte to multiplex TLS user traffic (Cloudflare → NLB
@@ -582,6 +611,7 @@ async fn run_user_server(
                     let apex_route = apex_route.clone();
                     let websocket_service = websocket_service.clone();
                     let stream_budget = stream_budget.clone();
+                    let egress_budget = egress_budget.clone();
                     async move {
                         handle_user_request(
                             req,
@@ -593,6 +623,7 @@ async fn run_user_server(
                             websocket_service,
                             peer_addr,
                             stream_budget,
+                            egress_budget,
                         )
                         .await
                     }
@@ -1225,6 +1256,15 @@ fn websocket_handshake_header_allowed(header_name: &hyper::header::HeaderName) -
         && !header_name.as_str().starts_with("sec-websocket-")
 }
 
+fn egress_quota_exhausted_response() -> HyperResponse {
+    hyper::Response::builder()
+        .status(429)
+        .header("content-type", "text/plain; charset=utf-8")
+        .header("retry-after", "60")
+        .body(full_body(Bytes::from("Monthly egress quota exhausted")))
+        .unwrap()
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn handle_user_request(
     mut req: hyper::Request<hyper::body::Incoming>,
@@ -1236,6 +1276,7 @@ async fn handle_user_request(
     websocket_service: Arc<websocket::WebSocketService>,
     peer_addr: SocketAddr,
     stream_budget: Arc<Semaphore>,
+    egress_budget: Arc<dyn EgressBudget>,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
     if req.uri().path().starts_with("/__fn0_queue_task/") {
         return Ok(hyper::Response::builder()
@@ -1301,6 +1342,10 @@ async fn handle_user_request(
         },
     };
     fn0::telemetry::stage_duration("resolve_domain", resolve_start.elapsed());
+
+    if egress_budget.known_exhausted(&project_id) {
+        return Ok(egress_quota_exhausted_response());
+    }
 
     if fastwebsockets::upgrade::is_upgrade_request(&req) {
         return handle_websocket_upgrade(req, project_id, websocket_service, peer_addr).await;
@@ -1371,8 +1416,14 @@ async fn handle_user_request(
             }
             let (parts, body) = resp.into_parts();
             cancellation_guard.disarm();
-            let response_body = UnsyncBoxBody::new(CancellationBody::new(
+            let metered_body = EgressMeteredBody::new(
                 body,
+                egress_budget,
+                project_id.clone(),
+                |denied: fn0::EgressDenied| anyhow::anyhow!("response egress refused: {denied}"),
+            );
+            let response_body = UnsyncBoxBody::new(CancellationBody::new(
+                metered_body.boxed_unsync(),
                 cancellation,
                 in_flight_guard,
                 request_deadline,

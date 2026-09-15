@@ -62,6 +62,9 @@ pub fn generate_routes() {
     let has_ws_out = websockets
         .iter()
         .any(|websocket| matches!(websocket.direction, model::WebSocketDirection::Outbound));
+    let has_ws_singleton = websockets
+        .iter()
+        .any(|websocket| matches!(websocket.direction, model::WebSocketDirection::Singleton));
     let tokens = generate_code(
         &pages,
         &hooks,
@@ -124,6 +127,7 @@ pub fn generate_routes() {
         !admin_tasks.is_empty(),
         !queue_tasks.is_empty(),
         has_ws_out,
+        has_ws_singleton,
     );
 }
 
@@ -159,6 +163,7 @@ fn render_managed_block(
     has_admin: bool,
     has_queue_tasks: bool,
     has_ws_out: bool,
+    has_ws_singleton: bool,
 ) -> String {
     let mut lines = Vec::new();
     lines.push(LIB_RS_MARKER_START.to_string());
@@ -181,6 +186,9 @@ fn render_managed_block(
     if has_ws_out {
         lines.push("pub use route_generated::ws_out;".to_string());
     }
+    if has_ws_singleton {
+        lines.push("pub use route_generated::ws_singleton;".to_string());
+    }
     lines.push(LIB_RS_MARKER_END.to_string());
     lines.join("\n")
 }
@@ -191,8 +199,15 @@ fn update_lib_rs_managed_block(
     has_admin: bool,
     has_queue_tasks: bool,
     has_ws_out: bool,
+    has_ws_singleton: bool,
 ) {
-    let new_block = render_managed_block(has_actions, has_admin, has_queue_tasks, has_ws_out);
+    let new_block = render_managed_block(
+        has_actions,
+        has_admin,
+        has_queue_tasks,
+        has_ws_out,
+        has_ws_singleton,
+    );
     let existing = fs::read_to_string(lib_rs_path).unwrap_or_default();
 
     let updated = match (

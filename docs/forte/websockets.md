@@ -5,8 +5,8 @@ modules under `rs/src/ws_in`; they are published below `/ws`. Create outbound ro
 `rs/src/ws_out`; they receive messages from connections opened by the application. Create singleton
 route modules under `rs/src/ws_singleton`; fn0 maintains one current connection assignment per
 singleton and routes callbacks through the worker that owns the current physical connection.
-During lease expiry or a network partition, an old physical socket may overlap a replacement
-temporarily; the database assignment and fencing checks remain authoritative.
+An old physical socket may close before its reservation expires; the reservation and fencing checks
+remain authoritative while sends to that unavailable connection fail.
 
 ## Local development
 
@@ -152,8 +152,9 @@ live messages.
 Singleton routes model **one named outbound connection assignment per project** — a market-data
 feed, a third-party push channel, or a chat firehose. The assignment is project-scoped and the
 singleton name is derived from the module path. fn0 opens the current physical socket and re-opens
-it when reconciliation finds that the assignment is missing or expired. A paused old worker can
-leave a temporary upstream duplicate until fencing and lease expiry take effect.
+it when reconciliation finds that the assignment is missing or expired. Version changes,
+disconnects, crashes, activation failures, and declaration removals preserve the reservation until
+its deadline, so a replacement claim waits even when the old socket has already closed.
 
 Create modules under `rs/src/ws_singleton`. Dynamic path segments (`[param]`) are rejected at
 build time. `codegen` scans this directory recursively for `.rs` files, and derives the singleton
@@ -215,7 +216,8 @@ options.protocols.push("market.v1".to_string());
 Ok(options)
 ```
 
-The URL must be `ws://` or `wss://`. Reserved headers (`host`, `content-length`, `upgrade`,
+The URL must be `ws://` or `wss://` and must resolve to a public internet address; see
+[Outbound destinations](../fn0/limits.md#outbound-destinations). Reserved headers (`host`, `content-length`, `upgrade`,
 `connection`, `sec-websocket-*`, and anything starting with `x-fn0-`) are stripped; fn0 owns
 those. Protocols must be non-empty, must not contain whitespace, and must not contain commas.
 
@@ -226,18 +228,31 @@ the selected `Sec-WebSocket-Protocol`, if any. `on_message` fires for every inbo
 
 ### Sending and disconnecting
 
-The initial singleton implementation does not provide a public API that resolves a singleton name
-to its current physical connection. Singleton callbacks receive the `ConnectionId` for their
-current connection, and applications that retain that ID may use
-`forte_sdk::websocket::send` and `forte_sdk::websocket::disconnect` as with other WebSockets:
+`forte build` generates a `send` function for each singleton module, addressed by module path.
+`rs/src/ws_singleton/market_feed.rs` produces `crate::ws_singleton::market_feed::send`, and
+`rs/src/ws_singleton/feeds/us.rs` produces `crate::ws_singleton::feeds::us::send`. Any handler in
+the same project can call it; another project cannot address the singleton.
 
 ```rust
-forte_sdk::websocket::send(
-    &connection_id,
+crate::ws_singleton::market_feed::send(
     WebSocketMessage::text("{\"op\":\"subscribe\",\"symbol\":\"AAPL\"}"),
 )
 .await?;
 ```
+
+The runtime resolves the current active connection once, caches that result only until a safety
+deadline before the control reservation expires, and sends once. Concurrent cache misses for the
+same `(project_id, singleton_id)` share one control lookup. It returns
+`WebSocketSendError::ConnectionNotFound` when the singleton has no active connection: it is
+connecting, its lease expired, it belongs to an older deployment, its socket closed before the
+reservation expired, or its owner was replaced before the write. A send never retries on a
+replacement connection, because the replacement may not have finished its own subscription or
+authentication. Delivery keeps the at-most-once rules of `forte_sdk::websocket::send`;
+`delivery_state()` tells whether any bytes were written.
+
+Singleton callbacks also receive the `ConnectionId` of their current connection, and
+`forte_sdk::websocket::send` and `forte_sdk::websocket::disconnect` accept it as with other
+WebSockets.
 
 There is no public `connect_singleton` in the SDK — fn0 owns opening and re-opening the socket
 in response to the manifest declaration, so user code never calls it.
@@ -248,21 +263,31 @@ the module and deploy to restore it. These are deployment procedures, not runtim
 
 The internal `websocket_singleton_status` action accepts worker heartbeat and disconnect reports;
 it is not a public status query or a dashboard contract. The current runtime record contains the
-assignment version, claim token, physical connection ID, and lease expiry. It does not store a
-handshake timestamp or the last error.
+assignment version, claim token, physical connection ID, preparing/active/terminating state, and
+lease expiry. It does not store a handshake timestamp or the last error.
 
 ### Lifecycle
 
 - Registered at deploy time from `.forte/ws_singletons.json`; a rename or removal takes effect on
   the next `forte deploy`.
-- fn0 keeps one current database assignment per `(project, singleton_id)` even across many worker
-  instances. A paused old worker or a partition can leave a temporary physical overlap while the
-  old lease expires; no strict upstream-level exactly-one guarantee is made.
+- fn0 keeps one reservation per `(project, singleton_id)` even across many worker instances. A
+  version change, disconnect, crash, activation failure, or declaration removal cannot create a new
+  claim before the existing reservation expires. The socket may close earlier, and sends fail while
+  the reservation remains.
 - A new deploy closes project connections on the worker generation that adopts the new code. The
-  replacement connection may be established before every old close handshake has completed.
+  old connection may close before its reservation expires; the replacement waits for that
+  reservation before it can claim.
 - Delivery is still at-most-once. A dropped message is not replayed.
-- Per-connector owner leases are renewed periodically; when a worker vanishes, control hands the
-  singleton to another worker and calls `connect` again there.
+- Per-connector owner reservations are renewed periodically; when a worker vanishes, control waits
+  for the stored reservation to expire before handing the singleton to another worker and calling
+  `connect` there.
+- A worker that cannot renew for 30 seconds stops the connection. Every send admission, every
+  outgoing frame, and every callback start checks the local lease deadline, so a worker that
+  resumes after a long pause refuses traffic before its renewal task runs. Bytes already handed to
+  the operating system before the deadline cannot be recalled.
+- Message payloads count toward the project's monthly compute egress. When the quota is
+  exhausted, sends fail with `EgressQuotaExceeded` and the connection closes with
+  `DisconnectCause::EgressQuotaExceeded`.
 
 See [Limits & Quotas](../fn0/limits.md) and the internal
 [WebSocket design](../design/forte-websockets.md) for queue, size, and lifecycle details.

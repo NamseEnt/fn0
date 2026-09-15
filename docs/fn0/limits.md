@@ -1,7 +1,9 @@
 # Limits & Quotas
 
 Every limit that applies to fn0 Cloud, in one place. Self-hosted fn0 has none
-of these — run it yourself and they are yours to change.
+of these except the per-project compute egress quota and the outbound
+destination policy, which the worker enforces wherever it runs; run it yourself
+and the rest are yours to change.
 
 fn0 Cloud is not open yet; values below are the planned launch limits and may
 be adjusted before general availability.
@@ -90,6 +92,27 @@ complete message before the application sees it. The absence of an explicit byte
 promise of unlimited memory or bandwidth. WebSocket delivery is at-most-once and not durable.
 Reconnecting clients synchronize authoritative state through HTTP.
 
+## Outbound destinations
+
+Application code may name any URL, but the worker opens the socket, so the worker refuses
+destinations that are not on the public internet. This covers Rust HTTP requests, JavaScript
+`fetch`, and outbound and singleton WebSockets. Refused ranges include loopback, private
+networks (`10/8`, `172.16/12`, `192.168/16`, `fc00::/7`), link-local and cloud metadata
+(`169.254/16`, `fe80::/10`), carrier-grade NAT (`100.64/10`), multicast, documentation,
+benchmarking, and reserved ranges, and IPv6 forms that embed one of those IPv4 addresses.
+
+The worker resolves the hostname, drops non-public answers, and connects to the exact address it
+approved. TLS still verifies the original hostname. Every new connection and every singleton
+reconnect resolves again, so DNS that later points at a private address is refused at that
+point. A request refused this way fails with `destination-IP-prohibited` in Rust, a `403`
+response from JavaScript `fetch`, and `WebSocketConnectError::DestinationForbidden` for
+WebSockets.
+
+Self-hosted operators who intentionally reach private services set
+`FN0_ALLOW_PRIVATE_OUTBOUND_DESTINATIONS=true` on the worker. The variable accepts only `true`
+or `false`; any other value stops the worker at startup. `forte dev` applies no destination
+policy and no egress quota.
+
 ## Monthly quotas — one dollar plan
 
 ### Projects & domains
@@ -112,8 +135,32 @@ month's budget instead of hitting a daily wall.
 
 | Quota | Value | Notes |
 | --- | --- | --- |
-| Compute egress | 20 GB / month | Bytes leaving your handlers: SSR pages, API responses |
+| Compute egress | 20 GB / month | Bytes your application sends out of the platform; see below |
 | Static asset downloads | Unlimited | Served through the CDN cache — never metered, never counted as egress |
+
+Compute egress counts, per project and per UTC calendar month:
+
+- HTTP response bodies the worker sends to clients.
+- WebSocket message payloads the application sends, on any connection kind.
+- Request bodies of the application's own outbound HTTP calls, from Rust and from JavaScript
+  `fetch`.
+
+It does not count headers, WebSocket control frames, received bytes, queue tasks, cron runs, or
+callbacks the platform invokes internally. The fn0 control project is not metered.
+
+A byte is charged before it is handed to the network. When the monthly quota is exhausted, new
+HTTP requests receive `429 Monthly egress quota exhausted`, a response or request body that is
+streaming stops at the next chunk, WebSocket sends fail with `EgressQuotaExceeded`, and the
+connection closes with code `1008`. Bytes already written stay written. Workers take credit
+from the control plane in chunks of up to 64 MiB and credit is charged when it is granted, so a
+worker restart can count up to one unused chunk. When the control plane cannot be reached,
+egress is refused rather than allowed.
+
+The quota is stored per project in the control database as `ProjectEgressQuotaDoc`, with
+`monthly_egress_limit` set to `{"Bytes": <limit>}` or `"Unlimited"`. New projects are created
+with 20 GB. Operators change it by editing that document; a project without the document can
+send nothing. A raised limit takes effect within a minute on workers that already saw the old
+limit exhausted. Monthly usage is kept in `ProjectEgressUsageDoc` under `YYYY-MM`.
 
 Static assets (your deployed build's files) are served from your own
 Cloudflare account through your own CDN hostname, so their bandwidth is

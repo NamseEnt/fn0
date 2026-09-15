@@ -286,6 +286,49 @@ fn test_build_websocket_route() {
     );
 }
 
+const SINGLETON_WEBSOCKET_ROUTE: &str = r#"
+use forte_sdk::anyhow::Result;
+use forte_sdk::websocket::{MessageEvent, SingletonConnectionOptions, WebSocketMessage};
+
+pub async fn connect() -> Result<SingletonConnectionOptions> {
+    Ok(SingletonConnectionOptions::new("wss://stream.example.com/market"))
+}
+
+pub async fn on_message(_event: MessageEvent) -> Result<()> {
+    crate::ws_singleton::feeds::us_market::send(WebSocketMessage::text("ack")).await?;
+    Ok(())
+}
+"#;
+
+#[test]
+fn test_build_generates_named_singleton_send() {
+    let temp = tempfile::tempdir().unwrap();
+    let project_dir = setup_project(&temp);
+    let singleton_dir = project_dir.join("rs/src/ws_singleton/feeds");
+    std::fs::create_dir_all(&singleton_dir).unwrap();
+    std::fs::write(
+        singleton_dir.join("us_market.rs"),
+        SINGLETON_WEBSOCKET_ROUTE,
+    )
+    .unwrap();
+
+    cargo::cargo_bin_cmd!("forte")
+        .args(["build"])
+        .current_dir(&project_dir)
+        .assert()
+        .success();
+
+    let generated_routes =
+        std::fs::read_to_string(project_dir.join("rs/src/route_generated.rs")).unwrap();
+    let generated_lib = std::fs::read_to_string(project_dir.join("rs/src/lib.rs")).unwrap();
+    assert!(generated_routes.contains("pub mod ws_singleton"));
+    assert!(generated_routes.contains("const SINGLETON_ID: &str = \"feeds/us_market\";"));
+    assert!(
+        generated_routes.contains("forte_sdk::websocket::send_singleton(SINGLETON_ID, message)")
+    );
+    assert!(generated_lib.contains("pub use route_generated::ws_singleton;"));
+}
+
 #[test]
 fn test_build_fails_outside_project() {
     let temp = tempfile::tempdir().unwrap();

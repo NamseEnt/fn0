@@ -34,3 +34,4 @@ deno_error = { workspace = true }
 deno_fetch = { package = "fn0-deno-fetch", version = "=0.250.0", path = "../../vendor/deno/ext/fetch" }
 deno_web = { package = "fn0-deno-web", version = "=0.257.0", path = "../../vendor/deno/ext/web" }
 deno_webidl = { workspace = true }
+http.workspace = true

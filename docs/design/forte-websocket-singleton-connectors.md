@@ -7,9 +7,9 @@ application invocation calling `connect`. It extends the physical outbound trans
 [Forte WebSocket Design](./forte-websockets.md).
 
 The implemented scope is deployment-time discovery, active-version registration, per-connector
-ownership claims, lease renewal, reconnect reconciliation, and callback delivery. Runtime pause,
-runtime resume, and public singleton status APIs are intentionally unsupported. A public logical
-singleton send API, destination policy, and bandwidth quota are not part of this implementation.
+ownership claims, lease renewal with local fencing, reconnect reconciliation, callback delivery,
+a named send API, the outbound destination policy, and compute egress accounting. Runtime pause,
+runtime resume, and public singleton status APIs are intentionally unsupported.
 
 ## Application configuration
 
@@ -56,17 +56,20 @@ The logical identity is:
 (project_id, singleton_id)
 ```
 
-The control plane has one current, unexpired assignment for that identity under normal operation.
+The control plane has one current, unexpired reservation for that identity under normal operation.
 One worker normally owns the current physical connection. A physical connection uses the existing
 opaque `connection_id`. Control uses an internal, short-lived `claim_token` to fence assignment
 attempts and late status updates. The token is not application-visible and does not change the
 logical identity. The same claim is idempotent on a worker; a different singleton ID creates a
-different connection even when URL and receive path are equal.
+different connection even when URL and receive path are equal. A version change, disconnect, crash,
+activation failure, or declaration removal preserves the reservation until its stored deadline;
+another claim is allowed only at or after that deadline.
 
-The database assignment is the authority, not the number of sockets that an upstream server may
-temporarily observe. If an old worker is paused or partitioned, its socket can remain open until
-the local safety deadline and lease expiry allow replacement. The platform prevents stale database
-writes and stale local sends, but it cannot forcibly close a socket across a network partition.
+The database reservation is the authority, not the number of sockets that an upstream server may
+temporarily observe. If an old worker is paused or partitioned, its socket can remain open until the
+local safety deadline, or it can close earlier while the reservation still blocks replacement. The
+platform prevents stale database writes and stale local sends, but it cannot forcibly close a socket
+across a network partition.
 
 ## Deployment state
 
@@ -83,15 +86,16 @@ remains retained.
 
 Each deletion re-reads the manifest and the exact `(project_id, code_version)` document in one
 transaction. Cleanup stops if the project disappears, the active version changes, or activation is
-no longer `active`. Already-deleted documents are harmless on retry. Cleanup logs scanned, retained,
-and deleted document counts and does not change singleton runtime leases or ownership.
+no longer `active`. Already-deleted documents are harmless on retry. Cleanup marks stale singleton
+runtime records unavailable and preserves their reservation until expiry; it deletes them only at or
+after the stored deadline.
 
 When a worker adopts a new project code version, it closes every WebSocket for that project with
 `1012 Service Restart`. Control does not reconnect a persistent WebSocket from the previous
-deployment. It uses the declaration shipped with the active deployment, so a renamed handler either
-produces the new path or fails deployment validation rather than reconnecting to a stale path.
-Rolling deployment does not promise that the old close handshake completes before a replacement
-dial starts.
+deployment before its reservation expires. It uses the declaration shipped with the active
+deployment, so a renamed handler either produces the new path or fails deployment validation rather
+than reconnecting to a stale path. The old connection can close before the reservation expires, so
+sends can fail during the remaining reservation period.
 
 Deployments use the platform's rolling consistency model. HTTP requests, WebSocket callbacks, and
 queue work may briefly run on old and new code during rollout. Applications that cannot tolerate
@@ -109,10 +113,11 @@ connect_singleton(project_id, singleton_id, claim_token, url, receive_path) -> c
 Control reads the active deployment declaration from its database. The worker never reads that
 record and reuses the existing URL-based outbound WebSocket transport.
 
-Control serializes assignment for one `(project_id, singleton_id)`. A committed, unexpired lease
-prevents another worker from receiving the same assignment. Network connection establishment occurs
-after the database transaction. The lease is stored and renewed per connector; it is not a shared
-worker-session lease.
+Control serializes assignment for one `(project_id, singleton_id)`. A committed, unexpired
+reservation prevents another worker from receiving the same assignment, including after a version
+change or declaration removal. Network connection establishment occurs after the database
+transaction. The reservation is stored and renewed per connector; it is not a shared worker-session
+lease.
 
 ## Connection lease
 
@@ -129,11 +134,28 @@ status = heartbeat | disconnected
 The existing `connection_id` lets control ignore a late heartbeat or disconnect from a replaced
 physical connection.
 
-The initial lease is 60 seconds. A worker renews substantially earlier and uses a local safety
-deadline shorter than the control lease. If it cannot renew by that deadline, it stops admitting
-sends and callback dispatch, then closes the socket. Control assigns a replacement only after the
-stored lease expires. A crashed worker cannot send `disconnected`; lease expiry is its recovery
-path. The worker uses a 10-second heartbeat interval and a 30-second local safety deadline.
+The initial reservation is 60 seconds. A worker renews substantially earlier and uses a local safety
+deadline shorter than the control reservation. If it cannot renew by that deadline, it stops
+admitting sends and callback dispatch, then closes the socket. Control assigns a replacement only at
+or after the stored reservation expires. A crashed worker cannot send `disconnected`; reservation
+expiry is its recovery path. The worker uses a 10-second heartbeat interval and a 30-second local
+safety deadline.
+
+The worker keeps the deadline in a lease guard that every connection path reads directly:
+
+- send admission, before a command is queued;
+- the writer, before it starts a queued send and again before every outgoing data frame;
+- inbound message dispatch, and the worker thread immediately before a message or `on_connect`
+  callback starts;
+- activation, before `on_connect` is invoked.
+
+The renewal task extends the guard and closes the socket, but none of these checks wait for it.
+A process that was paused past the deadline refuses traffic as soon as it resumes, even if the
+renewal task has not been scheduled yet. An accepted renewal moves the deadline to 30 seconds after
+the renewal request was sent, not after its answer arrived, because control stamps the lease no
+earlier than that. A renewal whose answer is lost counts as a failure even though control may have
+applied it. A rejected renewal revokes the guard at once. A frame already written to the operating
+system before the deadline cannot be recalled; such a send reports delivery `Unknown`.
 
 ## Reconciliation
 
@@ -145,25 +167,67 @@ with the failed declaration. One project-level error also stopped the remaining 
 
 The control tick scans at most 64 projects and 256 declarations per invocation. It stores a
 `(project_id, singleton_id)` cursor, reads each project's runtime records in one query, and enqueues
-only missing, expired, or old-version singletons. It enqueues one targeted reconcile task per
+only missing or expired singletons. It marks old-version and undeclared records unavailable while
+preserving their reservations. It enqueues one targeted reconcile task per
 candidate; there is no batch claim transaction or deployment-configurable claim count in the current
 implementation. For each targeted task it:
 
-1. skips an unexpired current connection or claim;
+1. skips an unexpired current connection, unavailable reservation, or claim;
 2. claims the singleton in a short database transaction;
 3. calls `connect_singleton` on the worker executing the targeted queue task;
 4. records the returned `connection_id` only when the claim token still matches;
-5. releases its own failed claim without deleting a replacement claim.
+5. retires its own failed claim without shortening or deleting the reservation.
 
-The tick also removes runtime state that no longer exists in the active deployment. A worker that
-still owns the removed state can no longer renew it and self-fences at its local safety deadline.
+The tick retires runtime state that no longer exists in the active deployment. A worker that still
+owns the removed state can no longer renew it and self-fences at the local safety deadline; the
+reservation remains until its stored deadline.
 
 ## Delivery behavior
 
 Message callbacks use the declared outbound handler and retain the existing online-only,
 at-most-once behavior. The platform does not replay messages received while disconnected and does
 not retry ambiguous sends. `send` and `disconnect` continue to address the physical
-`connection_id`; a logical singleton send API is outside the initial scope.
+`connection_id`.
+
+## Named send
+
+Code generation emits `crate::ws_singleton::<module path>::send(message)` for every singleton
+module, with the singleton ID fixed in the generated function. The guest calls the WebSocket hijack
+at `/send-singleton`; the worker takes the project from the calling invocation, not from the
+request, so a project can only address its own singletons.
+
+The worker asks the internal `websocket_singleton_resolve` control action for the current
+connection. Control answers with a connection only when the project's active deployment is
+active, the runtime record belongs to that code version, activation has completed, and the
+reservation has not expired. The response includes the connection ID, reservation deadline, and
+control lookup time. The worker derives a relative lifetime from those timestamps, subtracts its
+safety margin, and caches the connection until that local deadline. Concurrent misses for the same
+logical key share one lookup, and each send retains its own deadline. The worker then performs one
+ordinary `send` to that connection, locally or through QUIC. If the connection disappears before
+the write, the result is `ConnectionNotFound` and only the matching cache entry is removed. The
+worker does not resolve again or send to a replacement for that message: the replacement's
+protocol setup in `on_connect` may not have completed, and the application cannot tell which
+physical socket received the message.
+
+## Outbound destination policy
+
+The singleton URL is application-controlled and the worker opens the socket, so the dial goes
+through the same `OutboundDialer` as guest HTTP requests and JavaScript `fetch`. It resolves the
+host, removes every address outside the public internet, and connects to an approved
+`SocketAddr`. TLS SNI and the HTTP `Host` header keep the original hostname. Each reconnect
+resolves again. A refused destination fails the claim like any other dial failure, so control
+retries it on later ticks. Self-hosted workers can allow private destinations with
+`FN0_ALLOW_PRIVATE_OUTBOUND_DESTINATIONS=true`; see
+[Limits & Quotas](../fn0/limits.md#outbound-destinations).
+
+## Egress accounting
+
+Message payloads a singleton sends are charged to the project's monthly compute egress before each
+frame is written, on the worker that owns the socket. When control refuses credit because the quota
+is exhausted or not configured, the send fails with `EgressQuotaExceeded` and the connection closes
+with code `1008`; when control cannot be reached, the send fails as a transport error and the
+connection closes. Received messages are not charged. The quota model is described in
+[Limits & Quotas](../fn0/limits.md#network).
 
 ## Failure behavior
 
@@ -171,12 +235,17 @@ not retry ambiguous sends. `send` and `disconnect` continue to address the physi
 | --- | --- |
 | Duplicate control tick | One database claim wins; the other skips the singleton |
 | Duplicate worker request | The worker keeps the current singleton connection |
-| Upstream dial failure | The claim remains until its lease expires or is released by the task; queue redelivery or a later tick retries |
-| Worker crash | The socket disappears and control reassigns after lease expiry |
+| Upstream dial failure | The reservation remains until expiry; the failed attempt is unavailable and a later tick retries after the boundary |
+| Worker crash | The socket disappears and control reassigns at or after reservation expiry |
 | Worker cannot renew | The worker self-closes before control can reassign |
+| Worker resumes after a pause past the deadline | Sends, frames, and callbacks are refused before the renewal task runs |
+| Renewal answer lost | Treated as a failure; the worker fences 30 seconds after its last confirmed request |
+| Named send races an owner change | `ConnectionNotFound`; no retry on the replacement |
+| DNS changes to a private address | The next dial is refused |
+| Egress quota exhausted | Sends fail and the connection closes with `1008` |
 | Late disconnect | Control ignores it when `connection_id` is no longer current |
 | Project deployment | Workers close project sockets; control uses only the new deployment declaration |
-| Declaration removed | Control stops reconciling it; the previous owner eventually self-closes when its lease renewal is rejected or expires |
+| Declaration removed | Control stops reconciling it and preserves the reservation until expiry; the previous owner may close earlier and sends fail during the remaining reservation |
 
 ## Unsupported lifecycle controls
 
@@ -190,14 +259,11 @@ endpoint. It is not an application read API or a dashboard contract and must not
 
 ## Open follow-ups
 
-The current implementation does not promise a public API that resolves a singleton name to its
-current connection. Applications that need to send use the physical `connection_id` available in a
-callback or otherwise stored by the application.
+The message contract remains online-only and at-most-once. It has no explicit fn0 per-message byte
+cap; actual processing is bounded by transport backpressure, available memory, queue limits, the
+invocation deadline described in [Forte WebSocket Design](./forte-websockets.md), and the project's
+monthly egress quota.
 
-The current implementation validates WebSocket URL syntax, reserved headers, and subprotocol shape.
-It does not establish a destination allowlist, DNS-rebinding policy, or bandwidth quota. Those
-requirements need a separate product and security decision before being described as guarantees.
-
-The current message contract remains online-only and at-most-once. It has no explicit fn0 byte cap;
-actual processing is bounded by transport backpressure, available memory, queue limits, and the
-invocation deadline described in [Forte WebSocket Design](./forte-websockets.md).
+Verification is by unit and component tests with virtual time, in-memory control databases, and
+loopback sockets. These tests do not observe whether a kernel keeps a TCP connection open after a
+worker fences it, and they do not exercise real DNS resolvers or remote TLS servers.

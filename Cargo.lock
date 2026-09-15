@@ -2169,6 +2169,7 @@ dependencies = [
  "wasmtime",
  "wasmtime-wasi",
  "wasmtime-wasi-http",
+ "webpki-roots 1.0.9",
  "zstd",
 ]
 
@@ -2412,6 +2413,7 @@ dependencies = [
  "async_singleflight",
  "base64 0.22.1",
  "bytes",
+ "chrono",
  "color-eyre",
  "dashmap",
  "fastwebsockets",

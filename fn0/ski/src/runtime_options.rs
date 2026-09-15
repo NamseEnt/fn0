@@ -5,13 +5,34 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub fn runtime_options() -> RuntimeOptions {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeNetworkFetch {
+    Allowed,
+    Refused,
+}
+
+fn refuse_native_network_fetch(
+    _request: &mut http::Request<deno_fetch::ReqBody>,
+) -> Result<(), JsErrorBox> {
+    Err(JsErrorBox::generic(
+        "network fetch must go through the host fetch handler",
+    ))
+}
+
+pub fn runtime_options(native_network_fetch: NativeNetworkFetch) -> RuntimeOptions {
+    let fetch_options = deno_fetch::Options {
+        request_builder_hook: match native_network_fetch {
+            NativeNetworkFetch::Allowed => None,
+            NativeNetworkFetch::Refused => Some(refuse_native_network_fetch),
+        },
+        ..Default::default()
+    };
     RuntimeOptions {
         extensions: vec![
             deno_webidl::deno_webidl::init(),
             deno_web::deno_web::init(Default::default()),
             deno_crypto::deno_crypto::init(None),
-            deno_fetch::deno_fetch::init(Default::default()),
+            deno_fetch::deno_fetch::init(fetch_options),
             bootstrap::init(),
             request_response_extension::init(),
         ],

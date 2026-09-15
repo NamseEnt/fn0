@@ -285,7 +285,7 @@ async fn recover_expired_websocket_singletons_with(
         for runtime in &runtime_records {
             if (runtime.code_version != entry.code_version
                 || !declared_ids.contains(runtime.singleton_id.as_str()))
-                && let Err(error) = delete_runtime_if_unchanged(db, runtime).await
+                && let Err(error) = retire_runtime_if_unchanged(db, runtime, current_time).await
             {
                 tracing::error!(
                     %project_id,
@@ -316,7 +316,6 @@ async fn recover_expired_websocket_singletons_with(
                 runtime_by_id
                     .get(declaration.singleton_id.as_str())
                     .copied(),
-                entry.code_version,
                 current_time,
             ) && let Err(error) = crate::enqueue::websocket_singleton_reconcile(
                 crate::queue_task::websocket_singleton_reconcile::Input {
@@ -393,15 +392,17 @@ async fn save_websocket_reconcile_cursor(
     .await
 }
 
-pub(crate) async fn delete_runtime_if_unchanged(
+pub(crate) async fn retire_runtime_if_unchanged(
     db: &doc_db::Database,
     expected: &WebSocketSingletonRuntimeDoc,
+    current_time: DateTime,
 ) -> anyhow::Result<bool> {
     let project_id = expected.project_id.clone();
     let singleton_id = expected.singleton_id.clone();
     let code_version = expected.code_version;
     let claim_token = expected.claim_token.clone();
     let connection_id = expected.connection_id.clone();
+    let lease_expires_at = expected.lease_expires_at.clone();
     let result = db
         .trx(|trx| {
             let project_id = project_id.clone();
@@ -409,7 +410,7 @@ pub(crate) async fn delete_runtime_if_unchanged(
             let claim_token = claim_token.clone();
             let connection_id = connection_id.clone();
             async move {
-                let Some(runtime) = trx
+                let Some(mut runtime) = trx
                     .get(WebSocketSingletonRuntimeDocGet {
                         project_id: project_id.as_str(),
                         singleton_id: singleton_id.as_str(),
@@ -421,11 +422,17 @@ pub(crate) async fn delete_runtime_if_unchanged(
                 if runtime.code_version != code_version
                     || runtime.claim_token != claim_token
                     || runtime.connection_id != connection_id
+                    || runtime.lease_expires_at != lease_expires_at
                 {
                     return trx.commit::<_, ()>(false);
                 }
-                runtime.delete();
-                trx.commit::<_, ()>(true)
+                if runtime.lease_expires_at <= current_time {
+                    runtime.delete();
+                    return trx.commit::<_, ()>(true);
+                }
+                runtime.connection_id.clear();
+                runtime.state = WebSocketSingletonRuntimeState::Terminating;
+                trx.commit::<_, ()>(false)
             }
         })
         .await;
@@ -441,12 +448,9 @@ pub(crate) async fn delete_runtime_if_unchanged(
 
 fn runtime_needs_reconnect(
     runtime: Option<&WebSocketSingletonRuntimeDoc>,
-    code_version: u64,
     current_time: DateTime,
 ) -> bool {
-    runtime.is_none_or(|runtime| {
-        runtime.code_version != code_version || runtime.lease_expires_at <= current_time
-    })
+    runtime.is_none_or(|runtime| runtime.lease_expires_at <= current_time)
 }
 
 #[derive(Serialize)]
@@ -484,14 +488,21 @@ async fn enqueue_other_project_cron_task(
 
 #[cfg(test)]
 mod websocket_singleton_lease_tests {
-    use super::{declarations_after_cursor, project_ids_after_cursor, runtime_needs_reconnect};
-    use crate::docs::{WebSocketSingletonDeclaration, WebSocketSingletonRuntimeDoc};
+    use super::{
+        declarations_after_cursor, project_ids_after_cursor, retire_runtime_if_unchanged,
+        runtime_needs_reconnect,
+    };
+    use crate::docs::{
+        DbRequest, WebSocketSingletonDeclaration, WebSocketSingletonRuntimeDoc,
+        WebSocketSingletonRuntimeDocGet, WebSocketSingletonRuntimeDocPut,
+        WebSocketSingletonRuntimeState,
+    };
     use forte_sdk::{chrono, now};
 
     #[test]
     fn missing_expired_and_old_version_leases_reconnect() {
         let current_time = now();
-        assert!(runtime_needs_reconnect(None, 42, current_time));
+        assert!(runtime_needs_reconnect(None, current_time));
         let expired = WebSocketSingletonRuntimeDoc {
             project_id: "project".to_string(),
             singleton_id: "feed".to_string(),
@@ -499,23 +510,20 @@ mod websocket_singleton_lease_tests {
             claim_token: "expired-claim".to_string(),
             connection_id: "expired".to_string(),
             lease_expires_at: current_time - chrono::Duration::seconds(1),
+            state: crate::docs::WebSocketSingletonRuntimeState::Active,
         };
-        assert!(runtime_needs_reconnect(Some(&expired), 42, current_time));
+        assert!(runtime_needs_reconnect(Some(&expired), current_time));
         let old_version = WebSocketSingletonRuntimeDoc {
             lease_expires_at: current_time + chrono::Duration::seconds(60),
             code_version: 41,
             ..expired
         };
-        assert!(runtime_needs_reconnect(
-            Some(&old_version),
-            42,
-            current_time
-        ));
+        assert!(!runtime_needs_reconnect(Some(&old_version), current_time));
         let live = WebSocketSingletonRuntimeDoc {
             code_version: 42,
             ..old_version
         };
-        assert!(!runtime_needs_reconnect(Some(&live), 42, current_time));
+        assert!(!runtime_needs_reconnect(Some(&live), current_time));
     }
 
     #[test]
@@ -553,5 +561,60 @@ mod websocket_singleton_lease_tests {
             .map(|declaration| declaration.singleton_id.as_str())
             .collect();
         assert_eq!(remaining_ids, vec!["charlie"]);
+    }
+
+    #[test]
+    fn stale_cleanup_preserves_the_reservation_until_the_boundary() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            let current_time = now();
+            let expected = WebSocketSingletonRuntimeDoc {
+                project_id: "project".to_string(),
+                singleton_id: "feed".to_string(),
+                code_version: 41,
+                claim_token: "claim".to_string(),
+                connection_id: "connection".to_string(),
+                lease_expires_at: current_time + chrono::Duration::seconds(60),
+                state: WebSocketSingletonRuntimeState::Active,
+            };
+            WebSocketSingletonRuntimeDocPut(expected.clone())
+                .send_with(&db)
+                .await
+                .unwrap();
+            assert!(
+                !retire_runtime_if_unchanged(
+                    &db,
+                    &expected,
+                    current_time + chrono::Duration::seconds(59),
+                )
+                .await
+                .unwrap()
+            );
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap()
+            .unwrap();
+            assert!(runtime.connection_id.is_empty());
+            assert_eq!(runtime.state, WebSocketSingletonRuntimeState::Terminating);
+
+            let second_db = doc_db::memory();
+            WebSocketSingletonRuntimeDocPut(expected.clone())
+                .send_with(&second_db)
+                .await
+                .unwrap();
+            assert!(
+                retire_runtime_if_unchanged(
+                    &second_db,
+                    &expected,
+                    current_time + chrono::Duration::seconds(60),
+                )
+                .await
+                .unwrap()
+            );
+        });
     }
 }

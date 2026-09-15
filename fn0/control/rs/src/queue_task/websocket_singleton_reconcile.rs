@@ -315,13 +315,24 @@ async fn connect_claimed<Initializer: SingletonInitializer, Connector: Singleton
                 &connection_id,
             )
             .await;
-        if abort_result.is_ok() {
-            release_finalized_connection(db, input, claim_token, &connection_id)
-                .await
-                .map_err(ClaimedFailure::Retain)?;
+        let release_result =
+            release_finalized_connection(db, input, claim_token, &connection_id).await;
+        if abort_result.is_ok() && release_result.is_ok() {
             return Err(ClaimedFailure::Release(error));
         }
-        return Err(ClaimedFailure::Retain(error));
+        let abort_error = abort_result.err();
+        let release_error = release_result.err();
+        return Err(ClaimedFailure::Retain(anyhow::anyhow!(
+            "websocket singleton activation failed: {error:#}; abort failed: {:?}; release failed: {:?}",
+            abort_error.as_ref().map(|error| format!("{error:#}")),
+            release_error.as_ref().map(|error| format!("{error:#}")),
+        )));
+    }
+    let activated = mark_connection_active(db, input, claim_token, &connection_id)
+        .await
+        .map_err(ClaimedFailure::Retain)?;
+    if !activated {
+        return Ok(());
     }
     Ok(())
 }
@@ -392,17 +403,17 @@ async fn acquire_claim(
                         })
                         .await?
                     {
-                        Some(runtime)
-                            if runtime.code_version == code_version
-                                && runtime.lease_expires_at > current_time =>
-                        {
+                        Some(runtime) if runtime.lease_expires_at > current_time => {
                             return trx.commit::<_, ()>(false);
                         }
                         Some(mut runtime) => {
                             runtime.code_version = code_version;
                             runtime.claim_token = claim_token;
                             runtime.connection_id.clear();
-                            runtime.lease_expires_at = lease_expires_at;
+                            if lease_expires_at > runtime.lease_expires_at {
+                                runtime.lease_expires_at = lease_expires_at;
+                            }
+                            runtime.state = WebSocketSingletonRuntimeState::Preparing;
                         }
                         None => {
                             trx.create(WebSocketSingletonRuntimeDoc {
@@ -412,6 +423,7 @@ async fn acquire_claim(
                                 claim_token,
                                 connection_id: String::new(),
                                 lease_expires_at,
+                                state: WebSocketSingletonRuntimeState::Preparing,
                             })?;
                         }
                     }
@@ -489,7 +501,10 @@ async fn finalize_claim(
                     return trx.commit::<_, ()>(false);
                 }
                 runtime.connection_id = connection_id;
-                runtime.lease_expires_at = lease_expires_at;
+                if lease_expires_at > runtime.lease_expires_at {
+                    runtime.lease_expires_at = lease_expires_at;
+                }
+                runtime.state = WebSocketSingletonRuntimeState::Preparing;
                 trx.commit::<_, ()>(true)
             }
         })
@@ -518,7 +533,7 @@ async fn release_claim(
             let singleton_id = singleton_id.clone();
             let claim_token = claim_token.clone();
             async move {
-                if let Some(runtime) = trx
+                if let Some(mut runtime) = trx
                     .get(WebSocketSingletonRuntimeDocGet {
                         project_id: project_id.as_str(),
                         singleton_id: singleton_id.as_str(),
@@ -527,7 +542,7 @@ async fn release_claim(
                     && runtime.claim_token == claim_token
                     && runtime.connection_id.is_empty()
                 {
-                    runtime.delete();
+                    runtime.state = WebSocketSingletonRuntimeState::Terminating;
                 }
                 trx.commit::<_, ()>(())
             }
@@ -538,6 +553,50 @@ async fn release_claim(
         doc_db::TrxResult::Cancelled(()) => unreachable!(),
         doc_db::TrxResult::Conflict(error) => {
             anyhow::bail!("websocket singleton claim release conflict: {error:?}")
+        }
+        doc_db::TrxResult::Err(error) => Err(error),
+    }
+}
+
+async fn mark_connection_active(
+    db: &doc_db::Database,
+    input: &Input,
+    claim_token: &str,
+    connection_id: &str,
+) -> anyhow::Result<bool> {
+    let project_id = input.project_id.clone();
+    let singleton_id = input.singleton_id.clone();
+    let claim_token = claim_token.to_string();
+    let connection_id = connection_id.to_string();
+    let result = db
+        .trx(|trx| {
+            let project_id = project_id.clone();
+            let singleton_id = singleton_id.clone();
+            let claim_token = claim_token.clone();
+            let connection_id = connection_id.clone();
+            async move {
+                let Some(mut runtime) = trx
+                    .get(WebSocketSingletonRuntimeDocGet {
+                        project_id: project_id.as_str(),
+                        singleton_id: singleton_id.as_str(),
+                    })
+                    .await?
+                else {
+                    return trx.commit::<_, ()>(false);
+                };
+                if runtime.claim_token != claim_token || runtime.connection_id != connection_id {
+                    return trx.commit::<_, ()>(false);
+                }
+                runtime.state = WebSocketSingletonRuntimeState::Active;
+                trx.commit::<_, ()>(true)
+            }
+        })
+        .await;
+    match result {
+        doc_db::TrxResult::Committed(activated) => Ok(activated),
+        doc_db::TrxResult::Cancelled(()) => unreachable!(),
+        doc_db::TrxResult::Conflict(error) => {
+            anyhow::bail!("websocket singleton activation conflict: {error:?}")
         }
         doc_db::TrxResult::Err(error) => Err(error),
     }
@@ -560,7 +619,7 @@ async fn release_finalized_connection(
             let claim_token = claim_token.clone();
             let connection_id = connection_id.clone();
             async move {
-                if let Some(runtime) = trx
+                if let Some(mut runtime) = trx
                     .get(WebSocketSingletonRuntimeDocGet {
                         project_id: project_id.as_str(),
                         singleton_id: singleton_id.as_str(),
@@ -569,7 +628,8 @@ async fn release_finalized_connection(
                     && runtime.claim_token == claim_token
                     && runtime.connection_id == connection_id
                 {
-                    runtime.delete();
+                    runtime.connection_id.clear();
+                    runtime.state = WebSocketSingletonRuntimeState::Terminating;
                 }
                 trx.commit::<_, ()>(())
             }
@@ -594,8 +654,9 @@ mod tests {
     };
     use crate::docs::{
         DbRequest, WebSocketSingletonConfigDoc, WebSocketSingletonConfigDocPut,
-        WebSocketSingletonDeclaration, WebSocketSingletonRuntimeDocGet, WorkerManifestDoc,
-        WorkerManifestDocPut, WorkerProjectManifest,
+        WebSocketSingletonDeclaration, WebSocketSingletonRuntimeDocGet,
+        WebSocketSingletonRuntimeState, WorkerManifestDoc, WorkerManifestDocPut,
+        WorkerProjectManifest,
     };
     use forte_sdk::{chrono, now};
     use std::collections::HashMap;
@@ -805,6 +866,41 @@ mod tests {
     }
 
     #[test]
+    fn unexpired_reservation_blocks_version_change_until_the_boundary() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            let first_input = input();
+            let current_time = now();
+            let first = acquire_claim(&db, &first_input, "first".to_string(), current_time)
+                .await
+                .unwrap();
+            assert!(matches!(first, ClaimResult::Acquired { .. }));
+
+            let mut replacement_input = input();
+            replacement_input.code_version = 43;
+            let blocked = acquire_claim(
+                &db,
+                &replacement_input,
+                "second".to_string(),
+                current_time + chrono::Duration::seconds(59),
+            )
+            .await
+            .unwrap();
+            assert!(matches!(blocked, ClaimResult::Live));
+
+            let acquired = acquire_claim(
+                &db,
+                &replacement_input,
+                "second".to_string(),
+                current_time + chrono::Duration::seconds(60),
+            )
+            .await
+            .unwrap();
+            assert!(matches!(acquired, ClaimResult::Acquired { .. }));
+        });
+    }
+
+    #[test]
     fn duplicate_reconcile_connects_once() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
@@ -899,7 +995,7 @@ mod tests {
     }
 
     #[test]
-    fn initializer_failure_releases_claim_immediately() {
+    fn initializer_failure_keeps_reservation_until_lease_expiry() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
             put_active_manifest(&db, 42).await;
@@ -919,12 +1015,14 @@ mod tests {
             .send_with(&db)
             .await
             .unwrap();
-            assert!(runtime.is_none());
+            let runtime = runtime.unwrap();
+            assert!(runtime.connection_id.is_empty());
+            assert_eq!(runtime.state, WebSocketSingletonRuntimeState::Terminating);
         });
     }
 
     #[test]
-    fn activation_failure_releases_finalized_connection_after_abort() {
+    fn activation_failure_keeps_reservation_after_abort() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
             put_active_manifest(&db, 42).await;
@@ -965,12 +1063,14 @@ mod tests {
             .send_with(&db)
             .await
             .unwrap();
-            assert!(runtime.is_none());
+            let runtime = runtime.unwrap();
+            assert!(runtime.connection_id.is_empty());
+            assert_eq!(runtime.state, WebSocketSingletonRuntimeState::Terminating);
         });
     }
 
     #[test]
-    fn activation_failure_preserves_finalized_connection_when_abort_fails() {
+    fn activation_failure_keeps_reservation_when_abort_fails() {
         futures::executor::block_on(async {
             let db = doc_db::memory();
             put_active_manifest(&db, 42).await;
@@ -1011,7 +1111,8 @@ mod tests {
             .unwrap()
             .unwrap();
             assert_eq!(runtime.claim_token, claim_token);
-            assert_eq!(runtime.connection_id, "failed-connection");
+            assert!(runtime.connection_id.is_empty());
+            assert_eq!(runtime.state, WebSocketSingletonRuntimeState::Terminating);
         });
     }
 

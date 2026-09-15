@@ -24,7 +24,10 @@ pub struct RequestEnvelope {
     pub execution_deadline: std::time::Duration,
     admission: Option<ProjectAdmissionGuard>,
     started_sender: Option<oneshot::Sender<()>>,
+    start_gate: Option<StartGate>,
 }
+
+pub type StartGate = Arc<dyn Fn() -> bool + Send + Sync>;
 
 impl RequestEnvelope {
     pub fn new(
@@ -40,7 +43,15 @@ impl RequestEnvelope {
             execution_deadline: PROJECT_EXECUTION_DEADLINE,
             admission: None,
             started_sender: None,
+            start_gate: None,
         }
+    }
+
+    /// Checked after the envelope wins an execution slot and immediately before the handler
+    /// starts. A `false` answer drops the request without running it.
+    pub fn with_start_gate(mut self, start_gate: StartGate) -> Self {
+        self.start_gate = Some(start_gate);
+        self
     }
 
     pub fn with_execution_deadline(mut self, execution_deadline: std::time::Duration) -> Self {
@@ -160,6 +171,35 @@ pub fn dispatch(
     }
 }
 
+pub async fn invoke_and_wait(
+    senders: &[mpsc::Sender<RequestEnvelope>],
+    envelope_for: impl FnOnce(oneshot::Sender<Result<Response>>) -> RequestEnvelope,
+    admission_deadline: std::time::Duration,
+    response_deadline: std::time::Duration,
+) -> Result<Response> {
+    let (response_sender, response_receiver) = oneshot::channel();
+    let (envelope, started_receiver) = envelope_for(response_sender).with_start_signal();
+    dispatch(senders, envelope).map_err(|error| match error {
+        DispatchError::Full => anyhow::anyhow!("worker queue full"),
+        DispatchError::Closed => anyhow::anyhow!("worker queue closed"),
+    })?;
+    let mut response_receiver = response_receiver;
+    tokio::select! {
+        started = tokio::time::timeout(admission_deadline, started_receiver) => {
+            started
+                .map_err(|_| anyhow::anyhow!("invocation admission deadline exceeded"))?
+                .map_err(|_| anyhow::anyhow!("invocation admission failed"))?;
+        }
+        response = &mut response_receiver => {
+            return response.map_err(|_| anyhow::anyhow!("invocation response dropped"))?;
+        }
+    }
+    tokio::time::timeout(response_deadline, response_receiver)
+        .await
+        .map_err(|_| anyhow::anyhow!("invocation deadline exceeded"))?
+        .map_err(|_| anyhow::anyhow!("invocation response dropped"))?
+}
+
 fn pick_worker(project_id: &str, n: usize) -> usize {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     hasher.write(project_id.as_bytes());
@@ -202,6 +242,7 @@ where
                     execution_deadline,
                     admission,
                     started_sender,
+                    start_gate,
                 } = env;
                 let Some(admission) = admission else {
                     let _ = resp_tx.send(Err(anyhow::anyhow!("project admission missing")));
@@ -237,6 +278,12 @@ where
                         }
                     }
                 };
+                if start_gate.is_some_and(|start_gate| !start_gate()) {
+                    drop(active_permit);
+                    drop(admission);
+                    let _ = resp_tx.send(Err(anyhow::anyhow!("request start gate refused")));
+                    return;
+                }
                 if let Some(started_sender) = started_sender {
                     let _ = started_sender.send(());
                 }

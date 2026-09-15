@@ -54,6 +54,8 @@ pub enum WebSocketCommandErrorKind {
     DeadlineExceeded,
     Transport,
     InvalidText,
+    DestinationForbidden,
+    EgressQuotaExceeded,
     Internal,
 }
 
@@ -184,6 +186,28 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
         remaining: std::time::Duration,
     ) -> WebSocketCommandFuture;
 
+    fn send_singleton(
+        &self,
+        caller_project_id: String,
+        singleton_id: String,
+        message_kind: WebSocketMessageKind,
+        body: Body,
+        remaining: std::time::Duration,
+    ) -> WebSocketCommandFuture {
+        let _ = (
+            caller_project_id,
+            singleton_id,
+            message_kind,
+            body,
+            remaining,
+        );
+        Box::pin(async {
+            Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::Internal,
+            ))
+        })
+    }
+
     fn disconnect(
         &self,
         caller_project_id: String,
@@ -218,6 +242,10 @@ impl WebSocketHijack {
             control_project_id,
             dispatcher: Arc::new(OnceLock::new()),
         }
+    }
+
+    pub fn control_project_id(&self) -> &str {
+        &self.control_project_id
     }
 
     pub fn placeholder_url(&self) -> String {
@@ -477,6 +505,48 @@ impl WebSocketHijack {
                 Err(error) => response(status_for(error.kind), error.delivery),
             };
         }
+        if request.uri().path() == "/send-singleton" {
+            let Some(singleton_id) = request
+                .headers()
+                .get(SINGLETON_ID_HEADER)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+            else {
+                return response(400, WebSocketDeliveryState::NotSent);
+            };
+            if !valid_singleton_id(&singleton_id) {
+                return response(400, WebSocketDeliveryState::NotSent);
+            }
+            let message_kind = match request
+                .headers()
+                .get(MESSAGE_KIND_HEADER)
+                .and_then(|value| value.to_str().ok())
+            {
+                Some("text") => WebSocketMessageKind::Text,
+                Some("binary") => WebSocketMessageKind::Binary,
+                _ => return response(400, WebSocketDeliveryState::NotSent),
+            };
+            let Some(dispatcher) = self.dispatcher.get() else {
+                return response(503, WebSocketDeliveryState::NotSent);
+            };
+            let body = request
+                .into_body()
+                .map_err(|error| anyhow::anyhow!("websocket body: {error:?}"))
+                .boxed_unsync();
+            return match dispatcher
+                .send_singleton(
+                    caller_project_id.to_string(),
+                    singleton_id,
+                    message_kind,
+                    body,
+                    remaining,
+                )
+                .await
+            {
+                Ok(()) => response(204, WebSocketDeliveryState::NotSent),
+                Err(error) => response(status_for(error.kind), error.delivery),
+            };
+        }
         let Some((command, connection_id)) = command_and_connection(request.uri().path()) else {
             return response(404, WebSocketDeliveryState::NotSent);
         };
@@ -539,6 +609,17 @@ impl WebSocketHijack {
     }
 }
 
+fn valid_singleton_id(singleton_id: &str) -> bool {
+    !singleton_id.is_empty()
+        && singleton_id.len() <= 512
+        && singleton_id.split('/').all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        })
+}
+
 fn valid_singleton_route(route_path: &str) -> bool {
     route_path.starts_with("/ws_singleton/")
         && !route_path.contains('?')
@@ -594,6 +675,8 @@ fn status_for(kind: WebSocketCommandErrorKind) -> u16 {
         WebSocketCommandErrorKind::DeadlineExceeded => 504,
         WebSocketCommandErrorKind::Transport => 503,
         WebSocketCommandErrorKind::InvalidText => 422,
+        WebSocketCommandErrorKind::DestinationForbidden => 403,
+        WebSocketCommandErrorKind::EgressQuotaExceeded => 402,
         WebSocketCommandErrorKind::Internal => 500,
     }
 }
@@ -636,6 +719,74 @@ mod tests {
 
     struct LifecycleDispatcher {
         commands: Arc<Mutex<Vec<String>>>,
+    }
+
+    struct RecordedSingletonSend {
+        caller_project_id: String,
+        singleton_id: String,
+        body: Vec<u8>,
+    }
+
+    struct SingletonSendDispatcher {
+        sends: Arc<Mutex<Vec<RecordedSingletonSend>>>,
+    }
+
+    impl WebSocketCommandDispatcher for SingletonSendDispatcher {
+        fn send(
+            &self,
+            _caller_project_id: String,
+            _connection_id: String,
+            _message_kind: WebSocketMessageKind,
+            _body: Body,
+            _remaining: std::time::Duration,
+        ) -> WebSocketCommandFuture {
+            Box::pin(async {
+                Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::Internal,
+                ))
+            })
+        }
+
+        fn send_singleton(
+            &self,
+            caller_project_id: String,
+            singleton_id: String,
+            message_kind: WebSocketMessageKind,
+            body: Body,
+            _remaining: std::time::Duration,
+        ) -> WebSocketCommandFuture {
+            let sends = self.sends.clone();
+            Box::pin(async move {
+                assert_eq!(message_kind, WebSocketMessageKind::Binary);
+                let bytes = body
+                    .collect()
+                    .await
+                    .map_err(|_| {
+                        WebSocketCommandError::unknown(WebSocketCommandErrorKind::Internal)
+                    })?
+                    .to_bytes();
+                sends
+                    .lock()
+                    .expect("singleton sends lock")
+                    .push(RecordedSingletonSend {
+                        caller_project_id,
+                        singleton_id,
+                        body: bytes.to_vec(),
+                    });
+                Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::EgressQuotaExceeded,
+                ))
+            })
+        }
+
+        fn disconnect(
+            &self,
+            _caller_project_id: String,
+            _connection_id: String,
+            _remaining: std::time::Duration,
+        ) -> WebSocketCommandFuture {
+            Box::pin(async { Ok(()) })
+        }
     }
 
     impl WebSocketCommandDispatcher for RecordingDispatcher {
@@ -785,6 +936,52 @@ mod tests {
         assert!(valid_connection_id(&format!("v1.{encoded}")));
         assert!(!valid_connection_id("v1.short"));
         assert!(!valid_connection_id(&encoded));
+    }
+
+    #[test]
+    fn singleton_id_matches_module_path_segments() {
+        assert!(valid_singleton_id("market_feed"));
+        assert!(valid_singleton_id("feeds/us/market-v2"));
+        assert!(!valid_singleton_id(""));
+        assert!(!valid_singleton_id("feeds//market"));
+        assert!(!valid_singleton_id("../market"));
+        assert!(!valid_singleton_id("market feed"));
+    }
+
+    #[tokio::test]
+    async fn named_singleton_send_uses_the_calling_project() {
+        let sends = Arc::new(Mutex::new(Vec::new()));
+        let hijack = WebSocketHijack::new("fn0-websocket.test".to_string());
+        hijack.set_dispatcher(Arc::new(SingletonSendDispatcher {
+            sends: sends.clone(),
+        }));
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("http://fn0-websocket.test/send-singleton")
+            .header(SINGLETON_ID_HEADER, "feeds/market")
+            .header(SINGLETON_PROJECT_HEADER, "victim-project")
+            .header(MESSAGE_KIND_HEADER, "binary")
+            .body(
+                Full::new(Bytes::from_static(b"order"))
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .expect("request");
+        let response = hijack
+            .handle_command(
+                "calling-project",
+                request,
+                std::time::Duration::from_secs(15),
+            )
+            .await
+            .expect("response");
+        assert_eq!(response.status(), hyper::StatusCode::PAYMENT_REQUIRED);
+        assert_eq!(response.headers()[DELIVERY_STATE_HEADER], "not-sent");
+        let sends = sends.lock().expect("singleton sends lock");
+        assert_eq!(sends.len(), 1);
+        assert_eq!(sends[0].caller_project_id, "calling-project");
+        assert_eq!(sends[0].singleton_id, "feeds/market");
+        assert_eq!(sends[0].body, b"order");
     }
 
     #[test]

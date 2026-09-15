@@ -8,6 +8,7 @@ use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::otlp_hijack::{self, OtlpHijack, OtlpSignal};
+use crate::outbound_http::GuestOutboundHttp;
 use crate::presign_gate::PresignDenied;
 use crate::public_storage_hijack::PublicStorageHijack;
 use crate::queue_hijack::QueueHijack;
@@ -105,6 +106,7 @@ pub(crate) struct SelfInvokeHooks {
     public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
     websocket_hijack: Option<Arc<WebSocketHijack>>,
+    guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
 }
 
 impl SelfInvokeHooks {
@@ -122,6 +124,7 @@ impl SelfInvokeHooks {
         public_storage_hijack: Option<Arc<PublicStorageHijack>>,
         static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
         websocket_hijack: Option<Arc<WebSocketHijack>>,
+        guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
     ) -> Self {
         Self {
             project_id,
@@ -136,6 +139,7 @@ impl SelfInvokeHooks {
             public_storage_hijack,
             static_page_cache_hijack,
             websocket_hijack,
+            guest_outbound_http,
         }
     }
 }
@@ -231,7 +235,15 @@ impl WasiHttpHooks for SelfInvokeHooks {
             return websocket_send(hijack, self.project_id.clone(), request, remaining);
         }
 
-        default_send(request, options)
+        match self.guest_outbound_http.clone() {
+            Some(guest_outbound_http) => guarded_default_send(
+                guest_outbound_http,
+                self.project_id.clone(),
+                request,
+                options,
+            ),
+            None => default_send(request, options),
+        }
     }
 }
 
@@ -1024,6 +1036,23 @@ fn default_send(
         let (res, io) = default_send_request(request, options).await?;
         telemetry::stage_duration("outbound_fetch", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
+        let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
+        Ok((res, io))
+    })
+}
+
+fn guarded_default_send(
+    guest_outbound_http: Arc<GuestOutboundHttp>,
+    project_id: String,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+    options: Option<RequestOptions>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let send_start = std::time::Instant::now();
+        let (res, io) = guest_outbound_http
+            .send(&project_id, request, options)
+            .await?;
+        telemetry::stage_duration("outbound_fetch", send_start.elapsed());
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
         Ok((res, io))
     })

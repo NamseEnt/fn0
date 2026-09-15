@@ -91,7 +91,12 @@ pub async fn on_message(_event: MessageEvent) -> Result<()> {
 }
 ```
 
-See [websockets.md](websockets.md) for subprotocols, streaming bodies, disconnects, and recovery.
+```rust
+// any handler in the same project — rs/src/ws_singleton/market_feed.rs  →  crate::ws_singleton::market_feed::send
+crate::ws_singleton::market_feed::send(WebSocketMessage::text("{\"op\":\"ping\"}")).await?;
+```
+
+See [websockets.md](websockets.md) for subprotocols, streaming bodies, named send, disconnects, and recovery.
 
 ## Page Handler
 

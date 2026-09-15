@@ -89,6 +89,7 @@ pub enum DisconnectCause {
     Application,
     Deployment,
     HeartbeatTimeout,
+    EgressQuotaExceeded,
     ProtocolError,
     TransportError,
     InternalError,
@@ -148,6 +149,7 @@ pub enum WebSocketSendError {
     DeadlineExceeded { delivery: WebSocketDeliveryState },
     Transport { delivery: WebSocketDeliveryState },
     InvalidText { delivery: WebSocketDeliveryState },
+    EgressQuotaExceeded { delivery: WebSocketDeliveryState },
     Internal { delivery: WebSocketDeliveryState },
 }
 
@@ -158,6 +160,7 @@ impl WebSocketSendError {
             Self::DeadlineExceeded { delivery }
             | Self::Transport { delivery }
             | Self::InvalidText { delivery }
+            | Self::EgressQuotaExceeded { delivery }
             | Self::Internal { delivery } => *delivery,
         }
     }
@@ -178,6 +181,12 @@ impl std::fmt::Display for WebSocketSendError {
                 write!(
                     formatter,
                     "websocket text is not valid UTF-8 ({delivery:?})"
+                )
+            }
+            Self::EgressQuotaExceeded { delivery } => {
+                write!(
+                    formatter,
+                    "project monthly egress quota exhausted ({delivery:?})"
                 )
             }
             Self::Internal { delivery } => {
@@ -211,6 +220,8 @@ impl std::error::Error for WebSocketDisconnectError {}
 #[derive(Debug)]
 pub enum WebSocketConnectError {
     InvalidUrl,
+    DestinationForbidden,
+    EgressQuotaExceeded,
     DeadlineExceeded,
     Transport,
     Internal,
@@ -220,6 +231,12 @@ impl std::fmt::Display for WebSocketConnectError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidUrl => formatter.write_str("invalid websocket URL"),
+            Self::DestinationForbidden => {
+                formatter.write_str("websocket URL does not resolve to a public internet address")
+            }
+            Self::EgressQuotaExceeded => {
+                formatter.write_str("project monthly egress quota exhausted")
+            }
             Self::DeadlineExceeded => formatter.write_str("websocket connect deadline exceeded"),
             Self::Transport => formatter.write_str("websocket connect transport failed"),
             Self::Internal => formatter.write_str("websocket connect failed internally"),
@@ -268,6 +285,8 @@ pub async fn connect(
             Ok(ConnectionId::new(connection_id))
         }
         StatusCode::BAD_REQUEST => Err(WebSocketConnectError::InvalidUrl),
+        StatusCode::FORBIDDEN => Err(WebSocketConnectError::DestinationForbidden),
+        StatusCode::PAYMENT_REQUIRED => Err(WebSocketConnectError::EgressQuotaExceeded),
         StatusCode::REQUEST_TIMEOUT | StatusCode::GATEWAY_TIMEOUT => {
             Err(WebSocketConnectError::DeadlineExceeded)
         }
@@ -356,6 +375,8 @@ pub async fn connect_singleton(
             Ok(ConnectionId::new(connection_id))
         }
         StatusCode::BAD_REQUEST => Err(WebSocketConnectError::InvalidUrl),
+        StatusCode::FORBIDDEN => Err(WebSocketConnectError::DestinationForbidden),
+        StatusCode::PAYMENT_REQUIRED => Err(WebSocketConnectError::EgressQuotaExceeded),
         StatusCode::REQUEST_TIMEOUT | StatusCode::GATEWAY_TIMEOUT => {
             Err(WebSocketConnectError::DeadlineExceeded)
         }
@@ -491,6 +512,49 @@ pub async fn send(
     map_send_response(response.status(), response.headers())
 }
 
+/// Sends to the current connection of a persistent singleton in the calling project.
+///
+/// Use the generated `crate::ws_singleton::<module path>::send` instead of calling this with a
+/// hand-written ID. The runtime looks up the current connection once. When there is no current
+/// connection, or the owner was replaced before the write, the send fails with
+/// [`WebSocketSendError::ConnectionNotFound`] and is not retried on the replacement.
+#[doc(hidden)]
+pub async fn send_singleton(
+    singleton_id: &str,
+    message: WebSocketMessage,
+) -> Result<(), WebSocketSendError> {
+    let endpoint =
+        std::env::var("FN0_WEBSOCKET_URL").map_err(|_| WebSocketSendError::Internal {
+            delivery: WebSocketDeliveryState::NotSent,
+        })?;
+    if singleton_id.is_empty() {
+        return Err(WebSocketSendError::Internal {
+            delivery: WebSocketDeliveryState::NotSent,
+        });
+    }
+    let (message_kind, body) = match message {
+        WebSocketMessage::Text(body) => ("text", body),
+        WebSocketMessage::Binary(body) => ("binary", body),
+    };
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(format!("{}/send-singleton", endpoint.trim_end_matches('/')))
+        .header(SINGLETON_ID_HEADER, singleton_id)
+        .header(MESSAGE_KIND_HEADER, message_kind)
+        .body(body)
+        .map_err(|_| WebSocketSendError::Internal {
+            delivery: WebSocketDeliveryState::NotSent,
+        })?;
+    let response =
+        Client::new()
+            .send(request)
+            .await
+            .map_err(|_| WebSocketSendError::Transport {
+                delivery: WebSocketDeliveryState::Unknown,
+            })?;
+    map_send_response(response.status(), response.headers())
+}
+
 pub async fn disconnect(connection_id: &ConnectionId) -> Result<(), WebSocketDisconnectError> {
     let endpoint =
         std::env::var("FN0_WEBSOCKET_URL").map_err(|_| WebSocketDisconnectError::Internal)?;
@@ -535,6 +599,7 @@ fn map_send_response(status: StatusCode, headers: &HeaderMap) -> Result<(), WebS
             Err(WebSocketSendError::DeadlineExceeded { delivery })
         }
         StatusCode::UNPROCESSABLE_ENTITY => Err(WebSocketSendError::InvalidText { delivery }),
+        StatusCode::PAYMENT_REQUIRED => Err(WebSocketSendError::EgressQuotaExceeded { delivery }),
         StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE => {
             Err(WebSocketSendError::Transport { delivery })
         }
@@ -556,6 +621,23 @@ mod tests {
             WebSocketSendError::Backpressure.delivery_state(),
             WebSocketDeliveryState::NotSent
         );
+    }
+
+    #[test]
+    fn egress_quota_response_keeps_delivery_state() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            DELIVERY_STATE_HEADER,
+            "unknown".parse().expect("valid header"),
+        );
+        let error = map_send_response(StatusCode::PAYMENT_REQUIRED, &headers)
+            .expect_err("quota refusal must fail");
+        assert!(matches!(
+            error,
+            WebSocketSendError::EgressQuotaExceeded {
+                delivery: WebSocketDeliveryState::Unknown
+            }
+        ));
     }
 
     #[test]

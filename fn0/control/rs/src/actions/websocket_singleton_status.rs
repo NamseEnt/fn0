@@ -39,8 +39,17 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Unauthorized;
     }
     let db = doc_db::turso();
+    let manifest = match (WorkerManifestDocGet {}).send_with(&db).await {
+        Ok(Some(manifest)) => manifest,
+        Ok(None) => return Output::Ignored,
+        Err(_) => return Output::Error,
+    };
+    let Some(entry) = manifest.project_manifests.get(&req.body.project_id) else {
+        return Output::Ignored;
+    };
     let disconnected = matches!(req.body.status, Status::Disconnected);
-    let lease_expires_at = now() + chrono::Duration::seconds(LEASE_SECONDS);
+    let current_time = now();
+    let lease_expires_at = current_time + chrono::Duration::seconds(LEASE_SECONDS);
     let accepted = match update_runtime_status(
         &db,
         &req.body.project_id,
@@ -48,7 +57,9 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         &req.body.claim_token,
         &req.body.connection_id,
         disconnected,
+        current_time,
         lease_expires_at,
+        entry.code_version,
     )
     .await
     {
@@ -59,14 +70,6 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Ignored;
     }
     if disconnected {
-        let manifest = match (WorkerManifestDocGet {}).send_with(&db).await {
-            Ok(Some(manifest)) => manifest,
-            Ok(None) => return Output::Ignored,
-            Err(_) => return Output::Error,
-        };
-        let Some(entry) = manifest.project_manifests.get(&req.body.project_id) else {
-            return Output::Ignored;
-        };
         if let Err(error) = crate::enqueue::websocket_singleton_reconcile(
             crate::queue_task::websocket_singleton_reconcile::Input {
                 project_id: req.body.project_id.clone(),
@@ -90,7 +93,9 @@ async fn update_runtime_status(
     claim_token: &str,
     connection_id: &str,
     disconnected: bool,
+    current_time: DateTime,
     lease_expires_at: DateTime,
+    active_code_version: u64,
 ) -> anyhow::Result<bool> {
     let project_id = project_id.to_string();
     let singleton_id = singleton_id.to_string();
@@ -116,13 +121,18 @@ async fn update_runtime_status(
                 if (!legacy_claim && runtime.claim_token != claim_token)
                     || (!runtime.connection_id.is_empty() && runtime.connection_id != connection_id)
                     || (!disconnected && runtime.connection_id.is_empty())
+                    || (!disconnected && runtime.code_version != active_code_version)
+                    || (!disconnected && runtime.lease_expires_at <= current_time)
                 {
                     return trx.commit::<_, ()>(false);
                 }
                 if disconnected {
-                    runtime.delete();
+                    runtime.connection_id.clear();
+                    runtime.state = WebSocketSingletonRuntimeState::Terminating;
                 } else {
-                    runtime.lease_expires_at = lease_expires_at;
+                    if lease_expires_at > runtime.lease_expires_at {
+                        runtime.lease_expires_at = lease_expires_at;
+                    }
                 }
                 trx.commit::<_, ()>(true)
             }
@@ -143,7 +153,7 @@ mod tests {
     use super::update_runtime_status;
     use crate::docs::{
         DbRequest, WebSocketSingletonRuntimeDoc, WebSocketSingletonRuntimeDocGet,
-        WebSocketSingletonRuntimeDocPut,
+        WebSocketSingletonRuntimeDocPut, WebSocketSingletonRuntimeState,
     };
     use forte_sdk::{chrono, now};
 
@@ -159,6 +169,7 @@ mod tests {
                 claim_token: "replacement-claim".to_string(),
                 connection_id: "replacement".to_string(),
                 lease_expires_at,
+                state: WebSocketSingletonRuntimeState::Active,
             })
             .send_with(&db)
             .await
@@ -170,7 +181,9 @@ mod tests {
                 "old-claim",
                 "old",
                 true,
+                now(),
                 lease_expires_at,
+                2,
             )
             .await
             .unwrap();
@@ -198,7 +211,9 @@ mod tests {
                 "claim",
                 "connection",
                 true,
+                now(),
                 now() + chrono::Duration::seconds(60),
+                2,
             )
             .await
             .unwrap();
@@ -217,7 +232,86 @@ mod tests {
                 "claim",
                 "connection",
                 false,
+                now(),
                 now() + chrono::Duration::seconds(60),
+                2,
+            )
+            .await
+            .unwrap();
+            assert!(!accepted);
+        });
+    }
+
+    #[test]
+    fn heartbeat_only_extends_an_existing_reservation() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            let existing_expiry = now() + chrono::Duration::seconds(120);
+            WebSocketSingletonRuntimeDocPut(WebSocketSingletonRuntimeDoc {
+                project_id: "project".to_string(),
+                singleton_id: "feed".to_string(),
+                code_version: 2,
+                claim_token: "claim".to_string(),
+                connection_id: "connection".to_string(),
+                lease_expires_at: existing_expiry,
+                state: WebSocketSingletonRuntimeState::Active,
+            })
+            .send_with(&db)
+            .await
+            .unwrap();
+            let accepted = update_runtime_status(
+                &db,
+                "project",
+                "feed",
+                "claim",
+                "connection",
+                false,
+                now(),
+                now() + chrono::Duration::seconds(60),
+                2,
+            )
+            .await
+            .unwrap();
+            assert!(accepted);
+            let runtime = (WebSocketSingletonRuntimeDocGet {
+                project_id: "project",
+                singleton_id: "feed",
+            })
+            .send_with(&db)
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(runtime.lease_expires_at, existing_expiry);
+        });
+    }
+
+    #[test]
+    fn heartbeat_at_expiry_cannot_extend_the_reservation() {
+        futures::executor::block_on(async {
+            let db = doc_db::memory();
+            let current_time = now();
+            WebSocketSingletonRuntimeDocPut(WebSocketSingletonRuntimeDoc {
+                project_id: "project".to_string(),
+                singleton_id: "feed".to_string(),
+                code_version: 2,
+                claim_token: "claim".to_string(),
+                connection_id: "connection".to_string(),
+                lease_expires_at: current_time,
+                state: WebSocketSingletonRuntimeState::Active,
+            })
+            .send_with(&db)
+            .await
+            .unwrap();
+            let accepted = update_runtime_status(
+                &db,
+                "project",
+                "feed",
+                "claim",
+                "connection",
+                false,
+                current_time,
+                current_time + chrono::Duration::seconds(60),
+                2,
             )
             .await
             .unwrap();
@@ -237,6 +331,7 @@ mod tests {
                 claim_token: "claim".to_string(),
                 connection_id: String::new(),
                 lease_expires_at,
+                state: WebSocketSingletonRuntimeState::Preparing,
             })
             .send_with(&db)
             .await
@@ -248,7 +343,9 @@ mod tests {
                 "claim",
                 "connection",
                 true,
+                now(),
                 lease_expires_at,
+                2,
             )
             .await
             .unwrap();
@@ -260,7 +357,7 @@ mod tests {
             .send_with(&db)
             .await
             .unwrap();
-            assert!(runtime.is_none());
+            assert!(runtime.unwrap().connection_id.is_empty());
         });
     }
 }

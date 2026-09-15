@@ -108,8 +108,10 @@ target audience.
 
 ### Egress semantics
 
-"Egress" in the plan means **compute egress**: bytes leaving the runtime
-(SSR responses, API responses, subrequest downloads billed to the requester).
+"Egress" in the plan means **compute egress**: bytes the runtime sends out
+(SSR and API response bodies, WebSocket message payloads, and request bodies of
+the application's outbound HTTP calls). Received bytes, including subrequest
+downloads, are not counted; `docs/fn0/limits.md` holds the enforced rules.
 **Static asset** downloads are not metered — they are served through the CDN
 cache and R2 charges no egress. Public copy must scope the unlimited promise
 to static assets, or the 20 GB number reads as a gallery-killer.

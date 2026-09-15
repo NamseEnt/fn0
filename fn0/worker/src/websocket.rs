@@ -3,7 +3,7 @@ use crate::websocket_directory::{
     worker_identity_from_env,
 };
 use crate::websocket_quic::QuicTransport;
-use crate::worker_pool::{self, DispatchError, RequestEnvelope};
+use crate::worker_pool::{self, RequestEnvelope, StartGate};
 use base64::Engine;
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -11,7 +11,8 @@ use fastwebsockets::handshake;
 use fastwebsockets::upgrade::UpgradeFut;
 use fastwebsockets::{Frame, OpCode, Payload, WebSocketError, WebSocketRead, WebSocketWrite};
 use fn0::{
-    Body, WebSocketCommandDispatcher, WebSocketCommandError, WebSocketCommandErrorKind,
+    Body, EgressBudget, EgressDenied, OutboundDialError, OutboundDialer,
+    WebSocketCommandDispatcher, WebSocketCommandError, WebSocketCommandErrorKind,
     WebSocketCommandFuture, WebSocketConnectFuture, WebSocketDeliveryState, WebSocketMessageKind,
 };
 use http_body_util::{BodyExt, Empty, Full};
@@ -20,6 +21,7 @@ use rand::RngCore;
 use rustls::pki_types::ServerName;
 use sha1::{Digest, Sha1};
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::Duration;
@@ -48,6 +50,7 @@ type UpgradedIo = TokioIo<hyper::upgrade::Upgraded>;
 type SocketReader = WebSocketRead<ReadHalf<UpgradedIo>>;
 type SocketWriter = WebSocketWrite<WriteHalf<UpgradedIo>>;
 type SingletonKey = (String, String, String);
+type SingletonResolveKey = (String, String);
 type SingletonConnectSlot =
     tokio::sync::OnceCell<Result<Arc<PreparedSingleton>, WebSocketCommandError>>;
 type OutboundHandshakeRequest = (String, String, u16, hyper::Request<Empty<Bytes>>, String);
@@ -57,10 +60,94 @@ struct PreparedSingleton {
     project_id: String,
     route_uri: hyper::Uri,
     response_headers: hyper::HeaderMap,
+    lease_guard: Arc<SingletonLeaseGuard>,
     lease_activation_sender: Mutex<Option<oneshot::Sender<()>>>,
     message_ready_sender: Mutex<Option<oneshot::Sender<()>>>,
     activation_lifecycle: Arc<SingletonActivationLifecycle>,
     activation: tokio::sync::OnceCell<watch::Receiver<Option<Result<(), WebSocketCommandError>>>>,
+}
+
+#[derive(Clone)]
+pub(crate) struct SingletonConnectionResolution {
+    pub connection_id: String,
+    pub lease_expires_at_millis: i64,
+    pub resolved_at_millis: i64,
+}
+
+#[derive(Clone)]
+enum SingletonResolveResult {
+    Connected(CachedSingletonConnection),
+    Unavailable,
+    Failed(String),
+}
+
+#[derive(Clone)]
+struct CachedSingletonConnection {
+    connection_id: String,
+    valid_until: tokio::time::Instant,
+}
+
+struct SingletonResolveEntry {
+    request_started_at: tokio::time::Instant,
+    started: tokio::sync::OnceCell<()>,
+    result: tokio::sync::OnceCell<SingletonResolveResult>,
+    result_ready: tokio::sync::Notify,
+}
+
+impl SingletonResolveEntry {
+    fn new(request_started_at: tokio::time::Instant) -> Self {
+        Self {
+            request_started_at,
+            started: tokio::sync::OnceCell::new(),
+            result: tokio::sync::OnceCell::new(),
+            result_ready: tokio::sync::Notify::new(),
+        }
+    }
+
+    async fn start(
+        self: &Arc<Self>,
+        resolver: Arc<dyn SingletonConnectionResolver>,
+        project_id: String,
+        singleton_id: String,
+    ) {
+        let entry = self.clone();
+        let _ = self
+            .started
+            .get_or_init(|| async move {
+                tokio::spawn(async move {
+                    let result = match resolver.resolve(&project_id, &singleton_id).await {
+                        Ok(Some(resolution)) => {
+                            SingletonResolveResult::Connected(CachedSingletonConnection {
+                                connection_id: resolution.connection_id,
+                                valid_until: singleton_cache_valid_until(
+                                    entry.request_started_at,
+                                    resolution.lease_expires_at_millis,
+                                    resolution.resolved_at_millis,
+                                ),
+                            })
+                        }
+                        Ok(None) => SingletonResolveResult::Unavailable,
+                        Err(error) => SingletonResolveResult::Failed(error.to_string()),
+                    };
+                    let _ = entry.result.set(result);
+                    entry.result_ready.notify_waiters();
+                });
+            })
+            .await;
+    }
+
+    async fn wait(&self) -> SingletonResolveResult {
+        loop {
+            if let Some(result) = self.result.get() {
+                return result.clone();
+            }
+            let notified = self.result_ready.notified();
+            if let Some(result) = self.result.get() {
+                return result.clone();
+            }
+            notified.await;
+        }
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -199,13 +286,216 @@ struct SingletonLeaseTiming {
     retry_max_delay: Duration,
 }
 
+const SINGLETON_LEASE_TIMING: SingletonLeaseTiming = SingletonLeaseTiming {
+    heartbeat_interval: SINGLETON_HEARTBEAT_INTERVAL,
+    safety_deadline: SINGLETON_SAFETY_DEADLINE,
+    retry_initial_delay: SINGLETON_RETRY_INITIAL_DELAY,
+    retry_max_delay: SINGLETON_RETRY_MAX_DELAY,
+};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SingletonFenceReason {
+    OwnershipRejected,
+    SafetyDeadlineExpired,
+}
+
+/// The local answer to "may this singleton connection still carry application traffic?".
+///
+/// The lease task extends and revokes it, but every send admission, frame write, and callback
+/// start reads the clock itself. A process that resumes after a pause past `valid_until` is
+/// refused before the lease task gets a chance to run and close the socket.
+struct SingletonLeaseGuard {
+    valid_until: Mutex<tokio::time::Instant>,
+    revoked: AtomicBool,
+}
+
+impl SingletonLeaseGuard {
+    fn new(valid_until: tokio::time::Instant) -> Self {
+        Self {
+            valid_until: Mutex::new(valid_until),
+            revoked: AtomicBool::new(false),
+        }
+    }
+
+    fn permits_traffic(&self) -> bool {
+        !self.revoked.load(Ordering::Acquire) && tokio::time::Instant::now() < self.valid_until()
+    }
+
+    fn valid_until(&self) -> tokio::time::Instant {
+        *self.valid_until.lock().expect("singleton lease guard lock")
+    }
+
+    fn extend_to(&self, valid_until: tokio::time::Instant) {
+        let mut current_valid_until = self.valid_until.lock().expect("singleton lease guard lock");
+        if valid_until > *current_valid_until {
+            *current_valid_until = valid_until;
+        }
+    }
+
+    fn revoke(&self) {
+        self.revoked.store(true, Ordering::Release);
+    }
+
+    fn start_gate(self: &Arc<Self>) -> StartGate {
+        let lease_guard = self.clone();
+        Arc::new(move || lease_guard.permits_traffic())
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum SingletonLeaseStep {
+    AttemptAt(tokio::time::Instant),
+    Fence(SingletonFenceReason),
+}
+
+struct SingletonLeaseSchedule {
+    timing: SingletonLeaseTiming,
+    safety_deadline: tokio::time::Instant,
+    next_attempt: tokio::time::Instant,
+    retry_backoff: Duration,
+}
+
+impl SingletonLeaseSchedule {
+    fn new(
+        timing: SingletonLeaseTiming,
+        safety_deadline: tokio::time::Instant,
+        now: tokio::time::Instant,
+    ) -> Self {
+        Self {
+            timing,
+            safety_deadline,
+            next_attempt: now + timing.heartbeat_interval,
+            retry_backoff: timing.retry_initial_delay,
+        }
+    }
+
+    fn next_step(&self, now: tokio::time::Instant) -> SingletonLeaseStep {
+        if now >= self.safety_deadline {
+            SingletonLeaseStep::Fence(SingletonFenceReason::SafetyDeadlineExpired)
+        } else {
+            SingletonLeaseStep::AttemptAt(self.next_attempt.min(self.safety_deadline))
+        }
+    }
+
+    /// `None` is a renewal whose answer never arrived. Control may have extended the lease, but
+    /// the worker cannot know that, so it is treated like a retryable failure. An accepted
+    /// renewal extends the deadline from when the request was sent, not when the answer arrived,
+    /// because control stamps its lease no earlier than that moment.
+    fn record_renewal(
+        &mut self,
+        response: Option<SingletonStatusResponse>,
+        request_started_at: tokio::time::Instant,
+        now: tokio::time::Instant,
+        jittered_retry_delay: Duration,
+    ) -> Result<(), SingletonFenceReason> {
+        match response {
+            Some(SingletonStatusResponse::Accepted) => {
+                self.safety_deadline = self
+                    .safety_deadline
+                    .max(request_started_at + self.timing.safety_deadline);
+                self.next_attempt = now + self.timing.heartbeat_interval;
+                self.retry_backoff = self.timing.retry_initial_delay;
+                Ok(())
+            }
+            Some(SingletonStatusResponse::Rejected) => Err(SingletonFenceReason::OwnershipRejected),
+            Some(SingletonStatusResponse::Retryable) | None => {
+                let remaining = self.safety_deadline.saturating_duration_since(now);
+                self.next_attempt = now + jittered_retry_delay.min(remaining);
+                self.retry_backoff = self
+                    .retry_backoff
+                    .saturating_mul(2)
+                    .min(self.timing.retry_max_delay);
+                Ok(())
+            }
+        }
+    }
+}
+
+pub(crate) type SingletonConnectionResolveFuture = Pin<
+    Box<
+        dyn Future<Output = anyhow::Result<Option<SingletonConnectionResolution>>> + Send + 'static,
+    >,
+>;
+
+pub(crate) trait SingletonConnectionResolver: Send + Sync {
+    fn resolve(&self, project_id: &str, singleton_id: &str) -> SingletonConnectionResolveFuture;
+}
+
+struct ControlSingletonConnectionResolver {
+    worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
+}
+
+#[derive(serde::Deserialize)]
+enum SingletonResolveResponse {
+    Connected {
+        connection_id: String,
+        lease_expires_at_millis: i64,
+        resolved_at_millis: i64,
+    },
+    Unavailable,
+    Unauthorized,
+    Error,
+}
+
+impl SingletonConnectionResolver for ControlSingletonConnectionResolver {
+    fn resolve(&self, project_id: &str, singleton_id: &str) -> SingletonConnectionResolveFuture {
+        let worker_senders = self.worker_senders.clone();
+        let project_id = project_id.to_string();
+        let singleton_id = singleton_id.to_string();
+        Box::pin(async move {
+            let body = serde_json::to_vec(&serde_json::json!({
+                "project_id": project_id,
+                "singleton_id": singleton_id,
+            }))?;
+            let request = hyper::Request::builder()
+                .method(hyper::Method::POST)
+                .uri("https://fn0-control.internal/__forte_action/websocket_singleton_resolve")
+                .header(hyper::header::CONTENT_TYPE, "application/json")
+                .header("x-fn0-internal-websocket-singleton-resolve", "true")
+                .body(
+                    Full::new(Bytes::from(body))
+                        .map_err(|never: std::convert::Infallible| match never {})
+                        .boxed_unsync(),
+                )?;
+            let response = worker_pool::invoke_and_wait(
+                &worker_senders,
+                |response_sender| {
+                    RequestEnvelope::new("fn0-control".to_string(), request, response_sender)
+                },
+                CALLBACK_DEADLINE,
+                CALLBACK_DEADLINE,
+            )
+            .await?;
+            if !response.status().is_success() {
+                anyhow::bail!("singleton resolve returned status {}", response.status());
+            }
+            let body = response.into_body().collect().await?.to_bytes();
+            match serde_json::from_slice(&body)? {
+                SingletonResolveResponse::Connected {
+                    connection_id,
+                    lease_expires_at_millis,
+                    resolved_at_millis,
+                } => Ok(Some(SingletonConnectionResolution {
+                    connection_id,
+                    lease_expires_at_millis,
+                    resolved_at_millis,
+                })),
+                SingletonResolveResponse::Unavailable => Ok(None),
+                SingletonResolveResponse::Unauthorized | SingletonResolveResponse::Error => {
+                    anyhow::bail!("singleton resolve failed in control")
+                }
+            }
+        })
+    }
+}
+
 #[derive(Clone)]
 struct SingletonBinding {
     key: SingletonKey,
     slot: Arc<SingletonConnectSlot>,
     singleton_id: String,
     claim_token: String,
-    initial_lease_deadline: i64,
+    lease_guard: Arc<SingletonLeaseGuard>,
     activation_lifecycle: Arc<SingletonActivationLifecycle>,
 }
 
@@ -251,6 +541,14 @@ impl DisconnectInfo {
             close_code: Some(1012),
             reason: None,
             cause: "deployment",
+        }
+    }
+
+    fn egress_quota_exceeded() -> Self {
+        Self {
+            close_code: Some(1008),
+            reason: None,
+            cause: "egress-quota-exceeded",
         }
     }
 
@@ -313,6 +611,19 @@ struct ConnectionEntry {
     closed_receiver: watch::Receiver<bool>,
     control_sender: mpsc::UnboundedSender<WriterControl>,
     force_close_sender: watch::Sender<bool>,
+    lease_guard: Option<Arc<SingletonLeaseGuard>>,
+}
+
+impl ConnectionEntry {
+    fn lease_permits_traffic(&self) -> bool {
+        self.lease_guard
+            .as_ref()
+            .is_none_or(|lease_guard| lease_guard.permits_traffic())
+    }
+
+    fn accepts_application_traffic(&self) -> bool {
+        !self.closing.load(Ordering::Acquire) && self.lease_permits_traffic()
+    }
 }
 
 struct RegisteredConnection {
@@ -355,6 +666,7 @@ pub struct WebSocketService {
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     connections: DashMap<String, Arc<ConnectionEntry>>,
     singleton_connections: DashMap<SingletonKey, Arc<SingletonConnectSlot>>,
+    singleton_resolve_cache: DashMap<SingletonResolveKey, Arc<SingletonResolveEntry>>,
     project_counts: DashMap<String, Arc<AtomicUsize>>,
     project_generations: DashMap<String, Arc<std::sync::atomic::AtomicU64>>,
     worker_count: Arc<AtomicUsize>,
@@ -363,18 +675,27 @@ pub struct WebSocketService {
     identity: WorkerIdentity,
     quic: OnceLock<Arc<QuicTransport>>,
     self_reference: OnceLock<Weak<WebSocketService>>,
+    outbound_dialer: OutboundDialer,
+    egress_budget: Arc<dyn EgressBudget>,
+    singleton_resolver: Arc<dyn SingletonConnectionResolver>,
 }
 
 impl WebSocketService {
     pub async fn new(
         worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
+        outbound_dialer: OutboundDialer,
+        egress_budget: Arc<dyn EgressBudget>,
     ) -> anyhow::Result<Arc<Self>> {
         let identity = worker_identity_from_env();
         let directory = directory_from_env(&identity)?;
+        let singleton_resolver = Arc::new(ControlSingletonConnectionResolver {
+            worker_senders: worker_senders.clone(),
+        });
         let service = Arc::new(Self {
             worker_senders,
             connections: DashMap::new(),
             singleton_connections: DashMap::new(),
+            singleton_resolve_cache: DashMap::new(),
             project_counts: DashMap::new(),
             project_generations: DashMap::new(),
             worker_count: Arc::new(AtomicUsize::new(0)),
@@ -383,6 +704,9 @@ impl WebSocketService {
             identity,
             quic: OnceLock::new(),
             self_reference: OnceLock::new(),
+            outbound_dialer,
+            egress_budget,
+            singleton_resolver,
         });
         service
             .self_reference
@@ -444,6 +768,26 @@ impl WebSocketService {
         request_headers: &hyper::HeaderMap,
         client_address: Option<std::net::SocketAddr>,
     ) -> anyhow::Result<fn0::Response> {
+        self.invoke_connect_with_gate(
+            project_id,
+            connection_id,
+            uri,
+            request_headers,
+            client_address,
+            None,
+        )
+        .await
+    }
+
+    async fn invoke_connect_with_gate(
+        &self,
+        project_id: &str,
+        connection_id: &str,
+        uri: &hyper::Uri,
+        request_headers: &hyper::HeaderMap,
+        client_address: Option<std::net::SocketAddr>,
+        start_gate: Option<StartGate>,
+    ) -> anyhow::Result<fn0::Response> {
         let body = Empty::<Bytes>::new()
             .map_err(|never: std::convert::Infallible| match never {})
             .boxed_unsync();
@@ -461,7 +805,7 @@ impl WebSocketService {
                 client_address.to_string().parse()?,
             );
         }
-        self.invoke(project_id, request).await
+        self.invoke_gated(project_id, request, start_gate).await
     }
 
     pub async fn publish_connection(
@@ -519,6 +863,24 @@ impl WebSocketService {
         if entry.project_id != caller_project_id || entry.closing.load(Ordering::Acquire) {
             return Err(WebSocketCommandError::not_sent(
                 WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        if !entry.lease_permits_traffic() {
+            fence_singleton(self, caller_project_id, connection_id);
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
+        if self.egress_budget.known_exhausted(caller_project_id) {
+            close_connection(
+                self,
+                caller_project_id,
+                connection_id,
+                1008,
+                DisconnectInfo::egress_quota_exceeded(),
+            );
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::EgressQuotaExceeded,
             ));
         }
         let (ready_sender, ready_receiver) = oneshot::channel();
@@ -587,7 +949,7 @@ impl WebSocketService {
             reader.set_auto_pong(false);
             reader.set_max_message_size(usize::MAX);
             let registered =
-                service.register_connection(&project_id, &connection_id, &capacity_guard);
+                service.register_connection(&project_id, &connection_id, &capacity_guard, None);
             service
                 .run_connection(
                     project_id,
@@ -621,6 +983,11 @@ impl WebSocketService {
         protocols: Vec<String>,
     ) -> Result<OutboundConnectResult, WebSocketCommandError> {
         let deadline = tokio::time::Instant::now() + remaining;
+        if self.egress_budget.known_exhausted(&project_id) {
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::EgressQuotaExceeded,
+            ));
+        }
         let capacity_guard = self.reserve_capacity(&project_id).map_err(|_| {
             WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Backpressure)
         })?;
@@ -630,17 +997,24 @@ impl WebSocketService {
             .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Internal))?;
         let (scheme, host, port, request, expected_accept) =
             build_outbound_handshake_request(&url, handshake_headers, &protocols)?;
-        let stream = tokio::time::timeout_at(
+        let stream: TcpStream = tokio::time::timeout_at(
             deadline,
-            tokio::time::timeout(
-                OUTBOUND_DIAL_TIMEOUT,
-                TcpStream::connect((host.as_str(), port)),
-            ),
+            self.outbound_dialer
+                .connect(&host, port, OUTBOUND_DIAL_TIMEOUT),
         )
         .await
         .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DeadlineExceeded))?
-        .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?
-        .map_err(|_| WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport))?;
+        .map_err(|error| match error {
+            OutboundDialError::DestinationForbidden => {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DestinationForbidden)
+            }
+            OutboundDialError::NameResolution(_)
+            | OutboundDialError::NoAddresses
+            | OutboundDialError::Connect(_)
+            | OutboundDialError::Timeout => {
+                WebSocketCommandError::not_sent(WebSocketCommandErrorKind::Transport)
+            }
+        })?;
         let result = if scheme == "ws" {
             tokio::time::timeout_at(
                 deadline,
@@ -731,6 +1105,9 @@ impl WebSocketService {
         let result = slot
             .get_or_init(move || async move {
                 let activation_lifecycle = Arc::new(SingletonActivationLifecycle::new());
+                let lease_guard = Arc::new(SingletonLeaseGuard::new(initial_lease_valid_until(
+                    initial_lease_deadline,
+                )));
                 let result = service
                     .connect_outbound(
                         project_id,
@@ -742,7 +1119,7 @@ impl WebSocketService {
                             slot: slot_for_connect,
                             singleton_id,
                             claim_token,
-                            initial_lease_deadline,
+                            lease_guard,
                             activation_lifecycle,
                         }),
                         headers,
@@ -908,13 +1285,20 @@ impl WebSocketService {
                 WebSocketCommandErrorKind::ConnectionNotFound,
             ));
         }
+        if !prepared.lease_guard.permits_traffic() {
+            fence_singleton(self, &prepared.project_id, &prepared.connection_id);
+            return Err(WebSocketCommandError::not_sent(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+            ));
+        }
         let callback_response = self
-            .invoke_connect(
+            .invoke_connect_with_gate(
                 &prepared.project_id,
                 &prepared.connection_id,
                 &prepared.route_uri,
                 &prepared.response_headers,
                 None,
+                Some(prepared.lease_guard.start_gate()),
             )
             .await;
         if !matches!(callback_response, Ok(response) if response.status().is_success()) {
@@ -1085,7 +1469,15 @@ impl WebSocketService {
                 WebSocketCommandErrorKind::Transport,
             ));
         }
-        let registered = self.register_connection(&project_id, &connection_id, &capacity_guard);
+        let lease_guard = singleton_binding
+            .as_ref()
+            .map(|binding| binding.lease_guard.clone());
+        let registered = self.register_connection(
+            &project_id,
+            &connection_id,
+            &capacity_guard,
+            lease_guard.clone(),
+        );
         let (message_ready_sender, message_ready_receiver) = oneshot::channel();
         let is_singleton = singleton_binding.is_some();
         let singleton_activation_lifecycle = singleton_binding
@@ -1128,6 +1520,7 @@ impl WebSocketService {
                     project_id,
                     route_uri,
                     response_headers: response.headers().clone(),
+                    lease_guard: lease_guard.expect("singleton lease guard"),
                     lease_activation_sender: Mutex::new(lease_activation_sender),
                     message_ready_sender: Mutex::new(Some(message_ready_sender)),
                     activation_lifecycle: singleton_activation_lifecycle
@@ -1170,6 +1563,7 @@ impl WebSocketService {
         project_id: &str,
         connection_id: &str,
         capacity_guard: &CapacityGuard,
+        lease_guard: Option<Arc<SingletonLeaseGuard>>,
     ) -> RegisteredConnection {
         let (command_sender, command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         let (control_sender, control_receiver) = mpsc::unbounded_channel();
@@ -1182,6 +1576,7 @@ impl WebSocketService {
             closed_receiver,
             control_sender: control_sender.clone(),
             force_close_sender,
+            lease_guard,
         });
         self.connections
             .insert(connection_id.to_string(), entry.clone());
@@ -1248,6 +1643,108 @@ impl WebSocketService {
         }
     }
 
+    /// Resolves the singleton's current physical connection once and sends to it once. When the
+    /// owner is replaced between the lookup and the write, the send fails with
+    /// `ConnectionNotFound` instead of being retried on the replacement, because the caller
+    /// cannot tell whether the replacement has finished its own protocol setup.
+    async fn send_to_singleton(
+        &self,
+        caller_project_id: String,
+        singleton_id: String,
+        message_kind: WebSocketMessageKind,
+        body: Body,
+        remaining: Duration,
+    ) -> Result<(), WebSocketCommandError> {
+        let deadline = tokio::time::Instant::now() + remaining;
+        let cache_key = (caller_project_id.clone(), singleton_id.clone());
+        let (cache_entry, cached_connection) = self
+            .resolve_singleton_cached(&caller_project_id, &singleton_id, deadline)
+            .await?;
+        let result = self
+            .send(
+                caller_project_id,
+                cached_connection.connection_id,
+                message_kind,
+                body,
+                deadline.saturating_duration_since(tokio::time::Instant::now()),
+            )
+            .await;
+        if result
+            .as_ref()
+            .is_err_and(|error| error.kind == WebSocketCommandErrorKind::ConnectionNotFound)
+        {
+            self.singleton_resolve_cache
+                .remove_if(&cache_key, |_, current| Arc::ptr_eq(current, &cache_entry));
+        }
+        result
+    }
+
+    async fn resolve_singleton_cached(
+        &self,
+        project_id: &str,
+        singleton_id: &str,
+        deadline: tokio::time::Instant,
+    ) -> Result<(Arc<SingletonResolveEntry>, CachedSingletonConnection), WebSocketCommandError>
+    {
+        let cache_key = (project_id.to_string(), singleton_id.to_string());
+        let mut expired_cache_seen = false;
+        loop {
+            let request_started_at = tokio::time::Instant::now();
+            let cache_entry = self
+                .singleton_resolve_cache
+                .entry(cache_key.clone())
+                .or_insert_with(|| Arc::new(SingletonResolveEntry::new(request_started_at)))
+                .clone();
+            cache_entry
+                .start(
+                    self.singleton_resolver.clone(),
+                    project_id.to_string(),
+                    singleton_id.to_string(),
+                )
+                .await;
+            let result = match tokio::time::timeout_at(deadline, cache_entry.wait()).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(WebSocketCommandError::not_sent(
+                        WebSocketCommandErrorKind::DeadlineExceeded,
+                    ));
+                }
+            };
+            match result {
+                SingletonResolveResult::Connected(cached_connection)
+                    if tokio::time::Instant::now() < cached_connection.valid_until =>
+                {
+                    return Ok((cache_entry, cached_connection));
+                }
+                SingletonResolveResult::Connected(_) => {
+                    self.singleton_resolve_cache
+                        .remove_if(&cache_key, |_, current| Arc::ptr_eq(current, &cache_entry));
+                    if expired_cache_seen {
+                        return Err(WebSocketCommandError::not_sent(
+                            WebSocketCommandErrorKind::ConnectionNotFound,
+                        ));
+                    }
+                    expired_cache_seen = true;
+                }
+                SingletonResolveResult::Unavailable => {
+                    self.singleton_resolve_cache
+                        .remove_if(&cache_key, |_, current| Arc::ptr_eq(current, &cache_entry));
+                    return Err(WebSocketCommandError::not_sent(
+                        WebSocketCommandErrorKind::ConnectionNotFound,
+                    ));
+                }
+                SingletonResolveResult::Failed(error) => {
+                    self.singleton_resolve_cache
+                        .remove_if(&cache_key, |_, current| Arc::ptr_eq(current, &cache_entry));
+                    tracing::warn!(%project_id, %singleton_id, %error, "websocket singleton resolve failed");
+                    return Err(WebSocketCommandError::not_sent(
+                        WebSocketCommandErrorKind::Transport,
+                    ));
+                }
+            }
+        }
+    }
+
     pub fn connection_count(&self) -> usize {
         self.worker_count.load(Ordering::Acquire)
     }
@@ -1280,6 +1777,9 @@ impl WebSocketService {
         let singleton_activation_lifecycle = singleton_binding
             .as_ref()
             .map(|binding| binding.activation_lifecycle.clone());
+        let lease_guard = singleton_binding
+            .as_ref()
+            .map(|binding| binding.lease_guard.clone());
         let lease_handle = singleton_binding.as_ref().map(|binding| {
             tokio::spawn(singleton_lease_loop(
                 self.clone(),
@@ -1298,13 +1798,20 @@ impl WebSocketService {
             control_sender,
             disconnect_info.clone(),
             message_ready,
+            lease_guard.clone(),
         ));
+        let outbound_frame_admission = OutboundFrameAdmission {
+            project_id: project_id.clone(),
+            lease_guard,
+            egress_budget: self.egress_budget.clone(),
+        };
         tokio::select! {
             _ = writer_loop(
                 &mut writer,
                 command_receiver,
                 control_receiver,
                 disconnect_info.clone(),
+                &outbound_frame_admission,
             ) => {}
             _ = wait_for_force_close(&mut force_close_receiver) => {}
         }
@@ -1419,22 +1926,29 @@ impl WebSocketService {
         project_id: &str,
         request: fn0::Request,
     ) -> anyhow::Result<fn0::Response> {
-        let (response_sender, response_receiver) = oneshot::channel();
-        let (envelope, started_receiver) =
-            RequestEnvelope::new(project_id.to_string(), request, response_sender)
-                .with_start_signal();
-        worker_pool::dispatch(&self.worker_senders, envelope).map_err(|error| match error {
-            DispatchError::Full => anyhow::anyhow!("worker queue full"),
-            DispatchError::Closed => anyhow::anyhow!("worker queue closed"),
-        })?;
-        tokio::time::timeout(CALLBACK_DEADLINE, started_receiver)
-            .await
-            .map_err(|_| anyhow::anyhow!("websocket callback admission deadline exceeded"))?
-            .map_err(|_| anyhow::anyhow!("websocket callback admission failed"))?;
-        tokio::time::timeout(CALLBACK_DEADLINE, response_receiver)
-            .await
-            .map_err(|_| anyhow::anyhow!("websocket callback deadline exceeded"))?
-            .map_err(|_| anyhow::anyhow!("websocket callback response dropped"))?
+        self.invoke_gated(project_id, request, None).await
+    }
+
+    async fn invoke_gated(
+        &self,
+        project_id: &str,
+        request: fn0::Request,
+        start_gate: Option<StartGate>,
+    ) -> anyhow::Result<fn0::Response> {
+        worker_pool::invoke_and_wait(
+            &self.worker_senders,
+            |response_sender| {
+                let envelope =
+                    RequestEnvelope::new(project_id.to_string(), request, response_sender);
+                match start_gate {
+                    Some(start_gate) => envelope.with_start_gate(start_gate),
+                    None => envelope,
+                }
+            },
+            CALLBACK_DEADLINE,
+            CALLBACK_DEADLINE,
+        )
+        .await
     }
 
     async fn notify_singleton_status(
@@ -1635,6 +2149,30 @@ fn valid_websocket_protocol(protocol: &str) -> bool {
         })
 }
 
+fn initial_lease_valid_until(initial_lease_deadline_millis: i64) -> tokio::time::Instant {
+    let current_epoch_millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(i64::MAX);
+    let initial_remaining_millis = initial_lease_deadline_millis
+        .saturating_sub(current_epoch_millis)
+        .max(0) as u64;
+    tokio::time::Instant::now()
+        + SINGLETON_SAFETY_DEADLINE.min(Duration::from_millis(initial_remaining_millis))
+}
+
+fn singleton_cache_valid_until(
+    request_started_at: tokio::time::Instant,
+    lease_expires_at_millis: i64,
+    resolved_at_millis: i64,
+) -> tokio::time::Instant {
+    let relative_millis = lease_expires_at_millis
+        .saturating_sub(resolved_at_millis)
+        .max(0) as u64;
+    let safety_millis = SINGLETON_SAFETY_DEADLINE.as_millis() as u64;
+    request_started_at + Duration::from_millis(relative_millis.saturating_sub(safety_millis))
+}
+
 async fn singleton_lease_loop(
     service: Arc<WebSocketService>,
     project_id: String,
@@ -1642,16 +2180,7 @@ async fn singleton_lease_loop(
     binding: SingletonBinding,
     lease_activation: oneshot::Receiver<()>,
 ) {
-    let current_epoch_millis = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or(i64::MAX);
-    let initial_remaining_millis = binding
-        .initial_lease_deadline
-        .saturating_sub(current_epoch_millis)
-        .max(0) as u64;
-    let pending_deadline = tokio::time::Instant::now()
-        + SINGLETON_SAFETY_DEADLINE.min(Duration::from_millis(initial_remaining_millis));
+    let lease_guard = binding.lease_guard.clone();
     tokio::select! {
         activation = lease_activation => {
             if activation.is_err() {
@@ -1659,18 +2188,19 @@ async fn singleton_lease_loop(
                 return;
             }
         }
-        _ = tokio::time::sleep_until(pending_deadline) => {
+        _ = tokio::time::sleep_until(lease_guard.valid_until()) => {
             fence_singleton(&service, &project_id, &connection_id);
             return;
         }
     }
-    let lease_result = renew_singleton_lease(
-        SingletonLeaseTiming {
-            heartbeat_interval: SINGLETON_HEARTBEAT_INTERVAL,
-            safety_deadline: SINGLETON_SAFETY_DEADLINE,
-            retry_initial_delay: SINGLETON_RETRY_INITIAL_DELAY,
-            retry_max_delay: SINGLETON_RETRY_MAX_DELAY,
-        },
+    if !lease_guard.permits_traffic() {
+        fence_singleton(&service, &project_id, &connection_id);
+        return;
+    }
+    lease_guard.extend_to(tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE);
+    let fence_reason = maintain_singleton_lease(
+        SINGLETON_LEASE_TIMING,
+        &lease_guard,
         || {
             service.notify_singleton_status(
                 &project_id,
@@ -1683,57 +2213,62 @@ async fn singleton_lease_loop(
         singleton_retry_delay,
     )
     .await;
-    match lease_result {
-        SingletonStatusResponse::Rejected => {
+    match fence_reason {
+        SingletonFenceReason::OwnershipRejected => {
             tracing::warn!(%project_id, %connection_id, "websocket singleton ownership rejected");
         }
-        SingletonStatusResponse::Retryable => {
+        SingletonFenceReason::SafetyDeadlineExpired => {
             tracing::warn!(%project_id, %connection_id, "websocket singleton lease safety deadline expired");
         }
-        SingletonStatusResponse::Accepted => unreachable!(),
     }
     fence_singleton(&service, &project_id, &connection_id);
 }
 
-async fn renew_singleton_lease<Renew, RenewalFuture, RetryDelay>(
+async fn maintain_singleton_lease<Renew, RenewalFuture, RetryDelay>(
     timing: SingletonLeaseTiming,
+    lease_guard: &SingletonLeaseGuard,
     mut renew: Renew,
     mut retry_delay: RetryDelay,
-) -> SingletonStatusResponse
+) -> SingletonFenceReason
 where
     Renew: FnMut() -> RenewalFuture,
     RenewalFuture: Future<Output = anyhow::Result<SingletonStatusResponse>>,
     RetryDelay: FnMut(Duration) -> Duration,
 {
-    let mut safety_deadline = tokio::time::Instant::now() + timing.safety_deadline;
-    let mut next_attempt = tokio::time::Instant::now() + timing.heartbeat_interval;
-    let mut retry_backoff = timing.retry_initial_delay;
+    let mut schedule = SingletonLeaseSchedule::new(
+        timing,
+        lease_guard.valid_until(),
+        tokio::time::Instant::now(),
+    );
     loop {
-        tokio::time::sleep_until(next_attempt.min(safety_deadline)).await;
-        if tokio::time::Instant::now() >= safety_deadline {
-            return SingletonStatusResponse::Retryable;
+        let attempt_at = match schedule.next_step(tokio::time::Instant::now()) {
+            SingletonLeaseStep::Fence(fence_reason) => {
+                lease_guard.revoke();
+                return fence_reason;
+            }
+            SingletonLeaseStep::AttemptAt(attempt_at) => attempt_at,
+        };
+        tokio::time::sleep_until(attempt_at).await;
+        let request_started_at = tokio::time::Instant::now();
+        if request_started_at >= schedule.safety_deadline {
+            continue;
         }
-        let renewal = tokio::time::timeout_at(safety_deadline, renew()).await;
-        match renewal {
-            Ok(Ok(SingletonStatusResponse::Accepted)) => {
-                safety_deadline = tokio::time::Instant::now() + timing.safety_deadline;
-                next_attempt = tokio::time::Instant::now() + timing.heartbeat_interval;
-                retry_backoff = timing.retry_initial_delay;
+        let response = tokio::time::timeout_at(schedule.safety_deadline, renew())
+            .await
+            .ok()
+            .and_then(Result::ok);
+        let jittered_retry_delay = retry_delay(schedule.retry_backoff);
+        match schedule.record_renewal(
+            response,
+            request_started_at,
+            tokio::time::Instant::now(),
+            jittered_retry_delay,
+        ) {
+            Ok(()) => lease_guard.extend_to(schedule.safety_deadline),
+            Err(fence_reason) => {
+                lease_guard.revoke();
+                return fence_reason;
             }
-            Ok(Ok(SingletonStatusResponse::Rejected)) => {
-                return SingletonStatusResponse::Rejected;
-            }
-            Ok(Ok(SingletonStatusResponse::Retryable)) | Ok(Err(_)) => {
-                let remaining =
-                    safety_deadline.saturating_duration_since(tokio::time::Instant::now());
-                if remaining.is_zero() {
-                    return SingletonStatusResponse::Retryable;
-                }
-                next_attempt =
-                    tokio::time::Instant::now() + retry_delay(retry_backoff).min(remaining);
-                retry_backoff = retry_backoff.saturating_mul(2).min(timing.retry_max_delay);
-            }
-            Err(_) => return SingletonStatusResponse::Retryable,
         }
     }
 }
@@ -1750,6 +2285,13 @@ fn singleton_retry_delay(backoff: Duration) -> Duration {
 }
 
 fn fence_singleton(service: &WebSocketService, project_id: &str, connection_id: &str) {
+    if let Some(lease_guard) = service
+        .connections
+        .get(connection_id)
+        .and_then(|entry| entry.lease_guard.clone())
+    {
+        lease_guard.revoke();
+    }
     close_connection(
         service,
         project_id,
@@ -2060,6 +2602,34 @@ impl WebSocketCommandDispatcher for WebSocketService {
         })
     }
 
+    fn send_singleton(
+        &self,
+        caller_project_id: String,
+        singleton_id: String,
+        message_kind: WebSocketMessageKind,
+        body: Body,
+        remaining: Duration,
+    ) -> WebSocketCommandFuture {
+        let Some(service) = self.self_reference.get().and_then(Weak::upgrade) else {
+            return Box::pin(async {
+                Err(WebSocketCommandError::not_sent(
+                    WebSocketCommandErrorKind::Internal,
+                ))
+            });
+        };
+        Box::pin(async move {
+            service
+                .send_to_singleton(
+                    caller_project_id,
+                    singleton_id,
+                    message_kind,
+                    body,
+                    remaining,
+                )
+                .await
+        })
+    }
+
     fn disconnect(
         &self,
         caller_project_id: String,
@@ -2238,6 +2808,7 @@ async fn read_loop(
     control_sender: mpsc::UnboundedSender<WriterControl>,
     disconnect_info: Arc<Mutex<Option<DisconnectInfo>>>,
     message_ready: Option<oneshot::Receiver<()>>,
+    lease_guard: Option<Arc<SingletonLeaseGuard>>,
 ) {
     if let Some(message_ready) = message_ready
         && message_ready.await.is_err()
@@ -2276,8 +2847,14 @@ async fn read_loop(
         ) && service
             .connections
             .get(&connection_id)
-            .is_none_or(|entry| entry.closing.load(Ordering::Acquire))
+            .is_none_or(|entry| !entry.accepts_application_traffic())
         {
+            if lease_guard
+                .as_ref()
+                .is_some_and(|lease_guard| !lease_guard.permits_traffic())
+            {
+                fence_singleton(&service, &project_id, &connection_id);
+            }
             return;
         }
         match frame.opcode {
@@ -2323,6 +2900,7 @@ async fn read_loop(
                         std::mem::take(&mut message_bytes),
                         &pending_messages,
                         &control_sender,
+                        lease_guard.as_ref(),
                     ) {
                         close_reader(
                             &control_sender,
@@ -2358,6 +2936,7 @@ async fn read_loop(
                         message_bytes,
                         &pending_messages,
                         &control_sender,
+                        lease_guard.as_ref(),
                     ) {
                         close_reader(
                             &control_sender,
@@ -2383,6 +2962,7 @@ fn dispatch_inbound(
     message_bytes: Vec<u8>,
     pending_messages: &Arc<AtomicUsize>,
     control_sender: &mpsc::UnboundedSender<WriterControl>,
+    lease_guard: Option<&Arc<SingletonLeaseGuard>>,
 ) -> Result<(), u16> {
     if message_kind == WebSocketMessageKind::Text && std::str::from_utf8(&message_bytes).is_err() {
         return Err(1007);
@@ -2412,9 +2992,17 @@ fn dispatch_inbound(
             WebSocketMessageKind::Binary => "binary".parse().expect("static header"),
         },
     );
+    if lease_guard.is_some_and(|lease_guard| !lease_guard.permits_traffic()) {
+        pending_messages.fetch_sub(1, Ordering::AcqRel);
+        return Err(1011);
+    }
     let (response_sender, response_receiver) = oneshot::channel();
-    let (envelope, started_receiver) =
-        RequestEnvelope::new(project_id.to_string(), request, response_sender).with_start_signal();
+    let envelope = RequestEnvelope::new(project_id.to_string(), request, response_sender);
+    let envelope = match lease_guard {
+        Some(lease_guard) => envelope.with_start_gate(lease_guard.start_gate()),
+        None => envelope,
+    };
+    let (envelope, started_receiver) = envelope.with_start_signal();
     if worker_pool::dispatch(&service.worker_senders, envelope).is_err() {
         pending_messages.fetch_sub(1, Ordering::AcqRel);
         return Err(1013);
@@ -2447,12 +3035,88 @@ fn dispatch_inbound(
     Ok(())
 }
 
-async fn writer_loop(
-    writer: &mut SocketWriter,
+struct OutboundFrameAdmission {
+    project_id: String,
+    lease_guard: Option<Arc<SingletonLeaseGuard>>,
+    egress_budget: Arc<dyn EgressBudget>,
+}
+
+impl OutboundFrameAdmission {
+    fn lease_permits_traffic(&self) -> bool {
+        self.lease_guard
+            .as_ref()
+            .is_none_or(|lease_guard| lease_guard.permits_traffic())
+    }
+
+    async fn admit_frame(
+        &self,
+        payload_bytes: usize,
+        wrote_any_frame: bool,
+    ) -> Result<(), WebSocketCommandError> {
+        if !self.lease_permits_traffic() {
+            return Err(delivery_error(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+                wrote_any_frame,
+            ));
+        }
+        match self
+            .egress_budget
+            .charge(&self.project_id, payload_bytes as u64)
+            .await
+        {
+            Ok(()) => {}
+            Err(EgressDenied::QuotaExhausted | EgressDenied::QuotaNotConfigured) => {
+                return Err(delivery_error(
+                    WebSocketCommandErrorKind::EgressQuotaExceeded,
+                    wrote_any_frame,
+                ));
+            }
+            Err(EgressDenied::BudgetUnavailable) => {
+                return Err(delivery_error(
+                    WebSocketCommandErrorKind::Transport,
+                    wrote_any_frame,
+                ));
+            }
+        }
+        if !self.lease_permits_traffic() {
+            return Err(delivery_error(
+                WebSocketCommandErrorKind::ConnectionNotFound,
+                wrote_any_frame,
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn send_failure_close(error: &WebSocketCommandError) -> Option<(u16, DisconnectInfo)> {
+    match error.kind {
+        WebSocketCommandErrorKind::InvalidText
+            if error.delivery == WebSocketDeliveryState::NotSent =>
+        {
+            None
+        }
+        WebSocketCommandErrorKind::InvalidText => {
+            Some((1007, DisconnectInfo::protocol_error(1007)))
+        }
+        WebSocketCommandErrorKind::EgressQuotaExceeded => {
+            Some((1008, DisconnectInfo::egress_quota_exceeded()))
+        }
+        WebSocketCommandErrorKind::ConnectionNotFound => {
+            Some((1011, DisconnectInfo::heartbeat_timeout()))
+        }
+        _ => Some((1011, DisconnectInfo::protocol_error(1011))),
+    }
+}
+
+async fn writer_loop<Writer>(
+    writer: &mut WebSocketWrite<Writer>,
     mut command_receiver: mpsc::Receiver<SocketCommand>,
     mut control_receiver: mpsc::UnboundedReceiver<WriterControl>,
     disconnect_info: Arc<Mutex<Option<DisconnectInfo>>>,
-) {
+    outbound_frame_admission: &OutboundFrameAdmission,
+) where
+    Writer: AsyncWrite + Unpin,
+{
     let mut ping_interval = tokio::time::interval(PING_INTERVAL);
     ping_interval.tick().await;
     let pong_timeout = tokio::time::sleep(Duration::from_secs(86_400));
@@ -2550,11 +3214,31 @@ async fn writer_loop(
                             .await;
                             return;
                         }
+                        if !outbound_frame_admission.lease_permits_traffic() {
+                            let _ = response_sender.send(Err(WebSocketCommandError::not_sent(
+                                WebSocketCommandErrorKind::ConnectionNotFound,
+                            )));
+                            store_disconnect_info(&disconnect_info, DisconnectInfo::heartbeat_timeout());
+                            let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
+                            let _ = write_frame_until(
+                                writer,
+                                Frame::close(1011, &[]),
+                                close_deadline,
+                            )
+                            .await;
+                            return;
+                        }
                         let _ = ready_sender.send(());
                         let wrote_frame = Arc::new(AtomicBool::new(false));
                         let result = tokio::time::timeout_at(
                             deadline,
-                            send_message(writer, message_kind, body, wrote_frame.clone()),
+                            send_message(
+                                writer,
+                                message_kind,
+                                body,
+                                wrote_frame.clone(),
+                                outbound_frame_admission,
+                            ),
                         )
                         .await;
                         let result = match result {
@@ -2573,18 +3257,10 @@ async fn writer_loop(
                                 return;
                             }
                         };
-                        let must_close = result.as_ref().is_err_and(|error| {
-                            error.kind != WebSocketCommandErrorKind::InvalidText
-                                || error.delivery == WebSocketDeliveryState::Unknown
-                        });
-                        let close_code = if result.as_ref().is_err_and(|error| error.kind == WebSocketCommandErrorKind::InvalidText) {
-                            1007
-                        } else {
-                            1011
-                        };
+                        let failure_close = result.as_ref().err().and_then(send_failure_close);
                         let _ = response_sender.send(result);
-                        if must_close {
-                            store_disconnect_info(&disconnect_info, DisconnectInfo::protocol_error(close_code));
+                        if let Some((close_code, close_info)) = failure_close {
+                            store_disconnect_info(&disconnect_info, close_info);
                             let close_deadline = tokio::time::Instant::now() + CLOSE_HANDSHAKE_DEADLINE;
                             let _ = write_frame_until(
                                 writer,
@@ -2663,12 +3339,16 @@ where
     .is_ok_and(|result| result.is_ok())
 }
 
-async fn send_message(
-    writer: &mut SocketWriter,
+async fn send_message<Writer>(
+    writer: &mut WebSocketWrite<Writer>,
     message_kind: WebSocketMessageKind,
     mut body: Body,
     wrote_frame: Arc<AtomicBool>,
-) -> Result<(), WebSocketCommandError> {
+    outbound_frame_admission: &OutboundFrameAdmission,
+) -> Result<(), WebSocketCommandError>
+where
+    Writer: AsyncWrite + Unpin,
+{
     let mut validator = Utf8Validator::default();
     let mut wrote_any_frame = false;
     let mut first_frame = true;
@@ -2692,6 +3372,9 @@ async fn send_message(
         } else {
             OpCode::Continuation
         };
+        outbound_frame_admission
+            .admit_frame(data.len(), wrote_any_frame)
+            .await?;
         wrote_frame.store(true, Ordering::Release);
         writer
             .write_frame(Frame::new(false, opcode, None, Payload::Bytes(data.into())))
@@ -2714,6 +3397,9 @@ async fn send_message(
     } else {
         OpCode::Continuation
     };
+    outbound_frame_admission
+        .admit_frame(0, wrote_any_frame)
+        .await?;
     wrote_frame.store(true, Ordering::Release);
     writer
         .write_frame(Frame::new(
@@ -2818,10 +3504,10 @@ fn unix_millis() -> u64 {
 mod tests {
     use super::*;
     use crate::websocket_directory::MemoryDirectory;
-    use fn0::WebSocketCommandDispatcher;
+    use fn0::{EgressChargeFuture, PrivateDestinationAccess, WebSocketCommandDispatcher};
+    use std::collections::VecDeque;
     use std::convert::Infallible;
     use std::net::{SocketAddr, UdpSocket};
-    use std::pin::Pin;
     use std::task::{Context, Poll};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
@@ -2890,54 +3576,960 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn transient_singleton_heartbeat_failure_retries_before_fencing() {
+    fn test_lease_timing() -> SingletonLeaseTiming {
+        SINGLETON_LEASE_TIMING
+    }
+
+    fn fixed_retry_delay(_backoff: Duration) -> Duration {
+        Duration::from_secs(1)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn partition_recovered_before_safety_deadline_keeps_connection() {
+        let started_at = tokio::time::Instant::now();
+        let lease_guard = Arc::new(SingletonLeaseGuard::new(
+            started_at + SINGLETON_SAFETY_DEADLINE,
+        ));
+        let attempts = Arc::new(Mutex::new(Vec::new()));
+        let attempts_for_renewal = attempts.clone();
+        let guard_for_renewal = lease_guard.clone();
+        let accepted = Arc::new(AtomicBool::new(false));
+        let fence_reason = maintain_singleton_lease(
+            test_lease_timing(),
+            &lease_guard,
+            move || {
+                let elapsed = started_at.elapsed();
+                attempts_for_renewal
+                    .lock()
+                    .unwrap()
+                    .push((elapsed, guard_for_renewal.permits_traffic()));
+                let response = if elapsed < Duration::from_secs(25) {
+                    SingletonStatusResponse::Retryable
+                } else if !accepted.swap(true, Ordering::AcqRel) {
+                    SingletonStatusResponse::Accepted
+                } else {
+                    SingletonStatusResponse::Rejected
+                };
+                async move { Ok(response) }
+            },
+            fixed_retry_delay,
+        )
+        .await;
+        assert_eq!(fence_reason, SingletonFenceReason::OwnershipRejected);
+        let attempts = attempts.lock().unwrap();
+        assert!(attempts.iter().all(|(_, permits_traffic)| *permits_traffic));
+        let (rejected_at, _) = *attempts.last().unwrap();
+        assert!(rejected_at > SINGLETON_SAFETY_DEADLINE);
+        assert!(!lease_guard.permits_traffic());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn partition_longer_than_safety_deadline_fences_exactly_at_deadline() {
+        let started_at = tokio::time::Instant::now();
+        let lease_guard = SingletonLeaseGuard::new(started_at + SINGLETON_SAFETY_DEADLINE);
+        let fence_reason = maintain_singleton_lease(
+            test_lease_timing(),
+            &lease_guard,
+            || async { Err(anyhow::anyhow!("control unreachable")) },
+            fixed_retry_delay,
+        )
+        .await;
+        assert_eq!(fence_reason, SingletonFenceReason::SafetyDeadlineExpired);
+        assert_eq!(started_at.elapsed(), SINGLETON_SAFETY_DEADLINE);
+        assert!(!lease_guard.permits_traffic());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lost_heartbeat_response_fences_from_last_confirmed_request() {
+        let started_at = tokio::time::Instant::now();
+        let lease_guard = SingletonLeaseGuard::new(started_at + SINGLETON_SAFETY_DEADLINE);
         let attempt_count = Arc::new(AtomicUsize::new(0));
         let attempt_count_for_renewal = attempt_count.clone();
-        let result = renew_singleton_lease(
-            SingletonLeaseTiming {
-                heartbeat_interval: Duration::from_millis(5),
-                safety_deadline: Duration::from_millis(100),
-                retry_initial_delay: Duration::from_millis(1),
-                retry_max_delay: Duration::from_millis(5),
-            },
+        let fence_reason = maintain_singleton_lease(
+            test_lease_timing(),
+            &lease_guard,
             move || {
                 let attempt_number = attempt_count_for_renewal.fetch_add(1, Ordering::AcqRel);
                 async move {
-                    Ok(match attempt_number {
-                        0 => SingletonStatusResponse::Retryable,
-                        1 => SingletonStatusResponse::Accepted,
-                        _ => SingletonStatusResponse::Rejected,
-                    })
+                    if attempt_number == 0 {
+                        tokio::time::sleep(Duration::from_secs(4)).await;
+                        Ok(SingletonStatusResponse::Accepted)
+                    } else {
+                        std::future::pending().await
+                    }
                 }
             },
-            |_| Duration::from_millis(1),
+            fixed_retry_delay,
         )
         .await;
-        assert_eq!(result, SingletonStatusResponse::Rejected);
-        assert_eq!(attempt_count.load(Ordering::Acquire), 3);
+        assert_eq!(fence_reason, SingletonFenceReason::SafetyDeadlineExpired);
+        assert_eq!(
+            started_at.elapsed(),
+            SINGLETON_HEARTBEAT_INTERVAL + SINGLETON_SAFETY_DEADLINE
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stale_claim_rejection_fences_without_waiting_for_deadline() {
+        let started_at = tokio::time::Instant::now();
+        let lease_guard = SingletonLeaseGuard::new(started_at + SINGLETON_SAFETY_DEADLINE);
+        let fence_reason = maintain_singleton_lease(
+            test_lease_timing(),
+            &lease_guard,
+            || async { Ok(SingletonStatusResponse::Rejected) },
+            fixed_retry_delay,
+        )
+        .await;
+        assert_eq!(fence_reason, SingletonFenceReason::OwnershipRejected);
+        assert_eq!(started_at.elapsed(), SINGLETON_HEARTBEAT_INTERVAL);
+        assert!(tokio::time::Instant::now() < lease_guard.valid_until());
+        assert!(!lease_guard.permits_traffic());
+    }
+
+    #[test]
+    fn lease_schedule_never_moves_deadline_backwards() {
+        let now = tokio::time::Instant::now();
+        let mut schedule =
+            SingletonLeaseSchedule::new(test_lease_timing(), now + Duration::from_secs(30), now);
+        schedule
+            .record_renewal(
+                Some(SingletonStatusResponse::Accepted),
+                now - Duration::from_secs(5),
+                now,
+                Duration::from_secs(1),
+            )
+            .unwrap();
+        assert_eq!(schedule.safety_deadline, now + Duration::from_secs(30));
+        assert_eq!(
+            schedule.next_step(now + Duration::from_secs(30)),
+            SingletonLeaseStep::Fence(SingletonFenceReason::SafetyDeadlineExpired)
+        );
+    }
+
+    struct UnlimitedEgressBudget;
+
+    impl EgressBudget for UnlimitedEgressBudget {
+        fn charge(&self, _project_id: &str, _byte_count: u64) -> EgressChargeFuture {
+            Box::pin(async { Ok(()) })
+        }
+
+        fn known_exhausted(&self, _project_id: &str) -> bool {
+            false
+        }
+    }
+
+    struct LimitedEgressBudget {
+        remaining_bytes: Mutex<u64>,
+        exhausted: bool,
+    }
+
+    impl EgressBudget for LimitedEgressBudget {
+        fn charge(&self, _project_id: &str, byte_count: u64) -> EgressChargeFuture {
+            let mut remaining_bytes = self.remaining_bytes.lock().unwrap();
+            let result = if *remaining_bytes >= byte_count {
+                *remaining_bytes -= byte_count;
+                Ok(())
+            } else {
+                Err(EgressDenied::QuotaExhausted)
+            };
+            Box::pin(async move { result })
+        }
+
+        fn known_exhausted(&self, _project_id: &str) -> bool {
+            self.exhausted
+        }
+    }
+
+    struct ScriptedSingletonResolver {
+        answers: Mutex<VecDeque<Option<String>>>,
+        lookups: Mutex<Vec<(String, String)>>,
+    }
+
+    impl ScriptedSingletonResolver {
+        fn new(answers: Vec<Option<String>>) -> Arc<Self> {
+            Arc::new(Self {
+                answers: Mutex::new(answers.into()),
+                lookups: Mutex::new(Vec::new()),
+            })
+        }
+    }
+
+    impl SingletonConnectionResolver for ScriptedSingletonResolver {
+        fn resolve(
+            &self,
+            project_id: &str,
+            singleton_id: &str,
+        ) -> SingletonConnectionResolveFuture {
+            self.lookups
+                .lock()
+                .unwrap()
+                .push((project_id.to_string(), singleton_id.to_string()));
+            let answer = self.answers.lock().unwrap().pop_front().flatten();
+            let resolved_at_millis = unix_millis() as i64;
+            let answer = answer.map(|connection_id| SingletonConnectionResolution {
+                connection_id,
+                lease_expires_at_millis: resolved_at_millis + 60_000,
+                resolved_at_millis,
+            });
+            Box::pin(async move { Ok(answer) })
+        }
+    }
+
+    struct BlockingSingletonResolver {
+        started_count: Arc<AtomicUsize>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    impl BlockingSingletonResolver {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                started_count: Arc::new(AtomicUsize::new(0)),
+                release: Arc::new(tokio::sync::Notify::new()),
+            })
+        }
+    }
+
+    impl SingletonConnectionResolver for BlockingSingletonResolver {
+        fn resolve(
+            &self,
+            _project_id: &str,
+            _singleton_id: &str,
+        ) -> SingletonConnectionResolveFuture {
+            let started_count = self.started_count.clone();
+            let release = self.release.clone();
+            Box::pin(async move {
+                let release_wait = release.notified();
+                started_count.fetch_add(1, Ordering::AcqRel);
+                release_wait.await;
+                let resolved_at_millis = unix_millis() as i64;
+                Ok(Some(SingletonConnectionResolution {
+                    connection_id: "connection".to_string(),
+                    lease_expires_at_millis: resolved_at_millis + 60_000,
+                    resolved_at_millis,
+                }))
+            })
+        }
+    }
+
+    struct FailingSingletonResolver {
+        lookup_count: Arc<AtomicUsize>,
+    }
+
+    impl FailingSingletonResolver {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                lookup_count: Arc::new(AtomicUsize::new(0)),
+            })
+        }
+    }
+
+    impl SingletonConnectionResolver for FailingSingletonResolver {
+        fn resolve(
+            &self,
+            _project_id: &str,
+            _singleton_id: &str,
+        ) -> SingletonConnectionResolveFuture {
+            self.lookup_count.fetch_add(1, Ordering::AcqRel);
+            Box::pin(async { Err(anyhow::anyhow!("resolution response lost")) })
+        }
+    }
+
+    fn test_service(
+        worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
+        directory: Arc<MemoryDirectory>,
+        identity: WorkerIdentity,
+    ) -> Arc<WebSocketService> {
+        test_service_with(
+            worker_senders,
+            directory,
+            identity,
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            ScriptedSingletonResolver::new(Vec::new()),
+        )
+    }
+
+    fn test_service_with(
+        worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
+        directory: Arc<MemoryDirectory>,
+        identity: WorkerIdentity,
+        outbound_dialer: OutboundDialer,
+        egress_budget: Arc<dyn EgressBudget>,
+        singleton_resolver: Arc<dyn SingletonConnectionResolver>,
+    ) -> Arc<WebSocketService> {
+        let service = Arc::new(WebSocketService {
+            worker_senders,
+            connections: DashMap::new(),
+            singleton_connections: DashMap::new(),
+            singleton_resolve_cache: DashMap::new(),
+            project_counts: DashMap::new(),
+            project_generations: DashMap::new(),
+            worker_count: Arc::new(AtomicUsize::new(0)),
+            draining: AtomicBool::new(false),
+            directory,
+            identity,
+            quic: OnceLock::new(),
+            self_reference: OnceLock::new(),
+            outbound_dialer,
+            egress_budget,
+            singleton_resolver,
+        });
+        service
+            .self_reference
+            .set(Arc::downgrade(&service))
+            .expect("set test websocket service self reference");
+        service
+    }
+
+    fn local_worker_identity() -> WorkerIdentity {
+        WorkerIdentity {
+            worker_id: "worker".to_string(),
+            endpoint: String::new(),
+        }
+    }
+
+    struct TestConnection {
+        command_receiver: mpsc::Receiver<SocketCommand>,
+        control_receiver: mpsc::UnboundedReceiver<WriterControl>,
+        _closed_sender: watch::Sender<bool>,
+    }
+
+    fn insert_test_connection(
+        service: &WebSocketService,
+        project_id: &str,
+        connection_id: &str,
+        lease_guard: Option<Arc<SingletonLeaseGuard>>,
+    ) -> TestConnection {
+        let (command_sender, command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
+        let (closed_sender, closed_receiver) = watch::channel(false);
+        let (force_close_sender, _force_close_receiver) = watch::channel(false);
+        let (control_sender, control_receiver) = mpsc::unbounded_channel();
+        service.connections.insert(
+            connection_id.to_string(),
+            Arc::new(ConnectionEntry {
+                project_id: project_id.to_string(),
+                command_sender,
+                closing: AtomicBool::new(false),
+                closed_receiver,
+                control_sender,
+                force_close_sender,
+                lease_guard,
+            }),
+        );
+        TestConnection {
+            command_receiver,
+            control_receiver,
+            _closed_sender: closed_sender,
+        }
+    }
+
+    fn text_body(text: &'static str) -> Body {
+        Full::new(Bytes::from_static(text.as_bytes()))
+            .map_err(|never: Infallible| match never {})
+            .boxed_unsync()
+    }
+
+    fn connection_id_with(fill_byte: u8) -> String {
+        format!(
+            "v1.{}",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([fill_byte; 32])
+        )
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn resumed_process_refuses_send_before_lease_task_runs() {
+        let service = test_service(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+        );
+        let lease_guard = Arc::new(SingletonLeaseGuard::new(
+            tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE,
+        ));
+        let mut connection =
+            insert_test_connection(&service, "project", "connection", Some(lease_guard));
+        tokio::time::advance(SINGLETON_SAFETY_DEADLINE + Duration::from_secs(1)).await;
+        let admitted = service.admit_local_send(
+            "project",
+            "connection",
+            WebSocketMessageKind::Text,
+            text_body("late"),
+            tokio::time::Instant::now() + Duration::from_secs(5),
+        );
+        let Err(error) = admitted else {
+            panic!("expired lease admitted a send");
+        };
+        assert_eq!(
+            error,
+            WebSocketCommandError::not_sent(WebSocketCommandErrorKind::ConnectionNotFound)
+        );
+        assert!(connection.command_receiver.try_recv().is_err());
+        let Ok(WriterControl::Close(close_code, close_info)) =
+            connection.control_receiver.try_recv()
+        else {
+            panic!("expired lease did not close the connection");
+        };
+        assert_eq!(close_code, 1011);
+        assert_eq!(close_info.cause, "heartbeat-timeout");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn expired_lease_refuses_inbound_callback_and_worker_start() {
+        let service = test_service(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+        );
+        let lease_guard = Arc::new(SingletonLeaseGuard::new(
+            tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE,
+        ));
+        let start_gate = lease_guard.start_gate();
+        assert!(start_gate());
+        tokio::time::advance(SINGLETON_SAFETY_DEADLINE).await;
+        assert!(!start_gate());
+        let (control_sender, _control_receiver) = mpsc::unbounded_channel();
+        let pending_messages = Arc::new(AtomicUsize::new(0));
+        let dispatch_result = dispatch_inbound(
+            &service,
+            "project",
+            "connection",
+            &"https://fn0-websocket.internal/ws_singleton/feed"
+                .parse()
+                .unwrap(),
+            WebSocketMessageKind::Text,
+            b"late".to_vec(),
+            &pending_messages,
+            &control_sender,
+            Some(&lease_guard),
+        );
+        assert_eq!(dispatch_result, Err(1011));
+        assert_eq!(pending_messages.load(Ordering::Acquire), 0);
+    }
+
+    async fn channel_body(chunk_receiver: mpsc::Receiver<Bytes>) -> Body {
+        let stream = futures::stream::unfold(chunk_receiver, |mut chunk_receiver| async move {
+            chunk_receiver.recv().await.map(|chunk| {
+                (
+                    Ok::<_, anyhow::Error>(http_body::Frame::data(chunk)),
+                    chunk_receiver,
+                )
+            })
+        });
+        http_body_util::StreamBody::new(stream).boxed_unsync()
+    }
+
+    async fn read_written_bytes(reader: &mut tokio::io::DuplexStream) -> Vec<u8> {
+        let mut written = Vec::new();
+        let mut buffer = [0_u8; 1024];
+        while let Ok(Ok(read_count)) =
+            timeout(Duration::from_millis(1), reader.read(&mut buffer)).await
+        {
+            if read_count == 0 {
+                break;
+            }
+            written.extend_from_slice(&buffer[..read_count]);
+        }
+        written
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn streaming_send_stops_before_next_frame_after_lease_expiry() {
+        let (mut peer, local) = tokio::io::duplex(64 * 1024);
+        let (local_reader, local_writer) = tokio::io::split(local);
+        let (_, mut writer) = fastwebsockets::after_handshake_split(
+            local_reader,
+            local_writer,
+            fastwebsockets::Role::Server,
+        );
+        let lease_guard = Arc::new(SingletonLeaseGuard::new(
+            tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE,
+        ));
+        let admission = OutboundFrameAdmission {
+            project_id: "project".to_string(),
+            lease_guard: Some(lease_guard),
+            egress_budget: Arc::new(UnlimitedEgressBudget),
+        };
+        let (chunk_sender, chunk_receiver) = mpsc::channel(1);
+        let wrote_frame = Arc::new(AtomicBool::new(false));
+        chunk_sender
+            .send(Bytes::from_static(b"first-chunk"))
+            .await
+            .unwrap();
+        let body = channel_body(chunk_receiver).await;
+        let send = send_message(
+            &mut writer,
+            WebSocketMessageKind::Binary,
+            body,
+            wrote_frame.clone(),
+            &admission,
+        );
+        tokio::pin!(send);
+        assert!(
+            timeout(Duration::from_millis(1), send.as_mut())
+                .await
+                .is_err()
+        );
+        assert!(wrote_frame.load(Ordering::Acquire));
+        tokio::time::advance(SINGLETON_SAFETY_DEADLINE).await;
+        chunk_sender
+            .send(Bytes::from_static(b"second-chunk"))
+            .await
+            .unwrap();
+        let error = send.await.unwrap_err();
+        assert_eq!(
+            error,
+            WebSocketCommandError::unknown(WebSocketCommandErrorKind::ConnectionNotFound)
+        );
+        let written = read_written_bytes(&mut peer).await;
+        assert!(written.windows(11).any(|window| window == b"first-chunk"));
+        assert!(!written.windows(12).any(|window| window == b"second-chunk"));
+        assert_eq!(
+            send_failure_close(&error)
+                .map(|(close_code, close_info)| (close_code, close_info.cause)),
+            Some((1011, "heartbeat-timeout"))
+        );
     }
 
     #[tokio::test]
-    async fn singleton_heartbeat_failures_fence_at_safety_deadline() {
-        let attempt_count = Arc::new(AtomicUsize::new(0));
-        let attempt_count_for_renewal = attempt_count.clone();
-        let result = renew_singleton_lease(
-            SingletonLeaseTiming {
-                heartbeat_interval: Duration::from_millis(1),
-                safety_deadline: Duration::from_millis(30),
-                retry_initial_delay: Duration::from_millis(1),
-                retry_max_delay: Duration::from_millis(5),
-            },
-            move || {
-                attempt_count_for_renewal.fetch_add(1, Ordering::AcqRel);
-                async { Ok(SingletonStatusResponse::Retryable) }
-            },
-            |backoff| backoff,
+    async fn egress_refusal_mid_stream_stops_the_message_and_closes_with_policy_violation() {
+        let (mut peer, local) = tokio::io::duplex(64 * 1024);
+        let (local_reader, local_writer) = tokio::io::split(local);
+        let (_, mut writer) = fastwebsockets::after_handshake_split(
+            local_reader,
+            local_writer,
+            fastwebsockets::Role::Server,
+        );
+        let admission = OutboundFrameAdmission {
+            project_id: "project".to_string(),
+            lease_guard: None,
+            egress_budget: Arc::new(LimitedEgressBudget {
+                remaining_bytes: Mutex::new(11),
+                exhausted: false,
+            }),
+        };
+        let (chunk_sender, chunk_receiver) = mpsc::channel(2);
+        chunk_sender
+            .send(Bytes::from_static(b"first-chunk"))
+            .await
+            .unwrap();
+        chunk_sender
+            .send(Bytes::from_static(b"second-chunk"))
+            .await
+            .unwrap();
+        drop(chunk_sender);
+        let error = send_message(
+            &mut writer,
+            WebSocketMessageKind::Binary,
+            channel_body(chunk_receiver).await,
+            Arc::new(AtomicBool::new(false)),
+            &admission,
         )
-        .await;
-        assert_eq!(result, SingletonStatusResponse::Retryable);
-        assert!(attempt_count.load(Ordering::Acquire) > 1);
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error,
+            WebSocketCommandError::unknown(WebSocketCommandErrorKind::EgressQuotaExceeded)
+        );
+        drop(writer);
+        let written = read_written_bytes(&mut peer).await;
+        assert!(!written.windows(12).any(|window| window == b"second-chunk"));
+        assert_eq!(
+            send_failure_close(&error)
+                .map(|(close_code, close_info)| (close_code, close_info.cause)),
+            Some((1008, "egress-quota-exceeded"))
+        );
+    }
+
+    #[tokio::test]
+    async fn egress_refusal_before_first_frame_is_not_sent() {
+        let (_peer, local) = tokio::io::duplex(1024);
+        let (local_reader, local_writer) = tokio::io::split(local);
+        let (_, mut writer) = fastwebsockets::after_handshake_split(
+            local_reader,
+            local_writer,
+            fastwebsockets::Role::Server,
+        );
+        let admission = OutboundFrameAdmission {
+            project_id: "project".to_string(),
+            lease_guard: None,
+            egress_budget: Arc::new(LimitedEgressBudget {
+                remaining_bytes: Mutex::new(0),
+                exhausted: false,
+            }),
+        };
+        let wrote_frame = Arc::new(AtomicBool::new(false));
+        let error = send_message(
+            &mut writer,
+            WebSocketMessageKind::Text,
+            text_body("hello"),
+            wrote_frame.clone(),
+            &admission,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error,
+            WebSocketCommandError::not_sent(WebSocketCommandErrorKind::EgressQuotaExceeded)
+        );
+        assert!(!wrote_frame.load(Ordering::Acquire));
+    }
+
+    #[tokio::test]
+    async fn known_exhausted_project_send_is_refused_and_connection_closed() {
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(LimitedEgressBudget {
+                remaining_bytes: Mutex::new(0),
+                exhausted: true,
+            }),
+            ScriptedSingletonResolver::new(Vec::new()),
+        );
+        let mut connection = insert_test_connection(&service, "project", "connection", None);
+        let Err(error) = service.admit_local_send(
+            "project",
+            "connection",
+            WebSocketMessageKind::Text,
+            text_body("hello"),
+            tokio::time::Instant::now() + Duration::from_secs(5),
+        ) else {
+            panic!("exhausted project admitted a send");
+        };
+        assert_eq!(
+            error,
+            WebSocketCommandError::not_sent(WebSocketCommandErrorKind::EgressQuotaExceeded)
+        );
+        assert!(connection.command_receiver.try_recv().is_err());
+        let Ok(WriterControl::Close(close_code, _)) = connection.control_receiver.try_recv() else {
+            panic!("exhausted project connection was not closed");
+        };
+        assert_eq!(close_code, 1008);
+    }
+
+    #[tokio::test]
+    async fn named_send_reaches_the_resolved_current_connection() {
+        let current_connection_id = connection_id_with(1);
+        let resolver = ScriptedSingletonResolver::new(vec![Some(current_connection_id.clone())]);
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            resolver.clone(),
+        );
+        let mut connection =
+            insert_test_connection(&service, "project", &current_connection_id, None);
+        let send_task = tokio::spawn({
+            let service = service.clone();
+            async move {
+                service
+                    .send_singleton(
+                        "project".to_string(),
+                        "market_feed".to_string(),
+                        WebSocketMessageKind::Text,
+                        text_body("subscribe"),
+                        Duration::from_secs(5),
+                    )
+                    .await
+            }
+        });
+        let Some(SocketCommand::Send {
+            body,
+            response_sender,
+            ..
+        }) = connection.command_receiver.recv().await
+        else {
+            panic!("named send did not reach the connection");
+        };
+        assert_eq!(
+            body.collect().await.unwrap().to_bytes(),
+            Bytes::from_static(b"subscribe")
+        );
+        response_sender.send(Ok(())).unwrap();
+        send_task.await.unwrap().unwrap();
+        assert_eq!(
+            resolver.lookups.lock().unwrap().as_slice(),
+            [("project".to_string(), "market_feed".to_string())]
+        );
+    }
+
+    #[tokio::test]
+    async fn concurrent_cache_misses_share_one_resolution_after_one_waiter_is_cancelled() {
+        let resolver = BlockingSingletonResolver::new();
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            resolver.clone(),
+        );
+        let first_service = service.clone();
+        let first = tokio::spawn(async move {
+            first_service
+                .resolve_singleton_cached(
+                    "project",
+                    "feed",
+                    tokio::time::Instant::now() + Duration::from_secs(5),
+                )
+                .await
+        });
+        while resolver.started_count.load(Ordering::Acquire) == 0 {
+            tokio::task::yield_now().await;
+        }
+        let second_service = service.clone();
+        let second = tokio::spawn(async move {
+            second_service
+                .resolve_singleton_cached(
+                    "project",
+                    "feed",
+                    tokio::time::Instant::now() + Duration::from_secs(5),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        assert_eq!(resolver.started_count.load(Ordering::Acquire), 1);
+        first.abort();
+        resolver.release.notify_waiters();
+        let (_, cached_connection) = second.await.unwrap().unwrap();
+        assert_eq!(cached_connection.connection_id, "connection");
+        assert_eq!(resolver.started_count.load(Ordering::Acquire), 1);
+    }
+
+    #[test]
+    fn singleton_cache_expires_at_request_start_minus_safety_margin() {
+        let request_started_at = tokio::time::Instant::now();
+        let valid_until = singleton_cache_valid_until(request_started_at, 61_000, 1_000);
+        assert_eq!(
+            valid_until.duration_since(request_started_at),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cache_expiry_triggers_a_new_control_lookup() {
+        let resolver = ScriptedSingletonResolver::new(vec![
+            Some("first-connection".to_string()),
+            Some("second-connection".to_string()),
+        ]);
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            resolver.clone(),
+        );
+        let (_, first_connection) = service
+            .resolve_singleton_cached(
+                "project",
+                "feed",
+                tokio::time::Instant::now() + Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+        assert_eq!(first_connection.connection_id, "first-connection");
+        tokio::time::advance(Duration::from_secs(30)).await;
+        let (_, second_connection) = service
+            .resolve_singleton_cached(
+                "project",
+                "feed",
+                tokio::time::Instant::now() + Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+        assert_eq!(second_connection.connection_id, "second-connection");
+        assert_eq!(resolver.lookups.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn failed_resolution_is_not_cached() {
+        let resolver = FailingSingletonResolver::new();
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            resolver.clone(),
+        );
+        for _ in 0..2 {
+            let result = service
+                .resolve_singleton_cached(
+                    "project",
+                    "feed",
+                    tokio::time::Instant::now() + Duration::from_secs(5),
+                )
+                .await;
+            let Err(error) = result else {
+                panic!("failed singleton resolution unexpectedly succeeded");
+            };
+            assert_eq!(error.kind, WebSocketCommandErrorKind::Transport);
+        }
+        assert_eq!(resolver.lookup_count.load(Ordering::Acquire), 2);
+    }
+
+    #[tokio::test]
+    async fn named_send_to_replaced_owner_fails_without_retrying_on_replacement() {
+        let stale_connection_id = connection_id_with(2);
+        let replacement_connection_id = connection_id_with(3);
+        let resolver = ScriptedSingletonResolver::new(vec![
+            Some(stale_connection_id),
+            Some(replacement_connection_id.clone()),
+        ]);
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            resolver.clone(),
+        );
+        let mut replacement =
+            insert_test_connection(&service, "project", &replacement_connection_id, None);
+        let error = service
+            .send_singleton(
+                "project".to_string(),
+                "market_feed".to_string(),
+                WebSocketMessageKind::Text,
+                text_body("order"),
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error,
+            WebSocketCommandError::not_sent(WebSocketCommandErrorKind::ConnectionNotFound)
+        );
+        assert_eq!(resolver.lookups.lock().unwrap().len(), 1);
+        assert!(replacement.command_receiver.try_recv().is_err());
+        let second_send = tokio::spawn({
+            let service = service.clone();
+            async move {
+                service
+                    .send_singleton(
+                        "project".to_string(),
+                        "market_feed".to_string(),
+                        WebSocketMessageKind::Text,
+                        text_body("replacement-message"),
+                        Duration::from_secs(5),
+                    )
+                    .await
+            }
+        });
+        let Some(SocketCommand::Send {
+            response_sender, ..
+        }) = replacement.command_receiver.recv().await
+        else {
+            panic!("replacement send did not reach the replacement connection");
+        };
+        response_sender.send(Ok(())).unwrap();
+        second_send.await.unwrap().unwrap();
+        assert_eq!(resolver.lookups.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn named_send_resolves_in_the_calling_project_only() {
+        let other_project_connection_id = connection_id_with(4);
+        let resolver =
+            ScriptedSingletonResolver::new(vec![Some(other_project_connection_id.clone())]);
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            resolver.clone(),
+        );
+        let mut other_project_connection = insert_test_connection(
+            &service,
+            "other-project",
+            &other_project_connection_id,
+            None,
+        );
+        let error = service
+            .send_singleton(
+                "calling-project".to_string(),
+                "market_feed".to_string(),
+                WebSocketMessageKind::Text,
+                text_body("order"),
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind, WebSocketCommandErrorKind::ConnectionNotFound);
+        assert_eq!(
+            resolver.lookups.lock().unwrap()[0].0,
+            "calling-project".to_string()
+        );
+        assert!(
+            other_project_connection
+                .command_receiver
+                .try_recv()
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn named_send_without_current_connection_is_not_sent() {
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Allowed),
+            Arc::new(UnlimitedEgressBudget),
+            ScriptedSingletonResolver::new(vec![None]),
+        );
+        let error = service
+            .send_singleton(
+                "project".to_string(),
+                "market_feed".to_string(),
+                WebSocketMessageKind::Text,
+                text_body("order"),
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error,
+            WebSocketCommandError::not_sent(WebSocketCommandErrorKind::ConnectionNotFound)
+        );
+    }
+
+    #[tokio::test]
+    async fn blocked_destination_policy_refuses_private_websocket_before_dialing() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let listener_address = listener.local_addr().unwrap();
+        let service = test_service_with(
+            Arc::new(Vec::new()),
+            Arc::new(MemoryDirectory::default()),
+            local_worker_identity(),
+            OutboundDialer::system(PrivateDestinationAccess::Blocked),
+            Arc::new(UnlimitedEgressBudget),
+            ScriptedSingletonResolver::new(Vec::new()),
+        );
+        let error = service
+            .connect(
+                "project".to_string(),
+                format!("ws://{listener_address}/socket"),
+                "/ws_out/feed".to_string(),
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error,
+            WebSocketCommandError::not_sent(WebSocketCommandErrorKind::DestinationForbidden)
+        );
+        assert!(
+            timeout(Duration::from_millis(50), listener.accept())
+                .await
+                .is_err()
+        );
+        assert_eq!(service.connection_count(), 0);
     }
 
     struct PendingWriter;
@@ -3030,26 +4622,14 @@ mod tests {
     #[tokio::test]
     async fn singleton_abort_waits_for_connection_and_activation_completion() {
         let directory = Arc::new(MemoryDirectory::default());
-        let service = Arc::new(WebSocketService {
-            worker_senders: Arc::new(Vec::new()),
-            connections: DashMap::new(),
-            singleton_connections: DashMap::new(),
-            project_counts: DashMap::new(),
-            project_generations: DashMap::new(),
-            worker_count: Arc::new(AtomicUsize::new(0)),
-            draining: AtomicBool::new(false),
+        let service = test_service(
+            Arc::new(Vec::new()),
             directory,
-            identity: WorkerIdentity {
+            WorkerIdentity {
                 worker_id: "worker".to_string(),
                 endpoint: String::new(),
             },
-            quic: OnceLock::new(),
-            self_reference: OnceLock::new(),
-        });
-        service
-            .self_reference
-            .set(Arc::downgrade(&service))
-            .unwrap();
+        );
         let singleton_key = (
             "project".to_string(),
             "feed".to_string(),
@@ -3065,6 +4645,9 @@ mod tests {
                 .parse()
                 .unwrap(),
             response_headers: hyper::HeaderMap::new(),
+            lease_guard: Arc::new(SingletonLeaseGuard::new(
+                tokio::time::Instant::now() + SINGLETON_SAFETY_DEADLINE,
+            )),
             lease_activation_sender: Mutex::new(None),
             message_ready_sender: Mutex::new(None),
             activation_lifecycle: activation_lifecycle.clone(),
@@ -3087,6 +4670,7 @@ mod tests {
                 closed_receiver,
                 control_sender,
                 force_close_sender,
+                lease_guard: None,
             }),
         );
         let service_for_abort = service.clone();
@@ -3314,26 +4898,14 @@ mod tests {
         });
 
         let directory = Arc::new(MemoryDirectory::default());
-        let service = Arc::new(WebSocketService {
-            worker_senders: Arc::new(vec![worker_sender]),
-            connections: DashMap::new(),
-            singleton_connections: DashMap::new(),
-            project_counts: DashMap::new(),
-            project_generations: DashMap::new(),
-            worker_count: Arc::new(AtomicUsize::new(0)),
-            draining: AtomicBool::new(false),
-            directory: directory.clone(),
-            identity: WorkerIdentity {
+        let service = test_service(
+            Arc::new(vec![worker_sender]),
+            directory.clone(),
+            WorkerIdentity {
                 worker_id: "worker".to_string(),
                 endpoint: String::new(),
             },
-            quic: OnceLock::new(),
-            self_reference: OnceLock::new(),
-        });
-        service
-            .self_reference
-            .set(Arc::downgrade(&service))
-            .unwrap();
+        );
         let initial_lease_deadline = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -3392,26 +4964,14 @@ mod tests {
     #[tokio::test]
     async fn deployment_closes_existing_connection_with_service_restart() {
         let directory = Arc::new(MemoryDirectory::default());
-        let service = Arc::new(WebSocketService {
-            worker_senders: Arc::new(Vec::new()),
-            connections: DashMap::new(),
-            singleton_connections: DashMap::new(),
-            project_counts: DashMap::new(),
-            project_generations: DashMap::new(),
-            worker_count: Arc::new(AtomicUsize::new(0)),
-            draining: AtomicBool::new(false),
+        let service = test_service(
+            Arc::new(Vec::new()),
             directory,
-            identity: WorkerIdentity {
+            WorkerIdentity {
                 worker_id: "worker".to_string(),
                 endpoint: String::new(),
             },
-            quic: OnceLock::new(),
-            self_reference: OnceLock::new(),
-        });
-        service
-            .self_reference
-            .set(Arc::downgrade(&service))
-            .unwrap();
+        );
         let (command_sender, mut command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         let (_closed_sender, closed_receiver) = watch::channel(false);
         let (force_close_sender, _force_close_receiver) = watch::channel(false);
@@ -3425,6 +4985,7 @@ mod tests {
                 closed_receiver,
                 control_sender,
                 force_close_sender,
+                lease_guard: None,
             }),
         );
         service.close_project("project").await;
@@ -3442,26 +5003,14 @@ mod tests {
     #[tokio::test]
     async fn singleton_fencing_blocks_sends_and_closes_connection() {
         let directory = Arc::new(MemoryDirectory::default());
-        let service = Arc::new(WebSocketService {
-            worker_senders: Arc::new(Vec::new()),
-            connections: DashMap::new(),
-            singleton_connections: DashMap::new(),
-            project_counts: DashMap::new(),
-            project_generations: DashMap::new(),
-            worker_count: Arc::new(AtomicUsize::new(0)),
-            draining: AtomicBool::new(false),
+        let service = test_service(
+            Arc::new(Vec::new()),
             directory,
-            identity: WorkerIdentity {
+            WorkerIdentity {
                 worker_id: "worker".to_string(),
                 endpoint: String::new(),
             },
-            quic: OnceLock::new(),
-            self_reference: OnceLock::new(),
-        });
-        service
-            .self_reference
-            .set(Arc::downgrade(&service))
-            .unwrap();
+        );
         let (command_sender, _command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         for queue_position in 0..OUTBOUND_COMMAND_CAPACITY {
             let (ready_sender, _ready_receiver) = oneshot::channel();
@@ -3490,6 +5039,7 @@ mod tests {
                 closed_receiver,
                 control_sender,
                 force_close_sender,
+                lease_guard: None,
             }),
         );
         fence_singleton(&service, "project", "connection");
@@ -3512,26 +5062,14 @@ mod tests {
     #[tokio::test]
     async fn expired_initial_singleton_lease_fences_immediately() {
         let directory = Arc::new(MemoryDirectory::default());
-        let service = Arc::new(WebSocketService {
-            worker_senders: Arc::new(Vec::new()),
-            connections: DashMap::new(),
-            singleton_connections: DashMap::new(),
-            project_counts: DashMap::new(),
-            project_generations: DashMap::new(),
-            worker_count: Arc::new(AtomicUsize::new(0)),
-            draining: AtomicBool::new(false),
+        let service = test_service(
+            Arc::new(Vec::new()),
             directory,
-            identity: WorkerIdentity {
+            WorkerIdentity {
                 worker_id: "worker".to_string(),
                 endpoint: String::new(),
             },
-            quic: OnceLock::new(),
-            self_reference: OnceLock::new(),
-        });
-        service
-            .self_reference
-            .set(Arc::downgrade(&service))
-            .unwrap();
+        );
         let (command_sender, _command_receiver) = mpsc::channel(OUTBOUND_COMMAND_CAPACITY);
         let (_closed_sender, closed_receiver) = watch::channel(false);
         let (force_close_sender, _force_close_receiver) = watch::channel(false);
@@ -3545,6 +5083,7 @@ mod tests {
                 closed_receiver,
                 control_sender,
                 force_close_sender,
+                lease_guard: None,
             }),
         );
         let singleton_key = (
@@ -3563,7 +5102,7 @@ mod tests {
                 slot,
                 singleton_id: "feed".to_string(),
                 claim_token: "claim".to_string(),
-                initial_lease_deadline: 0,
+                lease_guard: Arc::new(SingletonLeaseGuard::new(initial_lease_valid_until(0))),
                 activation_lifecycle: Arc::new(SingletonActivationLifecycle::new()),
             },
             lease_activation_receiver,
@@ -3625,6 +5164,7 @@ mod tests {
                 closed_receiver,
                 control_sender,
                 force_close_sender,
+                lease_guard: None,
             }),
         );
         target_service
@@ -3683,26 +5223,14 @@ mod tests {
         bearer: String,
         server_name: String,
     ) -> Arc<WebSocketService> {
-        let service = Arc::new(WebSocketService {
-            worker_senders: Arc::new(Vec::new()),
-            connections: DashMap::new(),
-            singleton_connections: DashMap::new(),
-            project_counts: DashMap::new(),
-            project_generations: DashMap::new(),
-            worker_count: Arc::new(AtomicUsize::new(0)),
-            draining: AtomicBool::new(false),
+        let service = test_service(
+            Arc::new(Vec::new()),
             directory,
-            identity: WorkerIdentity {
+            WorkerIdentity {
                 worker_id: format!("test-worker-{endpoint}"),
                 endpoint: endpoint.to_string(),
             },
-            quic: OnceLock::new(),
-            self_reference: OnceLock::new(),
-        });
-        service
-            .self_reference
-            .set(Arc::downgrade(&service))
-            .expect("set test websocket service self reference");
+        );
         let quic = QuicTransport::from_test_config(
             Arc::downgrade(&service),
             endpoint,

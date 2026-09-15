@@ -74,6 +74,8 @@ enum WireErrorKind {
     DeadlineExceeded,
     Transport,
     InvalidText,
+    DestinationForbidden,
+    EgressQuotaExceeded,
     Internal,
 }
 
@@ -548,6 +550,12 @@ impl From<WebSocketCommandError> for WireError {
                 WebSocketCommandErrorKind::DeadlineExceeded => WireErrorKind::DeadlineExceeded,
                 WebSocketCommandErrorKind::Transport => WireErrorKind::Transport,
                 WebSocketCommandErrorKind::InvalidText => WireErrorKind::InvalidText,
+                WebSocketCommandErrorKind::DestinationForbidden => {
+                    WireErrorKind::DestinationForbidden
+                }
+                WebSocketCommandErrorKind::EgressQuotaExceeded => {
+                    WireErrorKind::EgressQuotaExceeded
+                }
                 WebSocketCommandErrorKind::Internal => WireErrorKind::Internal,
             },
             delivery: match value.delivery {
@@ -567,6 +575,12 @@ impl From<WireError> for WebSocketCommandError {
                 WireErrorKind::DeadlineExceeded => WebSocketCommandErrorKind::DeadlineExceeded,
                 WireErrorKind::Transport => WebSocketCommandErrorKind::Transport,
                 WireErrorKind::InvalidText => WebSocketCommandErrorKind::InvalidText,
+                WireErrorKind::DestinationForbidden => {
+                    WebSocketCommandErrorKind::DestinationForbidden
+                }
+                WireErrorKind::EgressQuotaExceeded => {
+                    WebSocketCommandErrorKind::EgressQuotaExceeded
+                }
                 WireErrorKind::Internal => WebSocketCommandErrorKind::Internal,
             },
             delivery: match value.delivery {

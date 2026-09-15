@@ -158,6 +158,7 @@ When running `fn0-worker` yourself, set these environment variables on the binar
 | `ORIGIN_KEY_PEM` | Yes | — | PEM-encoded TLS private key (or use `ORIGIN_KEY_PEM_BASE64`) |
 | `FN0_APEX_DOMAIN` | No | — | Apex domain to route when no project hostname matches |
 | `FN0_APEX_PROJECT_ID` | No | — | Project ID to serve for `FN0_APEX_DOMAIN` requests; both must be set together |
+| `FN0_ALLOW_PRIVATE_OUTBOUND_DESTINATIONS` | No | `false` | `true` lets application HTTP, `fetch`, and WebSockets reach loopback and private addresses; see [Limits](./limits.md#outbound-destinations) |
 
 The first byte on `HTTP_PORT`: `0x16` (TLS ClientHello) routes to user traffic; anything else routes to health checks. `FN0_WORKER_OPS_PORT` serves ops endpoints unconditionally.
 
@@ -204,7 +205,7 @@ fn0 uses "hijack" components to inject platform services into the WASM execution
 | `otlp_hijack` | Injects OpenTelemetry OTLP endpoint |
 | `queue_hijack` | Intercepts outgoing queue requests |
 | `vault_hijack` | Injects secrets (Vault integration) |
-| `websocket_hijack` | Dispatches WebSocket `send` and `disconnect` commands via QUIC |
+| `websocket_hijack` | Dispatches WebSocket `send`, named singleton `send`, and `disconnect` commands via QUIC |
 | `static_page_cache_hijack` | Routes `static_page_cache::purge` calls; shares the hourly purge budget with public storage purges |
 | `cross_project_enqueue_hijack` | Routes cross-project queue enqueue calls |
 | `cross_project_invoke_hijack` | Routes cross-project direct invocations |
@@ -222,5 +223,10 @@ let ctx = ExecutionContext::new(engine, linker, bundle_cache)
     .with_object_storage_hijack(object_storage_hijack)
     .with_public_storage_hijack(public_storage_hijack)
     .with_websocket_hijack(websocket_hijack)
-    .with_static_page_cache_hijack(static_page_cache_hijack);
+    .with_static_page_cache_hijack(static_page_cache_hijack)
+    .with_guest_outbound_http(guest_outbound_http);
 ```
+
+`with_guest_outbound_http` routes the application's own HTTP requests and JavaScript `fetch`
+through the outbound destination policy and the project egress budget. Without it, requests use
+wasmtime's default sender with neither check, which is what `forte dev` does.

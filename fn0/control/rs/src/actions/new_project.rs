@@ -1,6 +1,7 @@
 use crate::common::auth;
 use crate::common::project_name::is_valid_project_name;
 use crate::docs::*;
+use crate::quota;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
@@ -53,6 +54,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     project_id: project_id.clone(),
                     name: name.clone(),
                 });
+                trx.create(ProjectEgressQuotaDoc {
+                    project_id: project_id.clone(),
+                    monthly_egress_limit: MonthlyEgressLimit::Bytes(
+                        quota::DEFAULT_MONTHLY_EGRESS_BYTES,
+                    ),
+                })?;
                 trx.create(ProjectDoc {
                     project_id,
                     owner_github_id: github_id,

@@ -3,11 +3,11 @@
 mod runtime_options;
 
 use deno_core::JsRuntimeForSnapshot;
-use runtime_options::runtime_options;
+use runtime_options::{NativeNetworkFetch, runtime_options};
 use std::{env, fs, path::PathBuf};
 
 fn main() {
-    let runtime = JsRuntimeForSnapshot::new(runtime_options());
+    let runtime = JsRuntimeForSnapshot::new(runtime_options(NativeNetworkFetch::Allowed));
     let snapshot = runtime.snapshot();
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let file_path = out_dir.join("RUNJS_SNAPSHOT.bin");

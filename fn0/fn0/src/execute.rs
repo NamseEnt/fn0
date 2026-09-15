@@ -313,6 +313,7 @@ pub async fn run_wasm_instance_loop(
     public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
     websocket_hijack: Option<Arc<WebSocketHijack>>,
+    guest_outbound_http: Option<Arc<crate::GuestOutboundHttp>>,
 ) -> Result<()> {
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -336,6 +337,7 @@ pub async fn run_wasm_instance_loop(
             public_storage_hijack.clone(),
             static_page_cache_hijack.clone(),
             websocket_hijack.clone(),
+            guest_outbound_http,
         ),
         turso_hijack.as_deref(),
         queue_hijack.as_deref(),
