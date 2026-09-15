@@ -4,6 +4,7 @@ import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
 import { gzipSync } from "node:zlib";
 import { CustomWorkerImage } from "./CustomWorkerImage";
+import { OciWorkerTelemetryVolumeCleanup } from "./OciWorkerTelemetryVolumeCleanup";
 import {
   CLOUDFLARE_IPV4_RANGES,
   CLOUDFLARE_IPV6_RANGES,
@@ -231,6 +232,26 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       backendSet,
     );
     this.instancePoolId = instancePool.id;
+
+    new OciWorkerTelemetryVolumeCleanup(
+      "worker-telemetry-volume-cleanup",
+      {
+        region: args.region,
+        compartmentId: compartment.id,
+        instancePoolId: instancePool.id,
+        instanceConfigurationId: instanceConfiguration.id,
+        expectedAttachedVolumeCount: args.count,
+        volumeDisplayNames: [
+          "fn0-worker-collecty-queue",
+          "fn0-worker-alloy-queue",
+        ],
+        managedByTagKey: "managed_by",
+        managedByTagValue: MANAGED_BY_TAG_VALUE,
+        roleTagKey: "fn0_role",
+        roleTagValue: "worker",
+      },
+      { parent: this, dependsOn: [instancePool] },
+    );
 
     // customWorkerImage referenced to avoid unused-variable lint; imageId is
     // already its primary output.
@@ -617,6 +638,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
                 freeformTags: {
                   managed_by: MANAGED_BY_TAG_VALUE,
                   fn0_role: "worker",
+                  fn0_volume_role: "telemetry-queue",
                 },
               },
               attachDetails: {
@@ -1131,7 +1153,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
         compartmentId: compartment.id,
         displayName: `${name}-autoscaling`,
         coolDownInSeconds: 300,
-        isEnabled: true,
+        isEnabled: false,
         autoScalingResources: {
           id: instancePool.id,
           type: "instancePool",
