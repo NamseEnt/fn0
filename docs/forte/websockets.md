@@ -224,7 +224,7 @@ the selected `Sec-WebSocket-Protocol`, if any. `on_message` fires for every inbo
 `on_disconnect` is best-effort, with the same `DisconnectCause` mapping as inbound routes; use
 `Deployment` and `TransportError` to distinguish an intentional restart from a wire drop.
 
-### Sending, disconnecting, and status
+### Sending and disconnecting
 
 The initial singleton implementation does not provide a public API that resolves a singleton name
 to its current physical connection. Singleton callbacks receive the `ConnectionId` for their
@@ -240,11 +240,16 @@ forte_sdk::websocket::send(
 ```
 
 There is no public `connect_singleton` in the SDK — fn0 owns opening and re-opening the socket
-in response to the manifest declaration, so user code never calls it. The internal
-`websocket_singleton_status` action accepts worker heartbeat and disconnect reports; it is not a
-public status query or a dashboard contract. The current runtime record contains the assignment
-version, claim token, physical connection ID, and lease expiry. It does not store a handshake
-timestamp or the last error.
+in response to the manifest declaration, so user code never calls it.
+
+Runtime pause, resume, and public status operations are intentionally unsupported. The active
+deployment is the desired state: remove a singleton module and deploy to stop reconciling it; add
+the module and deploy to restore it. These are deployment procedures, not runtime WebSocket APIs.
+
+The internal `websocket_singleton_status` action accepts worker heartbeat and disconnect reports;
+it is not a public status query or a dashboard contract. The current runtime record contains the
+assignment version, claim token, physical connection ID, and lease expiry. It does not store a
+handshake timestamp or the last error.
 
 ### Lifecycle
 

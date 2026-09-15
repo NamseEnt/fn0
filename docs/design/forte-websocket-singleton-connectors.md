@@ -7,9 +7,9 @@ application invocation calling `connect`. It extends the physical outbound trans
 [Forte WebSocket Design](./forte-websockets.md).
 
 The implemented scope is deployment-time discovery, active-version registration, per-connector
-ownership claims, lease renewal, reconnect reconciliation, and callback delivery. A public logical
-singleton send API, a public singleton status query, runtime pause/resume, destination policy, and
-bandwidth quota are not part of this implementation.
+ownership claims, lease renewal, reconnect reconciliation, and callback delivery. Runtime pause,
+runtime resume, and public singleton status APIs are intentionally unsupported. A public logical
+singleton send API, destination policy, and bandwidth quota are not part of this implementation.
 
 ## Application configuration
 
@@ -178,12 +178,21 @@ not retry ambiguous sends. `send` and `disconnect` continue to address the physi
 | Project deployment | Workers close project sockets; control uses only the new deployment declaration |
 | Declaration removed | Control stops reconciling it; the previous owner eventually self-closes when its lease renewal is rejected or expires |
 
-## Explicit non-goals and open follow-ups
+## Unsupported lifecycle controls
+
+Forte does not provide runtime pause, resume, or public status operations for persistent outbound
+WebSocket singletons. The deployed module declaration is the desired state: while the active
+deployment contains the declaration, fn0 reconciles the connection automatically. Stopping or
+restoring a singleton requires changing the deployed declarations and deploying that change.
+
+The internal `websocket_singleton_status` action is only the worker heartbeat and disconnect-report
+endpoint. It is not an application read API or a dashboard contract and must not be exposed as one.
+
+## Open follow-ups
 
 The current implementation does not promise a public API that resolves a singleton name to its
 current connection. Applications that need to send use the physical `connection_id` available in a
-callback or otherwise stored by the application. The internal status action accepts worker
-heartbeat and disconnect reports; it is not a read API for applications or a dashboard contract.
+callback or otherwise stored by the application.
 
 The current implementation validates WebSocket URL syntax, reserved headers, and subprotocol shape.
 It does not establish a destination allowlist, DNS-rebinding policy, or bandwidth quota. Those

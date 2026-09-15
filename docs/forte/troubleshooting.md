@@ -211,8 +211,9 @@ callback receives `DisconnectCause::Deployment` when the old connection observes
 new connection is opened automatically from the active deployment declaration. A rolling deploy
 does not guarantee that the old close handshake completes before the replacement dial starts.
 
-### Checking singleton status
+### Singleton status is unavailable
 
-The current implementation does not expose a public singleton status query. The
+Forte intentionally does not expose public singleton status, pause, or resume operations. The
 `websocket_singleton_status` action is an internal worker heartbeat and disconnect endpoint, not a
-read action. Use worker and control logs when diagnosing connection ownership or reconnects.
+read action. Use worker and control logs when diagnosing connection ownership or reconnects. To
+stop or restore a singleton, change its deployed module declaration and deploy that change.
