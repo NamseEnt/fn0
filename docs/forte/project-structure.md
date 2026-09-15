@@ -228,17 +228,21 @@ project_name = "my-app"
 zone = "example.com"
 domain = "my-app.example.com"
 origin_hostname = "oci-ap-osaka-1-nlb.fn0.dev"
+cloudflare_account_id = "0123456789abcdef0123456789abcdef"
+cloudflare_broker_url = "https://fn0-broker.example.workers.dev"
 ```
 
-`project_id`, `project_name`, `zone`, `domain`, and `origin_hostname` are
-recognized keys. The project name is a DNS label and the domain is derived from
-the project name and zone. `origin_hostname` records the fn0 origin used for
-safe DNS cleanup. `forte cloud init` refuses to continue if the saved values
-disagree with the requested project or the live Cloudflare connection.
+All seven keys are recognized. The project name is a DNS label and the domain is
+derived from the project name and zone. `origin_hostname` records the fn0 origin
+used for safe DNS cleanup. `cloudflare_account_id` and `cloudflare_broker_url`
+identify the Cloudflare account's broker Worker — `forte cloud init` reuses the
+broker for all projects on the same account. `forte cloud init` refuses to
+continue if the stored values disagree with the requested project or the live
+Cloudflare connection.
 
 `forte deploy` and `forte destroy` preserve the Cloudflare configuration.
-`forte destroy` removes the project identity and hostname keys so the next
-`forte cloud init` registers a new project.
+`forte destroy` removes all seven keys (project identity, hostname, and broker
+fields) so the next `forte cloud init` registers a new project.
 
 ## cron.yaml (optional)
 

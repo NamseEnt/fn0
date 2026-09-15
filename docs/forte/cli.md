@@ -120,7 +120,7 @@ fn0's control plane removes the routing, bundles, assets, and database and empti
 
 The three buckets are left standing (empty) unless `--delete-buckets` is passed — deleting a bucket needs a token minted from the setup token, so only the broker can do it, and only once control has emptied it. The command waits for the fn0-side teardown before revoking project credentials. A bucket that is not empty yet is reported as pending, and `Forte.toml` remains intact for a later retry.
 
-On success the `project_id`, `project_name`, `zone`, `domain`, and `origin_hostname` keys are removed from `Forte.toml` (all other keys and formatting are preserved), so the next `forte cloud init` registers a new project. If either side of teardown fails or times out, the command returns the error and leaves `Forte.toml` unchanged so the cleanup can be retried.
+On success all seven Cloudflare and project keys — `project_id`, `project_name`, `zone`, `domain`, `origin_hostname`, `cloudflare_account_id`, and `cloudflare_broker_url` — are removed from `Forte.toml` (all other keys and formatting are preserved), so the next `forte cloud init` registers a new project. If either side of teardown fails or times out, the command returns the error and leaves `Forte.toml` unchanged so the cleanup can be retried.
 
 ```sh
 forte destroy

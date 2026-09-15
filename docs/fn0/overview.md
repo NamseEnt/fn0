@@ -59,12 +59,12 @@ that require it. Request and response streaming is implemented end to end; see
 
 | Package | Version | Description |
 |---|---|---|
-| `fn0` | 0.6.9 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
-| `fn0-cli` | 0.1.20 | Local development CLI |
-| `fn0-worker` | 0.4.14 | Worker binary (distributed execution node) |
+| `fn0` | 0.7.0 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
+| `fn0-cli` | 0.1.21 | Local development CLI |
+| `fn0-worker` | 0.4.16 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.8 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.1 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
-| `fn0-deploy` | 0.3.3 | fn0 Cloud deployment client |
+| `fn0-deploy` | 0.3.4 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.2.1 | Wasmtime wrapper with fn0-specific config |
 | `fn0-ski` | 0.1.12 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | CLI tool: compiles `.wasm` → `.cwasm` (Wasmtime pre-compiled native format); used internally by the platform |
