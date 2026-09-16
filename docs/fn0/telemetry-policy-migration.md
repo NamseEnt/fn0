@@ -48,7 +48,14 @@ equal.
 3. Stop the old control writer, queue consumers, scheduled reconciliation, and
    any administrative writer of `ProjectDoc`. Confirm from process and queue
    telemetry that no old writer can continue to commit during migration.
-4. Keep an authenticated read-only observation path available for the
+4. Freeze direct Signy policy mutations for every target project as well:
+   generic operator/admin retention PUTs, project-policy PUTs outside the
+   migration or control outbox path, and policy-changing admin jobs. Also
+   freeze uncoordinated access-fence changes. The migration's unchanged
+   ownership claim and the later control outbox delivery are the only allowed
+   Signy mutations in this window; an operator must not change Signy directly
+   between target capture and semantic verification.
+5. Keep an authenticated read-only observation path available for the
    database, Signy, outbox, deletion tombstones, and migration exceptions.
    Do not modify data during this check.
 
@@ -204,13 +211,27 @@ migration build or a newer build, with writers still frozen:
 - an optimistic transaction conflict: reread the latest ProjectDoc and rerun;
   the migration must never move its revision backward.
 
-Do not resume the old writer after any migration write. A rollback is allowed
-only to a control build that can read and preserve the required policy field,
-outbox documents, and unknown future fields without dropping them. Never
-restore a database snapshot that predates a migrated ProjectDoc, send a lower
+Before any target tenant is claimed as project-managed and before any legacy
+ProjectDoc receives the required policy field, the old control version may be
+used for rollback, provided no other migration write has occurred. Once either
+the project-managed Signy ownership transition or a required policy document
+write has occurred for any target, rollback is restricted to a control build
+that understands the new schema, outbox records, revisions, generation/access
+fences, and project-managed Signy ownership. A writer that does not know the
+new field must not be restarted, even if it can read the rest of the document.
+
+Do not resume the old writer after any migration write. A compatible rollback
+must preserve the required policy field, outbox documents, and unknown future
+fields without dropping them. Failed outbox delivery resumes with the same
+ProjectDoc revision; failed access revoke resumes with the same deletion
+generation/fence. Both are safe to retry because Signy treats the same policy
+body/revision as idempotent and the same revoke generation as idempotent.
+
+Rollback must not change retention, delete a policy, purge telemetry, lower a
 Signy revision, lower a deletion fence, or use a generic PUT to undo a project
-claim. If the new control image fails after migration, keep the migrated
-database frozen and redeploy the same compatible build or a newer one.
+claim. Never restore a database snapshot that predates a migrated ProjectDoc.
+If the new control image fails after migration, keep the migrated database
+frozen and redeploy the same compatible build or a newer one.
 
 ## Completion and observation
 
