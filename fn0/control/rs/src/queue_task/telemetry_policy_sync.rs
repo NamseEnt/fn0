@@ -161,9 +161,11 @@ async fn finish_attempt(
                 else {
                     return trx.commit(false);
                 };
-                if outbox.policy_revision != revision
-                    || project.telemetry_policy.revision != revision
-                {
+                if !attempt_matches_current_policy(
+                    outbox.policy_revision,
+                    project.telemetry_policy.revision,
+                    revision,
+                ) {
                     return trx.commit(false);
                 }
                 outbox.state = if error.is_some() {
@@ -184,5 +186,30 @@ async fn finish_attempt(
             anyhow::bail!("finish telemetry policy attempt conflict: {error:?}")
         }
         doc_db::TrxResult::Err(error) => Err(error),
+    }
+}
+
+fn attempt_matches_current_policy(
+    outbox_revision: u64,
+    project_revision: u64,
+    attempted_revision: u64,
+) -> bool {
+    outbox_revision == attempted_revision && project_revision == attempted_revision
+}
+
+#[cfg(test)]
+mod tests {
+    use super::attempt_matches_current_policy;
+
+    #[test]
+    fn an_old_attempt_cannot_finalize_a_newer_project_policy() {
+        assert!(!attempt_matches_current_policy(2, 2, 1));
+        assert!(!attempt_matches_current_policy(1, 2, 1));
+        assert!(attempt_matches_current_policy(2, 2, 2));
+    }
+
+    #[test]
+    fn an_outbox_ahead_of_the_project_is_not_claimed_by_an_old_attempt() {
+        assert!(!attempt_matches_current_policy(3, 2, 2));
     }
 }
