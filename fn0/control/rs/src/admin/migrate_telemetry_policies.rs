@@ -88,6 +88,12 @@ pub async fn handle(Input: Input) -> anyhow::Result<()> {
             // revision (0 -> 1) and policies that an operator pushed after
             // the revision field was introduced (N -> N+1).
             policy.revision = policy.revision.saturating_add(1).max(1);
+            // Claim the unchanged values before ProjectDoc is written. Once
+            // this succeeds, the generic operator PUT cannot mutate this
+            // tenant and the normal outbox retry can safely resend the same
+            // revision. The migration changes only revision metadata; all
+            // retention and storage values came from Signy above.
+            signy_tenant::register_project(&project_id, &policy).await?;
             value["telemetry_policy"] = serde_json::to_value(&policy)?;
             db.put(pk, sk, &serde_json::to_vec(&value)?).await?;
             (TelemetryPolicyOutboxDocPut(TelemetryPolicyOutboxDoc {
