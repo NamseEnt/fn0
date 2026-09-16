@@ -53,9 +53,13 @@ pub struct ProjectDoc {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TelemetryPolicy {
     pub revision: u64,
-    pub log_retention: String,
-    pub trace_retention: String,
-    pub metric_retention: String,
+    /// The tenant-level retention. A signal without an override inherits it.
+    pub base_retention: String,
+    /// `None` is meaningful: it preserves Signy's signal inheritance rather
+    /// than materialising the current effective value.
+    pub log_retention_override: Option<String>,
+    pub trace_retention_override: Option<String>,
+    pub metric_retention_override: Option<String>,
     pub max_stored_bytes: String,
 }
 
@@ -76,6 +80,10 @@ pub struct TelemetryPolicyOutboxDoc {
     pub state: TelemetryPolicySyncState,
     pub attempts: u64,
     pub last_error: Option<String>,
+    /// The first time the current pending cycle was observed. This is kept
+    /// separately from `updated_at`, which changes on every retry.
+    #[serde(default)]
+    pub pending_since: Option<DateTime>,
     pub updated_at: DateTime,
 }
 
@@ -93,6 +101,10 @@ pub struct ProjectDeletionDoc {
     pub project_id: String,
     pub fence: u64,
     pub state: ProjectDeletionState,
+    /// The start of the durable revoke-pending interval, independent of retry
+    /// updates to `updated_at`.
+    #[serde(default)]
+    pub revoke_pending_since: Option<DateTime>,
     pub updated_at: DateTime,
     pub last_error: Option<String>,
 }

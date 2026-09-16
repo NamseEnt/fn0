@@ -1,8 +1,8 @@
 use crate::actions::bundle_gc;
 use crate::actions::zombie_sweep;
 use crate::common::admin;
-use crate::common::signy_tenant;
 use crate::common::websocket_directory_gc;
+use crate::common::{signy_tenant, telemetry_policy_metrics};
 use crate::docs::*;
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -205,6 +205,12 @@ async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStat
     let db = doc_db::turso();
     let mut after: Option<(String, String)> = None;
     let mut requeued_records = 0;
+    let mut pending = 0_u64;
+    let mut oldest_pending_age_seconds = 0_u64;
+    let mut revoke_pending = 0_u64;
+    let mut oldest_revoke_pending_age_seconds = 0_u64;
+    let mut migration_exceptions = 0_u64;
+    let current_time = now();
     loop {
         let page = db
             .scan(
@@ -225,6 +231,14 @@ async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStat
                     }
                 };
                 if tombstone.state != ProjectDeletionState::TeardownComplete {
+                    if tombstone.state == ProjectDeletionState::RevokePending {
+                        revoke_pending += 1;
+                        let pending_since = tombstone
+                            .revoke_pending_since
+                            .unwrap_or(tombstone.updated_at);
+                        oldest_revoke_pending_age_seconds = oldest_revoke_pending_age_seconds
+                            .max((current_time - pending_since).num_seconds().max(0) as u64);
+                    }
                     match crate::enqueue::project_teardown(
                         crate::queue_task::project_teardown::Input {
                             project_id: tombstone.project_id.clone(),
@@ -240,6 +254,10 @@ async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStat
                         ),
                     }
                 }
+                continue;
+            }
+            if pk.starts_with("TelemetryPolicyMigrationExceptionDoc/") {
+                migration_exceptions += 1;
                 continue;
             }
             if !pk.starts_with("TelemetryPolicyOutboxDoc/") {
@@ -258,6 +276,10 @@ async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStat
             ) {
                 continue;
             }
+            pending += 1;
+            let pending_since = outbox.pending_since.unwrap_or(outbox.updated_at);
+            oldest_pending_age_seconds = oldest_pending_age_seconds
+                .max((current_time - pending_since).num_seconds().max(0) as u64);
             match crate::enqueue::telemetry_policy_sync(
                 crate::queue_task::telemetry_policy_sync::Input {
                     project_id: outbox.project_id.clone(),
@@ -265,7 +287,10 @@ async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStat
             )
             .await
             {
-                Ok(()) => requeued_records += 1,
+                Ok(()) => {
+                    requeued_records += 1;
+                    telemetry_policy_metrics::enqueue_correction();
+                }
                 Err(error) => tracing::error!(
                     project_id = %outbox.project_id,
                     %error,
@@ -278,6 +303,13 @@ async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStat
         };
         after = Some((pk.clone(), sk.clone()));
     }
+    telemetry_policy_metrics::record_state(
+        pending,
+        oldest_pending_age_seconds,
+        revoke_pending,
+        oldest_revoke_pending_age_seconds,
+        migration_exceptions,
+    );
     Ok(signy_tenant::ReconcileStats { requeued_records })
 }
 

@@ -75,6 +75,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     state: TelemetryPolicySyncState::Pending,
                     attempts: 0,
                     last_error: None,
+                    pending_since: Some(now),
                     updated_at: now,
                 })?;
                 trx.commit::<_, ()>(())
@@ -113,9 +114,10 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 fn selected_telemetry_policy() -> TelemetryPolicy {
     TelemetryPolicy {
         revision: 1,
-        log_retention: "30d".to_string(),
-        trace_retention: "30d".to_string(),
-        metric_retention: "30d".to_string(),
+        base_retention: "30d".to_string(),
+        log_retention_override: None,
+        trace_retention_override: None,
+        metric_retention_override: None,
         max_stored_bytes: "512MiB".to_string(),
     }
 }
@@ -144,9 +146,10 @@ mod tests {
     fn new_projects_store_the_concrete_control_selected_policy() {
         let policy = selected_telemetry_policy();
         assert_eq!(policy.revision, 1);
-        assert_eq!(policy.log_retention, "30d");
-        assert_eq!(policy.trace_retention, "30d");
-        assert_eq!(policy.metric_retention, "30d");
+        assert_eq!(policy.base_retention, "30d");
+        assert_eq!(policy.log_retention_override, None);
+        assert_eq!(policy.trace_retention_override, None);
+        assert_eq!(policy.metric_retention_override, None);
         assert_eq!(policy.max_stored_bytes, "512MiB");
     }
 }

@@ -96,9 +96,10 @@ mod tests {
     fn telemetry_policy() -> TelemetryPolicy {
         TelemetryPolicy {
             revision: 1,
-            log_retention: "30d".to_string(),
-            trace_retention: "30d".to_string(),
-            metric_retention: "30d".to_string(),
+            base_retention: "30d".to_string(),
+            log_retention_override: None,
+            trace_retention_override: None,
+            metric_retention_override: None,
             max_stored_bytes: "512MiB".to_string(),
         }
     }

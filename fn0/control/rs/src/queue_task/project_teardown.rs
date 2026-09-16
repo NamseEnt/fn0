@@ -43,6 +43,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         }
         let mut revoked = tombstone.clone();
         revoked.state = ProjectDeletionState::AccessRevoked;
+        revoked.revoke_pending_since = None;
         revoked.last_error = None;
         revoked.updated_at = now;
         (ProjectDeletionDocPut(revoked.clone()))
@@ -68,6 +69,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         project_id: project_id.clone(),
         fence: tombstone.fence,
         state: ProjectDeletionState::TeardownComplete,
+        revoke_pending_since: None,
         updated_at: now,
         last_error: None,
     }))
@@ -90,6 +92,7 @@ async fn ensure_revoke_pending(
         project_id: project_id.to_string(),
         fence: 1,
         state: ProjectDeletionState::RevokePending,
+        revoke_pending_since: Some(now),
         updated_at: now,
         last_error: None,
     };
@@ -106,6 +109,7 @@ async fn record_revoke_failure(
 ) -> anyhow::Result<()> {
     let mut failed = tombstone.clone();
     failed.state = ProjectDeletionState::RevokePending;
+    failed.revoke_pending_since = failed.revoke_pending_since.or(Some(now()));
     failed.last_error = Some(error);
     failed.updated_at = now();
     (ProjectDeletionDocPut(failed)).send_with(db).await?;

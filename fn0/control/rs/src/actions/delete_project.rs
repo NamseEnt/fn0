@@ -56,12 +56,14 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             return Output::InternalError;
         }
     };
+    let deletion_now = now();
     if deletion.is_none()
         && let Err(error) = (ProjectDeletionDocPut(ProjectDeletionDoc {
             project_id: req.body.project_id.clone(),
             fence: 1,
             state: ProjectDeletionState::RevokePending,
-            updated_at: now(),
+            revoke_pending_since: Some(deletion_now),
+            updated_at: deletion_now,
             last_error: None,
         }))
         .send_with(&db)

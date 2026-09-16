@@ -12,6 +12,12 @@ pub struct ReconcileStats {
     pub requeued_records: u64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PolicySyncResult {
+    Applied,
+    Stale,
+}
+
 #[derive(Deserialize)]
 struct TenantPolicyResponse {
     revision: u64,
@@ -63,34 +69,50 @@ impl SignyAdmin {
     }
 }
 
-pub async fn register_project(project_id: &str, policy: &TelemetryPolicy) -> anyhow::Result<()> {
+pub async fn register_project(
+    project_id: &str,
+    policy: &TelemetryPolicy,
+) -> anyhow::Result<PolicySyncResult> {
     let admin = SignyAdmin::from_env()?;
+    let requested_policy = serde_json::json!({
+        "revision": policy.revision,
+        "retention": policy.base_retention,
+        "log_retention": policy.log_retention_override,
+        "trace_retention": policy.trace_retention_override,
+        "metric_retention": policy.metric_retention_override,
+        "max_stored_bytes": policy.max_stored_bytes,
+    });
     let response: TenantPolicyResponse = serde_json::from_slice(
         &admin
             .send(
                 "PUT",
                 &format!("project-tenants/{project_id}/retention"),
-                serde_json::to_vec(&serde_json::json!({
-                    "revision": policy.revision,
-                    "retention": policy.log_retention,
-                    "log_retention": policy.log_retention,
-                    "trace_retention": policy.trace_retention,
-                    "metric_retention": policy.metric_retention,
-                    "max_stored_bytes": policy.max_stored_bytes,
-                }))?,
+                serde_json::to_vec(&requested_policy)?,
             )
             .await?,
     )?;
-    if response.revision != policy.revision
-        || response.retention != policy.log_retention
-        || response.max_stored_bytes.as_deref() != Some(policy.max_stored_bytes.as_str())
-        || response.log_retention.as_deref() != Some(policy.log_retention.as_str())
-        || response.trace_retention.as_deref() != Some(policy.trace_retention.as_str())
-        || response.metric_retention.as_deref() != Some(policy.metric_retention.as_str())
-    {
+    if response.revision < policy.revision {
+        anyhow::bail!(
+            "Signy returned revision {} older than ProjectDoc revision {}",
+            response.revision,
+            policy.revision
+        );
+    }
+    if response.revision > policy.revision {
+        return Ok(PolicySyncResult::Stale);
+    }
+    let response_policy = serde_json::json!({
+        "revision": response.revision,
+        "retention": response.retention,
+        "log_retention": response.log_retention,
+        "trace_retention": response.trace_retention,
+        "metric_retention": response.metric_retention,
+        "max_stored_bytes": response.max_stored_bytes,
+    });
+    if response_policy != requested_policy {
         anyhow::bail!("Signy returned a policy different from ProjectDoc");
     }
-    Ok(())
+    Ok(PolicySyncResult::Applied)
 }
 
 /// Reads the policy already registered in Signy for migration. Missing
@@ -120,12 +142,12 @@ pub async fn read_policy(project_id: &str) -> anyhow::Result<Option<TelemetryPol
         );
     }
     let response: TenantPolicyResponse = serde_json::from_slice(&body)?;
-    let base = response.retention;
     Ok(Some(TelemetryPolicy {
         revision: response.revision,
-        log_retention: response.log_retention.unwrap_or_else(|| base.clone()),
-        trace_retention: response.trace_retention.unwrap_or_else(|| base.clone()),
-        metric_retention: response.metric_retention.unwrap_or(base),
+        base_retention: response.retention,
+        log_retention_override: response.log_retention,
+        trace_retention_override: response.trace_retention,
+        metric_retention_override: response.metric_retention,
         max_stored_bytes: response
             .max_stored_bytes
             .unwrap_or_else(|| "unlimited".to_string()),
