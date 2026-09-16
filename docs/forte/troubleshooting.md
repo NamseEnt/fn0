@@ -164,9 +164,11 @@ rm -rf .forte/data/objects/
 `forte deploy` needs you to be authenticated:
 
 ```sh
-forte login      # opens browser for PKCE flow
+forte login
 forte deploy
 ```
+
+Copy the URL printed by `forte login` into any browser, approve access, and paste the one-time code into the CLI prompt.
 
 ### Environment variables not available in production
 

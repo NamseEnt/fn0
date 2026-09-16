@@ -6,7 +6,7 @@ import { callAction } from "@forte/react";
 const InputSchema = z.object({
     code: z.string(),
     codeVerifier: z.string(),
-    redirectUri: z.string(),
+    redirectUri: z.string().optional(),
   });
 
 const OutputSchema = z.discriminatedUnion("t", [

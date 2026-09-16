@@ -1,23 +1,15 @@
 use anyhow::{Result, anyhow};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use inquire::Password;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
 use std::process::Command;
-use std::time::Duration;
 
-const PKCE_TIMEOUT_SECS: u64 = 300;
+const RESPONSE_MODE: &str = "code";
 
 pub async fn login_pkce(control_url: &str) -> Result<String> {
-    let listener = TcpListener::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)))?;
-    let local_addr = listener.local_addr()?;
-    let port = local_addr.port();
-    listener.set_nonblocking(false)?;
-
     let mut verifier_bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut verifier_bytes);
     let code_verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
@@ -25,58 +17,51 @@ pub async fn login_pkce(control_url: &str) -> Result<String> {
     hasher.update(code_verifier.as_bytes());
     let code_challenge = URL_SAFE_NO_PAD.encode(hasher.finalize());
 
-    let mut state_bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut state_bytes);
-    let state = URL_SAFE_NO_PAD.encode(state_bytes);
-
     let label = hostname::get()
         .ok()
-        .and_then(|h| h.into_string().ok())
+        .and_then(|host| host.into_string().ok())
         .unwrap_or_else(|| "cli".to_string());
 
-    let redirect_uri = format!("http://127.0.0.1:{port}/callback");
     let trimmed_control = control_url.trim_end_matches('/');
-    let authorize_url = format!(
-        "{trimmed_control}/oauth/cli/authorize?redirect_uri={}&code_challenge={}&code_challenge_method=S256&state={}&label={}",
-        urlencoding::encode(&redirect_uri),
-        urlencoding::encode(&code_challenge),
-        urlencoding::encode(&state),
-        urlencoding::encode(&label),
-    );
+    let authorize_url = build_authorize_url(trimmed_control, &code_challenge, &label);
 
-    println!("Opening {authorize_url}");
-    if let Err(err) = open_browser(&authorize_url) {
-        eprintln!("(could not auto-open browser: {err}; open the URL manually)");
+    println!("Open this URL in any browser:\n\n{authorize_url}");
+    if should_open_browser()
+        && let Err(error) = open_browser(&authorize_url)
+    {
+        eprintln!("Could not open a browser automatically: {error}");
     }
     println!();
-    println!("Waiting for browser approval (timeout {PKCE_TIMEOUT_SECS}s)…");
-
-    let callback = tokio::task::spawn_blocking(move || -> Result<CallbackParams> {
-        listener.set_nonblocking(false)?;
-        let (mut stream, _peer) = listener.accept()?;
-        stream.set_read_timeout(Some(Duration::from_secs(PKCE_TIMEOUT_SECS)))?;
-        stream.set_write_timeout(Some(Duration::from_secs(10)))?;
-        let params = read_callback_params(&mut stream)?;
-        write_callback_response(&mut stream, &params)?;
-        Ok(params)
-    });
-
-    let callback = tokio::time::timeout(Duration::from_secs(PKCE_TIMEOUT_SECS), callback)
-        .await
-        .map_err(|_| anyhow!("timed out waiting for browser callback"))?
-        .map_err(|e| anyhow!("callback task panicked: {e}"))??;
-
-    if callback.state != state {
-        return Err(anyhow!(
-            "state mismatch in browser callback (possible CSRF)"
-        ));
+    println!(
+        "After approval, copy the one-time authorization code here. It expires in five minutes."
+    );
+    let code = Password::new("Authorization code")
+        .without_confirmation()
+        .prompt()?;
+    let code = code.trim();
+    if code.is_empty() {
+        return Err(anyhow!("authorization code cannot be empty"));
     }
 
-    let exchange_url = format!("{trimmed_control}/__forte_action/oauth_cli_exchange");
+    exchange_code(trimmed_control, code, &code_verifier).await
+}
+
+fn build_authorize_url(control_url: &str, code_challenge: &str, label: &str) -> String {
+    format!(
+        "{control_url}/oauth/cli/authorize?response_mode={RESPONSE_MODE}&code_challenge={}&code_challenge_method=S256&label={}",
+        urlencoding::encode(code_challenge),
+        urlencoding::encode(label),
+    )
+}
+
+async fn exchange_code(control_url: &str, code: &str, code_verifier: &str) -> Result<String> {
+    let exchange_url = format!(
+        "{}/__forte_action/oauth_cli_exchange",
+        control_url.trim_end_matches('/')
+    );
     let exchange_body = ExchangeInput {
-        code: callback.code,
-        code_verifier,
-        redirect_uri,
+        code: code.to_string(),
+        code_verifier: code_verifier.to_string(),
     };
     let resp = reqwest::Client::new()
         .post(&exchange_url)
@@ -94,79 +79,38 @@ pub async fn login_pkce(control_url: &str) -> Result<String> {
     }
 }
 
-fn open_browser(url: &str) -> Result<()> {
-    let cmd = if cfg!(target_os = "macos") {
-        "open"
-    } else if cfg!(target_os = "windows") {
-        "cmd"
-    } else {
-        "xdg-open"
-    };
-    let mut command = Command::new(cmd);
-    if cfg!(target_os = "windows") {
-        command.args(["/C", "start", "", url]);
-    } else {
-        command.arg(url);
+fn should_open_browser() -> bool {
+    if std::env::var_os("SSH_CONNECTION").is_some()
+        || std::env::var_os("SSH_TTY").is_some()
+        || std::env::var_os("CI").is_some()
+    {
+        return false;
     }
-    let status = command.spawn()?.wait()?;
+    if cfg!(target_os = "linux") {
+        return std::env::var_os("DISPLAY").is_some()
+            || std::env::var_os("WAYLAND_DISPLAY").is_some();
+    }
+    true
+}
+
+fn open_browser(url: &str) -> Result<()> {
+    let mut command = if cfg!(target_os = "macos") {
+        let mut command = Command::new("open");
+        command.arg(url);
+        command
+    } else if cfg!(target_os = "windows") {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "start", "", url]);
+        command
+    } else {
+        let mut command = Command::new("xdg-open");
+        command.arg(url);
+        command
+    };
+    let status = command.status()?;
     if !status.success() {
         return Err(anyhow!("browser open command exited with {status}"));
     }
-    Ok(())
-}
-
-struct CallbackParams {
-    code: String,
-    state: String,
-}
-
-fn read_callback_params(stream: &mut TcpStream) -> Result<CallbackParams> {
-    let mut buf = [0u8; 4096];
-    let n = stream.read(&mut buf)?;
-    if n == 0 {
-        return Err(anyhow!("empty callback request"));
-    }
-    let request_text =
-        std::str::from_utf8(&buf[..n]).map_err(|_| anyhow!("non-utf8 callback request"))?;
-    let request_line = request_text
-        .lines()
-        .next()
-        .ok_or_else(|| anyhow!("missing request line"))?;
-    let path_and_query = request_line
-        .split_whitespace()
-        .nth(1)
-        .ok_or_else(|| anyhow!("malformed request line"))?;
-    let query = path_and_query
-        .split_once('?')
-        .map(|x| x.1)
-        .ok_or_else(|| anyhow!("missing query string in callback"))?;
-    let mut params: HashMap<String, String> = HashMap::new();
-    for pair in query.split('&') {
-        if let Some((k, v)) = pair.split_once('=') {
-            let decoded_value = urlencoding::decode(v)
-                .map_err(|e| anyhow!("invalid url-encoded value: {e}"))?
-                .into_owned();
-            params.insert(k.to_string(), decoded_value);
-        }
-    }
-    let code = params
-        .remove("code")
-        .ok_or_else(|| anyhow!("callback missing `code` parameter"))?;
-    let state = params
-        .remove("state")
-        .ok_or_else(|| anyhow!("callback missing `state` parameter"))?;
-    Ok(CallbackParams { code, state })
-}
-
-fn write_callback_response(stream: &mut TcpStream, _params: &CallbackParams) -> Result<()> {
-    let body = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>fn0 CLI login</title></head><body style=\"font-family:system-ui;max-width:420px;margin:3rem auto\"><h1>Authorized.</h1><p>You can close this tab and return to the terminal.</p></body></html>";
-    let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        body.len(),
-        body,
-    );
-    stream.write_all(response.as_bytes())?;
-    stream.flush()?;
     Ok(())
 }
 
@@ -174,7 +118,6 @@ fn write_callback_response(stream: &mut TcpStream, _params: &CallbackParams) -> 
 struct ExchangeInput {
     code: String,
     code_verifier: String,
-    redirect_uri: String,
 }
 
 #[derive(Deserialize)]
@@ -183,4 +126,46 @@ enum ExchangeOutput {
     Ok { token: String },
     InvalidGrant { message: String },
     Error { message: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_authorize_url, exchange_code};
+    use serde_json::json;
+    use wiremock::matchers::{body_json, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[test]
+    fn authorize_url_uses_manual_code_mode_without_a_loopback_callback() {
+        let url = build_authorize_url("https://fn0.dev", "challenge", "remote-cli");
+        assert!(url.contains("response_mode=code"));
+        assert!(url.contains("code_challenge=challenge"));
+        assert!(!url.contains("redirect_uri="));
+        assert!(!url.contains("state="));
+    }
+
+    #[tokio::test]
+    async fn exchange_sends_only_code_and_verifier() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/__forte_action/oauth_cli_exchange"))
+            .and(body_json(json!({
+                "code": "authorization-code",
+                "code_verifier": "code-verifier"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "t": "Ok",
+                "token": "fn0_test"
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let token = exchange_code(&server.uri(), "authorization-code", "code-verifier")
+            .await
+            .unwrap();
+        assert_eq!(token, "fn0_test");
+        server.verify().await;
+    }
 }

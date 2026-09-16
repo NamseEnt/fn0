@@ -81,7 +81,7 @@ The fn0 CLI (`fn0/cli`) provides tooling for projects deployed directly to fn0 w
 | `fn0 deploy` | Build and deploy to fn0 Cloud |
 | `fn0 destroy` | Delete the deployed project |
 | `fn0 rename <new-name>` | Rename the deployed project |
-| `fn0 login [token]` | Authenticate with fn0 Cloud |
+| `fn0 login [token]` | Authenticate with fn0 Cloud; interactive login uses a one-time browser code |
 | `fn0 admin run <task>` | Run an admin task against the deployed app |
 | `fn0 env set <key> <value> [--secret]` | Set an env entry (plain by default; `--secret` encrypts via vault and injects through vault_hijack at runtime) |
 | `fn0 env list` | List env entries with their kind (plain / secret) |

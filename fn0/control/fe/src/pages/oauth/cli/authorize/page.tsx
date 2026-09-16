@@ -6,6 +6,9 @@ export default function AuthorizeCliPage(props: Props) {
     const [label, setLabel] = useState(props.defaultLabel);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [authorizationCode, setAuthorizationCode] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+    const [showCode, setShowCode] = useState(false);
 
     async function onApprove(e: React.FormEvent) {
         e.preventDefault();
@@ -18,14 +21,22 @@ export default function AuthorizeCliPage(props: Props) {
         setBusy(true);
         setError(null);
         const res = await approveCliAuthorization({
-            redirectUri: props.redirectUri,
+            responseMode: props.manualCode ? "code" : undefined,
+            redirectUri: props.redirectUri ?? undefined,
             codeChallenge: props.codeChallenge,
             codeChallengeMethod: props.codeChallengeMethod,
-            state: props.state,
+            state: props.state ?? undefined,
             label: trimmed,
         });
         if (res.t === "Ok") {
-            window.location.replace(res.redirectTo);
+            if (res.redirectTo) {
+                window.location.replace(res.redirectTo);
+                return;
+            }
+            setAuthorizationCode(res.code);
+            setCopied(false);
+            setShowCode(false);
+            setBusy(false);
             return;
         }
         setBusy(false);
@@ -36,34 +47,71 @@ export default function AuthorizeCliPage(props: Props) {
         }
     }
 
-    function onCancel() {
-        window.location.replace("/");
+    async function onCopyCode() {
+        if (!authorizationCode) return;
+        try {
+            await navigator.clipboard.writeText(authorizationCode);
+            setCopied(true);
+            setError(null);
+        } catch {
+            setError("Could not copy the code. Use Show code and copy it manually.");
+        }
+    }
+
+    if (authorizationCode) {
+        return (
+            <div style={{ maxWidth: 540, margin: "3rem auto", fontFamily: "system-ui" }}>
+                <h1>Authorization approved</h1>
+                <p>Copy the one-time code and paste it into the waiting CLI prompt.</p>
+                <p>This code expires in five minutes and can be used only once.</p>
+                {showCode && (
+                    <code style={{ display: "block", wordBreak: "break-all", margin: "1rem 0" }}>
+                        {authorizationCode}
+                    </code>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" onClick={onCopyCode}>
+                        {copied ? "Copied" : "Copy one-time code"}
+                    </button>
+                    <button type="button" onClick={() => setShowCode((visible) => !visible)}>
+                        {showCode ? "Hide code" : "Show code"}
+                    </button>
+                </div>
+                {error && <p style={{ color: "crimson", marginTop: 16 }}>{error}</p>}
+            </div>
+        );
     }
 
     return (
         <div style={{ maxWidth: 540, margin: "3rem auto", fontFamily: "system-ui" }}>
             <h1>Authorize CLI</h1>
-            <p>
-                A CLI on this machine is requesting access to your fn0 account.
-            </p>
+            <p>A CLI is requesting access to your fn0 account.</p>
             <p>
                 Signed in as <strong>{props.githubLogin}</strong>.
             </p>
 
-            <div
-                style={{
-                    margin: "1rem 0",
-                    padding: 12,
-                    border: "1px solid #ddd",
-                    background: "#fafafa",
-                    fontSize: 14,
-                }}
-            >
-                <div style={{ marginBottom: 6 }}>
-                    <strong>Will redirect back to:</strong>
+            {!props.manualCode && props.redirectUri && (
+                <div
+                    style={{
+                        margin: "1rem 0",
+                        padding: 12,
+                        border: "1px solid #ddd",
+                        background: "#fafafa",
+                        fontSize: 14,
+                    }}
+                >
+                    <div style={{ marginBottom: 6 }}>
+                        <strong>Will redirect back to:</strong>
+                    </div>
+                    <code style={{ wordBreak: "break-all" }}>{props.redirectUri}</code>
                 </div>
-                <code style={{ wordBreak: "break-all" }}>{props.redirectUri}</code>
-            </div>
+            )}
+
+            {props.manualCode && (
+                <p>
+                    After approval, this page will provide a one-time code for the CLI.
+                </p>
+            )}
 
             <form onSubmit={onApprove}>
                 <label style={{ display: "block", marginBottom: 4 }}>
@@ -81,15 +129,13 @@ export default function AuthorizeCliPage(props: Props) {
                     <button type="submit" disabled={busy || !label.trim()}>
                         {busy ? "Authorizing…" : "Approve"}
                     </button>
-                    <button type="button" onClick={onCancel} disabled={busy}>
+                    <button type="button" onClick={() => window.location.replace("/")} disabled={busy}>
                         Cancel
                     </button>
                 </div>
             </form>
 
-            {error && (
-                <p style={{ color: "crimson", marginTop: 16 }}>{error}</p>
-            )}
+            {error && <p style={{ color: "crimson", marginTop: 16 }}>{error}</p>}
         </div>
     );
 }

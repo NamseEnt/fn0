@@ -4,10 +4,11 @@ import { z } from "zod";
 
 export const PropsSchema = z.object({
     githubLogin: z.string(),
-    redirectUri: z.string(),
+    manualCode: z.boolean(),
+    redirectUri: z.string().optional(),
     codeChallenge: z.string(),
     codeChallengeMethod: z.string(),
-    state: z.string(),
+    state: z.string().optional(),
     defaultLabel: z.string(),
   });
 

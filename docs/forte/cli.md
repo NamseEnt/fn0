@@ -251,10 +251,10 @@ Authenticate with fn0 Cloud using a PKCE OAuth flow and saves credentials locall
 | `--token <token>` | — | Provide token directly (skips interactive flow) |
 
 Default interactive flow:
-1. A loopback TCP listener is started on a random port.
-2. A PKCE authorization URL is printed and the browser is opened automatically (falls back to manual URL if auto-open fails).
-3. After you approve in the browser, the callback redirects to `http://127.0.0.1:<port>/callback`.
-4. The CLI exchanges the authorization code for a token and saves it locally.
+1. A PKCE authorization URL is printed and opened automatically when a browser is available. The URL can be opened manually on any computer.
+2. After you approve in the browser, copy the one-time authorization code shown by the consent page.
+3. Paste the code into the masked prompt in the CLI. The code expires after five minutes and can be used only once.
+4. The CLI exchanges the code and its PKCE verifier for a token and saves it locally.
 
 With `--token`, the interactive flow is skipped — the token is validated (must start with `fn0_`) and saved directly. Credentials are saved to a local file (path printed on success).
 

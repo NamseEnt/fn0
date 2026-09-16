@@ -9,19 +9,27 @@ const CODE_TTL_SECS: i64 = 300;
 
 #[derive(Deserialize)]
 pub struct Input {
-    pub redirect_uri: String,
+    pub response_mode: Option<String>,
+    pub redirect_uri: Option<String>,
     pub code_challenge: String,
     pub code_challenge_method: String,
-    pub state: String,
+    pub state: Option<String>,
     pub label: String,
 }
 
 #[derive(Serialize)]
 pub enum Output {
-    Ok { redirect_to: String },
+    Ok {
+        code: String,
+        redirect_to: Option<String>,
+    },
     NotLoggedIn,
-    InvalidRequest { message: String },
-    Error { message: String },
+    InvalidRequest {
+        message: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
@@ -29,6 +37,15 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotLoggedIn;
     };
 
+    let manual_code = match req.body.response_mode.as_deref() {
+        None => false,
+        Some("code") => true,
+        Some(_) => {
+            return Output::InvalidRequest {
+                message: "unsupported response_mode".to_string(),
+            };
+        }
+    };
     if req.body.code_challenge_method != "S256" {
         return Output::InvalidRequest {
             message: "code_challenge_method must be S256".to_string(),
@@ -39,11 +56,29 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             message: "code_challenge is required".to_string(),
         };
     }
-    if !auth::is_loopback_redirect(&req.body.redirect_uri) {
-        return Output::InvalidRequest {
-            message: "redirect_uri must be http loopback (127.0.0.1, localhost, or [::1])"
-                .to_string(),
+    if manual_code {
+        if req.body.redirect_uri.is_some() || req.body.state.is_some() {
+            return Output::InvalidRequest {
+                message: "manual code mode cannot include a redirect".to_string(),
+            };
+        }
+    } else {
+        let Some(redirect_uri) = req.body.redirect_uri.as_deref() else {
+            return Output::InvalidRequest {
+                message: "redirect_uri is required".to_string(),
+            };
         };
+        if !auth::is_loopback_redirect(redirect_uri) {
+            return Output::InvalidRequest {
+                message: "redirect_uri must be http loopback (127.0.0.1, localhost, or [::1])"
+                    .to_string(),
+            };
+        }
+        if req.body.state.as_deref().is_none_or(str::is_empty) {
+            return Output::InvalidRequest {
+                message: "state is required".to_string(),
+            };
+        }
     }
 
     let label = req.body.label.trim().to_string();
@@ -76,16 +111,18 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         };
     }
 
-    let query = form_urlencoded::Serializer::new(String::new())
-        .append_pair("code", &code)
-        .append_pair("state", &req.body.state)
-        .finish();
-    let separator = if req.body.redirect_uri.contains('?') {
-        '&'
+    let redirect_to = if manual_code {
+        None
     } else {
-        '?'
+        let redirect_uri = req.body.redirect_uri.as_deref().unwrap();
+        let state = req.body.state.as_deref().unwrap();
+        let query = form_urlencoded::Serializer::new(String::new())
+            .append_pair("code", &code)
+            .append_pair("state", state)
+            .finish();
+        let separator = if redirect_uri.contains('?') { '&' } else { '?' };
+        Some(format!("{}{}{}", redirect_uri, separator, query))
     };
-    let redirect_to = format!("{}{}{}", req.body.redirect_uri, separator, query);
 
-    Output::Ok { redirect_to }
+    Output::Ok { code, redirect_to }
 }

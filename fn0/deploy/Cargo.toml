@@ -1,6 +1,6 @@
 [package]
 name = "fn0-deploy"
-version = "0.3.4"
+version = "0.3.5"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -14,6 +14,7 @@ chrono = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
 hostname = "=0.4.1"
+inquire = { workspace = true }
 rand = { workspace = true }
 rcgen = { version = "=0.14.7", default-features = false, features = ["pem", "ring"] }
 reqwest = { workspace = true }

@@ -235,7 +235,7 @@ pub struct CliAuthorizationCodeDoc {
     pub code: String,
     pub github_id: i64,
     pub code_challenge: String,
-    pub redirect_uri: String,
+    pub redirect_uri: Option<String>,
     pub label: String,
     pub expires_at: DateTime,
 }

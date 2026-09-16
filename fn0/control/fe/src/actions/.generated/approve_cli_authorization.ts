@@ -4,17 +4,19 @@ import { z } from "zod";
 import { callAction } from "@forte/react";
 
 const InputSchema = z.object({
-    redirectUri: z.string(),
+    responseMode: z.string().optional(),
+    redirectUri: z.string().optional(),
     codeChallenge: z.string(),
     codeChallengeMethod: z.string(),
-    state: z.string(),
+    state: z.string().optional(),
     label: z.string(),
   });
 
 const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("Ok"),
-    redirectTo: z.string(),
+    code: z.string(),
+    redirectTo: z.string().optional(),
   }),
     z.object({
     t: z.literal("NotLoggedIn"),

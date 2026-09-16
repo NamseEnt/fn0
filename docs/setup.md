@@ -112,7 +112,7 @@ Deploying requires three steps the first time:
 forte login
 ```
 
-Opens a browser for PKCE OAuth, exchanges the code for a token, and saves credentials locally.
+Prints a PKCE authorization URL, accepts a one-time authorization code copied from the browser, and saves credentials locally. The browser and CLI can run on different computers, so this also works over SSH.
 
 **2. Connect your Cloudflare account:**
 
