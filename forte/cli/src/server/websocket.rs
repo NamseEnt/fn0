@@ -405,7 +405,7 @@ impl LocalWebSocketService {
             .insert(connection_id.clone(), entry);
         let service = self.clone();
         tokio::task::spawn_local(async move {
-            run_connection(
+            run_connection(LocalRunConnectionOptions {
                 service,
                 executor,
                 project_id,
@@ -416,7 +416,7 @@ impl LocalWebSocketService {
                 command_receiver,
                 control_receiver,
                 control_sender,
-            )
+            })
             .await;
         });
     }
@@ -492,18 +492,7 @@ impl WebSocketCommandDispatcher for LocalWebSocketDispatcher {
 
 struct OutboundExecutor;
 
-impl<Fut> hyper::rt::Executor<Fut> for OutboundExecutor
-where
-    Fut: Future + Send + 'static,
-    Fut::Output: Send + 'static,
-{
-    fn execute(&self, future: Fut) {
-        tokio::spawn(future);
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn run_connection<S>(
+struct LocalRunConnectionOptions<S> {
     service: LocalWebSocketService,
     executor: Rc<CodeExecutor<SimpleCache>>,
     project_id: String,
@@ -514,21 +503,57 @@ async fn run_connection<S>(
     command_receiver: mpsc::Receiver<SocketCommand>,
     control_receiver: mpsc::UnboundedReceiver<WriterControl>,
     control_sender: mpsc::UnboundedSender<WriterControl>,
-) where
+}
+
+struct LocalReadLoopOptions<S> {
+    executor: Rc<CodeExecutor<SimpleCache>>,
+    project_id: String,
+    connection_id: String,
+    route_uri: Uri,
+    reader: fastwebsockets::WebSocketRead<tokio::io::ReadHalf<S>>,
+    writer: SharedWriter<S>,
+    disconnect_info: Arc<Mutex<Option<DisconnectInfo>>>,
+    control_sender: mpsc::UnboundedSender<WriterControl>,
+}
+
+impl<Fut> hyper::rt::Executor<Fut> for OutboundExecutor
+where
+    Fut: Future + Send + 'static,
+    Fut::Output: Send + 'static,
+{
+    fn execute(&self, future: Fut) {
+        tokio::spawn(future);
+    }
+}
+
+async fn run_connection<S>(options: LocalRunConnectionOptions<S>)
+where
     S: AsyncRead + AsyncWrite + Unpin + 'static,
 {
+    let LocalRunConnectionOptions {
+        service,
+        executor,
+        project_id,
+        connection_id,
+        route_uri,
+        reader,
+        writer,
+        command_receiver,
+        control_receiver,
+        control_sender,
+    } = options;
     let disconnect_info = Arc::new(Mutex::new(None));
     let shared_writer = Arc::new(tokio::sync::Mutex::new(writer));
-    let mut reader_handle = tokio::task::spawn_local(read_loop(
-        executor.clone(),
-        project_id.clone(),
-        connection_id.clone(),
-        route_uri.clone(),
+    let mut reader_handle = tokio::task::spawn_local(read_loop(LocalReadLoopOptions {
+        executor: executor.clone(),
+        project_id: project_id.clone(),
+        connection_id: connection_id.clone(),
+        route_uri: route_uri.clone(),
         reader,
-        shared_writer.clone(),
-        disconnect_info.clone(),
+        writer: shared_writer.clone(),
+        disconnect_info: disconnect_info.clone(),
         control_sender,
-    ));
+    }));
     let mut writer_handle = tokio::task::spawn_local(write_loop(
         shared_writer,
         command_receiver,
@@ -562,19 +587,20 @@ async fn run_connection<S>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn read_loop<S>(
-    executor: Rc<CodeExecutor<SimpleCache>>,
-    project_id: String,
-    connection_id: String,
-    route_uri: Uri,
-    reader: fastwebsockets::WebSocketRead<tokio::io::ReadHalf<S>>,
-    writer: SharedWriter<S>,
-    disconnect_info: Arc<Mutex<Option<DisconnectInfo>>>,
-    control_sender: mpsc::UnboundedSender<WriterControl>,
-) where
+async fn read_loop<S>(options: LocalReadLoopOptions<S>)
+where
     S: AsyncRead + AsyncWrite + Unpin + 'static,
 {
+    let LocalReadLoopOptions {
+        executor,
+        project_id,
+        connection_id,
+        route_uri,
+        reader,
+        writer,
+        disconnect_info,
+        control_sender,
+    } = options;
     let mut reader = FragmentCollectorRead::new(reader);
     let mut send_control_frame = |frame: Frame<'static>| {
         let writer = writer.clone();

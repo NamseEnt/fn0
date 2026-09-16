@@ -3,8 +3,8 @@ mod discover;
 mod model;
 
 use codegen::{
-    generate_actions_mod, generate_admin_mod, generate_code, generate_fe_paths,
-    generate_queue_task_mod,
+    GenerateCodeOptions, generate_actions_mod, generate_admin_mod, generate_code,
+    generate_fe_paths, generate_queue_task_mod,
 };
 use discover::{
     discover_actions, discover_admin_tasks, discover_apis, discover_hooks, discover_pages,
@@ -65,16 +65,16 @@ pub fn generate_routes() {
     let has_ws_singleton = websockets
         .iter()
         .any(|websocket| matches!(websocket.direction, model::WebSocketDirection::Singleton));
-    let tokens = generate_code(
-        &pages,
-        &hooks,
-        &actions,
-        &queue_tasks,
-        &admin_tasks,
-        &static_files,
-        &websockets,
-        &wit_dir_str,
-    );
+    let tokens = generate_code(GenerateCodeOptions {
+        pages: &pages,
+        hooks: &hooks,
+        actions: &actions,
+        queue_tasks: &queue_tasks,
+        admin_tasks: &admin_tasks,
+        static_files: &static_files,
+        websockets: &websockets,
+        wit_dir: &wit_dir_str,
+    });
 
     let syntax_tree = syn::parse2::<syn::File>(tokens).expect("Failed to parse generated code");
     let pp_output = prettyplease::unparse(&syntax_tree);

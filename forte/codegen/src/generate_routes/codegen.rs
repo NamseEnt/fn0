@@ -3,17 +3,28 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::BTreeMap;
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn generate_code(
-    pages: &[PageInfo],
-    hooks: &[HookInfo],
-    actions: &[ActionInfo],
-    queue_tasks: &[QueueTaskInfo],
-    admin_tasks: &[AdminTaskInfo],
-    static_files: &[StaticFileInfo],
-    websockets: &[WebSocketRouteInfo],
-    wit_dir: &str,
-) -> TokenStream {
+pub(super) struct GenerateCodeOptions<'a> {
+    pub(super) pages: &'a [PageInfo],
+    pub(super) hooks: &'a [HookInfo],
+    pub(super) actions: &'a [ActionInfo],
+    pub(super) queue_tasks: &'a [QueueTaskInfo],
+    pub(super) admin_tasks: &'a [AdminTaskInfo],
+    pub(super) static_files: &'a [StaticFileInfo],
+    pub(super) websockets: &'a [WebSocketRouteInfo],
+    pub(super) wit_dir: &'a str,
+}
+
+pub(super) fn generate_code(options: GenerateCodeOptions<'_>) -> TokenStream {
+    let GenerateCodeOptions {
+        pages,
+        hooks,
+        actions,
+        queue_tasks,
+        admin_tasks,
+        static_files,
+        websockets,
+        wit_dir,
+    } = options;
     let mut all_module_decls: Vec<(String, TokenStream)> = Vec::new();
     for (name, ts) in generate_module_declarations(pages) {
         all_module_decls.push((name, ts));
@@ -119,13 +130,12 @@ pub(super) fn generate_code(
 
         #enqueue_module
 
-        #[allow(clippy::crate_in_macro_def)]
         mod proxy {
             forte_sdk::wit_bindgen::generate!({
                 inline: #proxy_world_inline,
                 path: #wit_dir,
                 world: "service-export",
-                default_bindings_module: "crate::route_generated::proxy",
+                default_bindings_module: "$crate::route_generated::proxy",
                 pub_export_macro: true,
                 features: ["clocks-timezone"],
                 with: {

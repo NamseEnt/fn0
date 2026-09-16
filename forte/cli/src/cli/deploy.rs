@@ -62,17 +62,17 @@ pub async fn run(project_dir: PathBuf) -> Result<()> {
     let cron_updated_at = chrono::Utc::now().to_rfc3339();
 
     let fe_dist = project_dir.join("fe/dist");
-    fn0_deploy::deploy_forte(
-        &creds.control_url,
-        &creds.token,
-        &project_id,
+    fn0_deploy::deploy_forte(fn0_deploy::ForteDeployOptions {
+        control_url: &creds.control_url,
+        token: &creds.token,
+        project_id: &project_id,
         code_version,
-        &fe_dist,
-        &bundle_path,
-        &jobs,
-        &cron_updated_at,
-        &websocket_singletons,
-    )
+        fe_dist_dir: &fe_dist,
+        bundle_tar_path: &bundle_path,
+        jobs: &jobs,
+        cron_updated_at: &cron_updated_at,
+        websocket_singletons: &websocket_singletons,
+    })
     .await?;
 
     let resolved = fn0_deploy::resolve_app_url(&project_id).await?;

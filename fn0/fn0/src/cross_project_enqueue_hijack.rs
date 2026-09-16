@@ -29,6 +29,17 @@ pub struct CrossProjectEnqueueMessage {
     pub payload: serde_json::Value,
 }
 
+pub struct CrossProjectEnqueueOciOptions {
+    pub placeholder_host: String,
+    pub allowed_caller_project_id: String,
+    pub queue_ocid: String,
+    pub messages_endpoint: String,
+    pub tenancy: String,
+    pub user: String,
+    pub fingerprint: String,
+    pub private_key_pem: String,
+}
+
 #[derive(Clone)]
 enum Backend {
     Oci {
@@ -78,17 +89,17 @@ pub(crate) enum HijackAction {
 }
 
 impl CrossProjectEnqueueHijack {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_oci(
-        placeholder_host: String,
-        allowed_caller_project_id: String,
-        queue_ocid: String,
-        messages_endpoint: String,
-        tenancy: String,
-        user: String,
-        fingerprint: String,
-        private_key_pem: String,
-    ) -> Result<Self> {
+    pub fn new_oci(options: CrossProjectEnqueueOciOptions) -> Result<Self> {
+        let CrossProjectEnqueueOciOptions {
+            placeholder_host,
+            allowed_caller_project_id,
+            queue_ocid,
+            messages_endpoint,
+            tenancy,
+            user,
+            fingerprint,
+            private_key_pem,
+        } = options;
         let messages_host = host_from_endpoint(&messages_endpoint)?;
 
         let provider: Arc<SimpleAuthProvider> = Arc::new(
@@ -161,7 +172,7 @@ impl CrossProjectEnqueueHijack {
                     .map_err(|e| anyhow::anyhow!("cross project enqueue private key utf8: {e}"))
             })?;
 
-        Self::new_oci(
+        Self::new_oci(CrossProjectEnqueueOciOptions {
             placeholder_host,
             allowed_caller_project_id,
             queue_ocid,
@@ -170,7 +181,7 @@ impl CrossProjectEnqueueHijack {
             user,
             fingerprint,
             private_key_pem,
-        )
+        })
     }
 
     pub fn placeholder_url(&self) -> String {

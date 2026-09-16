@@ -44,18 +44,29 @@ pub struct VaultHijack {
     signer: Arc<RequestSigner>,
 }
 
+pub struct VaultOciOptions {
+    pub placeholder_host: String,
+    pub crypto_endpoint: String,
+    pub allowed_project_id: String,
+    pub key_ocid: String,
+    pub tenancy: String,
+    pub user: String,
+    pub fingerprint: String,
+    pub private_key_pem: String,
+}
+
 impl VaultHijack {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        placeholder_host: String,
-        crypto_endpoint: String,
-        allowed_project_id: String,
-        key_ocid: String,
-        tenancy: String,
-        user: String,
-        fingerprint: String,
-        private_key_pem: String,
-    ) -> Result<Self> {
+    pub fn new(options: VaultOciOptions) -> Result<Self> {
+        let VaultOciOptions {
+            placeholder_host,
+            crypto_endpoint,
+            allowed_project_id,
+            key_ocid,
+            tenancy,
+            user,
+            fingerprint,
+            private_key_pem,
+        } = options;
         let crypto_host = host_from_endpoint(&crypto_endpoint)?;
 
         let provider: Arc<SimpleAuthProvider> = Arc::new(
@@ -105,7 +116,7 @@ impl VaultHijack {
                 String::from_utf8(b).map_err(|e| anyhow::anyhow!("vault private key utf8: {e}"))
             })?;
 
-        Self::new(
+        Self::new(VaultOciOptions {
             placeholder_host,
             crypto_endpoint,
             allowed_project_id,
@@ -114,7 +125,7 @@ impl VaultHijack {
             user,
             fingerprint,
             private_key_pem,
-        )
+        })
     }
 
     pub fn placeholder_url(&self) -> String {

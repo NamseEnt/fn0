@@ -128,10 +128,7 @@ fn route_logs(
             let mut records_by_tenant: BTreeMap<String, Vec<_>> = BTreeMap::new();
             for mut record in scope_logs.log_records {
                 let tenant_id = take_tenant(&mut record.attributes, platform_tenant_id);
-                records_by_tenant
-                    .entry(tenant_id)
-                    .or_default()
-                    .push(record);
+                records_by_tenant.entry(tenant_id).or_default().push(record);
             }
             for (tenant_id, log_records) in records_by_tenant {
                 by_tenant.entry(tenant_id).or_default().push(ScopeLogs {

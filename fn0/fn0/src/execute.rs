@@ -3,7 +3,8 @@ use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::public_storage_hijack::PublicStorageHijack;
 use crate::self_invoke::{
-    self, INVOCATION_CANCELLATION, INVOCATION_DEADLINE, SELF_HOST, SelfInvokeHooks, call_service,
+    self, INVOCATION_CANCELLATION, INVOCATION_DEADLINE, SELF_HOST, SelfInvokeHooks,
+    SelfInvokeHooksOptions, call_service,
 };
 use crate::static_page_cache_hijack::StaticPageCacheHijack;
 use crate::turso_hijack::TursoHijack;
@@ -133,27 +134,45 @@ pub fn spawn_epoch_ticker(engine: Engine) {
         .expect("failed to spawn epoch ticker thread");
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn build_store<C>(
-    engine: &Engine,
-    project_id: &str,
-    env_vars: &[(String, String)],
-    time_tracker: TimeTracker<C>,
-    is_timeout: Arc<AtomicBool>,
-    hooks: SelfInvokeHooks,
-    turso_hijack: Option<&TursoHijack>,
-    queue_hijack: Option<&crate::QueueHijack>,
-    cross_project_enqueue_hijack: Option<&crate::CrossProjectEnqueueHijack>,
-    cross_project_invoke_hijack: Option<&crate::CrossProjectInvokeHijack>,
-    vault_hijack: Option<&crate::VaultHijack>,
-    object_storage_hijack: Option<&ObjectStorageHijack>,
-    public_storage_hijack: Option<&PublicStorageHijack>,
-    static_page_cache_hijack: Option<&StaticPageCacheHijack>,
-    websocket_hijack: Option<&WebSocketHijack>,
-) -> Store<ClientState<C>>
+pub(crate) struct BuildStoreOptions<'a, C: Clock> {
+    pub(crate) engine: &'a Engine,
+    pub(crate) project_id: &'a str,
+    pub(crate) env_vars: &'a [(String, String)],
+    pub(crate) time_tracker: TimeTracker<C>,
+    pub(crate) is_timeout: Arc<AtomicBool>,
+    pub(crate) hooks: SelfInvokeHooks,
+    pub(crate) turso_hijack: Option<&'a TursoHijack>,
+    pub(crate) queue_hijack: Option<&'a crate::QueueHijack>,
+    pub(crate) cross_project_enqueue_hijack: Option<&'a crate::CrossProjectEnqueueHijack>,
+    pub(crate) cross_project_invoke_hijack: Option<&'a crate::CrossProjectInvokeHijack>,
+    pub(crate) vault_hijack: Option<&'a crate::VaultHijack>,
+    pub(crate) object_storage_hijack: Option<&'a ObjectStorageHijack>,
+    pub(crate) public_storage_hijack: Option<&'a PublicStorageHijack>,
+    pub(crate) static_page_cache_hijack: Option<&'a StaticPageCacheHijack>,
+    pub(crate) websocket_hijack: Option<&'a WebSocketHijack>,
+}
+
+pub(crate) fn build_store<C>(options: BuildStoreOptions<'_, C>) -> Store<ClientState<C>>
 where
     C: Clock,
 {
+    let BuildStoreOptions {
+        engine,
+        project_id,
+        env_vars,
+        time_tracker,
+        is_timeout,
+        hooks,
+        turso_hijack,
+        queue_hijack,
+        cross_project_enqueue_hijack,
+        cross_project_invoke_hijack,
+        vault_hijack,
+        object_storage_hijack,
+        public_storage_hijack,
+        static_page_cache_hijack,
+        websocket_hijack,
+    } = options;
     let wasi = {
         let mut builder = WasiCtx::builder();
         builder.stdout(make_tracing_stream(project_id.to_string(), false));
@@ -304,59 +323,78 @@ impl Injector for HeaderInjector<'_> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn run_wasm_instance_loop(
-    engine: &Engine,
-    bundle: Arc<Bundle>,
-    project_id: String,
-    self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
-    mut rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
-    turso_hijack: Option<Arc<TursoHijack>>,
-    otlp_hijack: Option<Arc<crate::OtlpHijack>>,
-    queue_hijack: Option<Arc<crate::QueueHijack>>,
-    cross_project_enqueue_hijack: Option<Arc<crate::CrossProjectEnqueueHijack>>,
-    cross_project_invoke_hijack: Option<Arc<crate::CrossProjectInvokeHijack>>,
-    vault_hijack: Option<Arc<crate::VaultHijack>>,
-    object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
-    public_storage_hijack: Option<Arc<PublicStorageHijack>>,
-    static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
-    websocket_hijack: Option<Arc<WebSocketHijack>>,
-    guest_outbound_http: Option<Arc<crate::GuestOutboundHttp>>,
-) -> Result<()> {
+pub(crate) struct WasmInstanceLoopOptions<'a> {
+    pub(crate) engine: &'a Engine,
+    pub(crate) bundle: Arc<Bundle>,
+    pub(crate) project_id: String,
+    pub(crate) self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
+    pub(crate) rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
+    pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
+    pub(crate) otlp_hijack: Option<Arc<crate::OtlpHijack>>,
+    pub(crate) queue_hijack: Option<Arc<crate::QueueHijack>>,
+    pub(crate) cross_project_enqueue_hijack: Option<Arc<crate::CrossProjectEnqueueHijack>>,
+    pub(crate) cross_project_invoke_hijack: Option<Arc<crate::CrossProjectInvokeHijack>>,
+    pub(crate) vault_hijack: Option<Arc<crate::VaultHijack>>,
+    pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+    pub(crate) public_storage_hijack: Option<Arc<crate::PublicStorageHijack>>,
+    pub(crate) static_page_cache_hijack: Option<Arc<crate::StaticPageCacheHijack>>,
+    pub(crate) websocket_hijack: Option<Arc<WebSocketHijack>>,
+    pub(crate) guest_outbound_http: Option<Arc<crate::GuestOutboundHttp>>,
+}
+
+pub(crate) async fn run_wasm_instance_loop(options: WasmInstanceLoopOptions<'_>) -> Result<()> {
+    let WasmInstanceLoopOptions {
+        engine,
+        bundle,
+        project_id,
+        self_invoke_sender,
+        mut rx,
+        turso_hijack,
+        otlp_hijack,
+        queue_hijack,
+        cross_project_enqueue_hijack,
+        cross_project_invoke_hijack,
+        vault_hijack,
+        object_storage_hijack,
+        public_storage_hijack,
+        static_page_cache_hijack,
+        websocket_hijack,
+        guest_outbound_http,
+    } = options;
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
 
-    let mut store = build_store(
+    let mut store = build_store(BuildStoreOptions {
         engine,
-        &project_id,
-        &bundle.env_vars,
-        time_tracker.clone(),
-        is_timeout.clone(),
-        SelfInvokeHooks::new(
-            project_id.clone(),
+        project_id: &project_id,
+        env_vars: &bundle.env_vars,
+        time_tracker: time_tracker.clone(),
+        is_timeout: is_timeout.clone(),
+        hooks: SelfInvokeHooks::new(SelfInvokeHooksOptions {
+            project_id: project_id.clone(),
             self_invoke_sender,
-            turso_hijack.clone(),
-            otlp_hijack.clone(),
-            queue_hijack.clone(),
-            cross_project_enqueue_hijack.clone(),
-            cross_project_invoke_hijack.clone(),
-            vault_hijack.clone(),
-            object_storage_hijack.clone(),
-            public_storage_hijack.clone(),
-            static_page_cache_hijack.clone(),
-            websocket_hijack.clone(),
+            turso_hijack: turso_hijack.clone(),
+            otlp_hijack: otlp_hijack.clone(),
+            queue_hijack: queue_hijack.clone(),
+            cross_project_enqueue_hijack: cross_project_enqueue_hijack.clone(),
+            cross_project_invoke_hijack: cross_project_invoke_hijack.clone(),
+            vault_hijack: vault_hijack.clone(),
+            object_storage_hijack: object_storage_hijack.clone(),
+            public_storage_hijack: public_storage_hijack.clone(),
+            static_page_cache_hijack: static_page_cache_hijack.clone(),
+            websocket_hijack: websocket_hijack.clone(),
             guest_outbound_http,
-        ),
-        turso_hijack.as_deref(),
-        queue_hijack.as_deref(),
-        cross_project_enqueue_hijack.as_deref(),
-        cross_project_invoke_hijack.as_deref(),
-        vault_hijack.as_deref(),
-        object_storage_hijack.as_deref(),
-        public_storage_hijack.as_deref(),
-        static_page_cache_hijack.as_deref(),
-        websocket_hijack.as_deref(),
-    );
+        }),
+        turso_hijack: turso_hijack.as_deref(),
+        queue_hijack: queue_hijack.as_deref(),
+        cross_project_enqueue_hijack: cross_project_enqueue_hijack.as_deref(),
+        cross_project_invoke_hijack: cross_project_invoke_hijack.as_deref(),
+        vault_hijack: vault_hijack.as_deref(),
+        object_storage_hijack: object_storage_hijack.as_deref(),
+        public_storage_hijack: public_storage_hijack.as_deref(),
+        static_page_cache_hijack: static_page_cache_hijack.as_deref(),
+        websocket_hijack: websocket_hijack.as_deref(),
+    });
 
     let instantiate_start = std::time::Instant::now();
     let service = bundle

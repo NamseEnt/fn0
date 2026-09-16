@@ -527,7 +527,7 @@ pub(crate) async fn retire_runtime_if_unchanged(
     let code_version = expected.code_version;
     let claim_token = expected.claim_token.clone();
     let connection_id = expected.connection_id.clone();
-    let lease_expires_at = expected.lease_expires_at.clone();
+    let lease_expires_at = expected.lease_expires_at;
     let result = db
         .trx(|trx| {
             let project_id = project_id.clone();

@@ -52,14 +52,16 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let lease_expires_at = current_time + chrono::Duration::seconds(LEASE_SECONDS);
     let accepted = match update_runtime_status(
         &db,
-        &req.body.project_id,
-        &req.body.singleton_id,
-        &req.body.claim_token,
-        &req.body.connection_id,
-        disconnected,
-        current_time,
-        lease_expires_at,
-        entry.code_version,
+        RuntimeStatusRequest {
+            project_id: &req.body.project_id,
+            singleton_id: &req.body.singleton_id,
+            claim_token: &req.body.claim_token,
+            connection_id: &req.body.connection_id,
+            disconnected,
+            current_time,
+            lease_expires_at,
+            active_code_version: entry.code_version,
+        },
     )
     .await
     {
@@ -69,8 +71,8 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     if !accepted {
         return Output::Ignored;
     }
-    if disconnected {
-        if let Err(error) = crate::enqueue::websocket_singleton_reconcile(
+    if disconnected
+        && let Err(error) = crate::enqueue::websocket_singleton_reconcile(
             crate::queue_task::websocket_singleton_reconcile::Input {
                 project_id: req.body.project_id.clone(),
                 code_version: entry.code_version,
@@ -78,25 +80,38 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             },
         )
         .await
-        {
-            tracing::error!(%error, "websocket singleton reconnect enqueue failed");
-            return Output::Error;
-        }
+    {
+        tracing::error!(%error, "websocket singleton reconnect enqueue failed");
+        return Output::Error;
     }
     Output::Ok
 }
 
-async fn update_runtime_status(
-    db: &doc_db::Database,
-    project_id: &str,
-    singleton_id: &str,
-    claim_token: &str,
-    connection_id: &str,
+struct RuntimeStatusRequest<'a> {
+    project_id: &'a str,
+    singleton_id: &'a str,
+    claim_token: &'a str,
+    connection_id: &'a str,
     disconnected: bool,
     current_time: DateTime,
     lease_expires_at: DateTime,
     active_code_version: u64,
+}
+
+async fn update_runtime_status(
+    db: &doc_db::Database,
+    request: RuntimeStatusRequest<'_>,
 ) -> anyhow::Result<bool> {
+    let RuntimeStatusRequest {
+        project_id,
+        singleton_id,
+        claim_token,
+        connection_id,
+        disconnected,
+        current_time,
+        lease_expires_at,
+        active_code_version,
+    } = request;
     let project_id = project_id.to_string();
     let singleton_id = singleton_id.to_string();
     let claim_token = claim_token.to_string();
@@ -129,10 +144,8 @@ async fn update_runtime_status(
                 if disconnected {
                     runtime.connection_id.clear();
                     runtime.state = WebSocketSingletonRuntimeState::Terminating;
-                } else {
-                    if lease_expires_at > runtime.lease_expires_at {
-                        runtime.lease_expires_at = lease_expires_at;
-                    }
+                } else if lease_expires_at > runtime.lease_expires_at {
+                    runtime.lease_expires_at = lease_expires_at;
                 }
                 trx.commit::<_, ()>(true)
             }
@@ -150,7 +163,7 @@ async fn update_runtime_status(
 
 #[cfg(test)]
 mod tests {
-    use super::update_runtime_status;
+    use super::{RuntimeStatusRequest, update_runtime_status};
     use crate::docs::{
         DbRequest, WebSocketSingletonRuntimeDoc, WebSocketSingletonRuntimeDocGet,
         WebSocketSingletonRuntimeDocPut, WebSocketSingletonRuntimeState,
@@ -176,14 +189,16 @@ mod tests {
             .unwrap();
             let accepted = update_runtime_status(
                 &db,
-                "project",
-                "feed",
-                "old-claim",
-                "old",
-                true,
-                now(),
-                lease_expires_at,
-                2,
+                RuntimeStatusRequest {
+                    project_id: "project",
+                    singleton_id: "feed",
+                    claim_token: "old-claim",
+                    connection_id: "old",
+                    disconnected: true,
+                    current_time: now(),
+                    lease_expires_at,
+                    active_code_version: 2,
+                },
             )
             .await
             .unwrap();
@@ -206,14 +221,16 @@ mod tests {
             let db = doc_db::memory();
             let accepted = update_runtime_status(
                 &db,
-                "project",
-                "feed",
-                "claim",
-                "connection",
-                true,
-                now(),
-                now() + chrono::Duration::seconds(60),
-                2,
+                RuntimeStatusRequest {
+                    project_id: "project",
+                    singleton_id: "feed",
+                    claim_token: "claim",
+                    connection_id: "connection",
+                    disconnected: true,
+                    current_time: now(),
+                    lease_expires_at: now() + chrono::Duration::seconds(60),
+                    active_code_version: 2,
+                },
             )
             .await
             .unwrap();
@@ -227,14 +244,16 @@ mod tests {
             let db = doc_db::memory();
             let accepted = update_runtime_status(
                 &db,
-                "project",
-                "feed",
-                "claim",
-                "connection",
-                false,
-                now(),
-                now() + chrono::Duration::seconds(60),
-                2,
+                RuntimeStatusRequest {
+                    project_id: "project",
+                    singleton_id: "feed",
+                    claim_token: "claim",
+                    connection_id: "connection",
+                    disconnected: false,
+                    current_time: now(),
+                    lease_expires_at: now() + chrono::Duration::seconds(60),
+                    active_code_version: 2,
+                },
             )
             .await
             .unwrap();
@@ -261,14 +280,16 @@ mod tests {
             .unwrap();
             let accepted = update_runtime_status(
                 &db,
-                "project",
-                "feed",
-                "claim",
-                "connection",
-                false,
-                now(),
-                now() + chrono::Duration::seconds(60),
-                2,
+                RuntimeStatusRequest {
+                    project_id: "project",
+                    singleton_id: "feed",
+                    claim_token: "claim",
+                    connection_id: "connection",
+                    disconnected: false,
+                    current_time: now(),
+                    lease_expires_at: now() + chrono::Duration::seconds(60),
+                    active_code_version: 2,
+                },
             )
             .await
             .unwrap();
@@ -304,14 +325,16 @@ mod tests {
             .unwrap();
             let accepted = update_runtime_status(
                 &db,
-                "project",
-                "feed",
-                "claim",
-                "connection",
-                false,
-                current_time,
-                current_time + chrono::Duration::seconds(60),
-                2,
+                RuntimeStatusRequest {
+                    project_id: "project",
+                    singleton_id: "feed",
+                    claim_token: "claim",
+                    connection_id: "connection",
+                    disconnected: false,
+                    current_time,
+                    lease_expires_at: current_time + chrono::Duration::seconds(60),
+                    active_code_version: 2,
+                },
             )
             .await
             .unwrap();
@@ -338,14 +361,16 @@ mod tests {
             .unwrap();
             let accepted = update_runtime_status(
                 &db,
-                "project",
-                "feed",
-                "claim",
-                "connection",
-                true,
-                now(),
-                lease_expires_at,
-                2,
+                RuntimeStatusRequest {
+                    project_id: "project",
+                    singleton_id: "feed",
+                    claim_token: "claim",
+                    connection_id: "connection",
+                    disconnected: true,
+                    current_time: now(),
+                    lease_expires_at,
+                    active_code_version: 2,
+                },
             )
             .await
             .unwrap();

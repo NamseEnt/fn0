@@ -463,8 +463,8 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
         let websocket_service = websocket_service.clone();
         let egress_budget = egress_budget.clone();
         async move {
-            if let Err(err) = run_user_server(
-                user_port,
+            if let Err(err) = run_user_server(UserServerOptions {
+                port: user_port,
                 worker_senders,
                 instance_count,
                 drain_flag,
@@ -473,7 +473,7 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
                 cert_resolver,
                 websocket_service,
                 egress_budget,
-            )
+            })
             .await
             {
                 tracing::error!(%err, "user server error");
@@ -539,8 +539,7 @@ fn build_cert_resolver() -> Result<SniCertResolver> {
     Ok(SniCertResolver::new(fallback))
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn run_user_server(
+struct UserServerOptions {
     port: u16,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     instance_count: Arc<AtomicU64>,
@@ -550,7 +549,20 @@ async fn run_user_server(
     cert_resolver: Arc<SniCertResolver>,
     websocket_service: Arc<websocket::WebSocketService>,
     egress_budget: Arc<dyn EgressBudget>,
-) -> Result<()> {
+}
+
+async fn run_user_server(options: UserServerOptions) -> Result<()> {
+    let UserServerOptions {
+        port,
+        worker_senders,
+        instance_count,
+        drain_flag,
+        cache,
+        apex_route,
+        cert_resolver,
+        websocket_service,
+        egress_budget,
+    } = options;
     let tls_acceptor = {
         let config = rustls::ServerConfig::builder()
             .with_no_client_auth()
@@ -613,7 +625,7 @@ async fn run_user_server(
                     let stream_budget = stream_budget.clone();
                     let egress_budget = egress_budget.clone();
                     async move {
-                        handle_user_request(
+                        handle_user_request(UserRequestOptions {
                             req,
                             worker_senders,
                             instance_count,
@@ -624,7 +636,7 @@ async fn run_user_server(
                             peer_addr,
                             stream_budget,
                             egress_budget,
-                        )
+                        })
                         .await
                     }
                 });
@@ -785,10 +797,11 @@ fn classify_failed_request(error: &anyhow::Error, body_too_large: bool) -> Faile
     }) {
         return FailedRequest::NotDeployed;
     }
-    if error
-        .chain()
-        .any(|cause| cause.downcast_ref::<fn0::RequestDeadlineExceeded>().is_some())
-    {
+    if error.chain().any(|cause| {
+        cause
+            .downcast_ref::<fn0::RequestDeadlineExceeded>()
+            .is_some()
+    }) {
         return FailedRequest::DeadlineExceeded;
     }
     FailedRequest::BadGateway
@@ -1293,9 +1306,8 @@ fn egress_quota_exhausted_response() -> HyperResponse {
         .unwrap()
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn handle_user_request(
-    mut req: hyper::Request<hyper::body::Incoming>,
+struct UserRequestOptions {
+    req: hyper::Request<hyper::body::Incoming>,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
     instance_count: Arc<AtomicU64>,
     drain_flag: Arc<AtomicBool>,
@@ -1305,7 +1317,23 @@ async fn handle_user_request(
     peer_addr: SocketAddr,
     stream_budget: Arc<Semaphore>,
     egress_budget: Arc<dyn EgressBudget>,
+}
+
+async fn handle_user_request(
+    options: UserRequestOptions,
 ) -> std::result::Result<HyperResponse, anyhow::Error> {
+    let UserRequestOptions {
+        mut req,
+        worker_senders,
+        instance_count,
+        drain_flag,
+        cache,
+        apex_route,
+        websocket_service,
+        peer_addr,
+        stream_budget,
+        egress_budget,
+    } = options;
     if req.uri().path().starts_with("/__fn0_queue_task/") {
         return Ok(hyper::Response::builder()
             .status(403)

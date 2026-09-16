@@ -109,23 +109,39 @@ pub(crate) struct SelfInvokeHooks {
     guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
 }
 
+pub(crate) struct SelfInvokeHooksOptions {
+    pub(crate) project_id: String,
+    pub(crate) self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
+    pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
+    pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
+    pub(crate) queue_hijack: Option<Arc<QueueHijack>>,
+    pub(crate) cross_project_enqueue_hijack: Option<Arc<CrossProjectEnqueueHijack>>,
+    pub(crate) cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
+    pub(crate) vault_hijack: Option<Arc<VaultHijack>>,
+    pub(crate) object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
+    pub(crate) public_storage_hijack: Option<Arc<PublicStorageHijack>>,
+    pub(crate) static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
+    pub(crate) websocket_hijack: Option<Arc<WebSocketHijack>>,
+    pub(crate) guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
+}
+
 impl SelfInvokeHooks {
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new(
-        project_id: String,
-        self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
-        turso_hijack: Option<Arc<TursoHijack>>,
-        otlp_hijack: Option<Arc<OtlpHijack>>,
-        queue_hijack: Option<Arc<QueueHijack>>,
-        cross_project_enqueue_hijack: Option<Arc<CrossProjectEnqueueHijack>>,
-        cross_project_invoke_hijack: Option<Arc<CrossProjectInvokeHijack>>,
-        vault_hijack: Option<Arc<VaultHijack>>,
-        object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
-        public_storage_hijack: Option<Arc<PublicStorageHijack>>,
-        static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
-        websocket_hijack: Option<Arc<WebSocketHijack>>,
-        guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
-    ) -> Self {
+    pub(crate) fn new(options: SelfInvokeHooksOptions) -> Self {
+        let SelfInvokeHooksOptions {
+            project_id,
+            self_invoke_sender,
+            turso_hijack,
+            otlp_hijack,
+            queue_hijack,
+            cross_project_enqueue_hijack,
+            cross_project_invoke_hijack,
+            vault_hijack,
+            object_storage_hijack,
+            public_storage_hijack,
+            static_page_cache_hijack,
+            websocket_hijack,
+            guest_outbound_http,
+        } = options;
         Self {
             project_id,
             self_invoke_sender,

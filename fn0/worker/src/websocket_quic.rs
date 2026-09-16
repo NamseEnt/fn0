@@ -26,6 +26,16 @@ const RECONCILE_CONNECTION_LIMIT: usize = 256;
 const RECONCILE_BODY_LIMIT: usize = 1024 * 1024;
 const RECONCILE_PATH: &str = "/__fn0_websocket/reconcile";
 
+pub(crate) struct QuicSendRequest {
+    pub(crate) endpoint: String,
+    pub(crate) caller_project_id: String,
+    pub(crate) connection_id: String,
+    pub(crate) target_worker_id: String,
+    pub(crate) message_kind: WebSocketMessageKind,
+    pub(crate) body: Body,
+    pub(crate) remaining: Duration,
+}
+
 #[derive(Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum CommandKind {
@@ -301,18 +311,17 @@ impl QuicTransport {
             .expect("valid reconciliation response"))
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub async fn send(
-        &self,
-        endpoint: &str,
-        caller_project_id: String,
-        connection_id: String,
-        target_worker_id: String,
-        message_kind: WebSocketMessageKind,
-        mut body: Body,
-        remaining: Duration,
-    ) -> Result<(), WebSocketCommandError> {
-        let connection = self.connection(endpoint).await?;
+    pub async fn send(&self, request: QuicSendRequest) -> Result<(), WebSocketCommandError> {
+        let QuicSendRequest {
+            endpoint,
+            caller_project_id,
+            connection_id,
+            target_worker_id,
+            message_kind,
+            mut body,
+            remaining,
+        } = request;
+        let connection = self.connection(&endpoint).await?;
         let (mut send_stream, mut receive_stream) = connection
             .open_bi()
             .await

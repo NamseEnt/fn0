@@ -1,4 +1,5 @@
 use crate::docs::*;
+use forte_sdk::websocket::{SingletonConnectRequest, SingletonConnectionOptions};
 use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
@@ -63,16 +64,18 @@ struct ProjectInitializer;
 
 impl SingletonConnector for WorkerConnector {
     async fn connect(&self, request: ConnectRequest) -> anyhow::Result<String> {
-        Ok(websocket::connect_singleton(
-            &request.project_id,
-            &request.singleton_id,
-            request.url,
-            &request.route_path,
-            &request.headers,
-            &request.protocols,
-            &request.claim_token,
-            request.lease_deadline_millis,
-        )
+        Ok(websocket::connect_singleton(SingletonConnectRequest {
+            project_id: &request.project_id,
+            singleton_id: &request.singleton_id,
+            connection: SingletonConnectionOptions {
+                url: request.url,
+                headers: request.headers,
+                protocols: request.protocols,
+            },
+            route_path: &request.route_path,
+            claim_token: &request.claim_token,
+            initial_lease_deadline: request.lease_deadline_millis,
+        })
         .await?
         .to_string())
     }

@@ -15,6 +15,28 @@ struct DeployInput<'a> {
     websocket_singletons: &'a [WebSocketSingletonDeclaration],
 }
 
+pub struct WasmDeployOptions<'a> {
+    pub control_url: &'a str,
+    pub token: &'a str,
+    pub project_id: &'a str,
+    pub code_version: u64,
+    pub bundle_tar_path: &'a Path,
+    pub jobs: &'a [CronJob],
+    pub cron_updated_at: &'a str,
+}
+
+pub struct ForteDeployOptions<'a> {
+    pub control_url: &'a str,
+    pub token: &'a str,
+    pub project_id: &'a str,
+    pub code_version: u64,
+    pub fe_dist_dir: &'a Path,
+    pub bundle_tar_path: &'a Path,
+    pub jobs: &'a [CronJob],
+    pub cron_updated_at: &'a str,
+    pub websocket_singletons: &'a [WebSocketSingletonDeclaration],
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CronJob {
     pub function: String,
@@ -94,16 +116,16 @@ enum DeployStatus {
     InternalError,
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn deploy_wasm(
-    control_url: &str,
-    token: &str,
-    project_id: &str,
-    code_version: u64,
-    bundle_tar_path: &Path,
-    jobs: &[CronJob],
-    cron_updated_at: &str,
-) -> Result<()> {
+pub async fn deploy_wasm(options: WasmDeployOptions<'_>) -> Result<()> {
+    let WasmDeployOptions {
+        control_url,
+        token,
+        project_id,
+        code_version,
+        bundle_tar_path,
+        jobs,
+        cron_updated_at,
+    } = options;
     let client = reqwest::Client::new();
     println!("project_id: {project_id}");
 
@@ -113,18 +135,18 @@ pub async fn deploy_wasm(
         presigned_put_url,
         object_key,
         static_uploads: _,
-    } = request_deploy(
-        &client,
+    } = request_deploy(DeployRequest {
+        client: &client,
         control_url,
         token,
         project_id,
         code_version,
-        Vec::new(),
+        files: Vec::new(),
         bundle_size,
         jobs,
         cron_updated_at,
-        &[],
-    )
+        websocket_singletons: &[],
+    })
     .await?;
 
     println!("uploading bundle to {object_key} (code_version={code_version})...");
@@ -141,18 +163,18 @@ struct DeployOk {
     static_uploads: Vec<StaticUpload>,
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn deploy_forte(
-    control_url: &str,
-    token: &str,
-    project_id: &str,
-    code_version: u64,
-    fe_dist_dir: &Path,
-    bundle_tar_path: &Path,
-    jobs: &[CronJob],
-    cron_updated_at: &str,
-    websocket_singletons: &[WebSocketSingletonDeclaration],
-) -> Result<()> {
+pub async fn deploy_forte(options: ForteDeployOptions<'_>) -> Result<()> {
+    let ForteDeployOptions {
+        control_url,
+        token,
+        project_id,
+        code_version,
+        fe_dist_dir,
+        bundle_tar_path,
+        jobs,
+        cron_updated_at,
+        websocket_singletons,
+    } = options;
     let client = reqwest::Client::new();
     println!("project_id: {project_id}");
 
@@ -175,18 +197,18 @@ pub async fn deploy_forte(
         presigned_put_url,
         object_key,
         static_uploads,
-    } = request_deploy(
-        &client,
+    } = request_deploy(DeployRequest {
+        client: &client,
         control_url,
         token,
         project_id,
         code_version,
-        deploy_files,
+        files: deploy_files,
         bundle_size,
         jobs,
         cron_updated_at,
         websocket_singletons,
-    )
+    })
     .await?;
 
     if !static_files.is_empty() {
@@ -202,19 +224,32 @@ pub async fn deploy_forte(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn request_deploy(
-    client: &reqwest::Client,
-    control_url: &str,
-    token: &str,
-    project_id: &str,
+struct DeployRequest<'a> {
+    client: &'a reqwest::Client,
+    control_url: &'a str,
+    token: &'a str,
+    project_id: &'a str,
     code_version: u64,
     files: Vec<DeployFile>,
     bundle_size: u64,
-    jobs: &[CronJob],
-    cron_updated_at: &str,
-    websocket_singletons: &[WebSocketSingletonDeclaration],
-) -> Result<DeployOk> {
+    jobs: &'a [CronJob],
+    cron_updated_at: &'a str,
+    websocket_singletons: &'a [WebSocketSingletonDeclaration],
+}
+
+async fn request_deploy(request: DeployRequest<'_>) -> Result<DeployOk> {
+    let DeployRequest {
+        client,
+        control_url,
+        token,
+        project_id,
+        code_version,
+        files,
+        bundle_size,
+        jobs,
+        cron_updated_at,
+        websocket_singletons,
+    } = request;
     let deploy_url = format!(
         "{}/__forte_action/deploy",
         control_url.trim_end_matches('/')

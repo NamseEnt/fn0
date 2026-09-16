@@ -78,6 +78,15 @@ impl SingletonConnectionOptions {
     }
 }
 
+pub struct SingletonConnectRequest<'a> {
+    pub project_id: &'a str,
+    pub singleton_id: &'a str,
+    pub connection: SingletonConnectionOptions,
+    pub route_path: &'a str,
+    pub claim_token: &'a str,
+    pub initial_lease_deadline: i64,
+}
+
 pub struct SingletonConnectEvent {
     pub connection_id: ConnectionId,
     pub protocol: Option<String>,
@@ -298,20 +307,24 @@ pub async fn connect(
 }
 
 #[doc(hidden)]
-#[allow(clippy::too_many_arguments)]
 pub async fn connect_singleton(
-    project_id: &str,
-    singleton_id: &str,
-    url: impl Into<String>,
-    route_path: &str,
-    headers: &HeaderMap,
-    protocols: &[String],
-    claim_token: &str,
-    initial_lease_deadline: i64,
+    request: SingletonConnectRequest<'_>,
 ) -> Result<ConnectionId, WebSocketConnectError> {
+    let SingletonConnectRequest {
+        project_id,
+        singleton_id,
+        connection:
+            SingletonConnectionOptions {
+                url: target_url,
+                headers,
+                protocols,
+            },
+        route_path,
+        claim_token,
+        initial_lease_deadline,
+    } = request;
     let endpoint =
         std::env::var("FN0_WEBSOCKET_URL").map_err(|_| WebSocketConnectError::Internal)?;
-    let target_url = url.into();
     if project_id.is_empty() || singleton_id.is_empty() || claim_token.is_empty() {
         return Err(WebSocketConnectError::Internal);
     }
@@ -322,7 +335,7 @@ pub async fn connect_singleton(
         return Err(WebSocketConnectError::InvalidUrl);
     }
     let mut serialized_headers = Vec::new();
-    for (header_name, header_value) in headers {
+    for (header_name, header_value) in headers.iter() {
         if singleton_system_header(header_name.as_str()) {
             return Err(WebSocketConnectError::Internal);
         }

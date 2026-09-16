@@ -50,7 +50,7 @@ use wasmtime::Engine;
 use wasmtime::component::Linker;
 use wasmtime_wasi_http::p3::bindings::ServicePre;
 
-pub use cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
+pub use cross_project_enqueue_hijack::{CrossProjectEnqueueHijack, CrossProjectEnqueueOciOptions};
 pub use cross_project_invoke_hijack::{CrossProjectInvokeDispatcher, CrossProjectInvokeHijack};
 pub use egress::{EgressBudget, EgressChargeFuture, EgressDenied, EgressMeteredBody};
 pub use metric_gate::MetricCardinalityGate;
@@ -72,12 +72,12 @@ pub use storage_target::{
     R2Credentials, StaticResolver,
 };
 pub use turso_hijack::TursoHijack;
-pub use vault_hijack::VaultHijack;
+pub use vault_hijack::{VaultHijack, VaultOciOptions};
 pub use wasmtime;
 pub use websocket_hijack::{
     WebSocketCommandDispatcher, WebSocketCommandError, WebSocketCommandErrorKind,
     WebSocketCommandFuture, WebSocketConnectFuture, WebSocketDeliveryState, WebSocketHijack,
-    WebSocketMessageKind,
+    WebSocketMessageKind, WebSocketSingletonConnectRequest,
 };
 
 pub type WasmProxyPre = ServicePre<ClientState<SystemClock>>;
@@ -924,22 +924,24 @@ impl<C: BundleCache> CodeExecutor<C> {
         let self_invoke_sender = tx.clone();
         let driver = tokio::task::spawn_local(async move {
             let outcome = AssertUnwindSafe(execute::run_wasm_instance_loop(
-                &ctx.engine,
-                bundle,
-                project_id_owned,
-                self_invoke_sender,
-                rx,
-                turso_hijack,
-                otlp_hijack,
-                queue_hijack,
-                cross_project_enqueue_hijack,
-                cross_project_invoke_hijack,
-                vault_hijack,
-                object_storage_hijack,
-                public_storage_hijack,
-                static_page_cache_hijack,
-                websocket_hijack,
-                guest_outbound_http,
+                execute::WasmInstanceLoopOptions {
+                    engine: &ctx.engine,
+                    bundle,
+                    project_id: project_id_owned,
+                    self_invoke_sender,
+                    rx,
+                    turso_hijack,
+                    otlp_hijack,
+                    queue_hijack,
+                    cross_project_enqueue_hijack,
+                    cross_project_invoke_hijack,
+                    vault_hijack,
+                    object_storage_hijack,
+                    public_storage_hijack,
+                    static_page_cache_hijack,
+                    websocket_hijack,
+                    guest_outbound_http,
+                },
             ))
             .catch_unwind()
             .await;

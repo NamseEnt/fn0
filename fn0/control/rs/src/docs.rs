@@ -155,18 +155,13 @@ pub struct WebSocketSingletonDeclaration {
     pub route_path: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Default, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WebSocketSingletonRuntimeState {
     Preparing,
+    #[default]
     Active,
     Terminating,
-}
-
-impl Default for WebSocketSingletonRuntimeState {
-    fn default() -> Self {
-        Self::Active
-    }
 }
 
 #[forte_doc]

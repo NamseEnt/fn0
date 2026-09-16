@@ -3,6 +3,7 @@
 ## Code Style
 
 - **No explanatory comments in code**: Do not leave explanatory comments in the source code. TODO comments are allowed.
+- Do not add Clippy exception attributes or equivalent lint suppressions. Resolve Clippy findings through code changes.
 
 ## Project Context
 

@@ -86,6 +86,18 @@ pub type WebSocketCommandFuture =
 pub type WebSocketConnectFuture =
     Pin<Box<dyn Future<Output = Result<String, WebSocketCommandError>> + Send + 'static>>;
 
+pub struct WebSocketSingletonConnectRequest {
+    pub project_id: String,
+    pub singleton_id: String,
+    pub url: String,
+    pub route_path: String,
+    pub headers: Vec<(String, String)>,
+    pub protocols: Vec<String>,
+    pub claim_token: String,
+    pub initial_lease_deadline: i64,
+    pub remaining: std::time::Duration,
+}
+
 pub trait WebSocketCommandDispatcher: Send + Sync {
     fn connect(
         &self,
@@ -102,30 +114,10 @@ pub trait WebSocketCommandDispatcher: Send + Sync {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn connect_singleton(
         &self,
-        project_id: String,
-        singleton_id: String,
-        url: String,
-        route_path: String,
-        headers: Vec<(String, String)>,
-        protocols: Vec<String>,
-        claim_token: String,
-        initial_lease_deadline: i64,
-        remaining: std::time::Duration,
+        _request: WebSocketSingletonConnectRequest,
     ) -> WebSocketConnectFuture {
-        let _ = (
-            project_id,
-            singleton_id,
-            url,
-            route_path,
-            headers,
-            protocols,
-            claim_token,
-            initial_lease_deadline,
-            remaining,
-        );
         Box::pin(async {
             Err(WebSocketCommandError::not_sent(
                 WebSocketCommandErrorKind::Internal,
@@ -390,17 +382,17 @@ impl WebSocketHijack {
                 return response(503, WebSocketDeliveryState::NotSent);
             };
             return match dispatcher
-                .connect_singleton(
+                .connect_singleton(WebSocketSingletonConnectRequest {
                     project_id,
                     singleton_id,
-                    input.url,
+                    url: input.url,
                     route_path,
-                    input.headers,
-                    input.protocols,
-                    input.claim_token,
-                    input.initial_lease_deadline,
+                    headers: input.headers,
+                    protocols: input.protocols,
+                    claim_token: input.claim_token,
+                    initial_lease_deadline: input.initial_lease_deadline,
                     remaining,
-                )
+                })
                 .await
             {
                 Ok(connection_id) => response_with_body(
@@ -802,16 +794,19 @@ mod tests {
 
         fn connect_singleton(
             &self,
-            project_id: String,
-            singleton_id: String,
-            url: String,
-            route_path: String,
-            headers: Vec<(String, String)>,
-            protocols: Vec<String>,
-            claim_token: String,
-            initial_lease_deadline: i64,
-            _remaining: std::time::Duration,
+            request: WebSocketSingletonConnectRequest,
         ) -> WebSocketConnectFuture {
+            let WebSocketSingletonConnectRequest {
+                project_id,
+                singleton_id,
+                url,
+                route_path,
+                headers,
+                protocols,
+                claim_token,
+                initial_lease_deadline,
+                remaining: _,
+            } = request;
             Box::pin(async move {
                 assert_eq!(project_id, "target-project");
                 assert_eq!(singleton_id, "market-feed");

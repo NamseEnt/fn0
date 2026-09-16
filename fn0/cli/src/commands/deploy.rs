@@ -47,15 +47,15 @@ pub async fn execute() -> Result<()> {
         .expect("system clock returns positive timestamp");
     let jobs: Vec<fn0_deploy::CronJob> = Vec::new();
     let cron_updated_at = chrono::Utc::now().to_rfc3339();
-    fn0_deploy::deploy_wasm(
-        &creds.control_url,
-        &creds.token,
-        &project_id_resolved,
+    fn0_deploy::deploy_wasm(fn0_deploy::WasmDeployOptions {
+        control_url: &creds.control_url,
+        token: &creds.token,
+        project_id: &project_id_resolved,
         code_version,
-        &bundle_path,
-        &jobs,
-        &cron_updated_at,
-    )
+        bundle_tar_path: &bundle_path,
+        jobs: &jobs,
+        cron_updated_at: &cron_updated_at,
+    })
     .await
     .map_err(|e| eyre!(e))?;
 
