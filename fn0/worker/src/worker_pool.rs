@@ -326,12 +326,9 @@ where
                     }
                     Err(_) => {
                         cancellation.cancel();
-                        fn0::telemetry::failure(
-                            fn0::telemetry::FailureComponent::Executor,
-                            "deadline_exceeded",
-                        );
-                        let _ = resp_tx
-                            .send(Err(anyhow::anyhow!("request execution deadline exceeded")));
+                        let _ = resp_tx.send(Err(anyhow::Error::new(
+                            fn0::RequestDeadlineExceeded,
+                        )));
                     }
                 }
             });

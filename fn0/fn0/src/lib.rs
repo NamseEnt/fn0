@@ -100,6 +100,21 @@ impl std::fmt::Display for RequestBodyTooLarge {
 
 impl std::error::Error for RequestBodyTooLarge {}
 
+/// A request that ran past its execution deadline, as a type rather than a
+/// message: two places raise it and the request handler answers for both, so
+/// the handler has to recognize it rather than count and log it again behind
+/// whichever one fired first.
+#[derive(Debug)]
+pub struct RequestDeadlineExceeded;
+
+impl std::fmt::Display for RequestDeadlineExceeded {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "request execution deadline exceeded")
+    }
+}
+
+impl std::error::Error for RequestDeadlineExceeded {}
+
 #[derive(Clone)]
 pub struct RequestCancellation(pub CancellationToken);
 
@@ -380,25 +395,20 @@ impl<C: BundleCache> CodeExecutor<C> {
         if outcome.is_error() {
             span.record("otel.status_code", "ERROR");
         }
-        let duration_ms = duration.as_millis() as u64;
+        // A slow request that succeeded is a duration, and the histogram
+        // above already carries it; what an operator wants beside it is the
+        // call tree, which is the trace's job. Only the failure is logged.
         if outcome == telemetry::RequestOutcome::ServerError {
-            tracing::warn!(
-                parent: &span,
-                project_id,
-                route,
-                status = status_code,
-                duration_ms,
-                "guest responded with a server error"
-            );
-        } else if duration >= telemetry::SLOW_REQUEST {
-            tracing::warn!(
-                parent: &span,
-                project_id,
-                route,
-                outcome = outcome.as_str(),
-                duration_ms,
-                "slow request"
-            );
+            span.in_scope(|| {
+                tracing::error!(
+                    project_id,
+                    route,
+                    status = status_code,
+                    duration_ms = duration.as_millis() as u64,
+                    error.type = "guest_server_error",
+                    "the guest answered with a server error"
+                );
+            });
         }
 
         result.map(|response| {
@@ -524,21 +534,13 @@ impl<C: BundleCache> CodeExecutor<C> {
         static_page::record_outcome(project_id, outcome);
         static_page::record_generation_duration(project_id, outcome, duration);
         if let Err(error) = &result {
-            tracing::warn!(
+            tracing::error!(
                 project_id,
                 code_version = candidate.code_version,
                 path_hash = %candidate.path_hash,
                 duration_ms = duration.as_millis() as u64,
+                error.type = "static_page_generation",
                 "static page generation failed: {error:#}"
-            );
-        } else if duration >= static_page::SLOW_GENERATION {
-            tracing::warn!(
-                project_id,
-                code_version = candidate.code_version,
-                path_hash = %candidate.path_hash,
-                outcome = outcome.as_str(),
-                duration_ms = duration.as_millis() as u64,
-                "slow static page generation"
             );
         }
         result.map(|(response, _)| response)
@@ -667,16 +669,22 @@ impl<C: BundleCache> CodeExecutor<C> {
                 StaticPageOutcome::Cacheable,
             ));
         }
-        tracing::warn!(
-            project_id,
-            code_version = candidate.code_version,
-            path_hash = %candidate.path_hash,
-            used_js,
-            status = parts.status.as_u16(),
-            content_type,
-            sets_cookie = parts.headers.contains_key(SET_COOKIE),
-            "static page response is not cacheable"
-        );
+        // Once per deployed version, not once per request: every request to
+        // an uncacheable page reaches this, and the reason is a property of
+        // the code, not of the request. The count is on
+        // `fn0.static_page.requests{outcome="unsafe"}`.
+        if static_page::first_uncacheable_response(project_id, candidate.code_version) {
+            tracing::warn!(
+                project_id,
+                code_version = candidate.code_version,
+                path_hash = %candidate.path_hash,
+                used_js,
+                status = parts.status.as_u16(),
+                content_type,
+                sets_cookie = parts.headers.contains_key(SET_COOKIE),
+                "static page response is not cacheable"
+            );
+        }
 
         parts.headers.remove("cloudflare-cdn-cache-control");
         parts.headers.remove("cache-tag");

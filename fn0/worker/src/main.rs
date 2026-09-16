@@ -737,10 +737,32 @@ fn payload_too_large_response() -> HyperResponse {
         .unwrap()
 }
 
+/// The one place a request that ran out of time is counted and logged. The
+/// executor's own deadline and this handler's both raise
+/// [`fn0::RequestDeadlineExceeded`], and only the side that answers the client
+/// reports it.
+fn deadline_exceeded_response(project_id: &str) -> HyperResponse {
+    fn0::telemetry::failure(
+        fn0::telemetry::FailureComponent::Executor,
+        "deadline_exceeded",
+    );
+    tracing::error!(
+        project_id,
+        error.type = "deadline_exceeded",
+        "the request ran past its execution deadline"
+    );
+    hyper::Response::builder()
+        .status(504)
+        .header("connection", "close")
+        .body(full_body(Bytes::from("Gateway Timeout")))
+        .unwrap()
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum FailedRequest {
     PayloadTooLarge,
     NotDeployed,
+    DeadlineExceeded,
     BadGateway,
 }
 
@@ -762,6 +784,12 @@ fn classify_failed_request(error: &anyhow::Error, body_too_large: bool) -> Faile
         )
     }) {
         return FailedRequest::NotDeployed;
+    }
+    if error
+        .chain()
+        .any(|cause| cause.downcast_ref::<fn0::RequestDeadlineExceeded>().is_some())
+    {
+        return FailedRequest::DeadlineExceeded;
     }
     FailedRequest::BadGateway
 }
@@ -1396,16 +1424,7 @@ async fn handle_user_request(
                 .unwrap());
         }
         Err(_) => {
-            fn0::telemetry::failure(
-                fn0::telemetry::FailureComponent::Executor,
-                "deadline_exceeded",
-            );
-            tracing::error!(%project_id, "request exceeded deadline");
-            return Ok(hyper::Response::builder()
-                .status(504)
-                .header("connection", "close")
-                .body(full_body(Bytes::from("Gateway Timeout")))
-                .unwrap());
+            return Ok(deadline_exceeded_response(&project_id));
         }
     };
 
@@ -1440,11 +1459,13 @@ async fn handle_user_request(
                     "No application is deployed at this subdomain.",
                 )))
                 .unwrap()),
+            FailedRequest::DeadlineExceeded => Ok(deadline_exceeded_response(&project_id)),
             FailedRequest::BadGateway => {
-                // The cause goes in the message, not a field: the log pipeline
-                // forwards message bodies and drops structured fields, so a field
-                // here is invisible exactly when an outage makes it matter.
-                tracing::error!(%project_id, path = %request_path, "Failed to run fn0: {err:#}");
+                tracing::error!(
+                    project_id,
+                    error.type = "bad_gateway",
+                    "the guest could not be run: {err:#}"
+                );
                 Ok(hyper::Response::builder()
                     .status(502)
                     .body(full_body(Bytes::from("Bad Gateway")))

@@ -129,9 +129,11 @@ For self-hosted fn0 worker deployments, configure the OTLP collector via environ
 
 The worker intercepts outgoing OTLP requests that target `FN0_OTLP_PLACEHOLDER_HOST`. It accepts only uncompressed `application/x-protobuf` exports on `/v1/traces`, `/v1/metrics`, and `/v1/logs`, sets `tenant.id` on every resource to the calling project's id, applies the metric cardinality caps, and forwards the result to `OTLP_ENDPOINT`.
 
-Each project is its own Signy tenant. The worker's request spans, and the request, static page, and CPU metrics it records for a project, go to that project's tenant as well. The worker's logs, failure counters, and capacity metrics go to the platform tenant named by `FN0_PLATFORM_TELEMETRY_TENANT_ID`. Signy drops data for a tenant that has no pushed policy, so control registers each project with Signy.
+Each project is its own Signy tenant. The worker's request spans, the request, static page, and CPU metrics it records for a project, and the lines it captures from that project's stdout and stderr all go to the project's tenant. The worker's own logs, its failure counters and its capacity metrics go to the platform tenant named by `FN0_PLATFORM_TELEMETRY_TENANT_ID`. Signy drops data for a tenant that has no pushed policy, so control registers each project with Signy, for 30 days of logs, traces and metrics alike.
 
-Trace sampling is decided once, by the worker, when a request arrives: 1% of requests are traced, and background loops such as manifest polling are never traced. The worker passes its decision to the guest in a `traceparent` header, and an incoming `traceparent` from a visitor is discarded. Server errors and requests slower than one second are always written as logs instead.
+Trace sampling is decided once, by the worker, when a request arrives: 1% of requests are traced, and background loops such as manifest polling are never traced. The worker passes its decision to the guest in a `traceparent` header, and an incoming `traceparent` from a visitor is discarded.
+
+What the worker writes as a log is the failure and the state change, not the ordinary request: a guest that answered with a server error, a request that ran out of time (once, from the side that answers the client), a static page that could not be generated, and the first uncacheable answer of each deployed version. A slow request that succeeded is a duration on `fn0.http.server.request.duration` and a span in whichever trace was sampled; it is not a log line. A guest's captured output keeps the level it was written at, with the stream it came from as an attribute, because a library that writes its whole output to stderr is not a library reporting errors.
 
 ## Worker Environment Variables (Self-Hosting)
 

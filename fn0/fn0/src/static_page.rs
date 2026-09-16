@@ -3,10 +3,27 @@
 
 use opentelemetry::{KeyValue, global};
 use sha2::{Digest, Sha256};
-
-pub const SLOW_GENERATION: std::time::Duration = std::time::Duration::from_secs(1);
+use std::collections::HashSet;
+use std::sync::{Mutex, OnceLock};
 
 const GENERATION_SECONDS_BUCKETS: [f64; 5] = [0.05, 0.25, 1.0, 5.0, 30.0];
+/// Deployments whose uncacheable answer has been reported. A project's code
+/// version is what decides whether its pages can be cached, so the report is
+/// per version; the cap is what keeps a worker that has served many versions
+/// from holding them all, at the price of reporting one of them twice.
+const MAX_REPORTED_DEPLOYMENTS: usize = 256;
+
+static REPORTED_UNCACHEABLE: OnceLock<Mutex<HashSet<(String, u64)>>> = OnceLock::new();
+
+/// Whether this is the first uncacheable answer seen for the deployment.
+pub fn first_uncacheable_response(project_id: &str, code_version: u64) -> bool {
+    let reported = REPORTED_UNCACHEABLE.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut reported = reported.lock().unwrap_or_else(|error| error.into_inner());
+    if reported.len() >= MAX_REPORTED_DEPLOYMENTS {
+        reported.clear();
+    }
+    reported.insert((project_id.to_string(), code_version))
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StaticPagePathError {

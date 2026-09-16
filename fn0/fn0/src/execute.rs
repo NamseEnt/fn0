@@ -53,12 +53,20 @@ impl TracingWriter {
         }
     }
 
+    /// Both streams are recorded at the same level, under the project's own
+    /// tenant. A guest's logging library writes its whole output to stderr --
+    /// the Forte SDK's does -- so raising stderr to `ERROR` marked every line
+    /// a project ever printed as an error, and filed it under the platform's
+    /// tenant besides. Which stream a line came from is an attribute; it is
+    /// not a severity.
     fn emit_line(&self, line: &str) {
-        if self.is_stderr {
-            tracing::error!(project_id = %self.project_id, stream = "stderr", "{}", line);
-        } else {
-            tracing::info!(project_id = %self.project_id, stream = "stdout", "{}", line);
-        }
+        let stream = if self.is_stderr { "stderr" } else { "stdout" };
+        tracing::info!(
+            fn0.project_tenant = %self.project_id,
+            stream,
+            "{}",
+            line
+        );
     }
 }
 

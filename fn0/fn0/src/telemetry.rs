@@ -11,9 +11,17 @@ pub const REQUEST_SPAN_NAME: &str = "fn0.request";
 /// tenant. The request span sets it under this literal name, so the two must
 /// not drift apart.
 pub const PROJECT_TENANT_ATTRIBUTE: &str = "fn0.project_tenant";
-pub const SLOW_REQUEST: Duration = Duration::from_secs(1);
-pub const REQUEST_DURATION_METRIC: &str = "fn0.request.duration";
-pub const CPU_TIME_METRIC: &str = "fn0.cpu_time";
+/// Both histograms carry [`SECONDS_BUCKETS`], and both are named apart from
+/// the `fn0.request.duration` and `fn0.cpu_time` they replace. Those two were
+/// exported as exponential histograms, whose bucket boundaries move with the
+/// data: the store expands them into `le` series, so one series' boundaries
+/// changed under it — 33 distinct `le` values for five request series in two
+/// hours of production — and a quantile over a window holding both shapes
+/// interpolates across brackets that never existed. New names keep the two
+/// shapes in separate families; the old ones stop being written and leave with
+/// the tenant's metric retention.
+pub const REQUEST_DURATION_METRIC: &str = "fn0.http.server.request.duration";
+pub const CPU_TIME_METRIC: &str = "fn0.guest.cpu.duration";
 pub const MAX_ROUTES_PER_PROJECT: usize = 40;
 
 const SECONDS_BUCKETS: [f64; 7] = [0.005, 0.025, 0.1, 0.5, 1.0, 5.0, 30.0];

@@ -30,6 +30,12 @@ The image references and the telemetry configuration version are stored in
 `infra/cloud/Pulumi.prod.yaml`. Worker cloud-init and the node setup script
 consume those values, so a redeploy cannot silently select a mutable tag.
 
+The node is running `sha256:d3d98bf52987a18eb8d44506b4cdfc11dc967994769771a522691c6dd7bf9150`,
+built from obsy `38ca089bc0d4662d294bc2845c6fca7899a68c0b`, which is one commit
+past the digest pinned above: `38ca089` fixed a replay that failed every
+startup attempt. Re-running the node setup as it stands would roll that fix
+back. The pin moves with the next image build.
+
 ## Deployment
 
 Apply the Pulumi stack before configuring the node:
@@ -61,20 +67,27 @@ the worker's 50 GiB volume and is the recovery buffer when Signy is unavailable.
 
 Signy declares a 2 GiB memory budget, an 8 GiB cache limit, a 1 GiB WAL
 backlog limit, a 4 GiB minimum free-disk floor, and a 10 GiB tenant storage
-limit. The `fn0` retention policy keeps metrics 30 days, logs 14 days, and
-traces 3 days.
+limit. Every tenant, the platform's `fn0` and each project's alike, keeps
+metrics, logs and traces for 30 days.
 
 Signy flushes at most once a minute (`SIGNY_FLUSH_MAX_INTERVAL=60s`), so data
 reaches R2 up to a minute after it is written to the local WAL. Fewer flushes
-mean fewer parts and fewer catalog commits. Trace parts are compacted by size
-tier like metric parts. Orphaned part objects are collected every hour
-(`SIGNY_ORPHAN_GC_INTERVAL=1h`) whether or not retention expired anything, and
-catalog commits and snapshots older than eight days
+mean fewer parts and fewer catalog commits. Log, trace and metric parts are
+compacted by size tier, so a part is only ever rewritten with parts of its own
+size. Orphaned part objects are collected every hour
+(`SIGNY_ORPHAN_GC_INTERVAL=1h`) whether or not retention expired anything, in
+passes bounded by `SIGNY_ORPHAN_GC_MAX_RUNTIME`,
+`SIGNY_ORPHAN_GC_MAX_SCANNED_OBJECTS`, `SIGNY_ORPHAN_GC_MAX_DELETED_OBJECTS`
+and `SIGNY_ORPHAN_GC_MAX_DELETED_BYTES` that resume where the last one
+stopped; `SIGNY_ORPHAN_GC_DRY_RUN=true` reports what a pass would delete
+without deleting it. Catalog commits and snapshots older than eight days
 (`SIGNY_CATALOG_PRUNE_MIN_AGE=8d`, one day past the seven-day Bucket Lock) are
-deleted once two newer snapshots verify.
+deleted once two newer snapshots verify, on their own schedule rather than
+behind orphan collection.
 
 On the worker, 1% of requests are traced and background loops are never traced.
-Server errors and requests slower than one second are always logged instead.
+Server errors, requests that ran out of time and failed static page
+generations are logged; a slow request that succeeded is not.
 Request metrics carry the project, the route template, and a bounded outcome;
 raw paths and raw error messages go to logs only. Signy container logs rotate at five
 100 MiB files. At the verification time the R2 bucket contained 1,281 objects

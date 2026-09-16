@@ -118,24 +118,41 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         after = last;
     }
 
-    tracing::info!(
-        fired_count = fired,
-        scanned_projects_count = scanned_projects,
-        scanned_jobs_count = scanned_jobs,
-        epoch_minute,
-        "cron_on_tick dispatch completed"
-    );
+    // A tick that fired nothing is the normal minute, and there are 1,440 of
+    // them a day. What it scanned is worth a line only when it acted.
+    if fired > 0 {
+        tracing::info!(
+            fired_count = fired,
+            scanned_projects_count = scanned_projects,
+            scanned_jobs_count = scanned_jobs,
+            epoch_minute,
+            "cron_on_tick dispatched jobs"
+        );
+    } else {
+        tracing::debug!(
+            scanned_projects_count = scanned_projects,
+            scanned_jobs_count = scanned_jobs,
+            epoch_minute,
+            "cron_on_tick fired nothing"
+        );
+    }
 
     if let Err(err) = zombie_sweep::run_sweep().await {
         tracing::error!(?err, "zombie_sweep within cron_on_tick failed");
     }
 
     match websocket_directory_gc::run_gc().await {
-        Ok(stats) => tracing::info!(
+        Ok(stats) if stats.deleted_connections > 0 || stats.unreachable_workers > 0 => {
+            tracing::info!(
+                scanned_connections_count = stats.scanned_connections,
+                deleted_connections_count = stats.deleted_connections,
+                unreachable_workers_count = stats.unreachable_workers,
+                "websocket directory GC removed entries",
+            )
+        }
+        Ok(stats) => tracing::debug!(
             scanned_connections_count = stats.scanned_connections,
-            deleted_connections_count = stats.deleted_connections,
-            unreachable_workers_count = stats.unreachable_workers,
-            "websocket directory GC completed",
+            "websocket directory GC found nothing to remove",
         ),
         Err(err) => tracing::error!(?err, "websocket directory GC within cron_on_tick failed"),
     }
@@ -146,22 +163,30 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     if epoch_minute % SIGNY_TENANT_RECONCILE_EVERY_MINUTES == 0 {
         match reconcile_signy_tenants().await {
-            Ok(stats) => tracing::info!(
+            Ok(stats) if stats.registered_projects > 0 => tracing::info!(
                 registered_projects_count = stats.registered_projects,
-                "signy tenant reconcile completed",
+                "signy tenant reconcile registered projects",
             ),
+            Ok(_) => tracing::debug!("signy tenant reconcile found every project registered"),
             Err(err) => tracing::error!(?err, "signy tenant reconcile within cron_on_tick failed"),
         }
     }
 
     if epoch_minute % 60 == 0 {
         match bundle_gc::run_gc().await {
-            Ok(stats) => tracing::info!(
-                deleted_versions_count = stats.deleted_versions,
-                deleted_orphans_count = stats.deleted_orphans,
-                deleted_static_prefixes_count = stats.deleted_static_prefixes,
-                "bundle_gc completed",
-            ),
+            Ok(stats)
+                if stats.deleted_versions > 0
+                    || stats.deleted_orphans > 0
+                    || stats.deleted_static_prefixes > 0 =>
+            {
+                tracing::info!(
+                    deleted_versions_count = stats.deleted_versions,
+                    deleted_orphans_count = stats.deleted_orphans,
+                    deleted_static_prefixes_count = stats.deleted_static_prefixes,
+                    "bundle_gc deleted bundles",
+                )
+            }
+            Ok(_) => tracing::debug!("bundle_gc found nothing to delete"),
             Err(err) => tracing::error!(?err, "bundle_gc within cron_on_tick failed"),
         }
     }

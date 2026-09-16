@@ -17,9 +17,11 @@ use fn0::otlp_hijack::stamp_tenant;
 use fn0::telemetry::PROJECT_TENANT_ATTRIBUTE;
 use opentelemetry::trace::{Span as _, SpanId, TraceContextExt, TraceId};
 use opentelemetry::{Context, KeyValue, Value};
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{KeyValue as ProtoKeyValue, any_value};
+use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 use opentelemetry_proto::tonic::metrics::v1::{Metric, ResourceMetrics, ScopeMetrics, metric};
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans};
 use opentelemetry_sdk::error::OTelSdkResult;
@@ -105,7 +107,53 @@ pub fn route_export(path: &str, body: &[u8], platform_tenant_id: &str) -> Option
         let request = ExportMetricsServiceRequest::decode(body).ok()?;
         return Some(route_metrics(request, platform_tenant_id).encode_to_vec());
     }
+    if path.ends_with("/v1/logs") {
+        let request = ExportLogsServiceRequest::decode(body).ok()?;
+        return Some(route_logs(request, platform_tenant_id).encode_to_vec());
+    }
     None
+}
+
+/// A guest's own output is the project's log, not the platform's: the lines
+/// the worker captures from a guest's stdout and stderr carry the attribute,
+/// and everything the worker says about itself does not.
+fn route_logs(
+    request: ExportLogsServiceRequest,
+    platform_tenant_id: &str,
+) -> ExportLogsServiceRequest {
+    let mut routed = Vec::new();
+    for resource_logs in request.resource_logs {
+        let mut by_tenant: BTreeMap<String, Vec<ScopeLogs>> = BTreeMap::new();
+        for scope_logs in resource_logs.scope_logs {
+            let mut records_by_tenant: BTreeMap<String, Vec<_>> = BTreeMap::new();
+            for mut record in scope_logs.log_records {
+                let tenant_id = take_tenant(&mut record.attributes, platform_tenant_id);
+                records_by_tenant
+                    .entry(tenant_id)
+                    .or_default()
+                    .push(record);
+            }
+            for (tenant_id, log_records) in records_by_tenant {
+                by_tenant.entry(tenant_id).or_default().push(ScopeLogs {
+                    scope: scope_logs.scope.clone(),
+                    log_records,
+                    schema_url: scope_logs.schema_url.clone(),
+                });
+            }
+        }
+        for (tenant_id, scope_logs) in by_tenant {
+            let mut resource = resource_logs.resource.clone();
+            stamp_tenant(&mut resource, &tenant_id);
+            routed.push(ResourceLogs {
+                resource,
+                scope_logs,
+                schema_url: resource_logs.schema_url.clone(),
+            });
+        }
+    }
+    ExportLogsServiceRequest {
+        resource_logs: routed,
+    }
 }
 
 /// Removes the project attribute and says which tenant the item belongs to.
@@ -359,6 +407,79 @@ mod tests {
         }
     }
 
+    /// A guest's captured output belongs to the project that printed it; the
+    /// worker's own lines stay with the platform, and neither carries the mark
+    /// onward.
+    #[test]
+    fn guest_output_moves_to_the_project_tenant_and_the_workers_own_lines_do_not() {
+        use opentelemetry_proto::tonic::logs::v1::LogRecord;
+
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: platform_resource(),
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![
+                        LogRecord {
+                            severity_text: "INFO".to_string(),
+                            attributes: vec![
+                                string_attribute(PROJECT_TENANT_ATTRIBUTE, "project-a"),
+                                string_attribute("stream", "stderr"),
+                            ],
+                            ..Default::default()
+                        },
+                        LogRecord {
+                            severity_text: "ERROR".to_string(),
+                            ..Default::default()
+                        },
+                    ],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+
+        let routed = route_logs(request, "fn0");
+
+        let mut tenants: Vec<(&str, Vec<&str>)> = routed
+            .resource_logs
+            .iter()
+            .map(|resource_logs| {
+                (
+                    tenant_of(&resource_logs.resource),
+                    resource_logs.scope_logs[0]
+                        .log_records
+                        .iter()
+                        .map(|record| record.severity_text.as_str())
+                        .collect(),
+                )
+            })
+            .collect();
+        tenants.sort();
+        assert_eq!(
+            tenants,
+            vec![("fn0", vec!["ERROR"]), ("project-a", vec!["INFO"])]
+        );
+        let guest_record = &routed
+            .resource_logs
+            .iter()
+            .find(|resource_logs| tenant_of(&resource_logs.resource) == "project-a")
+            .expect("the project's own resource")
+            .scope_logs[0]
+            .log_records[0];
+        assert!(
+            guest_record
+                .attributes
+                .iter()
+                .all(|attribute| attribute.key != PROJECT_TENANT_ATTRIBUTE)
+        );
+        assert!(
+            guest_record
+                .attributes
+                .iter()
+                .any(|attribute| attribute.key == "stream")
+        );
+    }
+
     #[test]
     fn one_metric_splits_into_one_copy_per_tenant() {
         let point = |project_id: Option<&str>| HistogramDataPoint {
@@ -373,7 +494,7 @@ mod tests {
                 resource: platform_resource(),
                 scope_metrics: vec![ScopeMetrics {
                     metrics: vec![Metric {
-                        name: "fn0.request.duration".to_string(),
+                        name: fn0::telemetry::REQUEST_DURATION_METRIC.to_string(),
                         unit: "s".to_string(),
                         data: Some(metric::Data::Histogram(Histogram {
                             data_points: vec![
@@ -399,7 +520,7 @@ mod tests {
             .iter()
             .map(|resource_metrics| {
                 let metric = &resource_metrics.scope_metrics[0].metrics[0];
-                assert_eq!(metric.name, "fn0.request.duration");
+                assert_eq!(metric.name, fn0::telemetry::REQUEST_DURATION_METRIC);
                 let Some(metric::Data::Histogram(histogram)) = &metric.data else {
                     panic!("expected a histogram");
                 };

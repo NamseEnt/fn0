@@ -145,10 +145,11 @@ Cost safety is part of the deployment: collecty uses warning-level JSON logs,
 does not enable journald collection, samples host metrics once per minute, and
 caps its durable queue at 1 GiB per worker. Signy has a 2 GiB declared memory
 budget, an 8 GiB local cache, a 1 GiB WAL backlog limit, a 4 GiB free-space
-floor, a `fn0` retention policy of 30 days for metrics, 14 days for logs, and 3
-days for traces, and a 10 GiB tenant storage limit. Signy flushes at most once a
-minute, compacts trace parts, collects orphaned objects hourly, and prunes
-catalog history older than eight days.
+floor, a `fn0` retention policy of 30 days for metrics, logs and traces alike,
+and a 10 GiB tenant storage limit. Signy flushes at most once a minute,
+compacts every signal's parts by size tier, collects orphaned objects hourly in
+bounded resumable passes, and prunes catalog history older than eight days on
+its own schedule.
 Docker log rotation is capped at five 100 MiB files on the Signy node.
 
 Provision the permanent node from the Pulumi stack with
