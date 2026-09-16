@@ -7,27 +7,6 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-retention="30d"
-log_retention="14d"
-trace_retention="3d"
-max_stored_bytes="10737418240"
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --retention)
-      retention="$2"
-      shift 2
-      ;;
-    --max-stored-bytes)
-      max_stored_bytes="$2"
-      shift 2
-      ;;
-    *)
-      echo "unknown argument: $1" >&2
-      exit 1
-      ;;
-  esac
-done
-
 required_names=(
   SIGNY_IMAGE_REF
   SIGNY_R2_BUCKET
@@ -86,7 +65,6 @@ printf '%s\n' \
   'SIGNY_ORPHAN_GC_INTERVAL=1h' \
   'SIGNY_CATALOG_PRUNE_MIN_AGE=8d' \
   'SIGNY_MIN_FREE_DISK_BYTES=4294967296' \
-  'SIGNY_DEFAULT_TENANT_MAX_STORED_BYTES=10737418240' \
   'SIGNY_RETENTION_INTERVAL=300s' \
   'SIGNY_RETENTION_GRACE_PERIOD=3600s' \
   'SIGNY_STARTUP_RETRY_BUDGET=300s' > "$signy_env_file"
@@ -155,21 +133,6 @@ for attempt in $(seq 1 60); do
   sleep 2
 done
 
-curl -fsS -X PUT http://127.0.0.1:3100/signy/api/v1/admin/tenants/fn0/retention \
-  -H 'Content-Type: application/json' \
-  --data "{\"retention\":\"${retention}\",\"log_retention\":\"${log_retention}\",\"trace_retention\":\"${trace_retention}\",\"max_stored_bytes\":\"${max_stored_bytes}\"}" >/dev/null
-
-policy_json="$(curl -fsS http://127.0.0.1:3100/signy/api/v1/admin/tenants/fn0/retention)"
-policy_tenant="$(jq -r '.tenant' <<<"$policy_json")"
-policy_retention="$(jq -r '.retention' <<<"$policy_json")"
-policy_log_retention="$(jq -r '.log_retention' <<<"$policy_json")"
-policy_trace_retention="$(jq -r '.trace_retention' <<<"$policy_json")"
-if [[ "$policy_tenant" != fn0 || "$policy_retention" != "$retention" \
-  || "$policy_log_retention" != "$log_retention" || "$policy_trace_retention" != "$trace_retention" ]]; then
-  echo "tenant policy verification failed" >&2
-  exit 1
-fi
-
 ready_body="$(curl -fsS http://127.0.0.1:3100/ready)"
 remote_healthy="$(curl -fsS http://127.0.0.1:3100/metrics | awk '$1 == "signy_remote_healthy" {print $2; exit}')"
 if [[ "$remote_healthy" != 1 ]]; then
@@ -179,6 +142,6 @@ fi
 
 echo "signy image: ${SIGNY_IMAGE_REF}"
 echo "signy ready: ${ready_body}"
-echo "signy tenant policy: ${policy_tenant} retention=${policy_retention} logs=${policy_log_retention} traces=${policy_trace_retention} max_stored_bytes=${max_stored_bytes}"
+echo "signy tenant policy: unchanged by installer; control owns project policies"
 echo "signy R2 remote healthy: ${remote_healthy}"
 echo "signy tunnel unit: active"

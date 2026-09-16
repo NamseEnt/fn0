@@ -55,7 +55,8 @@ scripts/setup-signy-node-remote.sh --ssh namse@192.168.0.10
 
 The script writes root-only secret files, starts the digest-pinned Signy
 container, configures the Tunnel, removes obsolete metrics tunnel and backup
-units, sets the `fn0` retention policy, and verifies R2 health.
+units, and verifies R2 health. It does not create a platform tenant policy;
+control owns explicit project policies.
 
 ## Cost and retention controls
 
@@ -66,9 +67,9 @@ collection. Host metrics are sampled once per minute. Signy runs with
 the worker's 50 GiB volume and is the recovery buffer when Signy is unavailable.
 
 Signy declares a 2 GiB memory budget, an 8 GiB cache limit, a 1 GiB WAL
-backlog limit, a 4 GiB minimum free-disk floor, and a 10 GiB tenant storage
-limit. Every tenant, the platform's `fn0` and each project's alike, keeps
-metrics, logs and traces for 30 days.
+backlog limit, and a 4 GiB minimum free-disk floor. Retention and storage
+limits are explicit per-tenant policies; there is no global or platform
+retention fallback.
 
 Signy flushes at most once a minute (`SIGNY_FLUSH_MAX_INTERVAL=60s`), so data
 reaches R2 up to a minute after it is written to the local WAL. Fewer flushes

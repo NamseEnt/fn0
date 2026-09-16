@@ -1,56 +1,29 @@
-//! Registers projects as Signy tenants.
+//! Control-owned registration of project tenants in Signy.
 //!
-//! Every project's telemetry is filed under a tenant named by its project id,
-//! and Signy drops the data of a tenant nobody pushed a policy for. So a
-//! project has to be registered before its first export arrives, and control
-//! is the side that knows when projects come and go. Signy never calls out:
-//! a failed push is control's to retry, which the cron reconcile does.
+//! ProjectDoc is the source of truth. This module only transports the latest
+//! document value to Signy through the durable queue; it never invents a
+//! policy, reconciles from a platform default, or changes retention on delete.
 
+use crate::docs::TelemetryPolicy;
 use forte_sdk::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-/// The policy every project gets: 30 days for logs, traces and metrics alike,
-/// and 512 MiB stored.
-pub const PROJECT_RETENTION: &str = "30d";
-pub const PROJECT_MAX_STORED_BYTES: &str = "512MiB";
-
-/// Pushed when a project is deleted. Retention `0` is how Signy deletes a
-/// tenant's data; the zero storage limit refuses anything still in flight.
-const DELETED_RETENTION: &str = "0";
-const DELETED_MAX_STORED_BYTES: &str = "0";
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct TenantPolicy {
-    pub retention: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_stored_bytes: Option<String>,
+pub struct ReconcileStats {
+    pub requeued_records: u64,
 }
 
 #[derive(Deserialize)]
-struct TenantListResponse {
-    tenants: Vec<TenantListEntry>,
-}
-
-#[derive(Deserialize)]
-struct TenantListEntry {
-    tenant: String,
+struct TenantPolicyResponse {
+    revision: u64,
     retention: String,
     #[serde(default)]
     max_stored_bytes: Option<String>,
-}
-
-pub fn project_policy() -> TenantPolicy {
-    TenantPolicy {
-        retention: PROJECT_RETENTION.to_string(),
-        max_stored_bytes: Some(PROJECT_MAX_STORED_BYTES.to_string()),
-    }
-}
-
-fn deleted_project_policy() -> TenantPolicy {
-    TenantPolicy {
-        retention: DELETED_RETENTION.to_string(),
-        max_stored_bytes: Some(DELETED_MAX_STORED_BYTES.to_string()),
-    }
+    #[serde(default)]
+    log_retention: Option<String>,
+    #[serde(default)]
+    trace_retention: Option<String>,
+    #[serde(default)]
+    metric_retention: Option<String>,
 }
 
 struct SignyAdmin {
@@ -88,116 +61,84 @@ impl SignyAdmin {
         }
         Ok(body)
     }
+}
 
-    async fn put_policy(&self, tenant: &str, policy: &TenantPolicy) -> anyhow::Result<()> {
-        self.send(
-            "PUT",
-            &format!("tenants/{tenant}/retention"),
-            serde_json::to_vec(policy)?,
+pub async fn register_project(project_id: &str, policy: &TelemetryPolicy) -> anyhow::Result<()> {
+    let admin = SignyAdmin::from_env()?;
+    let response: TenantPolicyResponse = serde_json::from_slice(
+        &admin
+            .send(
+                "PUT",
+                &format!("project-tenants/{project_id}/retention"),
+                serde_json::to_vec(&serde_json::json!({
+                    "revision": policy.revision,
+                    "retention": policy.log_retention,
+                    "log_retention": policy.log_retention,
+                    "trace_retention": policy.trace_retention,
+                    "metric_retention": policy.metric_retention,
+                    "max_stored_bytes": policy.max_stored_bytes,
+                }))?,
+            )
+            .await?,
+    )?;
+    if response.revision != policy.revision
+        || response.retention != policy.log_retention
+        || response.max_stored_bytes.as_deref() != Some(policy.max_stored_bytes.as_str())
+        || response.log_retention.as_deref() != Some(policy.log_retention.as_str())
+        || response.trace_retention.as_deref() != Some(policy.trace_retention.as_str())
+        || response.metric_retention.as_deref() != Some(policy.metric_retention.as_str())
+    {
+        anyhow::bail!("Signy returned a policy different from ProjectDoc");
+    }
+    Ok(())
+}
+
+/// Reads the policy already registered in Signy for migration. Missing
+/// policies are returned as `None`; callers record that as an operator
+/// exception rather than inventing a value.
+pub async fn read_policy(project_id: &str) -> anyhow::Result<Option<TelemetryPolicy>> {
+    let admin = SignyAdmin::from_env()?;
+    let request = http::Request::builder()
+        .uri(format!(
+            "{}/signy/api/v1/admin/tenants/{project_id}/retention",
+            admin.url
+        ))
+        .method("GET")
+        .header("CF-Access-Client-Id", &admin.access_client_id)
+        .header("CF-Access-Client-Secret", &admin.access_client_secret)
+        .body(Vec::new())?;
+    let response = http::Client::new().send(request).await?;
+    if response.status() == http::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    let status = response.status();
+    let body = response.into_body().bytes().await?.to_vec();
+    if !status.is_success() {
+        anyhow::bail!(
+            "signy admin GET tenants/{project_id}/retention answered {status}: {}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+    let response: TenantPolicyResponse = serde_json::from_slice(&body)?;
+    let base = response.retention;
+    Ok(Some(TelemetryPolicy {
+        revision: response.revision,
+        log_retention: response.log_retention.unwrap_or_else(|| base.clone()),
+        trace_retention: response.trace_retention.unwrap_or_else(|| base.clone()),
+        metric_retention: response.metric_retention.unwrap_or(base),
+        max_stored_bytes: response
+            .max_stored_bytes
+            .unwrap_or_else(|| "unlimited".to_string()),
+    }))
+}
+
+pub async fn revoke_project_access(project_id: &str, fence: u64) -> anyhow::Result<()> {
+    SignyAdmin::from_env()?
+        .send(
+            "POST",
+            &format!("project-tenants/{project_id}/access/revoke"),
+            serde_json::to_vec(&serde_json::json!({ "fence": fence }))?,
         )
         .await?;
-        Ok(())
-    }
-}
-
-pub async fn register_project(project_id: &str) -> anyhow::Result<()> {
-    SignyAdmin::from_env()?
-        .put_policy(project_id, &project_policy())
-        .await
-}
-
-pub async fn delete_project(project_id: &str) -> anyhow::Result<()> {
-    SignyAdmin::from_env()?
-        .put_policy(project_id, &deleted_project_policy())
-        .await
-}
-
-pub struct ReconcileStats {
-    pub registered_projects: u64,
-}
-
-/// Pushes the project policy for every project that lacks it or holds an
-/// outdated one. A project already at retention `0` is being deleted and is
-/// never pushed back: undoing a deletion is not a reconcile's decision.
-pub async fn reconcile_projects(project_ids: &[String]) -> anyhow::Result<ReconcileStats> {
-    let admin = SignyAdmin::from_env()?;
-    let listing: TenantListResponse =
-        serde_json::from_slice(&admin.send("GET", "tenants", Vec::new()).await?)?;
-    let existing: std::collections::HashMap<String, TenantPolicy> = listing
-        .tenants
-        .into_iter()
-        .map(|entry| {
-            (
-                entry.tenant,
-                TenantPolicy {
-                    retention: entry.retention,
-                    max_stored_bytes: entry.max_stored_bytes,
-                },
-            )
-        })
-        .collect();
-    let mut registered_projects = 0;
-    for project_id in projects_needing_policy(project_ids, &existing) {
-        admin.put_policy(project_id, &project_policy()).await?;
-        registered_projects += 1;
-    }
-    Ok(ReconcileStats {
-        registered_projects,
-    })
-}
-
-fn projects_needing_policy<'a>(
-    project_ids: &'a [String],
-    existing: &std::collections::HashMap<String, TenantPolicy>,
-) -> Vec<&'a str> {
-    let wanted = project_policy();
-    project_ids
-        .iter()
-        .filter(|project_id| match existing.get(project_id.as_str()) {
-            None => true,
-            Some(policy) if policy.retention == DELETED_RETENTION => false,
-            Some(policy) => *policy != wanted,
-        })
-        .map(String::as_str)
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{TenantPolicy, deleted_project_policy, project_policy, projects_needing_policy};
-
-    #[test]
-    fn registers_missing_and_outdated_projects_but_never_revives_a_deleted_one() {
-        let project_ids = vec![
-            "missing".to_string(),
-            "current".to_string(),
-            "outdated".to_string(),
-            "deleted".to_string(),
-        ];
-        let existing = std::collections::HashMap::from([
-            ("current".to_string(), project_policy()),
-            (
-                "outdated".to_string(),
-                TenantPolicy {
-                    retention: "7d".to_string(),
-                    max_stored_bytes: None,
-                },
-            ),
-            ("deleted".to_string(), deleted_project_policy()),
-            ("fn0".to_string(), project_policy()),
-        ]);
-
-        assert_eq!(
-            projects_needing_policy(&project_ids, &existing),
-            vec!["missing", "outdated"]
-        );
-    }
-
-    #[test]
-    fn the_pushed_body_is_the_whole_policy() {
-        assert_eq!(
-            serde_json::to_value(project_policy()).unwrap(),
-            serde_json::json!({"retention": "30d", "max_stored_bytes": "512MiB"})
-        );
-    }
+    Ok(())
 }

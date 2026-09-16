@@ -37,6 +37,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
     let now = forte_sdk::now();
     let github_id = user.github_id;
+    let telemetry_policy = selected_telemetry_policy();
 
     let project_id_for_trx = project_id.clone();
     let name_for_trx = name.clone();
@@ -45,6 +46,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         .trx(|trx| {
             let project_id = project_id_for_trx.clone();
             let name = name_for_trx.clone();
+            let telemetry_policy = telemetry_policy.clone();
             async move {
                 let mut user_handle = trx
                     .get(UserDocGet { github_id })
@@ -61,10 +63,19 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                     ),
                 })?;
                 trx.create(ProjectDoc {
-                    project_id,
+                    project_id: project_id.clone(),
                     owner_github_id: github_id,
                     name,
                     created_at: now,
+                    telemetry_policy: telemetry_policy.clone(),
+                })?;
+                trx.create(TelemetryPolicyOutboxDoc {
+                    project_id,
+                    policy_revision: telemetry_policy.revision,
+                    state: TelemetryPolicySyncState::Pending,
+                    attempts: 0,
+                    last_error: None,
+                    updated_at: now,
                 })?;
                 trx.commit::<_, ()>(())
             }
@@ -73,10 +84,13 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     match result {
         doc_db::TrxResult::Committed(()) => {
-            // Not a failure of the project: the cron reconcile registers any
-            // project this push missed before its first deploy is likely to
-            // export anything.
-            if let Err(e) = crate::common::signy_tenant::register_project(&project_id).await {
+            if let Err(e) = crate::enqueue::telemetry_policy_sync(
+                crate::queue_task::telemetry_policy_sync::Input {
+                    project_id: project_id.clone(),
+                },
+            )
+            .await
+            {
                 tracing::error!(%project_id, "new_project signy tenant registration: {e}");
             }
             Output::Ok { project_id }
@@ -90,6 +104,19 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
             tracing::error!("new_project trx err: {e}");
             Output::InternalError
         }
+    }
+}
+
+/// The concrete policy control currently selects for a new project. This is
+/// intentionally scoped to project creation, not a Signy fallback or an
+/// installer default.
+fn selected_telemetry_policy() -> TelemetryPolicy {
+    TelemetryPolicy {
+        revision: 1,
+        log_retention: "30d".to_string(),
+        trace_retention: "30d".to_string(),
+        metric_retention: "30d".to_string(),
+        max_stored_bytes: "512MiB".to_string(),
     }
 }
 
@@ -107,4 +134,19 @@ async fn generate_project_id() -> Result<String, String> {
         out.push(PROJECT_ID_ALPHABET[(b % alpha_len) as usize] as char);
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::selected_telemetry_policy;
+
+    #[test]
+    fn new_projects_store_the_concrete_control_selected_policy() {
+        let policy = selected_telemetry_policy();
+        assert_eq!(policy.revision, 1);
+        assert_eq!(policy.log_retention, "30d");
+        assert_eq!(policy.trace_retention, "30d");
+        assert_eq!(policy.metric_retention, "30d");
+        assert_eq!(policy.max_stored_bytes, "512MiB");
+    }
 }

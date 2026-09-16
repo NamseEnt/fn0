@@ -6,21 +6,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pulumi_dir="${repo_root}/infra/cloud"
 stack="prod"
 ssh_target=""
-retention="30d"
-max_stored_bytes="10737418240"
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ssh)
       ssh_target="$2"
-      shift 2
-      ;;
-    --retention)
-      retention="$2"
-      shift 2
-      ;;
-    --max-stored-bytes)
-      max_stored_bytes="$2"
       shift 2
       ;;
     *)
@@ -31,7 +20,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$ssh_target" ]]; then
-  echo "usage: $0 --ssh user@host [--retention 30d] [--max-stored-bytes bytes]" >&2
+  echo "usage: $0 --ssh user@host" >&2
   exit 1
 fi
 for tool in pulumi ssh scp; do
@@ -77,8 +66,8 @@ chmod 0600 "$payload"
 remote_file="fn0-signy-setup.sh"
 if [[ -n "${SSHPASS:-}" ]] && command -v sshpass >/dev/null; then
   SSHPASS="$SSHPASS" sshpass -e scp -q "$payload" "${ssh_target}:${remote_file}"
-  printf '%s\n' "$SSHPASS" | SSHPASS="$SSHPASS" sshpass -e ssh -T "$ssh_target" "chmod 0600 ${remote_file} && sudo -S -p '' bash ${remote_file} --retention $(printf '%q' "$retention") --max-stored-bytes $(printf '%q' "$max_stored_bytes"); setup_status=\$?; rm -f ${remote_file}; exit \$setup_status"
+  printf '%s\n' "$SSHPASS" | SSHPASS="$SSHPASS" sshpass -e ssh -T "$ssh_target" "chmod 0600 ${remote_file} && sudo -S -p '' bash ${remote_file}; setup_status=\$?; rm -f ${remote_file}; exit \$setup_status"
 else
   scp -q "$payload" "${ssh_target}:${remote_file}"
-  ssh -t "$ssh_target" "chmod 0600 ${remote_file} && sudo bash ${remote_file} --retention $(printf '%q' "$retention") --max-stored-bytes $(printf '%q' "$max_stored_bytes"); setup_status=\$?; rm -f ${remote_file}; exit \$setup_status"
+  ssh -t "$ssh_target" "chmod 0600 ${remote_file} && sudo bash ${remote_file}; setup_status=\$?; rm -f ${remote_file}; exit \$setup_status"
 fi

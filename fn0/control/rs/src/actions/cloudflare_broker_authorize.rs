@@ -89,9 +89,19 @@ async fn authorize(
 #[cfg(test)]
 mod tests {
     use super::{Output, authorize};
-    use crate::docs::{DbRequest, ProjectDoc, ProjectDocPut};
+    use crate::docs::{DbRequest, ProjectDoc, ProjectDocPut, TelemetryPolicy};
 
     const ACCOUNT_ID: &str = "account-id";
+
+    fn telemetry_policy() -> TelemetryPolicy {
+        TelemetryPolicy {
+            revision: 1,
+            log_retention: "30d".to_string(),
+            trace_retention: "30d".to_string(),
+            metric_retention: "30d".to_string(),
+            max_stored_bytes: "512MiB".to_string(),
+        }
+    }
 
     #[test]
     fn refuses_an_operation_outside_the_fixed_set() {
@@ -129,6 +139,7 @@ mod tests {
                 owner_github_id: 7,
                 name: "demo".to_string(),
                 created_at: forte_sdk::now(),
+                telemetry_policy: telemetry_policy(),
             })
             .send_with(&db)
             .await
@@ -147,6 +158,7 @@ mod tests {
                 owner_github_id: 7,
                 name: "demo".to_string(),
                 created_at: forte_sdk::now(),
+                telemetry_policy: telemetry_policy(),
             })
             .send_with(&db)
             .await
@@ -174,6 +186,7 @@ mod tests {
                 owner_github_id: 7,
                 name: "demo".to_string(),
                 created_at: forte_sdk::now(),
+                telemetry_policy: telemetry_policy(),
             })
             .send_with(&db)
             .await

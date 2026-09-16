@@ -45,6 +45,66 @@ pub struct ProjectDoc {
     pub owner_github_id: i64,
     pub name: String,
     pub created_at: DateTime,
+    pub telemetry_policy: TelemetryPolicy,
+}
+
+/// The concrete policy selected by control for one project. These are actual
+/// Signy values, never a fallback marker or a migration sentinel.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct TelemetryPolicy {
+    pub revision: u64,
+    pub log_retention: String,
+    pub trace_retention: String,
+    pub metric_retention: String,
+    pub max_stored_bytes: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TelemetryPolicySyncState {
+    Pending,
+    Applied,
+    Failed,
+    BlockedByDeletion,
+}
+
+#[forte_doc]
+pub struct TelemetryPolicyOutboxDoc {
+    #[pk]
+    pub project_id: String,
+    pub policy_revision: u64,
+    pub state: TelemetryPolicySyncState,
+    pub attempts: u64,
+    pub last_error: Option<String>,
+    pub updated_at: DateTime,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectDeletionState {
+    RevokePending,
+    AccessRevoked,
+    TeardownComplete,
+}
+
+#[forte_doc]
+pub struct ProjectDeletionDoc {
+    #[pk]
+    pub project_id: String,
+    pub fence: u64,
+    pub state: ProjectDeletionState,
+    pub updated_at: DateTime,
+    pub last_error: Option<String>,
+}
+
+/// Projects whose old ProjectDoc cannot be upgraded because Signy has no
+/// explicit policy. This is an operator exception, not a policy value.
+#[forte_doc]
+pub struct TelemetryPolicyMigrationExceptionDoc {
+    #[pk]
+    pub project_id: String,
+    pub reason: String,
+    pub observed_at: DateTime,
 }
 
 #[forte_doc]

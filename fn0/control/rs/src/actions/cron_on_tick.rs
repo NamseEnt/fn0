@@ -163,12 +163,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     if epoch_minute % SIGNY_TENANT_RECONCILE_EVERY_MINUTES == 0 {
         match reconcile_signy_tenants().await {
-            Ok(stats) if stats.registered_projects > 0 => tracing::info!(
-                registered_projects_count = stats.registered_projects,
-                "signy tenant reconcile registered projects",
+            Ok(stats) if stats.requeued_records > 0 => tracing::info!(
+                requeued_records_count = stats.requeued_records,
+                "signy policy reconcile requeued durable work",
             ),
-            Ok(_) => tracing::debug!("signy tenant reconcile found every project registered"),
-            Err(err) => tracing::error!(?err, "signy tenant reconcile within cron_on_tick failed"),
+            Ok(_) => tracing::debug!("signy policy reconcile found no pending work"),
+            Err(err) => tracing::error!(?err, "signy policy reconcile within cron_on_tick failed"),
         }
     }
 
@@ -198,19 +198,87 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 }
 
-/// Every project the workers route to is a project that can export
-/// telemetry, so the manifest is the set that has to be registered.
+/// Re-enqueues durable policy outbox records. This is the correction path for
+/// the window where ProjectDoc committed but the first queue request failed.
+/// It never reconstructs a policy from Signy or from a platform default.
 async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStats> {
-    let Some(manifest) = (WorkerManifestDocGet {})
-        .send_with(&doc_db::turso())
-        .await?
-    else {
-        return Ok(signy_tenant::ReconcileStats {
-            registered_projects: 0,
-        });
-    };
-    let project_ids: Vec<String> = manifest.project_manifests.keys().cloned().collect();
-    signy_tenant::reconcile_projects(&project_ids).await
+    let db = doc_db::turso();
+    let mut after: Option<(String, String)> = None;
+    let mut requeued_records = 0;
+    loop {
+        let page = db
+            .scan(
+                after.as_ref().map(|(pk, sk)| (pk.as_str(), sk.as_str())),
+                256,
+            )
+            .await?;
+        if page.is_empty() {
+            break;
+        }
+        for (pk, _sk, bytes) in &page {
+            if pk.starts_with("ProjectDeletionDoc/") {
+                let tombstone: ProjectDeletionDoc = match serde_json::from_slice(bytes) {
+                    Ok(tombstone) => tombstone,
+                    Err(error) => {
+                        tracing::error!(%pk, %error, "invalid project deletion tombstone");
+                        continue;
+                    }
+                };
+                if tombstone.state != ProjectDeletionState::TeardownComplete {
+                    match crate::enqueue::project_teardown(
+                        crate::queue_task::project_teardown::Input {
+                            project_id: tombstone.project_id.clone(),
+                        },
+                    )
+                    .await
+                    {
+                        Ok(()) => requeued_records += 1,
+                        Err(error) => tracing::error!(
+                            project_id = %tombstone.project_id,
+                            %error,
+                            "project deletion re-enqueue failed"
+                        ),
+                    }
+                }
+                continue;
+            }
+            if !pk.starts_with("TelemetryPolicyOutboxDoc/") {
+                continue;
+            }
+            let outbox: TelemetryPolicyOutboxDoc = match serde_json::from_slice(bytes) {
+                Ok(outbox) => outbox,
+                Err(error) => {
+                    tracing::error!(%pk, %error, "invalid telemetry policy outbox document");
+                    continue;
+                }
+            };
+            if !matches!(
+                outbox.state,
+                TelemetryPolicySyncState::Pending | TelemetryPolicySyncState::Failed
+            ) {
+                continue;
+            }
+            match crate::enqueue::telemetry_policy_sync(
+                crate::queue_task::telemetry_policy_sync::Input {
+                    project_id: outbox.project_id.clone(),
+                },
+            )
+            .await
+            {
+                Ok(()) => requeued_records += 1,
+                Err(error) => tracing::error!(
+                    project_id = %outbox.project_id,
+                    %error,
+                    "telemetry policy outbox re-enqueue failed"
+                ),
+            }
+        }
+        let Some((pk, sk, _)) = page.last() else {
+            break;
+        };
+        after = Some((pk.clone(), sk.clone()));
+    }
+    Ok(signy_tenant::ReconcileStats { requeued_records })
 }
 
 async fn recover_expired_websocket_singletons() -> anyhow::Result<()> {

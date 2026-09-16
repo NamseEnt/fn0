@@ -123,7 +123,8 @@ seed_project_doc() {
     --argjson owner "$owner_github_id" \
     --arg name "$name" \
     --arg created "$created_at" \
-    '{project_id:$pid, owner_github_id:$owner, name:$name, created_at:$created}')"
+    '{project_id:$pid, owner_github_id:$owner, name:$name, created_at:$created,
+      telemetry_policy:{revision:1, log_retention:"30d", trace_retention:"30d", metric_retention:"30d", max_stored_bytes:"512MiB"}}')"
   echo ">> seed ProjectDoc project_id=${project_id} (insert-only)"
   __insert_doc_if_missing "$db_url" "$db_token" "ProjectDoc/project_id=${project_id}" "" "$data"
 }

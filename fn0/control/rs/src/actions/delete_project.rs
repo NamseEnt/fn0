@@ -1,8 +1,7 @@
-//! Owner-initiated project deletion. Verifies ownership, then enqueues the
-//! `project_teardown` queue task which removes every resource the project
-//! accretes (routing, cron, telemetry, bundles, static assets, object
-//! storage, turso database, docs). Deletion is asynchronous: `Ok` means teardown is
-//! enqueued, not finished.
+//! Owner-initiated project deletion. Verifies ownership, records an access
+//! revoke tombstone, then enqueues the `project_teardown` queue task. Deletion
+//! is asynchronous: `Ok` means teardown is enqueued, not finished. The task
+//! does not change Signy's retention policy or purge Signy telemetry.
 
 use crate::common::auth;
 use crate::docs::*;
@@ -42,6 +41,34 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     };
     if project.owner_github_id != user.github_id {
         return Output::NotFound;
+    }
+
+    let db = doc_db::turso();
+    let deletion = match (ProjectDeletionDocGet {
+        project_id: &req.body.project_id,
+    })
+    .send_with(&db)
+    .await
+    {
+        Ok(deletion) => deletion,
+        Err(error) => {
+            tracing::error!(project_id = %req.body.project_id, %error, "delete_project: failed to read deletion tombstone");
+            return Output::InternalError;
+        }
+    };
+    if deletion.is_none()
+        && let Err(error) = (ProjectDeletionDocPut(ProjectDeletionDoc {
+            project_id: req.body.project_id.clone(),
+            fence: 1,
+            state: ProjectDeletionState::RevokePending,
+            updated_at: now(),
+            last_error: None,
+        }))
+        .send_with(&db)
+        .await
+    {
+        tracing::error!(project_id = %req.body.project_id, %error, "delete_project: tombstone write failed");
+        return Output::InternalError;
     }
 
     if let Err(e) = crate::enqueue::project_teardown(crate::queue_task::project_teardown::Input {

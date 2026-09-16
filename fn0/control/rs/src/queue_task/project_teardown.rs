@@ -1,13 +1,17 @@
 //! Full teardown of one project, enqueued by the `delete_project` action.
 //!
+//! Signy access is revoked before any teardown is reported complete. The
+//! project's Signy retention policy and telemetry objects are deliberately
+//! preserved; this task does not perform a retention change or telemetry
+//! purge.
+//!
 //! The queue is at-least-once with redelivery on failure, so every step
 //! tolerates already-deleted resources and the identity docs (`ProjectDoc`,
 //! the owner's `UserDoc.projects` entry) are removed last: a redelivered
 //! message re-runs the whole sequence and converges.
 //!
-//! Known race: the owner can re-deploy the project while teardown is in
-//! flight and resurrect some resources. That is the owner racing their own
-//! destroy, so it is accepted rather than locked against.
+//! The deletion tombstone remains after teardown and fences a redelivered
+//! policy-registration task from restoring Signy access.
 
 use crate::common::byoc::{self, ProjectStorage};
 use crate::common::r2_store::{BundleStore, ProjectR2Store, parse_compiled_key};
@@ -27,11 +31,30 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     let db = doc_db::turso();
     let now = forte_sdk::now();
 
+    let tombstone = ensure_revoke_pending(&db, &project_id, now).await?;
+    if tombstone.state != ProjectDeletionState::AccessRevoked
+        && tombstone.state != ProjectDeletionState::TeardownComplete
+    {
+        if let Err(error) =
+            crate::common::signy_tenant::revoke_project_access(&project_id, tombstone.fence).await
+        {
+            record_revoke_failure(&db, &tombstone, error.to_string()).await?;
+            return Err(error);
+        }
+        let mut revoked = tombstone.clone();
+        revoked.state = ProjectDeletionState::AccessRevoked;
+        revoked.last_error = None;
+        revoked.updated_at = now;
+        (ProjectDeletionDocPut(revoked.clone()))
+            .send_with(&db)
+            .await?;
+        tracing::info!(%project_id, fence = revoked.fence, "project_teardown: Signy access revoked");
+    }
+
     let storage = ProjectStorage::resolve_if_connected(&db, &project_id).await?;
 
     delete_domain(&db, &project_id).await?;
     remove_routing_and_cron(&db, &project_id).await?;
-    crate::common::signy_tenant::delete_project(&project_id).await?;
     delete_bundle_store_objects(&project_id, now).await?;
     if let Some(storage) = &storage {
         empty_project_buckets(&project_id, storage, now).await?;
@@ -41,7 +64,51 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
     delete_compiled_bundle_docs(&db, &project_id).await?;
     delete_identity_docs(&db, &project_id).await?;
 
+    (ProjectDeletionDocPut(ProjectDeletionDoc {
+        project_id: project_id.clone(),
+        fence: tombstone.fence,
+        state: ProjectDeletionState::TeardownComplete,
+        updated_at: now,
+        last_error: None,
+    }))
+    .send_with(&db)
+    .await?;
+
     tracing::info!(%project_id, "project_teardown complete");
+    Ok(())
+}
+
+async fn ensure_revoke_pending(
+    db: &doc_db::Database,
+    project_id: &str,
+    now: DateTime,
+) -> anyhow::Result<ProjectDeletionDoc> {
+    if let Some(tombstone) = (ProjectDeletionDocGet { project_id }).send_with(db).await? {
+        return Ok(tombstone);
+    }
+    let tombstone = ProjectDeletionDoc {
+        project_id: project_id.to_string(),
+        fence: 1,
+        state: ProjectDeletionState::RevokePending,
+        updated_at: now,
+        last_error: None,
+    };
+    (ProjectDeletionDocPut(tombstone.clone()))
+        .send_with(db)
+        .await?;
+    Ok(tombstone)
+}
+
+async fn record_revoke_failure(
+    db: &doc_db::Database,
+    tombstone: &ProjectDeletionDoc,
+    error: String,
+) -> anyhow::Result<()> {
+    let mut failed = tombstone.clone();
+    failed.state = ProjectDeletionState::RevokePending;
+    failed.last_error = Some(error);
+    failed.updated_at = now();
+    (ProjectDeletionDocPut(failed)).send_with(db).await?;
     Ok(())
 }
 
