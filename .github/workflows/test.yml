@@ -143,6 +143,17 @@ jobs:
           cargo metadata --manifest-path "$package_dir/Cargo.toml" --no-deps --format-version 1 >/dev/null
           grep -q 'INIT_FORTE_JSON_VERSION' "$package_dir/src/cli/init.rs"
 
+      # v8's build script skips its prebuilt-archive download whenever the
+      # checksum file matches, without verifying the archive exists. A cache
+      # restore can lose the ~130MB librusty_v8.a while keeping the checksum,
+      # which silently breaks the link; drop the checksum so it re-downloads.
+      - name: Repair v8 archive cache
+        run: |
+          find target -path '*/gn_out/obj/*.sum' -print0 |
+          while IFS= read -r -d '' sum; do
+            [ -f "${sum%.sum}" ] || rm -f "$sum"
+          done
+
       # Each test runs `forte init` and then a real `forte build` or `forte dev`
       # in a temp project: npm install, vite, sqld and a full wasm app build.
       # Kept off the unit gate so an npm registry outage cannot mask a real
