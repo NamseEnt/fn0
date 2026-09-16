@@ -8,8 +8,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 retention="30d"
-log_retention="14d"
-trace_retention="3d"
+log_retention="30d"
+trace_retention="30d"
 max_stored_bytes="10737418240"
 while [[ $# -gt 0 ]]; do
   case "$1" in

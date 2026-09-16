@@ -10,8 +10,13 @@ use forte_sdk::*;
 use serde::{Deserialize, Serialize};
 
 /// The policy every project gets: 30 days for logs, traces and metrics alike,
-/// and 512 MiB stored.
+/// and 512 MiB stored. Each signal is named rather than left to the default,
+/// so a change to one of them is a change to this line and the reconcile below
+/// notices a tenant that is still on an older policy.
 pub const PROJECT_RETENTION: &str = "30d";
+pub const PROJECT_LOG_RETENTION: &str = "30d";
+pub const PROJECT_TRACE_RETENTION: &str = "30d";
+pub const PROJECT_METRIC_RETENTION: &str = "30d";
 pub const PROJECT_MAX_STORED_BYTES: &str = "512MiB";
 
 /// Pushed when a project is deleted. Retention `0` is how Signy deletes a
@@ -24,6 +29,12 @@ pub struct TenantPolicy {
     pub retention: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_stored_bytes: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log_retention: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_retention: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metric_retention: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -37,12 +48,21 @@ struct TenantListEntry {
     retention: String,
     #[serde(default)]
     max_stored_bytes: Option<String>,
+    #[serde(default)]
+    log_retention: Option<String>,
+    #[serde(default)]
+    trace_retention: Option<String>,
+    #[serde(default)]
+    metric_retention: Option<String>,
 }
 
 pub fn project_policy() -> TenantPolicy {
     TenantPolicy {
         retention: PROJECT_RETENTION.to_string(),
         max_stored_bytes: Some(PROJECT_MAX_STORED_BYTES.to_string()),
+        log_retention: Some(PROJECT_LOG_RETENTION.to_string()),
+        trace_retention: Some(PROJECT_TRACE_RETENTION.to_string()),
+        metric_retention: Some(PROJECT_METRIC_RETENTION.to_string()),
     }
 }
 
@@ -50,6 +70,9 @@ fn deleted_project_policy() -> TenantPolicy {
     TenantPolicy {
         retention: DELETED_RETENTION.to_string(),
         max_stored_bytes: Some(DELETED_MAX_STORED_BYTES.to_string()),
+        log_retention: None,
+        trace_retention: None,
+        metric_retention: None,
     }
 }
 
@@ -132,6 +155,9 @@ pub async fn reconcile_projects(project_ids: &[String]) -> anyhow::Result<Reconc
                 TenantPolicy {
                     retention: entry.retention,
                     max_stored_bytes: entry.max_stored_bytes,
+                    log_retention: entry.log_retention,
+                    trace_retention: entry.trace_retention,
+                    metric_retention: entry.metric_retention,
                 },
             )
         })
@@ -164,7 +190,10 @@ fn projects_needing_policy<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{TenantPolicy, deleted_project_policy, project_policy, projects_needing_policy};
+    use super::{
+        PROJECT_MAX_STORED_BYTES, PROJECT_RETENTION, TenantPolicy, deleted_project_policy,
+        project_policy, projects_needing_policy,
+    };
 
     #[test]
     fn registers_missing_and_outdated_projects_but_never_revives_a_deleted_one() {
@@ -181,6 +210,9 @@ mod tests {
                 TenantPolicy {
                     retention: "7d".to_string(),
                     max_stored_bytes: None,
+                    log_retention: None,
+                    trace_retention: None,
+                    metric_retention: None,
                 },
             ),
             ("deleted".to_string(), deleted_project_policy()),
@@ -193,11 +225,38 @@ mod tests {
         );
     }
 
+    /// A tenant already registered under the policy that named no signal is
+    /// reconciled onto this one, which is what carries the signal periods to
+    /// the projects registered before they existed.
+    #[test]
+    fn a_policy_without_signal_periods_is_outdated() {
+        let existing = std::collections::HashMap::from([(
+            "pre-signal".to_string(),
+            TenantPolicy {
+                retention: PROJECT_RETENTION.to_string(),
+                max_stored_bytes: Some(PROJECT_MAX_STORED_BYTES.to_string()),
+                log_retention: None,
+                trace_retention: None,
+                metric_retention: None,
+            },
+        )]);
+        assert_eq!(
+            projects_needing_policy(&["pre-signal".to_string()], &existing),
+            vec!["pre-signal"]
+        );
+    }
+
     #[test]
     fn the_pushed_body_is_the_whole_policy() {
         assert_eq!(
             serde_json::to_value(project_policy()).unwrap(),
-            serde_json::json!({"retention": "30d", "max_stored_bytes": "512MiB"})
+            serde_json::json!({
+                "retention": "30d",
+                "max_stored_bytes": "512MiB",
+                "log_retention": "30d",
+                "trace_retention": "30d",
+                "metric_retention": "30d"
+            })
         );
     }
 }
