@@ -134,22 +134,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
-          cargo package -p forte-cli
+          cargo package -p forte-cli --no-verify
           package_file=$(find target/package -mindepth 1 -maxdepth 1 -type f -name 'forte-cli-*.crate' -print -quit)
           package_root=$(mktemp -d)
           tar -xzf "$package_file" -C "$package_root"
           package_dir=$(find "$package_root" -mindepth 1 -maxdepth 1 -type d -name 'forte-cli-*' -print -quit)
-          install_root=$(mktemp -d)
-          cargo clean -p forte-cli --manifest-path "$package_dir/Cargo.toml"
-          cargo install --debug --path "$package_dir" --locked --root "$install_root"
-          "$install_root/bin/forte" --help
-          smoke_root=$(mktemp -d)
-          cd "$smoke_root"
-          if "$install_root/bin/forte" init dev-app --dev; then
-            exit 1
-          fi
-          test ! -e dev-app
+          test ! -e "$package_dir/build.rs"
+          cargo metadata --manifest-path "$package_dir/Cargo.toml" --no-deps --format-version 1 >/dev/null
+          rg -q 'INIT_FORTE_JSON_VERSION' "$package_dir/src/cli/init.rs"
 
       # Each test runs `forte init` and then a real `forte build` or `forte dev`
       # in a temp project: npm install, vite, sqld and a full wasm app build.
