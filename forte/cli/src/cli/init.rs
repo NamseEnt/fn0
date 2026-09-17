@@ -3,11 +3,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const FORTE_JSON_VERSION: &str = env!("FORTE_JSON_VERSION");
-const FORTE_SDK_VERSION: &str = env!("FORTE_SDK_VERSION");
-const FORTE_CODEGEN_VERSION: &str = env!("FORTE_CODEGEN_VERSION");
-const FN0_DOC_DB_VERSION: &str = env!("FN0_DOC_DB_VERSION");
-const FN0_OBJECT_STORAGE_VERSION: &str = env!("FN0_OBJECT_STORAGE_VERSION");
+const INIT_FORTE_JSON_VERSION: &str = "0.1.3";
+const INIT_FORTE_SDK_VERSION: &str = "0.10.0";
+const INIT_FORTE_CODEGEN_VERSION: &str = "0.5.0";
+const INIT_FN0_DOC_DB_VERSION: &str = "0.4.14";
+const INIT_FN0_OBJECT_STORAGE_VERSION: &str = "0.5.8";
+
+const DEV_WORKSPACE_MANIFESTS: &[&str] = &[
+    "forte/json/Cargo.toml",
+    "forte/sdk/Cargo.toml",
+    "forte/codegen/Cargo.toml",
+    "doc-db/Cargo.toml",
+    "object-storage/Cargo.toml",
+];
 
 pub fn run(name: &str, dev: bool) -> Result<()> {
     let project_dir = Path::new(name);
@@ -15,6 +23,8 @@ pub fn run(name: &str, dev: bool) -> Result<()> {
     if project_dir.exists() {
         anyhow::bail!("Directory '{}' already exists", name);
     }
+
+    let rust_manifest = rs_cargo_toml(name, dev)?;
 
     fs::create_dir_all(project_dir.join("rs/.cargo"))?;
     fs::create_dir_all(project_dir.join("rs/src/pages/index"))?;
@@ -26,7 +36,7 @@ pub fn run(name: &str, dev: bool) -> Result<()> {
 
     fs::write(project_dir.join("rs/.gitignore"), RS_GITIGNORE)?;
     fs::write(project_dir.join("rs/.cargo/config.toml"), RS_CARGO_CONFIG)?;
-    fs::write(project_dir.join("rs/Cargo.toml"), rs_cargo_toml(name, dev))?;
+    fs::write(project_dir.join("rs/Cargo.toml"), rust_manifest)?;
     fs::write(project_dir.join("rs/build.rs"), RS_BUILD_RS)?;
     fs::write(project_dir.join("rs/src/lib.rs"), RS_LIB_RS)?;
     fs::write(
@@ -68,10 +78,10 @@ fn npm_install(fe_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn rs_cargo_toml(name: &str, dev: bool) -> String {
+fn rs_cargo_toml(name: &str, dev: bool) -> Result<String> {
     let (forte_json_dep, forte_sdk_dep, doc_db_dep, object_storage_dep, forte_codegen_dep) = if dev
     {
-        let workspace_root = workspace_root_path();
+        let workspace_root = workspace_root_path(Path::new(env!("CARGO_MANIFEST_DIR")))?;
         (
             format!(
                 r#"{{ path = "{}" }}"#,
@@ -96,17 +106,17 @@ fn rs_cargo_toml(name: &str, dev: bool) -> String {
         )
     } else {
         (
-            format!(r#""={FORTE_JSON_VERSION}""#),
-            format!(r#""={FORTE_SDK_VERSION}""#),
-            format!(r#"{{ package = "fn0-doc-db", version = "={FN0_DOC_DB_VERSION}" }}"#),
+            format!(r#""={INIT_FORTE_JSON_VERSION}""#),
+            format!(r#""={INIT_FORTE_SDK_VERSION}""#),
+            format!(r#"{{ package = "fn0-doc-db", version = "={INIT_FN0_DOC_DB_VERSION}" }}"#),
             format!(
-                r#"{{ package = "fn0-object-storage", version = "={FN0_OBJECT_STORAGE_VERSION}" }}"#
+                r#"{{ package = "fn0-object-storage", version = "={INIT_FN0_OBJECT_STORAGE_VERSION}" }}"#
             ),
-            format!(r#""={FORTE_CODEGEN_VERSION}""#),
+            format!(r#""={INIT_FORTE_CODEGEN_VERSION}""#),
         )
     };
 
-    format!(
+    Ok(format!(
         r#"[workspace]
 
 [package]
@@ -132,15 +142,30 @@ object-storage = {object_storage_dep}
 [build-dependencies]
 forte-codegen = {forte_codegen_dep}
 "#
-    )
+    ))
 }
 
-fn workspace_root_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("workspace root from forte/cli manifest dir")
-        .to_path_buf()
+fn workspace_root_path(manifest_dir: &Path) -> Result<PathBuf> {
+    for candidate in manifest_dir.ancestors() {
+        let workspace_manifest_path = candidate.join("Cargo.toml");
+        let Ok(workspace_manifest) = fs::read_to_string(&workspace_manifest_path) else {
+            continue;
+        };
+        let Ok(workspace_manifest) = workspace_manifest.parse::<toml::Value>() else {
+            continue;
+        };
+        if workspace_manifest.get("workspace").is_some()
+            && DEV_WORKSPACE_MANIFESTS
+                .iter()
+                .all(|relative_path| candidate.join(relative_path).is_file())
+        {
+            return Ok(candidate.to_path_buf());
+        }
+    }
+
+    anyhow::bail!(
+        "`forte init --dev` requires a Forte source workspace; use `forte init <name>` with an installed CLI"
+    )
 }
 
 fn fe_package_json(name: &str) -> String {
@@ -236,3 +261,68 @@ export default function IndexPage(props: Props) {
     );
 }
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn template_versions_match_workspace_packages() {
+        let workspace_root = workspace_root_path(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
+        let expected_packages = [
+            (
+                "forte/json/Cargo.toml",
+                "forte-json",
+                INIT_FORTE_JSON_VERSION,
+            ),
+            ("forte/sdk/Cargo.toml", "forte-sdk", INIT_FORTE_SDK_VERSION),
+            (
+                "forte/codegen/Cargo.toml",
+                "forte-codegen",
+                INIT_FORTE_CODEGEN_VERSION,
+            ),
+            ("doc-db/Cargo.toml", "fn0-doc-db", INIT_FN0_DOC_DB_VERSION),
+            (
+                "object-storage/Cargo.toml",
+                "fn0-object-storage",
+                INIT_FN0_OBJECT_STORAGE_VERSION,
+            ),
+        ];
+
+        for (relative_path, expected_name, expected_version) in expected_packages {
+            let manifest_path = workspace_root.join(relative_path);
+            let manifest_text = fs::read_to_string(&manifest_path).unwrap();
+            let manifest_value = manifest_text.parse::<toml::Value>().unwrap();
+            let package = manifest_value.get("package").unwrap();
+
+            assert_eq!(
+                package.get("name").and_then(toml::Value::as_str),
+                Some(expected_name)
+            );
+            assert_eq!(
+                package.get("version").and_then(toml::Value::as_str),
+                Some(expected_version)
+            );
+        }
+    }
+
+    #[test]
+    fn dev_workspace_resolution_fails_without_workspace() {
+        let temporary_directory = tempfile::tempdir().unwrap();
+        let error = workspace_root_path(temporary_directory.path()).unwrap_err();
+
+        assert!(error.to_string().contains("forte init --dev"));
+    }
+
+    #[test]
+    fn release_manifest_uses_registry_dependencies() {
+        let manifest = rs_cargo_toml("my-app", false).unwrap();
+
+        assert!(manifest.contains("forte-json = \"=0.1.3\""));
+        assert!(manifest.contains("forte-sdk = \"=0.10.0\""));
+        assert!(manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.14\""));
+        assert!(manifest.contains("package = \"fn0-object-storage\", version = \"=0.5.8\""));
+        assert!(manifest.contains("forte-codegen = \"=0.5.0\""));
+        assert!(!manifest.contains("path = "));
+    }
+}

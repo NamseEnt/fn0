@@ -30,6 +30,14 @@ fn test_init_creates_project_structure() {
     assert!(project_dir.join("fe/src/pages/index/page.tsx").exists());
     assert!(project_dir.join("fe/public/robots.txt").exists());
 
+    let rust_manifest = std::fs::read_to_string(project_dir.join("rs/Cargo.toml")).unwrap();
+    assert!(rust_manifest.contains("forte-json = \"=0.1.3\""));
+    assert!(rust_manifest.contains("forte-sdk = \"=0.10.0\""));
+    assert!(rust_manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.14\""));
+    assert!(rust_manifest.contains("package = \"fn0-object-storage\", version = \"=0.5.8\""));
+    assert!(rust_manifest.contains("forte-codegen = \"=0.5.0\""));
+    assert!(!rust_manifest.contains("path = "));
+
     let app_tsx = std::fs::read_to_string(project_dir.join("fe/src/app.tsx")).unwrap();
     assert!(app_tsx.contains("export const head"));
     assert!(app_tsx.contains("export function Head"));
