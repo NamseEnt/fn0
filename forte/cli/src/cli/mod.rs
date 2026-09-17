@@ -149,9 +149,14 @@ pub enum CloudCommands {
             help = "Cloudflare zone name, not a zone ID; required for a new project"
         )]
         zone: Option<String>,
+    },
+    /// Log in to a Cloudflare account and install its setup broker
+    Login {
+        #[arg(long, help = "Cloudflare zone name used to select the account")]
+        zone: String,
         #[arg(
             long,
-            help = "Read the first-time setup token from the clipboard instead of a prompt, for when an AI agent creates it in the Cloudflare dashboard"
+            help = "Read the setup token from the clipboard instead of a prompt"
         )]
         setup_token_from_clipboard: bool,
     },

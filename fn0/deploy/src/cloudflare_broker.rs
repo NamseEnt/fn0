@@ -552,7 +552,7 @@ impl BrokerClient {
 
     /// Tears the broker down entirely: the Worker script, its Secrets
     /// Store, and the setup token stored in it. Every project on this
-    /// Cloudflare account that used this broker needs `forte cloud init`
+    /// Cloudflare account that used this broker needs `forte cloud login`
     /// run again afterward.
     pub async fn destroy_broker(&self) -> Result<()> {
         self.post_empty("/v1/destroy-broker", &serde_json::json!({}))

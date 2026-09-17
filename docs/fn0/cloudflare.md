@@ -18,28 +18,26 @@ at Cloudflare. Not just an account: an R2 custom domain has to live in a zone
 in the same account as the bucket, and that hostname is where your frontend
 assets get served from.
 
-## One command
+## Connect the account, then initialize the project
 
 ```sh
+forte cloud login --zone example.com
+
 forte cloud init \
   --project . \
   --project-name my-app \
   --zone example.com
 ```
 
-`forte login` must be run first — the command loads fn0 credentials to
-register the project and fails immediately if they are absent.
+`forte login` must be run first. Then `forte cloud login` asks for the
+Cloudflare setup token and installs the account-level broker. It stores only
+the non-secret account ID and broker URL locally; the setup token remains in
+your Cloudflare account's Secrets Store.
 
-The first time this runs for a Cloudflare account, it asks for the setup
-token through a masked prompt — never a command-line argument, an
-environment variable, or something printed or saved anywhere in the clear —
-and uses it once to install a small broker Worker in your own account. After
-that, the token lives only inside that Worker's Secrets Store; the CLI never
-holds it again, and later runs for this project or any other project on the
-same account reuse the broker without asking for the token a second time.
-(`--setup-token-from-clipboard` swaps the masked prompt for a clipboard
-hand-off, so an AI agent can create the token for you — see
-[AI-assisted setup](#ai-assisted-setup).)
+After that, `forte cloud init` never asks for the setup token. It reuses the
+broker for this project or any other project on the same account.
+`--setup-token-from-clipboard` is available on `cloud login` when an AI agent
+creates the token for you — see [AI-assisted setup](#ai-assisted-setup).
 
 As part of initialization, the CLI enables WebSockets for the selected zone.
 This is required for Forte WebSocket routes to complete their upgrade through
@@ -65,15 +63,15 @@ argument is not needed.
 
 Setup has to create buckets, point a hostname at one, write one zone rule, add
 one DNS record and sign a certificate. Create one reusable setup token.
-Cloudflare dashboard → **My Profile → API Tokens →
-Create Token → Create Custom Token**. Give it exactly one permission:
+Cloudflare dashboard → **My Profile → API Tokens → Create Token → Create
+Additional Tokens**. Use that template and give it exactly one permission:
 
 | Scope | Permission |
 | --- | --- |
 | User | API Tokens → Edit |
 
-Type it in once, at the masked prompt the first `forte cloud init` for this
-account shows. That first run uses it to install a broker Worker — a small
+Type it in once, at the masked prompt `forte cloud login` shows. That first run
+uses it to install a broker Worker — a small
 Cloudflare Worker that lives in your own account — and stores the token as a
 secret in your account's own Secrets Store, bound only to that Worker. From
 then on, the broker is the only thing that ever reads the token: it mints a
@@ -87,12 +85,12 @@ Cloudflare account after the first run. If it's ever compromised or you just
 want a new one, `forte cloud rotate` replaces it in place and republishes the
 current broker Worker; `forte cloud
 clear` removes it without replacing it; `forte cloud destroy` removes the
-whole broker, token included. See [`forte cloud`](../forte/cli.md#forte-cloud-init)
+whole broker, token included. See [`forte cloud`](../forte/cli.md#forte-cloud-login)
 for all three.
 
 ## AI-assisted setup
 
-`forte cloud init --setup-token-from-clipboard` and `forte cloud rotate
+`forte cloud login --setup-token-from-clipboard` and `forte cloud rotate
 --setup-token-from-clipboard` take the setup token from the OS clipboard
 instead of a masked prompt: the command waits, you (or an AI agent driving your
 browser) create the token in the dashboard and click its **Copy** button, and

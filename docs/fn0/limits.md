@@ -179,7 +179,7 @@ directly to the storage endpoint and are not cached.
 ### Object storage
 
 Object storage, public objects, deployed static assets and cached pages all
-live in **your own Cloudflare account**, connected with `forte cloud init`. Their storage and operation limits are whatever your Cloudflare
+live in **your own Cloudflare account**, connected with `forte cloud login` and `forte cloud init`. Their storage and operation limits are whatever your Cloudflare
 plan gives you — R2's forever-free tier is 10 GB, 1M writes and 10M reads a
 month — and fn0 does not meter or cap them.
 

@@ -52,7 +52,7 @@ Key properties of the SSR step:
 | Package | Version | Crate | Purpose |
 |---|---|---|---|
 | `forte-sdk` | 0.10.0 | `forte/sdk` | Runtime library for wasm components (HTTP types, `ForteRequest`, cookie utilities, metrics, etc.) |
-| `forte-cli` | 0.6.8 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
+| `forte-cli` | 0.6.10 | `forte/cli` | Developer CLI (`forte dev`, `forte build`, `forte deploy`, etc.) |
 | `forte-macros` | 0.6.0 | `forte/macros` | Procedural macros: `#[forte_sdk::test]`, `#[forte_doc]` |
 | `forte-json` | 0.1.3 | `forte/json` | Streaming JSON serializer used for Props serialization |
 | `forte-codegen` | 0.5.0 | `forte/codegen` | Build-script library that generates `route_generated.rs` |
@@ -98,7 +98,7 @@ See the full handler docs: [Pages](pages.md), [API Endpoints](apis.md), [Actions
 3. `forte add page <path>` / `forte add action <path>` — add handlers
 4. `forte build` — compile backend (WASM) + frontend (Vite)
 5. `forte login` — authenticate with fn0 Cloud (required before first deploy)
-6. `forte cloud init --zone <zone> --project-name <name>` — connect your Cloudflare account (required before first deploy; asks for a setup token once per Cloudflare account, then reuses it for every other project on that account)
+6. `forte cloud login --zone <zone>` then `forte cloud init --zone <zone> --project-name <name>` — connect your Cloudflare account and initialize the project
 7. `forte deploy` — upload to fn0 Cloud
 
 See [cli.md](cli.md) for all commands and [fn0/cloudflare.md](../fn0/cloudflare.md) for the Cloudflare token setup.

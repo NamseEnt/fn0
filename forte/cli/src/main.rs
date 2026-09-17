@@ -130,11 +130,15 @@ async fn async_main() -> Result<()> {
                 project,
                 project_name,
                 zone,
-                setup_token_from_clipboard,
             } => {
                 let project_dir = project.unwrap_or_else(|| ".".into());
-                cli::cloud::init(project_dir, project_name, zone, setup_token_from_clipboard)
-                    .await?;
+                cli::cloud::init(project_dir, project_name, zone).await?;
+            }
+            CloudCommands::Login {
+                zone,
+                setup_token_from_clipboard,
+            } => {
+                cli::cloud::login(zone, setup_token_from_clipboard).await?;
             }
             CloudCommands::Rotate {
                 project,

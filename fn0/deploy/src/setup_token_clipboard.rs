@@ -1,5 +1,5 @@
 //! Reading the Cloudflare setup token off the OS clipboard for
-//! `forte cloud init --setup-token-from-clipboard`.
+//! `forte cloud login --setup-token-from-clipboard`.
 //!
 //! An AI agent (or the user) creates the token in the Cloudflare dashboard and
 //! clicks its "Copy" button. Nothing types the secret into a prompt, a command
@@ -19,7 +19,7 @@ const POLL_TIMEOUT: Duration = Duration::from_secs(900);
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
 const MINIMUM_TOKEN_LENGTH: usize = 20;
 const MAXIMUM_TOKEN_LENGTH: usize = 200;
-const CONSUMED_MARKER: &str = "(Cloudflare setup token consumed by forte cloud init)";
+const CONSUMED_MARKER: &str = "(Cloudflare setup token consumed by forte cloud login)";
 
 pub async fn read_setup_token_from_clipboard() -> Result<String> {
     let client = reqwest::Client::new();

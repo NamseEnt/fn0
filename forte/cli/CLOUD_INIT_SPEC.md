@@ -2,14 +2,17 @@
 
 Status: **Implemented**.
 
-This document defines the Cloudflare setup contract for the Forte CLI. The
-command remains a single operation: it resolves the requested zone, registers
-the project, provisions its Cloudflare resources, creates the credentials Forte
+This document defines the Cloudflare setup contract for the Forte CLI. Cloudflare
+account authentication is a separate `forte cloud login` operation. Once a
+broker is available, `cloud init` resolves the requested zone, registers the
+project, provisions its Cloudflare resources, creates the credentials Forte
 needs, and prints the DNS record that must be added.
 
 ## Invocation
 
 ```sh
+forte cloud login --zone example.com
+
 forte cloud init \
   --project . \
   --project-name my-app \
@@ -23,25 +26,24 @@ forte cloud rotate --project .
 forte cloud clear --project . --yes
 ```
 
-On the first run, `forte cloud init` asks for the Cloudflare setup token through
-a masked prompt. It is never a command-line argument, environment variable,
-printed value, or project/local credential-store entry.
+Before the first `forte cloud init`, run `forte cloud login` to install the
+per-account broker. `forte cloud init` never asks for a Cloudflare setup token.
+The token is never a command-line argument, environment variable, printed
+value, or project/local credential-store entry.
 
-`--setup-token-from-clipboard` replaces the masked prompt with a clipboard
+`forte cloud login --setup-token-from-clipboard` provides the clipboard
 hand-off: the command polls the OS clipboard, and the token is created in the
 Cloudflare dashboard — by the user, or by an AI agent driving the browser — and
 put on the clipboard with the dashboard's own Copy control. The command reads it
 from the clipboard, verifies it against Cloudflare, and overwrites the
-clipboard. The token is still never an argument, environment variable, printed
-value, or credential-store entry, and an agent that only clicks Copy never
-handles the value. The mode needs a desktop session; with no reachable
-clipboard (SSH, CI) it is an error.
+clipboard. The mode needs a desktop session; with no reachable clipboard (SSH,
+CI) it is an error.
 
-The first run uses the token only during bootstrap of the per-account
+`cloud login` uses the token only during bootstrap of the per-account
 `fn0-broker` Worker. The token is saved as `FN0_SETUP_TOKEN` in the user's Cloudflare
 account-level Secrets Store with the `workers` scope, and the Worker receives
 it through a Secrets Store binding. Later runs use the broker URL already in
-`Forte.toml` and do not ask for the setup token again.
+the saved broker configuration and do not ask for the setup token again.
 
 For a new project directory, the same non-secret account ID and broker URL are
 also reused from Forte's user configuration. That file contains no Cloudflare
@@ -54,7 +56,6 @@ token.
 | `-p, --project <dir>` | no | Forte project directory; defaults to `.` |
 | `--project-name <name>` | for a new project | Project identity and DNS label |
 | `--zone <name>` | for a new project | Cloudflare zone name, such as `example.com` |
-| `--setup-token-from-clipboard` | no | Read the first-run setup token from the clipboard instead of a masked prompt |
 
 `--domain` is not part of the default contract. The public hostname is
 derived as `<project-name>.<zone>`.
@@ -102,9 +103,9 @@ reported as an error instead of starting a reconfiguration flow.
 
 ## Authentication and secrets
 
-The setup token is a bootstrap credential with `User -> API Tokens -> Edit`.
-The first run creates a short-lived token with the account permissions needed
-to create or update the user's Secrets Store secret and deploy the broker
+`forte cloud login --zone <name>` requires a setup token with `User -> API Tokens
+-> Edit`. The first run creates a short-lived token with the account permissions
+needed to create or update the user's Secrets Store secret and deploy the broker
 Worker, then revokes that temporary token. The setup token itself is sent only
 to Cloudflare during bootstrap and is never sent to fn0-control or the broker
 API as a request value.
@@ -136,9 +137,9 @@ created with only the permissions and resource scope required by each project.
 ## Operation order
 
 1. Validate all local arguments.
-2. Load the saved broker configuration, or read the setup token (prompt or
-   clipboard), roll its secret, and install the user's account-level broker
-   Worker and Secrets Store binding around the rolled value.
+2. Load the saved project broker configuration or the user's saved broker
+   configuration. If neither exists, fail and tell the user to run
+   `forte cloud login --zone <zone>`.
 3. Resolve the exact Cloudflare zone name through the broker.
 4. Derive and validate `<project-name>.<zone>`.
 5. Create or resolve the Forte project identity.
@@ -167,9 +168,21 @@ fails, including:
 - inaccessible zone
 - a configuration mismatch on an existing project
 
-If the account has no saved broker configuration, an empty setup-token prompt
-is also an error. Token rotation republishes the current broker Worker, uses a
-masked prompt, and never reads a local environment variable. Both `init` and
-`rotate` accept
-`--setup-token-from-clipboard` instead; in that mode an unreachable clipboard,
-or no accepted token within the poll window, is an error.
+If the account has no saved broker configuration, `cloud init` fails with an
+instruction to run `forte cloud login --zone <zone>`. Token login and rotation
+use a masked prompt and never read a local environment variable. `cloud login`
+and `rotate` accept `--setup-token-from-clipboard`; in that mode an unreachable
+clipboard, or no accepted token within the poll window, is an error.
+
+## Cloudflare login
+
+```sh
+forte cloud login --zone example.com
+```
+
+This command requires `forte login`, reads the setup token, discovers the exact
+Cloudflare account that owns the requested zone, installs the account-level
+broker, and saves only the non-secret account ID and broker URL in the user's
+Forte configuration. If a broker is already configured, it refuses to replace
+it and points to `forte cloud rotate`. It does not create a project or write
+`Forte.toml`.

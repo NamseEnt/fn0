@@ -265,6 +265,27 @@ forte login --token fn0_xxxxx
 
 ---
 
+### `forte cloud login`
+
+Connect the CLI to a Cloudflare account by installing the account-level setup
+broker.
+
+**Prerequisites:** `forte login` must be run before `forte cloud login`.
+
+```sh
+forte cloud login --zone example.com
+```
+
+The command asks for a setup token through a masked prompt. The token must use
+only the `User -> API Tokens -> Edit` permission. The command discovers the
+account that owns the requested zone, installs the broker, stores the token in
+your Cloudflare account's Secrets Store, and saves only the non-secret account
+ID and broker URL in the user's Forte configuration.
+
+Use `--setup-token-from-clipboard` for the clipboard hand-off described in
+[AI-assisted setup](../fn0/cloudflare.md#ai-assisted-setup). This command does
+not create a project or write `Forte.toml`.
+
 ### `forte cloud init`
 
 Give a project an identity and a Cloudflare zone. The public hostname is
@@ -273,7 +294,9 @@ project can be deployed. See [Bring Your Own Cloudflare](../fn0/cloudflare.md)
 for what it creates and which token permissions it needs. The normative command
 contract is [the cloud init specification](../../forte/cli/CLOUD_INIT_SPEC.md).
 
-**Prerequisites:** `forte login` must be run before `forte cloud init` — the command loads fn0 credentials and fails with "not signed in" if they are missing.
+**Prerequisites:** `forte login` and `forte cloud login --zone <zone>` must be
+run before `forte cloud init`. If the Cloudflare broker is missing, the command
+fails and tells you to run `forte cloud login`.
 
 ```sh
 forte cloud init \
@@ -282,22 +305,8 @@ forte cloud init \
   --zone example.com
 ```
 
-On the first run for a Cloudflare account, the command asks for a setup token
-through a masked prompt — never a command-line argument, an environment
-variable, or something it prints or saves anywhere in the clear. That first
-run uses the token to install a small broker Worker in your own Cloudflare
-account and stores the token only inside that Worker's Secrets Store. Every
-later run, for this project or any other project on the same account, reuses
-the broker and does not ask for the token again.
-
-`--setup-token-from-clipboard` replaces that masked prompt with a clipboard
-hand-off: the command waits while you (or an AI agent driving your browser)
-create the token in the Cloudflare dashboard and click **Copy**, then reads it
-from the clipboard, verifies it, and wipes the clipboard. During bootstrap
-`forte` rolls the token's secret in place, so the string that was copied stops
-working while the setup token itself keeps its name and permission. Needs a
-desktop session (it cannot reach a clipboard over SSH or in CI). See
-[AI-assisted setup](../fn0/cloudflare.md#ai-assisted-setup).
+The command never asks for a Cloudflare setup token. It reuses the broker
+installed by `forte cloud login` and prepares this project's resources.
 
 `--zone` is a Cloudflare zone name such as `example.com`, not the internal
 hexadecimal zone ID. The CLI resolves the exact zone and must not choose one
@@ -318,8 +327,7 @@ no separate `--domain` argument in the default contract.
 
 What it does, in order:
 
-1. Validates all arguments; installs the broker Worker first if this
-   Cloudflare account does not have one yet
+1. Validates all arguments and loads the saved Cloudflare broker
 2. Resolves the requested zone and derives the app hostname
 3. Registers the project and writes `project_id`, `project_name`, `zone`,
    `domain`, `cloudflare_account_id`, and `cloudflare_broker_url` to
@@ -349,7 +357,7 @@ forte cloud rotate --project .
 
 Replaces the setup token stored in the broker's Secrets Store and republishes
 the current setup broker Worker. Asks for the new token through the same masked
-prompt as `init` (or reads it from the clipboard with
+prompt as `cloud login` (or reads it from the clipboard with
 `--setup-token-from-clipboard`), then has the broker save it, revoke the old
 one, and installs the current CLI's Worker script. Every project already
 connected through this broker keeps working.
@@ -363,7 +371,7 @@ forte cloud clear --project . --yes
 Deletes the setup token secret from the broker's Secrets Store and revokes
 it. The broker Worker and its Secrets Store are left in place, empty — this
 is for retiring a compromised or unwanted token, not for undoing `cloud
-init`. Without `--yes` this asks for confirmation first.
+login`. Without `--yes` this asks for confirmation first.
 
 #### `forte cloud destroy`
 
@@ -372,9 +380,9 @@ forte cloud destroy --project . --yes
 ```
 
 Deletes the broker Worker, its Secrets Store, and the setup token stored in
-it — the full undo of a `cloud init` bootstrap for this Cloudflare account.
+it — the full undo of a `cloud login` bootstrap for this Cloudflare account.
 This is account-scoped: a broker is meant to be shared by every project on
-the account that has run `cloud init`, and this command does not check
+the account that has run `cloud login`, and this command does not check
 whether another project still depends on it before tearing it down. Without
 `--yes` it asks you to type the Cloudflare account ID to confirm.
 

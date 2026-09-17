@@ -73,7 +73,7 @@ async fn prepare_teardown(config: &CloudConfig) -> Result<Option<TeardownContext
     let creds = fn0_deploy::credentials::require()?;
     let broker = load_broker(config, &creds)?.ok_or_else(|| {
         anyhow!(
-            "Cloudflare is configured but the setup broker is missing; run `forte cloud init` or restore the broker settings before destroying the project"
+            "Cloudflare is configured but the setup broker is missing; run `forte cloud login --zone {zone_name}` or restore the broker settings before destroying the project"
         )
     })?;
     let zone = broker.resolve_zone(zone_name).await?;

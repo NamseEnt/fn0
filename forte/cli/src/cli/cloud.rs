@@ -13,7 +13,6 @@ pub async fn init(
     project_dir: PathBuf,
     requested_project_name: Option<String>,
     requested_zone: Option<String>,
-    setup_token_from_clipboard: bool,
 ) -> Result<()> {
     let config = read_cloud_config(&project_dir)?;
     let has_project_id = config.project_id.is_some();
@@ -63,17 +62,9 @@ pub async fn init(
                 settings.account_id,
             )?,
             None => {
-                let setup_token = obtain_setup_token(setup_token_from_clipboard).await?;
-                println!("checking the Cloudflare account and installing the setup broker...");
-                let zones = ZoneDiscovery::new(setup_token.clone()).list().await?;
-                let zone = resolve_zone(zones, &zone_name)?;
-                BrokerClient::bootstrap(
-                    setup_token,
-                    zone.account_id,
-                    creds.control_url.clone(),
-                    creds.token.clone(),
-                )
-                .await?
+                return Err(anyhow!(
+                    "Cloudflare is not logged in. Run `forte cloud login --zone {zone_name}` first."
+                ));
             }
         },
         (Some(_), None) | (None, Some(_)) => {
@@ -164,6 +155,46 @@ pub async fn init(
     Ok(())
 }
 
+pub async fn login(zone_name: String, setup_token_from_clipboard: bool) -> Result<()> {
+    validate_zone_name(&zone_name)?;
+
+    let creds = fn0_deploy::credentials::load()?.ok_or_else(|| {
+        anyhow!(
+            "not signed in. Run `forte login` first (credentials at {}).",
+            fn0_deploy::credentials::path()
+                .map(|path| path.display().to_string())
+                .unwrap_or_default()
+        )
+    })?;
+
+    if let Some(settings) = fn0_deploy::load_broker_settings()? {
+        return Err(anyhow!(
+            "Cloudflare is already logged in with account '{}'. Run `forte cloud rotate --project <project>` to replace its setup token.",
+            settings.account_id
+        ));
+    }
+
+    let setup_token = obtain_setup_token(setup_token_from_clipboard).await?;
+    println!("checking the Cloudflare account and installing the setup broker...");
+    let zones = ZoneDiscovery::new(setup_token.clone()).list().await?;
+    let zone = resolve_zone(zones, &zone_name)?;
+    let broker = BrokerClient::bootstrap(
+        setup_token,
+        zone.account_id.clone(),
+        creds.control_url,
+        creds.token,
+    )
+    .await?;
+    fn0_deploy::save_broker_settings(&broker.settings())?;
+
+    println!(
+        "Cloudflare account '{}' logged in for zone '{}'",
+        zone.account_name, zone.zone_name
+    );
+    println!("  broker {}", broker.url());
+    Ok(())
+}
+
 pub async fn rotate(project_dir: PathBuf, setup_token_from_clipboard: bool) -> Result<()> {
     let creds = fn0_deploy::credentials::require()?;
     let broker = load_broker(&project_dir, &creds)?;
@@ -214,7 +245,7 @@ pub async fn destroy(project_dir: PathBuf, confirmed: bool) -> Result<()> {
              the fn0-broker Worker, its Secrets Store, and the setup token stored in it.\n\
              \n\
              A broker is shared by every project on this Cloudflare account that has run\n\
-             `forte cloud init`. This command cannot tell whether another project still\n\
+             `forte cloud login`. This command cannot tell whether another project still\n\
              depends on it — each one will need to bootstrap a new broker with a fresh\n\
              setup token afterward.",
             broker.account_id()
@@ -251,7 +282,9 @@ fn load_broker(
         ),
         (None, None) => {
             let settings = fn0_deploy::load_broker_settings()?.ok_or_else(|| {
-                anyhow!("Cloudflare broker is not configured. Run `forte cloud init` first.")
+                anyhow!(
+                    "Cloudflare broker is not configured. Run `forte cloud login --zone <zone>` first."
+                )
             })?;
             BrokerClient::new(
                 settings.broker_url,
@@ -267,8 +300,8 @@ fn load_broker(
 }
 
 async fn obtain_setup_token(from_clipboard: bool) -> Result<String> {
+    print_setup_token_instructions(from_clipboard);
     if from_clipboard {
-        print_setup_token_instructions();
         fn0_deploy::read_setup_token_from_clipboard().await
     } else {
         prompt_cloudflare_token()
@@ -286,20 +319,25 @@ fn prompt_cloudflare_token() -> Result<String> {
     Ok(trimmed_token.to_string())
 }
 
-fn print_setup_token_instructions() {
-    println!();
-    println!("Need a Cloudflare setup token (User -> API Tokens -> Edit). Get one of these ways:");
-    println!();
-    println!("  Claude Code   run the \"cloudflare-setup-token\" skill");
-    println!("  Other agent   docs/fn0/cloudflare.md#ai-assisted-setup — same dashboard steps");
-    println!("  By hand       https://dash.cloudflare.com/profile/api-tokens");
-    println!(
-        "                Create Token -> \"Create Additional Tokens\" template -> Create -> Copy"
-    );
-    println!();
-    println!("Waiting for the token on the clipboard. Copy it and it is picked up here;");
-    println!("it is verified against Cloudflare, then wiped from the clipboard.");
-    println!();
+fn print_setup_token_instructions(from_clipboard: bool) {
+    println!("{}", setup_token_instructions(from_clipboard));
+}
+
+fn setup_token_instructions(from_clipboard: bool) -> String {
+    let handoff = if from_clipboard {
+        "Waiting for the token on the clipboard. Copy it and it is picked up here; it is verified against Cloudflare, then wiped from the clipboard."
+    } else {
+        "Paste the token at the prompt below. It is used only to bootstrap the broker and is not saved locally."
+    };
+    format!(
+        "\nA Cloudflare setup token is required.\n\n\
+         Create it at:\n\
+           https://dash.cloudflare.com/profile/api-tokens\n\n\
+         Select Create Token -> the \"Create Additional Tokens\" template.\n\
+         Required permission (and no other permissions):\n\
+           User -> API Tokens -> Edit\n\n\
+         {handoff}\n"
+    )
 }
 
 fn resolve_setting(
@@ -506,5 +544,21 @@ mod tests {
         .unwrap();
         assert_eq!(resolved_zone.zone_id, "zone-id");
         assert!(resolve_zone(Vec::new(), "other.example.com").is_err());
+    }
+
+    #[test]
+    fn setup_token_prompt_explains_the_required_permission() {
+        let instructions = setup_token_instructions(false);
+        assert!(instructions.contains("Create Additional Tokens"));
+        assert!(instructions.contains("User -> API Tokens -> Edit"));
+        assert!(instructions.contains("not saved locally"));
+        assert!(!instructions.contains("clipboard"));
+    }
+
+    #[test]
+    fn clipboard_setup_token_instructions_explain_the_handoff() {
+        let instructions = setup_token_instructions(true);
+        assert!(instructions.contains("clipboard"));
+        assert!(instructions.contains("wiped from the clipboard"));
     }
 }
