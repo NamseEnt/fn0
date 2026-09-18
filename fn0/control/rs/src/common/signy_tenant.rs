@@ -20,6 +20,7 @@ pub enum PolicySyncResult {
 
 #[derive(Deserialize)]
 struct TenantPolicyResponse {
+    #[serde(default)]
     revision: u64,
     retention: String,
     #[serde(default)]
@@ -163,4 +164,24 @@ pub async fn revoke_project_access(project_id: &str, fence: u64) -> anyhow::Resu
         )
         .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TenantPolicyResponse;
+
+    #[test]
+    fn legacy_policy_without_revision_deserializes_as_zero() {
+        let policy: TenantPolicyResponse = serde_json::from_str(
+            r#"{"tenant":"project","retention":"30d","max_stored_bytes":"512MiB"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(policy.revision, 0);
+        assert_eq!(policy.retention, "30d");
+        assert_eq!(policy.max_stored_bytes.as_deref(), Some("512MiB"));
+        assert_eq!(policy.log_retention, None);
+        assert_eq!(policy.trace_retention, None);
+        assert_eq!(policy.metric_retention, None);
+    }
 }

@@ -66,6 +66,7 @@ need python3
 container_runtime_ensure_available
 
 load_pulumi_outputs
+"${REPO_ROOT}/scripts/migrate-project-telemetry-policies.sh" --check-schema
 
 CONTROL_PROJECT_ID="${CONTROL_PROJECT_ID:-fn0-control}"
 CONTROL_CUSTOM_DOMAIN="${CONTROL_CUSTOM_DOMAIN:-}"
