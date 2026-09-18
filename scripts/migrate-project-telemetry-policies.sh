@@ -283,8 +283,9 @@ for inventory_row in "${inventory_rows[@]}"; do
     outbox_data="$(jq -nc \
       --arg project_id "$project_id" \
       --argjson policy_revision "$policy_revision" \
+      --argjson policy "$policy" \
       --arg timestamp "$timestamp" \
-      '{project_id:$project_id,policy_revision:$policy_revision,state:"pending",attempts:0,last_error:null,pending_since:$timestamp,updated_at:$timestamp}')"
+      '{project_id:$project_id,policy_revision:$policy_revision,policy:$policy,state:"pending",attempts:0,last_error:null,pending_since:$timestamp,updated_at:$timestamp}')"
     outbox_base64="$(printf '%s' "$outbox_data" | base64 | tr -d '\n')"
     statement="$(jq -nc \
       --arg pk "$outbox_pk" \
@@ -292,14 +293,15 @@ for inventory_row in "${inventory_rows[@]}"; do
       --arg sql "$outbox_insert_sql" \
       '{type:"execute",stmt:{sql:$sql,args:[{type:"text",value:$pk},{type:"blob",base64:$blob}]}}')"
     requests="$(jq -c --argjson statement "$statement" '. + [$statement]' <<<"$requests")"
-  elif (( $(jq -r '.outbox.data.policy_revision' <<<"$inventory_row") < $(jq -r '.policy.revision' <<<"$inventory_row") )); then
+  elif [[ "$(jq -r '(.outbox.data.policy_revision < .policy.revision) or ((.outbox.data.policy_revision == .policy.revision) and (.outbox.data.policy == null))' <<<"$inventory_row")" == "true" ]]; then
     policy_revision="$(jq -r '.policy.revision' <<<"$inventory_row")"
     outbox_pk="$(jq -r '.outbox.pk' <<<"$inventory_row")"
     outbox_version="$(jq -r '.outbox.version' <<<"$inventory_row")"
     outbox_data="$(jq -c \
       --argjson policy_revision "$policy_revision" \
+      --argjson policy "$policy" \
       --arg timestamp "$timestamp" \
-      '.outbox.data + {policy_revision:$policy_revision,state:"pending",last_error:null,pending_since:(.outbox.data.pending_since // $timestamp),updated_at:$timestamp}' \
+      '.outbox.data + {policy_revision:$policy_revision,policy:$policy,state:"pending",last_error:null,pending_since:(.outbox.data.pending_since // $timestamp),updated_at:$timestamp}' \
       <<<"$inventory_row")"
     outbox_base64="$(printf '%s' "$outbox_data" | base64 | tr -d '\n')"
     statement="$(jq -nc \

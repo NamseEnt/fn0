@@ -30,6 +30,10 @@ pub fn sync_conflict() {
     add_counter("fn0.telemetry.policy.sync.conflict", 1);
 }
 
+pub fn sync_dead_letter() {
+    add_counter("fn0.telemetry.policy.sync.dead_letter", 1);
+}
+
 pub fn enqueue_correction() {
     add_counter("fn0.telemetry.policy.enqueue_corrections", 1);
 }

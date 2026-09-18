@@ -48,7 +48,7 @@ pub async fn handle(Input: Input) -> anyhow::Result<()> {
             {
                 match signy_tenant::read_policy(&project_id).await? {
                     Some(signy_policy) if same_policy_meaning(&policy, &signy_policy) => {
-                        ensure_outbox(&db, &project_id, policy.revision).await?;
+                        ensure_outbox(&db, &project_id, &policy).await?;
                         (TelemetryPolicyMigrationExceptionDocDelete {
                             project_id: &project_id,
                         })
@@ -136,12 +136,14 @@ pub async fn handle(Input: Input) -> anyhow::Result<()> {
 async fn ensure_outbox(
     db: &doc_db::Database,
     project_id: &str,
-    revision: u64,
+    policy: &TelemetryPolicy,
 ) -> anyhow::Result<()> {
     let project_id = project_id.to_string();
+    let policy = policy.clone();
     match db
         .trx(|trx| {
             let project_id = project_id.clone();
+            let policy = policy.clone();
             async move {
                 let Some(mut outbox) = trx
                     .get(TelemetryPolicyOutboxDocGet {
@@ -152,7 +154,8 @@ async fn ensure_outbox(
                     let timestamp = now();
                     trx.create(TelemetryPolicyOutboxDoc {
                         project_id,
-                        policy_revision: revision,
+                        policy_revision: policy.revision,
+                        policy: Some(policy.clone()),
                         state: TelemetryPolicySyncState::Pending,
                         attempts: 0,
                         last_error: None,
@@ -161,9 +164,12 @@ async fn ensure_outbox(
                     })?;
                     return trx.commit(());
                 };
-                if outbox.policy_revision < revision {
+                if outbox.policy_revision < policy.revision
+                    || (outbox.policy_revision == policy.revision && outbox.policy.is_none())
+                {
                     let timestamp = now();
-                    outbox.policy_revision = revision;
+                    outbox.policy_revision = policy.revision;
+                    outbox.policy = Some(policy.clone());
                     outbox.state = TelemetryPolicySyncState::Pending;
                     if outbox.pending_since.is_none() {
                         outbox.pending_since = Some(timestamp);
@@ -228,9 +234,14 @@ async fn write_migrated_project_doc(
                 if let Some(current_policy) = current_policy {
                     let current_revision = current_policy.revision;
                     match outbox {
-                        Some(mut outbox) if outbox.policy_revision < current_revision => {
+                        Some(mut outbox)
+                            if outbox.policy_revision < current_revision
+                                || (outbox.policy_revision == current_revision
+                                    && outbox.policy.is_none()) =>
+                        {
                             let timestamp = now();
                             outbox.policy_revision = current_revision;
+                            outbox.policy = Some(current_policy.clone());
                             outbox.state = TelemetryPolicySyncState::Pending;
                             if outbox.pending_since.is_none() {
                                 outbox.pending_since = Some(timestamp);
@@ -244,6 +255,7 @@ async fn write_migrated_project_doc(
                             trx.create(TelemetryPolicyOutboxDoc {
                                 project_id,
                                 policy_revision: current_revision,
+                                policy: Some(current_policy.clone()),
                                 state: TelemetryPolicySyncState::Pending,
                                 attempts: 0,
                                 last_error: None,
@@ -267,6 +279,7 @@ async fn write_migrated_project_doc(
                 match outbox {
                     Some(mut outbox) => {
                         outbox.policy_revision = policy.revision;
+                        outbox.policy = Some(policy.clone());
                         outbox.state = TelemetryPolicySyncState::Pending;
                         if outbox.pending_since.is_none() {
                             outbox.pending_since = Some(timestamp);
@@ -278,6 +291,7 @@ async fn write_migrated_project_doc(
                         trx.create(TelemetryPolicyOutboxDoc {
                             project_id,
                             policy_revision: policy.revision,
+                            policy: Some(policy.clone()),
                             state: TelemetryPolicySyncState::Pending,
                             attempts: 0,
                             last_error: None,

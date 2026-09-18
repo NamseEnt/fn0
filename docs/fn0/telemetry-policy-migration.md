@@ -91,12 +91,12 @@ For every target project:
    placeholder into `ProjectDoc`.
 4. Claim the unchanged Signy values under the project-managed policy path at
    the current revision. This metadata claim changes ownership semantics, not
-   retention or storage values. It is protected by Signy's CAS and is safe to
-   repeat.
-5. Write the raw ProjectDoc policy and its outbox record in an optimistic
-   transaction. The transaction re-reads the document and refuses to replace
-   a policy or outbox revision that a newer control writer has already
-   committed.
+   retention or storage values. Signy's in-process revision fence makes a
+   repeated request safe.
+5. Write the raw ProjectDoc policy and its complete desired-state outbox record
+   in an optimistic transaction. The transaction re-reads the document and
+   refuses to replace a policy or outbox revision that a newer control writer
+   has already committed.
 6. Ensure the outbox record exists and points at the ProjectDoc revision.
    If document persistence succeeded but queue submission failed, the
    reconciliation scan recreates the submission. A missing or failed outbox

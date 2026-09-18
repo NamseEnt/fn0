@@ -69,6 +69,7 @@ pub enum TelemetryPolicySyncState {
     Pending,
     Applied,
     Failed,
+    DeadLetter,
     BlockedByDeletion,
 }
 
@@ -77,6 +78,8 @@ pub struct TelemetryPolicyOutboxDoc {
     #[pk]
     pub project_id: String,
     pub policy_revision: u64,
+    #[serde(default)]
+    pub policy: Option<TelemetryPolicy>,
     pub state: TelemetryPolicySyncState,
     pub attempts: u64,
     pub last_error: Option<String>,

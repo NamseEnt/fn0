@@ -72,6 +72,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
                 trx.create(TelemetryPolicyOutboxDoc {
                     project_id,
                     policy_revision: telemetry_policy.revision,
+                    policy: Some(telemetry_policy),
                     state: TelemetryPolicySyncState::Pending,
                     attempts: 0,
                     last_error: None,
