@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const INIT_FORTE_JSON_VERSION: &str = "0.1.3";
-const INIT_FORTE_SDK_VERSION: &str = "0.10.0";
+const INIT_FORTE_SDK_VERSION: &str = "0.11.0";
 const INIT_FORTE_CODEGEN_VERSION: &str = "0.5.0";
-const INIT_FN0_DOC_DB_VERSION: &str = "0.4.14";
-const INIT_FN0_OBJECT_STORAGE_VERSION: &str = "0.5.8";
+const INIT_FN0_DOC_DB_VERSION: &str = "0.4.15";
+const INIT_FN0_OBJECT_STORAGE_VERSION: &str = "0.5.9";
 
 const DEV_WORKSPACE_MANIFESTS: &[&str] = &[
     "forte/json/Cargo.toml",
@@ -319,9 +319,9 @@ mod tests {
         let manifest = rs_cargo_toml("my-app", false).unwrap();
 
         assert!(manifest.contains("forte-json = \"=0.1.3\""));
-        assert!(manifest.contains("forte-sdk = \"=0.10.0\""));
-        assert!(manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.14\""));
-        assert!(manifest.contains("package = \"fn0-object-storage\", version = \"=0.5.8\""));
+        assert!(manifest.contains("forte-sdk = \"=0.11.0\""));
+        assert!(manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.15\""));
+        assert!(manifest.contains("package = \"fn0-object-storage\", version = \"=0.5.9\""));
         assert!(manifest.contains("forte-codegen = \"=0.5.0\""));
         assert!(!manifest.contains("path = "));
     }
