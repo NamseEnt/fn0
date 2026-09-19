@@ -66,7 +66,7 @@ that require it. Request and response streaming is implemented end to end; see
 | `fn0-worker-proxy` | 0.1.1 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
 | `fn0-deploy` | 0.3.5 | fn0 Cloud deployment client |
 | `fn0-wasmtime` | 0.2.1 | Wasmtime wrapper with fn0-specific config |
-| `fn0-ski` | 0.1.12 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
+| `fn0-ski` | 0.1.13 | WinterCG-compatible JS runtime (Deno-based, no Node.js) |
 | `fn0-compiler` | 0.1.0 | CLI tool: compiles `.wasm` → `.cwasm` (Wasmtime pre-compiled native format); used internally by the platform |
 
 ## fn0-cli Commands
