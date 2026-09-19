@@ -1,4 +1,5 @@
 use std::fmt;
+use std::time::Duration;
 
 use wit_bindgen::rt::async_support::{FutureReader, StreamReader, StreamResult, StreamWriter};
 
@@ -61,6 +62,7 @@ pub enum Error {
     InvalidPathWithQuery,
     InvalidMethod,
     Wasi(p3::ErrorCode),
+    RequestTimeout(p3::RequestOptionsError),
     BuildResponse(http::Error),
     Json(serde_json::Error),
     Body(BodyError),
@@ -75,6 +77,7 @@ impl fmt::Display for Error {
             Error::InvalidPathWithQuery => write!(f, "invalid path-with-query"),
             Error::InvalidMethod => write!(f, "invalid method"),
             Error::Wasi(ec) => write!(f, "wasi http error: {ec:?}"),
+            Error::RequestTimeout(e) => write!(f, "request timeout not applied: {e:?}"),
             Error::BuildResponse(e) => write!(f, "failed to build response: {e}"),
             Error::Json(e) => write!(f, "failed to decode JSON: {e}"),
             Error::Body(e) => write!(f, "failed to read body: {e}"),
@@ -294,12 +297,36 @@ impl From<()> for Body {
     }
 }
 
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RequestTimeouts {
+    pub connect: Option<Duration>,
+    pub first_byte: Option<Duration>,
+    pub between_bytes: Option<Duration>,
+}
+
+impl RequestTimeouts {
+    pub fn all(duration: Duration) -> Self {
+        Self {
+            connect: Some(duration),
+            first_byte: Some(duration),
+            between_bytes: Some(duration),
+        }
+    }
+}
+
 #[derive(Default, Clone, Debug)]
-pub struct Client {}
+pub struct Client {
+    timeouts: RequestTimeouts,
+}
 
 impl Client {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
+    }
+
+    pub fn with_timeouts(mut self, timeouts: RequestTimeouts) -> Self {
+        self.timeouts = timeouts;
+        self
     }
 
     pub async fn send<B: Into<Body>>(&self, req: Request<B>) -> Result<Response<Body>> {
@@ -312,6 +339,7 @@ impl Client {
             .map(|(name, value)| (name.as_str().to_string(), value.as_bytes().to_vec()))
             .collect();
         let fields = p3::Fields::from_list(&header_entries).map_err(Error::Headers)?;
+        let request_options = build_request_options(&self.timeouts)?;
 
         let contents_reader = match body {
             Body::Empty => None,
@@ -336,7 +364,7 @@ impl Client {
         });
 
         let (wasi_req, _transmit) =
-            p3::Request::new(fields, contents_reader, trailers_reader, None);
+            p3::Request::new(fields, contents_reader, trailers_reader, request_options);
 
         wasi_req
             .set_method(&convert_method(&parts.method))
@@ -384,6 +412,27 @@ impl Client {
             })
             .map_err(Error::from)
     }
+}
+
+fn build_request_options(timeouts: &RequestTimeouts) -> Result<Option<p3::RequestOptions>> {
+    if *timeouts == RequestTimeouts::default() {
+        return Ok(None);
+    }
+    let options = p3::RequestOptions::new();
+    options
+        .set_connect_timeout(timeouts.connect.map(duration_nanoseconds))
+        .map_err(Error::RequestTimeout)?;
+    options
+        .set_first_byte_timeout(timeouts.first_byte.map(duration_nanoseconds))
+        .map_err(Error::RequestTimeout)?;
+    options
+        .set_between_bytes_timeout(timeouts.between_bytes.map(duration_nanoseconds))
+        .map_err(Error::RequestTimeout)?;
+    Ok(Some(options))
+}
+
+fn duration_nanoseconds(duration: Duration) -> u64 {
+    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
 }
 
 fn convert_method(m: &Method) -> p3::Method {

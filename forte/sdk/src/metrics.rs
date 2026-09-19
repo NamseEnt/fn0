@@ -131,7 +131,7 @@ pub(crate) fn flush() {
                 return;
             }
         };
-        match (Client {}).send(request).await {
+        match Client::new().send(request).await {
             Ok(response) if response.status().is_success() => {}
             Ok(response) => {
                 tracing::warn!(status = %response.status(), "otlp metrics export failed");

@@ -21,7 +21,16 @@ use std::time::Duration;
 use wasmtime_wasi_http::p3::RequestOptions;
 use wasmtime_wasi_http::p3::bindings::http::types::ErrorCode;
 
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
+pub(crate) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
+pub(crate) fn with_default_timeouts(options: Option<RequestOptions>) -> Option<RequestOptions> {
+    let options = options.unwrap_or_default();
+    Some(RequestOptions {
+        connect_timeout: Some(options.connect_timeout.unwrap_or(DEFAULT_TIMEOUT)),
+        first_byte_timeout: Some(options.first_byte_timeout.unwrap_or(DEFAULT_TIMEOUT)),
+        between_bytes_timeout: Some(options.between_bytes_timeout.unwrap_or(DEFAULT_TIMEOUT)),
+    })
+}
 
 pub type OutboundHttpBody = UnsyncBoxBody<Bytes, ErrorCode>;
 pub type OutboundHttpTransmit = Pin<Box<dyn Future<Output = Result<(), ErrorCode>> + Send>>;
@@ -475,5 +484,42 @@ mod tests {
         assert!(result.is_err());
         let received = server_task.await.unwrap();
         assert!(!received.windows(7).any(|window| window == b"payload"));
+    }
+
+    #[test]
+    fn missing_options_get_thirty_second_defaults() {
+        let resolved = with_default_timeouts(None).unwrap();
+        assert_eq!(resolved.connect_timeout, Some(Duration::from_secs(30)));
+        assert_eq!(resolved.first_byte_timeout, Some(Duration::from_secs(30)));
+        assert_eq!(resolved.between_bytes_timeout, Some(Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn guest_timeouts_below_and_above_the_default_are_kept() {
+        let resolved = with_default_timeouts(Some(RequestOptions {
+            connect_timeout: Some(Duration::from_secs(5)),
+            first_byte_timeout: Some(Duration::from_secs(120)),
+            between_bytes_timeout: Some(Duration::from_millis(250)),
+        }))
+        .unwrap();
+        assert_eq!(resolved.connect_timeout, Some(Duration::from_secs(5)));
+        assert_eq!(resolved.first_byte_timeout, Some(Duration::from_secs(120)));
+        assert_eq!(
+            resolved.between_bytes_timeout,
+            Some(Duration::from_millis(250))
+        );
+    }
+
+    #[test]
+    fn only_the_timeouts_the_guest_left_unset_get_the_default() {
+        let resolved = with_default_timeouts(Some(RequestOptions {
+            connect_timeout: None,
+            first_byte_timeout: Some(Duration::from_secs(5)),
+            between_bytes_timeout: None,
+        }))
+        .unwrap();
+        assert_eq!(resolved.connect_timeout, Some(DEFAULT_TIMEOUT));
+        assert_eq!(resolved.first_byte_timeout, Some(Duration::from_secs(5)));
+        assert_eq!(resolved.between_bytes_timeout, Some(DEFAULT_TIMEOUT));
     }
 }

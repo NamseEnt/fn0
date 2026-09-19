@@ -8,7 +8,7 @@ use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::otlp_hijack::{self, OtlpHijack, OtlpSignal};
-use crate::outbound_http::GuestOutboundHttp;
+use crate::outbound_http::{GuestOutboundHttp, with_default_timeouts};
 use crate::presign_gate::PresignDenied;
 use crate::public_storage_hijack::PublicStorageHijack;
 use crate::queue_hijack::QueueHijack;
@@ -314,7 +314,7 @@ fn turso_send(
         }
 
         let send_start = std::time::Instant::now();
-        let (res, io) = default_send_request(request, options).await?;
+        let (res, io) = default_send_request(request, with_default_timeouts(options)).await?;
         telemetry::stage_duration("hijack_turso", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);
@@ -361,7 +361,7 @@ fn queue_send(
         match action {
             crate::queue_hijack::HijackAction::Forward(signed) => {
                 let send_start = std::time::Instant::now();
-                let (res, io) = default_send_request(signed, options).await?;
+                let (res, io) = default_send_request(signed, with_default_timeouts(options)).await?;
                 telemetry::stage_duration("hijack_queue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
@@ -425,7 +425,7 @@ fn cross_project_enqueue_send(
         match action {
             crate::cross_project_enqueue_hijack::HijackAction::Forward(signed) => {
                 let send_start = std::time::Instant::now();
-                let (res, io) = default_send_request(signed, options).await?;
+                let (res, io) = default_send_request(signed, with_default_timeouts(options)).await?;
                 telemetry::stage_duration("hijack_cross_project_enqueue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
@@ -508,7 +508,7 @@ fn vault_send(
         };
 
         let send_start = std::time::Instant::now();
-        let (res, io) = default_send_request(signed, options).await?;
+        let (res, io) = default_send_request(signed, with_default_timeouts(options)).await?;
         telemetry::stage_duration("hijack_vault", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
@@ -609,7 +609,7 @@ fn otlp_send(
 
         tokio::task::spawn_local(async move {
             let send_start = std::time::Instant::now();
-            match default_send_request(forward_request, options).await {
+            match default_send_request(forward_request, with_default_timeouts(options)).await {
                 Ok((response, io)) => {
                     let _ = io.await;
                     drop(body_permit);
@@ -703,7 +703,7 @@ fn object_storage_send(
             return Err(e.into());
         }
         let send_start = std::time::Instant::now();
-        let (res, send_io) = default_send_request(request, options).await?;
+        let (res, send_io) = default_send_request(request, with_default_timeouts(options)).await?;
         telemetry::stage_duration("hijack_object_storage", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
@@ -781,7 +781,7 @@ fn public_storage_send(
             return Err(e.into());
         }
         let send_start = std::time::Instant::now();
-        let (res, send_io) = default_send_request(request, options).await?;
+        let (res, send_io) = default_send_request(request, with_default_timeouts(options)).await?;
         telemetry::stage_duration("hijack_public_storage", send_start.elapsed());
 
         if let Some(url) = public_url
@@ -860,7 +860,7 @@ fn static_page_cache_send(
         match action {
             Ok(crate::queue_hijack::HijackAction::Synthesized(_)) => {}
             Ok(crate::queue_hijack::HijackAction::Forward(request)) => {
-                if let Err(error) = default_send_request(request, None).await {
+                if let Err(error) = default_send_request(request, with_default_timeouts(None)).await {
                     tracing::warn!(?error, "static page purge enqueue failed");
                     let resp = text_response(500, "purge could not be queued".to_string())?;
                     return Ok((resp, empty_io()));
@@ -952,7 +952,7 @@ async fn public_cdn_get(url: String, options: Option<RequestOptions>) -> HookRes
         .map_err(|e| ErrorCode::InternalError(Some(e.to_string())))?;
 
     let send_start = std::time::Instant::now();
-    let (res, send_io) = default_send_request(request, options).await?;
+    let (res, send_io) = default_send_request(request, with_default_timeouts(options)).await?;
     telemetry::stage_duration("hijack_public_storage_cdn", send_start.elapsed());
 
     let (mut parts, body) = res.into_parts();
@@ -1010,7 +1010,7 @@ async fn enqueue_public_object_purge(
     match action {
         Ok(crate::queue_hijack::HijackAction::Synthesized(_)) => {}
         Ok(crate::queue_hijack::HijackAction::Forward(request)) => {
-            if let Err(error) = default_send_request(request, None).await {
+            if let Err(error) = default_send_request(request, with_default_timeouts(None)).await {
                 tracing::warn!(?error, "public object purge enqueue failed");
             }
         }
@@ -1049,7 +1049,7 @@ fn default_send(
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
         let send_start = std::time::Instant::now();
-        let (res, io) = default_send_request(request, options).await?;
+        let (res, io) = default_send_request(request, with_default_timeouts(options)).await?;
         telemetry::stage_duration("outbound_fetch", send_start.elapsed());
         let res = res.map(BodyExt::boxed_unsync);
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> = Box::new(io);

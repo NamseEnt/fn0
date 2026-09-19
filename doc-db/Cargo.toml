@@ -1,6 +1,6 @@
 [package]
 name = "fn0-doc-db"
-version = "0.4.14"
+version = "0.4.15"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -41,3 +41,7 @@ forte-sdk = { workspace = true, features = ["test-harness"] }
 rand = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+rustls = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "net", "time"] }

@@ -1,6 +1,8 @@
 use anyhow::Result;
 use std::time::Duration;
 
+const DATABASE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
+
 #[cfg(target_arch = "wasm32")]
 pub(crate) async fn http_post_json(
     url: &str,
@@ -8,7 +10,7 @@ pub(crate) async fn http_post_json(
     auth_token: Option<&str>,
 ) -> Result<Vec<u8>> {
     use anyhow::bail;
-    use forte_sdk::http::{Client, HeaderValue, Request, Uri};
+    use forte_sdk::http::{Client, HeaderValue, Request, RequestTimeouts, Uri};
     use std::str::FromStr;
 
     let uri = Uri::from_str(url).map_err(|e| anyhow::anyhow!("Invalid URI: {e}"))?;
@@ -27,7 +29,7 @@ pub(crate) async fn http_post_json(
     let request = builder
         .body(body)
         .map_err(|e| anyhow::anyhow!("Failed to build request: {e}"))?;
-    let client = Client::new();
+    let client = Client::new().with_timeouts(RequestTimeouts::all(DATABASE_RESPONSE_TIMEOUT));
     let response = client.send(request).await?;
     if !response.status().is_success() {
         bail!("HTTP request failed with status: {}", response.status());
@@ -46,7 +48,13 @@ pub(crate) async fn http_post_json(
     use std::sync::OnceLock;
 
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    let client = CLIENT.get_or_init(reqwest::Client::new);
+    let client = CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(DATABASE_RESPONSE_TIMEOUT)
+            .read_timeout(DATABASE_RESPONSE_TIMEOUT)
+            .build()
+            .expect("database http client must build")
+    });
 
     let mut req = client
         .post(url)
@@ -81,4 +89,34 @@ pub(crate) async fn random_bytes(buf: &mut [u8]) {
 pub(crate) async fn random_bytes(buf: &mut [u8]) {
     use rand::RngCore;
     rand::thread_rng().fill_bytes(buf);
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn unresponsive_database_fails_within_the_response_timeout() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let silent_server = tokio::spawn(async move {
+            let (_connection, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        });
+
+        let started = std::time::Instant::now();
+        let result = http_post_json(
+            &format!("http://127.0.0.1:{port}/v2/pipeline"),
+            vec![],
+            None,
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(started.elapsed() >= DATABASE_RESPONSE_TIMEOUT);
+        assert!(started.elapsed() < DATABASE_RESPONSE_TIMEOUT + Duration::from_secs(2));
+        silent_server.abort();
+    }
 }

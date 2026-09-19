@@ -43,7 +43,7 @@ impl SpanExporter for ForteOtlpExporter {
             .body(Body::Bytes(buf))
             .map_err(|e| OTelSdkError::InternalFailure(e.to_string()))?;
 
-        let response = Client {}
+        let response = Client::new()
             .send(req)
             .await
             .map_err(|e| OTelSdkError::InternalFailure(e.to_string()))?;
