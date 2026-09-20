@@ -34,7 +34,7 @@ pulumi_config() {
   pulumi -C "$pulumi_dir" -s "$stack" config get "$1"
 }
 
-signy_image_ref="$(pulumi_output signyImageRefOutput)"
+signy_image_ref="$(pulumi_config fn0Cloud:signyImageRef)"
 signy_r2_bucket="$(pulumi_output signyR2BucketName)"
 signy_r2_prefix="$(pulumi_output signyR2StoragePrefix)"
 signy_r2_endpoint="$(pulumi_output signyR2Endpoint)"
