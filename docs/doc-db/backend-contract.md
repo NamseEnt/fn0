@@ -94,6 +94,12 @@ version: i64
 
 With no prefix it scans the whole database. With `pk_prefix`, it returns only keys whose partition key starts with that prefix while retaining global `(pk, sk)` ordering. The cursor is exclusive and can be passed back in the next request. No SQL predicate language is part of this API.
 
+`AdminScan` is not a snapshot scan, and one page or a complete paginated pass does not represent a single point-in-time database state. Concurrent creates, updates, and deletes may occur during a scan. For example, a document created behind the current cursor may not be visible during that pass.
+
+Each returned `AdminDocument` must still contain `data` and `version` from the same state of that document at the time it is read. This allows a migration client to transform `data` observed at version `N` and safely submit a `Put` with `expected_version: N`. A concurrent update after the read makes that conditional write stale, so it conflicts instead of overwriting the newer document.
+
+Callers that require a completely static full-database migration must stop application writes or use a separate maintenance procedure. Phase 0 adds neither a snapshot API nor a migration lock.
+
 ### Conditional writes
 
 `AdminWriteOp` has these forms:
@@ -107,6 +113,8 @@ A conditional failure is reported as a conflict with the expected and actual ver
 ### Atomic migration batches
 
 Submitting multiple `AdminWriteOp` values to `Database::admin_write_batch` evaluates every precondition before making the batch visible. If all preconditions hold, all operations commit atomically and the outcome is `Applied`. If any operation conflicts, none of the operations is applied and the outcome is `Conflict`.
+
+Every `(pk, sk)` in one administrative write batch must be unique, regardless of operation type. A duplicate key makes the batch invalid: `admin_write_batch` returns an error before starting a transaction, and no write is executed. This error is not an `AdminWriteOutcome::Conflict` because it does not represent a concurrent modification.
 
 ## Migration workflow
 

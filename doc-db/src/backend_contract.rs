@@ -33,6 +33,8 @@ pub async fn run_backend_contract(create_db: impl Fn() -> Database) {
     run_ordering_contract(&create_db).await;
     run_batch_contract(&create_db).await;
     run_version_and_admin_contract(&create_db).await;
+    run_duplicate_admin_put_contract(&create_db).await;
+    run_duplicate_admin_mixed_write_contract(&create_db).await;
     run_explicit_transaction_contract(&create_db).await;
     run_optimistic_transaction_contract(&create_db).await;
     run_execute_ops_contract(&create_db).await;
@@ -296,6 +298,74 @@ async fn run_version_and_admin_contract(create_db: &impl Fn() -> Database) {
     assert_eq!(
         database.get("migration", "b").await.unwrap(),
         Some(Bytes::from_static(b"b0"))
+    );
+}
+
+async fn run_duplicate_admin_put_contract(create_db: &impl Fn() -> Database) {
+    let database = create_db();
+    database.put("duplicate", "put", b"original").await.unwrap();
+
+    let error = database
+        .admin_write_batch(&[
+            AdminWriteOp::Put {
+                pk: "duplicate".to_string(),
+                sk: "put".to_string(),
+                expected_version: 0,
+                data: b"first".to_vec(),
+            },
+            AdminWriteOp::Put {
+                pk: "duplicate".to_string(),
+                sk: "put".to_string(),
+                expected_version: 0,
+                data: b"second".to_vec(),
+            },
+        ])
+        .await
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate admin write key: duplicate/put")
+    );
+    assert_eq!(
+        database.get("duplicate", "put").await.unwrap(),
+        Some(Bytes::from_static(b"original"))
+    );
+}
+
+async fn run_duplicate_admin_mixed_write_contract(create_db: &impl Fn() -> Database) {
+    let database = create_db();
+    database
+        .put("duplicate", "mixed", b"original")
+        .await
+        .unwrap();
+
+    let error = database
+        .admin_write_batch(&[
+            AdminWriteOp::Put {
+                pk: "duplicate".to_string(),
+                sk: "mixed".to_string(),
+                expected_version: 0,
+                data: b"updated".to_vec(),
+            },
+            AdminWriteOp::Delete {
+                pk: "duplicate".to_string(),
+                sk: "mixed".to_string(),
+                expected_version: 0,
+            },
+        ])
+        .await
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate admin write key: duplicate/mixed")
+    );
+    assert_eq!(
+        database.get("duplicate", "mixed").await.unwrap(),
+        Some(Bytes::from_static(b"original"))
     );
 }
 

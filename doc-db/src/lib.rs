@@ -10,6 +10,7 @@ use anyhow::Result;
 use bytes::Bytes;
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
+use std::collections::HashSet;
 use std::future::Future;
 pub use trx::{
     ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
@@ -336,6 +337,18 @@ impl Database {
     ) -> Result<AdminWriteOutcome> {
         if operations.is_empty() {
             return Ok(AdminWriteOutcome::Applied);
+        }
+
+        let mut write_keys = HashSet::with_capacity(operations.len());
+        for operation in operations {
+            let (pk, sk) = match operation {
+                AdminWriteOp::Create { pk, sk, .. }
+                | AdminWriteOp::Put { pk, sk, .. }
+                | AdminWriteOp::Delete { pk, sk, .. } => (pk, sk),
+            };
+            if !write_keys.insert((pk.as_str(), sk.as_str())) {
+                anyhow::bail!("duplicate admin write key: {pk}/{sk}");
+            }
         }
 
         let writes: Vec<WriteOp> = operations
