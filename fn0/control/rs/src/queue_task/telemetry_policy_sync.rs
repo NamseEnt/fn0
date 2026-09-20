@@ -88,6 +88,14 @@ async fn begin_attempt(
                     tracing::warn!(%project_id, "telemetry policy sync has no outbox record");
                     return trx.commit::<_, Option<TelemetryPolicy>>(None);
                 };
+                if matches!(
+                    outbox.state,
+                    TelemetryPolicySyncState::Applied
+                        | TelemetryPolicySyncState::DeadLetter
+                        | TelemetryPolicySyncState::BlockedByDeletion
+                ) {
+                    return trx.commit::<_, Option<TelemetryPolicy>>(None);
+                }
                 if let Some(tombstone) = trx
                     .get(ProjectDeletionDocGet {
                         project_id: &project_id,
