@@ -492,6 +492,7 @@ const workerHostObservability = {
   signyUrl: `https://${signyHostname}`,
   signyAccessClientId: signyAccessServiceToken.clientId,
   signyAccessClientSecret: signyAccessServiceToken.clientSecret,
+  generatedTelemetryTenant: "fn0",
   platformTelemetryTenant: "fn0",
   telemetryConfigVersion,
 };

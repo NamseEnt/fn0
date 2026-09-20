@@ -16,9 +16,9 @@ served through the Signy Tunnel.
 - collecty image:
   `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:249ba93f391d71db4bd4ae8826eac12cf5c80e57b878c6672cbb46014da86866`
 - Signy image:
-  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:a9b8bdd994295b9c069e28480d333189b9740714a2ff5d342198f18f4128e842`
+  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:8212e26d9e46e5d52ff9ee8c498673959347f5cb0a705a7057f0a3b78eed357d`
 - Obsy source revision for the collecty image: `406a55fca23c433a05c772510e96d9c6ebb5e0e4`
-- Obsy source revision for the Signy image: `35f2541de94a81c37e270ddae16d86c5ba8588a8`
+- Obsy source revision for the Signy image: `4da304fb9c1ada8d8871076fae92bae402f39317`
   (built on the x86_64 Signy node from `signy/Dockerfile`)
 - R2 bucket: `fn0-signy-u35twkcf`
 - R2 prefix: `fn0/signy`
@@ -30,11 +30,8 @@ The image references and the telemetry configuration version are stored in
 `infra/cloud/Pulumi.prod.yaml`. Worker cloud-init and the node setup script
 consume those values, so a redeploy cannot silently select a mutable tag.
 
-The node is running `sha256:d3d98bf52987a18eb8d44506b4cdfc11dc967994769771a522691c6dd7bf9150`,
-built from obsy `38ca089bc0d4662d294bc2845c6fca7899a68c0b`, which is one commit
-past the digest pinned above: `38ca089` fixed a replay that failed every
-startup attempt. Re-running the node setup as it stands would roll that fix
-back. The pin moves with the next image build.
+The node is running the pinned Signy image above. It was built on the x86_64
+Signy node from the source revision listed above.
 
 ## Deployment
 
