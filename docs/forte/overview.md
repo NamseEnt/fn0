@@ -39,7 +39,7 @@ For API endpoints (`src/apis/`), the Rust handler returns JSON directly — no S
 
 ### SSR pipeline detail
 
-When a page handler sets `x-fn0-next: js`, fn0 delegates to **fn0-ski** — a WinterCG-compatible JavaScript runtime built on V8 (via `deno_core`). fn0-ski executes `dist/server.js`, the Vite SSR bundle produced by `forte build`. That bundle re-imports React, the page component, and the `@forte/react` helpers, then calls `renderToString` with the `Props` JSON returned by the Rust handler. The resulting HTML is sent to the browser.
+When a page handler sets `x-fn0-next: js`, fn0 delegates to **fn0-ski** — a WinterCG-compatible JavaScript runtime built on V8 (via `deno_core`). fn0-ski executes `dist/server.js`, the Vite SSR bundle produced by `forte build`. That bundle re-imports React, the page component, and the `@forte/react` helpers, then calls `renderToReadableStream` with the `Props` JSON returned by the Rust handler. The resulting HTML is sent to the browser.
 
 Key properties of the SSR step:
 

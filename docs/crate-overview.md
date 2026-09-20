@@ -44,7 +44,7 @@ The runtime library every Forte application handler imports. Exposes:
 - Cookie signing (`forte_sdk::cookie`)
 - UUID v7 (`forte_sdk::uuid`)
 - Async runtime (`forte_sdk::runtime::spawn_local`, `block_on`, `yield_async`)
-- Re-exports `forte_json`, `anyhow`, `serde`, `bytes`, `http`
+- Re-exports `forte_json`, `anyhow`, `serde`; `http` is exposed as `pub mod http` (not a direct re-export)
 
 **Change when:** adding or changing any SDK API that handler code calls; changing serialization behavior; adding new platform capabilities.
 
@@ -59,7 +59,7 @@ forte_codegen::generate_routes();
 forte_codegen::generate_env();
 ```
 
-`generate_routes()` scans `rs/src/{pages,apis,actions,hooks,queue_tasks,admin,ws_in,ws_out,ws_singleton}` by static source analysis, emits `rs/src/route_generated.rs` and `.forte/ws_singletons.json`, updates the `FORTE-MANAGED` block in `lib.rs`, and drives `forte-rs-to-ts` to produce TypeScript type stubs.
+`generate_routes()` scans `rs/src/{pages,apis,actions,hooks,queue_tasks,admin,ws_in,ws_out,ws_singleton}` by static source analysis, emits `rs/src/route_generated.rs`, `paths.generated.ts`, per-handler `mod.rs` files, and `.forte/ws_singletons.json`, and updates the `FORTE-MANAGED` block in `lib.rs`. TypeScript type stubs are generated separately by `forte-rs-to-ts`, which the CLI (`forte build`/`forte dev`) runs as a subprocess — it is not invoked by the build script itself.
 
 `generate_env()` reads `env.yaml` and emits type-safe accessor functions.
 
@@ -96,7 +96,7 @@ The `forte` binary. Key subcommands:
 Three proc-macros re-exported through `forte-sdk`:
 
 - `#[forte_sdk::test]` — marks a wasm32-wasip2 test; pairs with `forte-test-runner`
-- `#[forte_doc]` — annotates public types for TypeScript type generation
+- `#[forte_doc]` — derives database CRUD operations (`UserPut/Get/Query/Delete`, `impl Document`) for a struct with `#[pk]`/`#[sk]` field attributes; types marked this way are also picked up by `forte-rs-to-ts` for TypeScript generation
 - `#[cache_static]` — enables lazy static page caching for a page handler
 
 **Change when:** changing test harness behavior; changing how types are marked for ts generation; changing static page cache annotation semantics.
@@ -147,7 +147,7 @@ Lives in `forte/rs-to-ts/` which is excluded from the workspace because it requi
 
 **Crate:** `fn0-ski` · **Target:** native binary embedded in `fn0-worker`
 
-A WinterCG-compatible JavaScript runtime built on V8 and `deno_core`. Runs server-side React rendering (`renderToString`). The worker invokes it for each SSR request, passing the props JSON from the Rust handler and receiving HTML.
+A WinterCG-compatible JavaScript runtime built on V8 and `deno_core`. Runs server-side React rendering (`renderToReadableStream`). The worker invokes it for each SSR request, passing the props JSON from the Rust handler and receiving HTML.
 
 **Change when:** upgrading deno_core/V8; changing the SSR protocol between worker and ski; fixing SSR-specific JavaScript runtime behavior.
 
@@ -155,7 +155,7 @@ A WinterCG-compatible JavaScript runtime built on V8 and `deno_core`. Runs serve
 
 **Crate:** `fn0-doc-db` · **Target:** `wasm32-wasip2` + native
 
-Document-oriented database wrapper over Turso/libSQL. Supports `get`, `put`, `delete`, `query`, `scan`, and batch operations. Works in WASM (via the WIT HTTP interface to Turso) and natively (for tests with `doc_db::memory()`).
+Document-oriented database wrapper over Turso/libSQL. Supports `get`, `put`, `delete`, `query`, `scan`, batch operations, explicit ACID `transaction`s, and `trx` optimistic concurrency. Works in WASM (via the WIT HTTP interface to Turso) and natively (for tests with `doc_db::memory()`).
 
 Re-exported through `forte-sdk` as `forte_sdk::doc_db`.
 
@@ -170,7 +170,7 @@ S3-compatible object storage client. Two namespaces:
 - `object_storage::private` — objects readable only via signed requests
 - `object_storage::public` — objects served publicly from a CDN hostname
 
-Supports `put`, `get`, `delete`, presigned URL generation, and cache purge. In-memory implementations available for tests via `object_storage::private::memory()`.
+Supports `put`, `get`, `head` (metadata without body), `delete`, `list` (key-prefix scan with cursor pagination), presigned URL generation, and cache purge. In-memory implementations available for tests via `object_storage::private::memory()`.
 
 Re-exported through `forte-sdk`.
 
@@ -219,11 +219,12 @@ forte-macros                      │
                               fn0-worker
 build.rs calls                    ├── fn0-ski (SSR)
 forte-codegen                     ├── fn0-doc-db
-    ├── calls forte-rs-to-ts       ├── fn0-object-storage
-    └── reads forte-wit            └── forte-wit (WIT defs)
+    └── reads forte-wit            ├── fn0-object-storage
+                                   └── forte-wit (WIT defs)
 
 forte-cli (developer machine)
-    ├── drives forte-codegen
+    ├── drives forte-codegen (via cargo build)
+    ├── invokes forte-rs-to-ts (subprocess)
     └── deploys to fn0-worker via fn0 Cloud API
 
 forte-test-runner (test machine)
