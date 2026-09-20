@@ -1,5 +1,6 @@
 use super::*;
 use crate::BatchOp;
+use crate::StoredDoc;
 use crate::runtime;
 use anyhow::{Result, bail};
 use bytes::Bytes;

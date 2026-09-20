@@ -63,7 +63,7 @@ pub trait TrxRead: Sized {
     async fn finalize(
         self,
         tx: &Trx,
-        results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+        results: &mut std::vec::IntoIter<Option<crate::StoredDoc>>,
     ) -> Result<Self::Output>;
 }
 
@@ -80,7 +80,7 @@ where
     async fn finalize(
         self,
         tx: &Trx,
-        results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+        results: &mut std::vec::IntoIter<Option<crate::StoredDoc>>,
     ) -> Result<Self::Output> {
         let stored = results
             .next()
@@ -107,7 +107,7 @@ macro_rules! impl_trx_read_tuple {
             async fn finalize(
                 self,
                 tx: &Trx,
-                results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+                results: &mut std::vec::IntoIter<Option<crate::StoredDoc>>,
             ) -> Result<Self::Output> {
                 let ($($T,)+) = self;
                 Ok(($($T.finalize(tx, results).await?,)+))
@@ -207,10 +207,7 @@ impl Trx {
         })
     }
 
-    async fn batch_load(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<crate::turso::StoredDoc>>> {
+    async fn batch_load(&self, keys: &[(String, String)]) -> Result<Vec<Option<crate::StoredDoc>>> {
         if keys.is_empty() {
             return Ok(vec![]);
         }
@@ -250,12 +247,12 @@ pub enum TrxResult<Out, Cancel, Err> {
     Err(Err),
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ConflictDetails {
     pub keys: Vec<ConflictKey>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ConflictKey {
     pub key: DocKey,
     pub expected_version: Option<i64>,
@@ -381,7 +378,7 @@ impl TrxState {
     fn register_loaded<T>(
         &mut self,
         key: DocKey,
-        stored: Option<crate::turso::StoredDoc>,
+        stored: Option<crate::StoredDoc>,
     ) -> Result<Option<DocHandle<T>>>
     where
         T: Document,
@@ -773,7 +770,7 @@ mod tests {
         let mut handle = state
             .register_loaded::<TestDoc>(
                 key,
-                Some(crate::turso::StoredDoc {
+                Some(crate::StoredDoc {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
                     version: 7,
                 }),
@@ -807,7 +804,7 @@ mod tests {
         let handle = state
             .register_loaded::<TestDoc>(
                 key,
-                Some(crate::turso::StoredDoc {
+                Some(crate::StoredDoc {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
                     version: 7,
                 }),

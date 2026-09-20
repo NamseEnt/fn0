@@ -1,5 +1,4 @@
-use crate::turso::StoredDoc;
-use crate::{BatchOp, DbOp, DbResult};
+use crate::{BatchOp, DbOp, DbResult, StoredDoc};
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
@@ -233,17 +232,17 @@ impl MemoryTransaction {
     ) -> Result<crate::CommitOutcome> {
         use crate::WriteOp;
 
-        let mut staged = self.working.clone();
+        let mut staged = self.db.store.lock().unwrap().clone();
         let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
         let mut conflict: Option<crate::ConflictInfo> = None;
 
-        for (i, op) in writes.iter().enumerate() {
+        for (write_index, op) in writes.iter().enumerate() {
             match op {
                 WriteOp::Insert { pk, sk, data } => {
                     let key = (pk.clone(), sk.clone());
                     if staged.contains_key(&key) {
                         conflict = Some(crate::ConflictInfo {
-                            step_index: i,
+                            step_index: write_index,
                             message: format!(
                                 "UNIQUE constraint failed: docs.pk, docs.sk ({pk}/{sk})"
                             ),
@@ -273,7 +272,14 @@ impl MemoryTransaction {
                             doc.version += 1;
                             affected_counts.push(1);
                         }
-                        _ => affected_counts.push(0),
+                        _ => {
+                            affected_counts.push(0);
+                            conflict = Some(crate::ConflictInfo {
+                                step_index: write_index,
+                                message: format!("optimistic update conflict for {pk}/{sk}"),
+                            });
+                            break;
+                        }
                     }
                 }
                 WriteOp::Delete {
@@ -287,7 +293,14 @@ impl MemoryTransaction {
                             staged.remove(&key);
                             affected_counts.push(1);
                         }
-                        _ => affected_counts.push(0),
+                        _ => {
+                            affected_counts.push(0);
+                            conflict = Some(crate::ConflictInfo {
+                                step_index: write_index,
+                                message: format!("optimistic delete conflict for {pk}/{sk}"),
+                            });
+                            break;
+                        }
                     }
                 }
             }

@@ -1,3 +1,5 @@
+#[doc(hidden)]
+pub mod backend_contract;
 mod memory;
 pub mod mock;
 mod runtime;
@@ -13,7 +15,13 @@ pub use trx::{
     ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
     TrxResult,
 };
-use turso::{StoredDoc, TursoDatabase, TursoTransaction};
+use turso::{TursoDatabase, TursoTransaction};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StoredDoc {
+    pub(crate) data: Bytes,
+    pub(crate) version: i64,
+}
 
 pub fn text_value(s: impl Into<String>) -> Value {
     Value::Text {
@@ -35,6 +43,53 @@ pub enum BatchOp<'a> {
         pk: &'a str,
         sk: &'a str,
     },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminScanRequest {
+    pub after: Option<(String, String)>,
+    pub limit: usize,
+    pub pk_prefix: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminDocument {
+    pub pk: String,
+    pub sk: String,
+    pub data: Bytes,
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminScanPage {
+    pub documents: Vec<AdminDocument>,
+    pub next: Option<(String, String)>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AdminWriteOp {
+    Create {
+        pk: String,
+        sk: String,
+        data: Vec<u8>,
+    },
+    Put {
+        pk: String,
+        sk: String,
+        expected_version: i64,
+        data: Vec<u8>,
+    },
+    Delete {
+        pk: String,
+        sk: String,
+        expected_version: i64,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AdminWriteOutcome {
+    Applied,
+    Conflict(ConflictDetails),
 }
 
 #[derive(Clone)]
@@ -205,6 +260,194 @@ impl Database {
             DatabaseInner::Turso(db) => db.scan(after, limit).await,
             DatabaseInner::Memory(db) => db.scan(after, limit).await,
         }
+    }
+
+    pub async fn admin_scan(&self, request: AdminScanRequest) -> Result<AdminScanPage> {
+        if request.limit == 0 {
+            return Ok(AdminScanPage {
+                documents: Vec::new(),
+                next: request.after,
+            });
+        }
+
+        let page_limit = request.limit;
+        let mut cursor = request.after;
+        let mut documents = Vec::with_capacity(request.limit);
+
+        loop {
+            let page = self
+                .scan(
+                    cursor.as_ref().map(|(pk, sk)| (pk.as_str(), sk.as_str())),
+                    page_limit,
+                )
+                .await?;
+
+            if page.is_empty() {
+                return Ok(AdminScanPage {
+                    documents,
+                    next: None,
+                });
+            }
+
+            let last_key = page.last().map(|(pk, sk, _)| (pk.clone(), sk.clone()));
+            let page_is_full = page.len() == page_limit;
+
+            for (pk, sk, _data) in page {
+                if request
+                    .pk_prefix
+                    .as_deref()
+                    .is_some_and(|prefix| !pk.starts_with(prefix))
+                {
+                    continue;
+                }
+
+                let next = (pk.clone(), sk.clone());
+                let Some(stored) = self.get_with_version(&pk, &sk).await? else {
+                    continue;
+                };
+                documents.push(AdminDocument {
+                    pk,
+                    sk,
+                    data: stored.data,
+                    version: stored.version,
+                });
+
+                if documents.len() >= request.limit {
+                    return Ok(AdminScanPage {
+                        next: Some(next),
+                        documents,
+                    });
+                }
+            }
+
+            cursor = last_key;
+            if !page_is_full {
+                return Ok(AdminScanPage {
+                    documents,
+                    next: None,
+                });
+            }
+        }
+    }
+
+    pub async fn admin_write_batch(
+        &self,
+        operations: &[AdminWriteOp],
+    ) -> Result<AdminWriteOutcome> {
+        if operations.is_empty() {
+            return Ok(AdminWriteOutcome::Applied);
+        }
+
+        let writes: Vec<WriteOp> = operations
+            .iter()
+            .map(|operation| match operation {
+                AdminWriteOp::Create { pk, sk, data } => WriteOp::Insert {
+                    pk: pk.clone(),
+                    sk: sk.clone(),
+                    data: data.clone(),
+                },
+                AdminWriteOp::Put {
+                    pk,
+                    sk,
+                    expected_version,
+                    data,
+                } => WriteOp::Update {
+                    pk: pk.clone(),
+                    sk: sk.clone(),
+                    expected_version: *expected_version,
+                    data: data.clone(),
+                },
+                AdminWriteOp::Delete {
+                    pk,
+                    sk,
+                    expected_version,
+                } => WriteOp::Delete {
+                    pk: pk.clone(),
+                    sk: sk.clone(),
+                    expected_version: *expected_version,
+                },
+            })
+            .collect();
+
+        let mut transaction = self.transaction().await?;
+        let outcome = transaction.apply_writes_and_commit(&writes).await?;
+        let mut conflicts = Vec::new();
+
+        for (write_index, affected_count) in outcome.affected_counts.iter().enumerate() {
+            if *affected_count == 1 {
+                continue;
+            }
+
+            let Some(write) = writes.get(write_index) else {
+                continue;
+            };
+            let (pk, sk, expected_version) = match write {
+                WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
+                WriteOp::Update {
+                    pk,
+                    sk,
+                    expected_version,
+                    ..
+                }
+                | WriteOp::Delete {
+                    pk,
+                    sk,
+                    expected_version,
+                } => (pk.clone(), sk.clone(), Some(*expected_version)),
+            };
+            conflicts.push(ConflictKey {
+                key: DocKey { pk, sk },
+                expected_version,
+                actual_version: None,
+            });
+        }
+
+        if let Some(conflict) = outcome.conflict
+            && let Some(write) = writes.get(conflict.step_index)
+        {
+            let (pk, sk, expected_version) = match write {
+                WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
+                WriteOp::Update {
+                    pk,
+                    sk,
+                    expected_version,
+                    ..
+                }
+                | WriteOp::Delete {
+                    pk,
+                    sk,
+                    expected_version,
+                } => (pk.clone(), sk.clone(), Some(*expected_version)),
+            };
+            if !conflicts
+                .iter()
+                .any(|item| item.key.pk == pk && item.key.sk == sk)
+            {
+                conflicts.push(ConflictKey {
+                    key: DocKey { pk, sk },
+                    expected_version,
+                    actual_version: None,
+                });
+            }
+        }
+
+        if conflicts.is_empty() {
+            return Ok(AdminWriteOutcome::Applied);
+        }
+
+        let keys: Vec<(String, String)> = conflicts
+            .iter()
+            .map(|conflict| (conflict.key.pk.clone(), conflict.key.sk.clone()))
+            .collect();
+        if let Ok(current_documents) = self.batch_get_with_version(&keys).await {
+            for (conflict, current_document) in conflicts.iter_mut().zip(current_documents) {
+                conflict.actual_version = current_document.map(|document| document.version);
+            }
+        }
+
+        Ok(AdminWriteOutcome::Conflict(ConflictDetails {
+            keys: conflicts,
+        }))
     }
 
     #[tracing::instrument(skip_all, fields(ops = ops.len()))]

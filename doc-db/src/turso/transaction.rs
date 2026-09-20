@@ -1,4 +1,5 @@
 use super::*;
+use crate::StoredDoc;
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
@@ -55,6 +56,32 @@ impl TursoTransaction {
         }
 
         bail!("Missing transaction execute result")
+    }
+
+    async fn finish_current(&mut self, statement: &str) -> Result<()> {
+        let response = self
+            .execute_in_tx(vec![
+                StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: Stmt {
+                        sql: Some(statement.to_string()),
+                        sql_id: None,
+                        args: vec![],
+                        named_args: vec![],
+                        want_rows: Some(false),
+                        replication_index: None,
+                    },
+                }),
+                StreamRequest::Close(CloseStreamReq {}),
+            ])
+            .await;
+        self.baton = None;
+        let response = response?;
+        for result in response.results {
+            if let StreamResult::Error { error } = result {
+                bail!("Transaction {statement} error: {}", error.message);
+            }
+        }
+        Ok(())
     }
 
     pub(crate) async fn get(&mut self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
@@ -258,6 +285,62 @@ impl TursoTransaction {
         writes: &[crate::WriteOp],
     ) -> Result<crate::CommitOutcome> {
         use crate::WriteOp;
+
+        if writes.is_empty() {
+            self.finish_current("COMMIT").await?;
+            return Ok(crate::CommitOutcome {
+                affected_counts: vec![],
+                conflict: None,
+            });
+        }
+
+        let keys: Vec<(String, String)> = writes
+            .iter()
+            .map(|write| match write {
+                WriteOp::Insert { pk, sk, .. }
+                | WriteOp::Update { pk, sk, .. }
+                | WriteOp::Delete { pk, sk, .. } => (pk.clone(), sk.clone()),
+            })
+            .collect();
+        let mut current_documents = self.batch_get_with_version(&keys).await?;
+        for (write_index, write) in writes.iter().enumerate() {
+            let current_document = current_documents[write_index].as_ref();
+            let precondition_holds = match write {
+                WriteOp::Insert { .. } => current_document.is_none(),
+                WriteOp::Update {
+                    expected_version, ..
+                }
+                | WriteOp::Delete {
+                    expected_version, ..
+                } => current_document.is_some_and(|document| document.version == *expected_version),
+            };
+            if !precondition_holds {
+                let _ = self.finish_current("ROLLBACK").await;
+                return Ok(crate::CommitOutcome {
+                    affected_counts: vec![0; writes.len()],
+                    conflict: Some(crate::ConflictInfo {
+                        step_index: write_index,
+                        message: "conditional write precondition failed".to_string(),
+                    }),
+                });
+            }
+
+            match write {
+                WriteOp::Insert { data, .. } => {
+                    current_documents[write_index] = Some(StoredDoc {
+                        data: data.clone().into(),
+                        version: 0,
+                    });
+                }
+                WriteOp::Update { data, .. } => {
+                    if let Some(document) = current_documents[write_index].as_mut() {
+                        document.data = data.clone().into();
+                        document.version += 1;
+                    }
+                }
+                WriteOp::Delete { .. } => current_documents[write_index] = None,
+            }
+        }
 
         let mut steps: Vec<BatchStep> = Vec::with_capacity(writes.len() + 2);
 
