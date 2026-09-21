@@ -186,6 +186,11 @@ pub enum TransactWriteOperation {
         sk: String,
         expected_version: i64,
     },
+    ConditionCheck {
+        pk: String,
+        sk: String,
+        expected_version: Option<i64>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -717,6 +722,16 @@ fn encode_conditional_operations(encoder: &mut Encoder, operations: &[TransactWr
                 encoder.write_string(sk);
                 encoder.write_i64(*expected_version);
             }
+            TransactWriteOperation::ConditionCheck {
+                pk,
+                sk,
+                expected_version,
+            } => {
+                encoder.write_u8(0x04);
+                encoder.write_string(pk);
+                encoder.write_string(sk);
+                encoder.write_optional_i64(*expected_version);
+            }
         }
     }
 }
@@ -798,6 +813,11 @@ fn decode_conditional_operations(decoder: &mut Decoder<'_>) -> Result<Vec<Transa
                 pk: decoder.read_string(MAX_STRING_SIZE)?,
                 sk: decoder.read_string(MAX_STRING_SIZE)?,
                 expected_version: decoder.read_i64()?,
+            },
+            0x04 => TransactWriteOperation::ConditionCheck {
+                pk: decoder.read_string(MAX_STRING_SIZE)?,
+                sk: decoder.read_string(MAX_STRING_SIZE)?,
+                expected_version: decoder.read_optional_i64()?,
             },
             _ => {
                 return Err(ProtocolError::InvalidPayload(Opcode::TransactWriteItems));
@@ -1549,6 +1569,16 @@ mod tests {
                     pk: "b".to_owned(),
                     sk: "two".to_owned(),
                     expected_version: 7,
+                },
+                TransactWriteOperation::ConditionCheck {
+                    pk: "c".to_owned(),
+                    sk: "three".to_owned(),
+                    expected_version: Some(11),
+                },
+                TransactWriteOperation::ConditionCheck {
+                    pk: "missing".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: None,
                 },
             ]),
         ];

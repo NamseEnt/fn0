@@ -474,6 +474,18 @@ mod tests {
                                         return;
                                     }
                                 }
+                                RequestOperation::TransactWriteItems(_) => {
+                                    task_state.request_count.fetch_add(1, Ordering::Relaxed);
+                                    task_state.tenants.lock().await.push(request.tenant);
+                                    let response = encode_response_frame(
+                                        request.request_id,
+                                        Status::Ok,
+                                        &ResponsePayload::OptionalCommitId(None),
+                                    )
+                                    .unwrap();
+                                    send.write_all(&response).await.unwrap();
+                                    send.finish().unwrap();
+                                }
                                 _ => return,
                             }
                         }
@@ -561,6 +573,26 @@ mod tests {
         )
     }
 
+    fn guest_condition_check_frame(request_id: u64) -> Vec<u8> {
+        encode_request_frame(
+            request_id,
+            "",
+            &RequestOperation::TransactWriteItems(vec![
+                dibi_protocol::TransactWriteOperation::ConditionCheck {
+                    pk: "B".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(7),
+                },
+                dibi_protocol::TransactWriteOperation::Put {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: 3,
+                    data: b"updated".to_vec(),
+                },
+            ]),
+        )
+    }
+
     fn bridge_for_server(server: &MockServer) -> DibiBridge {
         DibiBridge::new(DibiBridgeConfig {
             placeholder_url: "dibi://fn0-db.fn0.dev".to_owned(),
@@ -612,6 +644,37 @@ mod tests {
         assert_eq!(
             &*server.state.tenants.lock().await,
             &["project-a".to_owned(), "project-b".to_owned()]
+        );
+        server.shutdown().await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn forwards_condition_check_transactions_with_injected_tenant() {
+        let server = MockServer::start(MockBehavior::Normal).await;
+        let bridge = bridge_for_server(&server);
+
+        let response = bridge
+            .request(
+                "project-a",
+                "dibi://fn0-db.fn0.dev",
+                &guest_condition_check_frame(1),
+            )
+            .await
+            .unwrap();
+        let response_frame = decode_response_frame(&response).unwrap();
+        assert_eq!(response_frame.status, Status::Ok);
+        assert_eq!(
+            decode_response_payload(
+                Opcode::TransactWriteItems,
+                Status::Ok,
+                &response_frame.payload,
+            )
+            .unwrap(),
+            ResponsePayload::OptionalCommitId(None)
+        );
+        assert_eq!(
+            &*server.state.tenants.lock().await,
+            &["project-a".to_owned()]
         );
         server.shutdown().await;
     }

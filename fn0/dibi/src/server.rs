@@ -647,6 +647,15 @@ fn conditional_writes(operations: Vec<TransactWriteOperation>) -> Vec<Conditiona
                 sk,
                 expected_version,
             },
+            TransactWriteOperation::ConditionCheck {
+                pk,
+                sk,
+                expected_version,
+            } => ConditionalWrite::Check {
+                pk,
+                sk,
+                expected_version,
+            },
         })
         .collect()
 }

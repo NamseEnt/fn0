@@ -361,7 +361,8 @@ fn queue_send(
         match action {
             crate::queue_hijack::HijackAction::Forward(signed) => {
                 let send_start = std::time::Instant::now();
-                let (res, io) = default_send_request(signed, with_default_timeouts(options)).await?;
+                let (res, io) =
+                    default_send_request(signed, with_default_timeouts(options)).await?;
                 telemetry::stage_duration("hijack_queue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
@@ -425,7 +426,8 @@ fn cross_project_enqueue_send(
         match action {
             crate::cross_project_enqueue_hijack::HijackAction::Forward(signed) => {
                 let send_start = std::time::Instant::now();
-                let (res, io) = default_send_request(signed, with_default_timeouts(options)).await?;
+                let (res, io) =
+                    default_send_request(signed, with_default_timeouts(options)).await?;
                 telemetry::stage_duration("hijack_cross_project_enqueue", send_start.elapsed());
                 let res = res.map(BodyExt::boxed_unsync);
                 let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
@@ -860,7 +862,8 @@ fn static_page_cache_send(
         match action {
             Ok(crate::queue_hijack::HijackAction::Synthesized(_)) => {}
             Ok(crate::queue_hijack::HijackAction::Forward(request)) => {
-                if let Err(error) = default_send_request(request, with_default_timeouts(None)).await {
+                if let Err(error) = default_send_request(request, with_default_timeouts(None)).await
+                {
                     tracing::warn!(?error, "static page purge enqueue failed");
                     let resp = text_response(500, "purge could not be queued".to_string())?;
                     return Ok((resp, empty_io()));

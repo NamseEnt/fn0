@@ -97,6 +97,11 @@ pub enum ConditionalWrite {
         sk: String,
         expected_version: i64,
     },
+    Check {
+        pk: String,
+        sk: String,
+        expected_version: Option<i64>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -431,7 +436,13 @@ impl DibiEngine {
                 ConditionalWrite::Delete { .. } => {
                     mutations.insert(key, None);
                 }
+                ConditionalWrite::Check { .. } => {}
             }
+        }
+        if mutations.is_empty() {
+            return Ok(ConditionalWriteOutcome::Applied(WriteResult {
+                commit_id: None,
+            }));
         }
         let commit_id = self.commit_mutations(mutations)?;
         Ok(ConditionalWriteOutcome::Applied(WriteResult {
@@ -668,6 +679,11 @@ fn conditional_key(operation: &ConditionalWrite) -> (&str, &str, Option<i64>) {
             sk,
             expected_version,
         } => (pk, sk, Some(*expected_version)),
+        ConditionalWrite::Check {
+            pk,
+            sk,
+            expected_version,
+        } => (pk, sk, *expected_version),
     }
 }
 

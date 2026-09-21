@@ -541,6 +541,59 @@ async fn authentication_is_required_and_tenant_operations_are_isolated() {
             .0,
         Status::Ok
     );
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-a",
+                RequestOperation::TransactWriteItems(vec![
+                    TransactWriteOperation::ConditionCheck {
+                        pk: "User".to_owned(),
+                        sk: "1".to_owned(),
+                        expected_version: Some(1),
+                    },
+                ]),
+            )
+            .await,
+        (Status::Ok, ResponsePayload::OptionalCommitId(None))
+    );
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-a",
+                RequestOperation::TransactWriteItems(vec![
+                    TransactWriteOperation::ConditionCheck {
+                        pk: "User".to_owned(),
+                        sk: "1".to_owned(),
+                        expected_version: Some(5),
+                    },
+                ]),
+            )
+            .await,
+        (
+            Status::Conflict,
+            ResponsePayload::ConditionalConflicts(vec![dibi_protocol::Conflict {
+                pk: "User".to_owned(),
+                sk: "1".to_owned(),
+                expected_version: Some(5),
+                actual_version: Some(1),
+            }]),
+        )
+    );
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-b",
+                RequestOperation::TransactWriteItems(vec![
+                    TransactWriteOperation::ConditionCheck {
+                        pk: "User".to_owned(),
+                        sk: "1".to_owned(),
+                        expected_version: Some(1),
+                    },
+                ]),
+            )
+            .await,
+        (Status::Ok, ResponsePayload::OptionalCommitId(None))
+    );
 
     client.close();
     server.shutdown().await;
@@ -746,6 +799,157 @@ async fn transact_write_version_correctness() {
             expected_version: Some(0),
             actual_version: Some(1),
         }])
+    );
+
+    client.close();
+    server.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn condition_checks_support_mixed_read_only_and_admin_transactions() {
+    let directory = tempfile::tempdir().unwrap();
+    let (cert_path, key_path) = create_certificate(directory.path());
+    let server = start_server(directory.path(), &cert_path, &key_path).await;
+    let client = connect_client(server.address, &cert_path).await;
+
+    assert_eq!(
+        client
+            .request_ok(RequestOperation::TransactWriteItems(vec![
+                TransactWriteOperation::Create {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    data: b"a0".to_vec(),
+                },
+                TransactWriteOperation::Create {
+                    pk: "B".to_owned(),
+                    sk: "key".to_owned(),
+                    data: b"b0".to_vec(),
+                },
+            ]))
+            .await,
+        ResponsePayload::OptionalCommitId(Some(1))
+    );
+    assert_eq!(
+        client
+            .request_ok(RequestOperation::TransactWriteItems(vec![
+                TransactWriteOperation::ConditionCheck {
+                    pk: "B".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(0),
+                },
+                TransactWriteOperation::Put {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: 0,
+                    data: b"a1".to_vec(),
+                },
+            ]))
+            .await,
+        ResponsePayload::OptionalCommitId(Some(2))
+    );
+    let status_payload = client.request_ok(RequestOperation::Status).await;
+    assert!(matches!(
+        status_payload,
+        ResponsePayload::Status {
+            last_commit_id: 2,
+            ..
+        }
+    ));
+    assert_eq!(
+        client
+            .request_ok(RequestOperation::TransactWriteItems(vec![
+                TransactWriteOperation::ConditionCheck {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(1),
+                },
+                TransactWriteOperation::ConditionCheck {
+                    pk: "B".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(0),
+                },
+            ]))
+            .await,
+        ResponsePayload::OptionalCommitId(None)
+    );
+    let (status_after_check, payload_after_check) = client.request(RequestOperation::Status).await;
+    assert_eq!(status_after_check, Status::Ok);
+    assert!(matches!(
+        payload_after_check,
+        ResponsePayload::Status {
+            last_commit_id: 2,
+            ..
+        }
+    ));
+
+    let (conflict_status, conflict_payload) = client
+        .request(RequestOperation::TransactWriteItems(vec![
+            TransactWriteOperation::Put {
+                pk: "A".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: 1,
+                data: b"must-not-update".to_vec(),
+            },
+            TransactWriteOperation::ConditionCheck {
+                pk: "B".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: Some(1),
+            },
+            TransactWriteOperation::Create {
+                pk: "C".to_owned(),
+                sk: "key".to_owned(),
+                data: b"must-not-create".to_vec(),
+            },
+        ]))
+        .await;
+    assert_eq!(conflict_status, Status::Conflict);
+    assert_eq!(
+        conflict_payload,
+        ResponsePayload::ConditionalConflicts(vec![dibi_protocol::Conflict {
+            pk: "B".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: Some(1),
+            actual_version: Some(0),
+        }])
+    );
+    assert_eq!(
+        client
+            .request_ok(RequestOperation::BatchGetWithVersion(vec![
+                Key {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                },
+                Key {
+                    pk: "C".to_owned(),
+                    sk: "key".to_owned(),
+                },
+            ]))
+            .await,
+        ResponsePayload::VersionedItems(vec![
+            VersionedItem {
+                found: true,
+                version: Some(1),
+                data: Some(b"a1".to_vec()),
+            },
+            VersionedItem {
+                found: false,
+                version: None,
+                data: None,
+            },
+        ])
+    );
+
+    assert_eq!(
+        client
+            .request_ok(RequestOperation::AdminTransactWriteItems(vec![
+                TransactWriteOperation::ConditionCheck {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(1),
+                },
+            ]))
+            .await,
+        ResponsePayload::OptionalCommitId(None)
     );
 
     client.close();

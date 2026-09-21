@@ -51,11 +51,18 @@ An explicit transaction provides read-your-own-writes. A write is visible to sub
 
 ## Optimistic transactions
 
-An optimistic transaction records the version (or missing state) observed by each read. Its writes are conditional on those observations:
+An optimistic transaction records the version (or missing state) observed by each read. All observed reads that can affect the transaction outcome are validated at commit, including documents that were read but not mutated. Its writes are conditional on those observations:
 
 - updating version `N` succeeds only while the document is still version `N`;
 - deleting version `N` succeeds only while the document is still version `N`;
 - creating a document read as missing succeeds only while the key is still missing.
+
+The client expresses observations with conditional transaction items:
+
+- reading an existing document and not mutating it uses `ConditionCheck { expected_version: N }`;
+- reading a missing document and not mutating it uses `ConditionCheck { expected_version: None }`;
+- reading an existing document and updating or deleting it is validated by the mutation's `expected_version` condition;
+- reading a missing document and creating it is validated by `Create`'s missing-key precondition.
 
 If a concurrent writer changes the observed state, the commit conflicts. A conflict reports the affected `ConflictKey` entries with `expected_version` and the best available `actual_version` (`None` means the key is currently missing). The high-level `trx` operation may retry the closure; after retry exhaustion it returns `TrxResult::Conflict`.
 

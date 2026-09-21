@@ -494,6 +494,492 @@ fn conditional_batches_distinguish_conflicts_and_remain_atomic() {
 }
 
 #[test]
+fn condition_checks_validate_existing_and_missing_without_commit() {
+    let (_directory, engine) = open_temporary();
+    for version in 0..=3 {
+        engine
+            .put(
+                "tenant-a",
+                "A",
+                "key",
+                Bytes::from(format!("value-{version}")),
+            )
+            .unwrap();
+    }
+    let document_before_check = engine.get_with_version("tenant-a", "A", "key").unwrap();
+    let commit_before_check = engine.last_commit_id().unwrap();
+    let outbox_before_check = engine.read_outbox(None, 100).unwrap();
+
+    assert_eq!(
+        engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Check {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(3),
+                }],
+            )
+            .unwrap(),
+        ConditionalWriteOutcome::Applied(dibi::WriteResult { commit_id: None })
+    );
+    assert_eq!(
+        engine.get_with_version("tenant-a", "A", "key").unwrap(),
+        document_before_check
+    );
+    assert_eq!(engine.last_commit_id().unwrap(), commit_before_check);
+    assert_eq!(engine.read_outbox(None, 100).unwrap(), outbox_before_check);
+
+    engine
+        .put("tenant-a", "A", "key", Bytes::from_static(b"value-4"))
+        .unwrap();
+    assert_eq!(
+        engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Check {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(3),
+                }],
+            )
+            .unwrap(),
+        ConditionalWriteOutcome::Conflict(vec![dibi::Conflict {
+            pk: "A".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: Some(3),
+            actual_version: Some(4),
+        }])
+    );
+
+    assert_eq!(
+        engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Check {
+                    pk: "missing".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: None,
+                }],
+            )
+            .unwrap(),
+        ConditionalWriteOutcome::Applied(dibi::WriteResult { commit_id: None })
+    );
+    engine
+        .put("tenant-a", "missing", "key", Bytes::from_static(b"created"))
+        .unwrap();
+    assert_eq!(
+        engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Check {
+                    pk: "missing".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: None,
+                }],
+            )
+            .unwrap(),
+        ConditionalWriteOutcome::Conflict(vec![dibi::Conflict {
+            pk: "missing".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: None,
+            actual_version: Some(0),
+        }])
+    );
+    engine.delete("tenant-a", "missing", "key").unwrap();
+    assert_eq!(
+        engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Check {
+                    pk: "missing".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(0),
+                }],
+            )
+            .unwrap(),
+        ConditionalWriteOutcome::Conflict(vec![dibi::Conflict {
+            pk: "missing".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: Some(0),
+            actual_version: None,
+        }])
+    );
+}
+
+#[test]
+fn mixed_condition_checks_are_atomic_and_validate_missing_reads() {
+    let (_directory, engine) = open_temporary();
+    for version in 0..=3 {
+        engine
+            .put("tenant-a", "A", "key", Bytes::from(format!("a-{version}")))
+            .unwrap();
+    }
+    for version in 0..=7 {
+        engine
+            .put("tenant-a", "B", "key", Bytes::from(format!("b-{version}")))
+            .unwrap();
+    }
+    let commit_before_mixed = engine.last_commit_id().unwrap();
+    let result = engine
+        .conditional_write_batch(
+            "tenant-a",
+            &[
+                ConditionalWrite::Put {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: 3,
+                    data: Bytes::from_static(b"a-final"),
+                },
+                ConditionalWrite::Check {
+                    pk: "B".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(7),
+                },
+                ConditionalWrite::Create {
+                    pk: "C".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"c-created"),
+                },
+            ],
+        )
+        .unwrap();
+    assert_eq!(
+        result,
+        ConditionalWriteOutcome::Applied(dibi::WriteResult {
+            commit_id: Some(commit_before_mixed + 1),
+        })
+    );
+    assert_eq!(
+        engine
+            .get_with_version("tenant-a", "A", "key")
+            .unwrap()
+            .unwrap()
+            .version,
+        4
+    );
+    assert_eq!(
+        engine
+            .get_with_version("tenant-a", "B", "key")
+            .unwrap()
+            .unwrap()
+            .version,
+        7
+    );
+    assert_eq!(
+        engine
+            .get_with_version("tenant-a", "C", "key")
+            .unwrap()
+            .unwrap()
+            .version,
+        0
+    );
+    let mixed_record = engine.read_outbox(Some(commit_before_mixed), 1).unwrap();
+    assert_eq!(mixed_record.len(), 1);
+    assert_eq!(mixed_record[0].mutations.len(), 2);
+
+    engine
+        .put("tenant-a", "B", "key", Bytes::from_static(b"b-stale"))
+        .unwrap();
+    let commit_before_conflict = engine.last_commit_id().unwrap();
+    let outbox_before_conflict = engine.read_outbox(None, 100).unwrap();
+    let conflict = engine
+        .conditional_write_batch(
+            "tenant-a",
+            &[
+                ConditionalWrite::Put {
+                    pk: "A".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: 4,
+                    data: Bytes::from_static(b"must-not-update"),
+                },
+                ConditionalWrite::Check {
+                    pk: "B".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(7),
+                },
+                ConditionalWrite::Create {
+                    pk: "D".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"must-not-create"),
+                },
+            ],
+        )
+        .unwrap();
+    assert_eq!(
+        conflict,
+        ConditionalWriteOutcome::Conflict(vec![dibi::Conflict {
+            pk: "B".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: Some(7),
+            actual_version: Some(8),
+        }])
+    );
+    assert_eq!(
+        engine
+            .get_with_version("tenant-a", "A", "key")
+            .unwrap()
+            .unwrap()
+            .data,
+        Bytes::from_static(b"a-final")
+    );
+    assert_eq!(engine.get("tenant-a", "D", "key").unwrap(), None);
+    assert_eq!(engine.last_commit_id().unwrap(), commit_before_conflict);
+    assert_eq!(
+        engine.read_outbox(None, 100).unwrap(),
+        outbox_before_conflict
+    );
+
+    let missing_read_engine = engine.clone();
+    missing_read_engine
+        .delete("tenant-a", "B-missing", "key")
+        .unwrap();
+    missing_read_engine
+        .put("tenant-a", "A-missing", "key", Bytes::from_static(b"a"))
+        .unwrap();
+    missing_read_engine
+        .put(
+            "tenant-a",
+            "B-missing",
+            "key",
+            Bytes::from_static(b"created"),
+        )
+        .unwrap();
+    let missing_read_conflict = missing_read_engine
+        .conditional_write_batch(
+            "tenant-a",
+            &[
+                ConditionalWrite::Put {
+                    pk: "A-missing".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: 0,
+                    data: Bytes::from_static(b"must-not-update"),
+                },
+                ConditionalWrite::Check {
+                    pk: "B-missing".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: None,
+                },
+            ],
+        )
+        .unwrap();
+    assert_eq!(
+        missing_read_conflict,
+        ConditionalWriteOutcome::Conflict(vec![dibi::Conflict {
+            pk: "B-missing".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: None,
+            actual_version: Some(0),
+        }])
+    );
+    assert_eq!(
+        missing_read_engine
+            .get_with_version("tenant-a", "A-missing", "key")
+            .unwrap()
+            .unwrap()
+            .data,
+        Bytes::from_static(b"a")
+    );
+    assert_eq!(
+        missing_read_engine
+            .get("tenant-a", "B-missing", "key")
+            .unwrap(),
+        Some(Bytes::from_static(b"created"))
+    );
+}
+
+#[test]
+fn duplicate_condition_keys_are_invalid_without_mutations() {
+    let (_directory, engine) = open_temporary();
+    let duplicate_batches = vec![
+        vec![
+            ConditionalWrite::Check {
+                pk: "A".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: Some(0),
+            },
+            ConditionalWrite::Check {
+                pk: "A".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: None,
+            },
+        ],
+        vec![
+            ConditionalWrite::Check {
+                pk: "B".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: Some(0),
+            },
+            ConditionalWrite::Put {
+                pk: "B".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: 0,
+                data: Bytes::from_static(b"must-not-write"),
+            },
+        ],
+        vec![
+            ConditionalWrite::Check {
+                pk: "C".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: None,
+            },
+            ConditionalWrite::Create {
+                pk: "C".to_owned(),
+                sk: "key".to_owned(),
+                data: Bytes::from_static(b"must-not-create"),
+            },
+        ],
+    ];
+    for duplicate_batch in duplicate_batches {
+        let commit_before = engine.last_commit_id().unwrap();
+        let outbox_before = engine.read_outbox(None, 100).unwrap();
+        assert!(matches!(
+            engine.conditional_write_batch("tenant-a", &duplicate_batch),
+            Err(dibi::DibiError::DuplicateConditionalKey { .. })
+        ));
+        assert_eq!(engine.last_commit_id().unwrap(), commit_before);
+        assert_eq!(engine.read_outbox(None, 100).unwrap(), outbox_before);
+    }
+    assert_eq!(engine.get("tenant-a", "B", "key").unwrap(), None);
+    assert_eq!(engine.get("tenant-a", "C", "key").unwrap(), None);
+}
+
+#[test]
+fn condition_checks_are_tenant_scoped() {
+    let (_directory, engine) = open_temporary();
+    engine
+        .put("tenant-a", "shared", "key", Bytes::from_static(b"a"))
+        .unwrap();
+    engine
+        .put("tenant-a", "shared", "key", Bytes::from_static(b"a1"))
+        .unwrap();
+    for version in 0..=5 {
+        engine
+            .put(
+                "tenant-b",
+                "shared",
+                "key",
+                Bytes::from(format!("b-{version}")),
+            )
+            .unwrap();
+    }
+    assert!(matches!(
+        engine.conditional_write_batch(
+            "tenant-a",
+            &[ConditionalWrite::Check {
+                pk: "shared".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: Some(1),
+            }],
+        ),
+        Ok(ConditionalWriteOutcome::Applied(dibi::WriteResult {
+            commit_id: None
+        }))
+    ));
+    assert_eq!(
+        engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Check {
+                    pk: "shared".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: Some(5),
+                }],
+            )
+            .unwrap(),
+        ConditionalWriteOutcome::Conflict(vec![dibi::Conflict {
+            pk: "shared".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: Some(5),
+            actual_version: Some(1),
+        }])
+    );
+    assert!(matches!(
+        engine.conditional_write_batch(
+            "tenant-b",
+            &[ConditionalWrite::Check {
+                pk: "shared".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: Some(5),
+            }],
+        ),
+        Ok(ConditionalWriteOutcome::Applied(dibi::WriteResult {
+            commit_id: None
+        }))
+    ));
+}
+
+#[test]
+fn changed_dependency_key_conflicts_after_another_writer_commits() {
+    let (_directory, engine) = open_temporary();
+    engine
+        .put("tenant-a", "A", "key", Bytes::from_static(b"a"))
+        .unwrap();
+    engine
+        .put("tenant-a", "B", "key", Bytes::from_static(b"b"))
+        .unwrap();
+    let engine = Arc::new(engine);
+    let writer_engine = Arc::clone(&engine);
+    thread::spawn(move || {
+        writer_engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Put {
+                    pk: "B".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: 0,
+                    data: Bytes::from_static(b"b-updated"),
+                }],
+            )
+            .unwrap();
+    })
+    .join()
+    .unwrap();
+    assert_eq!(
+        engine
+            .conditional_write_batch(
+                "tenant-a",
+                &[
+                    ConditionalWrite::Put {
+                        pk: "A".to_owned(),
+                        sk: "key".to_owned(),
+                        expected_version: 0,
+                        data: Bytes::from_static(b"must-not-update"),
+                    },
+                    ConditionalWrite::Check {
+                        pk: "B".to_owned(),
+                        sk: "key".to_owned(),
+                        expected_version: Some(0),
+                    },
+                ],
+            )
+            .unwrap(),
+        ConditionalWriteOutcome::Conflict(vec![dibi::Conflict {
+            pk: "B".to_owned(),
+            sk: "key".to_owned(),
+            expected_version: Some(0),
+            actual_version: Some(1),
+        }])
+    );
+    assert_eq!(
+        engine
+            .get_with_version("tenant-a", "A", "key")
+            .unwrap()
+            .unwrap()
+            .data,
+        Bytes::from_static(b"a")
+    );
+    assert_eq!(
+        engine
+            .get_with_version("tenant-a", "B", "key")
+            .unwrap()
+            .unwrap()
+            .data,
+        Bytes::from_static(b"b-updated")
+    );
+}
+
+#[test]
 fn commit_log_contains_final_physical_mutations_in_order() {
     let (_directory, engine) = open_temporary();
     engine

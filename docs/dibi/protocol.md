@@ -79,7 +79,20 @@ Query ordering is ascending `sk` within `(tenant, pk)` and its cursor is exclusi
 
 ## Conditional transactions
 
-`TRANSACT_WRITE_ITEMS` and `ADMIN_TRANSACT_WRITE_ITEMS` use one request-level tenant. Each item is Create, Put with an expected version, or Delete with an expected version. The engine validates all conditions before one atomic RocksDB commit. If any condition fails, no writes are applied and conflict details are returned.
+`TRANSACT_WRITE_ITEMS` and `ADMIN_TRANSACT_WRITE_ITEMS` use one request-level tenant. Each item is Create, Put with an expected version, Delete with an expected version, or ConditionCheck with an expected version or missing expectation. The engine validates all conditions before one atomic RocksDB commit. If any condition fails, no writes are applied and conflict details are returned.
+
+The transaction item encoding is:
+
+```text
+0x01 Create
+0x02 Put(expected_version)
+0x03 Delete(expected_version)
+0x04 ConditionCheck(expected_version or missing)
+```
+
+The `ConditionCheck` payload is `string pk`, `string sk`, and `optional i64 expected_version`; `Some(N)` requires version `N`, while `None` requires the key to be missing.
+
+`ConditionCheck` does not mutate the database and does not create an outbox mutation. A transaction containing only successful `ConditionCheck` items creates no `commit_id`.
 
 ## TLS and connection behavior
 
