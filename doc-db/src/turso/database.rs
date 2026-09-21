@@ -7,11 +7,6 @@ use bytes::Bytes;
 use libsql_hrana::proto::*;
 use std::sync::Arc;
 
-enum RetryKind {
-    Schema,
-    Busy,
-}
-
 const CREATE_DOCS_TABLE_SQL: &str = "CREATE TABLE IF NOT EXISTS docs (pk TEXT, sk TEXT, data BLOB, version INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (pk, sk))";
 const ADD_VERSION_COLUMN_SQL: &str =
     "ALTER TABLE docs ADD COLUMN version INTEGER NOT NULL DEFAULT 0";
@@ -265,6 +260,79 @@ impl TursoDatabase {
         }
 
         Ok(None)
+    }
+
+    pub(crate) async fn batch_get_with_version(
+        &self,
+        keys: &[(String, String)],
+    ) -> Result<Vec<Option<StoredDoc>>> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        for retry in 0..2 {
+            let mut requests = Vec::with_capacity(keys.len() + 1);
+            for (pk, sk) in keys {
+                requests.push(StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: Stmt {
+                        sql: Some(
+                            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?".to_string(),
+                        ),
+                        sql_id: None,
+                        args: vec![
+                            Value::Text {
+                                value: pk.clone().into(),
+                            },
+                            Value::Text {
+                                value: sk.clone().into(),
+                            },
+                        ],
+                        named_args: vec![],
+                        want_rows: Some(true),
+                        replication_index: None,
+                    },
+                }));
+            }
+            requests.push(StreamRequest::Close(CloseStreamReq {}));
+            let response = self.execute_pipeline(requests).await?;
+            let mut documents = Vec::with_capacity(keys.len());
+            let mut should_retry = false;
+            for result in response.results {
+                match result {
+                    StreamResult::Ok {
+                        response: StreamResponse::Execute(execute_response),
+                    } => {
+                        documents.push(parse_versioned_row(&execute_response.result.rows)?);
+                    }
+                    StreamResult::Ok {
+                        response: StreamResponse::Close(_),
+                    } => {}
+                    StreamResult::Ok { response: _ } => {
+                        bail!("batch_get_with_version returned an unexpected response")
+                    }
+                    StreamResult::Error { error } => {
+                        if retry == 0 && Self::is_schema_error(&error.message) {
+                            self.create_table().await?;
+                            should_retry = true;
+                            break;
+                        }
+                        bail!("batch_get_with_version error: {}", error.message);
+                    }
+                    StreamResult::None => {}
+                }
+            }
+            if should_retry {
+                continue;
+            }
+            if documents.len() != keys.len() {
+                bail!(
+                    "batch_get_with_version returned {} rows for {} keys",
+                    documents.len(),
+                    keys.len()
+                );
+            }
+            return Ok(documents);
+        }
+        bail!("batch_get_with_version: schema retries exhausted")
     }
 
     pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
@@ -1019,131 +1087,231 @@ impl TursoDatabase {
         })
     }
 
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn begin_immediate_with_reads(
+    pub(crate) async fn conditional_write_batch(
         &self,
-        keys: &[(String, String)],
-    ) -> Result<(TursoTransaction, Vec<Option<StoredDoc>>)> {
-        const MAX_BUSY_ATTEMPTS: u32 = 8;
-        let mut busy_attempt: u32 = 0;
+        operations: &[crate::ConditionalOp],
+    ) -> Result<crate::ConditionalOutcome> {
+        crate::validate_conditional_keys(operations)?;
+        if operations.is_empty() {
+            return Ok(crate::ConditionalOutcome::Applied);
+        }
+        self.ensure_table().await?;
+        let mut busy_attempt = 0_u32;
         let mut schema_retried = false;
         loop {
-            let mut requests: Vec<StreamRequest> = Vec::with_capacity(keys.len() + 1);
-            requests.push(StreamRequest::Execute(ExecuteStreamReq {
-                stmt: Stmt {
-                    sql: Some("BEGIN IMMEDIATE".to_string()),
-                    sql_id: None,
-                    args: vec![],
-                    named_args: vec![],
-                    want_rows: Some(false),
-                    replication_index: None,
-                },
+            let mut read_requests = Vec::with_capacity(operations.len() + 1);
+            read_requests.push(StreamRequest::Execute(ExecuteStreamReq {
+                stmt: simple_statement("BEGIN IMMEDIATE", vec![], false),
             }));
-            for (pk, sk) in keys {
-                requests.push(StreamRequest::Execute(ExecuteStreamReq {
-                    stmt: Stmt {
-                        sql: Some(
-                            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?".to_string(),
-                        ),
-                        sql_id: None,
-                        args: vec![
-                            Value::Text {
-                                value: pk.clone().into(),
-                            },
-                            Value::Text {
-                                value: sk.clone().into(),
-                            },
-                        ],
-                        named_args: vec![],
-                        want_rows: Some(true),
-                        replication_index: None,
-                    },
+            for operation in operations {
+                let (pk, sk, _) = crate::conditional_key_and_expected(operation);
+                read_requests.push(StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: simple_statement(
+                        "SELECT data, version FROM docs WHERE pk = ? AND sk = ?",
+                        vec![text_argument(pk), text_argument(sk)],
+                        true,
+                    ),
                 }));
             }
-
-            let response = self.execute_pipeline(requests).await?;
-
-            let mut docs: Vec<Option<StoredDoc>> = Vec::with_capacity(keys.len());
-            let mut idx = 0usize;
-            let mut retry_kind: Option<RetryKind> = None;
-            let mut fatal_error: Option<String> = None;
-
-            for stream_result in response.results {
-                match stream_result {
+            let response = self.execute_pipeline(read_requests).await?;
+            let baton = response.baton.clone();
+            let mut documents = Vec::with_capacity(operations.len());
+            let mut error_message = None;
+            for (result_index, result) in response.results.into_iter().enumerate() {
+                match result {
                     StreamResult::Ok {
-                        response: StreamResponse::Execute(exec_resp),
-                    } => {
-                        if idx == 0 {
-                            // BEGIN IMMEDIATE result, ignore
-                        } else {
-                            let stored = if let Some(row) = exec_resp.result.rows.first()
-                                && let (
-                                    Some(Value::Blob { value: data }),
-                                    Some(Value::Integer { value: version }),
-                                ) = (row.values.first(), row.values.get(1))
-                            {
-                                Some(StoredDoc {
-                                    data: data.clone(),
-                                    version: *version,
-                                })
-                            } else {
-                                None
-                            };
-                            docs.push(stored);
+                        response: StreamResponse::Execute(execute_response),
+                    } if result_index > 0 => {
+                        match parse_versioned_row(&execute_response.result.rows) {
+                            Ok(document) => documents.push(document),
+                            Err(error) => {
+                                rollback_baton(self, baton.clone()).await;
+                                return Err(error);
+                            }
                         }
-                        idx += 1;
                     }
-                    StreamResult::Ok { response: _ } => {}
+                    StreamResult::Ok { .. } => {}
                     StreamResult::Error { error } => {
-                        if !schema_retried && Self::is_schema_error(&error.message) {
-                            retry_kind = Some(RetryKind::Schema);
-                        } else if Self::is_busy_error(&error.message) {
-                            retry_kind = Some(RetryKind::Busy);
-                        } else {
-                            fatal_error = Some(error.message);
-                        }
+                        error_message = Some(error.message);
                         break;
                     }
                     StreamResult::None => {}
                 }
             }
-
-            if let Some(msg) = fatal_error {
-                bail!("begin_immediate_with_reads error: {}", msg);
-            }
-
-            match retry_kind {
-                Some(RetryKind::Schema) => {
+            if let Some(error_message) = error_message {
+                rollback_baton(self, baton).await;
+                if !schema_retried && Self::is_schema_error(&error_message) {
                     self.create_table().await?;
                     schema_retried = true;
                     continue;
                 }
-                Some(RetryKind::Busy) => {
-                    if busy_attempt + 1 >= MAX_BUSY_ATTEMPTS {
-                        bail!(
-                            "begin_immediate_with_reads: BUSY after {} attempts",
-                            MAX_BUSY_ATTEMPTS
-                        );
+                if Self::is_busy_error(&error_message) {
+                    if busy_attempt >= 8 {
+                        bail!("conditional write BEGIN IMMEDIATE remained busy after retries")
                     }
                     Self::busy_backoff(busy_attempt).await;
                     busy_attempt += 1;
                     continue;
                 }
-                None => {}
+                bail!("conditional write validation error: {error_message}")
+            }
+            let Some(baton) = baton else {
+                bail!("conditional write validation returned no transaction baton")
+            };
+            if documents.len() != operations.len() {
+                rollback_baton(self, Some(baton.clone())).await;
+                bail!(
+                    "conditional write validation returned {} rows for {} operations",
+                    documents.len(),
+                    operations.len()
+                )
             }
 
-            let baton = response
-                .baton
-                .ok_or_else(|| anyhow::anyhow!("No baton returned from BEGIN IMMEDIATE"))?;
-            let tx = TursoTransaction {
-                db: self.clone(),
-                baton: Some(baton),
-            };
-            return Ok((tx, docs));
+            let mut conflicts = Vec::new();
+            for (operation, document) in operations.iter().zip(documents.iter()) {
+                let (pk, sk, expected_version) = crate::conditional_key_and_expected(operation);
+                let actual_version = document.as_ref().map(|value| value.version);
+                if actual_version != expected_version {
+                    conflicts.push(crate::ConflictKey {
+                        key: crate::DocKey::new(pk, sk),
+                        expected_version,
+                        actual_version,
+                    });
+                }
+            }
+            if !conflicts.is_empty() {
+                rollback_baton(self, Some(baton)).await;
+                return Ok(crate::ConditionalOutcome::Conflict(
+                    crate::ConflictDetails { keys: conflicts },
+                ));
+            }
+
+            let mut write_requests = Vec::new();
+            for operation in operations {
+                let Some(statement) = conditional_statement(operation) else {
+                    continue;
+                };
+                write_requests.push(StreamRequest::Execute(ExecuteStreamReq { stmt: statement }));
+            }
+            write_requests.push(StreamRequest::Execute(ExecuteStreamReq {
+                stmt: simple_statement("COMMIT", vec![], false),
+            }));
+            write_requests.push(StreamRequest::Close(CloseStreamReq {}));
+            let commit_response = self
+                .execute_pipeline_with_baton(Some(baton), write_requests)
+                .await?;
+            let commit_baton = commit_response.baton;
+            for result in commit_response.results {
+                if let StreamResult::Error { error } = result {
+                    rollback_baton(self, commit_baton).await;
+                    bail!("conditional write commit error: {}", error.message)
+                }
+            }
+            return Ok(crate::ConditionalOutcome::Applied);
         }
     }
 
     async fn ensure_table(&self) -> Result<()> {
         self.create_table().await
     }
+}
+
+fn text_argument(value: &str) -> Value {
+    Value::Text {
+        value: value.to_owned().into(),
+    }
+}
+
+fn simple_statement(sql: &str, args: Vec<Value>, want_rows: bool) -> Stmt {
+    Stmt {
+        sql: Some(sql.to_owned()),
+        sql_id: None,
+        args,
+        named_args: vec![],
+        want_rows: Some(want_rows),
+        replication_index: None,
+    }
+}
+
+fn parse_versioned_row(rows: &[Row]) -> Result<Option<StoredDoc>> {
+    let Some(row) = rows.first() else {
+        return Ok(None);
+    };
+    let (Some(Value::Blob { value: data }), Some(Value::Integer { value: version })) =
+        (row.values.first(), row.values.get(1))
+    else {
+        bail!("Turso returned an invalid versioned document row")
+    };
+    Ok(Some(StoredDoc {
+        data: data.clone(),
+        version: *version,
+    }))
+}
+
+fn conditional_statement(operation: &crate::ConditionalOp) -> Option<Stmt> {
+    match operation {
+        crate::ConditionalOp::Create { pk, sk, data } => Some(simple_statement(
+            "INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0)",
+            vec![
+                text_argument(pk),
+                text_argument(sk),
+                Value::Blob {
+                    value: data.clone().into(),
+                },
+            ],
+            false,
+        )),
+        crate::ConditionalOp::Put {
+            pk,
+            sk,
+            expected_version,
+            data,
+        } => Some(simple_statement(
+            "UPDATE docs SET data = ?, version = version + 1 WHERE pk = ? AND sk = ? AND version = ?",
+            vec![
+                Value::Blob {
+                    value: data.clone().into(),
+                },
+                text_argument(pk),
+                text_argument(sk),
+                Value::Integer {
+                    value: *expected_version,
+                },
+            ],
+            false,
+        )),
+        crate::ConditionalOp::Delete {
+            pk,
+            sk,
+            expected_version,
+        } => Some(simple_statement(
+            "DELETE FROM docs WHERE pk = ? AND sk = ? AND version = ?",
+            vec![
+                text_argument(pk),
+                text_argument(sk),
+                Value::Integer {
+                    value: *expected_version,
+                },
+            ],
+            false,
+        )),
+        crate::ConditionalOp::Check { .. } => None,
+    }
+}
+
+async fn rollback_baton(database: &TursoDatabase, baton: Option<String>) {
+    let Some(baton) = baton else {
+        return;
+    };
+    let _ = database
+        .execute_pipeline_with_baton(
+            Some(baton),
+            vec![
+                StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: simple_statement("ROLLBACK", vec![], false),
+                }),
+                StreamRequest::Close(CloseStreamReq {}),
+            ],
+        )
+        .await;
 }

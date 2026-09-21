@@ -1,8 +1,12 @@
 use crate::{
-    AdminScanRequest, AdminWriteOp, AdminWriteOutcome, BatchOp, Database, DbOp, DbRequest,
-    DbResult, DocGet, DocKey, Document, Prepared, TrxResult, WriteOp,
+    AdminScanRequest, AdminWriteOp, AdminWriteOutcome, BatchOp, ConditionalOp, Database, DbOp,
+    DbRequest, DbResult, DocGet, DocKey, Document, Prepared, TrxResult,
 };
 use bytes::Bytes;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct ContractDocument {
@@ -37,6 +41,10 @@ pub async fn run_backend_contract(create_db: impl Fn() -> Database) {
     run_duplicate_admin_mixed_write_contract(&create_db).await;
     run_explicit_transaction_contract(&create_db).await;
     run_optimistic_transaction_contract(&create_db).await;
+    run_optimistic_read_dependency_contract(&create_db).await;
+    run_missing_read_dependency_contract(&create_db).await;
+    run_read_only_validation_contract(&create_db).await;
+    run_direct_create_contract(&create_db).await;
     run_execute_ops_contract(&create_db).await;
 }
 
@@ -573,25 +581,8 @@ async fn run_optimistic_conflict_pair_contract(create_db: &impl Fn() -> Database
         .put("conflict", "update", b"v0")
         .await
         .unwrap();
-    let conflict_key = vec![("conflict".to_string(), "update".to_string())];
-    let (mut first_update, first_reads) = update_database
-        .begin_immediate_with_reads(&conflict_key)
-        .await
-        .unwrap();
-    let (mut second_update, second_reads) = update_database
-        .begin_immediate_with_reads(&conflict_key)
-        .await
-        .unwrap();
-    assert_eq!(
-        first_reads[0].as_ref().map(|document| document.version),
-        Some(0)
-    );
-    assert_eq!(
-        second_reads[0].as_ref().map(|document| document.version),
-        Some(0)
-    );
-    let first_update_outcome = first_update
-        .apply_writes_and_commit(&[WriteOp::Update {
+    let first_update_outcome = update_database
+        .conditional_write_batch(&[ConditionalOp::Put {
             pk: "conflict".to_string(),
             sk: "update".to_string(),
             expected_version: 0,
@@ -599,8 +590,8 @@ async fn run_optimistic_conflict_pair_contract(create_db: &impl Fn() -> Database
         }])
         .await
         .unwrap();
-    let second_update_outcome = second_update
-        .apply_writes_and_commit(&[WriteOp::Update {
+    let second_update_outcome = update_database
+        .conditional_write_batch(&[ConditionalOp::Put {
             pk: "conflict".to_string(),
             sk: "update".to_string(),
             expected_version: 0,
@@ -608,63 +599,52 @@ async fn run_optimistic_conflict_pair_contract(create_db: &impl Fn() -> Database
         }])
         .await
         .unwrap();
-    assert_eq!(first_update_outcome.affected_counts, vec![1]);
-    assert!(first_update_outcome.conflict.is_none());
-    assert_eq!(second_update_outcome.affected_counts, vec![0]);
-    assert!(second_update_outcome.conflict.is_some());
+    assert!(matches!(
+        first_update_outcome,
+        crate::ConditionalOutcome::Applied
+    ));
+    assert!(matches!(
+        second_update_outcome,
+        crate::ConditionalOutcome::Conflict(_)
+    ));
     assert_eq!(
         update_database.get("conflict", "update").await.unwrap(),
         Some(Bytes::from_static(b"first"))
     );
 
     let create_database = create_db();
-    let create_key = vec![("conflict".to_string(), "create".to_string())];
-    let (mut first_create, first_create_reads) = create_database
-        .begin_immediate_with_reads(&create_key)
-        .await
-        .unwrap();
-    let (mut second_create, second_create_reads) = create_database
-        .begin_immediate_with_reads(&create_key)
-        .await
-        .unwrap();
-    assert!(first_create_reads[0].is_none());
-    assert!(second_create_reads[0].is_none());
-    let first_create_outcome = first_create
-        .apply_writes_and_commit(&[WriteOp::Insert {
+    let first_create_outcome = create_database
+        .conditional_write_batch(&[ConditionalOp::Create {
             pk: "conflict".to_string(),
             sk: "create".to_string(),
             data: b"first".to_vec(),
         }])
         .await
         .unwrap();
-    let second_create_outcome = second_create
-        .apply_writes_and_commit(&[WriteOp::Insert {
+    let second_create_outcome = create_database
+        .conditional_write_batch(&[ConditionalOp::Create {
             pk: "conflict".to_string(),
             sk: "create".to_string(),
             data: b"second".to_vec(),
         }])
         .await
         .unwrap();
-    assert_eq!(first_create_outcome.affected_counts, vec![1]);
-    assert_eq!(second_create_outcome.affected_counts, vec![0]);
-    assert!(second_create_outcome.conflict.is_some());
+    assert!(matches!(
+        first_create_outcome,
+        crate::ConditionalOutcome::Applied
+    ));
+    assert!(matches!(
+        second_create_outcome,
+        crate::ConditionalOutcome::Conflict(_)
+    ));
 
     let delete_database = create_db();
     delete_database
         .put("conflict", "delete", b"v0")
         .await
         .unwrap();
-    let delete_key = vec![("conflict".to_string(), "delete".to_string())];
-    let (mut first_delete, _) = delete_database
-        .begin_immediate_with_reads(&delete_key)
-        .await
-        .unwrap();
-    let (mut second_delete, _) = delete_database
-        .begin_immediate_with_reads(&delete_key)
-        .await
-        .unwrap();
-    let first_delete_outcome = first_delete
-        .apply_writes_and_commit(&[WriteOp::Update {
+    let first_delete_outcome = delete_database
+        .conditional_write_batch(&[ConditionalOp::Put {
             pk: "conflict".to_string(),
             sk: "delete".to_string(),
             expected_version: 0,
@@ -672,17 +652,284 @@ async fn run_optimistic_conflict_pair_contract(create_db: &impl Fn() -> Database
         }])
         .await
         .unwrap();
-    let second_delete_outcome = second_delete
-        .apply_writes_and_commit(&[WriteOp::Delete {
+    let second_delete_outcome = delete_database
+        .conditional_write_batch(&[ConditionalOp::Delete {
             pk: "conflict".to_string(),
             sk: "delete".to_string(),
             expected_version: 0,
         }])
         .await
         .unwrap();
-    assert_eq!(first_delete_outcome.affected_counts, vec![1]);
-    assert_eq!(second_delete_outcome.affected_counts, vec![0]);
-    assert!(second_delete_outcome.conflict.is_some());
+    assert!(matches!(
+        first_delete_outcome,
+        crate::ConditionalOutcome::Applied
+    ));
+    assert!(matches!(
+        second_delete_outcome,
+        crate::ConditionalOutcome::Conflict(_)
+    ));
+}
+
+async fn run_optimistic_read_dependency_contract(create_db: &impl Fn() -> Database) {
+    let database = create_db();
+    database
+        .put(
+            "contract",
+            "source",
+            &serde_json::to_vec(&ContractDocument {
+                id: "source".to_owned(),
+                value: "old-source".to_owned(),
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    database
+        .put(
+            "contract",
+            "derived",
+            &serde_json::to_vec(&ContractDocument {
+                id: "derived".to_owned(),
+                value: "old-derived".to_owned(),
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let attempt_count = Arc::new(AtomicUsize::new(0));
+    let result = database
+        .trx(|transaction| {
+            let database = database.clone();
+            let attempt_count = attempt_count.clone();
+            async move {
+                let attempt = attempt_count.fetch_add(1, Ordering::SeqCst);
+                let source = transaction
+                    .get(ContractDocumentGet {
+                        id: "source".to_owned(),
+                    })
+                    .await?
+                    .expect("source document");
+                let source_value = source.value.clone();
+                drop(source);
+                let mut derived = transaction
+                    .get(ContractDocumentGet {
+                        id: "derived".to_owned(),
+                    })
+                    .await?
+                    .expect("derived document");
+                derived.value = source_value;
+                drop(derived);
+                if attempt == 0 {
+                    database
+                        .put(
+                            "contract",
+                            "source",
+                            &serde_json::to_vec(&ContractDocument {
+                                id: "source".to_owned(),
+                                value: "new-source".to_owned(),
+                            })
+                            .unwrap(),
+                        )
+                        .await?;
+                }
+                transaction.commit::<(), ()>(())
+            }
+        })
+        .await;
+    assert!(matches!(result, TrxResult::Committed(())));
+    assert!(attempt_count.load(Ordering::SeqCst) >= 2);
+    let derived = database
+        .get("contract", "derived")
+        .await
+        .unwrap()
+        .map(|data| serde_json::from_slice::<ContractDocument>(&data).unwrap())
+        .unwrap();
+    assert_eq!(derived.value, "new-source");
+}
+
+async fn run_missing_read_dependency_contract(create_db: &impl Fn() -> Database) {
+    let database = create_db();
+    database
+        .put(
+            "contract",
+            "missing-derived",
+            &serde_json::to_vec(&ContractDocument {
+                id: "missing-derived".to_owned(),
+                value: "old".to_owned(),
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let attempt_count = Arc::new(AtomicUsize::new(0));
+    let result = database
+        .trx(|transaction| {
+            let database = database.clone();
+            let attempt_count = attempt_count.clone();
+            async move {
+                let attempt = attempt_count.fetch_add(1, Ordering::SeqCst);
+                let source = transaction
+                    .get(ContractDocumentGet {
+                        id: "missing-source".to_owned(),
+                    })
+                    .await?;
+                let source_value = source
+                    .as_ref()
+                    .map(|document| document.value.clone())
+                    .unwrap_or_else(|| "missing".to_owned());
+                drop(source);
+                let mut derived = transaction
+                    .get(ContractDocumentGet {
+                        id: "missing-derived".to_owned(),
+                    })
+                    .await?
+                    .expect("derived document");
+                derived.value = source_value;
+                drop(derived);
+                if attempt == 0 {
+                    database
+                        .put(
+                            "contract",
+                            "missing-source",
+                            &serde_json::to_vec(&ContractDocument {
+                                id: "missing-source".to_owned(),
+                                value: "created-source".to_owned(),
+                            })
+                            .unwrap(),
+                        )
+                        .await?;
+                }
+                transaction.commit::<(), ()>(())
+            }
+        })
+        .await;
+    assert!(matches!(result, TrxResult::Committed(())));
+    assert!(attempt_count.load(Ordering::SeqCst) >= 2);
+    let derived = database
+        .get("contract", "missing-derived")
+        .await
+        .unwrap()
+        .map(|data| serde_json::from_slice::<ContractDocument>(&data).unwrap())
+        .unwrap();
+    assert_eq!(derived.value, "created-source");
+}
+
+async fn run_read_only_validation_contract(create_db: &impl Fn() -> Database) {
+    let database = create_db();
+    database
+        .put(
+            "contract",
+            "read-only",
+            &serde_json::to_vec(&ContractDocument {
+                id: "read-only".to_owned(),
+                value: "before".to_owned(),
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let attempt_count = Arc::new(AtomicUsize::new(0));
+    let result = database
+        .trx(|transaction| {
+            let database = database.clone();
+            let attempt_count = attempt_count.clone();
+            async move {
+                let attempt = attempt_count.fetch_add(1, Ordering::SeqCst);
+                let handle = transaction
+                    .get(ContractDocumentGet {
+                        id: "read-only".to_owned(),
+                    })
+                    .await?
+                    .expect("read-only document");
+                drop(handle);
+                if attempt == 0 {
+                    database
+                        .put(
+                            "contract",
+                            "read-only",
+                            &serde_json::to_vec(&ContractDocument {
+                                id: "read-only".to_owned(),
+                                value: "after".to_owned(),
+                            })
+                            .unwrap(),
+                        )
+                        .await?;
+                }
+                transaction.commit::<(), ()>(())
+            }
+        })
+        .await;
+    assert!(matches!(result, TrxResult::Committed(())));
+    assert!(attempt_count.load(Ordering::SeqCst) >= 2);
+}
+
+async fn run_direct_create_contract(create_db: &impl Fn() -> Database) {
+    let database = create_db();
+    let no_op = database
+        .trx(|transaction| async move {
+            let handle = transaction.create(ContractDocument {
+                id: "direct-no-op".to_owned(),
+                value: "discarded".to_owned(),
+            })?;
+            handle.delete();
+            drop(handle);
+            transaction.commit::<(), ()>(())
+        })
+        .await;
+    assert!(matches!(no_op, TrxResult::Committed(())));
+    assert_eq!(
+        database.get("contract", "direct-no-op").await.unwrap(),
+        None
+    );
+
+    let attempt_count = Arc::new(AtomicUsize::new(0));
+    let observed_missing = database.clone();
+    let result = observed_missing
+        .trx(|transaction| {
+            let database = observed_missing.clone();
+            let attempt_count = attempt_count.clone();
+            async move {
+                let attempt = attempt_count.fetch_add(1, Ordering::SeqCst);
+                if transaction
+                    .get(ContractDocumentGet {
+                        id: "observed-missing".to_owned(),
+                    })
+                    .await?
+                    .is_none()
+                {
+                    let handle = transaction.create(ContractDocument {
+                        id: "observed-missing".to_owned(),
+                        value: "temporary".to_owned(),
+                    })?;
+                    handle.delete();
+                    drop(handle);
+                }
+                if attempt == 0 {
+                    database
+                        .put(
+                            "contract",
+                            "observed-missing",
+                            &serde_json::to_vec(&ContractDocument {
+                                id: "observed-missing".to_owned(),
+                                value: "external".to_owned(),
+                            })
+                            .unwrap(),
+                        )
+                        .await?;
+                }
+                transaction.commit::<(), ()>(())
+            }
+        })
+        .await;
+    assert!(matches!(result, TrxResult::Committed(())));
+    assert!(attempt_count.load(Ordering::SeqCst) >= 2);
+    assert!(
+        database
+            .get("contract", "observed-missing")
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 async fn run_execute_ops_contract(create_db: &impl Fn() -> Database) {

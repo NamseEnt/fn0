@@ -1,13 +1,13 @@
 # doc-db
 
-`doc-db` is a document-oriented database library backed by Turso/libSQL (or an in-memory store for tests). It works in both WASI components (Forte backends) and native Rust binaries.
+`doc-db` is a document-oriented database library backed by Turso/libSQL, an in-memory store, or Dibi. It works in both WASI components (Forte backends) and native Rust binaries.
 
 All documents are stored in a single table with a composite key: `pk` (partition key) and `sk` (sort key), both strings. The value is an opaque byte blob (usually JSON).
 
 ## Creating a Database Connection
 
 ```rust
-use doc_db::{Database, turso, memory};
+use doc_db::{Database, dibi, memory, turso};
 
 // Production: reads TURSO_URL and TURSO_AUTH_TOKEN from environment
 let db: Database = turso();
@@ -20,9 +20,13 @@ let db: Database = doc_db::turso_with_config(
 
 // In-memory (tests)
 let db: Database = memory();
+
+let db: Database = dibi();
+
+let db: Database = doc_db::dibi_with_config("dibi://fn0-db.fn0.dev".to_string());
 ```
 
-`Database` is `Clone`. Share it across your handler by cloning.
+`Database` is `Clone`. Share it across your handler by cloning. The Dibi guest never selects a tenant; the fn0 host maps the trusted project id to the Dibi tenant.
 
 ## Basic Operations
 
@@ -78,7 +82,7 @@ let ops = vec![
 db.batch(&ops).await?;
 ```
 
-### `transaction` — explicit ACID transaction
+### `transaction` — explicit transaction
 
 ```rust
 let mut tx = db.transaction().await?;
@@ -89,9 +93,11 @@ tx.commit().await?;
 
 Call `tx.rollback()` to abort.
 
+The backend-neutral explicit transaction guarantee is read-your-own-writes, atomic commit, and rollback. Snapshot isolation, repeatable reads, conflict detection, and serializable explicit transactions are not guaranteed. Dibi buffers writes locally and sends one ordered atomic `BATCH` request at commit.
+
 ## `trx` — Optimistic Concurrency Transaction
 
-Higher-level API with conflict detection. Reads are batched upfront; writes use optimistic locking with version checks.
+Higher-level API with optimistic conflict detection. Reads use `batch_get_with_version`; the user closure does not hold a backend transaction or write lock. Commit sends conditional atomic items for every observed key.
 
 ```rust
 let result = db.trx(|trx| async move {
@@ -127,6 +133,11 @@ Key points:
 - `trx.commit(value)` — commit and return `value` as `TrxResult::Committed(value)`
 - `trx.cancel(reason)` — abort without retry; returns `TrxResult::Cancelled(reason)`
 - On conflict, the closure is retried automatically; `TrxResult::Conflict` is returned only when retries are exhausted
+- An unchanged existing read uses `ConditionCheck { expected_version: N }`
+- An unchanged missing read uses `ConditionCheck { expected_version: None }`
+- A modified existing read uses `Put` or `Delete` with the observed version
+- A created document uses `Create`, whose missing-key condition validates an observed missing read
+- Only conflicts retry; transport, authentication, protocol, and backend errors return `TrxResult::Err`
 
 ## Batching Requests with `DbRequest`
 
@@ -242,6 +253,8 @@ UserDelete { id: "alice".to_string(), version: 1 }
 ```
 
 ## Raw SQL
+
+Raw SQL is supported by the Turso backend only. Dibi and Memory reject it as a backend-specific operation.
 
 ```rust
 use doc_db::Value;

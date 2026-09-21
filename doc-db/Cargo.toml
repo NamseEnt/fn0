@@ -26,6 +26,7 @@ harness = false
 [dependencies]
 anyhow = { workspace = true }
 bytes = { workspace = true }
+dibi-protocol = { workspace = true }
 libsql-hrana = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

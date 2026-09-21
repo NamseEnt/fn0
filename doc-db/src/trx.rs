@@ -1,4 +1,4 @@
-use crate::{Database, Transaction};
+use crate::{ConditionalOp, ConditionalOutcome, Database};
 use anyhow::{Result, anyhow, bail};
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -211,22 +211,8 @@ impl Trx {
         if keys.is_empty() {
             return Ok(vec![]);
         }
-        let mut tx_opt = self.inner.lock().unwrap().tx.take();
-        let result = match &mut tx_opt {
-            Some(tx) => tx.batch_get_with_version(keys).await,
-            None => {
-                let db = self.inner.lock().unwrap().db.clone();
-                match db.begin_immediate_with_reads(keys).await {
-                    Ok((tx, docs)) => {
-                        tx_opt = Some(tx);
-                        Ok(docs)
-                    }
-                    Err(e) => Err(e),
-                }
-            }
-        };
-        self.inner.lock().unwrap().tx = tx_opt;
-        result
+        let db = self.inner.lock().unwrap().db.clone();
+        db.batch_get_with_version(keys).await
     }
 }
 
@@ -319,30 +305,19 @@ where
 
     match control.inner {
         TrxControlInner::Commit(out) => {
-            let (commit_db, tx, entries_result) = take_entries_and_tx(state);
+            let (commit_db, entries_result) = take_entries(state);
             let entries = match entries_result {
                 Ok(e) => e,
-                Err(err) => {
-                    if let Some(tx) = tx {
-                        let _ = tx.rollback().await;
-                    }
-                    return AttemptOutcome::Done(TrxResult::Err(E::from(err)));
-                }
+                Err(err) => return AttemptOutcome::Done(TrxResult::Err(E::from(err))),
             };
 
-            match commit_entries(commit_db, tx, entries).await {
+            match commit_entries(commit_db, entries).await {
                 Ok(()) => AttemptOutcome::Done(TrxResult::Committed(out)),
                 Err(CommitFailure::Conflict(details)) => AttemptOutcome::Conflict(details),
                 Err(CommitFailure::Err(err)) => AttemptOutcome::Done(TrxResult::Err(E::from(err))),
             }
         }
-        TrxControlInner::Cancel(reason) => {
-            let tx_to_rollback = state.lock().unwrap().tx.take();
-            if let Some(tx) = tx_to_rollback {
-                let _ = tx.rollback().await;
-            }
-            AttemptOutcome::Done(TrxResult::Cancelled(reason))
-        }
+        TrxControlInner::Cancel(reason) => AttemptOutcome::Done(TrxResult::Cancelled(reason)),
     }
 }
 
@@ -362,7 +337,6 @@ struct TrxState {
     db: Database,
     entries: Vec<TrackedEntry>,
     index: HashMap<DocKey, usize>,
-    tx: Option<Transaction>,
 }
 
 impl TrxState {
@@ -371,7 +345,6 @@ impl TrxState {
             db,
             entries: Vec::new(),
             index: HashMap::new(),
-            tx: None,
         }
     }
 
@@ -409,6 +382,7 @@ impl TrxState {
                         shared,
                         created: false,
                     },
+                    observed: true,
                 });
                 Ok(Some(handle))
             }
@@ -417,6 +391,7 @@ impl TrxState {
                     key,
                     expected_version: None,
                     state: TrackedState::Missing,
+                    observed: true,
                 });
                 Ok(None)
             }
@@ -441,6 +416,7 @@ impl TrxState {
                         shared,
                         created: true,
                     },
+                    observed: false,
                 });
                 Ok(handle)
             }
@@ -454,6 +430,7 @@ impl TrxState {
                         shared,
                         created: true,
                     };
+                    self.entries[idx].observed = true;
                     Ok(handle)
                 }
                 _ => bail!("duplicate trx key access: {}/{}", key.pk, key.sk),
@@ -461,10 +438,7 @@ impl TrxState {
         }
     }
 
-    fn take_entries_and_tx(
-        &mut self,
-    ) -> (Database, Option<Transaction>, Result<Vec<TrackedEntry>>) {
-        let tx = self.tx.take();
+    fn take_entries(&mut self) -> (Database, Result<Vec<TrackedEntry>>) {
         let db = self.db.clone();
         for entry in &self.entries {
             if let TrackedState::Managed { shared, .. } = &entry.state
@@ -476,10 +450,10 @@ impl TrxState {
                     entry.key.sk
                 );
                 self.entries.clear();
-                return (db, tx, Err(err));
+                return (db, Err(err));
             }
         }
-        (db, tx, Ok(std::mem::take(&mut self.entries)))
+        (db, Ok(std::mem::take(&mut self.entries)))
     }
 }
 
@@ -487,38 +461,74 @@ struct TrackedEntry {
     key: DocKey,
     expected_version: Option<i64>,
     state: TrackedState,
+    observed: bool,
 }
 
 impl TrackedEntry {
-    fn write(&self) -> Result<PendingWrite> {
+    fn conditional_op(&self) -> Result<Option<ConditionalOp>> {
         match &self.state {
-            TrackedState::Missing => Ok(PendingWrite::None),
+            TrackedState::Missing => {
+                if self.observed {
+                    Ok(Some(ConditionalOp::Check {
+                        pk: self.key.pk.clone(),
+                        sk: self.key.sk.clone(),
+                        expected_version: None,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
             TrackedState::Managed { shared, created } => {
                 if shared.deleted.load(Ordering::Acquire) {
                     if *created {
-                        return Ok(PendingWrite::None);
+                        if self.observed {
+                            return Ok(Some(ConditionalOp::Check {
+                                pk: self.key.pk.clone(),
+                                sk: self.key.sk.clone(),
+                                expected_version: None,
+                            }));
+                        }
+                        return Ok(None);
                     }
                     let expected_version = self.expected_version.ok_or_else(|| {
                         anyhow!("existing tracked doc missing expected version for delete")
                     })?;
-                    return Ok(PendingWrite::Delete(expected_version));
+                    return Ok(Some(ConditionalOp::Delete {
+                        pk: self.key.pk.clone(),
+                        sk: self.key.sk.clone(),
+                        expected_version,
+                    }));
                 }
 
                 if *created {
-                    return Ok(PendingWrite::Insert((shared.serialize)()?));
+                    return Ok(Some(ConditionalOp::Create {
+                        pk: self.key.pk.clone(),
+                        sk: self.key.sk.clone(),
+                        data: (shared.serialize)()?,
+                    }));
                 }
 
                 if shared.dirty.load(Ordering::Acquire) {
                     let expected_version = self.expected_version.ok_or_else(|| {
                         anyhow!("existing tracked doc missing expected version for update")
                     })?;
-                    return Ok(PendingWrite::Update {
+                    return Ok(Some(ConditionalOp::Put {
+                        pk: self.key.pk.clone(),
+                        sk: self.key.sk.clone(),
                         expected_version,
                         data: (shared.serialize)()?,
-                    });
+                    }));
                 }
 
-                Ok(PendingWrite::None)
+                if self.observed {
+                    Ok(Some(ConditionalOp::Check {
+                        pk: self.key.pk.clone(),
+                        sk: self.key.sk.clone(),
+                        expected_version: self.expected_version,
+                    }))
+                } else {
+                    Ok(None)
+                }
             }
         }
     }
@@ -567,20 +577,8 @@ where
     (shared, handle)
 }
 
-fn take_entries_and_tx(
-    state: Arc<Mutex<TrxState>>,
-) -> (Database, Option<Transaction>, Result<Vec<TrackedEntry>>) {
-    state.lock().unwrap().take_entries_and_tx()
-}
-
-enum PendingWrite {
-    None,
-    Insert(Vec<u8>),
-    Update {
-        expected_version: i64,
-        data: Vec<u8>,
-    },
-    Delete(i64),
+fn take_entries(state: Arc<Mutex<TrxState>>) -> (Database, Result<Vec<TrackedEntry>>) {
+    state.lock().unwrap().take_entries()
 }
 
 enum CommitFailure {
@@ -588,117 +586,29 @@ enum CommitFailure {
     Err(anyhow::Error),
 }
 
-#[tracing::instrument(skip_all, fields(entries = entries.len(), reused_tx = tx.is_some()))]
+#[tracing::instrument(skip_all, fields(entries = entries.len()))]
 async fn commit_entries(
     db: Database,
-    tx: Option<Transaction>,
     entries: Vec<TrackedEntry>,
 ) -> std::result::Result<(), CommitFailure> {
-    let mut writes: Vec<crate::WriteOp> = Vec::new();
+    let mut operations = Vec::new();
     for entry in &entries {
-        match entry.write().map_err(CommitFailure::Err)? {
-            PendingWrite::None => {}
-            PendingWrite::Insert(data) => writes.push(crate::WriteOp::Insert {
-                pk: entry.key.pk.clone(),
-                sk: entry.key.sk.clone(),
-                data,
-            }),
-            PendingWrite::Update {
-                expected_version,
-                data,
-            } => writes.push(crate::WriteOp::Update {
-                pk: entry.key.pk.clone(),
-                sk: entry.key.sk.clone(),
-                expected_version,
-                data,
-            }),
-            PendingWrite::Delete(expected_version) => writes.push(crate::WriteOp::Delete {
-                pk: entry.key.pk.clone(),
-                sk: entry.key.sk.clone(),
-                expected_version,
-            }),
+        if let Some(operation) = entry.conditional_op().map_err(CommitFailure::Err)? {
+            operations.push(operation);
         }
     }
 
-    if writes.is_empty() && tx.is_none() {
+    if operations.is_empty() {
         return Ok(());
     }
 
-    let mut tx = match tx {
-        Some(t) => t,
-        None => {
-            let begin_span = tracing::info_span!("commit_begin_tx");
-            async { db.transaction().await.map_err(CommitFailure::Err) }
-                .instrument(begin_span)
-                .await?
-        }
-    };
-
-    let outcome = tx
-        .apply_writes_and_commit(&writes)
+    match db
+        .conditional_write_batch(&operations)
         .await
-        .map_err(CommitFailure::Err)?;
-
-    let mut conflicts = Vec::new();
-
-    if let Some(info) = outcome.conflict
-        && let Some(op) = writes.get(info.step_index)
+        .map_err(CommitFailure::Err)?
     {
-        let (pk, sk, expected) = write_key_and_expected(op);
-        conflicts.push(ConflictKey {
-            key: DocKey { pk, sk },
-            expected_version: expected,
-            actual_version: None,
-        });
-    }
-
-    for (i, count) in outcome.affected_counts.iter().enumerate() {
-        if *count == 1 {
-            continue;
-        }
-        let Some(op) = writes.get(i) else { continue };
-        let (pk, sk, expected) = write_key_and_expected(op);
-        let key = DocKey { pk, sk };
-        if conflicts.iter().any(|c| c.key == key) {
-            continue;
-        }
-        conflicts.push(ConflictKey {
-            key,
-            expected_version: expected,
-            actual_version: None,
-        });
-    }
-
-    if !conflicts.is_empty() {
-        let key_pairs: Vec<(String, String)> = conflicts
-            .iter()
-            .map(|c| (c.key.pk.clone(), c.key.sk.clone()))
-            .collect();
-        if let Ok(stored) = db.batch_get_with_version(&key_pairs).await {
-            for (c, slot) in conflicts.iter_mut().zip(stored.into_iter()) {
-                c.actual_version = slot.map(|d| d.version);
-            }
-        }
-        return Err(CommitFailure::Conflict(ConflictDetails { keys: conflicts }));
-    }
-
-    Ok(())
-}
-
-fn write_key_and_expected(op: &crate::WriteOp) -> (String, String, Option<i64>) {
-    match op {
-        crate::WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
-        crate::WriteOp::Update {
-            pk,
-            sk,
-            expected_version,
-            ..
-        }
-        | crate::WriteOp::Delete {
-            pk,
-            sk,
-            expected_version,
-        } => (pk.clone(), sk.clone(), Some(*expected_version)),
+        ConditionalOutcome::Applied => Ok(()),
+        ConditionalOutcome::Conflict(details) => Err(CommitFailure::Conflict(details)),
     }
 }
 
@@ -748,9 +658,12 @@ mod tests {
             })
             .expect("create should succeed");
 
-        let write = state.entries[0].write().expect("write plan");
+        let write = state.entries[0]
+            .conditional_op()
+            .expect("write plan")
+            .expect("create operation");
         match write {
-            PendingWrite::Insert(data) => {
+            ConditionalOp::Create { data, .. } => {
                 let doc: TestDoc = serde_json::from_slice(&data).expect("deserialize insert");
                 assert_eq!(doc.id, "a");
                 assert_eq!(doc.value, 1);
@@ -780,10 +693,15 @@ mod tests {
 
         handle.value = 5;
 
-        match state.entries[0].write().expect("write plan") {
-            PendingWrite::Update {
+        match state.entries[0]
+            .conditional_op()
+            .expect("write plan")
+            .expect("update operation")
+        {
+            ConditionalOp::Put {
                 expected_version,
                 data,
+                ..
             } => {
                 assert_eq!(expected_version, 7);
                 let doc: TestDoc = serde_json::from_slice(&data).expect("deserialize update");
@@ -814,8 +732,14 @@ mod tests {
 
         handle.delete();
 
-        match state.entries[0].write().expect("write plan") {
-            PendingWrite::Delete(expected_version) => assert_eq!(expected_version, 7),
+        match state.entries[0]
+            .conditional_op()
+            .expect("write plan")
+            .expect("delete operation")
+        {
+            ConditionalOp::Delete {
+                expected_version, ..
+            } => assert_eq!(expected_version, 7),
             _ => panic!("expected delete"),
         }
     }
@@ -838,8 +762,11 @@ mod tests {
         assert_eq!(handle.value, 3);
 
         assert!(matches!(
-            state.entries[0].write().expect("write plan"),
-            PendingWrite::Insert(_)
+            state.entries[0]
+                .conditional_op()
+                .expect("write plan")
+                .expect("create operation"),
+            ConditionalOp::Create { .. }
         ));
     }
 
@@ -863,7 +790,7 @@ mod tests {
             })
             .expect("create should succeed");
 
-        let (_, _, result) = state.take_entries_and_tx();
+        let (_, result) = state.take_entries();
         match result {
             Ok(_) => panic!("live handle should fail"),
             Err(err) => assert!(err.to_string().contains("live doc handle escaped trx")),

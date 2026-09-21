@@ -1,5 +1,6 @@
 #[doc(hidden)]
 pub mod backend_contract;
+mod dibi;
 mod memory;
 pub mod mock;
 mod runtime;
@@ -8,6 +9,7 @@ mod turso;
 
 use anyhow::Result;
 use bytes::Bytes;
+use dibi::{DibiDatabase, DibiTransaction};
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
 use std::collections::HashSet;
@@ -93,14 +95,13 @@ pub enum AdminWriteOutcome {
     Conflict(ConflictDetails),
 }
 
-#[derive(Clone)]
-pub enum WriteOp {
-    Insert {
+pub(crate) enum ConditionalOp {
+    Create {
         pk: String,
         sk: String,
         data: Vec<u8>,
     },
-    Update {
+    Put {
         pk: String,
         sk: String,
         expected_version: i64,
@@ -111,11 +112,49 @@ pub enum WriteOp {
         sk: String,
         expected_version: i64,
     },
+    Check {
+        pk: String,
+        sk: String,
+        expected_version: Option<i64>,
+    },
 }
 
-pub struct CommitOutcome {
-    pub affected_counts: Vec<u64>,
-    pub conflict: Option<ConflictInfo>,
+pub(crate) enum ConditionalOutcome {
+    Applied,
+    Conflict(ConflictDetails),
+}
+
+pub(crate) fn conditional_key_and_expected(operation: &ConditionalOp) -> (&str, &str, Option<i64>) {
+    match operation {
+        ConditionalOp::Create { pk, sk, .. } => (pk, sk, None),
+        ConditionalOp::Put {
+            pk,
+            sk,
+            expected_version,
+            ..
+        }
+        | ConditionalOp::Delete {
+            pk,
+            sk,
+            expected_version,
+        } => (pk, sk, Some(*expected_version)),
+        ConditionalOp::Check {
+            pk,
+            sk,
+            expected_version,
+        } => (pk, sk, *expected_version),
+    }
+}
+
+pub(crate) fn validate_conditional_keys(operations: &[ConditionalOp]) -> Result<()> {
+    let mut keys = HashSet::with_capacity(operations.len());
+    for operation in operations {
+        let (pk, sk, _) = conditional_key_and_expected(operation);
+        if !keys.insert((pk, sk)) {
+            anyhow::bail!("duplicate conditional write key: {pk}/{sk}");
+        }
+    }
+    Ok(())
 }
 
 pub struct RawStatement {
@@ -142,11 +181,6 @@ pub enum RawTransactionOutcome {
     },
 }
 
-pub struct ConflictInfo {
-    pub step_index: usize,
-    pub message: String,
-}
-
 pub fn turso() -> Database {
     let url = std::env::var("TURSO_URL").expect("TURSO_URL must be set");
     let auth_token = std::env::var("TURSO_AUTH_TOKEN").expect("TURSO_AUTH_TOKEN must be set");
@@ -163,6 +197,18 @@ pub fn turso_with_config(url: String, auth_token: String) -> Database {
 pub fn memory() -> Database {
     Database {
         inner: DatabaseInner::Memory(MemoryDatabase::new()),
+        mock_state: mock::MockState::default(),
+    }
+}
+
+pub fn dibi() -> Database {
+    let url = std::env::var("DIBI_URL").expect("DIBI_URL must be set");
+    dibi_with_config(url)
+}
+
+pub fn dibi_with_config(url: String) -> Database {
+    Database {
+        inner: DatabaseInner::Dibi(DibiDatabase::new(url)),
         mock_state: mock::MockState::default(),
     }
 }
@@ -185,6 +231,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.get(pk, sk).await,
             DatabaseInner::Memory(db) => db.get(pk, sk).await,
+            DatabaseInner::Dibi(db) => db.get(pk, sk).await,
         }
     }
 
@@ -199,6 +246,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.put(pk, sk, data).await,
             DatabaseInner::Memory(db) => db.put(pk, sk, data).await,
+            DatabaseInner::Dibi(db) => db.put(pk, sk, data).await,
         }
     }
 
@@ -213,6 +261,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.delete(pk, sk).await,
             DatabaseInner::Memory(db) => db.delete(pk, sk).await,
+            DatabaseInner::Dibi(db) => db.delete(pk, sk).await,
         }
     }
 
@@ -248,6 +297,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.query(pk, after_sk, limit).await,
             DatabaseInner::Memory(db) => db.query(pk, after_sk, limit).await,
+            DatabaseInner::Dibi(db) => db.query(pk, after_sk, limit).await,
         }
     }
 
@@ -260,6 +310,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.scan(after, limit).await,
             DatabaseInner::Memory(db) => db.scan(after, limit).await,
+            DatabaseInner::Dibi(db) => db.scan(after, limit).await,
         }
     }
 
@@ -269,6 +320,10 @@ impl Database {
                 documents: Vec::new(),
                 next: request.after,
             });
+        }
+
+        if let DatabaseInner::Dibi(db) = &self.inner {
+            return db.admin_scan(request).await;
         }
 
         let page_limit = request.limit;
@@ -351,10 +406,10 @@ impl Database {
             }
         }
 
-        let writes: Vec<WriteOp> = operations
+        let conditional_operations: Vec<ConditionalOp> = operations
             .iter()
             .map(|operation| match operation {
-                AdminWriteOp::Create { pk, sk, data } => WriteOp::Insert {
+                AdminWriteOp::Create { pk, sk, data } => ConditionalOp::Create {
                     pk: pk.clone(),
                     sk: sk.clone(),
                     data: data.clone(),
@@ -364,7 +419,7 @@ impl Database {
                     sk,
                     expected_version,
                     data,
-                } => WriteOp::Update {
+                } => ConditionalOp::Put {
                     pk: pk.clone(),
                     sk: sk.clone(),
                     expected_version: *expected_version,
@@ -374,7 +429,7 @@ impl Database {
                     pk,
                     sk,
                     expected_version,
-                } => WriteOp::Delete {
+                } => ConditionalOp::Delete {
                     pk: pk.clone(),
                     sk: sk.clone(),
                     expected_version: *expected_version,
@@ -382,85 +437,20 @@ impl Database {
             })
             .collect();
 
-        let mut transaction = self.transaction().await?;
-        let outcome = transaction.apply_writes_and_commit(&writes).await?;
-        let mut conflicts = Vec::new();
-
-        for (write_index, affected_count) in outcome.affected_counts.iter().enumerate() {
-            if *affected_count == 1 {
-                continue;
+        let outcome = match &self.inner {
+            DatabaseInner::Turso(db) => db.conditional_write_batch(&conditional_operations).await?,
+            DatabaseInner::Memory(db) => {
+                db.conditional_write_batch(&conditional_operations).await?
             }
-
-            let Some(write) = writes.get(write_index) else {
-                continue;
-            };
-            let (pk, sk, expected_version) = match write {
-                WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
-                WriteOp::Update {
-                    pk,
-                    sk,
-                    expected_version,
-                    ..
-                }
-                | WriteOp::Delete {
-                    pk,
-                    sk,
-                    expected_version,
-                } => (pk.clone(), sk.clone(), Some(*expected_version)),
-            };
-            conflicts.push(ConflictKey {
-                key: DocKey { pk, sk },
-                expected_version,
-                actual_version: None,
-            });
-        }
-
-        if let Some(conflict) = outcome.conflict
-            && let Some(write) = writes.get(conflict.step_index)
-        {
-            let (pk, sk, expected_version) = match write {
-                WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
-                WriteOp::Update {
-                    pk,
-                    sk,
-                    expected_version,
-                    ..
-                }
-                | WriteOp::Delete {
-                    pk,
-                    sk,
-                    expected_version,
-                } => (pk.clone(), sk.clone(), Some(*expected_version)),
-            };
-            if !conflicts
-                .iter()
-                .any(|item| item.key.pk == pk && item.key.sk == sk)
-            {
-                conflicts.push(ConflictKey {
-                    key: DocKey { pk, sk },
-                    expected_version,
-                    actual_version: None,
-                });
+            DatabaseInner::Dibi(db) => {
+                db.admin_conditional_write_batch(&conditional_operations)
+                    .await?
             }
-        }
-
-        if conflicts.is_empty() {
-            return Ok(AdminWriteOutcome::Applied);
-        }
-
-        let keys: Vec<(String, String)> = conflicts
-            .iter()
-            .map(|conflict| (conflict.key.pk.clone(), conflict.key.sk.clone()))
-            .collect();
-        if let Ok(current_documents) = self.batch_get_with_version(&keys).await {
-            for (conflict, current_document) in conflicts.iter_mut().zip(current_documents) {
-                conflict.actual_version = current_document.map(|document| document.version);
-            }
-        }
-
-        Ok(AdminWriteOutcome::Conflict(ConflictDetails {
-            keys: conflicts,
-        }))
+        };
+        Ok(match outcome {
+            ConditionalOutcome::Applied => AdminWriteOutcome::Applied,
+            ConditionalOutcome::Conflict(details) => AdminWriteOutcome::Conflict(details),
+        })
     }
 
     #[tracing::instrument(skip_all, fields(ops = ops.len()))]
@@ -468,6 +458,18 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.batch(ops).await,
             DatabaseInner::Memory(db) => db.batch(ops).await,
+            DatabaseInner::Dibi(db) => db.batch(ops).await,
+        }
+    }
+
+    pub(crate) async fn conditional_write_batch(
+        &self,
+        operations: &[ConditionalOp],
+    ) -> Result<ConditionalOutcome> {
+        match &self.inner {
+            DatabaseInner::Turso(db) => db.conditional_write_batch(operations).await,
+            DatabaseInner::Memory(db) => db.conditional_write_batch(operations).await,
+            DatabaseInner::Dibi(db) => db.conditional_write_batch(operations).await,
         }
     }
 
@@ -479,6 +481,9 @@ impl Database {
             }),
             DatabaseInner::Memory(db) => Ok(Transaction {
                 inner: TransactionInner::Memory(db.transaction().await?),
+            }),
+            DatabaseInner::Dibi(db) => Ok(Transaction {
+                inner: TransactionInner::Dibi(DibiTransaction::new(db.clone())),
             }),
         }
     }
@@ -503,6 +508,9 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_raw(sql, args, want_rows).await,
             DatabaseInner::Memory(db) => db.execute_raw(sql, args, want_rows).await,
+            DatabaseInner::Dibi(_) => {
+                anyhow::bail!("raw SQL is only supported by the Turso backend")
+            }
         }
     }
 
@@ -523,6 +531,9 @@ impl Database {
             DatabaseInner::Memory(_) => {
                 anyhow::bail!("execute_raw_transactional is only supported on the Turso backend")
             }
+            DatabaseInner::Dibi(_) => {
+                anyhow::bail!("raw SQL is only supported by the Turso backend")
+            }
         }
     }
 
@@ -531,6 +542,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_ops(ops).await,
             DatabaseInner::Memory(db) => db.execute_ops(ops).await,
+            DatabaseInner::Dibi(db) => db.execute_ops(ops).await,
         }
     }
 
@@ -539,6 +551,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.get_with_version(pk, sk).await,
             DatabaseInner::Memory(db) => db.get_with_version(pk, sk).await,
+            DatabaseInner::Dibi(db) => db.get_with_version(pk, sk).await,
         }
     }
 
@@ -550,37 +563,16 @@ impl Database {
         if keys.is_empty() {
             return Ok(vec![]);
         }
-        let mut out = Vec::with_capacity(keys.len());
-        for (pk, sk) in keys {
-            out.push(self.get_with_version(pk, sk).await?);
-        }
-        Ok(out)
-    }
-
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn begin_immediate_with_reads(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<(Transaction, Vec<Option<StoredDoc>>)> {
         match &self.inner {
-            DatabaseInner::Turso(db) => {
-                let (tx, docs) = db.begin_immediate_with_reads(keys).await?;
-                Ok((
-                    Transaction {
-                        inner: TransactionInner::Turso(tx),
-                    },
-                    docs,
-                ))
-            }
+            DatabaseInner::Turso(db) => db.batch_get_with_version(keys).await,
             DatabaseInner::Memory(db) => {
-                let (tx, docs) = db.begin_immediate_with_reads(keys).await?;
-                Ok((
-                    Transaction {
-                        inner: TransactionInner::Memory(tx),
-                    },
-                    docs,
-                ))
+                let mut output = Vec::with_capacity(keys.len());
+                for (pk, sk) in keys {
+                    output.push(db.get_with_version(pk, sk).await?);
+                }
+                Ok(output)
             }
+            DatabaseInner::Dibi(db) => db.batch_get_with_version(keys).await,
         }
     }
 }
@@ -589,6 +581,7 @@ impl Database {
 enum DatabaseInner {
     Turso(TursoDatabase),
     Memory(MemoryDatabase),
+    Dibi(DibiDatabase),
 }
 
 pub struct Transaction {
@@ -598,6 +591,7 @@ pub struct Transaction {
 enum TransactionInner {
     Turso(TursoTransaction),
     Memory(MemoryTransaction),
+    Dibi(DibiTransaction),
 }
 
 impl Transaction {
@@ -606,6 +600,7 @@ impl Transaction {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.get(pk, sk).await,
             TransactionInner::Memory(tx) => tx.get(pk, sk).await,
+            TransactionInner::Dibi(tx) => tx.get(pk, sk).await,
         }
     }
 
@@ -614,6 +609,7 @@ impl Transaction {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.put(pk, sk, data).await,
             TransactionInner::Memory(tx) => tx.put(pk, sk, data).await,
+            TransactionInner::Dibi(tx) => tx.put(pk, sk, data).await,
         }
     }
 
@@ -622,6 +618,7 @@ impl Transaction {
         match &mut self.inner {
             TransactionInner::Turso(tx) => tx.delete(pk, sk).await,
             TransactionInner::Memory(tx) => tx.delete(pk, sk).await,
+            TransactionInner::Dibi(tx) => tx.delete(pk, sk).await,
         }
     }
 
@@ -630,6 +627,7 @@ impl Transaction {
         match self.inner {
             TransactionInner::Turso(tx) => tx.commit().await,
             TransactionInner::Memory(tx) => tx.commit().await,
+            TransactionInner::Dibi(tx) => tx.commit().await,
         }
     }
 
@@ -638,32 +636,12 @@ impl Transaction {
         match self.inner {
             TransactionInner::Turso(tx) => tx.rollback().await,
             TransactionInner::Memory(tx) => tx.rollback().await,
-        }
-    }
-
-    #[tracing::instrument(skip_all, fields(writes = writes.len()))]
-    pub(crate) async fn apply_writes_and_commit(
-        &mut self,
-        writes: &[WriteOp],
-    ) -> Result<CommitOutcome> {
-        match &mut self.inner {
-            TransactionInner::Turso(tx) => tx.apply_writes_and_commit(writes).await,
-            TransactionInner::Memory(tx) => tx.apply_writes_and_commit(writes).await,
-        }
-    }
-
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn batch_get_with_version(
-        &mut self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<StoredDoc>>> {
-        match &mut self.inner {
-            TransactionInner::Turso(tx) => tx.batch_get_with_version(keys).await,
-            TransactionInner::Memory(tx) => tx.batch_get_with_version(keys).await,
+            TransactionInner::Dibi(tx) => tx.rollback().await,
         }
     }
 }
 
+#[derive(Debug)]
 pub enum DbOp {
     Get {
         pk: String,

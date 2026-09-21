@@ -391,6 +391,21 @@ pub fn encode_request_frame(
     encode_frame(operation.opcode().value(), 0, request_id, payload.finish())
 }
 
+pub fn encode_request_frame_checked(
+    request_id: u64,
+    tenant: &str,
+    operation: &RequestOperation,
+) -> Result<Vec<u8>> {
+    let mut payload = Encoder::new();
+    encode_request_payload(&mut payload, tenant, operation);
+    Ok(encode_frame(
+        operation.opcode().value(),
+        0,
+        request_id,
+        payload.finish_checked()?,
+    ))
+}
+
 pub fn decode_request_frame(encoded: &[u8]) -> Result<RequestFrame> {
     let (header, payload) = decode_frame_parts(encoded)?;
     let opcode = Opcode::from_u8(header.code)?;

@@ -152,27 +152,57 @@ impl MemoryDatabase {
         })
     }
 
-    pub(crate) async fn begin_immediate_with_reads(
+    pub(crate) async fn conditional_write_batch(
         &self,
-        keys: &[(String, String)],
-    ) -> Result<(MemoryTransaction, Vec<Option<StoredDoc>>)> {
-        let working = self.store.lock().unwrap().clone();
-        let docs = keys
-            .iter()
-            .map(|(pk, sk)| {
-                working.get(&(pk.clone(), sk.clone())).map(|doc| StoredDoc {
-                    data: doc.data.clone().into(),
-                    version: doc.version,
-                })
-            })
-            .collect();
-        Ok((
-            MemoryTransaction {
-                db: self.clone(),
-                working,
-            },
-            docs,
-        ))
+        operations: &[crate::ConditionalOp],
+    ) -> Result<crate::ConditionalOutcome> {
+        crate::validate_conditional_keys(operations)?;
+        let mut store = self.store.lock().unwrap();
+        let mut conflicts = Vec::new();
+        for operation in operations {
+            let (pk, sk, expected_version) = crate::conditional_key_and_expected(operation);
+            let actual_version = store
+                .get(&(pk.to_owned(), sk.to_owned()))
+                .map(|document| document.version);
+            if actual_version != expected_version {
+                conflicts.push(crate::ConflictKey {
+                    key: crate::DocKey::new(pk, sk),
+                    expected_version,
+                    actual_version,
+                });
+            }
+        }
+        if !conflicts.is_empty() {
+            return Ok(crate::ConditionalOutcome::Conflict(
+                crate::ConflictDetails { keys: conflicts },
+            ));
+        }
+
+        for operation in operations {
+            match operation {
+                crate::ConditionalOp::Create { pk, sk, data } => {
+                    store.insert(
+                        (pk.clone(), sk.clone()),
+                        MemDoc {
+                            data: data.clone(),
+                            version: 0,
+                        },
+                    );
+                }
+                crate::ConditionalOp::Put { pk, sk, data, .. } => {
+                    let document = store
+                        .get_mut(&(pk.clone(), sk.clone()))
+                        .ok_or_else(|| anyhow::anyhow!("conditional PUT document disappeared"))?;
+                    document.data = data.clone();
+                    document.version += 1;
+                }
+                crate::ConditionalOp::Delete { pk, sk, .. } => {
+                    store.remove(&(pk.clone(), sk.clone()));
+                }
+                crate::ConditionalOp::Check { .. } => {}
+            }
+        }
+        Ok(crate::ConditionalOutcome::Applied)
     }
 }
 
@@ -206,119 +236,6 @@ impl MemoryTransaction {
 
     pub(crate) async fn rollback(self) -> Result<()> {
         Ok(())
-    }
-
-    pub(crate) async fn batch_get_with_version(
-        &mut self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<StoredDoc>>> {
-        let docs = keys
-            .iter()
-            .map(|(pk, sk)| {
-                self.working
-                    .get(&(pk.clone(), sk.clone()))
-                    .map(|doc| StoredDoc {
-                        data: doc.data.clone().into(),
-                        version: doc.version,
-                    })
-            })
-            .collect();
-        Ok(docs)
-    }
-
-    pub(crate) async fn apply_writes_and_commit(
-        &mut self,
-        writes: &[crate::WriteOp],
-    ) -> Result<crate::CommitOutcome> {
-        use crate::WriteOp;
-
-        let mut staged = self.db.store.lock().unwrap().clone();
-        let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
-        let mut conflict: Option<crate::ConflictInfo> = None;
-
-        for (write_index, op) in writes.iter().enumerate() {
-            match op {
-                WriteOp::Insert { pk, sk, data } => {
-                    let key = (pk.clone(), sk.clone());
-                    if staged.contains_key(&key) {
-                        conflict = Some(crate::ConflictInfo {
-                            step_index: write_index,
-                            message: format!(
-                                "UNIQUE constraint failed: docs.pk, docs.sk ({pk}/{sk})"
-                            ),
-                        });
-                        affected_counts.push(0);
-                        break;
-                    }
-                    staged.insert(
-                        key,
-                        MemDoc {
-                            data: data.clone(),
-                            version: 0,
-                        },
-                    );
-                    affected_counts.push(1);
-                }
-                WriteOp::Update {
-                    pk,
-                    sk,
-                    expected_version,
-                    data,
-                } => {
-                    let key = (pk.clone(), sk.clone());
-                    match staged.get_mut(&key) {
-                        Some(doc) if doc.version == *expected_version => {
-                            doc.data = data.clone();
-                            doc.version += 1;
-                            affected_counts.push(1);
-                        }
-                        _ => {
-                            affected_counts.push(0);
-                            conflict = Some(crate::ConflictInfo {
-                                step_index: write_index,
-                                message: format!("optimistic update conflict for {pk}/{sk}"),
-                            });
-                            break;
-                        }
-                    }
-                }
-                WriteOp::Delete {
-                    pk,
-                    sk,
-                    expected_version,
-                } => {
-                    let key = (pk.clone(), sk.clone());
-                    match staged.get(&key) {
-                        Some(doc) if doc.version == *expected_version => {
-                            staged.remove(&key);
-                            affected_counts.push(1);
-                        }
-                        _ => {
-                            affected_counts.push(0);
-                            conflict = Some(crate::ConflictInfo {
-                                step_index: write_index,
-                                message: format!("optimistic delete conflict for {pk}/{sk}"),
-                            });
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        while affected_counts.len() < writes.len() {
-            affected_counts.push(0);
-        }
-
-        if conflict.is_none() {
-            *self.db.store.lock().unwrap() = staged;
-            self.working.clear();
-        }
-
-        Ok(crate::CommitOutcome {
-            affected_counts,
-            conflict,
-        })
     }
 }
 

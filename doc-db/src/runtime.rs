@@ -4,6 +4,18 @@ use std::time::Duration;
 const DATABASE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[cfg(target_arch = "wasm32")]
+pub(crate) async fn dibi_request(endpoint: &str, frame: &[u8]) -> anyhow::Result<Vec<u8>> {
+    forte_sdk::dibi::request(endpoint, frame)
+        .await
+        .map_err(|error| anyhow::anyhow!("Dibi host transport error: {error:?}"))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) async fn dibi_request(_endpoint: &str, _frame: &[u8]) -> anyhow::Result<Vec<u8>> {
+    anyhow::bail!("Dibi host transport is unavailable outside the fn0 WASM runtime")
+}
+
+#[cfg(target_arch = "wasm32")]
 pub(crate) async fn http_post_json(
     url: &str,
     body: Vec<u8>,

@@ -1,6 +1,24 @@
 # Document backend contract
 
-This document fixes the backend-neutral contract that a future Dibi backend must implement for `fn0-doc-db`. It describes application data access, optimistic transactions, and the administrative primitives needed for inspection and schema migration. It does not require a particular storage engine or wire protocol.
+This document fixes the backend-neutral contract implemented by `fn0-doc-db`. It describes application data access, optimistic transactions, and the administrative primitives needed for inspection and schema migration. It does not require a particular storage engine or wire protocol.
+
+## Backends
+
+`fn0-doc-db` provides three backends:
+
+- `Memory` for local tests and in-process use;
+- `Turso` for libSQL over Hrana HTTP;
+- `Dibi` for the Dibi protocol through the fn0 host transport.
+
+The Dibi path is:
+
+```text
+fn0-doc-db -> WIT host transport -> fn0 host -> authenticated QUIC -> Dibi -> RocksDB
+```
+
+`fn0-doc-db` does not implement QUIC, TLS, authentication, worker credentials, or tenant selection. A Dibi guest request always carries an empty tenant. The trusted fn0 host injects `project_id` as the Dibi tenant after validating the logical endpoint. Applications select the Dibi endpoint through `DIBI_URL`; the host normally supplies `dibi://fn0-db.fn0.dev`.
+
+Dibi protocol pages are limited to 10,000 records, but the public `query`, `scan`, and `admin_scan` limits are not. The Dibi client follows cursors across protocol pages until the caller's limit is satisfied. Atomic `batch`, administrative conditional writes, and optimistic conditional commits are never split when their operation count or encoded frame exceeds a protocol limit; they return an error instead.
 
 ## Application API contract
 
@@ -47,11 +65,11 @@ The ordinary application `get`, `query`, and `scan` APIs do not expose versions.
 
 An explicit transaction provides read-your-own-writes. A write is visible to subsequent reads in the same transaction, a deleted key reads as missing, and uncommitted data is not visible outside the transaction.
 
-`commit` makes all writes visible together. `rollback` makes none of the transaction's writes visible. A transaction containing multiple writes therefore has the same all-or-nothing boundary as `batch`.
+`commit` makes all writes visible together. `rollback` makes none of the transaction's writes visible. A transaction containing multiple writes therefore has the same all-or-nothing boundary as `batch`. The backend-neutral guarantee is read-your-own-writes, atomic commit, and rollback. Snapshot isolation, repeatable reads, conflict detection, and serializable explicit transactions are not guaranteed.
 
 ## Optimistic transactions
 
-An optimistic transaction records the version (or missing state) observed by each read. All observed reads that can affect the transaction outcome are validated at commit, including documents that were read but not mutated. Its writes are conditional on those observations:
+An optimistic transaction records the version (or missing state) observed by each read. Every observed key is validated exactly once at commit, including documents that were read but not mutated. Its writes are conditional on those observations:
 
 - updating version `N` succeeds only while the document is still version `N`;
 - deleting version `N` succeeds only while the document is still version `N`;
@@ -64,7 +82,9 @@ The client expresses observations with conditional transaction items:
 - reading an existing document and updating or deleting it is validated by the mutation's `expected_version` condition;
 - reading a missing document and creating it is validated by `Create`'s missing-key precondition.
 
-If a concurrent writer changes the observed state, the commit conflicts. A conflict reports the affected `ConflictKey` entries with `expected_version` and the best available `actual_version` (`None` means the key is currently missing). The high-level `trx` operation may retry the closure; after retry exhaustion it returns `TrxResult::Conflict`.
+If a key was read as missing, then created and deleted before commit, the final item is `ConditionCheck { expected_version: None }`. A direct create that is deleted before commit is an unobserved net no-op and does not add a condition.
+
+If a concurrent writer changes the observed state, the commit conflicts. A conflict reports the affected `ConflictKey` entries with `expected_version` and the best available `actual_version` (`None` means the key is currently missing). The high-level `trx` operation may retry the closure; after retry exhaustion it returns `TrxResult::Conflict`. Only a conditional conflict is retryable. Transport failures, timeouts, authentication failures, malformed responses, protocol errors, and backend errors return `TrxResult::Err`. The user closure runs without a backend write transaction. Memory validates and applies in one mutex critical section, Turso uses `BEGIN IMMEDIATE` only during its short commit phase, and Dibi sends one `TRANSACT_WRITE_ITEMS` request.
 
 ## `execute_ops` semantics
 
@@ -75,6 +95,8 @@ If a concurrent writer changes the observed state, the commit conflicts. A confl
 - `Put` and `Delete` return `DbResult::Done`.
 
 Combining requests through tuples or vectors via `DbRequest` preserves the same operation and result ordering. `execute_ops` is not implicitly transactional.
+
+For a Dibi `Query`, `limit: None` means unlimited according to the public API. The client paginates instead of truncating it to the Dibi protocol page limit. If an operation sequence cannot be represented by one `EXECUTE_OPS` request without changing its semantics, the client executes it sequentially while preserving result order and visibility.
 
 ## Administrative API
 
@@ -156,7 +178,11 @@ Inspection and migration remain supported as capabilities, but arbitrary SQL tex
 
 ### Raw SQL
 
-`execute_raw` and `execute_raw_transactional` are Turso-specific escape hatches. Arbitrary SQL execution, SQL query syntax, and SQL migration files are explicitly outside the backend-neutral contract and are not required from Dibi.
+`execute_raw` and `execute_raw_transactional` are Turso-only escape hatches. The Dibi backend returns an explicit `raw SQL is only supported by the Turso backend` error. Arbitrary SQL execution, SQL query syntax, and SQL migration files are explicitly outside the backend-neutral contract and are not required from Dibi.
+
+### Turso commit locking
+
+Turso does not begin `BEGIN IMMEDIATE` when an optimistic transaction starts or while the user closure runs. It reads versions without a write lock, then opens `BEGIN IMMEDIATE` only for commit-time validation and conditional application. A failed validation rolls back the whole commit phase.
 
 ### Turso-specific row counters
 
