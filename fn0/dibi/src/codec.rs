@@ -5,22 +5,24 @@ use crate::{DibiError, Result, StoredDocument};
 const ESCAPED_ZERO: u8 = 0xff;
 const TERMINATOR: u8 = 0x00;
 
-pub fn encode_document_key(pk: &str, sk: &str) -> Vec<u8> {
-    let mut encoded = Vec::with_capacity(pk.len() + sk.len() + 4);
+pub fn encode_document_key(tenant: &str, pk: &str, sk: &str) -> Vec<u8> {
+    let mut encoded = Vec::with_capacity(tenant.len() + pk.len() + sk.len() + 6);
+    encode_component(tenant, &mut encoded);
     encode_component(pk, &mut encoded);
     encode_component(sk, &mut encoded);
     encoded
 }
 
-pub fn decode_document_key(encoded: &[u8]) -> Result<(String, String)> {
-    let (pk, remainder) = decode_component(encoded)?;
+pub fn decode_document_key(encoded: &[u8]) -> Result<(String, String, String)> {
+    let (tenant, remainder) = decode_component(encoded)?;
+    let (pk, remainder) = decode_component(remainder)?;
     let (sk, remainder) = decode_component(remainder)?;
     if !remainder.is_empty() {
         return Err(DibiError::CorruptKey(
-            "trailing bytes after the second component".to_owned(),
+            "trailing bytes after the third component".to_owned(),
         ));
     }
-    Ok((pk, sk))
+    Ok((tenant, pk, sk))
 }
 
 pub fn encode_document_value(document: &StoredDocument) -> Vec<u8> {
@@ -107,12 +109,12 @@ mod tests {
         ];
         let mut encoded = keys
             .iter()
-            .map(|(pk, sk)| encode_document_key(pk, sk))
+            .map(|(pk, sk)| encode_document_key("tenant", pk, sk))
             .collect::<Vec<_>>();
         keys.sort();
         let expected = keys
             .iter()
-            .map(|(pk, sk)| ((*pk).to_owned(), (*sk).to_owned()))
+            .map(|(pk, sk)| ("tenant".to_owned(), (*pk).to_owned(), (*sk).to_owned()))
             .collect::<Vec<_>>();
         encoded.sort();
         let decoded = encoded
@@ -124,7 +126,15 @@ mod tests {
 
     #[test]
     fn malformed_key_is_an_error() {
-        for malformed in [vec![], vec![0], vec![0, 1], vec![0, 0], vec![b'a', 0, 0, 0]] {
+        let valid = encode_document_key("tenant", "pk", "sk");
+        for malformed in [
+            vec![],
+            vec![0],
+            vec![0, 1],
+            vec![0, 0],
+            vec![b'a', 0, 0, 0],
+            valid[..valid.len() - 2].to_vec(),
+        ] {
             assert!(decode_document_key(&malformed).is_err());
         }
     }

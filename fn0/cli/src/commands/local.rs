@@ -36,7 +36,11 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     let linker = fn0::build_linker(&engine);
 
     let cache = LocalCache::new(wasm_path, engine.clone(), linker.clone());
-    let ctx = Arc::new(ExecutionContext::new(engine, linker, cache));
+    let mut context = ExecutionContext::new(engine, linker, cache);
+    if let Some(dibi_bridge) = fn0::DibiBridge::from_env()? {
+        context = context.with_dibi_bridge(dibi_bridge);
+    }
+    let ctx = Arc::new(context);
     let executor = Rc::new(CodeExecutor::new(ctx));
 
     let port = port.unwrap_or(3000);

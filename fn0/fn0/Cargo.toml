@@ -12,6 +12,7 @@ base64 = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 crossbeam-channel = { workspace = true }
+dibi-protocol = { workspace = true }
 dashmap = { workspace = true }
 fn0-wasmtime = { workspace = true }
 futures = { workspace = true }
@@ -33,7 +34,9 @@ opentelemetry-proto = { workspace = true, features = ["gen-tonic-messages", "log
 prost = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = ["rt-tokio", "trace"] }
 reqwest = { workspace = true, features = ["http2"] }
+quinn = { workspace = true, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
 rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -45,6 +48,7 @@ sysinfo = { workspace = true }
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
+thiserror = { workspace = true }
 tower = { workspace = true, features = ["timeout", "util"] }
 tower-http = { workspace = true, features = ["timeout"] }
 tracing = { workspace = true }

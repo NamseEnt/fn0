@@ -19,56 +19,65 @@ fn basic_versions_and_reopen_persistence() {
     let engine = DibiEngine::open(directory.path()).unwrap();
     let database_uuid = engine.db_uuid().unwrap();
 
-    assert_eq!(engine.get("pk", "sk").unwrap(), None);
+    assert_eq!(engine.get("tenant-a", "pk", "sk").unwrap(), None);
     assert_eq!(
         engine
-            .put("pk", "sk", Bytes::from_static(b"\0binary\xff"))
+            .put("tenant-a", "pk", "sk", Bytes::from_static(b"\0binary\xff"))
             .unwrap(),
         1
     );
     assert_eq!(
-        engine.get("pk", "sk").unwrap().unwrap().as_ref(),
+        engine
+            .get("tenant-a", "pk", "sk")
+            .unwrap()
+            .unwrap()
+            .as_ref(),
         b"\0binary\xff"
     );
     assert_eq!(
         engine
-            .get_with_version("pk", "sk")
+            .get_with_version("tenant-a", "pk", "sk")
             .unwrap()
             .unwrap()
             .version,
         0
     );
     engine
-        .put("pk", "sk", Bytes::from_static(b"second"))
+        .put("tenant-a", "pk", "sk", Bytes::from_static(b"second"))
         .unwrap();
     assert_eq!(
         engine
-            .get_with_version("pk", "sk")
+            .get_with_version("tenant-a", "pk", "sk")
             .unwrap()
             .unwrap()
             .version,
         1
     );
     engine
-        .put("pk", "sk", Bytes::from_static(b"third"))
+        .put("tenant-a", "pk", "sk", Bytes::from_static(b"third"))
         .unwrap();
     assert_eq!(
         engine
-            .get_with_version("pk", "sk")
+            .get_with_version("tenant-a", "pk", "sk")
             .unwrap()
             .unwrap()
             .version,
         2
     );
-    engine.delete("pk", "sk").unwrap();
-    assert_eq!(engine.get("pk", "sk").unwrap(), None);
-    engine.delete("missing", "key").unwrap();
+    engine.delete("tenant-a", "pk", "sk").unwrap();
+    assert_eq!(engine.get("tenant-a", "pk", "sk").unwrap(), None);
+    engine.delete("tenant-a", "missing", "key").unwrap();
     engine
-        .put("pk", "sk", Bytes::from_static(b"new incarnation"))
+        .put(
+            "tenant-a",
+            "pk",
+            "sk",
+            Bytes::from_static(b"new incarnation"),
+        )
         .unwrap();
     assert_eq!(
         engine
-            .get_with_version("pk", "sk")
+            .get_with_version("tenant-a", "pk", "sk")
             .unwrap()
             .unwrap()
             .version,
@@ -82,7 +91,11 @@ fn basic_versions_and_reopen_persistence() {
     assert_eq!(reopened.db_uuid().unwrap(), database_uuid);
     assert_eq!(reopened.last_commit_id().unwrap(), 6);
     assert_eq!(
-        reopened.get_with_version("pk", "sk").unwrap().unwrap().data,
+        reopened
+            .get_with_version("tenant-a", "pk", "sk")
+            .unwrap()
+            .unwrap()
+            .data,
         Bytes::from_static(b"new incarnation")
     );
     assert_eq!(reopened.read_outbox(None, 100).unwrap(), outbox_before);
@@ -95,11 +108,16 @@ fn query_and_scan_preserve_order_and_exclusive_cursors() {
     let (_query_directory, query_engine) = open_temporary();
     for value in values {
         query_engine
-            .put("partition", value, Bytes::copy_from_slice(value.as_bytes()))
+            .put(
+                "tenant-a",
+                "partition",
+                value,
+                Bytes::copy_from_slice(value.as_bytes()),
+            )
             .unwrap();
     }
     query_engine
-        .put("other", "z", Bytes::from_static(b"ignored"))
+        .put("tenant-a", "other", "z", Bytes::from_static(b"ignored"))
         .unwrap();
     let mut expected = values.to_vec();
     expected.sort();
@@ -107,7 +125,7 @@ fn query_and_scan_preserve_order_and_exclusive_cursors() {
     let mut cursor = None;
     loop {
         let page = query_engine
-            .query("partition", cursor.as_deref(), 3)
+            .query("tenant-a", "partition", cursor.as_deref(), 3)
             .unwrap();
         if page.is_empty() {
             break;
@@ -120,7 +138,12 @@ fn query_and_scan_preserve_order_and_exclusive_cursors() {
     let (_scan_directory, scan_engine) = open_temporary();
     for value in values {
         scan_engine
-            .put(value, value, Bytes::copy_from_slice(value.as_bytes()))
+            .put(
+                "tenant-a",
+                value,
+                value,
+                Bytes::copy_from_slice(value.as_bytes()),
+            )
             .unwrap();
     }
     let mut expected_pairs = values
@@ -133,6 +156,7 @@ fn query_and_scan_preserve_order_and_exclusive_cursors() {
     loop {
         let page = scan_engine
             .scan(
+                "tenant-a",
                 scan_cursor
                     .as_ref()
                     .map(|(pk, sk)| (pk.as_str(), sk.as_str())),
@@ -151,71 +175,172 @@ fn query_and_scan_preserve_order_and_exclusive_cursors() {
 }
 
 #[test]
+fn tenant_keyspaces_are_independent_for_reads_scans_and_occ() {
+    let (_directory, engine) = open_temporary();
+    engine
+        .put("tenant-a", "User", "1", Bytes::from_static(b"A"))
+        .unwrap();
+    engine
+        .put("tenant-b", "User", "1", Bytes::from_static(b"B"))
+        .unwrap();
+
+    assert_eq!(
+        engine.get("tenant-a", "User", "1").unwrap(),
+        Some(Bytes::from_static(b"A"))
+    );
+    assert_eq!(
+        engine.get("tenant-b", "User", "1").unwrap(),
+        Some(Bytes::from_static(b"B"))
+    );
+    assert_eq!(
+        engine
+            .query("tenant-a", "User", None, 10)
+            .unwrap()
+            .into_iter()
+            .map(|document| document.data)
+            .collect::<Vec<_>>(),
+        vec![Bytes::from_static(b"A")]
+    );
+    assert_eq!(
+        engine
+            .scan("tenant-a", None, 10)
+            .unwrap()
+            .into_iter()
+            .map(|document| document.data)
+            .collect::<Vec<_>>(),
+        vec![Bytes::from_static(b"A")]
+    );
+    assert_eq!(
+        engine
+            .admin_scan(
+                "tenant-a",
+                AdminScanRequest {
+                    after: None,
+                    limit: 10,
+                    pk_prefix: None,
+                },
+            )
+            .unwrap()
+            .documents
+            .into_iter()
+            .map(|document| document.data)
+            .collect::<Vec<_>>(),
+        vec![Bytes::from_static(b"A")]
+    );
+
+    assert!(matches!(
+        engine.conditional_write_batch(
+            "tenant-a",
+            &[ConditionalWrite::Put {
+                pk: "User".to_owned(),
+                sk: "1".to_owned(),
+                expected_version: 0,
+                data: Bytes::from_static(b"A2"),
+            }],
+        ),
+        Ok(ConditionalWriteOutcome::Applied(_))
+    ));
+    assert!(matches!(
+        engine.conditional_write_batch(
+            "tenant-b",
+            &[ConditionalWrite::Put {
+                pk: "User".to_owned(),
+                sk: "1".to_owned(),
+                expected_version: 0,
+                data: Bytes::from_static(b"B2"),
+            }],
+        ),
+        Ok(ConditionalWriteOutcome::Applied(_))
+    ));
+}
+
+#[test]
 fn application_batch_uses_sequential_version_semantics() {
     let (_directory, engine) = open_temporary();
     for version in 0..=3 {
         engine
-            .put("existing", "key", Bytes::from(format!("value-{version}")))
+            .put(
+                "tenant-a",
+                "existing",
+                "key",
+                Bytes::from(format!("value-{version}")),
+            )
             .unwrap();
     }
     engine
-        .put("incarnation", "key", Bytes::from_static(b"old incarnation"))
+        .put(
+            "tenant-a",
+            "incarnation",
+            "key",
+            Bytes::from_static(b"old incarnation"),
+        )
         .unwrap();
     engine
-        .put("removed", "key", Bytes::from_static(b"old value"))
+        .put(
+            "tenant-a",
+            "removed",
+            "key",
+            Bytes::from_static(b"old value"),
+        )
         .unwrap();
     let result = engine
-        .application_write_batch(&[
-            ApplicationWrite::Put {
-                pk: "existing".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"A"),
-            },
-            ApplicationWrite::Put {
-                pk: "existing".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"B"),
-            },
-            ApplicationWrite::Delete {
-                pk: "incarnation".to_owned(),
-                sk: "key".to_owned(),
-            },
-            ApplicationWrite::Put {
-                pk: "incarnation".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"fresh"),
-            },
-            ApplicationWrite::Put {
-                pk: "removed".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"temporary"),
-            },
-            ApplicationWrite::Delete {
-                pk: "removed".to_owned(),
-                sk: "key".to_owned(),
-            },
-            ApplicationWrite::Put {
-                pk: "other".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"other"),
-            },
-        ])
+        .application_write_batch(
+            "tenant-a",
+            &[
+                ApplicationWrite::Put {
+                    pk: "existing".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"A"),
+                },
+                ApplicationWrite::Put {
+                    pk: "existing".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"B"),
+                },
+                ApplicationWrite::Delete {
+                    pk: "incarnation".to_owned(),
+                    sk: "key".to_owned(),
+                },
+                ApplicationWrite::Put {
+                    pk: "incarnation".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"fresh"),
+                },
+                ApplicationWrite::Put {
+                    pk: "removed".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"temporary"),
+                },
+                ApplicationWrite::Delete {
+                    pk: "removed".to_owned(),
+                    sk: "key".to_owned(),
+                },
+                ApplicationWrite::Put {
+                    pk: "other".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"other"),
+                },
+            ],
+        )
         .unwrap();
     assert_eq!(result.commit_id, Some(7));
-    let existing = engine.get_with_version("existing", "key").unwrap().unwrap();
+    let existing = engine
+        .get_with_version("tenant-a", "existing", "key")
+        .unwrap()
+        .unwrap();
     assert_eq!(existing.data, Bytes::from_static(b"B"));
     assert_eq!(existing.version, 5);
     assert_eq!(
         engine
-            .get_with_version("incarnation", "key")
+            .get_with_version("tenant-a", "incarnation", "key")
             .unwrap()
             .unwrap()
             .version,
         0
     );
-    assert_eq!(engine.get("removed", "key").unwrap(), None);
+    assert_eq!(engine.get("tenant-a", "removed", "key").unwrap(), None);
     assert_eq!(
-        engine.get("other", "key").unwrap(),
+        engine.get("tenant-a", "other", "key").unwrap(),
         Some(Bytes::from_static(b"other"))
     );
 }
@@ -230,12 +355,14 @@ fn conditional_batches_distinguish_conflicts_and_remain_atomic() {
     };
     assert!(matches!(
         engine
-            .conditional_write_batch(std::slice::from_ref(&create))
+            .conditional_write_batch("tenant-a", std::slice::from_ref(&create))
             .unwrap(),
         ConditionalWriteOutcome::Applied(_)
     ));
     let commit_after_create = engine.last_commit_id().unwrap();
-    let create_conflict = engine.conditional_write_batch(&[create]).unwrap();
+    let create_conflict = engine
+        .conditional_write_batch("tenant-a", &[create])
+        .unwrap();
     assert!(matches!(
         create_conflict,
         ConditionalWriteOutcome::Conflict(_)
@@ -244,22 +371,28 @@ fn conditional_batches_distinguish_conflicts_and_remain_atomic() {
 
     assert!(matches!(
         engine
-            .conditional_write_batch(&[ConditionalWrite::Put {
-                pk: "pk".to_owned(),
-                sk: "sk".to_owned(),
-                expected_version: 0,
-                data: Bytes::from_static(b"updated"),
-            }])
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Put {
+                    pk: "pk".to_owned(),
+                    sk: "sk".to_owned(),
+                    expected_version: 0,
+                    data: Bytes::from_static(b"updated"),
+                }]
+            )
             .unwrap(),
         ConditionalWriteOutcome::Applied(_)
     ));
     let stale_put = engine
-        .conditional_write_batch(&[ConditionalWrite::Put {
-            pk: "pk".to_owned(),
-            sk: "sk".to_owned(),
-            expected_version: 0,
-            data: Bytes::from_static(b"stale"),
-        }])
+        .conditional_write_batch(
+            "tenant-a",
+            &[ConditionalWrite::Put {
+                pk: "pk".to_owned(),
+                sk: "sk".to_owned(),
+                expected_version: 0,
+                data: Bytes::from_static(b"stale"),
+            }],
+        )
         .unwrap();
     assert_eq!(
         stale_put,
@@ -272,30 +405,33 @@ fn conditional_batches_distinguish_conflicts_and_remain_atomic() {
     );
 
     engine
-        .put("other", "key", Bytes::from_static(b"safe"))
+        .put("tenant-a", "other", "key", Bytes::from_static(b"safe"))
         .unwrap();
     let commit_before_multi_conflict = engine.last_commit_id().unwrap();
     let multi_conflict = engine
-        .conditional_write_batch(&[
-            ConditionalWrite::Put {
-                pk: "other".to_owned(),
-                sk: "key".to_owned(),
-                expected_version: 0,
-                data: Bytes::from_static(b"must not apply"),
-            },
-            ConditionalWrite::Delete {
-                pk: "pk".to_owned(),
-                sk: "sk".to_owned(),
-                expected_version: 0,
-            },
-        ])
+        .conditional_write_batch(
+            "tenant-a",
+            &[
+                ConditionalWrite::Put {
+                    pk: "other".to_owned(),
+                    sk: "key".to_owned(),
+                    expected_version: 0,
+                    data: Bytes::from_static(b"must not apply"),
+                },
+                ConditionalWrite::Delete {
+                    pk: "pk".to_owned(),
+                    sk: "sk".to_owned(),
+                    expected_version: 0,
+                },
+            ],
+        )
         .unwrap();
     assert!(matches!(
         multi_conflict,
         ConditionalWriteOutcome::Conflict(_)
     ));
     assert_eq!(
-        engine.get("other", "key").unwrap(),
+        engine.get("tenant-a", "other", "key").unwrap(),
         Some(Bytes::from_static(b"safe"))
     );
     assert_eq!(
@@ -305,20 +441,26 @@ fn conditional_batches_distinguish_conflicts_and_remain_atomic() {
 
     assert!(matches!(
         engine
-            .conditional_write_batch(&[ConditionalWrite::Delete {
-                pk: "pk".to_owned(),
-                sk: "sk".to_owned(),
-                expected_version: 1,
-            }])
+            .conditional_write_batch(
+                "tenant-a",
+                &[ConditionalWrite::Delete {
+                    pk: "pk".to_owned(),
+                    sk: "sk".to_owned(),
+                    expected_version: 1,
+                }]
+            )
             .unwrap(),
         ConditionalWriteOutcome::Applied(_)
     ));
     let stale_delete = engine
-        .conditional_write_batch(&[ConditionalWrite::Delete {
-            pk: "pk".to_owned(),
-            sk: "sk".to_owned(),
-            expected_version: 1,
-        }])
+        .conditional_write_batch(
+            "tenant-a",
+            &[ConditionalWrite::Delete {
+                pk: "pk".to_owned(),
+                sk: "sk".to_owned(),
+                expected_version: 1,
+            }],
+        )
         .unwrap();
     assert_eq!(
         stale_delete,
@@ -330,18 +472,21 @@ fn conditional_batches_distinguish_conflicts_and_remain_atomic() {
         }])
     );
 
-    let duplicate = engine.conditional_write_batch(&[
-        ConditionalWrite::Create {
-            pk: "duplicate".to_owned(),
-            sk: "key".to_owned(),
-            data: Bytes::new(),
-        },
-        ConditionalWrite::Delete {
-            pk: "duplicate".to_owned(),
-            sk: "key".to_owned(),
-            expected_version: 0,
-        },
-    ]);
+    let duplicate = engine.conditional_write_batch(
+        "tenant-a",
+        &[
+            ConditionalWrite::Create {
+                pk: "duplicate".to_owned(),
+                sk: "key".to_owned(),
+                data: Bytes::new(),
+            },
+            ConditionalWrite::Delete {
+                pk: "duplicate".to_owned(),
+                sk: "key".to_owned(),
+                expected_version: 0,
+            },
+        ],
+    );
     assert!(matches!(
         duplicate,
         Err(dibi::DibiError::DuplicateConditionalKey { .. })
@@ -352,27 +497,30 @@ fn conditional_batches_distinguish_conflicts_and_remain_atomic() {
 fn commit_log_contains_final_physical_mutations_in_order() {
     let (_directory, engine) = open_temporary();
     engine
-        .put("z", "key", Bytes::from_static(b"first"))
+        .put("tenant-a", "z", "key", Bytes::from_static(b"first"))
         .unwrap();
-    engine.delete("z", "key").unwrap();
+    engine.delete("tenant-a", "z", "key").unwrap();
     engine
-        .application_write_batch(&[
-            ApplicationWrite::Put {
-                pk: "b".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"old"),
-            },
-            ApplicationWrite::Put {
-                pk: "a".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"final-a"),
-            },
-            ApplicationWrite::Put {
-                pk: "b".to_owned(),
-                sk: "key".to_owned(),
-                data: Bytes::from_static(b"final-b"),
-            },
-        ])
+        .application_write_batch(
+            "tenant-a",
+            &[
+                ApplicationWrite::Put {
+                    pk: "b".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"old"),
+                },
+                ApplicationWrite::Put {
+                    pk: "a".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"final-a"),
+                },
+                ApplicationWrite::Put {
+                    pk: "b".to_owned(),
+                    sk: "key".to_owned(),
+                    data: Bytes::from_static(b"final-b"),
+                },
+            ],
+        )
         .unwrap();
 
     let records = engine.read_outbox(None, 10).unwrap();
@@ -390,7 +538,7 @@ fn commit_log_contains_final_physical_mutations_in_order() {
     assert_eq!(
         records[1].mutations,
         vec![CommitMutation::Delete {
-            encoded_key: encode_document_key("z", "key"),
+            encoded_key: encode_document_key("tenant-a", "z", "key"),
         }]
     );
     assert_eq!(records[2].mutations.len(), 2);
@@ -406,11 +554,11 @@ fn commit_log_contains_final_physical_mutations_in_order() {
         records[2].mutations,
         vec![
             CommitMutation::Set {
-                encoded_key: encode_document_key("a", "key"),
+                encoded_key: encode_document_key("tenant-a", "a", "key"),
                 encoded_value: expected_a,
             },
             CommitMutation::Set {
-                encoded_key: encode_document_key("b", "key"),
+                encoded_key: encode_document_key("tenant-a", "b", "key"),
                 encoded_value: expected_b,
             },
         ]
@@ -430,32 +578,40 @@ fn commit_log_contains_final_physical_mutations_in_order() {
 fn admin_scan_filters_and_returns_versions_from_iterator_values() {
     let (_directory, engine) = open_temporary();
     engine
-        .put("keep-a", "1", Bytes::from_static(b"a0"))
+        .put("tenant-a", "keep-a", "1", Bytes::from_static(b"a0"))
         .unwrap();
     engine
-        .put("keep-a", "1", Bytes::from_static(b"a1"))
+        .put("tenant-a", "keep-a", "1", Bytes::from_static(b"a1"))
         .unwrap();
     engine
-        .put("keep-b", "2", Bytes::from_static(b"b0"))
+        .put("tenant-a", "keep-b", "2", Bytes::from_static(b"b0"))
         .unwrap();
-    engine.put("skip", "3", Bytes::from_static(b"s0")).unwrap();
+    engine
+        .put("tenant-a", "skip", "3", Bytes::from_static(b"s0"))
+        .unwrap();
 
     let first = engine
-        .admin_scan(AdminScanRequest {
-            after: None,
-            limit: 1,
-            pk_prefix: Some("keep-".to_owned()),
-        })
+        .admin_scan(
+            "tenant-a",
+            AdminScanRequest {
+                after: None,
+                limit: 1,
+                pk_prefix: Some("keep-".to_owned()),
+            },
+        )
         .unwrap();
     assert_eq!(first.documents.len(), 1);
     assert_eq!(first.documents[0].data, Bytes::from_static(b"a1"));
     assert_eq!(first.documents[0].version, 1);
     let second = engine
-        .admin_scan(AdminScanRequest {
-            after: first.next,
-            limit: 10,
-            pk_prefix: Some("keep-".to_owned()),
-        })
+        .admin_scan(
+            "tenant-a",
+            AdminScanRequest {
+                after: first.next,
+                limit: 10,
+                pk_prefix: Some("keep-".to_owned()),
+            },
+        )
         .unwrap();
     assert_eq!(second.documents.len(), 1);
     assert_eq!(second.documents[0].pk, "keep-b");
@@ -466,7 +622,7 @@ fn admin_scan_filters_and_returns_versions_from_iterator_values() {
 fn concurrent_puts_have_no_lost_updates() {
     let (_directory, engine) = open_temporary();
     engine
-        .put("shared", "key", Bytes::from_static(b"seed"))
+        .put("tenant-a", "shared", "key", Bytes::from_static(b"seed"))
         .unwrap();
     let engine = Arc::new(engine);
     let thread_count = 8;
@@ -478,6 +634,7 @@ fn concurrent_puts_have_no_lost_updates() {
             for write_number in 0..writes_per_thread {
                 engine
                     .put(
+                        "tenant-a",
                         "shared",
                         "key",
                         Bytes::from(format!("{thread_number}-{write_number}")),
@@ -492,7 +649,7 @@ fn concurrent_puts_have_no_lost_updates() {
     let total_writes = thread_count * writes_per_thread;
     assert_eq!(
         engine
-            .get_with_version("shared", "key")
+            .get_with_version("tenant-a", "shared", "key")
             .unwrap()
             .unwrap()
             .version,

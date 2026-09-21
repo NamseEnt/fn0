@@ -1,10 +1,19 @@
-use std::{fs, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    fs,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use bytes::Bytes;
 use dibi_protocol::{
-    AdminItem, ExecuteOperation, ExecuteResult, Key, QueryItem, RequestFrame, RequestOperation,
-    ResponsePayload, ScanItem, Status, TransactWriteOperation, VersionedItem, WriteOperation,
-    decode_request_frame, encode_response_frame,
+    AdminItem, ExecuteOperation, ExecuteResult, Key, QueryItem, RequestOperation, ResponsePayload,
+    ScanItem, Status, TransactWriteOperation, VersionedItem, WriteOperation, decode_request_frame,
+    encode_response_frame, validate_tenant,
 };
 use rustls::pki_types::CertificateDer;
 use tokio::{task::JoinSet, time::timeout};
@@ -15,7 +24,7 @@ use crate::{
     DibiError, Document, StoredDocument,
 };
 
-const ALPN_PROTOCOL: &[u8] = b"dibi/1";
+const ALPN_PROTOCOL: &[u8] = b"dibi/2";
 const DEFAULT_REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_REQUEST_PROCESSING_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_PAYLOAD_SIZE: usize = dibi_protocol::MAX_FRAME_SIZE - dibi_protocol::FRAME_HEADER_SIZE;
@@ -26,6 +35,7 @@ pub struct DibiServerConfig {
     pub listen: SocketAddr,
     pub cert_path: PathBuf,
     pub key_path: PathBuf,
+    pub worker_token: Vec<u8>,
     pub request_read_timeout: Duration,
     pub request_processing_timeout: Duration,
 }
@@ -36,12 +46,14 @@ impl DibiServerConfig {
         listen: SocketAddr,
         cert_path: impl Into<PathBuf>,
         key_path: impl Into<PathBuf>,
+        worker_token: impl Into<Vec<u8>>,
     ) -> Self {
         Self {
             data_dir: data_dir.into(),
             listen,
             cert_path: cert_path.into(),
             key_path: key_path.into(),
+            worker_token: worker_token.into(),
             request_read_timeout: DEFAULT_REQUEST_READ_TIMEOUT,
             request_processing_timeout: DEFAULT_REQUEST_PROCESSING_TIMEOUT,
         }
@@ -69,6 +81,7 @@ pub enum ServerError {
 
 struct ServerState {
     engine: DibiEngine,
+    worker_token: Arc<[u8]>,
 }
 
 enum OperationError {
@@ -79,12 +92,20 @@ enum OperationError {
 
 impl DibiServer {
     pub fn bind(config: DibiServerConfig) -> Result<Self, ServerError> {
+        if config.worker_token.is_empty() {
+            return Err(ServerError::Quic(
+                "DIBI_WORKER_TOKEN must be configured and non-empty".to_owned(),
+            ));
+        }
         let engine = DibiEngine::open(&config.data_dir)?;
         let server_config = load_server_config(&config.cert_path, &config.key_path)?;
         let endpoint = quinn::Endpoint::server(server_config, config.listen)?;
         Ok(Self {
             endpoint,
-            state: Arc::new(ServerState { engine }),
+            state: Arc::new(ServerState {
+                engine,
+                worker_token: Arc::from(config.worker_token),
+            }),
             request_read_timeout: config.request_read_timeout,
             request_processing_timeout: config.request_processing_timeout,
         })
@@ -166,6 +187,7 @@ async fn handle_connection(
     request_read_timeout: Duration,
     request_processing_timeout: Duration,
 ) {
+    let authenticated = Arc::new(AtomicBool::new(false));
     let mut stream_tasks = JoinSet::new();
     loop {
         tokio::select! {
@@ -173,8 +195,17 @@ async fn handle_connection(
                 match stream {
                     Ok((send, receive)) => {
                         let state = Arc::clone(&state);
+                        let authenticated = Arc::clone(&authenticated);
                         stream_tasks.spawn(async move {
-                            handle_stream(send, receive, state, request_read_timeout, request_processing_timeout).await;
+                            handle_stream(
+                                send,
+                                receive,
+                                state,
+                                authenticated,
+                                request_read_timeout,
+                                request_processing_timeout,
+                            )
+                            .await;
                         });
                     }
                     Err(_) => break,
@@ -198,6 +229,7 @@ async fn handle_stream(
     mut send: quinn::SendStream,
     mut receive: quinn::RecvStream,
     state: Arc<ServerState>,
+    authenticated: Arc<AtomicBool>,
     request_read_timeout: Duration,
     request_processing_timeout: Duration,
 ) {
@@ -222,9 +254,27 @@ async fn handle_stream(
         }
     };
     let request_id = request.request_id;
+    let tenant = request.tenant;
+    let is_ping = matches!(&request.operation, RequestOperation::Ping);
+    let is_auth = matches!(&request.operation, RequestOperation::Auth { .. });
+    if !is_ping && !is_auth && !authenticated.load(Ordering::Acquire) {
+        let _ = send_error(&mut send, request_id, Status::Unauthorized).await;
+        return;
+    }
+    if request.operation.opcode().is_tenant_scoped() && validate_tenant(&tenant).is_err() {
+        let _ = send_error(&mut send, request_id, Status::InvalidRequest).await;
+        return;
+    }
+    if let RequestOperation::Auth { worker_token } = &request.operation {
+        if !constant_time_equal(worker_token, &state.worker_token) {
+            let _ = send_error(&mut send, request_id, Status::Unauthorized).await;
+            return;
+        }
+        authenticated.store(true, Ordering::Release);
+    }
     let result = timeout(
         request_processing_timeout,
-        execute_request(Arc::clone(&state), request),
+        execute_request(Arc::clone(&state), tenant, request.operation),
     )
     .await;
     let (status, payload) = match result {
@@ -318,22 +368,24 @@ async fn send_response(
 
 async fn execute_request(
     state: Arc<ServerState>,
-    request: RequestFrame,
+    tenant: String,
+    operation: RequestOperation,
 ) -> Result<ResponsePayload, OperationError> {
-    match request.operation {
+    match operation {
         RequestOperation::Get { pk, sk } => {
             let engine = state.engine.clone();
-            let document = run_engine(move || engine.get(&pk, &sk)).await?;
+            let document = run_engine(move || engine.get(&tenant, &pk, &sk)).await?;
             Ok(found_payload(document))
         }
         RequestOperation::Put { pk, sk, data } => {
             let engine = state.engine.clone();
-            let commit_id = run_engine(move || engine.put(&pk, &sk, Bytes::from(data))).await?;
+            let commit_id =
+                run_engine(move || engine.put(&tenant, &pk, &sk, Bytes::from(data))).await?;
             Ok(ResponsePayload::CommitId(commit_id))
         }
         RequestOperation::Delete { pk, sk } => {
             let engine = state.engine.clone();
-            let commit_id = run_engine(move || engine.delete(&pk, &sk)).await?;
+            let commit_id = run_engine(move || engine.delete(&tenant, &pk, &sk)).await?;
             Ok(ResponsePayload::CommitId(commit_id))
         }
         RequestOperation::Query {
@@ -343,13 +395,15 @@ async fn execute_request(
         } => {
             let engine = state.engine.clone();
             let documents =
-                run_engine(move || engine.query(&pk, after_sk.as_deref(), limit as usize)).await?;
+                run_engine(move || engine.query(&tenant, &pk, after_sk.as_deref(), limit as usize))
+                    .await?;
             Ok(ResponsePayload::QueryItems(query_items(documents)))
         }
         RequestOperation::Scan { cursor, limit } => {
             let engine = state.engine.clone();
             let documents = run_engine(move || {
                 engine.scan(
+                    &tenant,
                     cursor
                         .as_ref()
                         .map(|key| (key.pk.as_str(), key.sk.as_str())),
@@ -362,7 +416,8 @@ async fn execute_request(
         RequestOperation::Batch(operations) => {
             let engine = state.engine.clone();
             let operations = application_writes(operations);
-            let result = run_engine(move || engine.application_write_batch(&operations)).await?;
+            let result =
+                run_engine(move || engine.application_write_batch(&tenant, &operations)).await?;
             Ok(ResponsePayload::OptionalCommitId(result.commit_id))
         }
         RequestOperation::ExecuteOps(operations) => {
@@ -371,7 +426,9 @@ async fn execute_request(
                 match operation {
                     ExecuteOperation::Get { pk, sk } => {
                         let engine = state.engine.clone();
-                        let data = run_engine(move || engine.get(&pk, &sk)).await?;
+                        let operation_tenant = tenant.clone();
+                        let data =
+                            run_engine(move || engine.get(&operation_tenant, &pk, &sk)).await?;
                         results.push(ExecuteResult::Single {
                             found: data.is_some(),
                             data: data.map(|value| value.to_vec()),
@@ -383,20 +440,31 @@ async fn execute_request(
                         limit,
                     } => {
                         let engine = state.engine.clone();
+                        let operation_tenant = tenant.clone();
                         let documents = run_engine(move || {
-                            engine.query(&pk, after_sk.as_deref(), limit as usize)
+                            engine.query(
+                                &operation_tenant,
+                                &pk,
+                                after_sk.as_deref(),
+                                limit as usize,
+                            )
                         })
                         .await?;
                         results.push(ExecuteResult::Multiple(query_items(documents)));
                     }
                     ExecuteOperation::Put { pk, sk, data } => {
                         let engine = state.engine.clone();
-                        run_engine(move || engine.put(&pk, &sk, Bytes::from(data))).await?;
+                        let operation_tenant = tenant.clone();
+                        run_engine(move || {
+                            engine.put(&operation_tenant, &pk, &sk, Bytes::from(data))
+                        })
+                        .await?;
                         results.push(ExecuteResult::Done);
                     }
                     ExecuteOperation::Delete { pk, sk } => {
                         let engine = state.engine.clone();
-                        run_engine(move || engine.delete(&pk, &sk)).await?;
+                        let operation_tenant = tenant.clone();
+                        run_engine(move || engine.delete(&operation_tenant, &pk, &sk)).await?;
                         results.push(ExecuteResult::Done);
                     }
                 }
@@ -405,14 +473,14 @@ async fn execute_request(
         }
         RequestOperation::GetWithVersion { pk, sk } => {
             let engine = state.engine.clone();
-            let document = run_engine(move || engine.get_with_version(&pk, &sk)).await?;
+            let document = run_engine(move || engine.get_with_version(&tenant, &pk, &sk)).await?;
             Ok(versioned_payload(document))
         }
         RequestOperation::BatchGetWithVersion(keys) => {
             let engine = state.engine.clone();
             let documents = run_engine(move || {
                 keys.into_iter()
-                    .map(|key| engine.get_with_version(&key.pk, &key.sk))
+                    .map(|key| engine.get_with_version(&tenant, &key.pk, &key.sk))
                     .collect::<crate::Result<Vec<_>>>()
             })
             .await?;
@@ -422,7 +490,7 @@ async fn execute_request(
         | RequestOperation::AdminTransactWriteItems(operations) => {
             let engine = state.engine.clone();
             let operations = conditional_writes(operations);
-            match run_engine(move || engine.conditional_write_batch(&operations)).await? {
+            match run_engine(move || engine.conditional_write_batch(&tenant, &operations)).await? {
                 ConditionalWriteOutcome::Applied(result) => {
                     Ok(ResponsePayload::OptionalCommitId(result.commit_id))
                 }
@@ -438,11 +506,14 @@ async fn execute_request(
         } => {
             let engine = state.engine.clone();
             let page = run_engine(move || {
-                engine.admin_scan(AdminScanRequest {
-                    after: cursor.map(|key| (key.pk, key.sk)),
-                    limit: limit as usize,
-                    pk_prefix,
-                })
+                engine.admin_scan(
+                    &tenant,
+                    AdminScanRequest {
+                        after: cursor.map(|key| (key.pk, key.sk)),
+                        limit: limit as usize,
+                        pk_prefix,
+                    },
+                )
             })
             .await?;
             let crate::AdminScanPage { documents, next } = page;
@@ -460,7 +531,7 @@ async fn execute_request(
                 next_cursor: next.map(|(pk, sk)| Key { pk, sk }),
             })
         }
-        RequestOperation::Ping => Ok(ResponsePayload::Empty),
+        RequestOperation::Ping | RequestOperation::Auth { .. } => Ok(ResponsePayload::Empty),
         RequestOperation::Status => {
             let engine = state.engine.clone();
             let status = run_engine(move || {
@@ -615,4 +686,14 @@ fn operation_error_response(error: OperationError) -> (Status, ResponsePayload) 
 
 fn generic_error_payload() -> ResponsePayload {
     ResponsePayload::ErrorMessage("internal server error".to_owned())
+}
+
+fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
+    let mut difference = left.len() ^ right.len();
+    for byte_index in 0..left.len().max(right.len()) {
+        let left_byte = left.get(byte_index).copied().unwrap_or(0);
+        let right_byte = right.get(byte_index).copied().unwrap_or(0);
+        difference |= usize::from(left_byte ^ right_byte);
+    }
+    difference == 0
 }

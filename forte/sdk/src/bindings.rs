@@ -13,6 +13,7 @@ wit_bindgen::generate!({
             import wasi:random/insecure-seed@0.3.0;
             import wasi:http/types@0.3.0;
             import wasi:http/client@0.3.0;
+            import fn0:dibi-transport/client@0.1.0;
         }
     ",
     path: "wit",

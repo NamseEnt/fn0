@@ -47,6 +47,7 @@ async fn start_server(data_dir: &Path, cert_path: &Path, key_path: &Path) -> Tes
         "127.0.0.1:0".parse().unwrap(),
         cert_path,
         key_path,
+        b"test-worker-token".to_vec(),
     );
     let server = DibiServer::bind(config).unwrap();
     let address = server.local_addr().unwrap();
@@ -62,6 +63,17 @@ async fn start_server(data_dir: &Path, cert_path: &Path, key_path: &Path) -> Tes
 }
 
 async fn connect_client(address: std::net::SocketAddr, cert_path: &Path) -> TestClient {
+    let client = connect_raw_client(address, cert_path).await;
+    let (status, _) = client
+        .request(RequestOperation::Auth {
+            worker_token: b"test-worker-token".to_vec(),
+        })
+        .await;
+    assert_eq!(status, Status::Ok);
+    client
+}
+
+async fn connect_raw_client(address: std::net::SocketAddr, cert_path: &Path) -> TestClient {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let certificate_bytes = fs::read(cert_path).unwrap();
     let certificates = rustls_pemfile::certs(&mut certificate_bytes.as_slice())
@@ -74,7 +86,7 @@ async fn connect_client(address: std::net::SocketAddr, cert_path: &Path) -> Test
     let mut crypto_config = rustls::ClientConfig::builder()
         .with_root_certificates(roots)
         .with_no_client_auth();
-    crypto_config.alpn_protocols = vec![b"dibi/1".to_vec()];
+    crypto_config.alpn_protocols = vec![b"dibi/2".to_vec()];
     let crypto_config = quinn::crypto::rustls::QuicClientConfig::try_from(crypto_config).unwrap();
     let mut endpoint = quinn::Endpoint::client("127.0.0.1:0".parse().unwrap()).unwrap();
     endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(crypto_config)));
@@ -92,9 +104,17 @@ async fn connect_client(address: std::net::SocketAddr, cert_path: &Path) -> Test
 
 impl TestClient {
     async fn request(&self, operation: RequestOperation) -> (Status, ResponsePayload) {
+        self.request_as("tenant-a", operation).await
+    }
+
+    async fn request_as(
+        &self,
+        tenant: &str,
+        operation: RequestOperation,
+    ) -> (Status, ResponsePayload) {
         let request_id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
         let opcode = operation.opcode();
-        let frame = encode_request_frame(request_id, &operation);
+        let frame = encode_request_frame(request_id, tenant, &operation);
         let (mut send, mut receive) = self.connection.open_bi().await.unwrap();
         send.write_all(&frame).await.unwrap();
         send.finish().unwrap();
@@ -322,6 +342,204 @@ async fn basic_operations_and_status() {
                 data: Some(b"two".to_vec()),
             },
         ])
+    );
+
+    client.close();
+    server.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn authentication_is_required_and_tenant_operations_are_isolated() {
+    let directory = tempfile::tempdir().unwrap();
+    let (cert_path, key_path) = create_certificate(directory.path());
+    let server = start_server(directory.path(), &cert_path, &key_path).await;
+
+    let unauthenticated_client = connect_raw_client(server.address, &cert_path).await;
+    let (unauthenticated_status, _) = unauthenticated_client
+        .request_as(
+            "tenant-a",
+            RequestOperation::Get {
+                pk: "User".to_owned(),
+                sk: "1".to_owned(),
+            },
+        )
+        .await;
+    assert_eq!(unauthenticated_status, Status::Unauthorized);
+    let (status_status, _) = unauthenticated_client
+        .request(RequestOperation::Status)
+        .await;
+    assert_eq!(status_status, Status::Unauthorized);
+    unauthenticated_client.close();
+
+    let wrong_token_client = connect_raw_client(server.address, &cert_path).await;
+    let (wrong_token_status, _) = wrong_token_client
+        .request(RequestOperation::Auth {
+            worker_token: b"wrong-token".to_vec(),
+        })
+        .await;
+    assert_eq!(wrong_token_status, Status::Unauthorized);
+    wrong_token_client.close();
+
+    let client = connect_client(server.address, &cert_path).await;
+    assert!(matches!(
+        client
+            .request_as(
+                "tenant-a",
+                RequestOperation::Put {
+                    pk: "User".to_owned(),
+                    sk: "1".to_owned(),
+                    data: b"A".to_vec(),
+                },
+            )
+            .await,
+        (Status::Ok, ResponsePayload::CommitId(_))
+    ));
+    let (empty_tenant_status, _) = client
+        .request_as(
+            "",
+            RequestOperation::Get {
+                pk: "User".to_owned(),
+                sk: "1".to_owned(),
+            },
+        )
+        .await;
+    assert_eq!(empty_tenant_status, Status::InvalidRequest);
+    assert!(matches!(
+        client
+            .request_as(
+                "tenant-b",
+                RequestOperation::Put {
+                    pk: "User".to_owned(),
+                    sk: "1".to_owned(),
+                    data: b"B".to_vec(),
+                },
+            )
+            .await,
+        (Status::Ok, ResponsePayload::CommitId(_))
+    ));
+    assert_eq!(
+        found_payload(
+            client
+                .request_as(
+                    "tenant-a",
+                    RequestOperation::Get {
+                        pk: "User".to_owned(),
+                        sk: "1".to_owned(),
+                    },
+                )
+                .await
+                .1,
+        ),
+        (true, Some(b"A".to_vec()))
+    );
+    assert_eq!(
+        found_payload(
+            client
+                .request_as(
+                    "tenant-b",
+                    RequestOperation::Get {
+                        pk: "User".to_owned(),
+                        sk: "1".to_owned(),
+                    },
+                )
+                .await
+                .1,
+        ),
+        (true, Some(b"B".to_vec()))
+    );
+
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-a",
+                RequestOperation::Query {
+                    pk: "User".to_owned(),
+                    after_sk: None,
+                    limit: 10,
+                },
+            )
+            .await,
+        (
+            Status::Ok,
+            ResponsePayload::QueryItems(vec![QueryItem {
+                sk: "1".to_owned(),
+                data: b"A".to_vec(),
+            }]),
+        )
+    );
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-a",
+                RequestOperation::Scan {
+                    cursor: None,
+                    limit: 10,
+                },
+            )
+            .await,
+        (
+            Status::Ok,
+            ResponsePayload::ScanItems(vec![dibi_protocol::ScanItem {
+                pk: "User".to_owned(),
+                sk: "1".to_owned(),
+                data: b"A".to_vec(),
+            }]),
+        )
+    );
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-a",
+                RequestOperation::AdminScan {
+                    cursor: None,
+                    limit: 10,
+                    pk_prefix: None,
+                },
+            )
+            .await,
+        (
+            Status::Ok,
+            ResponsePayload::AdminScan {
+                items: vec![AdminItem {
+                    pk: "User".to_owned(),
+                    sk: "1".to_owned(),
+                    version: 0,
+                    data: b"A".to_vec(),
+                }],
+                next_cursor: None,
+            },
+        )
+    );
+
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-a",
+                RequestOperation::TransactWriteItems(vec![TransactWriteOperation::Put {
+                    pk: "User".to_owned(),
+                    sk: "1".to_owned(),
+                    expected_version: 0,
+                    data: b"A2".to_vec(),
+                }]),
+            )
+            .await
+            .0,
+        Status::Ok
+    );
+    assert_eq!(
+        client
+            .request_as(
+                "tenant-b",
+                RequestOperation::TransactWriteItems(vec![TransactWriteOperation::Put {
+                    pk: "User".to_owned(),
+                    sk: "1".to_owned(),
+                    expected_version: 0,
+                    data: b"B2".to_vec(),
+                }]),
+            )
+            .await
+            .0,
+        Status::Ok
     );
 
     client.close();

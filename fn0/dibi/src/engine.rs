@@ -16,7 +16,7 @@ use crate::{
     decode_document_key, decode_document_value, encode_document_key, encode_document_value,
 };
 
-const DATABASE_FORMAT_VERSION: u32 = 1;
+pub const DATABASE_FORMAT_VERSION: u32 = 2;
 const DOCS_CF: &str = "docs";
 const META_CF: &str = "meta";
 const BACKUP_OUTBOX_CF: &str = "backup_outbox";
@@ -148,18 +148,25 @@ impl DibiEngine {
         Ok(engine)
     }
 
-    pub fn get(&self, pk: &str, sk: &str) -> Result<Option<Bytes>> {
-        Ok(self.get_with_version(pk, sk)?.map(|document| document.data))
+    pub fn get(&self, tenant: &str, pk: &str, sk: &str) -> Result<Option<Bytes>> {
+        Ok(self
+            .get_with_version(tenant, pk, sk)?
+            .map(|document| document.data))
     }
 
-    pub fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDocument>> {
-        let key = encode_document_key(pk, sk);
+    pub fn get_with_version(
+        &self,
+        tenant: &str,
+        pk: &str,
+        sk: &str,
+    ) -> Result<Option<StoredDocument>> {
+        let key = encode_document_key(tenant, pk, sk);
         self.read_document(&key)
     }
 
-    pub fn put(&self, pk: &str, sk: &str, data: Bytes) -> Result<u64> {
+    pub fn put(&self, tenant: &str, pk: &str, sk: &str, data: Bytes) -> Result<u64> {
         let _guard = self.lock_writes()?;
-        let key = encode_document_key(pk, sk);
+        let key = encode_document_key(tenant, pk, sk);
         let version = match self.read_document(&key)? {
             Some(document) => increment_version(document.version, pk, sk)?,
             None => 0,
@@ -169,19 +176,25 @@ impl DibiEngine {
         self.commit_mutations(mutations)
     }
 
-    pub fn delete(&self, pk: &str, sk: &str) -> Result<u64> {
+    pub fn delete(&self, tenant: &str, pk: &str, sk: &str) -> Result<u64> {
         let _guard = self.lock_writes()?;
-        let mutations = BTreeMap::from([(encode_document_key(pk, sk), None)]);
+        let mutations = BTreeMap::from([(encode_document_key(tenant, pk, sk), None)]);
         self.commit_mutations(mutations)
     }
 
-    pub fn query(&self, pk: &str, after_sk: Option<&str>, limit: usize) -> Result<Vec<Document>> {
+    pub fn query(
+        &self,
+        tenant: &str,
+        pk: &str,
+        after_sk: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<Document>> {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        let prefix = encode_pk_prefix(pk);
+        let prefix = encode_pk_prefix(tenant, pk);
         let start = after_sk
-            .map(|sk| encode_document_key(pk, sk))
+            .map(|sk| encode_document_key(tenant, pk, sk))
             .unwrap_or_else(|| prefix.clone());
         let snapshot = self.inner.db.snapshot();
         let docs_cf = self.cf(DOCS_CF)?;
@@ -194,8 +207,8 @@ impl DibiEngine {
             if after_sk.is_some() && encoded_key.as_ref() == start.as_slice() {
                 continue;
             }
-            let (found_pk, sk) = decode_document_key(&encoded_key)?;
-            if found_pk != pk {
+            let (found_tenant, found_pk, sk) = decode_document_key(&encoded_key)?;
+            if found_tenant != tenant || found_pk != pk {
                 break;
             }
             let stored = decode_document_value(&encoded_value)?;
@@ -211,27 +224,35 @@ impl DibiEngine {
         Ok(documents)
     }
 
-    pub fn scan(&self, after: Option<(&str, &str)>, limit: usize) -> Result<Vec<Document>> {
+    pub fn scan(
+        &self,
+        tenant: &str,
+        after: Option<(&str, &str)>,
+        limit: usize,
+    ) -> Result<Vec<Document>> {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        let start = after.map(|(pk, sk)| encode_document_key(pk, sk));
-        let mode = start
-            .as_deref()
-            .map(|key| IteratorMode::From(key, Direction::Forward))
-            .unwrap_or(IteratorMode::Start);
+        let prefix = encode_tenant_prefix(tenant);
+        let start = after
+            .map(|(pk, sk)| encode_document_key(tenant, pk, sk))
+            .unwrap_or_else(|| prefix.clone());
+        let mode = IteratorMode::From(&start, Direction::Forward);
         let snapshot = self.inner.db.snapshot();
         let docs_cf = self.cf(DOCS_CF)?;
         let mut documents = Vec::with_capacity(limit);
         for item in snapshot.iterator_cf(docs_cf, mode) {
             let (encoded_key, encoded_value) = item?;
-            if start
-                .as_deref()
-                .is_some_and(|cursor| encoded_key.as_ref() == cursor)
-            {
+            if encoded_key.as_ref() == start.as_slice() {
                 continue;
             }
-            let (pk, sk) = decode_document_key(&encoded_key)?;
+            if !encoded_key.starts_with(&prefix) {
+                break;
+            }
+            let (found_tenant, pk, sk) = decode_document_key(&encoded_key)?;
+            if found_tenant != tenant {
+                break;
+            }
             let stored = decode_document_value(&encoded_value)?;
             documents.push(Document {
                 pk,
@@ -245,33 +266,35 @@ impl DibiEngine {
         Ok(documents)
     }
 
-    pub fn admin_scan(&self, request: AdminScanRequest) -> Result<AdminScanPage> {
+    pub fn admin_scan(&self, tenant: &str, request: AdminScanRequest) -> Result<AdminScanPage> {
         if request.limit == 0 {
             return Ok(AdminScanPage {
                 documents: Vec::new(),
                 next: None,
             });
         }
+        let prefix = encode_tenant_prefix(tenant);
         let start = request
             .after
             .as_ref()
-            .map(|(pk, sk)| encode_document_key(pk, sk));
-        let mode = start
-            .as_deref()
-            .map(|key| IteratorMode::From(key, Direction::Forward))
-            .unwrap_or(IteratorMode::Start);
+            .map(|(pk, sk)| encode_document_key(tenant, pk, sk))
+            .unwrap_or_else(|| prefix.clone());
+        let mode = IteratorMode::From(&start, Direction::Forward);
         let snapshot = self.inner.db.snapshot();
         let docs_cf = self.cf(DOCS_CF)?;
         let mut documents = Vec::with_capacity(request.limit);
         for item in snapshot.iterator_cf(docs_cf, mode) {
             let (encoded_key, encoded_value) = item?;
-            if start
-                .as_deref()
-                .is_some_and(|cursor| encoded_key.as_ref() == cursor)
-            {
+            if encoded_key.as_ref() == start.as_slice() {
                 continue;
             }
-            let (pk, sk) = decode_document_key(&encoded_key)?;
+            if !encoded_key.starts_with(&prefix) {
+                break;
+            }
+            let (found_tenant, pk, sk) = decode_document_key(&encoded_key)?;
+            if found_tenant != tenant {
+                break;
+            }
             if request
                 .pk_prefix
                 .as_ref()
@@ -300,7 +323,11 @@ impl DibiEngine {
         Ok(AdminScanPage { documents, next })
     }
 
-    pub fn application_write_batch(&self, operations: &[ApplicationWrite]) -> Result<WriteResult> {
+    pub fn application_write_batch(
+        &self,
+        tenant: &str,
+        operations: &[ApplicationWrite],
+    ) -> Result<WriteResult> {
         if operations.is_empty() {
             return Ok(WriteResult { commit_id: None });
         }
@@ -308,7 +335,7 @@ impl DibiEngine {
         let mut states = BTreeMap::new();
         for operation in operations {
             let (pk, sk) = application_key(operation);
-            let key = encode_document_key(pk, sk);
+            let key = encode_document_key(tenant, pk, sk);
             if !states.contains_key(&key) {
                 states.insert(key.clone(), self.read_encoded_document(&key)?);
             }
@@ -342,6 +369,7 @@ impl DibiEngine {
 
     pub fn conditional_write_batch(
         &self,
+        tenant: &str,
         operations: &[ConditionalWrite],
     ) -> Result<ConditionalWriteOutcome> {
         validate_conditional_uniqueness(operations)?;
@@ -355,7 +383,7 @@ impl DibiEngine {
         let mut conflicts = Vec::new();
         for operation in operations {
             let (pk, sk, expected_version) = conditional_key(operation);
-            let key = encode_document_key(pk, sk);
+            let key = encode_document_key(tenant, pk, sk);
             let value = self.read_encoded_document(&key)?;
             let actual_version = value
                 .as_deref()
@@ -610,8 +638,13 @@ fn validate_column_families(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn encode_pk_prefix(pk: &str) -> Vec<u8> {
-    let encoded = encode_document_key(pk, "");
+fn encode_tenant_prefix(tenant: &str) -> Vec<u8> {
+    let encoded = encode_document_key(tenant, "", "");
+    encoded[..encoded.len() - 4].to_vec()
+}
+
+fn encode_pk_prefix(tenant: &str, pk: &str) -> Vec<u8> {
+    let encoded = encode_document_key(tenant, pk, "");
     encoded[..encoded.len() - 2].to_vec()
 }
 
@@ -709,9 +742,13 @@ mod tests {
         engine
             .inner
             .db
-            .put_cf(docs_cf, b"malformed", [1, 2, 3])
+            .put_cf(
+                docs_cf,
+                encode_document_key("tenant-a", "pk", "sk"),
+                [1, 2, 3],
+            )
             .unwrap();
-        assert!(engine.scan(None, 10).is_err());
+        assert!(engine.scan("tenant-a", None, 10).is_err());
         let outbox_cf = engine.cf(BACKUP_OUTBOX_CF).unwrap();
         engine.inner.db.put_cf(outbox_cf, [0; 8], [0xff]).unwrap();
         assert!(engine.read_outbox(None, 10).is_err());
@@ -737,12 +774,12 @@ mod tests {
             engine
                 .inner
                 .db
-                .put_cf(meta_cf, FORMAT_VERSION_KEY, 2_u32.to_be_bytes())
+                .put_cf(meta_cf, FORMAT_VERSION_KEY, 1_u32.to_be_bytes())
                 .unwrap();
         }
         assert!(matches!(
             DibiEngine::open(unsupported_directory.path()),
-            Err(DibiError::UnsupportedFormatVersion(2))
+            Err(DibiError::UnsupportedFormatVersion(1))
         ));
     }
 

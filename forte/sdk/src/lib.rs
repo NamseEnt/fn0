@@ -1,5 +1,6 @@
 pub mod bindings;
 pub mod cookie_sign;
+pub mod dibi;
 pub mod http;
 pub mod metrics;
 pub(crate) mod otel;

@@ -342,30 +342,34 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
         Arc::new(egress_budget::SystemUtcMonthClock),
     ));
 
-    let execution_context = Arc::new(
-        ExecutionContext::new(engine, linker, cache.clone())
-            .with_turso_hijack(build_turso_hijack())
-            .with_queue_hijack(build_queue_hijack())
-            .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
-            .with_cross_project_invoke_hijack(direct_hijack.clone())
-            .with_vault_hijack(build_vault_hijack())
-            .with_otlp_hijack(build_otlp_hijack(otlp_endpoint, metric_gate.clone()))
-            .with_object_storage_hijack(build_object_storage_hijack(
-                storage_resolver.clone(),
-                presign_gate.clone(),
-            ))
-            .with_public_storage_hijack(build_public_storage_hijack(
-                storage_resolver.clone(),
-                purge_gate.clone(),
-            ))
-            .with_static_page_cache_hijack(build_static_page_cache_hijack(purge_gate))
-            .with_websocket_hijack(websocket_hijack.clone())
-            .with_guest_outbound_http(Arc::new(GuestOutboundHttp::new(
-                outbound_dialer.clone(),
-                egress_budget.clone(),
-                websocket_hijack.control_project_id().to_string(),
-            ))),
-    );
+    let dibi_bridge = fn0::DibiBridge::from_env()
+        .map_err(|error| color_eyre::eyre::eyre!("Dibi bridge configuration failed: {error}"))?;
+    let mut execution_context = ExecutionContext::new(engine, linker, cache.clone())
+        .with_turso_hijack(build_turso_hijack())
+        .with_queue_hijack(build_queue_hijack())
+        .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
+        .with_cross_project_invoke_hijack(direct_hijack.clone())
+        .with_vault_hijack(build_vault_hijack())
+        .with_otlp_hijack(build_otlp_hijack(otlp_endpoint, metric_gate.clone()))
+        .with_object_storage_hijack(build_object_storage_hijack(
+            storage_resolver.clone(),
+            presign_gate.clone(),
+        ))
+        .with_public_storage_hijack(build_public_storage_hijack(
+            storage_resolver.clone(),
+            purge_gate.clone(),
+        ))
+        .with_static_page_cache_hijack(build_static_page_cache_hijack(purge_gate))
+        .with_websocket_hijack(websocket_hijack.clone())
+        .with_guest_outbound_http(Arc::new(GuestOutboundHttp::new(
+            outbound_dialer.clone(),
+            egress_budget.clone(),
+            websocket_hijack.control_project_id().to_string(),
+        )));
+    if let Some(dibi_bridge) = dibi_bridge {
+        execution_context = execution_context.with_dibi_bridge(dibi_bridge);
+    }
+    let execution_context = Arc::new(execution_context);
 
     // Recorded on the worker's own meter rather than stamped into guest
     // payloads: this is operator-facing capacity data about the shared metrics

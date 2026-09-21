@@ -1,0 +1,19 @@
+package fn0:dibi-transport@0.1.0;
+
+interface client {
+    variant error {
+        not-configured,
+        endpoint-not-allowed,
+        invalid-request,
+        authentication-failed,
+        unavailable,
+        timeout,
+        response-too-large,
+        protocol-error,
+    }
+
+    request: async func(
+        endpoint: string,
+        frame: list<u8>
+    ) -> result<list<u8>, error>;
+}

@@ -1,8 +1,10 @@
 pub const MAGIC: [u8; 4] = *b"DIBI";
-pub const PROTOCOL_VERSION: u8 = 1;
+pub const PROTOCOL_VERSION: u8 = 2;
 pub const FRAME_HEADER_SIZE: usize = 20;
 pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024;
 pub const MAX_STRING_SIZE: usize = 1024 * 1024;
+pub const MAX_TENANT_SIZE: usize = 256;
+pub const MAX_AUTH_TOKEN_SIZE: usize = 4096;
 pub const MAX_DOCUMENT_SIZE: usize = 16 * 1024 * 1024;
 pub const MAX_BATCH_OPS: usize = 10_000;
 pub const MAX_QUERY_LIMIT: u32 = 10_000;
@@ -21,6 +23,7 @@ pub const ADMIN_SCAN_OPCODE: u8 = 0x20;
 pub const ADMIN_TRANSACT_WRITE_ITEMS_OPCODE: u8 = 0x21;
 pub const PING_OPCODE: u8 = 0x40;
 pub const STATUS_OPCODE: u8 = 0x41;
+pub const AUTH_OPCODE: u8 = 0x42;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -39,6 +42,7 @@ pub enum Opcode {
     AdminTransactWriteItems = ADMIN_TRANSACT_WRITE_ITEMS_OPCODE,
     Ping = PING_OPCODE,
     Status = STATUS_OPCODE,
+    Auth = AUTH_OPCODE,
 }
 
 impl Opcode {
@@ -58,6 +62,7 @@ impl Opcode {
             ADMIN_TRANSACT_WRITE_ITEMS_OPCODE => Self::AdminTransactWriteItems,
             PING_OPCODE => Self::Ping,
             STATUS_OPCODE => Self::Status,
+            AUTH_OPCODE => Self::Auth,
             _ => return Err(ProtocolError::UnknownOpcode(value)),
         };
         Ok(opcode)
@@ -65,6 +70,10 @@ impl Opcode {
 
     pub const fn value(self) -> u8 {
         self as u8
+    }
+
+    pub const fn is_tenant_scoped(self) -> bool {
+        !matches!(self, Self::Ping | Self::Status | Self::Auth)
     }
 }
 
@@ -219,6 +228,9 @@ pub enum RequestOperation {
     AdminTransactWriteItems(Vec<TransactWriteOperation>),
     Ping,
     Status,
+    Auth {
+        worker_token: Vec<u8>,
+    },
 }
 
 impl RequestOperation {
@@ -238,6 +250,7 @@ impl RequestOperation {
             Self::AdminTransactWriteItems(_) => Opcode::AdminTransactWriteItems,
             Self::Ping => Opcode::Ping,
             Self::Status => Opcode::Status,
+            Self::Auth { .. } => Opcode::Auth,
         }
     }
 }
@@ -247,6 +260,7 @@ pub struct RequestFrame {
     pub version: u8,
     pub flags: u16,
     pub request_id: u64,
+    pub tenant: String,
     pub operation: RequestOperation,
 }
 
@@ -343,13 +357,32 @@ pub enum ProtocolError {
     TrailingBytes,
     #[error("invalid response payload for status {0:?}")]
     InvalidResponsePayload(Status),
+    #[error("tenant must be non-empty")]
+    EmptyTenant,
 }
 
 pub type Result<T> = std::result::Result<T, ProtocolError>;
 
-pub fn encode_request_frame(request_id: u64, operation: &RequestOperation) -> Vec<u8> {
+pub fn validate_tenant(tenant: &str) -> Result<()> {
+    if tenant.is_empty() {
+        return Err(ProtocolError::EmptyTenant);
+    }
+    if tenant.len() > MAX_TENANT_SIZE {
+        return Err(ProtocolError::LengthLimit {
+            limit: MAX_TENANT_SIZE,
+            actual: tenant.len(),
+        });
+    }
+    Ok(())
+}
+
+pub fn encode_request_frame(
+    request_id: u64,
+    tenant: &str,
+    operation: &RequestOperation,
+) -> Vec<u8> {
     let mut payload = Encoder::new();
-    encode_request_payload(&mut payload, operation);
+    encode_request_payload(&mut payload, tenant, operation);
     encode_frame(operation.opcode().value(), 0, request_id, payload.finish())
 }
 
@@ -357,10 +390,17 @@ pub fn decode_request_frame(encoded: &[u8]) -> Result<RequestFrame> {
     let (header, payload) = decode_frame_parts(encoded)?;
     let opcode = Opcode::from_u8(header.code)?;
     let operation = decode_request_payload(opcode, payload)?;
+    let mut decoder = Decoder::new(payload);
+    let tenant = if opcode.is_tenant_scoped() {
+        decoder.read_string(MAX_TENANT_SIZE)?
+    } else {
+        String::new()
+    };
     Ok(RequestFrame {
         version: header.version,
         flags: header.flags,
         request_id: header.request_id,
+        tenant,
         operation,
     })
 }
@@ -436,7 +476,7 @@ fn decode_ok_response(decoder: &mut Decoder<'_>, opcode: Opcode) -> Result<Respo
             ResponsePayload::OptionalCommitId(decoder.read_optional_u64()?),
         ),
         Opcode::AdminScan => decode_admin_scan(decoder),
-        Opcode::Ping => Ok(ResponsePayload::Empty),
+        Opcode::Ping | Opcode::Auth => Ok(ResponsePayload::Empty),
         Opcode::Status => {
             let db_uuid = decoder.read_array_16()?;
             let last_commit_id = decoder.read_u64()?;
@@ -448,7 +488,10 @@ fn decode_ok_response(decoder: &mut Decoder<'_>, opcode: Opcode) -> Result<Respo
     }
 }
 
-fn encode_request_payload(encoder: &mut Encoder, operation: &RequestOperation) {
+fn encode_request_payload(encoder: &mut Encoder, tenant: &str, operation: &RequestOperation) {
+    if operation.opcode().is_tenant_scoped() {
+        encoder.write_string(tenant);
+    }
     match operation {
         RequestOperation::Get { pk, sk }
         | RequestOperation::Delete { pk, sk }
@@ -546,11 +589,15 @@ fn encode_request_payload(encoder: &mut Encoder, operation: &RequestOperation) {
             encoder.write_optional_string(pk_prefix.as_deref());
         }
         RequestOperation::Ping | RequestOperation::Status => {}
+        RequestOperation::Auth { worker_token } => encoder.write_bytes(worker_token),
     }
 }
 
 fn decode_request_payload(opcode: Opcode, encoded: &[u8]) -> Result<RequestOperation> {
     let mut decoder = Decoder::new(encoded);
+    if opcode.is_tenant_scoped() {
+        decoder.read_string(MAX_TENANT_SIZE)?;
+    }
     let operation = match opcode {
         Opcode::Get => RequestOperation::Get {
             pk: decoder.read_string(MAX_STRING_SIZE)?,
@@ -620,6 +667,9 @@ fn decode_request_payload(opcode: Opcode, encoded: &[u8]) -> Result<RequestOpera
         }
         Opcode::Ping => RequestOperation::Ping,
         Opcode::Status => RequestOperation::Status,
+        Opcode::Auth => RequestOperation::Auth {
+            worker_token: decoder.read_bytes(MAX_AUTH_TOKEN_SIZE)?,
+        },
     };
     decoder.finish()?;
     Ok(operation)
@@ -1336,15 +1386,16 @@ mod tests {
             sk: "b".to_owned(),
             data: vec![0, 1, 255],
         };
-        let encoded = encode_request_frame(42, &operation);
+        let encoded = encode_request_frame(42, "tenant-a", &operation);
         let decoded = decode_request_frame(&encoded).unwrap();
         assert_eq!(decoded.request_id, 42);
+        assert_eq!(decoded.tenant, "tenant-a");
         assert_eq!(decoded.operation, operation);
     }
 
     #[test]
     fn invalid_primitives_are_rejected() {
-        let mut operation = encode_request_frame(1, &RequestOperation::Ping);
+        let mut operation = encode_request_frame(1, "", &RequestOperation::Ping);
         operation.extend_from_slice(&[1]);
         assert!(matches!(
             decode_request_frame(&operation),
@@ -1377,25 +1428,25 @@ mod tests {
             decode_request_frame(&[]),
             Err(ProtocolError::Truncated)
         ));
-        let mut wrong_magic = encode_request_frame(1, &RequestOperation::Ping);
+        let mut wrong_magic = encode_request_frame(1, "", &RequestOperation::Ping);
         wrong_magic[0] = b'X';
         assert!(matches!(
             decode_request_frame(&wrong_magic),
             Err(ProtocolError::InvalidMagic)
         ));
-        let mut wrong_version = encode_request_frame(1, &RequestOperation::Ping);
-        wrong_version[4] = 2;
+        let mut wrong_version = encode_request_frame(1, "", &RequestOperation::Ping);
+        wrong_version[4] = 1;
         assert!(matches!(
             decode_request_frame(&wrong_version),
-            Err(ProtocolError::UnsupportedVersion(2))
+            Err(ProtocolError::UnsupportedVersion(1))
         ));
-        let mut flags = encode_request_frame(1, &RequestOperation::Ping);
+        let mut flags = encode_request_frame(1, "", &RequestOperation::Ping);
         flags[6] = 1;
         assert!(matches!(
             decode_request_frame(&flags),
             Err(ProtocolError::NonZeroFlags)
         ));
-        let mut trailing = encode_request_frame(1, &RequestOperation::Ping);
+        let mut trailing = encode_request_frame(1, "", &RequestOperation::Ping);
         trailing[19] = 1;
         assert!(matches!(
             decode_request_frame(&trailing),
@@ -1406,12 +1457,37 @@ mod tests {
             decode_request_frame(&unknown_opcode),
             Err(ProtocolError::UnknownOpcode(0xff))
         ));
-        let mut oversized = encode_request_frame(1, &RequestOperation::Ping);
+        let mut oversized = encode_request_frame(1, "", &RequestOperation::Ping);
         oversized[16..20].copy_from_slice(&(MAX_FRAME_SIZE as u32).to_be_bytes());
         assert!(matches!(
             decode_request_frame(&oversized),
             Err(ProtocolError::FrameTooLarge(_))
         ));
+    }
+
+    #[test]
+    fn tenant_and_auth_constraints_are_encoded_once() {
+        let auth = RequestOperation::Auth {
+            worker_token: b"worker-token".to_vec(),
+        };
+        let decoded_auth = decode_request_frame(&encode_request_frame(3, "", &auth)).unwrap();
+        assert!(decoded_auth.tenant.is_empty());
+        assert_eq!(decoded_auth.operation, auth);
+
+        let operation =
+            RequestOperation::TransactWriteItems(vec![TransactWriteOperation::Create {
+                pk: "pk".to_owned(),
+                sk: "sk".to_owned(),
+                data: b"data".to_vec(),
+            }]);
+        let decoded =
+            decode_request_frame(&encode_request_frame(4, "tenant-a", &operation)).unwrap();
+        assert_eq!(decoded.tenant, "tenant-a");
+        assert_eq!(decoded.operation, operation);
+        assert!(validate_tenant("tenant-a").is_ok());
+        assert!(validate_tenant("").is_err());
+        assert!(validate_tenant(&"x".repeat(MAX_TENANT_SIZE + 1)).is_err());
+        assert!(validate_tenant("a\0b").is_ok());
     }
 
     #[test]
@@ -1477,7 +1553,7 @@ mod tests {
             ]),
         ];
         for operation in operations {
-            let encoded = encode_request_frame(11, &operation);
+            let encoded = encode_request_frame(11, "tenant-a", &operation);
             assert_eq!(decode_request_frame(&encoded).unwrap().operation, operation);
         }
 

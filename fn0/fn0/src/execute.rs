@@ -9,7 +9,7 @@ use crate::self_invoke::{
 use crate::static_page_cache_hijack::StaticPageCacheHijack;
 use crate::turso_hijack::TursoHijack;
 use crate::websocket_hijack::WebSocketHijack;
-use crate::{Request, Response, telemetry};
+use crate::{DibiBridge, Request, Response, telemetry};
 use anyhow::{Result, anyhow};
 use futures::stream::{FuturesUnordered, StreamExt};
 use http_body_util::BodyExt;
@@ -38,6 +38,16 @@ use wasmtime_wasi_http::{
 
 const TRACEPARENT_HEADER: &str = "traceparent";
 const TRACESTATE_HEADER: &str = "tracestate";
+
+mod dibi_bindings {
+    wasmtime::component::bindgen!({
+        path: "../../forte/wit/wit",
+        inline: "package fn0:host; world host { import fn0:dibi-transport/client@0.1.0; }",
+        world: "fn0:host/host",
+        imports: { default: async },
+        require_store_data_send: true,
+    });
+}
 
 struct TracingWriter {
     project_id: String,
@@ -119,6 +129,11 @@ pub fn build_linker(engine: &Engine) -> Linker<ClientState<SystemClock>> {
     wasmtime_wasi::p2::add_to_linker_async(&mut linker).unwrap();
     wasmtime_wasi::p3::add_to_linker(&mut linker).unwrap();
     wasmtime_wasi_http::p3::add_to_linker(&mut linker).unwrap();
+    dibi_bindings::fn0::dibi_transport::client::add_to_linker::<
+        ClientState<SystemClock>,
+        wasmtime::component::HasSelf<ClientState<SystemClock>>,
+    >(&mut linker, |state| state)
+    .unwrap();
     linker
 }
 
@@ -150,6 +165,7 @@ pub(crate) struct BuildStoreOptions<'a, C: Clock> {
     pub(crate) public_storage_hijack: Option<&'a PublicStorageHijack>,
     pub(crate) static_page_cache_hijack: Option<&'a StaticPageCacheHijack>,
     pub(crate) websocket_hijack: Option<&'a WebSocketHijack>,
+    pub(crate) dibi_bridge: Option<Arc<DibiBridge>>,
 }
 
 pub(crate) fn build_store<C>(options: BuildStoreOptions<'_, C>) -> Store<ClientState<C>>
@@ -172,12 +188,28 @@ where
         public_storage_hijack,
         static_page_cache_hijack,
         websocket_hijack,
+        dibi_bridge,
     } = options;
     let wasi = {
         let mut builder = WasiCtx::builder();
         builder.stdout(make_tracing_stream(project_id.to_string(), false));
         builder.stderr(make_tracing_stream(project_id.to_string(), true));
         for (key, value) in env_vars {
+            if dibi_bridge.is_some()
+                && matches!(
+                    key.as_str(),
+                    "DIBI_URL"
+                        | "FN0_DIBI_TARGET_HOST"
+                        | "FN0_DIBI_TARGET_PORT"
+                        | "FN0_DIBI_SERVER_NAME"
+                        | "FN0_DIBI_PLACEHOLDER_URL"
+                        | "FN0_DIBI_WORKER_TOKEN"
+                        | "FN0_DIBI_CA_CERT"
+                        | "FN0_DIBI_CA_CERT_BASE64"
+                )
+            {
+                continue;
+            }
             if turso_hijack.is_some() && (key == "TURSO_URL" || key == "TURSO_AUTH_TOKEN") {
                 continue;
             }
@@ -247,6 +279,9 @@ where
         if let Some(hijack) = websocket_hijack {
             builder.env("FN0_WEBSOCKET_URL", hijack.placeholder_url());
         }
+        if let Some(bridge) = &dibi_bridge {
+            builder.env("DIBI_URL", bridge.placeholder_url());
+        }
         builder.build()
     };
 
@@ -259,6 +294,8 @@ where
             time_tracker,
             is_timeout,
             hooks,
+            project_id: project_id.to_owned(),
+            dibi_bridge,
         },
     );
     store.epoch_deadline_trap();
@@ -340,6 +377,7 @@ pub(crate) struct WasmInstanceLoopOptions<'a> {
     pub(crate) static_page_cache_hijack: Option<Arc<crate::StaticPageCacheHijack>>,
     pub(crate) websocket_hijack: Option<Arc<WebSocketHijack>>,
     pub(crate) guest_outbound_http: Option<Arc<crate::GuestOutboundHttp>>,
+    pub(crate) dibi_bridge: Option<Arc<DibiBridge>>,
 }
 
 pub(crate) async fn run_wasm_instance_loop(options: WasmInstanceLoopOptions<'_>) -> Result<()> {
@@ -360,6 +398,7 @@ pub(crate) async fn run_wasm_instance_loop(options: WasmInstanceLoopOptions<'_>)
         static_page_cache_hijack,
         websocket_hijack,
         guest_outbound_http,
+        dibi_bridge,
     } = options;
     let time_tracker = TimeTracker::new(SystemClock);
     let is_timeout = Arc::new(AtomicBool::new(false));
@@ -394,6 +433,7 @@ pub(crate) async fn run_wasm_instance_loop(options: WasmInstanceLoopOptions<'_>)
         public_storage_hijack: public_storage_hijack.as_deref(),
         static_page_cache_hijack: static_page_cache_hijack.as_deref(),
         websocket_hijack: websocket_hijack.as_deref(),
+        dibi_bridge,
     });
 
     let instantiate_start = std::time::Instant::now();
@@ -511,9 +551,58 @@ pub struct ClientState<C: Clock> {
     wasi: WasiCtx,
     http: WasiHttpCtx,
     table: ResourceTable,
+    project_id: String,
+    dibi_bridge: Option<Arc<DibiBridge>>,
     pub(crate) time_tracker: TimeTracker<C>,
     pub(crate) is_timeout: Arc<AtomicBool>,
     hooks: SelfInvokeHooks,
+}
+
+impl<C: Clock> dibi_bindings::fn0::dibi_transport::client::Host for ClientState<C> {}
+
+impl<C: Clock> dibi_bindings::fn0::dibi_transport::client::HostWithStore<ClientState<C>>
+    for wasmtime::component::HasSelf<ClientState<C>>
+{
+    fn request(
+        accessor: &wasmtime::component::Accessor<
+            ClientState<C>,
+            wasmtime::component::HasSelf<ClientState<C>>,
+        >,
+        endpoint: String,
+        frame: Vec<u8>,
+    ) -> impl std::future::Future<
+        Output = Result<Vec<u8>, dibi_bindings::fn0::dibi_transport::client::Error>,
+    > + Send {
+        let (project_id, dibi_bridge) = accessor.with(|mut access| {
+            let state = access.get();
+            (state.project_id.clone(), state.dibi_bridge.clone())
+        });
+        async move {
+            let Some(bridge) = dibi_bridge else {
+                return Err(dibi_bindings::fn0::dibi_transport::client::Error::NotConfigured);
+            };
+            bridge
+                .request(&project_id, &endpoint, &frame)
+                .await
+                .map_err(map_dibi_bridge_error)
+        }
+    }
+}
+
+fn map_dibi_bridge_error(
+    error: crate::DibiBridgeError,
+) -> dibi_bindings::fn0::dibi_transport::client::Error {
+    use dibi_bindings::fn0::dibi_transport::client::Error;
+    match error {
+        crate::DibiBridgeError::Configuration(_) => Error::NotConfigured,
+        crate::DibiBridgeError::EndpointNotAllowed => Error::EndpointNotAllowed,
+        crate::DibiBridgeError::InvalidRequest => Error::InvalidRequest,
+        crate::DibiBridgeError::Protocol(_) => Error::ProtocolError,
+        crate::DibiBridgeError::AuthenticationFailed => Error::AuthenticationFailed,
+        crate::DibiBridgeError::Unavailable(_) => Error::Unavailable,
+        crate::DibiBridgeError::Timeout => Error::Timeout,
+        crate::DibiBridgeError::ResponseTooLarge => Error::ResponseTooLarge,
+    }
 }
 
 impl<C: Clock> WasiView for ClientState<C> {

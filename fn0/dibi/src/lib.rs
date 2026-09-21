@@ -10,8 +10,8 @@ pub use commit_log::{CommitMutation, CommitRecord};
 pub use dibi_protocol;
 pub use engine::{
     AdminDocument, AdminScanPage, AdminScanRequest, ApplicationWrite, ConditionalWrite,
-    ConditionalWriteOutcome, Conflict, DibiConfig, DibiEngine, Document, StoredDocument,
-    WriteResult,
+    ConditionalWriteOutcome, Conflict, DATABASE_FORMAT_VERSION, DibiConfig, DibiEngine, Document,
+    StoredDocument, WriteResult,
 };
 pub use server::{DibiServer, DibiServerConfig, ServerError};
 

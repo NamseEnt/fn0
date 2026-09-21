@@ -1,43 +1,35 @@
-# Dibi Custom Protocol
+# Dibi Protocol
 
-Dibi Phase 2 exposes the synchronous DibiEngine through a custom binary application protocol carried directly over QUIC. The protocol is transport-independent at the codec layer, while the server uses one bidirectional QUIC stream for exactly one request and exactly one response.
+Dibi protocol version 2 is a binary protocol carried directly over authenticated QUIC. The protocol is transport-independent at the codec layer. Each request uses one bidirectional QUIC stream and each connection may carry multiple request streams.
 
-Phase 2 provides encrypted QUIC transport and server identity verification, but no client authentication/authorization.
+## Tenant model
 
-## Transport
+`fn0 project_id == Dibi tenant`.
 
-The server uses QUIC with TLS 1.3. HTTP, HTTP/1, HTTP/2, HTTP/3, h3, gRPC, protobuf, JSON RPC, and WebSocket are not used.
+Every document operation is scoped to one tenant. A tenant is a non-empty UTF-8 string of at most 256 bytes. Tenant-scoped request payloads begin with exactly one tenant string. Batch items and transaction items do not contain tenant fields.
 
-A client opens one bidirectional stream for each operation, writes one request frame, finishes its send side, and reads one response frame. A connection may have many request streams active at the same time. The server applies a 30 second request read timeout and a 60 second request processing timeout. The stream must finish after the request frame; bytes after the frame are invalid.
+The tenant is authoritative only after the authenticated fn0 host injects the current project ID. A WASM guest cannot select or override it. The Dibi server accepts tenant values only from an authenticated worker connection.
 
-## Frame format
+## Transport and frame format
 
-All integers use big-endian byte order.
+The server uses QUIC with TLS 1.3 and ALPN `dibi/2`. HTTP, HTTP/1, HTTP/2, HTTP/3, h3, gRPC, protobuf, JSON RPC, and WebSocket are not used.
 
-Every frame has this fixed 20 byte header:
+Every frame has this fixed 20-byte header:
 
 | Field | Size | Meaning |
 | --- | ---: | --- |
-| magic | 4 | ASCII DIBI, bytes 44 49 42 49 |
-| version | 1 | Protocol version 1 |
+| magic | 4 | ASCII `DIBI` |
+| version | 1 | Protocol version `2` |
 | opcode or status | 1 | Request opcode or response status |
-| flags | 2 | Must be 0 in Phase 2 |
-| request_id | 8 | Client-selected arbitrary u64; responses copy it |
+| flags | 2 | Must be zero |
+| request_id | 8 | Client-selected arbitrary `u64`; responses copy it |
 | payload_len | 4 | Payload length in bytes |
 
-The total frame is the header followed by exactly payload_len bytes. The maximum total frame size is 16 MiB. A frame whose declared length is too large, overflows, is truncated, or has trailing stream bytes is invalid.
+The total frame is the header followed by exactly `payload_len` bytes. The maximum total frame size is 16 MiB. Invalid magic, version, flags, lengths, UTF-8, payloads, or trailing bytes are rejected.
 
-Primitive values are encoded as follows:
+Primitive values use big-endian encoding. `bytes` and `string` use a `u32` length followed by the value. Strings are UTF-8. The maximum tenant size is 256 bytes, maximum string size is 1 MiB, maximum document size is 16 MiB, maximum batch operation count is 10,000, and maximum query, scan, and admin page limit is 10,000.
 
-- u8, u16, u32, u64, and i64 use their big-endian representation.
-- bool is 0 for false and 1 for true. Other values are invalid.
-- bytes is a u32 byte length followed by that many bytes.
-- string is a u32 byte length followed by UTF-8 bytes. Invalid UTF-8 is invalid.
-- Optional values are a one-byte presence marker: 0 means absent and 1 means the following value is present. Other markers are invalid.
-
-The maximum string size is 1 MiB, maximum document size is 16 MiB, maximum batch operation count is 10,000, and maximum query, scan, and admin page limit is 10,000. Lengths are checked before allocation.
-
-## Opcodes
+## Opcodes and authentication
 
 | Value | Opcode |
 | ---: | --- |
@@ -55,97 +47,50 @@ The maximum string size is 1 MiB, maximum document size is 16 MiB, maximum batch
 | 0x21 | ADMIN_TRANSACT_WRITE_ITEMS |
 | 0x40 | PING |
 | 0x41 | STATUS |
+| 0x42 | AUTH |
 
-Unknown opcodes are invalid requests.
+`AUTH` is a control operation with payload `bytes worker_token` and no tenant. The server requires `DIBI_WORKER_TOKEN` to be configured and non-empty. A new connection starts unauthenticated. `AUTH` compares the worker token in constant time and returns `OK` or `UNAUTHORIZED`. `PING` is allowed before authentication. `STATUS` and every tenant-scoped request return `UNAUTHORIZED` before successful `AUTH`.
 
-## Statuses
+The server returns `INVALID_REQUEST`, `NOT_FOUND`, `CONFLICT`, `UNAUTHORIZED`, or `INTERNAL_ERROR` as defined by the status codec. Normal document absence is an `OK` response with `found = false`.
 
-| Value | Status |
-| ---: | --- |
-| 0x00 | OK |
-| 0x01 | INVALID_REQUEST |
-| 0x02 | NOT_FOUND |
-| 0x03 | CONFLICT |
-| 0x06 | UNAUTHORIZED |
-| 0x07 | INTERNAL_ERROR |
+## Tenant-scoped payloads
 
-Missing documents use an OK response with found = false. NOT_FOUND is not used for normal document absence. CONFLICT is used for conditional write conflicts. Server failures use a short generic error message and do not expose filesystem paths, backtraces, or RocksDB error details.
-
-## Key and document operations
-
-GET request payload is string pk, string sk. Its response is bool found, followed by bytes data when found.
-
-PUT request payload is string pk, string sk, bytes data. Its response is u64 commit_id.
-
-DELETE request payload is string pk, string sk. Its response is u64 commit_id. Deleting a missing key follows engine semantics and succeeds.
-
-QUERY request payload is string pk, optional string after_sk, and u32 limit. Its response is u32 item_count, followed by item_count repetitions of string sk and bytes data. Sort order is ascending sk; after_sk is exclusive.
-
-SCAN request payload is an optional cursor consisting of string pk and string sk, followed by u32 limit. Its response is u32 item_count, followed by item_count repetitions of string pk, string sk, and bytes data. Sort order is ascending (pk, sk); the cursor is exclusive.
-
-BATCH request payload is u32 operation_count, followed by operations. A Put operation has type 0x01, string pk, string sk, and bytes data. A Delete operation has type 0x02, string pk, and string sk. The server performs one application_write_batch call. The response is an optional u64 commit_id; an empty batch has no commit ID.
-
-EXECUTE_OPS request payload is u32 operation_count, followed by operations in input order:
-
-- 0x01 Get: string pk, string sk
-- 0x02 Query: string pk, optional string after_sk, u32 limit
-- 0x03 Put: string pk, string sk, bytes data
-- 0x04 Delete: string pk, string sk
-
-The response contains u32 result_count, equal to the operation count. Results are 0x01 Done, 0x02 Single followed by bool found and optional data when found, or 0x03 Multiple followed by a query item list. Operations execute sequentially without an implicit transaction.
-
-GET_WITH_VERSION has the same request as GET. Its response is bool found, followed when found by i64 version and bytes data.
-
-BATCH_GET_WITH_VERSION has a u32 key_count followed by key_count repetitions of string pk and string sk. Its response contains the same number of items in input order. Each item contains bool found, followed when found by i64 version and bytes data. The operation reduces network round trips and does not promise a cross-key snapshot.
-
-## Optimistic transaction items
-
-TRANSACT_WRITE_ITEMS and ADMIN_TRANSACT_WRITE_ITEMS use the same request operation format. The request has u32 operation_count, followed by:
-
-- 0x01 Create: string pk, string sk, bytes data
-- 0x02 Put: string pk, string sk, i64 expected_version, bytes data
-- 0x03 Delete: string pk, string sk, i64 expected_version
-
-The engine conditional write API is used directly. An applied response is OK with an optional u64 commit_id. A conflict response is CONFLICT with u32 conflict_count, followed by string pk, string sk, optional i64 expected_version, and optional i64 actual_version for each conflict. Duplicate keys are invalid input and the request does not reach the engine.
-
-ADMIN_SCAN request payload is an optional (string pk, string sk) cursor, u32 limit, and optional string pk_prefix. Its response is u32 count, followed by string pk, string sk, i64 version, and bytes data for each item, followed by an optional (string pk, string sk) next cursor. The server calls DibiEngine::admin_scan and does not reimplement scan semantics.
-
-Dibi uses optimistic transaction items based on document versions. There is no server-side transaction session. GET_WITH_VERSION reads one document's current version. The client then sends all intended changes in one TRANSACT_WRITE_ITEMS request, and the server calls DibiEngine::conditional_write_batch once. The engine validates every condition before one atomic RocksDB commit; if any condition fails, zero writes are applied and all conflict details are returned.
-
-An example fn0-doc-db::trx flow is:
+The first payload field for every tenant-scoped operation is `string tenant`.
 
 ```text
-GET_WITH_VERSION A -> version 3
-GET_WITH_VERSION B -> version 7
-
-client code computes changes
-
-TRANSACT_WRITE_ITEMS:
-    PUT A expected_version=3
-    DELETE B expected_version=7
-    CREATE C
-
-server:
-    conditional_write_batch()
-
-success:
-    one atomic RocksDB commit
-
-conflict:
-    zero writes
-    expected/actual versions returned
+GET:
+    string tenant
+    string pk
+    string sk
 ```
 
-The server does not retry. Retry and closure re-execution are responsibilities of the future fn0-doc-db::trx client layer. This Phase 2 does not implement that client or explicit fn0-doc-db transaction compatibility. Client-side pending writes and read-your-own-writes overlay remain future client-layer behavior.
+```text
+TRANSACT_WRITE_ITEMS:
+    string tenant
+    u32 item_count
+    item...
+```
 
-## TLS and authentication
+`BATCH`, `EXECUTE_OPS`, `BATCH_GET_WITH_VERSION`, `TRANSACT_WRITE_ITEMS`, and `ADMIN_TRANSACT_WRITE_ITEMS` contain one request-level tenant and never repeat it in items. A cross-tenant transaction cannot be represented by this wire format.
 
-The server requires PEM certificate and private key files supplied with --cert and --key. Production startup does not generate a certificate automatically. The client must validate the server certificate during the TLS handshake. Tests use a generated self-signed certificate and explicitly trust that certificate.
+GET, PUT, DELETE, QUERY, SCAN, BATCH, EXECUTE_OPS, GET_WITH_VERSION, BATCH_GET_WITH_VERSION, TRANSACT_WRITE_ITEMS, ADMIN_SCAN, and ADMIN_TRANSACT_WRITE_ITEMS are tenant-scoped. PING, STATUS, and AUTH are tenant-independent control operations.
 
-Phase 2 provides encrypted QUIC transport and server identity verification, but no client authentication/authorization.
+Query ordering is ascending `sk` within `(tenant, pk)` and its cursor is exclusive. Scan ordering is ascending `(pk, sk)` within one tenant and its cursor exposes only `(pk, sk)`. ADMIN_SCAN is also restricted to one tenant; there is no global admin scan.
 
-## Server and malformed input behavior
+## Conditional transactions
 
-The server accepts --data-dir, --listen, --cert, and --key. It supports multiple QUIC connections, multiple concurrent bidirectional streams per connection, and blocking-pool execution for all DibiEngine operations.
+`TRANSACT_WRITE_ITEMS` and `ADMIN_TRANSACT_WRITE_ITEMS` use one request-level tenant. Each item is Create, Put with an expected version, or Delete with an expected version. The engine validates all conditions before one atomic RocksDB commit. If any condition fails, no writes are applied and conflict details are returned.
 
-Malformed frames are rejected without panicking or allocating from unchecked remote lengths. Invalid streams are isolated from other streams and connections. A response is emitted with INVALID_REQUEST when a request ID can be recovered; otherwise the stream is closed without a response.
+## TLS and connection behavior
+
+The client verifies the Dibi server certificate and hostname during the TLS handshake. Public roots are supported, and an optional custom CA may be added. Certificate and hostname verification are never disabled.
+
+After QUIC/TLS connection establishment, the client sends `AUTH` on a stream and publishes the connection for reuse only after receiving `OK`. A connection is authenticated as a worker, not bound to a tenant. Multiple projects can use the same authenticated connection; each request carries its host-injected tenant.
+
+If a connection fails before any request bytes are sent, reconnecting is allowed. If request bytes have been sent and the outcome is uncertain, the client returns an error and does not replay the request automatically.
+
+## Storage and format
+
+The physical document key is `(tenant, pk, sk)` encoded as three components using UTF-8 bytes, `00 -> 00 FF`, and a `00 00` component terminator. Query, scan, and admin iterators stop at the requested tenant prefix. Commit outbox mutations retain the complete encoded three-component key; mutation ordering remains encoded-key ascending.
+
+Dibi database format 2 introduces tenant-prefixed document keys. Format 1 databases require an explicit migration and are not opened automatically. No automatic format migration is performed.

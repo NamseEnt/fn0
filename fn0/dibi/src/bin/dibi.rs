@@ -25,11 +25,17 @@ async fn main() {
 
 async fn run() -> Result<(), String> {
     let arguments = Arguments::parse();
+    let worker_token = std::env::var("DIBI_WORKER_TOKEN")
+        .map_err(|_| "DIBI_WORKER_TOKEN must be configured and non-empty".to_owned())?;
+    if worker_token.is_empty() {
+        return Err("DIBI_WORKER_TOKEN must be configured and non-empty".to_owned());
+    }
     let config = DibiServerConfig::new(
         arguments.data_dir,
         arguments.listen,
         arguments.cert,
         arguments.key,
+        worker_token.into_bytes(),
     );
     let server = DibiServer::bind(config).map_err(|error| error.to_string())?;
     eprintln!(
