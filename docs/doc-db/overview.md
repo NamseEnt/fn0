@@ -32,7 +32,9 @@ The semantic observed state uses an opaque `DocDbRevision`. A present document c
 
 The semantic transaction request is a pair of condition and mutation lists. Updates and deletes use `RevisionEquals` with the observed revision, inserts use `NotExists`, and read-only observations contribute a condition without a mutation. Conditions are checked in order; a conflict reports the first failing condition index and publishes zero mutations.
 
-`execute_ops` uses one ordered semantic RPC containing `Get`, `Query`, `Put`, and `Delete` operations, preserving the result order. This is a round-trip reduction and does not by itself provide atomic transaction semantics. Use `batch` for the existing atomic write-batch contract or the transaction APIs for conditions plus mutations.
+Each transaction request allows at most one condition and at most one mutation for a key. A condition and a mutation for the same key are valid together; duplicate conditions or duplicate mutations are invalid requests and are rejected before backend execution. Condition-only transactions are valid and must still validate their conditions. A future dodb adapter must implement them with a consistent committed-point read such as `TransactGet` or an equivalent operation because dodb's write transaction primitive requires at least one mutation.
+
+`execute_ops` uses one ordered semantic RPC containing `Get`, `Query`, `Put`, and `Delete` operations. Operations execute in input order, and each later operation observes effects from earlier successful operations. This is a round-trip reduction and does not by itself provide atomic transaction semantics or rollback; existing partial-progress behavior is preserved if an operation fails. Use `batch` for the existing atomic write-batch contract or the transaction APIs for conditions plus mutations.
 
 The semantic RPC applies a 16 MiB fn0 platform frame limit to requests and responses. This limit is independent of any future dodb storage value limit. JSON and base64 encoding add overhead, so the largest usable binary document is smaller than 16 MiB.
 

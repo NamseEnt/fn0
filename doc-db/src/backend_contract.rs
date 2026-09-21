@@ -1,5 +1,5 @@
 use crate::{
-    Database, DocDbRevision, ObservedDocument, TransactCondition, TransactMutation,
+    Database, DbOp, DbResult, DocDbRevision, ObservedDocument, TransactCondition, TransactMutation,
     TransactRequest, memory, turso_with_config,
 };
 use anyhow::Result;
@@ -22,6 +22,7 @@ where
     observed_read_contract(&db, &prefix).await?;
     mutation_revision_contract(&db, &prefix).await?;
     check_version_contract(&db, &prefix).await?;
+    condition_only_contract(&db, &prefix).await?;
     check_missing_contract(&db, &prefix).await?;
     insert_contract(&db, &prefix).await?;
     update_contract(&db, &prefix).await?;
@@ -31,6 +32,7 @@ where
     empty_transaction_contract(&db).await?;
     query_contract(&db, &prefix).await?;
     scan_contract(&new_database(), &prefix).await?;
+    execute_ops_order_contract(&db, &prefix).await?;
     cleanup_backend_contract_data(&db).await?;
 
     Ok(())
@@ -245,6 +247,32 @@ async fn check_missing_contract(db: &Database, prefix: &str) -> Result<()> {
     expect_missing(db, &conflict_side_pk, &conflict_side_sk).await?;
     expect_present(db, &existing_pk, &existing_sk, b"existing").await?;
 
+    Ok(())
+}
+
+async fn condition_only_contract(db: &Database, prefix: &str) -> Result<()> {
+    let (pk, sk) = key(prefix, "condition-only");
+    db.put(&pk, &sk, b"before").await?;
+    let (_, revision) = expect_present(db, &pk, &sk, b"before").await?;
+
+    let outcome = db
+        .transact(&transact_request(
+            vec![revision_equals(&pk, &sk, revision)],
+            vec![],
+        ))
+        .await?;
+    assert_success(outcome);
+    expect_present(db, &pk, &sk, b"before").await?;
+
+    db.put(&pk, &sk, b"external").await?;
+    let outcome = db
+        .transact(&transact_request(
+            vec![revision_equals(&pk, &sk, revision)],
+            vec![],
+        ))
+        .await?;
+    assert_conflict(outcome, 0);
+    expect_present(db, &pk, &sk, b"external").await?;
     Ok(())
 }
 
@@ -546,6 +574,47 @@ async fn scan_contract(db: &Database, prefix: &str) -> Result<()> {
         ]
     );
 
+    Ok(())
+}
+
+async fn execute_ops_order_contract(db: &Database, prefix: &str) -> Result<()> {
+    let (pk, sk) = key(prefix, "execute-ops-order");
+    let results = db
+        .execute_ops(vec![
+            DbOp::Put {
+                pk: pk.clone(),
+                sk: sk.clone(),
+                data: b"inserted".to_vec(),
+            },
+            DbOp::Get {
+                pk: pk.clone(),
+                sk: sk.clone(),
+            },
+        ])
+        .await?;
+    assert!(matches!(
+        results.as_slice(),
+        [DbResult::Done, DbResult::Single(Some(data))] if data.as_ref() == b"inserted"
+    ));
+
+    let results = db
+        .execute_ops(vec![
+            DbOp::Put {
+                pk: pk.clone(),
+                sk: sk.clone(),
+                data: b"deleted".to_vec(),
+            },
+            DbOp::Delete {
+                pk: pk.clone(),
+                sk: sk.clone(),
+            },
+            DbOp::Get { pk, sk },
+        ])
+        .await?;
+    assert!(matches!(
+        results.as_slice(),
+        [DbResult::Done, DbResult::Done, DbResult::Single(None)]
+    ));
     Ok(())
 }
 

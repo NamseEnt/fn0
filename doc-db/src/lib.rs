@@ -22,7 +22,7 @@ use remote::RemoteDatabase;
 use std::future::Future;
 pub(crate) use transaction::{
     ObservedDocument, TransactCondition, TransactConflict, TransactMutation, TransactOutcome,
-    TransactRequest, revision_from_backend, revision_to_backend,
+    TransactRequest, revision_from_backend, revision_to_backend, validate_transact_request,
 };
 pub use trx::{
     ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
@@ -401,12 +401,16 @@ impl Database {
                         },
                     })
                     .collect::<Vec<_>>();
-                let outcome = self
-                    .transact(&TransactRequest {
-                        conditions,
-                        mutations,
-                    })
-                    .await?;
+                let request = TransactRequest {
+                    conditions,
+                    mutations,
+                };
+                if let Err(error) = validate_transact_request(&request) {
+                    return Ok(DocDbResponse::error(DocDbError::InvalidRequest {
+                        message: error.to_string(),
+                    }));
+                }
+                let outcome = self.transact(&request).await?;
                 let outcome = match outcome.conflict {
                     Some(conflict) => DocDbTransactOutcome::Conflict {
                         condition_index: conflict.condition_index,
@@ -470,6 +474,7 @@ impl Database {
         fields(conditions = request.conditions.len(), mutations = request.mutations.len())
     )]
     pub(crate) async fn transact(&self, request: &TransactRequest) -> Result<TransactOutcome> {
+        validate_transact_request(request)?;
         match &self.inner {
             DatabaseInner::Turso(db) => db.transact(request).await,
             DatabaseInner::Memory(db) => db.transact(request).await,
@@ -887,6 +892,54 @@ mod semantic_tests {
                 outcome: DocDbTransactOutcome::Conflict { condition_index: 0 }
             }
         );
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_transaction_keys_as_invalid_requests() {
+        let database = memory();
+
+        let duplicate_condition = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Transact {
+                conditions: vec![
+                    DocDbCondition::Exists {
+                        key: DocDbKey::new("pk", "duplicate"),
+                    },
+                    DocDbCondition::NotExists {
+                        key: DocDbKey::new("pk", "duplicate"),
+                    },
+                ],
+                mutations: vec![],
+            }))
+            .await
+            .unwrap();
+        assert!(matches!(
+            duplicate_condition.result,
+            DocDbResult::Error {
+                error: doc_db_protocol::DocDbError::InvalidRequest { .. }
+            }
+        ));
+
+        let duplicate_mutation = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Transact {
+                conditions: vec![],
+                mutations: vec![
+                    DocDbMutation::Put {
+                        key: DocDbKey::new("pk", "duplicate"),
+                        data: b"one".to_vec(),
+                    },
+                    DocDbMutation::Delete {
+                        key: DocDbKey::new("pk", "duplicate"),
+                    },
+                ],
+            }))
+            .await
+            .unwrap();
+        assert!(matches!(
+            duplicate_mutation.result,
+            DocDbResult::Error {
+                error: doc_db_protocol::DocDbError::InvalidRequest { .. }
+            }
+        ));
     }
 
     #[tokio::test]
