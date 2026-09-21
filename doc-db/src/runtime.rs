@@ -1,13 +1,43 @@
 use anyhow::Result;
+use dibi_protocol::MAX_FRAME_SIZE;
 use std::time::Duration;
 
 const DATABASE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) async fn dibi_request(endpoint: &str, frame: &[u8]) -> anyhow::Result<Vec<u8>> {
-    forte_sdk::dibi::request(endpoint, frame)
+    use anyhow::bail;
+    use forte_sdk::http::{Client, HeaderValue, Request, RequestTimeouts, Uri};
+    use std::str::FromStr;
+
+    let request_endpoint = if endpoint.ends_with('/') {
+        endpoint.to_owned()
+    } else {
+        format!("{endpoint}/")
+    };
+    let uri = Uri::from_str(&request_endpoint)
+        .map_err(|error| anyhow::anyhow!("Invalid Dibi URI: {error}"))?;
+    let request = Request::post(&uri)
+        .header(
+            "Content-Type",
+            HeaderValue::from_static("application/octet-stream"),
+        )
+        .body(frame.to_vec())
+        .map_err(|error| anyhow::anyhow!("Failed to build Dibi request: {error}"))?;
+    let client = Client::new().with_timeouts(RequestTimeouts::all(DATABASE_RESPONSE_TIMEOUT));
+    let response = client
+        .send(request)
         .await
-        .map_err(|error| anyhow::anyhow!("Dibi host transport error: {error:?}"))
+        .map_err(|error| anyhow::anyhow!("Dibi host transport error for {request_endpoint}: {error:?}"))?;
+    if !response.status().is_success() {
+        bail!("Dibi host transport returned HTTP status {}", response.status());
+    }
+    let bytes = response
+        .into_body()
+        .bytes_limited(MAX_FRAME_SIZE)
+        .await
+        .map_err(|error| anyhow::anyhow!("Dibi response body error: {error}"))?;
+    Ok(bytes.to_vec())
 }
 
 #[cfg(not(target_arch = "wasm32"))]

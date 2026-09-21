@@ -75,8 +75,8 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     if let Some(hijack) = websocket_hijack.clone() {
         ctx = ctx.with_websocket_hijack(hijack);
     }
-    if let Some(dibi_bridge) = fn0::DibiBridge::from_env()? {
-        ctx = ctx.with_dibi_bridge(dibi_bridge);
+    if let Some(dibi_hijack) = fn0::DibiHijack::from_env()? {
+        ctx = ctx.with_dibi_hijack(dibi_hijack);
     }
     let ctx = Arc::new(ctx);
     let executor = std::rc::Rc::new(CodeExecutor::new(ctx.clone()));

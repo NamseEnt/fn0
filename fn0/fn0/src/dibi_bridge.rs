@@ -14,14 +14,14 @@ use rustls::pki_types::CertificateDer;
 use tokio::{net::lookup_host, sync::Mutex, time::timeout};
 
 const DEFAULT_TARGET_PORT: u16 = 4433;
-const DEFAULT_PLACEHOLDER_URL: &str = "dibi://fn0-db.fn0.dev";
+const DEFAULT_PLACEHOLDER_HOST: &str = "fn0-dibi.fn0.dev";
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const ALPN_PROTOCOL: &[u8] = b"dibi/2";
 
 #[derive(Clone, Debug)]
 pub struct DibiBridgeConfig {
-    pub placeholder_url: String,
+    pub placeholder_host: String,
     pub target_host: String,
     pub target_port: u16,
     pub server_name: String,
@@ -35,8 +35,6 @@ pub struct DibiBridgeConfig {
 pub enum DibiBridgeError {
     #[error("Dibi bridge configuration error: {0}")]
     Configuration(String),
-    #[error("Dibi endpoint is not allowed")]
-    EndpointNotAllowed,
     #[error("Dibi request is invalid")]
     InvalidRequest,
     #[error("Dibi worker authentication failed")]
@@ -79,11 +77,11 @@ impl DibiBridge {
         let target_port = parse_env_u16("FN0_DIBI_TARGET_PORT", DEFAULT_TARGET_PORT)?;
         let server_name =
             std::env::var("FN0_DIBI_SERVER_NAME").unwrap_or_else(|_| target_host.clone());
-        let placeholder_url = std::env::var("FN0_DIBI_PLACEHOLDER_URL")
-            .unwrap_or_else(|_| DEFAULT_PLACEHOLDER_URL.to_owned());
+        let placeholder_host = std::env::var("FN0_DIBI_PLACEHOLDER_HOST")
+            .unwrap_or_else(|_| DEFAULT_PLACEHOLDER_HOST.to_owned());
         let ca_certificate = read_certificate_env()?;
         Ok(Some(Arc::new(Self::new(DibiBridgeConfig {
-            placeholder_url,
+            placeholder_host,
             target_host,
             target_port,
             server_name,
@@ -95,13 +93,14 @@ impl DibiBridge {
     }
 
     pub fn new(config: DibiBridgeConfig) -> Result<Self, DibiBridgeError> {
-        if config.placeholder_url.is_empty()
+        if config.placeholder_host.is_empty()
             || config.target_host.is_empty()
             || config.server_name.is_empty()
             || config.worker_token.is_empty()
         {
             return Err(DibiBridgeError::Configuration(
-                "placeholder, target host, server name, and worker token are required".to_owned(),
+                "placeholder host, target host, server name, and worker token are required"
+                    .to_owned(),
             ));
         }
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -125,19 +124,15 @@ impl DibiBridge {
         })
     }
 
-    pub fn placeholder_url(&self) -> &str {
-        &self.config.placeholder_url
+    pub fn placeholder_host(&self) -> &str {
+        &self.config.placeholder_host
     }
 
-    pub async fn request(
-        &self,
-        project_id: &str,
-        endpoint: &str,
-        frame: &[u8],
-    ) -> Result<Vec<u8>, DibiBridgeError> {
-        if endpoint != self.config.placeholder_url {
-            return Err(DibiBridgeError::EndpointNotAllowed);
-        }
+    pub fn placeholder_url(&self) -> String {
+        format!("http://{}", self.config.placeholder_host)
+    }
+
+    pub async fn request(&self, project_id: &str, frame: &[u8]) -> Result<Vec<u8>, DibiBridgeError> {
         let request = decode_request_frame(frame).map_err(|_| DibiBridgeError::InvalidRequest)?;
         let opcode = request.operation.opcode();
         if opcode == Opcode::Auth || (opcode.is_tenant_scoped() && !request.tenant.is_empty()) {
@@ -510,7 +505,7 @@ mod tests {
 
     fn test_bridge() -> DibiBridge {
         DibiBridge::new(DibiBridgeConfig {
-            placeholder_url: "dibi://fn0-db.fn0.dev".to_owned(),
+            placeholder_host: "fn0-dibi.fn0.dev".to_owned(),
             target_host: "127.0.0.1".to_owned(),
             target_port: 4433,
             server_name: "localhost".to_owned(),
@@ -535,29 +530,9 @@ mod tests {
         );
         assert!(matches!(
             bridge
-                .request("project-a", "dibi://fn0-db.fn0.dev", &frame)
+                .request("project-a", &frame)
                 .await,
             Err(DibiBridgeError::InvalidRequest)
-        ));
-        assert!(bridge.connection.lock().await.is_none());
-    }
-
-    #[tokio::test]
-    async fn rejects_arbitrary_endpoint_before_network_access() {
-        let bridge = test_bridge();
-        let frame = encode_request_frame(
-            1,
-            "",
-            &RequestOperation::Get {
-                pk: "User".to_owned(),
-                sk: "1".to_owned(),
-            },
-        );
-        assert!(matches!(
-            bridge
-                .request("project-a", "dibi://other.example", &frame)
-                .await,
-            Err(DibiBridgeError::EndpointNotAllowed)
         ));
         assert!(bridge.connection.lock().await.is_none());
     }
@@ -595,7 +570,7 @@ mod tests {
 
     fn bridge_for_server(server: &MockServer) -> DibiBridge {
         DibiBridge::new(DibiBridgeConfig {
-            placeholder_url: "dibi://fn0-db.fn0.dev".to_owned(),
+            placeholder_host: "fn0-dibi.fn0.dev".to_owned(),
             target_host: "127.0.0.1".to_owned(),
             target_port: server.address.port(),
             server_name: "localhost".to_owned(),
@@ -613,11 +588,11 @@ mod tests {
         let bridge = bridge_for_server(&server);
 
         let first = bridge
-            .request("project-a", "dibi://fn0-db.fn0.dev", &guest_get_frame(1))
+            .request("project-a", &guest_get_frame(1))
             .await
             .unwrap();
         let second = bridge
-            .request("project-b", "dibi://fn0-db.fn0.dev", &guest_get_frame(2))
+            .request("project-b", &guest_get_frame(2))
             .await
             .unwrap();
         let first_response = decode_response_frame(&first).unwrap();
@@ -656,7 +631,6 @@ mod tests {
         let response = bridge
             .request(
                 "project-a",
-                "dibi://fn0-db.fn0.dev",
                 &guest_condition_check_frame(1),
             )
             .await
@@ -685,7 +659,7 @@ mod tests {
         let bridge = bridge_for_server(&server);
 
         bridge
-            .request("project-a", "dibi://fn0-db.fn0.dev", &guest_get_frame(1))
+            .request("project-a", &guest_get_frame(1))
             .await
             .unwrap();
         tokio::time::timeout(Duration::from_secs(1), async {
@@ -705,7 +679,7 @@ mod tests {
         .await
         .unwrap();
         bridge
-            .request("project-b", "dibi://fn0-db.fn0.dev", &guest_get_frame(2))
+            .request("project-b", &guest_get_frame(2))
             .await
             .unwrap();
         assert_eq!(server.state.connection_count.load(Ordering::Relaxed), 2);
@@ -720,8 +694,8 @@ mod tests {
         let bridge = bridge_for_server(&server);
 
         assert!(
-            bridge
-                .request("project-a", "dibi://fn0-db.fn0.dev", &guest_get_frame(1))
+                bridge
+                .request("project-a", &guest_get_frame(1))
                 .await
                 .is_err()
         );

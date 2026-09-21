@@ -3,6 +3,7 @@ pub mod cache;
 pub mod cross_project_enqueue_hijack;
 pub mod cross_project_invoke_hijack;
 pub mod dibi_bridge;
+pub mod dibi_hijack;
 pub mod egress;
 pub mod execute;
 mod js;
@@ -54,6 +55,7 @@ use wasmtime_wasi_http::p3::bindings::ServicePre;
 pub use cross_project_enqueue_hijack::{CrossProjectEnqueueHijack, CrossProjectEnqueueOciOptions};
 pub use cross_project_invoke_hijack::{CrossProjectInvokeDispatcher, CrossProjectInvokeHijack};
 pub use dibi_bridge::{DibiBridge, DibiBridgeConfig, DibiBridgeError};
+pub use dibi_hijack::DibiHijack;
 pub use egress::{EgressBudget, EgressChargeFuture, EgressDenied, EgressMeteredBody};
 pub use metric_gate::MetricCardinalityGate;
 pub use object_storage_hijack::{DevReadResult, ObjectStorageHijack};
@@ -168,7 +170,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
     pub(crate) websocket_hijack: Option<Arc<WebSocketHijack>>,
     pub(crate) guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
-    pub(crate) dibi_bridge: Option<Arc<DibiBridge>>,
+    pub(crate) dibi_hijack: Option<Arc<DibiHijack>>,
 }
 
 impl<C: BundleCache> ExecutionContext<C> {
@@ -188,12 +190,12 @@ impl<C: BundleCache> ExecutionContext<C> {
             static_page_cache_hijack: None,
             websocket_hijack: None,
             guest_outbound_http: None,
-            dibi_bridge: None,
+            dibi_hijack: None,
         }
     }
 
-    pub fn with_dibi_bridge(mut self, dibi_bridge: Arc<DibiBridge>) -> Self {
-        self.dibi_bridge = Some(dibi_bridge);
+    pub fn with_dibi_hijack(mut self, dibi_hijack: Arc<DibiHijack>) -> Self {
+        self.dibi_hijack = Some(dibi_hijack);
         self
     }
 
@@ -279,10 +281,6 @@ impl<C: BundleCache> ExecutionContext<C> {
 
     pub fn linker(&self) -> &Linker<ClientState<SystemClock>> {
         &self.linker
-    }
-
-    pub fn dibi_bridge(&self) -> Option<&Arc<DibiBridge>> {
-        self.dibi_bridge.as_ref()
     }
 
     pub fn turso_hijack(&self) -> Option<&Arc<TursoHijack>> {
@@ -933,7 +931,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let static_page_cache_hijack = ctx.static_page_cache_hijack.clone();
         let websocket_hijack = ctx.websocket_hijack.clone();
         let guest_outbound_http = ctx.guest_outbound_http.clone();
-        let dibi_bridge = ctx.dibi_bridge.clone();
+        let dibi_hijack = ctx.dibi_hijack.clone();
         let project_id_for_log = project_id_owned.clone();
         let self_invoke_sender = tx.clone();
         let driver = tokio::task::spawn_local(async move {
@@ -955,7 +953,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                     static_page_cache_hijack,
                     websocket_hijack,
                     guest_outbound_http,
-                    dibi_bridge,
+                    dibi_hijack,
                 },
             ))
             .catch_unwind()

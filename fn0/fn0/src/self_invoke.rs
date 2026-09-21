@@ -4,6 +4,7 @@ use crate::body_limit::{
 };
 use crate::cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
+use crate::dibi_hijack::DibiHijack;
 use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::object_storage_hijack::ObjectStorageHijack;
@@ -106,6 +107,7 @@ pub(crate) struct SelfInvokeHooks {
     public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
     websocket_hijack: Option<Arc<WebSocketHijack>>,
+    dibi_hijack: Option<Arc<DibiHijack>>,
     guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
 }
 
@@ -122,6 +124,7 @@ pub(crate) struct SelfInvokeHooksOptions {
     pub(crate) public_storage_hijack: Option<Arc<PublicStorageHijack>>,
     pub(crate) static_page_cache_hijack: Option<Arc<StaticPageCacheHijack>>,
     pub(crate) websocket_hijack: Option<Arc<WebSocketHijack>>,
+    pub(crate) dibi_hijack: Option<Arc<DibiHijack>>,
     pub(crate) guest_outbound_http: Option<Arc<GuestOutboundHttp>>,
 }
 
@@ -140,6 +143,7 @@ impl SelfInvokeHooks {
             public_storage_hijack,
             static_page_cache_hijack,
             websocket_hijack,
+            dibi_hijack,
             guest_outbound_http,
         } = options;
         Self {
@@ -155,6 +159,7 @@ impl SelfInvokeHooks {
             public_storage_hijack,
             static_page_cache_hijack,
             websocket_hijack,
+            dibi_hijack,
             guest_outbound_http,
         }
     }
@@ -175,6 +180,12 @@ impl WasiHttpHooks for SelfInvokeHooks {
 
         if is_self {
             return self_invoke_send(self.self_invoke_sender.clone(), request);
+        }
+
+        if let Some(hijack) = self.dibi_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return dibi_send(hijack, self.project_id.clone(), request);
         }
 
         if let Some(hijack) = self.turso_hijack.clone()
@@ -299,6 +310,17 @@ fn self_invoke_send(
         let io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(async { Ok(()) });
         Ok((http_resp, io))
+    })
+}
+
+fn dibi_send(
+    hijack: Arc<DibiHijack>,
+    project_id: String,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        let response = hijack.handle_http(&project_id, request).await?;
+        Ok((response, empty_io()))
     })
 }
 

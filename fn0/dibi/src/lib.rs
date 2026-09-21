@@ -14,6 +14,8 @@ pub use engine::{
     StoredDocument, WriteResult,
 };
 pub use server::{DibiServer, DibiServerConfig, ServerError};
+#[cfg(feature = "test-support")]
+pub use server::{ConflictInjection, DibiServerMetrics, DibiServerTestSupport};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DibiError {

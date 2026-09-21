@@ -342,7 +342,7 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
         Arc::new(egress_budget::SystemUtcMonthClock),
     ));
 
-    let dibi_bridge = fn0::DibiBridge::from_env()
+    let dibi_hijack = fn0::DibiHijack::from_env()
         .map_err(|error| color_eyre::eyre::eyre!("Dibi bridge configuration failed: {error}"))?;
     let mut execution_context = ExecutionContext::new(engine, linker, cache.clone())
         .with_turso_hijack(build_turso_hijack())
@@ -366,8 +366,8 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
             egress_budget.clone(),
             websocket_hijack.control_project_id().to_string(),
         )));
-    if let Some(dibi_bridge) = dibi_bridge {
-        execution_context = execution_context.with_dibi_bridge(dibi_bridge);
+    if let Some(dibi_hijack) = dibi_hijack {
+        execution_context = execution_context.with_dibi_hijack(dibi_hijack);
     }
     let execution_context = Arc::new(execution_context);
 

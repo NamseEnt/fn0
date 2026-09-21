@@ -9,6 +9,9 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "test-support")]
+use std::sync::{Mutex, atomic::AtomicUsize};
+
 use bytes::Bytes;
 use dibi_protocol::{
     AdminItem, ExecuteOperation, ExecuteResult, Key, QueryItem, RequestOperation, ResponsePayload,
@@ -38,6 +41,8 @@ pub struct DibiServerConfig {
     pub worker_token: Vec<u8>,
     pub request_read_timeout: Duration,
     pub request_processing_timeout: Duration,
+    #[cfg(feature = "test-support")]
+    pub test_support: Option<Arc<DibiServerTestSupport>>,
 }
 
 impl DibiServerConfig {
@@ -56,7 +61,15 @@ impl DibiServerConfig {
             worker_token: worker_token.into(),
             request_read_timeout: DEFAULT_REQUEST_READ_TIMEOUT,
             request_processing_timeout: DEFAULT_REQUEST_PROCESSING_TIMEOUT,
+            #[cfg(feature = "test-support")]
+            test_support: None,
         }
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn with_test_support(mut self, test_support: Arc<DibiServerTestSupport>) -> Self {
+        self.test_support = Some(test_support);
+        self
     }
 }
 
@@ -82,6 +95,118 @@ pub enum ServerError {
 struct ServerState {
     engine: DibiEngine,
     worker_token: Arc<[u8]>,
+    #[cfg(feature = "test-support")]
+    test_support: Arc<DibiServerTestSupport>,
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Clone, Debug)]
+pub enum ConflictInjection {
+    Put {
+        tenant: String,
+        pk: String,
+        sk: String,
+        data: Vec<u8>,
+    },
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Debug)]
+pub struct DibiServerMetrics {
+    connection_count: AtomicUsize,
+    authentication_count: AtomicUsize,
+    request_stream_count: AtomicUsize,
+}
+
+#[cfg(feature = "test-support")]
+impl DibiServerMetrics {
+    pub fn connection_count(&self) -> usize {
+        self.connection_count.load(Ordering::Relaxed)
+    }
+
+    pub fn authentication_count(&self) -> usize {
+        self.authentication_count.load(Ordering::Relaxed)
+    }
+
+    pub fn request_stream_count(&self) -> usize {
+        self.request_stream_count.load(Ordering::Relaxed)
+    }
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Debug)]
+pub struct DibiServerTestSupport {
+    metrics: Arc<DibiServerMetrics>,
+    conflict_injection: Mutex<Option<ConflictInjection>>,
+    batch_get_barrier: Mutex<Option<BatchGetBarrier>>,
+}
+
+#[cfg(feature = "test-support")]
+impl Default for DibiServerTestSupport {
+    fn default() -> Self {
+        Self {
+            metrics: Arc::new(DibiServerMetrics {
+                connection_count: AtomicUsize::new(0),
+                authentication_count: AtomicUsize::new(0),
+                request_stream_count: AtomicUsize::new(0),
+            }),
+            conflict_injection: Mutex::new(None),
+            batch_get_barrier: Mutex::new(None),
+        }
+    }
+}
+
+#[cfg(feature = "test-support")]
+impl DibiServerTestSupport {
+    pub fn metrics(&self) -> Arc<DibiServerMetrics> {
+        Arc::clone(&self.metrics)
+    }
+
+    pub fn inject_conflict_once(&self, injection: ConflictInjection) {
+        *self.conflict_injection.lock().unwrap() = Some(injection);
+    }
+
+    pub fn synchronize_batch_gets(&self, participants: usize) {
+        assert!(participants > 0);
+        *self.batch_get_barrier.lock().unwrap() = Some(BatchGetBarrier::new(participants));
+    }
+
+    fn take_conflict_injection(&self) -> Option<ConflictInjection> {
+        self.conflict_injection.lock().unwrap().take()
+    }
+
+    async fn wait_for_batch_gets(&self) {
+        let barrier = self.batch_get_barrier.lock().unwrap().clone();
+        if let Some(barrier) = barrier {
+            barrier.wait().await;
+        }
+    }
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Clone, Debug)]
+struct BatchGetBarrier {
+    barrier: Arc<tokio::sync::Barrier>,
+    participants: usize,
+    arrivals: Arc<AtomicUsize>,
+}
+
+#[cfg(feature = "test-support")]
+impl BatchGetBarrier {
+    fn new(participants: usize) -> Self {
+        Self {
+            barrier: Arc::new(tokio::sync::Barrier::new(participants)),
+            participants,
+            arrivals: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    async fn wait(&self) {
+        let arrival = self.arrivals.fetch_add(1, Ordering::AcqRel);
+        if arrival < self.participants {
+            self.barrier.wait().await;
+        }
+    }
 }
 
 enum OperationError {
@@ -100,11 +225,15 @@ impl DibiServer {
         let engine = DibiEngine::open(&config.data_dir)?;
         let server_config = load_server_config(&config.cert_path, &config.key_path)?;
         let endpoint = quinn::Endpoint::server(server_config, config.listen)?;
+        #[cfg(feature = "test-support")]
+        let test_support = config.test_support.unwrap_or_default();
         Ok(Self {
             endpoint,
             state: Arc::new(ServerState {
                 engine,
                 worker_token: Arc::from(config.worker_token),
+                #[cfg(feature = "test-support")]
+                test_support,
             }),
             request_read_timeout: config.request_read_timeout,
             request_processing_timeout: config.request_processing_timeout,
@@ -113,6 +242,11 @@ impl DibiServer {
 
     pub fn local_addr(&self) -> Result<SocketAddr, ServerError> {
         Ok(self.endpoint.local_addr()?)
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn metrics(&self) -> Arc<DibiServerMetrics> {
+        self.state.test_support.metrics()
     }
 
     pub async fn run(
@@ -129,9 +263,15 @@ impl DibiServer {
                         break;
                     };
                     match incoming.await {
-                        Ok(connection) => {
-                            let state = Arc::clone(&self.state);
-                            let read_timeout = self.request_read_timeout;
+                    Ok(connection) => {
+                        let state = Arc::clone(&self.state);
+                        #[cfg(feature = "test-support")]
+                        state
+                            .test_support
+                            .metrics
+                            .connection_count
+                            .fetch_add(1, Ordering::Relaxed);
+                        let read_timeout = self.request_read_timeout;
                             let processing_timeout = self.request_processing_timeout;
                             connection_tasks.spawn(async move {
                                 handle_connection(connection, state, read_timeout, processing_timeout).await;
@@ -257,6 +397,20 @@ async fn handle_stream(
     let tenant = request.tenant;
     let is_ping = matches!(&request.operation, RequestOperation::Ping);
     let is_auth = matches!(&request.operation, RequestOperation::Auth { .. });
+    #[cfg(feature = "test-support")]
+    state
+        .test_support
+        .metrics
+        .request_stream_count
+        .fetch_add(1, Ordering::Relaxed);
+    #[cfg(feature = "test-support")]
+    if is_auth {
+        state
+            .test_support
+            .metrics
+            .authentication_count
+            .fetch_add(1, Ordering::Relaxed);
+    }
     if !is_ping && !is_auth && !authenticated.load(Ordering::Acquire) {
         let _ = send_error(&mut send, request_id, Status::Unauthorized).await;
         return;
@@ -484,12 +638,31 @@ async fn execute_request(
                     .collect::<crate::Result<Vec<_>>>()
             })
             .await?;
+            #[cfg(feature = "test-support")]
+            state.test_support.wait_for_batch_gets().await;
             Ok(ResponsePayload::VersionedItems(versioned_items(documents)))
         }
         RequestOperation::TransactWriteItems(operations)
         | RequestOperation::AdminTransactWriteItems(operations) => {
             let engine = state.engine.clone();
             let operations = conditional_writes(operations);
+            #[cfg(feature = "test-support")]
+            if let Some(injection) = state.test_support.take_conflict_injection() {
+                match injection {
+                    ConflictInjection::Put {
+                        tenant,
+                        pk,
+                        sk,
+                        data,
+                    } => {
+                        let injection_engine = engine.clone();
+                        run_engine(move || {
+                            injection_engine.put(&tenant, &pk, &sk, Bytes::from(data))
+                        })
+                            .await?;
+                    }
+                }
+            }
             match run_engine(move || engine.conditional_write_batch(&tenant, &operations)).await? {
                 ConditionalWriteOutcome::Applied(result) => {
                     Ok(ResponsePayload::OptionalCommitId(result.commit_id))
