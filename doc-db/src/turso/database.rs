@@ -1,6 +1,6 @@
 use super::*;
-use crate::BatchOp;
 use crate::runtime;
+use crate::{BatchOp, ObservedDocument};
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
@@ -197,7 +197,7 @@ impl TursoDatabase {
         Ok(None)
     }
 
-    pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
+    pub(crate) async fn get_observed(&self, pk: &str, sk: &str) -> Result<ObservedDocument> {
         for retry in 0..2 {
             let response = self
                 .execute_pipeline(vec![
@@ -236,12 +236,12 @@ impl TursoDatabase {
                                     Some(Value::Integer { value: version }),
                                 ) = (row.values.first(), row.values.get(1))
                             {
-                                return Ok(Some(StoredDoc {
+                                return Ok(ObservedDocument::Present {
                                     data: data.clone(),
                                     version: *version,
-                                }));
+                                });
                             }
-                            return Ok(None);
+                            return Ok(ObservedDocument::Missing);
                         }
                         StreamResponse::Close(_) => continue,
                         _ => {}
@@ -259,11 +259,11 @@ impl TursoDatabase {
             }
 
             if !should_retry {
-                return Ok(None);
+                return Ok(ObservedDocument::Missing);
             }
         }
 
-        Ok(None)
+        Ok(ObservedDocument::Missing)
     }
 
     pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {

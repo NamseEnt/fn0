@@ -1,5 +1,4 @@
-use crate::turso::StoredDoc;
-use crate::{BatchOp, DbOp, DbResult};
+use crate::{BatchOp, DbOp, DbResult, ObservedDocument};
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
@@ -34,14 +33,15 @@ impl MemoryDatabase {
             .map(|doc| doc.data.clone().into()))
     }
 
-    pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
+    pub(crate) async fn get_observed(&self, pk: &str, sk: &str) -> Result<ObservedDocument> {
         let store = self.store.lock().unwrap();
-        Ok(store
-            .get(&(pk.to_string(), sk.to_string()))
-            .map(|doc| StoredDoc {
+        Ok(match store.get(&(pk.to_string(), sk.to_string())) {
+            Some(doc) => ObservedDocument::Present {
                 data: doc.data.clone().into(),
                 version: doc.version,
-            }))
+            },
+            None => ObservedDocument::Missing,
+        })
     }
 
     pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {

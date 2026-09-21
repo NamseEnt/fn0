@@ -1,6 +1,7 @@
 mod memory;
 pub mod mock;
 mod runtime;
+mod transaction;
 mod trx;
 mod turso;
 
@@ -9,11 +10,12 @@ use bytes::Bytes;
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
 use std::future::Future;
+pub(crate) use transaction::{ObservedDocument, TransactConflict, TransactItem, TransactOutcome};
 pub use trx::{
     ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
     TrxResult,
 };
-use turso::{StoredDoc, TursoDatabase, TursoTransaction};
+use turso::{TursoDatabase, TursoTransaction};
 
 pub fn text_value(s: impl Into<String>) -> Value {
     Value::Text {
@@ -35,43 +37,6 @@ pub enum BatchOp<'a> {
         pk: &'a str,
         sk: &'a str,
     },
-}
-
-#[derive(Clone)]
-pub(crate) enum TransactItem {
-    CheckVersion {
-        pk: String,
-        sk: String,
-        expected_version: i64,
-    },
-    CheckMissing {
-        pk: String,
-        sk: String,
-    },
-    Insert {
-        pk: String,
-        sk: String,
-        data: Vec<u8>,
-    },
-    Update {
-        pk: String,
-        sk: String,
-        expected_version: i64,
-        data: Vec<u8>,
-    },
-    Delete {
-        pk: String,
-        sk: String,
-        expected_version: i64,
-    },
-}
-
-pub(crate) struct TransactOutcome {
-    pub(crate) conflict: Option<TransactConflict>,
-}
-
-pub(crate) struct TransactConflict {
-    pub(crate) step_index: usize,
 }
 
 pub enum WriteOp {
@@ -323,24 +288,24 @@ impl Database {
     }
 
     #[tracing::instrument(skip_all, fields(pk = %pk, sk = %sk))]
-    pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
+    pub(crate) async fn get_observed(&self, pk: &str, sk: &str) -> Result<ObservedDocument> {
         match &self.inner {
-            DatabaseInner::Turso(db) => db.get_with_version(pk, sk).await,
-            DatabaseInner::Memory(db) => db.get_with_version(pk, sk).await,
+            DatabaseInner::Turso(db) => db.get_observed(pk, sk).await,
+            DatabaseInner::Memory(db) => db.get_observed(pk, sk).await,
         }
     }
 
     #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn batch_get_with_version(
+    pub(crate) async fn batch_get_observed(
         &self,
         keys: &[(String, String)],
-    ) -> Result<Vec<Option<StoredDoc>>> {
+    ) -> Result<Vec<ObservedDocument>> {
         if keys.is_empty() {
             return Ok(vec![]);
         }
         let mut out = Vec::with_capacity(keys.len());
         for (pk, sk) in keys {
-            out.push(self.get_with_version(pk, sk).await?);
+            out.push(self.get_observed(pk, sk).await?);
         }
         Ok(out)
     }

@@ -1,4 +1,4 @@
-use crate::Database;
+use crate::{Database, ObservedDocument};
 use anyhow::{Result, anyhow, bail};
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -63,7 +63,7 @@ pub trait TrxRead: Sized {
     async fn finalize(
         self,
         tx: &Trx,
-        results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+        results: &mut std::vec::IntoIter<ObservedDocument>,
     ) -> Result<Self::Output>;
 }
 
@@ -80,7 +80,7 @@ where
     async fn finalize(
         self,
         tx: &Trx,
-        results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+        results: &mut std::vec::IntoIter<ObservedDocument>,
     ) -> Result<Self::Output> {
         let stored = results
             .next()
@@ -107,7 +107,7 @@ macro_rules! impl_trx_read_tuple {
             async fn finalize(
                 self,
                 tx: &Trx,
-                results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+                results: &mut std::vec::IntoIter<ObservedDocument>,
             ) -> Result<Self::Output> {
                 let ($($T,)+) = self;
                 Ok(($($T.finalize(tx, results).await?,)+))
@@ -207,12 +207,9 @@ impl Trx {
         })
     }
 
-    async fn batch_load(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<crate::turso::StoredDoc>>> {
+    async fn batch_load(&self, keys: &[(String, String)]) -> Result<Vec<ObservedDocument>> {
         let db = self.inner.lock().unwrap().db.clone();
-        db.batch_get_with_version(keys).await
+        db.batch_get_observed(keys).await
     }
 }
 
@@ -351,7 +348,7 @@ impl TrxState {
     fn register_loaded<T>(
         &mut self,
         key: DocKey,
-        stored: Option<crate::turso::StoredDoc>,
+        observed: ObservedDocument,
     ) -> Result<Option<DocHandle<T>>>
     where
         T: Document,
@@ -363,9 +360,9 @@ impl TrxState {
         let idx = self.entries.len();
         self.index.insert(key.clone(), idx);
 
-        match stored {
-            Some(stored) => {
-                let doc = serde_json::from_slice::<T>(&stored.data).map_err(|err| {
+        match observed {
+            ObservedDocument::Present { data, version } => {
+                let doc = serde_json::from_slice::<T>(&data).map_err(|err| {
                     anyhow!(
                         "failed to deserialize {} at {}/{}: {}",
                         type_name::<T>(),
@@ -377,7 +374,7 @@ impl TrxState {
                 let (shared, handle) = new_shared_doc(doc);
                 self.entries.push(TrackedEntry {
                     key,
-                    expected_version: Some(stored.version),
+                    expected_version: Some(version),
                     observed: true,
                     state: TrackedState::Managed {
                         shared,
@@ -386,7 +383,7 @@ impl TrxState {
                 });
                 Ok(Some(handle))
             }
-            None => {
+            ObservedDocument::Missing => {
                 self.entries.push(TrackedEntry {
                     key,
                     expected_version: None,
@@ -619,9 +616,12 @@ async fn commit_entries(
             .iter()
             .map(|c| (c.key.pk.clone(), c.key.sk.clone()))
             .collect();
-        if let Ok(stored) = db.batch_get_with_version(&key_pairs).await {
-            for (c, slot) in conflicts.iter_mut().zip(stored.into_iter()) {
-                c.actual_version = slot.map(|d| d.version);
+        if let Ok(observed) = db.batch_get_observed(&key_pairs).await {
+            for (c, observation) in conflicts.iter_mut().zip(observed.into_iter()) {
+                c.actual_version = match observation {
+                    ObservedDocument::Present { version, .. } => Some(version),
+                    ObservedDocument::Missing => None,
+                };
             }
         }
         return Err(CommitFailure::Conflict(ConflictDetails { keys: conflicts }));
@@ -656,7 +656,6 @@ fn item_key_and_expected(item: &crate::TransactItem) -> (String, String, Option<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::turso_with_config;
 
     #[derive(Clone, serde::Serialize, serde::Deserialize)]
     struct TestDoc {
@@ -683,10 +682,7 @@ mod tests {
     }
 
     fn test_state() -> TrxState {
-        TrxState::new(turso_with_config(
-            "http://127.0.0.1:0".to_string(),
-            String::new(),
-        ))
+        TrxState::new(crate::memory())
     }
 
     #[test]
@@ -724,10 +720,10 @@ mod tests {
         let mut handle = state
             .register_loaded::<TestDoc>(
                 key,
-                Some(crate::turso::StoredDoc {
+                ObservedDocument::Present {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
                     version: 7,
-                }),
+                },
             )
             .expect("load should succeed")
             .expect("doc should exist");
@@ -763,10 +759,10 @@ mod tests {
         let handle = state
             .register_loaded::<TestDoc>(
                 key,
-                Some(crate::turso::StoredDoc {
+                ObservedDocument::Present {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
                     version: 7,
-                }),
+                },
             )
             .expect("load should succeed")
             .expect("doc should exist");
@@ -790,7 +786,7 @@ mod tests {
         let mut state = test_state();
         let key = TestDocGet { id: "a".into() }.key();
         let loaded = state
-            .register_loaded::<TestDoc>(key, None)
+            .register_loaded::<TestDoc>(key, ObservedDocument::Missing)
             .expect("register missing should succeed");
         assert!(loaded.is_none());
 
@@ -817,7 +813,7 @@ mod tests {
         let key = TestDocGet { id: "a".into() }.key();
         assert!(
             state
-                .register_loaded::<TestDoc>(key, None)
+                .register_loaded::<TestDoc>(key, ObservedDocument::Missing)
                 .expect("register missing should succeed")
                 .is_none()
         );
@@ -867,7 +863,7 @@ mod tests {
         let handle = state
             .register_loaded::<TestDoc>(
                 key,
-                Some(crate::turso::StoredDoc {
+                ObservedDocument::Present {
                     data: serde_json::to_vec(&TestDoc {
                         id: "a".into(),
                         value: 1,
@@ -875,7 +871,7 @@ mod tests {
                     .expect("serialize")
                     .into(),
                     version: 7,
-                }),
+                },
             )
             .expect("load should succeed")
             .expect("doc should exist");
@@ -896,10 +892,16 @@ mod tests {
     #[test]
     fn duplicate_key_access_is_rejected() {
         let mut state = test_state();
-        let first = state.register_loaded::<TestDoc>(TestDocGet { id: "a".into() }.key(), None);
+        let first = state.register_loaded::<TestDoc>(
+            TestDocGet { id: "a".into() }.key(),
+            ObservedDocument::Missing,
+        );
         assert!(first.is_ok());
 
-        let second = state.register_loaded::<TestDoc>(TestDocGet { id: "a".into() }.key(), None);
+        let second = state.register_loaded::<TestDoc>(
+            TestDocGet { id: "a".into() }.key(),
+            ObservedDocument::Missing,
+        );
         assert!(second.is_err());
     }
 
