@@ -2130,6 +2130,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "dashmap",
+ "fn0-doc-db-protocol",
  "fn0-ski",
  "fn0-wasmtime",
  "futures",
@@ -2338,6 +2339,7 @@ version = "0.4.15"
 dependencies = [
  "anyhow",
  "bytes",
+ "fn0-doc-db-protocol",
  "forte-sdk",
  "libsql-hrana",
  "rand 0.8.5",
@@ -2347,6 +2349,15 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "fn0-doc-db-protocol"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2421,6 +2432,7 @@ dependencies = [
  "fastwebsockets",
  "fn0",
  "fn0-doc-db",
+ "fn0-doc-db-protocol",
  "fn0-shared-schema",
  "futures",
  "hmac",

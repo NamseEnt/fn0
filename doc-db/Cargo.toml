@@ -26,6 +26,7 @@ harness = false
 [dependencies]
 anyhow = { workspace = true }
 bytes = { workspace = true }
+fn0-doc-db-protocol = { path = "../fn0/doc-db-protocol", version = "=0.1.0" }
 libsql-hrana = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

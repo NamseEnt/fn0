@@ -1,6 +1,7 @@
 mod cache;
 mod cert_poller;
 mod cert_resolver;
+mod doc_db_service;
 mod egress_budget;
 mod env_crypto;
 mod env_yaml;
@@ -21,7 +22,7 @@ use cache::S3BundleCache;
 use cert_resolver::SniCertResolver;
 use color_eyre::eyre::Result;
 use fn0::{
-    CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack,
+    CrossProjectEnqueueHijack, CrossProjectInvokeDispatcher, CrossProjectInvokeHijack, DocDbHijack,
     EgressBudget, EgressMeteredBody, ExecutionContext, GuestOutboundHttp, MAX_REQUEST_BODY_SIZE,
     MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, OutboundDialer, PresignGate,
     PrivateDestinationAccess, PublicStorageHijack, PurgeGate, QueueHijack, RequestBodyTooLarge,
@@ -190,6 +191,13 @@ fn build_turso_hijack() -> Arc<TursoHijack> {
     })
 }
 
+fn build_doc_db_hijack(turso_hijack: Arc<TursoHijack>) -> Arc<DocDbHijack> {
+    let placeholder_host = std::env::var("FN0_DOC_DB_PLACEHOLDER_HOST")
+        .unwrap_or_else(|_| "fn0-doc-db.fn0.dev".to_string());
+    let service = Arc::new(doc_db_service::TursoDocDbService::new(turso_hijack));
+    Arc::new(DocDbHijack::new(placeholder_host, service))
+}
+
 fn build_object_storage_hijack(
     resolver: Arc<ManifestStorageResolver>,
     presign_gate: Arc<PresignGate>,
@@ -324,6 +332,8 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     );
     let storage_resolver = Arc::new(ManifestStorageResolver::new(vault_client.clone()));
     let direct_hijack = build_cross_project_invoke_hijack();
+    let turso_hijack = build_turso_hijack();
+    let doc_db_hijack = build_doc_db_hijack(turso_hijack.clone());
     let presign_gate = Arc::new(PresignGate::new());
     let purge_gate = Arc::new(PurgeGate::new());
     let metric_gate = Arc::new(MetricCardinalityGate::new());
@@ -344,7 +354,8 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
 
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
-            .with_turso_hijack(build_turso_hijack())
+            .with_doc_db_hijack(doc_db_hijack)
+            .with_turso_hijack(turso_hijack)
             .with_queue_hijack(build_queue_hijack())
             .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
             .with_cross_project_invoke_hijack(direct_hijack.clone())

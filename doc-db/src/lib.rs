@@ -2,6 +2,7 @@
 mod backend_contract;
 mod memory;
 pub mod mock;
+mod remote;
 mod runtime;
 mod transaction;
 mod trx;
@@ -9,8 +10,13 @@ mod turso;
 
 use anyhow::Result;
 use bytes::Bytes;
+use doc_db_protocol::{
+    DocDbBatchOperation, DocDbDocument, DocDbError, DocDbKey, DocDbObservedDocument,
+    DocDbOperation, DocDbResponse, DocDbResult, DocDbTransactItem, DocDbTransactOutcome,
+};
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
+use remote::RemoteDatabase;
 use std::future::Future;
 pub(crate) use transaction::{ObservedDocument, TransactConflict, TransactItem, TransactOutcome};
 pub use trx::{
@@ -114,6 +120,18 @@ pub fn memory() -> Database {
     }
 }
 
+pub fn semantic() -> Database {
+    let url = std::env::var("FN0_DOC_DB_URL").expect("FN0_DOC_DB_URL must be set");
+    semantic_with_config(url)
+}
+
+pub fn semantic_with_config(url: String) -> Database {
+    Database {
+        inner: DatabaseInner::Remote(RemoteDatabase::new(url)),
+        mock_state: mock::MockState::default(),
+    }
+}
+
 #[derive(Clone)]
 pub struct Database {
     inner: DatabaseInner,
@@ -132,6 +150,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.get(pk, sk).await,
             DatabaseInner::Memory(db) => db.get(pk, sk).await,
+            DatabaseInner::Remote(db) => db.get(pk, sk).await,
         }
     }
 
@@ -146,6 +165,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.put(pk, sk, data).await,
             DatabaseInner::Memory(db) => db.put(pk, sk, data).await,
+            DatabaseInner::Remote(db) => db.put(pk, sk, data).await,
         }
     }
 
@@ -160,6 +180,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.delete(pk, sk).await,
             DatabaseInner::Memory(db) => db.delete(pk, sk).await,
+            DatabaseInner::Remote(db) => db.delete(pk, sk).await,
         }
     }
 
@@ -195,6 +216,10 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.query(pk, after_sk, limit).await,
             DatabaseInner::Memory(db) => db.query(pk, after_sk, limit).await,
+            DatabaseInner::Remote(db) => {
+                db.query(pk.as_ref(), after_sk.as_ref().map(AsRef::as_ref), limit)
+                    .await
+            }
         }
     }
 
@@ -207,6 +232,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.scan(after, limit).await,
             DatabaseInner::Memory(db) => db.scan(after, limit).await,
+            DatabaseInner::Remote(db) => db.scan(after, limit).await,
         }
     }
 
@@ -215,6 +241,167 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.batch(ops).await,
             DatabaseInner::Memory(db) => db.batch(ops).await,
+            DatabaseInner::Remote(db) => db.batch(ops).await,
+        }
+    }
+
+    pub async fn execute_semantic(
+        &self,
+        request: doc_db_protocol::DocDbRequest,
+    ) -> Result<doc_db_protocol::DocDbResponse> {
+        if matches!(&self.inner, DatabaseInner::Remote(_)) {
+            anyhow::bail!("semantic execution is only available on a host database")
+        }
+
+        match request.operation {
+            DocDbOperation::Get { key } => {
+                let data = self.get(&key.pk, &key.sk).await?;
+                Ok(DocDbResponse::new(DocDbResult::Get {
+                    data: data.map(|value| doc_db_protocol::BinaryDocument {
+                        data: value.to_vec(),
+                    }),
+                }))
+            }
+            DocDbOperation::Put { key, data } => {
+                self.put(&key.pk, &key.sk, &data).await?;
+                Ok(DocDbResponse::new(DocDbResult::Put))
+            }
+            DocDbOperation::Delete { key } => {
+                self.delete(&key.pk, &key.sk).await?;
+                Ok(DocDbResponse::new(DocDbResult::Delete))
+            }
+            DocDbOperation::Query {
+                pk,
+                after_sk,
+                limit,
+            } => {
+                let limit = match semantic_limit(limit) {
+                    Ok(limit) => limit,
+                    Err(message) => {
+                        return Ok(DocDbResponse::error(DocDbError::InvalidRequest { message }));
+                    }
+                };
+                let documents = self
+                    .query(&pk, after_sk.as_deref(), limit)
+                    .await?
+                    .into_iter()
+                    .map(|(sk, data)| DocDbDocument {
+                        key: DocDbKey::new(pk.clone(), sk),
+                        data: data.to_vec(),
+                    })
+                    .collect();
+                Ok(DocDbResponse::new(DocDbResult::Query { documents }))
+            }
+            DocDbOperation::Scan { after, limit } => {
+                let limit = match semantic_limit(limit) {
+                    Ok(limit) => limit,
+                    Err(message) => {
+                        return Ok(DocDbResponse::error(DocDbError::InvalidRequest { message }));
+                    }
+                };
+                let after_refs = after.as_ref().map(|key| (key.pk.as_str(), key.sk.as_str()));
+                let documents = self
+                    .scan(after_refs, limit)
+                    .await?
+                    .into_iter()
+                    .map(|(pk, sk, data)| DocDbDocument {
+                        key: DocDbKey::new(pk, sk),
+                        data: data.to_vec(),
+                    })
+                    .collect();
+                Ok(DocDbResponse::new(DocDbResult::Scan { documents }))
+            }
+            DocDbOperation::Batch { operations } => {
+                let batch_operations: Vec<BatchOp<'_>> = operations
+                    .iter()
+                    .map(|operation| match operation {
+                        DocDbBatchOperation::Put { key, data } => BatchOp::Put {
+                            pk: &key.pk,
+                            sk: &key.sk,
+                            data,
+                        },
+                        DocDbBatchOperation::Delete { key } => BatchOp::Delete {
+                            pk: &key.pk,
+                            sk: &key.sk,
+                        },
+                    })
+                    .collect();
+                self.batch(&batch_operations).await?;
+                Ok(DocDbResponse::new(DocDbResult::Batch))
+            }
+            DocDbOperation::BatchGetObserved { keys } => {
+                let keys = keys
+                    .into_iter()
+                    .map(|key| (key.pk, key.sk))
+                    .collect::<Vec<_>>();
+                let documents = self
+                    .batch_get_observed(&keys)
+                    .await?
+                    .into_iter()
+                    .map(|document| match document {
+                        ObservedDocument::Present { data, version } => {
+                            DocDbObservedDocument::Present {
+                                data: data.to_vec(),
+                                version,
+                            }
+                        }
+                        ObservedDocument::Missing => DocDbObservedDocument::Missing,
+                    })
+                    .collect();
+                Ok(DocDbResponse::new(DocDbResult::BatchGetObserved {
+                    documents,
+                }))
+            }
+            DocDbOperation::Transact { items } => {
+                let items = items
+                    .into_iter()
+                    .map(|item| match item {
+                        DocDbTransactItem::CheckVersion {
+                            key,
+                            expected_version,
+                        } => TransactItem::CheckVersion {
+                            pk: key.pk,
+                            sk: key.sk,
+                            expected_version,
+                        },
+                        DocDbTransactItem::CheckMissing { key } => TransactItem::CheckMissing {
+                            pk: key.pk,
+                            sk: key.sk,
+                        },
+                        DocDbTransactItem::Insert { key, data } => TransactItem::Insert {
+                            pk: key.pk,
+                            sk: key.sk,
+                            data,
+                        },
+                        DocDbTransactItem::Update {
+                            key,
+                            expected_version,
+                            data,
+                        } => TransactItem::Update {
+                            pk: key.pk,
+                            sk: key.sk,
+                            expected_version,
+                            data,
+                        },
+                        DocDbTransactItem::Delete {
+                            key,
+                            expected_version,
+                        } => TransactItem::Delete {
+                            pk: key.pk,
+                            sk: key.sk,
+                            expected_version,
+                        },
+                    })
+                    .collect::<Vec<_>>();
+                let outcome = self.transact(&items).await?;
+                let outcome = match outcome.conflict {
+                    Some(conflict) => DocDbTransactOutcome::Conflict {
+                        step_index: conflict.step_index,
+                    },
+                    None => DocDbTransactOutcome::Committed,
+                };
+                Ok(DocDbResponse::new(DocDbResult::Transact { outcome }))
+            }
         }
     }
 
@@ -227,6 +414,9 @@ impl Database {
             DatabaseInner::Memory(db) => Ok(Transaction {
                 inner: TransactionInner::Memory(db.transaction().await?),
             }),
+            DatabaseInner::Remote(_) => {
+                anyhow::bail!("explicit transactions are not supported by semantic doc-db RPC")
+            }
         }
     }
 
@@ -235,6 +425,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.transact(items).await,
             DatabaseInner::Memory(db) => db.transact(items).await,
+            DatabaseInner::Remote(db) => db.transact(items).await,
         }
     }
 
@@ -258,6 +449,9 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_raw(sql, args, want_rows).await,
             DatabaseInner::Memory(db) => db.execute_raw(sql, args, want_rows).await,
+            DatabaseInner::Remote(_) => {
+                anyhow::bail!("raw SQL is not supported by semantic doc-db RPC")
+            }
         }
     }
 
@@ -278,6 +472,9 @@ impl Database {
             DatabaseInner::Memory(_) => {
                 anyhow::bail!("execute_raw_transactional is only supported on the Turso backend")
             }
+            DatabaseInner::Remote(_) => {
+                anyhow::bail!("raw SQL is not supported by semantic doc-db RPC")
+            }
         }
     }
 
@@ -286,6 +483,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_ops(ops).await,
             DatabaseInner::Memory(db) => db.execute_ops(ops).await,
+            DatabaseInner::Remote(db) => db.execute_ops(ops).await,
         }
     }
 
@@ -294,6 +492,7 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.get_observed(pk, sk).await,
             DatabaseInner::Memory(db) => db.get_observed(pk, sk).await,
+            DatabaseInner::Remote(db) => db.get_observed(pk, sk).await,
         }
     }
 
@@ -305,6 +504,9 @@ impl Database {
         if keys.is_empty() {
             return Ok(vec![]);
         }
+        if let DatabaseInner::Remote(db) = &self.inner {
+            return db.batch_get_observed(keys).await;
+        }
         let mut out = Vec::with_capacity(keys.len());
         for (pk, sk) in keys {
             out.push(self.get_observed(pk, sk).await?);
@@ -313,10 +515,360 @@ impl Database {
     }
 }
 
+fn semantic_limit(limit: u64) -> std::result::Result<usize, String> {
+    usize::try_from(limit).map_err(|_| "limit does not fit the host usize".to_string())
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod semantic_tests {
+    use super::*;
+    use doc_db_protocol::{
+        DocDbBatchOperation, DocDbKey, DocDbObservedDocument, DocDbOperation, DocDbRequest,
+        DocDbResult, DocDbTransactItem, DocDbTransactOutcome,
+    };
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::{TcpListener, TcpStream};
+
+    async fn read_http_body(stream: &mut TcpStream) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let header_end;
+        loop {
+            let mut chunk = [0u8; 4096];
+            let read = stream.read(&mut chunk).await.unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&chunk[..read]);
+            if let Some(end) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                header_end = end + 4;
+                break;
+            }
+        }
+        let headers = String::from_utf8_lossy(&bytes[..header_end]);
+        let content_length = headers
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                name.eq_ignore_ascii_case("content-length")
+                    .then_some(value.trim())
+            })
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        while bytes.len() < header_end + content_length {
+            let mut chunk = [0u8; 4096];
+            let read = stream.read(&mut chunk).await.unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&chunk[..read]);
+        }
+        bytes[header_end..header_end + content_length].to_vec()
+    }
+
+    async fn start_remote_server(
+        responses: Vec<DocDbResponse>,
+    ) -> (String, tokio::task::JoinHandle<Vec<DocDbOperation>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            let mut operations = Vec::new();
+            for response in responses {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let body = read_http_body(&mut stream).await;
+                let request = doc_db_protocol::decode_request(&body).unwrap();
+                operations.push(request.operation);
+                let response_body = doc_db_protocol::encode_response(&response).unwrap();
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    response_body.len()
+                );
+                stream.write_all(header.as_bytes()).await.unwrap();
+                stream.write_all(&response_body).await.unwrap();
+            }
+            operations
+        });
+        (format!("http://{address}/rpc"), handle)
+    }
+
+    #[tokio::test]
+    async fn maps_semantic_operations_to_the_backend_contract() {
+        let database = memory();
+        let binary_data = vec![0, 1, 127, 128, 255, 0];
+
+        let put = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Put {
+                key: DocDbKey::new("pk", "b"),
+                data: binary_data.clone(),
+            }))
+            .await
+            .unwrap();
+        assert_eq!(put.result, DocDbResult::Put);
+
+        database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Put {
+                key: DocDbKey::new("pk", "a"),
+                data: b"a".to_vec(),
+            }))
+            .await
+            .unwrap();
+        database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Put {
+                key: DocDbKey::new("other", "a"),
+                data: b"other".to_vec(),
+            }))
+            .await
+            .unwrap();
+
+        let get = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Get {
+                key: DocDbKey::new("pk", "b"),
+            }))
+            .await
+            .unwrap();
+        assert_eq!(
+            get.result,
+            DocDbResult::Get {
+                data: Some(doc_db_protocol::BinaryDocument { data: binary_data })
+            }
+        );
+
+        let query = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Query {
+                pk: "pk".to_string(),
+                after_sk: Some("a".to_string()),
+                limit: 1,
+            }))
+            .await
+            .unwrap();
+        assert_eq!(
+            query.result,
+            DocDbResult::Query {
+                documents: vec![doc_db_protocol::DocDbDocument {
+                    key: DocDbKey::new("pk", "b"),
+                    data: vec![0, 1, 127, 128, 255, 0],
+                }]
+            }
+        );
+
+        let scan = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Scan {
+                after: Some(DocDbKey::new("other", "a")),
+                limit: 1,
+            }))
+            .await
+            .unwrap();
+        assert_eq!(
+            scan.result,
+            DocDbResult::Scan {
+                documents: vec![doc_db_protocol::DocDbDocument {
+                    key: DocDbKey::new("pk", "a"),
+                    data: b"a".to_vec(),
+                }]
+            }
+        );
+
+        let batch = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Batch {
+                operations: vec![DocDbBatchOperation::Put {
+                    key: DocDbKey::new("pk", "batch"),
+                    data: b"batch".to_vec(),
+                }],
+            }))
+            .await
+            .unwrap();
+        assert_eq!(batch.result, DocDbResult::Batch);
+
+        let observed = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::BatchGetObserved {
+                keys: vec![DocDbKey::new("pk", "a"), DocDbKey::new("pk", "missing")],
+            }))
+            .await
+            .unwrap();
+        assert!(matches!(
+            observed.result,
+            DocDbResult::BatchGetObserved { ref documents }
+                if documents.len() == 2
+                    && matches!(documents[0], DocDbObservedDocument::Present { version: 0, .. })
+                    && matches!(documents[1], DocDbObservedDocument::Missing)
+        ));
+    }
+
+    #[tokio::test]
+    async fn maps_all_conditional_transaction_items_and_conflict_step() {
+        let database = memory();
+        for (sk, data) in [
+            ("version", b"version" as &[u8]),
+            ("update", b"old" as &[u8]),
+            ("delete", b"delete" as &[u8]),
+        ] {
+            database.put("pk", sk, data).await.unwrap();
+        }
+
+        let committed = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Transact {
+                items: vec![
+                    DocDbTransactItem::CheckVersion {
+                        key: DocDbKey::new("pk", "version"),
+                        expected_version: 0,
+                    },
+                    DocDbTransactItem::CheckMissing {
+                        key: DocDbKey::new("pk", "missing"),
+                    },
+                    DocDbTransactItem::Insert {
+                        key: DocDbKey::new("pk", "insert"),
+                        data: b"insert".to_vec(),
+                    },
+                    DocDbTransactItem::Update {
+                        key: DocDbKey::new("pk", "update"),
+                        expected_version: 0,
+                        data: b"new".to_vec(),
+                    },
+                    DocDbTransactItem::Delete {
+                        key: DocDbKey::new("pk", "delete"),
+                        expected_version: 0,
+                    },
+                ],
+            }))
+            .await
+            .unwrap();
+        assert_eq!(
+            committed.result,
+            DocDbResult::Transact {
+                outcome: DocDbTransactOutcome::Committed
+            }
+        );
+        assert_eq!(
+            database.get("pk", "insert").await.unwrap(),
+            Some(Bytes::from_static(b"insert"))
+        );
+        assert_eq!(
+            database.get("pk", "update").await.unwrap(),
+            Some(Bytes::from_static(b"new"))
+        );
+        assert_eq!(database.get("pk", "delete").await.unwrap(), None);
+
+        let conflict = database
+            .execute_semantic(DocDbRequest::new(DocDbOperation::Transact {
+                items: vec![DocDbTransactItem::CheckVersion {
+                    key: DocDbKey::new("pk", "update"),
+                    expected_version: 0,
+                }],
+            }))
+            .await
+            .unwrap();
+        assert_eq!(
+            conflict.result,
+            DocDbResult::Transact {
+                outcome: DocDbTransactOutcome::Conflict { step_index: 0 }
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn converts_remote_responses_to_database_results() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let responses = vec![
+            DocDbResponse::new(DocDbResult::Get {
+                data: Some(doc_db_protocol::BinaryDocument {
+                    data: vec![0, 128, 255],
+                }),
+            }),
+            DocDbResponse::new(DocDbResult::Put),
+            DocDbResponse::new(DocDbResult::Delete),
+            DocDbResponse::new(DocDbResult::Query {
+                documents: vec![doc_db_protocol::DocDbDocument {
+                    key: DocDbKey::new("pk", "query-sk"),
+                    data: b"query".to_vec(),
+                }],
+            }),
+            DocDbResponse::new(DocDbResult::Scan {
+                documents: vec![doc_db_protocol::DocDbDocument {
+                    key: DocDbKey::new("scan-pk", "scan-sk"),
+                    data: b"scan".to_vec(),
+                }],
+            }),
+            DocDbResponse::new(DocDbResult::BatchGetObserved {
+                documents: vec![
+                    DocDbObservedDocument::Present {
+                        data: b"observed".to_vec(),
+                        version: 7,
+                    },
+                    DocDbObservedDocument::Missing,
+                ],
+            }),
+            DocDbResponse::new(DocDbResult::Transact {
+                outcome: DocDbTransactOutcome::Conflict { step_index: 4 },
+            }),
+        ];
+        let (url, server) = start_remote_server(responses).await;
+        let database = semantic_with_config(url);
+
+        assert_eq!(
+            database.get("pk", "get").await.unwrap(),
+            Some(Bytes::from(vec![0, 128, 255]))
+        );
+        database.put("pk", "put", b"put").await.unwrap();
+        database.delete("pk", "delete").await.unwrap();
+        assert_eq!(
+            database.query("pk", Some("after"), 3).await.unwrap(),
+            vec![("query-sk".to_string(), Bytes::from_static(b"query"))]
+        );
+        assert_eq!(
+            database
+                .scan(Some(("after-pk", "after-sk")), 2)
+                .await
+                .unwrap(),
+            vec![(
+                "scan-pk".to_string(),
+                "scan-sk".to_string(),
+                Bytes::from_static(b"scan")
+            )]
+        );
+        let observed = database
+            .batch_get_observed(&[
+                ("pk".to_string(), "present".to_string()),
+                ("pk".to_string(), "missing".to_string()),
+            ])
+            .await
+            .unwrap();
+        assert!(matches!(
+            observed.as_slice(),
+            [
+                ObservedDocument::Present { version: 7, .. },
+                ObservedDocument::Missing
+            ]
+        ));
+        let conflict = database
+            .transact(&[TransactItem::CheckMissing {
+                pk: "pk".to_string(),
+                sk: "missing".to_string(),
+            }])
+            .await
+            .unwrap();
+        assert_eq!(conflict.conflict.unwrap().step_index, 4);
+
+        let operations = server.await.unwrap();
+        assert!(matches!(operations[0], DocDbOperation::Get { .. }));
+        assert!(matches!(operations[1], DocDbOperation::Put { .. }));
+        assert!(matches!(operations[2], DocDbOperation::Delete { .. }));
+        assert!(matches!(
+            operations[3],
+            DocDbOperation::Query { limit: 3, .. }
+        ));
+        assert!(matches!(
+            operations[4],
+            DocDbOperation::Scan { limit: 2, .. }
+        ));
+        assert!(matches!(
+            operations[5],
+            DocDbOperation::BatchGetObserved { .. }
+        ));
+        assert!(matches!(operations[6], DocDbOperation::Transact { .. }));
+    }
+}
+
 #[derive(Clone)]
 enum DatabaseInner {
     Turso(TursoDatabase),
     Memory(MemoryDatabase),
+    Remote(RemoteDatabase),
 }
 
 pub struct Transaction {

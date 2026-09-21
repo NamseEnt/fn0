@@ -1,9 +1,11 @@
 use crate::body_limit::{
-    BodyLimitError, OTLP_BODY_LIMIT, QUEUE_BODY_LIMIT, STATIC_PAGE_CACHE_BODY_LIMIT,
-    VAULT_BODY_LIMIT, collect_body_limited, declared_content_length_exceeds_limit,
+    BodyLimitError, DOC_DB_RPC_BODY_LIMIT, OTLP_BODY_LIMIT, QUEUE_BODY_LIMIT,
+    STATIC_PAGE_CACHE_BODY_LIMIT, VAULT_BODY_LIMIT, collect_body_limited,
+    declared_content_length_exceeds_limit,
 };
 use crate::cross_project_enqueue_hijack::CrossProjectEnqueueHijack;
 use crate::cross_project_invoke_hijack::CrossProjectInvokeHijack;
+use crate::doc_db_hijack::{DocDbHijack, response_status};
 use crate::execute::{ClientState, WasmInjectEnvelope};
 use crate::measure_cpu_time::{Clock, TimeTracker, measure_cpu_time};
 use crate::object_storage_hijack::ObjectStorageHijack;
@@ -96,6 +98,7 @@ type HookResult = std::result::Result<HookResponse, TrappableError<ErrorCode>>;
 pub(crate) struct SelfInvokeHooks {
     project_id: String,
     self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
+    doc_db_hijack: Option<Arc<DocDbHijack>>,
     turso_hijack: Option<Arc<TursoHijack>>,
     otlp_hijack: Option<Arc<OtlpHijack>>,
     queue_hijack: Option<Arc<QueueHijack>>,
@@ -112,6 +115,7 @@ pub(crate) struct SelfInvokeHooks {
 pub(crate) struct SelfInvokeHooksOptions {
     pub(crate) project_id: String,
     pub(crate) self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
+    pub(crate) doc_db_hijack: Option<Arc<DocDbHijack>>,
     pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
     pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
     pub(crate) queue_hijack: Option<Arc<QueueHijack>>,
@@ -130,6 +134,7 @@ impl SelfInvokeHooks {
         let SelfInvokeHooksOptions {
             project_id,
             self_invoke_sender,
+            doc_db_hijack,
             turso_hijack,
             otlp_hijack,
             queue_hijack,
@@ -145,6 +150,7 @@ impl SelfInvokeHooks {
         Self {
             project_id,
             self_invoke_sender,
+            doc_db_hijack,
             turso_hijack,
             otlp_hijack,
             queue_hijack,
@@ -175,6 +181,12 @@ impl WasiHttpHooks for SelfInvokeHooks {
 
         if is_self {
             return self_invoke_send(self.self_invoke_sender.clone(), request);
+        }
+
+        if let Some(hijack) = self.doc_db_hijack.clone()
+            && hijack.matches(request.uri())
+        {
+            return doc_db_send(hijack, self.project_id.clone(), request);
         }
 
         if let Some(hijack) = self.turso_hijack.clone()
@@ -261,6 +273,58 @@ impl WasiHttpHooks for SelfInvokeHooks {
             None => default_send(request, options),
         }
     }
+}
+
+fn doc_db_send(
+    hijack: Arc<DocDbHijack>,
+    project_id: String,
+    request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
+) -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async move {
+        if declared_content_length_exceeds_limit(request.headers(), DOC_DB_RPC_BODY_LIMIT) {
+            return Ok((
+                text_response(413, body_limit_message(DOC_DB_RPC_BODY_LIMIT))?,
+                empty_io(),
+            ));
+        }
+        let (_parts, body) = request.into_parts();
+        let limited_body = match collect_body_limited(body, DOC_DB_RPC_BODY_LIMIT).await {
+            Ok(body) => body,
+            Err(BodyLimitError::TooLarge) => {
+                return Ok((
+                    text_response(413, body_limit_message(DOC_DB_RPC_BODY_LIMIT))?,
+                    empty_io(),
+                ));
+            }
+            Err(BodyLimitError::Body(error)) => {
+                return Err(ErrorCode::InternalError(Some(format!("{error:?}"))).into());
+            }
+        };
+        let response = hijack.handle(&project_id, &limited_body.bytes).await;
+        let response_bytes = match doc_db_protocol::encode_response(&response) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                return Err(ErrorCode::InternalError(Some(error.to_string())).into());
+            }
+        };
+        if response_bytes.len() > DOC_DB_RPC_BODY_LIMIT {
+            return Ok((
+                text_response(413, body_limit_message(DOC_DB_RPC_BODY_LIMIT))?,
+                empty_io(),
+            ));
+        }
+        let response = http::Response::builder()
+            .status(response_status(&response))
+            .header(hyper::header::CONTENT_TYPE, "application/json")
+            .body(
+                http_body_util::Full::new(Bytes::from(response_bytes))
+                    .map_err(|never: std::convert::Infallible| match never {})
+                    .boxed_unsync(),
+            )
+            .map_err(|error| ErrorCode::InternalError(Some(error.to_string())))?;
+        drop(limited_body.permit);
+        Ok((response, empty_io()))
+    })
 }
 
 fn websocket_send(

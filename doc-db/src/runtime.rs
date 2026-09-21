@@ -3,6 +3,67 @@ use std::time::Duration;
 
 const DATABASE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
 
+pub(crate) async fn http_post_doc_db(url: &str, body: Vec<u8>) -> Result<(u16, Vec<u8>)> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        use forte_sdk::http::{Client, HeaderValue, Request, RequestTimeouts, Uri};
+        use std::str::FromStr;
+
+        let uri = Uri::from_str(url).map_err(|e| anyhow::anyhow!("Invalid URI: {e}"))?;
+        let request = Request::post(&uri)
+            .header(
+                "Content-Type",
+                HeaderValue::from_static("application/vnd.fn0.doc-db+json"),
+            )
+            .body(body)
+            .map_err(|e| anyhow::anyhow!("Failed to build request: {e}"))?;
+        let client = Client::new().with_timeouts(RequestTimeouts::all(DATABASE_RESPONSE_TIMEOUT));
+        let response = client.send(request).await?;
+        let status = response.status().as_u16();
+        let bytes = response
+            .into_body()
+            .bytes_limited(doc_db_protocol::MAX_FRAME_SIZE)
+            .await?;
+        return Ok((status, bytes.to_vec()));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use std::sync::OnceLock;
+
+        static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+        let client = CLIENT.get_or_init(|| {
+            reqwest::Client::builder()
+                .connect_timeout(DATABASE_RESPONSE_TIMEOUT)
+                .read_timeout(DATABASE_RESPONSE_TIMEOUT)
+                .build()
+                .expect("database http client must build")
+        });
+        let response = client
+            .post(url)
+            .header("Content-Type", "application/vnd.fn0.doc-db+json")
+            .body(body)
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        if response
+            .content_length()
+            .is_some_and(|length| length > doc_db_protocol::MAX_FRAME_SIZE as u64)
+        {
+            anyhow::bail!("doc-db response exceeds the semantic RPC frame limit");
+        }
+        let mut response_body = Vec::new();
+        let mut response = response;
+        while let Some(chunk) = response.chunk().await? {
+            if chunk.len() > doc_db_protocol::MAX_FRAME_SIZE.saturating_sub(response_body.len()) {
+                anyhow::bail!("doc-db response exceeds the semantic RPC frame limit");
+            }
+            response_body.extend_from_slice(&chunk);
+        }
+        Ok((status, response_body))
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
 pub(crate) async fn http_post_json(
     url: &str,

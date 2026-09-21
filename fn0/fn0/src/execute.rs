@@ -1,4 +1,5 @@
 use crate::cache::Bundle;
+use crate::doc_db_hijack::DocDbHijack;
 use crate::measure_cpu_time::{Clock, SystemClock, TimeTracker};
 use crate::object_storage_hijack::ObjectStorageHijack;
 use crate::public_storage_hijack::PublicStorageHijack;
@@ -141,6 +142,7 @@ pub(crate) struct BuildStoreOptions<'a, C: Clock> {
     pub(crate) time_tracker: TimeTracker<C>,
     pub(crate) is_timeout: Arc<AtomicBool>,
     pub(crate) hooks: SelfInvokeHooks,
+    pub(crate) doc_db_hijack: Option<&'a DocDbHijack>,
     pub(crate) turso_hijack: Option<&'a TursoHijack>,
     pub(crate) queue_hijack: Option<&'a crate::QueueHijack>,
     pub(crate) cross_project_enqueue_hijack: Option<&'a crate::CrossProjectEnqueueHijack>,
@@ -163,6 +165,7 @@ where
         time_tracker,
         is_timeout,
         hooks,
+        doc_db_hijack,
         turso_hijack,
         queue_hijack,
         cross_project_enqueue_hijack,
@@ -178,6 +181,9 @@ where
         builder.stdout(make_tracing_stream(project_id.to_string(), false));
         builder.stderr(make_tracing_stream(project_id.to_string(), true));
         for (key, value) in env_vars {
+            if doc_db_hijack.is_some() && key == "FN0_DOC_DB_URL" {
+                continue;
+            }
             if turso_hijack.is_some() && (key == "TURSO_URL" || key == "TURSO_AUTH_TOKEN") {
                 continue;
             }
@@ -208,6 +214,9 @@ where
                 continue;
             }
             builder.env(key, value);
+        }
+        if let Some(hijack) = doc_db_hijack {
+            builder.env("FN0_DOC_DB_URL", hijack.placeholder_url());
         }
         if let Some(hijack) = turso_hijack {
             builder.env("TURSO_URL", format!("http://{}", hijack.placeholder_host));
@@ -329,6 +338,7 @@ pub(crate) struct WasmInstanceLoopOptions<'a> {
     pub(crate) project_id: String,
     pub(crate) self_invoke_sender: mpsc::UnboundedSender<WasmInjectEnvelope>,
     pub(crate) rx: mpsc::UnboundedReceiver<WasmInjectEnvelope>,
+    pub(crate) doc_db_hijack: Option<Arc<DocDbHijack>>,
     pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
     pub(crate) otlp_hijack: Option<Arc<crate::OtlpHijack>>,
     pub(crate) queue_hijack: Option<Arc<crate::QueueHijack>>,
@@ -349,6 +359,7 @@ pub(crate) async fn run_wasm_instance_loop(options: WasmInstanceLoopOptions<'_>)
         project_id,
         self_invoke_sender,
         mut rx,
+        doc_db_hijack,
         turso_hijack,
         otlp_hijack,
         queue_hijack,
@@ -373,6 +384,7 @@ pub(crate) async fn run_wasm_instance_loop(options: WasmInstanceLoopOptions<'_>)
         hooks: SelfInvokeHooks::new(SelfInvokeHooksOptions {
             project_id: project_id.clone(),
             self_invoke_sender,
+            doc_db_hijack: doc_db_hijack.clone(),
             turso_hijack: turso_hijack.clone(),
             otlp_hijack: otlp_hijack.clone(),
             queue_hijack: queue_hijack.clone(),
@@ -385,6 +397,7 @@ pub(crate) async fn run_wasm_instance_loop(options: WasmInstanceLoopOptions<'_>)
             websocket_hijack: websocket_hijack.clone(),
             guest_outbound_http,
         }),
+        doc_db_hijack: doc_db_hijack.as_deref(),
         turso_hijack: turso_hijack.as_deref(),
         queue_hijack: queue_hijack.as_deref(),
         cross_project_enqueue_hijack: cross_project_enqueue_hijack.as_deref(),
