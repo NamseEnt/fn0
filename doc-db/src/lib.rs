@@ -1,3 +1,5 @@
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod backend_contract;
 mod memory;
 pub mod mock;
 mod runtime;
