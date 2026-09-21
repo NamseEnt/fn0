@@ -140,17 +140,12 @@ impl DibiBridge {
         }
         let request = decode_request_frame(frame).map_err(|_| DibiBridgeError::InvalidRequest)?;
         let opcode = request.operation.opcode();
-        if opcode == Opcode::Auth || (opcode.is_tenant_scoped() && !request.tenant.is_empty()) {
+        if !opcode.is_tenant_scoped() || !request.tenant.is_empty() {
             return Err(DibiBridgeError::InvalidRequest);
         }
-        let network_tenant = if opcode.is_tenant_scoped() {
-            validate_tenant(project_id).map_err(|_| DibiBridgeError::InvalidRequest)?;
-            project_id
-        } else {
-            ""
-        };
+        validate_tenant(project_id).map_err(|_| DibiBridgeError::InvalidRequest)?;
         let network_frame =
-            encode_request_frame(request.request_id, network_tenant, &request.operation);
+            encode_request_frame(request.request_id, project_id, &request.operation);
         let connection = self.connection().await?;
         let response = match timeout(
             self.config.request_timeout,
@@ -573,6 +568,34 @@ mod tests {
             request_timeout: Duration::from_secs(1),
         })
         .unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn rejects_guest_control_operations_before_network_access() {
+        let server = MockServer::start(MockBehavior::Normal).await;
+        let bridge = bridge_for_server(&server);
+        let operations = [
+            RequestOperation::Auth {
+                worker_token: b"worker-token".to_vec(),
+            },
+            RequestOperation::Ping,
+            RequestOperation::Status,
+        ];
+
+        for operation in operations {
+            let frame = encode_request_frame(1, "", &operation);
+            assert!(matches!(
+                bridge
+                    .request("project-a", "dibi://fn0-db.fn0.dev", &frame)
+                    .await,
+                Err(DibiBridgeError::InvalidRequest)
+            ));
+        }
+        assert_eq!(server.state.connection_count.load(Ordering::Relaxed), 0);
+        assert_eq!(server.state.authentication_count.load(Ordering::Relaxed), 0);
+        assert_eq!(server.state.request_count.load(Ordering::Relaxed), 0);
+        assert!(bridge.connection.lock().await.is_none());
+        server.shutdown().await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

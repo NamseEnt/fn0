@@ -3,7 +3,8 @@ use std::{sync::Arc, thread};
 use bytes::Bytes;
 use dibi::{
     AdminScanRequest, ApplicationWrite, CommitMutation, ConditionalWrite, ConditionalWriteOutcome,
-    DibiEngine, encode_document_key, encode_document_value,
+    DibiEngine, DibiError, dibi_protocol::MAX_TENANT_SIZE, encode_document_key,
+    encode_document_value,
 };
 use tempfile::TempDir;
 
@@ -616,6 +617,58 @@ fn admin_scan_filters_and_returns_versions_from_iterator_values() {
     assert_eq!(second.documents.len(), 1);
     assert_eq!(second.documents[0].pk, "keep-b");
     assert_eq!(second.documents[0].version, 0);
+}
+
+#[test]
+fn invalid_tenant_is_rejected_without_storage_changes() {
+    let (_directory, engine) = open_temporary();
+    let database_uuid = engine.db_uuid().unwrap();
+    let last_commit_id = engine.last_commit_id().unwrap();
+    let outbox = engine.read_outbox(None, 100).unwrap();
+    let oversized_tenant = "t".repeat(MAX_TENANT_SIZE + 1);
+
+    for tenant in ["", oversized_tenant.as_str()] {
+        assert!(matches!(
+            engine.get(tenant, "pk", "sk"),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.get_with_version(tenant, "pk", "sk"),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.put(tenant, "pk", "sk", Bytes::from_static(b"data")),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.delete(tenant, "pk", "sk"),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.query(tenant, "pk", None, 10),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.scan(tenant, None, 10),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.admin_scan(tenant, AdminScanRequest::default()),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.application_write_batch(tenant, &[]),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(matches!(
+            engine.conditional_write_batch(tenant, &[]),
+            Err(DibiError::InvalidTenant(_))
+        ));
+        assert!(engine.scan("tenant-a", None, 100).unwrap().is_empty());
+        assert_eq!(engine.db_uuid().unwrap(), database_uuid);
+        assert_eq!(engine.last_commit_id().unwrap(), last_commit_id);
+        assert_eq!(engine.read_outbox(None, 100).unwrap(), outbox);
+    }
 }
 
 #[test]

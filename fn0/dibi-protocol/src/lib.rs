@@ -73,7 +73,21 @@ impl Opcode {
     }
 
     pub const fn is_tenant_scoped(self) -> bool {
-        !matches!(self, Self::Ping | Self::Status | Self::Auth)
+        matches!(
+            self,
+            Self::Get
+                | Self::Put
+                | Self::Delete
+                | Self::Query
+                | Self::Scan
+                | Self::Batch
+                | Self::ExecuteOps
+                | Self::GetWithVersion
+                | Self::BatchGetWithVersion
+                | Self::TransactWriteItems
+                | Self::AdminScan
+                | Self::AdminTransactWriteItems
+        )
     }
 }
 

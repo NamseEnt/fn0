@@ -149,6 +149,7 @@ impl DibiEngine {
     }
 
     pub fn get(&self, tenant: &str, pk: &str, sk: &str) -> Result<Option<Bytes>> {
+        validate_tenant(tenant)?;
         Ok(self
             .get_with_version(tenant, pk, sk)?
             .map(|document| document.data))
@@ -160,11 +161,13 @@ impl DibiEngine {
         pk: &str,
         sk: &str,
     ) -> Result<Option<StoredDocument>> {
+        validate_tenant(tenant)?;
         let key = encode_document_key(tenant, pk, sk);
         self.read_document(&key)
     }
 
     pub fn put(&self, tenant: &str, pk: &str, sk: &str, data: Bytes) -> Result<u64> {
+        validate_tenant(tenant)?;
         let _guard = self.lock_writes()?;
         let key = encode_document_key(tenant, pk, sk);
         let version = match self.read_document(&key)? {
@@ -177,6 +180,7 @@ impl DibiEngine {
     }
 
     pub fn delete(&self, tenant: &str, pk: &str, sk: &str) -> Result<u64> {
+        validate_tenant(tenant)?;
         let _guard = self.lock_writes()?;
         let mutations = BTreeMap::from([(encode_document_key(tenant, pk, sk), None)]);
         self.commit_mutations(mutations)
@@ -189,6 +193,7 @@ impl DibiEngine {
         after_sk: Option<&str>,
         limit: usize,
     ) -> Result<Vec<Document>> {
+        validate_tenant(tenant)?;
         if limit == 0 {
             return Ok(Vec::new());
         }
@@ -230,6 +235,7 @@ impl DibiEngine {
         after: Option<(&str, &str)>,
         limit: usize,
     ) -> Result<Vec<Document>> {
+        validate_tenant(tenant)?;
         if limit == 0 {
             return Ok(Vec::new());
         }
@@ -267,6 +273,7 @@ impl DibiEngine {
     }
 
     pub fn admin_scan(&self, tenant: &str, request: AdminScanRequest) -> Result<AdminScanPage> {
+        validate_tenant(tenant)?;
         if request.limit == 0 {
             return Ok(AdminScanPage {
                 documents: Vec::new(),
@@ -328,6 +335,7 @@ impl DibiEngine {
         tenant: &str,
         operations: &[ApplicationWrite],
     ) -> Result<WriteResult> {
+        validate_tenant(tenant)?;
         if operations.is_empty() {
             return Ok(WriteResult { commit_id: None });
         }
@@ -372,6 +380,7 @@ impl DibiEngine {
         tenant: &str,
         operations: &[ConditionalWrite],
     ) -> Result<ConditionalWriteOutcome> {
+        validate_tenant(tenant)?;
         validate_conditional_uniqueness(operations)?;
         if operations.is_empty() {
             return Ok(ConditionalWriteOutcome::Applied(WriteResult {
@@ -641,6 +650,11 @@ fn validate_column_families(path: &Path) -> Result<()> {
 fn encode_tenant_prefix(tenant: &str) -> Vec<u8> {
     let encoded = encode_document_key(tenant, "", "");
     encoded[..encoded.len() - 4].to_vec()
+}
+
+fn validate_tenant(tenant: &str) -> Result<()> {
+    dibi_protocol::validate_tenant(tenant)
+        .map_err(|error| DibiError::InvalidTenant(error.to_string()))
 }
 
 fn encode_pk_prefix(tenant: &str, pk: &str) -> Vec<u8> {

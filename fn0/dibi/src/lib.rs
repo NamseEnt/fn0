@@ -29,6 +29,8 @@ pub enum DibiError {
     CorruptCommitRecord(String),
     #[error("unsupported database format version {0}")]
     UnsupportedFormatVersion(u32),
+    #[error("invalid tenant: {0}")]
+    InvalidTenant(String),
     #[error("document version overflow for ({pk:?}, {sk:?})")]
     VersionOverflow { pk: String, sk: String },
     #[error("commit id overflow")]
