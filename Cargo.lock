@@ -1661,11 +1661,26 @@ name = "dibi"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "clap",
+ "dibi-protocol",
  "prost 0.14.3",
+ "quinn",
+ "rcgen",
  "rocksdb",
+ "rustls",
+ "rustls-pemfile",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
+ "tracing",
  "uuid",
+]
+
+[[package]]
+name = "dibi-protocol"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
 ]
 
 [[package]]

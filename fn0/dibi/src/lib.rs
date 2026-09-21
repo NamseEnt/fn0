@@ -1,16 +1,19 @@
 mod codec;
 mod commit_log;
 mod engine;
+mod server;
 
 pub use codec::{
     decode_document_key, decode_document_value, encode_document_key, encode_document_value,
 };
 pub use commit_log::{CommitMutation, CommitRecord};
+pub use dibi_protocol;
 pub use engine::{
     AdminDocument, AdminScanPage, AdminScanRequest, ApplicationWrite, ConditionalWrite,
     ConditionalWriteOutcome, Conflict, DibiConfig, DibiEngine, Document, StoredDocument,
     WriteResult,
 };
+pub use server::{DibiServer, DibiServerConfig, ServerError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DibiError {

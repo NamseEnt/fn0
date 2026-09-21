@@ -7,10 +7,18 @@ repository.workspace = true
 
 [dependencies]
 bytes = { workspace = true }
+dibi-protocol = { path = "../dibi-protocol" }
+clap = { workspace = true, features = ["derive"] }
 prost = { workspace = true }
+quinn = { workspace = true, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
 rocksdb = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tracing = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
+rcgen = { workspace = true }
 tempfile = { workspace = true }
