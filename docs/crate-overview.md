@@ -18,12 +18,18 @@ fn0/
 │   ├── test-runner/   forte-test-runner    Binary test runner for wasm32-wasip2 targets
 │   └── rs-to-ts/      forte-rs-to-ts       Standalone binary: Rust → TypeScript type generation
 ├── fn0/
+│   ├── fn0/           fn0                  Core FaaS runtime: ExecutionContext, hijack architecture
+│   ├── cli/           fn0-cli              CLI for raw fn0 projects (non-Forte)
+│   ├── deploy/        fn0-deploy           fn0 Cloud deployment client
+│   ├── wasmtime/      fn0-wasmtime         Wasmtime wrapper with fn0-specific config
+│   ├── compiler/      fn0-compiler         CLI: compiles .wasm → .cwasm (Wasmtime native format)
+│   ├── shared-schema/ fn0-shared-schema    Shared type schemas between worker and control
 │   ├── ski/           fn0-ski              WinterCG JS runtime (V8/deno_core) for SSR
-│   ├── doc-db/        fn0-doc-db           Document-oriented Turso/libSQL wrapper (WASM + native)
-│   ├── object-storage/ fn0-object-storage  S3-compatible object storage client
 │   ├── worker/        fn0-worker           Worker process binary
 │   ├── worker-agent/  fn0-worker-agent     Per-instance supervisor for blue-green deploys
 │   └── worker-proxy/  fn0-worker-proxy     TCP forwarder fronting fn0-worker containers
+├── doc-db/            fn0-doc-db           Document-oriented Turso/libSQL wrapper (WASM + native)
+├── object-storage/    fn0-object-storage   S3-compatible object storage client
 └── vendor/            deno_core            Vendored and patched for deterministic module map serialization
 ```
 
@@ -143,6 +149,54 @@ Lives in `forte/rs-to-ts/` which is excluded from the workspace because it requi
 
 **Change when:** fixing TypeScript type mapping; supporting new Rust type patterns; changing the `#[forte_doc]` annotation semantics.
 
+## fn0
+
+**Crate:** `fn0` · **Target:** native (linked into `fn0-worker`)
+
+Core FaaS runtime library. Contains `ExecutionContext` (builder-configured engine + linker + bundle cache + hijack components) and `CodeExecutor` (routes requests to WASM instances and V8 isolates, implements the `x-fn0-next: js` SSR delegation, manages static page cache preflight). All hijack modules live here (`turso_hijack`, `otlp_hijack`, `queue_hijack`, `vault_hijack`, `object_storage_hijack`, `public_storage_hijack`, `static_page_cache_hijack`, `websocket_hijack`, `cross_project_enqueue_hijack`, `cross_project_invoke_hijack`). Also manages egress policy, outbound HTTP budget enforcement, and presign/purge rate gates.
+
+**Change when:** adding new hijack components; changing the guest-host boundary; changing the SSR delegation protocol; changing execution semantics (egress policy, budget enforcement, static page caching).
+
+## fn0-cli
+
+**Crate:** `fn0-cli` · **Target:** native (installed on developer machines)
+
+The `fn0` binary. Provides CLI commands for raw fn0 projects (projects that use fn0 as a direct FaaS platform, without Forte). See [fn0/overview.md](fn0/overview.md#fn0-cli-commands) for the full command list.
+
+**Change when:** adding CLI commands; changing deploy protocol for non-Forte projects.
+
+## fn0-deploy
+
+**Crate:** `fn0-deploy` · **Target:** native
+
+fn0 Cloud deployment client library. Handles Cloudflare broker installation and provisioning, bundle upload, credential management, and asset uploads. Used by both `forte-cli` and `fn0-cli`.
+
+**Change when:** changing the deploy protocol between CLI and fn0 Cloud; changing Cloudflare provisioning behavior; changing credential storage.
+
+## fn0-wasmtime
+
+**Crate:** `fn0-wasmtime` · **Target:** native
+
+Thin wrapper around Wasmtime that applies fn0-specific engine and module configuration. Also exposes `is_component` and `rewrite_wasi_030_rc_names` for normalizing WIT interface names across WASI 0.3 draft versions.
+
+**Change when:** updating the Wasmtime version; changing engine tuning (fuel limits, memory configuration, caching); adjusting WASI version rewrite rules.
+
+## fn0-compiler
+
+**Crate:** `fn0-compiler` · **Target:** native binary
+
+CLI tool: compiles a `.wasm` Component Model binary to `.cwasm` (Wasmtime's pre-compiled native cache format). Used internally by the control plane after bundle upload to eliminate JIT overhead at request time. Not intended for direct use by application developers.
+
+**Change when:** changing the AOT compilation pipeline; updating the Wasmtime serialization format.
+
+## fn0-shared-schema
+
+**Crate:** `fn0-shared-schema` · **Target:** native (shared between worker and control)
+
+Shared Rust type definitions (using `#[forte_doc]`-derived schemas and `DbRequest`) that are used by both the fn0-worker and fn0-control to read and write records in the Turso control database (bundle manifests, project configs, WebSocket connection records, etc.).
+
+**Change when:** adding or changing records in the control database; changing the schema used by both the control plane and workers.
+
 ## fn0-ski
 
 **Crate:** `fn0-ski` · **Target:** native binary embedded in `fn0-worker`
@@ -211,21 +265,27 @@ Vendored fork of `deno_core` with a patch for deterministic module map serializa
 ```
 Application code
     ↓ imports
-forte-sdk ──────────────────── fn0-doc-db
-    │                          fn0-object-storage
+forte-sdk ──────────────────── fn0-doc-db (doc-db/)
+    │                          fn0-object-storage (object-storage/)
     │ re-exports                   ↑
 forte-json                        │
 forte-macros                      │
                               fn0-worker
-build.rs calls                    ├── fn0-ski (SSR)
-forte-codegen                     ├── fn0-doc-db
-    └── reads forte-wit            ├── fn0-object-storage
+build.rs calls                    ├── fn0 (core runtime + hijacks)
+forte-codegen                     │    └── fn0-wasmtime
+    └── reads forte-wit            ├── fn0-ski (SSR)
+                                   ├── fn0-doc-db
+                                   ├── fn0-object-storage
+                                   ├── fn0-shared-schema
                                    └── forte-wit (WIT defs)
 
 forte-cli (developer machine)
     ├── drives forte-codegen (via cargo build)
     ├── invokes forte-rs-to-ts (subprocess)
-    └── deploys to fn0-worker via fn0 Cloud API
+    └── fn0-deploy (uploads bundle to fn0 Cloud)
+
+fn0-cli (developer machine)
+    └── fn0-deploy (uploads bundle to fn0 Cloud)
 
 forte-test-runner (test machine)
     └── executes wasm32-wasip2 test binaries
@@ -237,5 +297,6 @@ forte-test-runner (test machine)
 |---|---|
 | forte-sdk, forte-json, fn0-doc-db, fn0-object-storage | wasm32-wasip2 |
 | forte-codegen, forte-macros, forte-wit | native (build-time) |
-| forte-cli, forte-test-runner, forte-rs-to-ts | native (developer machine) |
-| fn0-ski, fn0-worker, fn0-worker-agent, fn0-worker-proxy | native Linux arm64 |
+| forte-cli, fn0-cli, fn0-deploy, forte-test-runner, forte-rs-to-ts | native (developer machine) |
+| fn0, fn0-wasmtime, fn0-shared-schema | native (linked into worker) |
+| fn0-ski, fn0-worker, fn0-worker-agent, fn0-worker-proxy, fn0-compiler | native Linux arm64 |
