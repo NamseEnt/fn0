@@ -24,6 +24,18 @@ let db: Database = memory();
 
 `Database` is `Clone`. Share it across your handler by cloning.
 
+## Semantic RPC boundary
+
+`doc_db::semantic()` is the backend-neutral client used by a WASM fn0 guest. Its request payload contains document keys and operations, but no project or tenant identity. fn0 obtains the authoritative project identity from the invocation context before forwarding the request to the host service. The existing `doc_db::turso()` path remains available.
+
+The semantic observed state uses an opaque `DocDbRevision`. A present document carries its revision. A missing document carries `Some(revision)` only when the backend has an exact revision for that missing state; `None` means that the backend knows only that the key is currently absent. Turso physically removes rows and therefore returns `None` for missing documents. A backend with persistent missing-state revisions must return the exact missing revision, including revision zero for a key that has never existed. The `trx` layer turns an exact missing revision into `RevisionEquals`, preserving insert-delete ABA detection, and uses `NotExists` when no exact revision is available.
+
+The semantic transaction request is a pair of condition and mutation lists. Updates and deletes use `RevisionEquals` with the observed revision, inserts use `NotExists`, and read-only observations contribute a condition without a mutation. Conditions are checked in order; a conflict reports the first failing condition index and publishes zero mutations.
+
+`execute_ops` uses one ordered semantic RPC containing `Get`, `Query`, `Put`, and `Delete` operations, preserving the result order. This is a round-trip reduction and does not by itself provide atomic transaction semantics. Use `batch` for the existing atomic write-batch contract or the transaction APIs for conditions plus mutations.
+
+The semantic RPC applies a 16 MiB fn0 platform frame limit to requests and responses. This limit is independent of any future dodb storage value limit. JSON and base64 encoding add overhead, so the largest usable binary document is smaller than 16 MiB.
+
 ## Basic Operations
 
 ### `get`

@@ -1,4 +1,7 @@
-use crate::{Database, ObservedDocument, TransactItem, memory, turso_with_config};
+use crate::{
+    Database, DocDbRevision, ObservedDocument, TransactCondition, TransactMutation,
+    TransactRequest, memory, turso_with_config,
+};
 use anyhow::Result;
 use bytes::Bytes;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -75,6 +78,46 @@ fn transact_key(pk: &str, sk: &str) -> (String, String) {
     (pk.to_string(), sk.to_string())
 }
 
+fn transact_request(
+    conditions: Vec<TransactCondition>,
+    mutations: Vec<TransactMutation>,
+) -> TransactRequest {
+    TransactRequest {
+        conditions,
+        mutations,
+    }
+}
+
+fn revision_equals(pk: &str, sk: &str, revision: DocDbRevision) -> TransactCondition {
+    TransactCondition::RevisionEquals {
+        pk: pk.to_string(),
+        sk: sk.to_string(),
+        expected_revision: revision,
+    }
+}
+
+fn not_exists(pk: &str, sk: &str) -> TransactCondition {
+    TransactCondition::NotExists {
+        pk: pk.to_string(),
+        sk: sk.to_string(),
+    }
+}
+
+fn put(pk: &str, sk: &str, data: &[u8]) -> TransactMutation {
+    TransactMutation::Put {
+        pk: pk.to_string(),
+        sk: sk.to_string(),
+        data: data.to_vec(),
+    }
+}
+
+fn delete(pk: &str, sk: &str) -> TransactMutation {
+    TransactMutation::Delete {
+        pk: pk.to_string(),
+        sk: sk.to_string(),
+    }
+}
+
 async fn cleanup_backend_contract_data(db: &Database) -> Result<()> {
     let items = db.scan(None, usize::MAX).await?;
     for (pk, sk, _) in items {
@@ -92,7 +135,7 @@ async fn observed_read_contract(db: &Database, prefix: &str) -> Result<()> {
 
     db.put(&present_pk, &present_sk, data).await?;
 
-    let (observed_data, version) = expect_present(db, &present_pk, &present_sk, data).await?;
+    let (observed_data, revision) = expect_present(db, &present_pk, &present_sk, data).await?;
     assert_eq!(observed_data.as_ref(), data);
 
     let observations = db
@@ -105,14 +148,17 @@ async fn observed_read_contract(db: &Database, prefix: &str) -> Result<()> {
     match &observations[0] {
         ObservedDocument::Present {
             data: batch_data,
-            version: batch_version,
+            revision: batch_revision,
         } => {
             assert_eq!(batch_data.as_ref(), data);
-            assert_eq!(*batch_version, version);
+            assert_eq!(*batch_revision, revision);
         }
-        ObservedDocument::Missing => panic!("present observation was missing in batch"),
+        ObservedDocument::Missing { .. } => panic!("present observation was missing in batch"),
     }
-    assert!(matches!(observations[1], ObservedDocument::Missing));
+    assert!(matches!(
+        observations[1],
+        ObservedDocument::Missing { revision: None }
+    ));
 
     expect_missing(db, &missing_pk, &missing_sk).await?;
     Ok(())
@@ -139,18 +185,10 @@ async fn check_version_contract(db: &Database, prefix: &str) -> Result<()> {
     let (_, current_revision) = expect_present(db, &target_pk, &target_sk, b"target").await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::CheckVersion {
-                pk: target_pk.clone(),
-                sk: target_sk.clone(),
-                expected_version: current_revision,
-            },
-            TransactItem::Insert {
-                pk: side_pk.clone(),
-                sk: side_sk.clone(),
-                data: b"side".to_vec(),
-            },
-        ])
+        .transact(&transact_request(
+            vec![revision_equals(&target_pk, &target_sk, current_revision)],
+            vec![put(&side_pk, &side_sk, b"side")],
+        ))
         .await?;
     assert_success(outcome);
     expect_present(db, &target_pk, &target_sk, b"target").await?;
@@ -163,20 +201,12 @@ async fn check_version_contract(db: &Database, prefix: &str) -> Result<()> {
     db.put(&stale_pk, &stale_sk, b"external").await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::Insert {
-                pk: stale_side_pk.clone(),
-                sk: stale_side_sk.clone(),
-                data: b"must-not-commit".to_vec(),
-            },
-            TransactItem::CheckVersion {
-                pk: stale_pk.clone(),
-                sk: stale_sk.clone(),
-                expected_version: stale_revision,
-            },
-        ])
+        .transact(&transact_request(
+            vec![revision_equals(&stale_pk, &stale_sk, stale_revision)],
+            vec![put(&stale_side_pk, &stale_side_sk, b"must-not-commit")],
+        ))
         .await?;
-    assert_conflict(outcome, 1);
+    assert_conflict(outcome, 0);
     expect_missing(db, &stale_side_pk, &stale_side_sk).await?;
     expect_present(db, &stale_pk, &stale_sk, b"external").await?;
 
@@ -189,17 +219,10 @@ async fn check_missing_contract(db: &Database, prefix: &str) -> Result<()> {
     expect_missing(db, &missing_pk, &missing_sk).await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::CheckMissing {
-                pk: missing_pk.clone(),
-                sk: missing_sk.clone(),
-            },
-            TransactItem::Insert {
-                pk: success_side_pk.clone(),
-                sk: success_side_sk.clone(),
-                data: b"side".to_vec(),
-            },
-        ])
+        .transact(&transact_request(
+            vec![not_exists(&missing_pk, &missing_sk)],
+            vec![put(&success_side_pk, &success_side_sk, b"side")],
+        ))
         .await?;
     assert_success(outcome);
     expect_present(db, &success_side_pk, &success_side_sk, b"side").await?;
@@ -209,19 +232,16 @@ async fn check_missing_contract(db: &Database, prefix: &str) -> Result<()> {
     db.put(&existing_pk, &existing_sk, b"existing").await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::Insert {
-                pk: conflict_side_pk.clone(),
-                sk: conflict_side_sk.clone(),
-                data: b"must-not-commit".to_vec(),
-            },
-            TransactItem::CheckMissing {
-                pk: existing_pk.clone(),
-                sk: existing_sk.clone(),
-            },
-        ])
+        .transact(&transact_request(
+            vec![not_exists(&existing_pk, &existing_sk)],
+            vec![put(
+                &conflict_side_pk,
+                &conflict_side_sk,
+                b"must-not-commit",
+            )],
+        ))
         .await?;
-    assert_conflict(outcome, 1);
+    assert_conflict(outcome, 0);
     expect_missing(db, &conflict_side_pk, &conflict_side_sk).await?;
     expect_present(db, &existing_pk, &existing_sk, b"existing").await?;
 
@@ -231,11 +251,10 @@ async fn check_missing_contract(db: &Database, prefix: &str) -> Result<()> {
 async fn insert_contract(db: &Database, prefix: &str) -> Result<()> {
     let (insert_pk, insert_sk) = key(prefix, "insert-success");
     let outcome = db
-        .transact(&[TransactItem::Insert {
-            pk: insert_pk.clone(),
-            sk: insert_sk.clone(),
-            data: b"inserted".to_vec(),
-        }])
+        .transact(&transact_request(
+            vec![not_exists(&insert_pk, &insert_sk)],
+            vec![put(&insert_pk, &insert_sk, b"inserted")],
+        ))
         .await?;
     assert_success(outcome);
     expect_present(db, &insert_pk, &insert_sk, b"inserted").await?;
@@ -245,18 +264,16 @@ async fn insert_contract(db: &Database, prefix: &str) -> Result<()> {
     db.put(&existing_pk, &existing_sk, b"original").await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::Insert {
-                pk: side_pk.clone(),
-                sk: side_sk.clone(),
-                data: b"must-not-commit".to_vec(),
-            },
-            TransactItem::Insert {
-                pk: existing_pk.clone(),
-                sk: existing_sk.clone(),
-                data: b"replacement".to_vec(),
-            },
-        ])
+        .transact(&transact_request(
+            vec![
+                not_exists(&side_pk, &side_sk),
+                not_exists(&existing_pk, &existing_sk),
+            ],
+            vec![
+                put(&side_pk, &side_sk, b"must-not-commit"),
+                put(&existing_pk, &existing_sk, b"replacement"),
+            ],
+        ))
         .await?;
     assert_conflict(outcome, 1);
     expect_missing(db, &side_pk, &side_sk).await?;
@@ -271,12 +288,10 @@ async fn update_contract(db: &Database, prefix: &str) -> Result<()> {
     let (_, old_revision) = expect_present(db, &pk, &sk, b"before").await?;
 
     let outcome = db
-        .transact(&[TransactItem::Update {
-            pk: pk.clone(),
-            sk: sk.clone(),
-            expected_version: old_revision,
-            data: b"after".to_vec(),
-        }])
+        .transact(&transact_request(
+            vec![revision_equals(&pk, &sk, old_revision)],
+            vec![put(&pk, &sk, b"after")],
+        ))
         .await?;
     assert_success(outcome);
     let (_, new_revision) = expect_present(db, &pk, &sk, b"after").await?;
@@ -289,21 +304,15 @@ async fn update_contract(db: &Database, prefix: &str) -> Result<()> {
     db.put(&stale_pk, &stale_sk, b"external").await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::Insert {
-                pk: side_pk.clone(),
-                sk: side_sk.clone(),
-                data: b"must-not-commit".to_vec(),
-            },
-            TransactItem::Update {
-                pk: stale_pk.clone(),
-                sk: stale_sk.clone(),
-                expected_version: stale_revision,
-                data: b"stale-write".to_vec(),
-            },
-        ])
+        .transact(&transact_request(
+            vec![revision_equals(&stale_pk, &stale_sk, stale_revision)],
+            vec![
+                put(&side_pk, &side_sk, b"must-not-commit"),
+                put(&stale_pk, &stale_sk, b"stale-write"),
+            ],
+        ))
         .await?;
-    assert_conflict(outcome, 1);
+    assert_conflict(outcome, 0);
     expect_missing(db, &side_pk, &side_sk).await?;
     expect_present(db, &stale_pk, &stale_sk, b"external").await?;
 
@@ -316,11 +325,10 @@ async fn delete_contract(db: &Database, prefix: &str) -> Result<()> {
     let (_, revision) = expect_present(db, &pk, &sk, b"to-delete").await?;
 
     let outcome = db
-        .transact(&[TransactItem::Delete {
-            pk: pk.clone(),
-            sk: sk.clone(),
-            expected_version: revision,
-        }])
+        .transact(&transact_request(
+            vec![revision_equals(&pk, &sk, revision)],
+            vec![delete(&pk, &sk)],
+        ))
         .await?;
     assert_success(outcome);
     assert!(db.get(&pk, &sk).await?.is_none());
@@ -333,20 +341,15 @@ async fn delete_contract(db: &Database, prefix: &str) -> Result<()> {
     db.put(&stale_pk, &stale_sk, b"external").await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::Insert {
-                pk: side_pk.clone(),
-                sk: side_sk.clone(),
-                data: b"must-not-commit".to_vec(),
-            },
-            TransactItem::Delete {
-                pk: stale_pk.clone(),
-                sk: stale_sk.clone(),
-                expected_version: stale_revision,
-            },
-        ])
+        .transact(&transact_request(
+            vec![revision_equals(&stale_pk, &stale_sk, stale_revision)],
+            vec![
+                put(&side_pk, &side_sk, b"must-not-commit"),
+                delete(&stale_pk, &stale_sk),
+            ],
+        ))
         .await?;
-    assert_conflict(outcome, 1);
+    assert_conflict(outcome, 0);
     expect_missing(db, &side_pk, &side_sk).await?;
     expect_present(db, &stale_pk, &stale_sk, b"external").await?;
 
@@ -367,29 +370,19 @@ async fn multi_item_transaction_contract(db: &Database, prefix: &str) -> Result<
     let (_, delete_revision) = expect_present(db, &delete_pk, &delete_sk, b"delete").await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::CheckVersion {
-                pk: check_pk.clone(),
-                sk: check_sk.clone(),
-                expected_version: check_revision,
-            },
-            TransactItem::Update {
-                pk: update_pk.clone(),
-                sk: update_sk.clone(),
-                expected_version: update_revision,
-                data: b"after".to_vec(),
-            },
-            TransactItem::Insert {
-                pk: insert_pk.clone(),
-                sk: insert_sk.clone(),
-                data: b"inserted".to_vec(),
-            },
-            TransactItem::Delete {
-                pk: delete_pk.clone(),
-                sk: delete_sk.clone(),
-                expected_version: delete_revision,
-            },
-        ])
+        .transact(&transact_request(
+            vec![
+                revision_equals(&check_pk, &check_sk, check_revision),
+                revision_equals(&update_pk, &update_sk, update_revision),
+                not_exists(&insert_pk, &insert_sk),
+                revision_equals(&delete_pk, &delete_sk, delete_revision),
+            ],
+            vec![
+                put(&update_pk, &update_sk, b"after"),
+                put(&insert_pk, &insert_sk, b"inserted"),
+                delete(&delete_pk, &delete_sk),
+            ],
+        ))
         .await?;
     assert_success(outcome);
 
@@ -421,26 +414,19 @@ async fn middle_conflict_rolls_back_prior_writes(db: &Database, prefix: &str) ->
         .await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::Update {
-                pk: first_pk.clone(),
-                sk: first_sk.clone(),
-                expected_version: first_revision,
-                data: b"first-after".to_vec(),
-            },
-            TransactItem::CheckVersion {
-                pk: conflict_pk.clone(),
-                sk: conflict_sk.clone(),
-                expected_version: conflict_revision,
-            },
-            TransactItem::Insert {
-                pk: last_pk.clone(),
-                sk: last_sk.clone(),
-                data: b"must-not-commit".to_vec(),
-            },
-        ])
+        .transact(&transact_request(
+            vec![
+                revision_equals(&first_pk, &first_sk, first_revision),
+                not_exists(&last_pk, &last_sk),
+                revision_equals(&conflict_pk, &conflict_sk, conflict_revision),
+            ],
+            vec![
+                put(&first_pk, &first_sk, b"first-after"),
+                put(&last_pk, &last_sk, b"must-not-commit"),
+            ],
+        ))
         .await?;
-    assert_conflict(outcome, 1);
+    assert_conflict(outcome, 2);
     expect_present(db, &first_pk, &first_sk, b"first-before").await?;
     expect_present(db, &conflict_pk, &conflict_sk, b"conflict-external").await?;
     expect_missing(db, &last_pk, &last_sk).await?;
@@ -465,29 +451,19 @@ async fn late_conflict_rolls_back_prior_writes(db: &Database, prefix: &str) -> R
         .await?;
 
     let outcome = db
-        .transact(&[
-            TransactItem::Update {
-                pk: first_pk.clone(),
-                sk: first_sk.clone(),
-                expected_version: first_revision,
-                data: b"first-after".to_vec(),
-            },
-            TransactItem::Insert {
-                pk: insert_pk.clone(),
-                sk: insert_sk.clone(),
-                data: b"must-not-commit".to_vec(),
-            },
-            TransactItem::Delete {
-                pk: delete_pk.clone(),
-                sk: delete_sk.clone(),
-                expected_version: delete_revision,
-            },
-            TransactItem::CheckVersion {
-                pk: conflict_pk.clone(),
-                sk: conflict_sk.clone(),
-                expected_version: conflict_revision,
-            },
-        ])
+        .transact(&transact_request(
+            vec![
+                revision_equals(&first_pk, &first_sk, first_revision),
+                not_exists(&insert_pk, &insert_sk),
+                revision_equals(&delete_pk, &delete_sk, delete_revision),
+                revision_equals(&conflict_pk, &conflict_sk, conflict_revision),
+            ],
+            vec![
+                put(&first_pk, &first_sk, b"first-after"),
+                put(&insert_pk, &insert_sk, b"must-not-commit"),
+                delete(&delete_pk, &delete_sk),
+            ],
+        ))
         .await?;
     assert_conflict(outcome, 3);
     expect_present(db, &first_pk, &first_sk, b"first-before").await?;
@@ -499,7 +475,7 @@ async fn late_conflict_rolls_back_prior_writes(db: &Database, prefix: &str) -> R
 }
 
 async fn empty_transaction_contract(db: &Database) -> Result<()> {
-    let outcome = db.transact(&[]).await?;
+    let outcome = db.transact(&transact_request(vec![], vec![])).await?;
     assert_success(outcome);
     Ok(())
 }
@@ -578,20 +554,20 @@ async fn expect_present(
     pk: &str,
     sk: &str,
     expected_data: &[u8],
-) -> Result<(Bytes, i64)> {
+) -> Result<(Bytes, DocDbRevision)> {
     match db.get_observed(pk, sk).await? {
-        ObservedDocument::Present { data, version } => {
+        ObservedDocument::Present { data, revision } => {
             assert_eq!(data.as_ref(), expected_data);
-            Ok((data, version))
+            Ok((data, revision))
         }
-        ObservedDocument::Missing => panic!("expected {pk}/{sk} to be present"),
+        ObservedDocument::Missing { .. } => panic!("expected {pk}/{sk} to be present"),
     }
 }
 
 async fn expect_missing(db: &Database, pk: &str, sk: &str) -> Result<()> {
     assert!(matches!(
         db.get_observed(pk, sk).await?,
-        ObservedDocument::Missing
+        ObservedDocument::Missing { revision: None }
     ));
     Ok(())
 }
@@ -603,9 +579,9 @@ fn assert_success(outcome: crate::TransactOutcome) {
     );
 }
 
-fn assert_conflict(outcome: crate::TransactOutcome, expected_step_index: usize) {
+fn assert_conflict(outcome: crate::TransactOutcome, expected_condition_index: usize) {
     let conflict = outcome.conflict.expect("expected transaction conflict");
-    assert_eq!(conflict.step_index, expected_step_index);
+    assert_eq!(conflict.condition_index, expected_condition_index);
 }
 
 fn query_keys(items: &[(String, Bytes)]) -> Vec<&str> {

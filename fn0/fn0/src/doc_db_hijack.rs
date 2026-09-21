@@ -28,11 +28,11 @@ impl DocDbHijack {
     }
 
     pub fn placeholder_url(&self) -> String {
-        format!("http://{}", self.placeholder_host)
+        format!("http://{}/rpc", self.placeholder_host)
     }
 
     pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
-        uri.host() == Some(self.placeholder_host.as_str())
+        uri.host() == Some(self.placeholder_host.as_str()) && uri.path() == "/rpc"
     }
 
     pub async fn handle(&self, project_id: &str, body: &[u8]) -> DocDbResponse {
@@ -110,6 +110,7 @@ mod tests {
         let hijack = DocDbHijack::new("fn0-doc-db.fn0.dev".to_string(), service);
         assert!(hijack.matches(&"http://fn0-doc-db.fn0.dev/rpc".parse().unwrap()));
         assert!(!hijack.matches(&"http://example.com/rpc".parse().unwrap()));
+        assert!(!hijack.matches(&"http://fn0-doc-db.fn0.dev/other".parse().unwrap()));
     }
 
     #[tokio::test]
@@ -126,6 +127,28 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].0, "authoritative-project");
         assert_eq!(calls[0].1, request());
+    }
+
+    #[tokio::test]
+    async fn rejects_guest_project_selection() {
+        let service = Arc::new(FakeService {
+            calls: Mutex::new(Vec::new()),
+            response: DocDbResponse::new(DocDbResult::Put),
+        });
+        let hijack = DocDbHijack::new("fn0-doc-db.fn0.dev".to_string(), service.clone());
+        let response = hijack
+            .handle(
+                "authoritative-project",
+                br#"{"version":1,"project_id":"other-project","operation":{"kind":"Get","value":{"key":{"pk":"pk","sk":"sk"}}}}"#,
+            )
+            .await;
+        assert!(matches!(
+            response.result,
+            DocDbResult::Error {
+                error: DocDbError::InvalidRequest { .. }
+            }
+        ));
+        assert!(service.calls.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -188,7 +211,7 @@ mod tests {
         );
         assert_eq!(
             response_status(&DocDbResponse::new(DocDbResult::Transact {
-                outcome: DocDbTransactOutcome::Conflict { step_index: 2 },
+                outcome: DocDbTransactOutcome::Conflict { condition_index: 2 },
             })),
             409
         );

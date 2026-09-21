@@ -10,15 +10,20 @@ mod turso;
 
 use anyhow::Result;
 use bytes::Bytes;
+pub use doc_db_protocol::DocDbRevision;
 use doc_db_protocol::{
-    DocDbBatchOperation, DocDbDocument, DocDbError, DocDbKey, DocDbObservedDocument,
-    DocDbOperation, DocDbResponse, DocDbResult, DocDbTransactItem, DocDbTransactOutcome,
+    DocDbBasicOperation, DocDbBasicResult, DocDbBatchOperation, DocDbCondition, DocDbDocument,
+    DocDbError, DocDbKey, DocDbMutation, DocDbObservedDocument, DocDbOperation, DocDbResponse,
+    DocDbResult, DocDbTransactOutcome,
 };
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
 use remote::RemoteDatabase;
 use std::future::Future;
-pub(crate) use transaction::{ObservedDocument, TransactConflict, TransactItem, TransactOutcome};
+pub(crate) use transaction::{
+    ObservedDocument, TransactCondition, TransactConflict, TransactMutation, TransactOutcome,
+    TransactRequest, revision_from_backend, revision_to_backend,
+};
 pub use trx::{
     ConflictDetails, ConflictKey, DocGet, DocHandle, DocKey, Document, Trx, TrxControl, TrxRead,
     TrxResult,
@@ -339,70 +344,110 @@ impl Database {
                     .await?
                     .into_iter()
                     .map(|document| match document {
-                        ObservedDocument::Present { data, version } => {
+                        ObservedDocument::Present { data, revision } => {
                             DocDbObservedDocument::Present {
                                 data: data.to_vec(),
-                                version,
+                                revision,
                             }
                         }
-                        ObservedDocument::Missing => DocDbObservedDocument::Missing,
+                        ObservedDocument::Missing { revision } => {
+                            DocDbObservedDocument::Missing { revision }
+                        }
                     })
                     .collect();
                 Ok(DocDbResponse::new(DocDbResult::BatchGetObserved {
                     documents,
                 }))
             }
-            DocDbOperation::Transact { items } => {
-                let items = items
+            DocDbOperation::ExecuteOps { operations } => {
+                self.execute_semantic_ops(operations).await
+            }
+            DocDbOperation::Transact {
+                conditions,
+                mutations,
+            } => {
+                let conditions = conditions
                     .into_iter()
-                    .map(|item| match item {
-                        DocDbTransactItem::CheckVersion {
+                    .map(|condition| match condition {
+                        DocDbCondition::RevisionEquals {
                             key,
-                            expected_version,
-                        } => TransactItem::CheckVersion {
+                            expected_revision,
+                        } => TransactCondition::RevisionEquals {
                             pk: key.pk,
                             sk: key.sk,
-                            expected_version,
+                            expected_revision,
                         },
-                        DocDbTransactItem::CheckMissing { key } => TransactItem::CheckMissing {
+                        DocDbCondition::Exists { key } => TransactCondition::Exists {
                             pk: key.pk,
                             sk: key.sk,
                         },
-                        DocDbTransactItem::Insert { key, data } => TransactItem::Insert {
+                        DocDbCondition::NotExists { key } => TransactCondition::NotExists {
                             pk: key.pk,
                             sk: key.sk,
-                            data,
-                        },
-                        DocDbTransactItem::Update {
-                            key,
-                            expected_version,
-                            data,
-                        } => TransactItem::Update {
-                            pk: key.pk,
-                            sk: key.sk,
-                            expected_version,
-                            data,
-                        },
-                        DocDbTransactItem::Delete {
-                            key,
-                            expected_version,
-                        } => TransactItem::Delete {
-                            pk: key.pk,
-                            sk: key.sk,
-                            expected_version,
                         },
                     })
                     .collect::<Vec<_>>();
-                let outcome = self.transact(&items).await?;
+                let mutations = mutations
+                    .into_iter()
+                    .map(|mutation| match mutation {
+                        DocDbMutation::Put { key, data } => TransactMutation::Put {
+                            pk: key.pk,
+                            sk: key.sk,
+                            data,
+                        },
+                        DocDbMutation::Delete { key } => TransactMutation::Delete {
+                            pk: key.pk,
+                            sk: key.sk,
+                        },
+                    })
+                    .collect::<Vec<_>>();
+                let outcome = self
+                    .transact(&TransactRequest {
+                        conditions,
+                        mutations,
+                    })
+                    .await?;
                 let outcome = match outcome.conflict {
                     Some(conflict) => DocDbTransactOutcome::Conflict {
-                        step_index: conflict.step_index,
+                        condition_index: conflict.condition_index,
                     },
                     None => DocDbTransactOutcome::Committed,
                 };
                 Ok(DocDbResponse::new(DocDbResult::Transact { outcome }))
             }
         }
+    }
+
+    async fn execute_semantic_ops(
+        &self,
+        operations: Vec<DocDbBasicOperation>,
+    ) -> Result<DocDbResponse> {
+        let db_operations = match operations
+            .iter()
+            .map(basic_operation_to_db_op)
+            .collect::<Result<Vec<_>>>()
+        {
+            Ok(operations) => operations,
+            Err(error) => {
+                return Ok(DocDbResponse::error(DocDbError::InvalidRequest {
+                    message: error.to_string(),
+                }));
+            }
+        };
+        let db_results = self.execute_ops(db_operations).await?;
+        if db_results.len() != operations.len() {
+            anyhow::bail!(
+                "semantic execute_ops result count mismatch: expected {}, got {}",
+                operations.len(),
+                db_results.len()
+            );
+        }
+        let results = operations
+            .into_iter()
+            .zip(db_results)
+            .map(|(operation, result)| basic_result_from_db_result(operation, result))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(DocDbResponse::new(DocDbResult::ExecuteOps { results }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -420,12 +465,15 @@ impl Database {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(items = items.len()))]
-    pub(crate) async fn transact(&self, items: &[TransactItem]) -> Result<TransactOutcome> {
+    #[tracing::instrument(
+        skip_all,
+        fields(conditions = request.conditions.len(), mutations = request.mutations.len())
+    )]
+    pub(crate) async fn transact(&self, request: &TransactRequest) -> Result<TransactOutcome> {
         match &self.inner {
-            DatabaseInner::Turso(db) => db.transact(items).await,
-            DatabaseInner::Memory(db) => db.transact(items).await,
-            DatabaseInner::Remote(db) => db.transact(items).await,
+            DatabaseInner::Turso(db) => db.transact(request).await,
+            DatabaseInner::Memory(db) => db.transact(request).await,
+            DatabaseInner::Remote(db) => db.transact(request).await,
         }
     }
 
@@ -515,6 +563,64 @@ impl Database {
     }
 }
 
+fn basic_operation_to_db_op(operation: &DocDbBasicOperation) -> Result<DbOp> {
+    Ok(match operation {
+        DocDbBasicOperation::Get { key } => DbOp::Get {
+            pk: key.pk.clone(),
+            sk: key.sk.clone(),
+        },
+        DocDbBasicOperation::Query {
+            pk,
+            after_sk,
+            limit,
+        } => DbOp::Query {
+            pk: pk.clone(),
+            after_sk: after_sk.clone(),
+            limit: limit
+                .map(|value| semantic_limit(value).map_err(anyhow::Error::msg))
+                .transpose()?,
+        },
+        DocDbBasicOperation::Put { key, data } => DbOp::Put {
+            pk: key.pk.clone(),
+            sk: key.sk.clone(),
+            data: data.clone(),
+        },
+        DocDbBasicOperation::Delete { key } => DbOp::Delete {
+            pk: key.pk.clone(),
+            sk: key.sk.clone(),
+        },
+    })
+}
+
+fn basic_result_from_db_result(
+    operation: DocDbBasicOperation,
+    result: DbResult,
+) -> Result<DocDbBasicResult> {
+    match (operation, result) {
+        (DocDbBasicOperation::Get { .. }, DbResult::Single(data)) => Ok(DocDbBasicResult::Get {
+            data: data.map(|value| doc_db_protocol::BinaryDocument {
+                data: value.to_vec(),
+            }),
+        }),
+        (DocDbBasicOperation::Query { pk, .. }, DbResult::Multiple(documents)) => {
+            Ok(DocDbBasicResult::Query {
+                documents: documents
+                    .into_iter()
+                    .map(|(sk, data)| DocDbDocument {
+                        key: DocDbKey::new(pk.clone(), sk),
+                        data: data.to_vec(),
+                    })
+                    .collect(),
+            })
+        }
+        (DocDbBasicOperation::Put { .. }, DbResult::Done) => Ok(DocDbBasicResult::Put),
+        (DocDbBasicOperation::Delete { .. }, DbResult::Done) => Ok(DocDbBasicResult::Delete),
+        (operation, result) => anyhow::bail!(
+            "semantic execute_ops result did not match operation: {operation:?} / {result:?}"
+        ),
+    }
+}
+
 fn semantic_limit(limit: u64) -> std::result::Result<usize, String> {
     usize::try_from(limit).map_err(|_| "limit does not fit the host usize".to_string())
 }
@@ -523,8 +629,9 @@ fn semantic_limit(limit: u64) -> std::result::Result<usize, String> {
 mod semantic_tests {
     use super::*;
     use doc_db_protocol::{
-        DocDbBatchOperation, DocDbKey, DocDbObservedDocument, DocDbOperation, DocDbRequest,
-        DocDbResult, DocDbTransactItem, DocDbTransactOutcome,
+        DocDbBasicOperation, DocDbBatchOperation, DocDbCondition, DocDbKey, DocDbMutation,
+        DocDbObservedDocument, DocDbOperation, DocDbRequest, DocDbResult, DocDbRevision,
+        DocDbTransactOutcome,
     };
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
@@ -681,17 +788,26 @@ mod semantic_tests {
             }))
             .await
             .unwrap();
+        let DocDbResult::BatchGetObserved { documents } = &observed.result else {
+            panic!("expected observed result");
+        };
+        assert_eq!(documents.len(), 2);
         assert!(matches!(
-            observed.result,
-            DocDbResult::BatchGetObserved { ref documents }
-                if documents.len() == 2
-                    && matches!(documents[0], DocDbObservedDocument::Present { version: 0, .. })
-                    && matches!(documents[1], DocDbObservedDocument::Missing)
+            documents[0],
+            DocDbObservedDocument::Present { .. }
         ));
+        assert!(matches!(
+            documents[1],
+            DocDbObservedDocument::Missing { revision: None }
+        ));
+        let DocDbObservedDocument::Present { revision, .. } = &documents[0] else {
+            panic!("expected present observation");
+        };
+        assert_eq!(*revision, DocDbRevision::new(0));
     }
 
     #[tokio::test]
-    async fn maps_all_conditional_transaction_items_and_conflict_step() {
+    async fn maps_transaction_conditions_and_mutations_and_conflict_condition() {
         let database = memory();
         for (sk, data) in [
             ("version", b"version" as &[u8]),
@@ -703,26 +819,37 @@ mod semantic_tests {
 
         let committed = database
             .execute_semantic(DocDbRequest::new(DocDbOperation::Transact {
-                items: vec![
-                    DocDbTransactItem::CheckVersion {
+                conditions: vec![
+                    DocDbCondition::RevisionEquals {
                         key: DocDbKey::new("pk", "version"),
-                        expected_version: 0,
+                        expected_revision: DocDbRevision::new(0),
                     },
-                    DocDbTransactItem::CheckMissing {
+                    DocDbCondition::NotExists {
                         key: DocDbKey::new("pk", "missing"),
                     },
-                    DocDbTransactItem::Insert {
+                    DocDbCondition::NotExists {
+                        key: DocDbKey::new("pk", "insert"),
+                    },
+                    DocDbCondition::RevisionEquals {
+                        key: DocDbKey::new("pk", "update"),
+                        expected_revision: DocDbRevision::new(0),
+                    },
+                    DocDbCondition::RevisionEquals {
+                        key: DocDbKey::new("pk", "delete"),
+                        expected_revision: DocDbRevision::new(0),
+                    },
+                ],
+                mutations: vec![
+                    DocDbMutation::Put {
                         key: DocDbKey::new("pk", "insert"),
                         data: b"insert".to_vec(),
                     },
-                    DocDbTransactItem::Update {
+                    DocDbMutation::Put {
                         key: DocDbKey::new("pk", "update"),
-                        expected_version: 0,
                         data: b"new".to_vec(),
                     },
-                    DocDbTransactItem::Delete {
+                    DocDbMutation::Delete {
                         key: DocDbKey::new("pk", "delete"),
-                        expected_version: 0,
                     },
                 ],
             }))
@@ -746,17 +873,18 @@ mod semantic_tests {
 
         let conflict = database
             .execute_semantic(DocDbRequest::new(DocDbOperation::Transact {
-                items: vec![DocDbTransactItem::CheckVersion {
+                conditions: vec![DocDbCondition::RevisionEquals {
                     key: DocDbKey::new("pk", "update"),
-                    expected_version: 0,
+                    expected_revision: DocDbRevision::new(0),
                 }],
+                mutations: vec![],
             }))
             .await
             .unwrap();
         assert_eq!(
             conflict.result,
             DocDbResult::Transact {
-                outcome: DocDbTransactOutcome::Conflict { step_index: 0 }
+                outcome: DocDbTransactOutcome::Conflict { condition_index: 0 }
             }
         );
     }
@@ -784,17 +912,34 @@ mod semantic_tests {
                     data: b"scan".to_vec(),
                 }],
             }),
+            DocDbResponse::new(DocDbResult::ExecuteOps {
+                results: vec![
+                    doc_db_protocol::DocDbBasicResult::Get {
+                        data: Some(doc_db_protocol::BinaryDocument {
+                            data: b"batched-get".to_vec(),
+                        }),
+                    },
+                    doc_db_protocol::DocDbBasicResult::Query {
+                        documents: vec![doc_db_protocol::DocDbDocument {
+                            key: DocDbKey::new("batched-pk", "batched-sk"),
+                            data: b"batched-query".to_vec(),
+                        }],
+                    },
+                    doc_db_protocol::DocDbBasicResult::Put,
+                    doc_db_protocol::DocDbBasicResult::Delete,
+                ],
+            }),
             DocDbResponse::new(DocDbResult::BatchGetObserved {
                 documents: vec![
                     DocDbObservedDocument::Present {
                         data: b"observed".to_vec(),
-                        version: 7,
+                        revision: DocDbRevision::new(7),
                     },
-                    DocDbObservedDocument::Missing,
+                    DocDbObservedDocument::Missing { revision: None },
                 ],
             }),
             DocDbResponse::new(DocDbResult::Transact {
-                outcome: DocDbTransactOutcome::Conflict { step_index: 4 },
+                outcome: DocDbTransactOutcome::Conflict { condition_index: 4 },
             }),
         ];
         let (url, server) = start_remote_server(responses).await;
@@ -821,6 +966,41 @@ mod semantic_tests {
                 Bytes::from_static(b"scan")
             )]
         );
+        let batched = database
+            .execute_ops(vec![
+                DbOp::Get {
+                    pk: "pk".to_string(),
+                    sk: "batched-get".to_string(),
+                },
+                DbOp::Query {
+                    pk: "batched-pk".to_string(),
+                    after_sk: Some("before".to_string()),
+                    limit: Some(4),
+                },
+                DbOp::Put {
+                    pk: "pk".to_string(),
+                    sk: "batched-put".to_string(),
+                    data: b"put".to_vec(),
+                },
+                DbOp::Delete {
+                    pk: "pk".to_string(),
+                    sk: "batched-delete".to_string(),
+                },
+            ])
+            .await
+            .unwrap();
+        assert_eq!(batched.len(), 4);
+        assert!(matches!(
+            batched[0],
+            DbResult::Single(Some(ref data)) if data.as_ref() == b"batched-get"
+        ));
+        assert!(matches!(
+            batched[1],
+            DbResult::Multiple(ref documents)
+                if documents == &[("batched-sk".to_string(), Bytes::from_static(b"batched-query"))]
+        ));
+        assert!(matches!(batched[2], DbResult::Done));
+        assert!(matches!(batched[3], DbResult::Done));
         let observed = database
             .batch_get_observed(&[
                 ("pk".to_string(), "present".to_string()),
@@ -831,18 +1011,25 @@ mod semantic_tests {
         assert!(matches!(
             observed.as_slice(),
             [
-                ObservedDocument::Present { version: 7, .. },
-                ObservedDocument::Missing
+                ObservedDocument::Present { .. },
+                ObservedDocument::Missing { revision: None },
             ]
         ));
+        let ObservedDocument::Present { revision, .. } = &observed[0] else {
+            panic!("expected present observation");
+        };
+        assert_eq!(*revision, DocDbRevision::new(7));
         let conflict = database
-            .transact(&[TransactItem::CheckMissing {
-                pk: "pk".to_string(),
-                sk: "missing".to_string(),
-            }])
+            .transact(&TransactRequest {
+                conditions: vec![TransactCondition::NotExists {
+                    pk: "pk".to_string(),
+                    sk: "missing".to_string(),
+                }],
+                mutations: vec![],
+            })
             .await
             .unwrap();
-        assert_eq!(conflict.conflict.unwrap().step_index, 4);
+        assert_eq!(conflict.conflict.unwrap().condition_index, 4);
 
         let operations = server.await.unwrap();
         assert!(matches!(operations[0], DocDbOperation::Get { .. }));
@@ -858,9 +1045,21 @@ mod semantic_tests {
         ));
         assert!(matches!(
             operations[5],
+            DocDbOperation::ExecuteOps { ref operations }
+                if operations.len() == 4
+                    && matches!(operations[0], DocDbBasicOperation::Get { .. })
+                    && matches!(
+                        operations[1],
+                        DocDbBasicOperation::Query { limit: Some(4), .. }
+                    )
+                    && matches!(operations[2], DocDbBasicOperation::Put { .. })
+                    && matches!(operations[3], DocDbBasicOperation::Delete { .. })
+        ));
+        assert!(matches!(
+            operations[6],
             DocDbOperation::BatchGetObserved { .. }
         ));
-        assert!(matches!(operations[6], DocDbOperation::Transact { .. }));
+        assert!(matches!(operations[7], DocDbOperation::Transact { .. }));
     }
 }
 
@@ -922,6 +1121,7 @@ impl Transaction {
     }
 }
 
+#[derive(Debug)]
 pub enum DbOp {
     Get {
         pk: String,
@@ -943,6 +1143,7 @@ pub enum DbOp {
     },
 }
 
+#[derive(Debug)]
 pub enum DbResult {
     Single(Option<Bytes>),
     Multiple(Vec<(String, Bytes)>),

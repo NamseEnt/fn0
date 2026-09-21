@@ -4,6 +4,7 @@ use std::fmt;
 
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024;
+pub const CONTENT_TYPE: &str = "application/vnd.fn0.doc-db+json";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,8 +51,33 @@ pub enum DocDbOperation {
     BatchGetObserved {
         keys: Vec<DocDbKey>,
     },
+    ExecuteOps {
+        operations: Vec<DocDbBasicOperation>,
+    },
     Transact {
-        items: Vec<DocDbTransactItem>,
+        conditions: Vec<DocDbCondition>,
+        mutations: Vec<DocDbMutation>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", deny_unknown_fields)]
+pub enum DocDbBasicOperation {
+    Get {
+        key: DocDbKey,
+    },
+    Query {
+        pk: String,
+        after_sk: Option<String>,
+        limit: Option<u64>,
+    },
+    Put {
+        key: DocDbKey,
+        #[serde(with = "base64_bytes")]
+        data: Vec<u8>,
+    },
+    Delete {
+        key: DocDbKey,
     },
 }
 
@@ -84,30 +110,45 @@ pub enum DocDbBatchOperation {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DocDbRevision(u64);
+
+impl DocDbRevision {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", deny_unknown_fields)]
-pub enum DocDbTransactItem {
-    CheckVersion {
+pub enum DocDbCondition {
+    RevisionEquals {
         key: DocDbKey,
-        expected_version: i64,
+        expected_revision: DocDbRevision,
     },
-    CheckMissing {
+    Exists {
         key: DocDbKey,
     },
-    Insert {
+    NotExists {
         key: DocDbKey,
-        #[serde(with = "base64_bytes")]
-        data: Vec<u8>,
     },
-    Update {
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", deny_unknown_fields)]
+pub enum DocDbMutation {
+    Put {
         key: DocDbKey,
-        expected_version: i64,
         #[serde(with = "base64_bytes")]
         data: Vec<u8>,
     },
     Delete {
         key: DocDbKey,
-        expected_version: i64,
     },
 }
 
@@ -149,6 +190,9 @@ pub enum DocDbResult {
     BatchGetObserved {
         documents: Vec<DocDbObservedDocument>,
     },
+    ExecuteOps {
+        results: Vec<DocDbBasicResult>,
+    },
     Transact {
         outcome: DocDbTransactOutcome,
     },
@@ -174,20 +218,31 @@ pub struct DocDbDocument {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", deny_unknown_fields)]
+pub enum DocDbBasicResult {
+    Get { data: Option<BinaryDocument> },
+    Query { documents: Vec<DocDbDocument> },
+    Put,
+    Delete,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", deny_unknown_fields)]
 pub enum DocDbObservedDocument {
     Present {
         #[serde(with = "base64_bytes")]
         data: Vec<u8>,
-        version: i64,
+        revision: DocDbRevision,
     },
-    Missing,
+    Missing {
+        revision: Option<DocDbRevision>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", deny_unknown_fields)]
 pub enum DocDbTransactOutcome {
     Committed,
-    Conflict { step_index: usize },
+    Conflict { condition_index: usize },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -328,26 +383,44 @@ mod tests {
                 keys: vec![DocDbKey::new("pk", "observed")],
             },
             DocDbOperation::Transact {
-                items: vec![
-                    DocDbTransactItem::CheckVersion {
+                conditions: vec![
+                    DocDbCondition::RevisionEquals {
                         key: DocDbKey::new("pk", "version"),
-                        expected_version: 4,
+                        expected_revision: DocDbRevision::new(4),
                     },
-                    DocDbTransactItem::CheckMissing {
+                    DocDbCondition::Exists {
                         key: DocDbKey::new("pk", "missing"),
                     },
-                    DocDbTransactItem::Insert {
+                    DocDbCondition::NotExists {
                         key: DocDbKey::new("pk", "insert"),
+                    },
+                ],
+                mutations: vec![
+                    DocDbMutation::Put {
+                        key: DocDbKey::new("pk", "put"),
                         data: data.clone(),
                     },
-                    DocDbTransactItem::Update {
-                        key: DocDbKey::new("pk", "update"),
-                        expected_version: 5,
-                        data: data.clone(),
-                    },
-                    DocDbTransactItem::Delete {
+                    DocDbMutation::Delete {
                         key: DocDbKey::new("pk", "delete"),
-                        expected_version: 6,
+                    },
+                ],
+            },
+            DocDbOperation::ExecuteOps {
+                operations: vec![
+                    DocDbBasicOperation::Get {
+                        key: DocDbKey::new("pk", "get"),
+                    },
+                    DocDbBasicOperation::Query {
+                        pk: "pk".to_string(),
+                        after_sk: Some("after".to_string()),
+                        limit: None,
+                    },
+                    DocDbBasicOperation::Put {
+                        key: DocDbKey::new("pk", "put"),
+                        data: data.clone(),
+                    },
+                    DocDbBasicOperation::Delete {
+                        key: DocDbKey::new("pk", "delete"),
                     },
                 ],
             },
@@ -365,13 +438,13 @@ mod tests {
                 documents: vec![
                     DocDbObservedDocument::Present {
                         data: data.clone(),
-                        version: 9,
+                        revision: DocDbRevision::new(9),
                     },
-                    DocDbObservedDocument::Missing,
+                    DocDbObservedDocument::Missing { revision: None },
                 ],
             }),
             DocDbResponse::new(DocDbResult::Transact {
-                outcome: DocDbTransactOutcome::Conflict { step_index: 3 },
+                outcome: DocDbTransactOutcome::Conflict { condition_index: 3 },
             }),
         ];
 
@@ -414,5 +487,17 @@ mod tests {
             decode_request(&encoded),
             Err(CodecError::UnsupportedVersion(version)) if version == PROTOCOL_VERSION + 1
         ));
+    }
+
+    #[test]
+    fn round_trips_revisions_above_i64_max() {
+        let revision = DocDbRevision::new(i64::MAX as u64 + 1);
+        let response = DocDbResponse::new(DocDbResult::BatchGetObserved {
+            documents: vec![DocDbObservedDocument::Missing {
+                revision: Some(revision),
+            }],
+        });
+        let encoded = encode_response(&response).unwrap();
+        assert_eq!(decode_response(&encoded).unwrap(), response);
     }
 }

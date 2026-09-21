@@ -186,12 +186,15 @@ impl TursoTransaction {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all, fields(items = items.len()))]
+    #[tracing::instrument(
+        skip_all,
+        fields(conditions = request.conditions.len(), mutations = request.mutations.len())
+    )]
     pub(crate) async fn transact(
         mut self,
-        items: &[crate::TransactItem],
+        request: &crate::TransactRequest,
     ) -> Result<crate::TransactOutcome> {
-        let validation = self.validate_items(items).await;
+        let validation = self.validate_conditions(&request.conditions).await;
         let conflict = match validation {
             Ok(conflict) => conflict,
             Err(error) => {
@@ -205,90 +208,71 @@ impl TursoTransaction {
             });
         }
 
-        let write_conflict = match self.apply_writes(items).await {
-            Ok(conflict) => conflict,
-            Err(error) => {
-                return Err(rollback_after_error(self, error).await);
-            }
-        };
-        if let Some(conflict) = write_conflict {
-            self.rollback().await?;
-            return Ok(crate::TransactOutcome {
-                conflict: Some(conflict),
-            });
+        if let Err(error) = self.apply_mutations(&request.mutations).await {
+            return Err(rollback_after_error(self, error).await);
         }
 
         self.commit().await?;
         Ok(crate::TransactOutcome { conflict: None })
     }
 
-    async fn validate_items(
+    async fn validate_conditions(
         &mut self,
-        items: &[crate::TransactItem],
+        conditions: &[crate::TransactCondition],
     ) -> Result<Option<crate::TransactConflict>> {
-        if items.is_empty() {
+        if conditions.is_empty() {
             return Ok(None);
         }
 
-        let requests = items
+        let requests = conditions
             .iter()
-            .map(|item| {
-                StreamRequest::Execute(ExecuteStreamReq {
-                    stmt: validation_stmt(item),
-                })
+            .map(|condition| {
+                Ok(StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: validation_stmt(condition)?,
+                }))
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
         let results = self.execute_statements(requests).await?;
-        if results.len() != items.len() {
+        if results.len() != conditions.len() {
             bail!(
                 "transaction validation result count mismatch: expected {}, got {}",
-                items.len(),
+                conditions.len(),
                 results.len()
             );
         }
 
-        for (step_index, (item, result)) in items.iter().zip(results.iter()).enumerate() {
-            if !condition_holds(item, result) {
-                return Ok(Some(crate::TransactConflict { step_index }));
+        for (condition_index, (condition, result)) in
+            conditions.iter().zip(results.iter()).enumerate()
+        {
+            if !condition_holds(condition, result)? {
+                return Ok(Some(crate::TransactConflict { condition_index }));
             }
         }
         Ok(None)
     }
 
-    async fn apply_writes(
-        &mut self,
-        items: &[crate::TransactItem],
-    ) -> Result<Option<crate::TransactConflict>> {
-        let writes: Vec<(usize, Stmt)> = items
-            .iter()
-            .enumerate()
-            .filter_map(|(step_index, item)| write_stmt(item).map(|stmt| (step_index, stmt)))
-            .collect();
-        if writes.is_empty() {
-            return Ok(None);
+    async fn apply_mutations(&mut self, mutations: &[crate::TransactMutation]) -> Result<()> {
+        if mutations.is_empty() {
+            return Ok(());
         }
 
-        let requests = writes
+        let requests = mutations
             .iter()
-            .map(|(_, stmt)| StreamRequest::Execute(ExecuteStreamReq { stmt: stmt.clone() }))
+            .map(|mutation| {
+                StreamRequest::Execute(ExecuteStreamReq {
+                    stmt: write_stmt(mutation),
+                })
+            })
             .collect();
         let results = self.execute_statements(requests).await?;
-        if results.len() != writes.len() {
+        if results.len() != mutations.len() {
             bail!(
-                "transaction write result count mismatch: expected {}, got {}",
-                writes.len(),
+                "transaction mutation result count mismatch: expected {}, got {}",
+                mutations.len(),
                 results.len()
             );
         }
-
-        for ((step_index, _), result) in writes.iter().zip(results.iter()) {
-            if result.affected_row_count != 1 {
-                return Ok(Some(crate::TransactConflict {
-                    step_index: *step_index,
-                }));
-            }
-        }
-        Ok(None)
+        Ok(())
     }
 
     async fn execute_statements(
@@ -322,59 +306,55 @@ async fn rollback_after_error(tx: TursoTransaction, error: anyhow::Error) -> any
     }
 }
 
-fn validation_stmt(item: &crate::TransactItem) -> Stmt {
-    let (sql, want_rows) = match item {
-        crate::TransactItem::CheckVersion { .. }
-        | crate::TransactItem::Update { .. }
-        | crate::TransactItem::Delete { .. } => {
+fn validation_stmt(condition: &crate::TransactCondition) -> Result<Stmt> {
+    let (sql, want_rows) = match condition {
+        crate::TransactCondition::RevisionEquals { .. }
+        | crate::TransactCondition::Exists { .. } => {
             ("SELECT version FROM docs WHERE pk = ? AND sk = ?", true)
         }
-        crate::TransactItem::CheckMissing { .. } | crate::TransactItem::Insert { .. } => {
+        crate::TransactCondition::NotExists { .. } => {
             ("SELECT 1 FROM docs WHERE pk = ? AND sk = ?", true)
         }
     };
-    let (pk, sk) = item_key(item);
-    Stmt {
+    let (pk, sk) = condition_key(condition);
+    let args = vec![
+        Value::Text {
+            value: pk.to_string().into(),
+        },
+        Value::Text {
+            value: sk.to_string().into(),
+        },
+    ];
+    Ok(Stmt {
         sql: Some(sql.to_string()),
         sql_id: None,
-        args: vec![
-            Value::Text {
-                value: pk.to_string().into(),
-            },
-            Value::Text {
-                value: sk.to_string().into(),
-            },
-        ],
+        args,
         named_args: vec![],
         want_rows: Some(want_rows),
         replication_index: None,
-    }
+    })
 }
 
-fn condition_holds(item: &crate::TransactItem, result: &StmtResult) -> bool {
-    match item {
-        crate::TransactItem::CheckMissing { .. } | crate::TransactItem::Insert { .. } => {
-            result.rows.is_empty()
+fn condition_holds(condition: &crate::TransactCondition, result: &StmtResult) -> Result<bool> {
+    Ok(match condition {
+        crate::TransactCondition::NotExists { .. } => result.rows.is_empty(),
+        crate::TransactCondition::Exists { .. } => !result.rows.is_empty(),
+        crate::TransactCondition::RevisionEquals {
+            expected_revision, ..
+        } => {
+            let expected_revision = crate::revision_to_backend(*expected_revision)?;
+            matches!(
+                result.rows.first().and_then(|row| row.values.first()),
+                Some(Value::Integer { value }) if *value == expected_revision
+            )
         }
-        crate::TransactItem::CheckVersion {
-            expected_version, ..
-        }
-        | crate::TransactItem::Update {
-            expected_version, ..
-        }
-        | crate::TransactItem::Delete {
-            expected_version, ..
-        } => matches!(
-            result.rows.first().and_then(|row| row.values.first()),
-            Some(Value::Integer { value }) if value == expected_version
-        ),
-    }
+    })
 }
 
-fn write_stmt(item: &crate::TransactItem) -> Option<Stmt> {
-    let stmt = match item {
-        crate::TransactItem::Insert { pk, sk, data } => Stmt {
-            sql: Some("INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0)".to_string()),
+fn write_stmt(mutation: &crate::TransactMutation) -> Stmt {
+    match mutation {
+        crate::TransactMutation::Put { pk, sk, data } => Stmt {
+            sql: Some(UPSERT_DOC_SQL.to_string()),
             sql_id: None,
             args: vec![
                 Value::Text {
@@ -391,42 +371,8 @@ fn write_stmt(item: &crate::TransactItem) -> Option<Stmt> {
             want_rows: Some(false),
             replication_index: None,
         },
-        crate::TransactItem::Update {
-            pk,
-            sk,
-            expected_version,
-            data,
-        } => Stmt {
-            sql: Some(
-                "UPDATE docs SET data = ?, version = version + 1 \
-                 WHERE pk = ? AND sk = ? AND version = ?"
-                    .to_string(),
-            ),
-            sql_id: None,
-            args: vec![
-                Value::Blob {
-                    value: data.clone().into(),
-                },
-                Value::Text {
-                    value: pk.clone().into(),
-                },
-                Value::Text {
-                    value: sk.clone().into(),
-                },
-                Value::Integer {
-                    value: *expected_version,
-                },
-            ],
-            named_args: vec![],
-            want_rows: Some(false),
-            replication_index: None,
-        },
-        crate::TransactItem::Delete {
-            pk,
-            sk,
-            expected_version,
-        } => Stmt {
-            sql: Some("DELETE FROM docs WHERE pk = ? AND sk = ? AND version = ?".to_string()),
+        crate::TransactMutation::Delete { pk, sk } => Stmt {
+            sql: Some("DELETE FROM docs WHERE pk = ? AND sk = ?".to_string()),
             sql_id: None,
             args: vec![
                 Value::Text {
@@ -435,27 +381,18 @@ fn write_stmt(item: &crate::TransactItem) -> Option<Stmt> {
                 Value::Text {
                     value: sk.clone().into(),
                 },
-                Value::Integer {
-                    value: *expected_version,
-                },
             ],
             named_args: vec![],
             want_rows: Some(false),
             replication_index: None,
         },
-        crate::TransactItem::CheckVersion { .. } | crate::TransactItem::CheckMissing { .. } => {
-            return None;
-        }
-    };
-    Some(stmt)
+    }
 }
 
-fn item_key(item: &crate::TransactItem) -> (&str, &str) {
-    match item {
-        crate::TransactItem::CheckVersion { pk, sk, .. }
-        | crate::TransactItem::CheckMissing { pk, sk }
-        | crate::TransactItem::Insert { pk, sk, .. }
-        | crate::TransactItem::Update { pk, sk, .. }
-        | crate::TransactItem::Delete { pk, sk, .. } => (pk, sk),
+fn condition_key(condition: &crate::TransactCondition) -> (&str, &str) {
+    match condition {
+        crate::TransactCondition::RevisionEquals { pk, sk, .. }
+        | crate::TransactCondition::Exists { pk, sk }
+        | crate::TransactCondition::NotExists { pk, sk } => (pk, sk),
     }
 }

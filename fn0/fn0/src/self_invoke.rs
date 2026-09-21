@@ -281,6 +281,26 @@ fn doc_db_send(
     request: http::Request<UnsyncBoxBody<Bytes, ErrorCode>>,
 ) -> Box<dyn Future<Output = HookResult> + Send> {
     Box::new(async move {
+        if request.method() != http::Method::POST {
+            return Ok((
+                text_response(405, "doc-db RPC requires POST".to_string())?,
+                empty_io(),
+            ));
+        }
+        if request
+            .headers()
+            .get(hyper::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            != Some(doc_db_protocol::CONTENT_TYPE)
+        {
+            return Ok((
+                text_response(
+                    415,
+                    "doc-db RPC requires its semantic content type".to_string(),
+                )?,
+                empty_io(),
+            ));
+        }
         if declared_content_length_exceeds_limit(request.headers(), DOC_DB_RPC_BODY_LIMIT) {
             return Ok((
                 text_response(413, body_limit_message(DOC_DB_RPC_BODY_LIMIT))?,
@@ -315,7 +335,7 @@ fn doc_db_send(
         }
         let response = http::Response::builder()
             .status(response_status(&response))
-            .header(hyper::header::CONTENT_TYPE, "application/json")
+            .header(hyper::header::CONTENT_TYPE, doc_db_protocol::CONTENT_TYPE)
             .body(
                 http_body_util::Full::new(Bytes::from(response_bytes))
                     .map_err(|never: std::convert::Infallible| match never {})

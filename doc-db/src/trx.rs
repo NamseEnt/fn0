@@ -1,4 +1,6 @@
-use crate::{Database, ObservedDocument};
+use crate::{
+    Database, DocDbRevision, ObservedDocument, TransactCondition, TransactMutation, TransactRequest,
+};
 use anyhow::{Result, anyhow, bail};
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -238,8 +240,8 @@ pub struct ConflictDetails {
 #[derive(Clone, Debug)]
 pub struct ConflictKey {
     pub key: DocKey,
-    pub expected_version: Option<i64>,
-    pub actual_version: Option<i64>,
+    pub expected_revision: Option<DocDbRevision>,
+    pub actual_revision: Option<DocDbRevision>,
 }
 
 const MAX_ATTEMPTS: u32 = 5;
@@ -361,7 +363,7 @@ impl TrxState {
         self.index.insert(key.clone(), idx);
 
         match observed {
-            ObservedDocument::Present { data, version } => {
+            ObservedDocument::Present { data, revision } => {
                 let doc = serde_json::from_slice::<T>(&data).map_err(|err| {
                     anyhow!(
                         "failed to deserialize {} at {}/{}: {}",
@@ -374,7 +376,7 @@ impl TrxState {
                 let (shared, handle) = new_shared_doc(doc);
                 self.entries.push(TrackedEntry {
                     key,
-                    expected_version: Some(version),
+                    expected_revision: Some(revision),
                     observed: true,
                     state: TrackedState::Managed {
                         shared,
@@ -383,10 +385,10 @@ impl TrxState {
                 });
                 Ok(Some(handle))
             }
-            ObservedDocument::Missing => {
+            ObservedDocument::Missing { revision } => {
                 self.entries.push(TrackedEntry {
                     key,
-                    expected_version: None,
+                    expected_revision: revision,
                     observed: true,
                     state: TrackedState::Missing,
                 });
@@ -408,7 +410,7 @@ impl TrxState {
                 self.index.insert(key.clone(), idx);
                 self.entries.push(TrackedEntry {
                     key,
-                    expected_version: None,
+                    expected_revision: None,
                     observed: false,
                     state: TrackedState::Managed {
                         shared,
@@ -419,7 +421,7 @@ impl TrxState {
             }
             Some(idx) => match self.entries.get_mut(idx) {
                 Some(TrackedEntry {
-                    expected_version: None,
+                    expected_revision: _,
                     state: TrackedState::Missing,
                     ..
                 }) => {
@@ -455,76 +457,59 @@ impl TrxState {
 
 struct TrackedEntry {
     key: DocKey,
-    expected_version: Option<i64>,
+    expected_revision: Option<DocDbRevision>,
     observed: bool,
     state: TrackedState,
 }
 
 impl TrackedEntry {
-    fn transaction_item(&self) -> Result<Option<crate::TransactItem>> {
-        match &self.state {
-            TrackedState::Missing => {
-                if self.observed {
-                    Ok(Some(crate::TransactItem::CheckMissing {
-                        pk: self.key.pk.clone(),
-                        sk: self.key.sk.clone(),
-                    }))
-                } else {
-                    Ok(None)
-                }
-            }
-            TrackedState::Managed { shared, created } => {
-                if shared.deleted.load(Ordering::Acquire) {
-                    if *created {
-                        return if self.observed {
-                            Ok(Some(crate::TransactItem::CheckMissing {
-                                pk: self.key.pk.clone(),
-                                sk: self.key.sk.clone(),
-                            }))
-                        } else {
-                            Ok(None)
-                        };
-                    }
-                    let expected_version = self.expected_version.ok_or_else(|| {
-                        anyhow!("existing tracked doc missing expected version for delete")
-                    })?;
-                    return Ok(Some(crate::TransactItem::Delete {
-                        pk: self.key.pk.clone(),
-                        sk: self.key.sk.clone(),
-                        expected_version,
-                    }));
-                }
-
-                if *created {
-                    return Ok(Some(crate::TransactItem::Insert {
-                        pk: self.key.pk.clone(),
-                        sk: self.key.sk.clone(),
-                        data: (shared.serialize)()?,
-                    }));
-                }
-
-                if shared.dirty.load(Ordering::Acquire) {
-                    let expected_version = self.expected_version.ok_or_else(|| {
-                        anyhow!("existing tracked doc missing expected version for update")
-                    })?;
-                    return Ok(Some(crate::TransactItem::Update {
-                        pk: self.key.pk.clone(),
-                        sk: self.key.sk.clone(),
-                        expected_version,
-                        data: (shared.serialize)()?,
-                    }));
-                }
-
-                let expected_version = self.expected_version.ok_or_else(|| {
-                    anyhow!("existing tracked doc missing expected version for validation")
-                })?;
-                Ok(Some(crate::TransactItem::CheckVersion {
-                    pk: self.key.pk.clone(),
-                    sk: self.key.sk.clone(),
-                    expected_version,
-                }))
+    fn condition(&self) -> Option<TransactCondition> {
+        if !self.observed {
+            let is_live_created = matches!(
+                &self.state,
+                TrackedState::Managed {
+                    shared,
+                    created: true,
+                } if !shared.deleted.load(Ordering::Acquire)
+            );
+            if !is_live_created {
+                return None;
             }
         }
+        match self.expected_revision {
+            Some(expected_revision) => Some(TransactCondition::RevisionEquals {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+                expected_revision,
+            }),
+            None => Some(TransactCondition::NotExists {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+            }),
+        }
+    }
+
+    fn mutation(&self) -> Result<Option<TransactMutation>> {
+        let TrackedState::Managed { shared, created } = &self.state else {
+            return Ok(None);
+        };
+        if shared.deleted.load(Ordering::Acquire) {
+            if *created {
+                return Ok(None);
+            }
+            return Ok(Some(TransactMutation::Delete {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+            }));
+        }
+        if *created || shared.dirty.load(Ordering::Acquire) {
+            return Ok(Some(TransactMutation::Put {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+                data: (shared.serialize)()?,
+            }));
+        }
+        Ok(None)
     }
 }
 
@@ -585,29 +570,37 @@ async fn commit_entries(
     db: Database,
     entries: Vec<TrackedEntry>,
 ) -> std::result::Result<(), CommitFailure> {
-    let mut items = Vec::new();
+    let mut conditions = Vec::new();
+    let mut mutations = Vec::new();
     for entry in &entries {
-        if let Some(item) = entry.transaction_item().map_err(CommitFailure::Err)? {
-            items.push(item);
+        if let Some(condition) = entry.condition() {
+            conditions.push(condition);
+        }
+        if let Some(mutation) = entry.mutation().map_err(CommitFailure::Err)? {
+            mutations.push(mutation);
         }
     }
 
-    if items.is_empty() {
+    if conditions.is_empty() && mutations.is_empty() {
         return Ok(());
     }
 
-    let outcome = db.transact(&items).await.map_err(CommitFailure::Err)?;
+    let request = TransactRequest {
+        conditions,
+        mutations,
+    };
+    let outcome = db.transact(&request).await.map_err(CommitFailure::Err)?;
 
     let mut conflicts = Vec::new();
 
     if let Some(info) = outcome.conflict
-        && let Some(item) = items.get(info.step_index)
+        && let Some(condition) = request.conditions.get(info.condition_index)
     {
-        let (pk, sk, expected) = item_key_and_expected(item);
+        let (pk, sk, expected_revision) = condition_key_and_expected(condition);
         conflicts.push(ConflictKey {
             key: DocKey { pk, sk },
-            expected_version: expected,
-            actual_version: None,
+            expected_revision,
+            actual_revision: None,
         });
     }
 
@@ -617,10 +610,10 @@ async fn commit_entries(
             .map(|c| (c.key.pk.clone(), c.key.sk.clone()))
             .collect();
         if let Ok(observed) = db.batch_get_observed(&key_pairs).await {
-            for (c, observation) in conflicts.iter_mut().zip(observed.into_iter()) {
-                c.actual_version = match observation {
-                    ObservedDocument::Present { version, .. } => Some(version),
-                    ObservedDocument::Missing => None,
+            for (conflict, observation) in conflicts.iter_mut().zip(observed.into_iter()) {
+                conflict.actual_revision = match observation {
+                    ObservedDocument::Present { revision, .. } => Some(revision),
+                    ObservedDocument::Missing { revision } => revision,
                 };
             }
         }
@@ -630,26 +623,18 @@ async fn commit_entries(
     Ok(())
 }
 
-fn item_key_and_expected(item: &crate::TransactItem) -> (String, String, Option<i64>) {
-    match item {
-        crate::TransactItem::CheckMissing { pk, sk }
-        | crate::TransactItem::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
-        crate::TransactItem::CheckVersion {
-            pk,
-            sk,
-            expected_version,
+fn condition_key_and_expected(
+    condition: &TransactCondition,
+) -> (String, String, Option<DocDbRevision>) {
+    match condition {
+        TransactCondition::Exists { pk, sk } | TransactCondition::NotExists { pk, sk } => {
+            (pk.clone(), sk.clone(), None)
         }
-        | crate::TransactItem::Update {
+        TransactCondition::RevisionEquals {
             pk,
             sk,
-            expected_version,
-            ..
-        }
-        | crate::TransactItem::Delete {
-            pk,
-            sk,
-            expected_version,
-        } => (pk.clone(), sk.clone(), Some(*expected_version)),
+            expected_revision,
+        } => (pk.clone(), sk.clone(), Some(*expected_revision)),
     }
 }
 
@@ -696,11 +681,11 @@ mod tests {
             .expect("create should succeed");
 
         let write = state.entries[0]
-            .transaction_item()
-            .expect("transaction item")
-            .expect("transaction item should exist");
+            .mutation()
+            .expect("transaction mutation")
+            .expect("transaction mutation should exist");
         match write {
-            crate::TransactItem::Insert { data, .. } => {
+            TransactMutation::Put { data, .. } => {
                 let doc: TestDoc = serde_json::from_slice(&data).expect("deserialize insert");
                 assert_eq!(doc.id, "a");
                 assert_eq!(doc.value, 1);
@@ -722,7 +707,7 @@ mod tests {
                 key,
                 ObservedDocument::Present {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
-                    version: 7,
+                    revision: DocDbRevision::new(7),
                 },
             )
             .expect("load should succeed")
@@ -731,21 +716,23 @@ mod tests {
         handle.value = 5;
 
         match state.entries[0]
-            .transaction_item()
-            .expect("transaction item")
-            .expect("transaction item should exist")
+            .mutation()
+            .expect("transaction mutation")
+            .expect("transaction mutation should exist")
         {
-            crate::TransactItem::Update {
-                expected_version,
-                data,
-                ..
-            } => {
-                assert_eq!(expected_version, 7);
+            TransactMutation::Put { data, .. } => {
                 let doc: TestDoc = serde_json::from_slice(&data).expect("deserialize update");
                 assert_eq!(doc.value, 5);
             }
             _ => panic!("expected update"),
         }
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
+                ..
+            }) if expected_revision == DocDbRevision::new(7)
+        ));
     }
 
     #[test]
@@ -761,7 +748,7 @@ mod tests {
                 key,
                 ObservedDocument::Present {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
-                    version: 7,
+                    revision: DocDbRevision::new(7),
                 },
             )
             .expect("load should succeed")
@@ -770,15 +757,20 @@ mod tests {
         handle.delete();
 
         match state.entries[0]
-            .transaction_item()
-            .expect("transaction item")
-            .expect("transaction item should exist")
+            .mutation()
+            .expect("transaction mutation")
+            .expect("transaction mutation should exist")
         {
-            crate::TransactItem::Delete {
-                expected_version, ..
-            } => assert_eq!(expected_version, 7),
+            TransactMutation::Delete { .. } => {}
             _ => panic!("expected delete"),
         }
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
+                ..
+            }) if expected_revision == DocDbRevision::new(7)
+        ));
     }
 
     #[test]
@@ -786,7 +778,7 @@ mod tests {
         let mut state = test_state();
         let key = TestDocGet { id: "a".into() }.key();
         let loaded = state
-            .register_loaded::<TestDoc>(key, ObservedDocument::Missing)
+            .register_loaded::<TestDoc>(key, ObservedDocument::Missing { revision: None })
             .expect("register missing should succeed");
         assert!(loaded.is_none());
 
@@ -799,12 +791,39 @@ mod tests {
         assert_eq!(handle.value, 3);
 
         assert!(matches!(
-            state.entries[0]
-                .transaction_item()
-                .expect("transaction item")
-                .expect("transaction item should exist"),
-            crate::TransactItem::Insert { .. }
+            state.entries[0].mutation().expect("transaction mutation"),
+            Some(TransactMutation::Put { .. })
         ));
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::NotExists { .. })
+        ));
+    }
+
+    #[test]
+    fn exact_missing_revision_becomes_revision_condition() {
+        let mut state = test_state();
+        let key = TestDocGet { id: "a".into() }.key();
+        assert!(
+            state
+                .register_loaded::<TestDoc>(
+                    key,
+                    ObservedDocument::Missing {
+                        revision: Some(DocDbRevision::new(11)),
+                    },
+                )
+                .expect("register missing should succeed")
+                .is_none()
+        );
+
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
+                ..
+            }) if expected_revision == DocDbRevision::new(11)
+        ));
+        assert!(state.entries[0].mutation().unwrap().is_none());
     }
 
     #[test]
@@ -813,7 +832,7 @@ mod tests {
         let key = TestDocGet { id: "a".into() }.key();
         assert!(
             state
-                .register_loaded::<TestDoc>(key, ObservedDocument::Missing)
+                .register_loaded::<TestDoc>(key, ObservedDocument::Missing { revision: None })
                 .expect("register missing should succeed")
                 .is_none()
         );
@@ -828,12 +847,15 @@ mod tests {
         drop(handle);
 
         assert!(matches!(
-            state.entries[0]
-                .transaction_item()
-                .expect("transaction item")
-                .expect("transaction item should exist"),
-            crate::TransactItem::CheckMissing { .. }
+            state.entries[0].condition(),
+            Some(TransactCondition::NotExists { .. })
         ));
+        assert!(
+            state.entries[0]
+                .mutation()
+                .expect("transaction mutation")
+                .is_none()
+        );
     }
 
     #[test]
@@ -849,10 +871,11 @@ mod tests {
         drop(handle);
 
         assert!(
-            state.entries[0]
-                .transaction_item()
-                .expect("transaction item")
-                .is_none()
+            state.entries[0].condition().is_none()
+                && state.entries[0]
+                    .mutation()
+                    .expect("transaction mutation")
+                    .is_none()
         );
     }
 
@@ -870,7 +893,7 @@ mod tests {
                     })
                     .expect("serialize")
                     .into(),
-                    version: 7,
+                    revision: DocDbRevision::new(7),
                 },
             )
             .expect("load should succeed")
@@ -878,14 +901,11 @@ mod tests {
         drop(handle);
 
         assert!(matches!(
-            state.entries[0]
-                .transaction_item()
-                .expect("transaction item")
-                .expect("transaction item should exist"),
-            crate::TransactItem::CheckVersion {
-                expected_version: 7,
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
                 ..
-            }
+            }) if expected_revision == DocDbRevision::new(7)
         ));
     }
 
@@ -894,13 +914,13 @@ mod tests {
         let mut state = test_state();
         let first = state.register_loaded::<TestDoc>(
             TestDocGet { id: "a".into() }.key(),
-            ObservedDocument::Missing,
+            ObservedDocument::Missing { revision: None },
         );
         assert!(first.is_ok());
 
         let second = state.register_loaded::<TestDoc>(
             TestDocGet { id: "a".into() }.key(),
-            ObservedDocument::Missing,
+            ObservedDocument::Missing { revision: None },
         );
         assert!(second.is_err());
     }
