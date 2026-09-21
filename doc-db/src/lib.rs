@@ -38,6 +38,42 @@ pub enum BatchOp<'a> {
 }
 
 #[derive(Clone)]
+pub(crate) enum TransactItem {
+    CheckVersion {
+        pk: String,
+        sk: String,
+        expected_version: i64,
+    },
+    CheckMissing {
+        pk: String,
+        sk: String,
+    },
+    Insert {
+        pk: String,
+        sk: String,
+        data: Vec<u8>,
+    },
+    Update {
+        pk: String,
+        sk: String,
+        expected_version: i64,
+        data: Vec<u8>,
+    },
+    Delete {
+        pk: String,
+        sk: String,
+        expected_version: i64,
+    },
+}
+
+pub(crate) struct TransactOutcome {
+    pub(crate) conflict: Option<TransactConflict>,
+}
+
+pub(crate) struct TransactConflict {
+    pub(crate) step_index: usize,
+}
+
 pub enum WriteOp {
     Insert {
         pk: String,
@@ -62,6 +98,11 @@ pub struct CommitOutcome {
     pub conflict: Option<ConflictInfo>,
 }
 
+pub struct ConflictInfo {
+    pub step_index: usize,
+    pub message: String,
+}
+
 pub struct RawStatement {
     pub sql: String,
     pub args: Vec<Value>,
@@ -84,11 +125,6 @@ pub enum RawTransactionOutcome {
         failed_statement_index: usize,
         error_message: String,
     },
-}
-
-pub struct ConflictInfo {
-    pub step_index: usize,
-    pub message: String,
 }
 
 pub fn turso() -> Database {
@@ -227,6 +263,14 @@ impl Database {
         }
     }
 
+    #[tracing::instrument(skip_all, fields(items = items.len()))]
+    pub(crate) async fn transact(&self, items: &[TransactItem]) -> Result<TransactOutcome> {
+        match &self.inner {
+            DatabaseInner::Turso(db) => db.transact(items).await,
+            DatabaseInner::Memory(db) => db.transact(items).await,
+        }
+    }
+
     #[tracing::instrument(skip_all)]
     pub async fn trx<F, Fut, Out, Cancel, E>(&self, f: F) -> TrxResult<Out, Cancel, E>
     where
@@ -300,33 +344,6 @@ impl Database {
         }
         Ok(out)
     }
-
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn begin_immediate_with_reads(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<(Transaction, Vec<Option<StoredDoc>>)> {
-        match &self.inner {
-            DatabaseInner::Turso(db) => {
-                let (tx, docs) = db.begin_immediate_with_reads(keys).await?;
-                Ok((
-                    Transaction {
-                        inner: TransactionInner::Turso(tx),
-                    },
-                    docs,
-                ))
-            }
-            DatabaseInner::Memory(db) => {
-                let (tx, docs) = db.begin_immediate_with_reads(keys).await?;
-                Ok((
-                    Transaction {
-                        inner: TransactionInner::Memory(tx),
-                    },
-                    docs,
-                ))
-            }
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -382,28 +399,6 @@ impl Transaction {
         match self.inner {
             TransactionInner::Turso(tx) => tx.rollback().await,
             TransactionInner::Memory(tx) => tx.rollback().await,
-        }
-    }
-
-    #[tracing::instrument(skip_all, fields(writes = writes.len()))]
-    pub(crate) async fn apply_writes_and_commit(
-        &mut self,
-        writes: &[WriteOp],
-    ) -> Result<CommitOutcome> {
-        match &mut self.inner {
-            TransactionInner::Turso(tx) => tx.apply_writes_and_commit(writes).await,
-            TransactionInner::Memory(tx) => tx.apply_writes_and_commit(writes).await,
-        }
-    }
-
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn batch_get_with_version(
-        &mut self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<StoredDoc>>> {
-        match &mut self.inner {
-            TransactionInner::Turso(tx) => tx.batch_get_with_version(keys).await,
-            TransactionInner::Memory(tx) => tx.batch_get_with_version(keys).await,
         }
     }
 }

@@ -1,4 +1,5 @@
-use doc_db::{BatchOp, DbOp, DbResult, turso_with_config};
+use doc_db::{BatchOp, DbOp, DbResult, DocGet, DocKey, Document, TrxResult, turso_with_config};
+use serde::{Deserialize, Serialize};
 
 forte_sdk::test_main!();
 
@@ -8,6 +9,56 @@ const DEFAULT_TEST_URL: &str = "http://127.0.0.1:18123";
 fn create_test_db() -> doc_db::Database {
     let url = std::env::var("DOC_DB_TEST_URL").unwrap_or_else(|_| DEFAULT_TEST_URL.to_string());
     turso_with_config(url, String::new())
+}
+
+#[derive(Deserialize, Serialize)]
+struct TrxDoc {
+    id: String,
+    value: i32,
+}
+
+impl Document for TrxDoc {
+    fn key(&self) -> DocKey {
+        DocKey::new("TrxIntegrationDoc", format!("id={}", self.id))
+    }
+}
+
+struct TrxDocGet {
+    id: &'static str,
+}
+
+impl DocGet for TrxDocGet {
+    type Doc = TrxDoc;
+
+    fn key(&self) -> DocKey {
+        DocKey::new("TrxIntegrationDoc", format!("id={}", self.id))
+    }
+}
+
+fn trx_get(id: &'static str) -> TrxDocGet {
+    TrxDocGet { id }
+}
+
+async fn put_trx_doc(db: &doc_db::Database, id: &'static str, value: i32) {
+    db.put(
+        "TrxIntegrationDoc",
+        &format!("id={id}"),
+        &serde_json::to_vec(&TrxDoc {
+            id: id.to_string(),
+            value,
+        })
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+}
+
+async fn cleanup_trx_docs(db: &doc_db::Database, ids: &[&str]) {
+    for id in ids {
+        db.delete("TrxIntegrationDoc", &format!("id={id}"))
+            .await
+            .unwrap();
+    }
 }
 
 #[forte_sdk::test]
@@ -724,4 +775,264 @@ async fn test_execute_raw_transactional_rolls_back_on_statement_error() {
     assert_eq!(unchanged.unwrap().as_ref(), b"original");
 
     db.delete(pk, "sk_1").await.expect("Cleanup failed");
+}
+
+#[forte_sdk::test]
+async fn test_trx_read_only_key_conflict_is_atomic() {
+    let db = create_test_db();
+    cleanup_trx_docs(
+        &db,
+        &[
+            "read-a",
+            "read-b",
+            "written",
+            "atomic-a",
+            "atomic-b",
+            "missing",
+            "create-conflict",
+            "read-without-lock",
+            "outside",
+            "read-only",
+        ],
+    )
+    .await;
+    put_trx_doc(&db, "read-a", 1).await;
+    put_trx_doc(&db, "read-b", 1).await;
+
+    let result = db
+        .trx(|trx| {
+            let db = db.clone();
+            async move {
+                let (a, b) = trx.get((trx_get("read-a"), trx_get("read-b"))).await?;
+                let mut a = a.unwrap();
+                let b = b.unwrap();
+                a.value = 2;
+                drop(a);
+                drop(b);
+                put_trx_doc(&db, "read-b", 9).await;
+                trx.commit::<(), ()>(())
+            }
+        })
+        .await;
+
+    assert!(matches!(result, TrxResult::Conflict(_)));
+    let a = db
+        .get("TrxIntegrationDoc", "id=read-a")
+        .await
+        .unwrap()
+        .unwrap();
+    let b = db
+        .get("TrxIntegrationDoc", "id=read-b")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(serde_json::from_slice::<TrxDoc>(&a).unwrap().value, 1);
+    assert_eq!(serde_json::from_slice::<TrxDoc>(&b).unwrap().value, 9);
+    cleanup_trx_docs(&db, &["read-a", "read-b"]).await;
+}
+
+#[forte_sdk::test]
+async fn test_trx_written_key_conflict_preserves_external_write() {
+    let db = create_test_db();
+    cleanup_trx_docs(&db, &["written"]).await;
+    put_trx_doc(&db, "written", 1).await;
+
+    let result = db
+        .trx(|trx| {
+            let db = db.clone();
+            async move {
+                let doc = trx.get(trx_get("written")).await?.unwrap();
+                let mut doc = doc;
+                doc.value = 2;
+                drop(doc);
+                put_trx_doc(&db, "written", 9).await;
+                trx.commit::<(), ()>(())
+            }
+        })
+        .await;
+
+    assert!(matches!(result, TrxResult::Conflict(_)));
+    let value = db
+        .get("TrxIntegrationDoc", "id=written")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(serde_json::from_slice::<TrxDoc>(&value).unwrap().value, 9);
+    cleanup_trx_docs(&db, &["written"]).await;
+}
+
+#[forte_sdk::test]
+async fn test_trx_conflict_does_not_partially_commit_writes() {
+    let db = create_test_db();
+    cleanup_trx_docs(&db, &["atomic-a", "atomic-b"]).await;
+    put_trx_doc(&db, "atomic-a", 1).await;
+    put_trx_doc(&db, "atomic-b", 1).await;
+
+    let result = db
+        .trx(|trx| {
+            let db = db.clone();
+            async move {
+                let (a, b) = trx.get((trx_get("atomic-a"), trx_get("atomic-b"))).await?;
+                let mut a = a.unwrap();
+                let mut b = b.unwrap();
+                a.value = 2;
+                b.value = 2;
+                drop(a);
+                drop(b);
+                put_trx_doc(&db, "atomic-b", 9).await;
+                trx.commit::<(), ()>(())
+            }
+        })
+        .await;
+
+    assert!(matches!(result, TrxResult::Conflict(_)));
+    let a = db
+        .get("TrxIntegrationDoc", "id=atomic-a")
+        .await
+        .unwrap()
+        .unwrap();
+    let b = db
+        .get("TrxIntegrationDoc", "id=atomic-b")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(serde_json::from_slice::<TrxDoc>(&a).unwrap().value, 1);
+    assert_eq!(serde_json::from_slice::<TrxDoc>(&b).unwrap().value, 9);
+    cleanup_trx_docs(&db, &["atomic-a", "atomic-b"]).await;
+}
+
+#[forte_sdk::test]
+async fn test_trx_missing_read_conflicts_when_key_is_inserted() {
+    let db = create_test_db();
+    cleanup_trx_docs(&db, &["missing"]).await;
+
+    let result = db
+        .trx(|trx| {
+            let db = db.clone();
+            async move {
+                db.delete("TrxIntegrationDoc", "id=missing").await?;
+                assert!(trx.get(trx_get("missing")).await?.is_none());
+                put_trx_doc(&db, "missing", 9).await;
+                trx.commit::<(), ()>(())
+            }
+        })
+        .await;
+
+    assert!(matches!(result, TrxResult::Conflict(_)));
+    assert!(
+        db.get("TrxIntegrationDoc", "id=missing")
+            .await
+            .unwrap()
+            .is_some()
+    );
+    cleanup_trx_docs(&db, &["missing"]).await;
+}
+
+#[forte_sdk::test]
+async fn test_trx_missing_read_then_create_conflicts() {
+    let db = create_test_db();
+    cleanup_trx_docs(&db, &["create-conflict"]).await;
+
+    let result = db
+        .trx(|trx| {
+            let db = db.clone();
+            async move {
+                db.delete("TrxIntegrationDoc", "id=create-conflict").await?;
+                assert!(trx.get(trx_get("create-conflict")).await?.is_none());
+                let created = trx.create(TrxDoc {
+                    id: "create-conflict".to_string(),
+                    value: 2,
+                })?;
+                drop(created);
+                put_trx_doc(&db, "create-conflict", 9).await;
+                trx.commit::<(), ()>(())
+            }
+        })
+        .await;
+
+    assert!(matches!(result, TrxResult::Conflict(_)));
+    let value = db
+        .get("TrxIntegrationDoc", "id=create-conflict")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(serde_json::from_slice::<TrxDoc>(&value).unwrap().value, 9);
+    cleanup_trx_docs(&db, &["create-conflict"]).await;
+}
+
+#[forte_sdk::test]
+async fn test_trx_closure_can_use_database_before_commit() {
+    let db = create_test_db();
+    cleanup_trx_docs(&db, &["read-without-lock", "outside"]).await;
+    put_trx_doc(&db, "read-without-lock", 1).await;
+
+    let result = db
+        .trx(|trx| {
+            let db = db.clone();
+            async move {
+                let doc = trx.get(trx_get("read-without-lock")).await?;
+                drop(doc);
+                put_trx_doc(&db, "outside", 7).await;
+                trx.commit::<(), ()>(())
+            }
+        })
+        .await;
+
+    assert!(matches!(result, TrxResult::Committed(())));
+    assert!(
+        db.get("TrxIntegrationDoc", "id=outside")
+            .await
+            .unwrap()
+            .is_some()
+    );
+    cleanup_trx_docs(&db, &["read-without-lock", "outside"]).await;
+}
+
+#[forte_sdk::test]
+async fn test_trx_read_only_commit_validates_without_writes() {
+    let db = create_test_db();
+    cleanup_trx_docs(&db, &["read-only"]).await;
+    put_trx_doc(&db, "read-only", 1).await;
+
+    let before_rows = db
+        .execute_raw(
+            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?",
+            vec![
+                doc_db::text_value("TrxIntegrationDoc"),
+                doc_db::text_value("id=read-only"),
+            ],
+            true,
+        )
+        .await
+        .unwrap();
+    let before_version = match &before_rows[0][1] {
+        doc_db::Value::Integer { value } => *value,
+        _ => panic!("expected integer version"),
+    };
+
+    let result = db
+        .trx(|trx| async move {
+            let doc = trx.get(trx_get("read-only")).await?;
+            drop(doc);
+            trx.commit::<(), ()>(())
+        })
+        .await;
+
+    assert!(matches!(result, TrxResult::Committed(())));
+    let rows = db
+        .execute_raw(
+            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?",
+            vec![
+                doc_db::text_value("TrxIntegrationDoc"),
+                doc_db::text_value("id=read-only"),
+            ],
+            true,
+        )
+        .await
+        .unwrap();
+    match rows[0][1] {
+        doc_db::Value::Integer { value } => assert_eq!(value, before_version),
+        _ => panic!("expected integer version"),
+    }
+    cleanup_trx_docs(&db, &["read-only"]).await;
 }

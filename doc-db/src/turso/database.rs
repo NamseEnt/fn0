@@ -1018,127 +1018,78 @@ impl TursoDatabase {
         })
     }
 
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn begin_immediate_with_reads(
+    pub(crate) async fn transact(
         &self,
-        keys: &[(String, String)],
-    ) -> Result<(TursoTransaction, Vec<Option<StoredDoc>>)> {
+        items: &[crate::TransactItem],
+    ) -> Result<crate::TransactOutcome> {
+        if items.is_empty() {
+            return Ok(crate::TransactOutcome { conflict: None });
+        }
+        let tx = self.begin_immediate().await?;
+        tx.transact(items).await
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn begin_immediate(&self) -> Result<TursoTransaction> {
         const MAX_BUSY_ATTEMPTS: u32 = 8;
         let mut busy_attempt: u32 = 0;
         let mut schema_retried = false;
         loop {
-            let mut requests: Vec<StreamRequest> = Vec::with_capacity(keys.len() + 1);
-            requests.push(StreamRequest::Execute(ExecuteStreamReq {
-                stmt: Stmt {
-                    sql: Some("BEGIN IMMEDIATE".to_string()),
-                    sql_id: None,
-                    args: vec![],
-                    named_args: vec![],
-                    want_rows: Some(false),
-                    replication_index: None,
-                },
-            }));
-            for (pk, sk) in keys {
-                requests.push(StreamRequest::Execute(ExecuteStreamReq {
+            self.ensure_table().await?;
+            let response = self
+                .execute_pipeline(vec![StreamRequest::Execute(ExecuteStreamReq {
                     stmt: Stmt {
-                        sql: Some(
-                            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?".to_string(),
-                        ),
+                        sql: Some("BEGIN IMMEDIATE".to_string()),
                         sql_id: None,
-                        args: vec![
-                            Value::Text {
-                                value: pk.clone().into(),
-                            },
-                            Value::Text {
-                                value: sk.clone().into(),
-                            },
-                        ],
+                        args: vec![],
                         named_args: vec![],
-                        want_rows: Some(true),
+                        want_rows: Some(false),
                         replication_index: None,
                     },
-                }));
-            }
+                })])
+                .await?;
 
-            let response = self.execute_pipeline(requests).await?;
-
-            let mut docs: Vec<Option<StoredDoc>> = Vec::with_capacity(keys.len());
-            let mut idx = 0usize;
             let mut retry_kind: Option<RetryKind> = None;
             let mut fatal_error: Option<String> = None;
-
-            for stream_result in response.results {
-                match stream_result {
-                    StreamResult::Ok {
-                        response: StreamResponse::Execute(exec_resp),
-                    } => {
-                        if idx == 0 {
-                            // BEGIN IMMEDIATE result, ignore
-                        } else {
-                            let stored = if let Some(row) = exec_resp.result.rows.first()
-                                && let (
-                                    Some(Value::Blob { value: data }),
-                                    Some(Value::Integer { value: version }),
-                                ) = (row.values.first(), row.values.get(1))
-                            {
-                                Some(StoredDoc {
-                                    data: data.clone(),
-                                    version: *version,
-                                })
-                            } else {
-                                None
-                            };
-                            docs.push(stored);
-                        }
-                        idx += 1;
+            for stream_result in &response.results {
+                if let StreamResult::Error { error } = stream_result {
+                    if !schema_retried && Self::is_schema_error(&error.message) {
+                        retry_kind = Some(RetryKind::Schema);
+                    } else if Self::is_busy_error(&error.message) {
+                        retry_kind = Some(RetryKind::Busy);
+                    } else {
+                        fatal_error = Some(error.message.clone());
                     }
-                    StreamResult::Ok { response: _ } => {}
-                    StreamResult::Error { error } => {
-                        if !schema_retried && Self::is_schema_error(&error.message) {
-                            retry_kind = Some(RetryKind::Schema);
-                        } else if Self::is_busy_error(&error.message) {
-                            retry_kind = Some(RetryKind::Busy);
-                        } else {
-                            fatal_error = Some(error.message);
-                        }
-                        break;
-                    }
-                    StreamResult::None => {}
+                    break;
                 }
             }
 
             if let Some(msg) = fatal_error {
-                bail!("begin_immediate_with_reads error: {}", msg);
+                bail!("begin_immediate error: {msg}");
             }
 
             match retry_kind {
                 Some(RetryKind::Schema) => {
                     self.create_table().await?;
                     schema_retried = true;
-                    continue;
                 }
                 Some(RetryKind::Busy) => {
                     if busy_attempt + 1 >= MAX_BUSY_ATTEMPTS {
-                        bail!(
-                            "begin_immediate_with_reads: BUSY after {} attempts",
-                            MAX_BUSY_ATTEMPTS
-                        );
+                        bail!("begin_immediate: BUSY after {MAX_BUSY_ATTEMPTS} attempts");
                     }
                     Self::busy_backoff(busy_attempt).await;
                     busy_attempt += 1;
-                    continue;
                 }
-                None => {}
+                None => {
+                    let baton = response
+                        .baton
+                        .ok_or_else(|| anyhow::anyhow!("No baton returned from BEGIN IMMEDIATE"))?;
+                    return Ok(TursoTransaction {
+                        db: self.clone(),
+                        baton: Some(baton),
+                    });
+                }
             }
-
-            let baton = response
-                .baton
-                .ok_or_else(|| anyhow::anyhow!("No baton returned from BEGIN IMMEDIATE"))?;
-            let tx = TursoTransaction {
-                db: self.clone(),
-                baton: Some(baton),
-            };
-            return Ok((tx, docs));
         }
     }
 

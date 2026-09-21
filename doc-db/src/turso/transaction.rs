@@ -186,268 +186,276 @@ impl TursoTransaction {
         Ok(())
     }
 
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn batch_get_with_version(
-        &mut self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<StoredDoc>>> {
-        if keys.is_empty() {
-            return Ok(vec![]);
+    #[tracing::instrument(skip_all, fields(items = items.len()))]
+    pub(crate) async fn transact(
+        mut self,
+        items: &[crate::TransactItem],
+    ) -> Result<crate::TransactOutcome> {
+        let validation = self.validate_items(items).await;
+        let conflict = match validation {
+            Ok(conflict) => conflict,
+            Err(error) => {
+                return Err(rollback_after_error(self, error).await);
+            }
+        };
+        if let Some(conflict) = conflict {
+            self.rollback().await?;
+            return Ok(crate::TransactOutcome {
+                conflict: Some(conflict),
+            });
         }
-        let requests: Vec<StreamRequest> = keys
+
+        let write_conflict = match self.apply_writes(items).await {
+            Ok(conflict) => conflict,
+            Err(error) => {
+                return Err(rollback_after_error(self, error).await);
+            }
+        };
+        if let Some(conflict) = write_conflict {
+            self.rollback().await?;
+            return Ok(crate::TransactOutcome {
+                conflict: Some(conflict),
+            });
+        }
+
+        self.commit().await?;
+        Ok(crate::TransactOutcome { conflict: None })
+    }
+
+    async fn validate_items(
+        &mut self,
+        items: &[crate::TransactItem],
+    ) -> Result<Option<crate::TransactConflict>> {
+        if items.is_empty() {
+            return Ok(None);
+        }
+
+        let requests = items
             .iter()
-            .map(|(pk, sk)| {
+            .map(|item| {
                 StreamRequest::Execute(ExecuteStreamReq {
-                    stmt: Stmt {
-                        sql: Some(
-                            "SELECT data, version FROM docs WHERE pk = ? AND sk = ?".to_string(),
-                        ),
-                        sql_id: None,
-                        args: vec![
-                            Value::Text {
-                                value: pk.clone().into(),
-                            },
-                            Value::Text {
-                                value: sk.clone().into(),
-                            },
-                        ],
-                        named_args: vec![],
-                        want_rows: Some(true),
-                        replication_index: None,
-                    },
+                    stmt: validation_stmt(item),
                 })
             })
             .collect();
+        let results = self.execute_statements(requests).await?;
+        if results.len() != items.len() {
+            bail!(
+                "transaction validation result count mismatch: expected {}, got {}",
+                items.len(),
+                results.len()
+            );
+        }
 
+        for (step_index, (item, result)) in items.iter().zip(results.iter()).enumerate() {
+            if !condition_holds(item, result) {
+                return Ok(Some(crate::TransactConflict { step_index }));
+            }
+        }
+        Ok(None)
+    }
+
+    async fn apply_writes(
+        &mut self,
+        items: &[crate::TransactItem],
+    ) -> Result<Option<crate::TransactConflict>> {
+        let writes: Vec<(usize, Stmt)> = items
+            .iter()
+            .enumerate()
+            .filter_map(|(step_index, item)| write_stmt(item).map(|stmt| (step_index, stmt)))
+            .collect();
+        if writes.is_empty() {
+            return Ok(None);
+        }
+
+        let requests = writes
+            .iter()
+            .map(|(_, stmt)| StreamRequest::Execute(ExecuteStreamReq { stmt: stmt.clone() }))
+            .collect();
+        let results = self.execute_statements(requests).await?;
+        if results.len() != writes.len() {
+            bail!(
+                "transaction write result count mismatch: expected {}, got {}",
+                writes.len(),
+                results.len()
+            );
+        }
+
+        for ((step_index, _), result) in writes.iter().zip(results.iter()) {
+            if result.affected_row_count != 1 {
+                return Ok(Some(crate::TransactConflict {
+                    step_index: *step_index,
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    async fn execute_statements(
+        &mut self,
+        requests: Vec<StreamRequest>,
+    ) -> Result<Vec<StmtResult>> {
         let response = self.execute_in_tx(requests).await?;
-
-        let mut docs: Vec<Option<StoredDoc>> = Vec::with_capacity(keys.len());
+        let mut results = Vec::new();
         for stream_result in response.results {
             match stream_result {
                 StreamResult::Ok {
                     response: StreamResponse::Execute(exec_resp),
-                } => {
-                    let stored = if let Some(row) = exec_resp.result.rows.first()
-                        && let (
-                            Some(Value::Blob { value: data }),
-                            Some(Value::Integer { value: version }),
-                        ) = (row.values.first(), row.values.get(1))
-                    {
-                        Some(StoredDoc {
-                            data: data.clone(),
-                            version: *version,
-                        })
-                    } else {
-                        None
-                    };
-                    docs.push(stored);
-                }
+                } => results.push(exec_resp.result),
                 StreamResult::Ok { response: _ } => {}
                 StreamResult::Error { error } => {
-                    bail!("batch_get_with_version error: {}", error.message);
+                    bail!("transaction statement error: {}", error.message);
                 }
                 StreamResult::None => {}
             }
         }
-        Ok(docs)
+        Ok(results)
     }
+}
 
-    #[tracing::instrument(skip_all, fields(writes = writes.len()))]
-    pub(crate) async fn apply_writes_and_commit(
-        &mut self,
-        writes: &[crate::WriteOp],
-    ) -> Result<crate::CommitOutcome> {
-        use crate::WriteOp;
-
-        let mut steps: Vec<BatchStep> = Vec::with_capacity(writes.len() + 2);
-
-        for op in writes {
-            let stmt = match op {
-                WriteOp::Insert { pk, sk, data } => Stmt {
-                    sql: Some(
-                        "INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0)".to_string(),
-                    ),
-                    sql_id: None,
-                    args: vec![
-                        Value::Text {
-                            value: pk.clone().into(),
-                        },
-                        Value::Text {
-                            value: sk.clone().into(),
-                        },
-                        Value::Blob {
-                            value: data.clone().into(),
-                        },
-                    ],
-                    named_args: vec![],
-                    want_rows: Some(false),
-                    replication_index: None,
-                },
-                WriteOp::Update {
-                    pk,
-                    sk,
-                    expected_version,
-                    data,
-                } => Stmt {
-                    sql: Some(
-                        "UPDATE docs SET data = ?, version = version + 1 \
-                         WHERE pk = ? AND sk = ? AND version = ?"
-                            .to_string(),
-                    ),
-                    sql_id: None,
-                    args: vec![
-                        Value::Blob {
-                            value: data.clone().into(),
-                        },
-                        Value::Text {
-                            value: pk.clone().into(),
-                        },
-                        Value::Text {
-                            value: sk.clone().into(),
-                        },
-                        Value::Integer {
-                            value: *expected_version,
-                        },
-                    ],
-                    named_args: vec![],
-                    want_rows: Some(false),
-                    replication_index: None,
-                },
-                WriteOp::Delete {
-                    pk,
-                    sk,
-                    expected_version,
-                } => Stmt {
-                    sql: Some(
-                        "DELETE FROM docs WHERE pk = ? AND sk = ? AND version = ?".to_string(),
-                    ),
-                    sql_id: None,
-                    args: vec![
-                        Value::Text {
-                            value: pk.clone().into(),
-                        },
-                        Value::Text {
-                            value: sk.clone().into(),
-                        },
-                        Value::Integer {
-                            value: *expected_version,
-                        },
-                    ],
-                    named_args: vec![],
-                    want_rows: Some(false),
-                    replication_index: None,
-                },
-            };
-            let condition = if steps.is_empty() {
-                None
-            } else {
-                Some(BatchCond::Ok {
-                    step: (steps.len() - 1) as u32,
-                })
-            };
-            steps.push(BatchStep { condition, stmt });
+async fn rollback_after_error(tx: TursoTransaction, error: anyhow::Error) -> anyhow::Error {
+    match tx.rollback().await {
+        Ok(()) => error,
+        Err(rollback_error) => {
+            anyhow::anyhow!("{error}; transaction rollback failed: {rollback_error}")
         }
+    }
+}
 
-        let last_write_step = if writes.is_empty() {
-            None
-        } else {
-            Some((steps.len() - 1) as u32)
-        };
-        let commit_cond = last_write_step.map(|s| BatchCond::Ok { step: s });
-        steps.push(BatchStep {
-            condition: commit_cond,
-            stmt: Stmt {
-                sql: Some("COMMIT".to_string()),
-                sql_id: None,
-                args: vec![],
-                named_args: vec![],
-                want_rows: Some(false),
-                replication_index: None,
+fn validation_stmt(item: &crate::TransactItem) -> Stmt {
+    let (sql, want_rows) = match item {
+        crate::TransactItem::CheckVersion { .. }
+        | crate::TransactItem::Update { .. }
+        | crate::TransactItem::Delete { .. } => {
+            ("SELECT version FROM docs WHERE pk = ? AND sk = ?", true)
+        }
+        crate::TransactItem::CheckMissing { .. } | crate::TransactItem::Insert { .. } => {
+            ("SELECT 1 FROM docs WHERE pk = ? AND sk = ?", true)
+        }
+    };
+    let (pk, sk) = item_key(item);
+    Stmt {
+        sql: Some(sql.to_string()),
+        sql_id: None,
+        args: vec![
+            Value::Text {
+                value: pk.to_string().into(),
             },
-        });
-        let commit_step_idx = (steps.len() - 1) as u32;
-        steps.push(BatchStep {
-            condition: Some(BatchCond::Not {
-                cond: Box::new(BatchCond::Ok {
-                    step: commit_step_idx,
-                }),
-            }),
-            stmt: Stmt {
-                sql: Some("ROLLBACK".to_string()),
-                sql_id: None,
-                args: vec![],
-                named_args: vec![],
-                want_rows: Some(false),
-                replication_index: None,
+            Value::Text {
+                value: sk.to_string().into(),
             },
-        });
+        ],
+        named_args: vec![],
+        want_rows: Some(want_rows),
+        replication_index: None,
+    }
+}
 
-        let batch = Batch {
-            steps,
+fn condition_holds(item: &crate::TransactItem, result: &StmtResult) -> bool {
+    match item {
+        crate::TransactItem::CheckMissing { .. } | crate::TransactItem::Insert { .. } => {
+            result.rows.is_empty()
+        }
+        crate::TransactItem::CheckVersion {
+            expected_version, ..
+        }
+        | crate::TransactItem::Update {
+            expected_version, ..
+        }
+        | crate::TransactItem::Delete {
+            expected_version, ..
+        } => matches!(
+            result.rows.first().and_then(|row| row.values.first()),
+            Some(Value::Integer { value }) if value == expected_version
+        ),
+    }
+}
+
+fn write_stmt(item: &crate::TransactItem) -> Option<Stmt> {
+    let stmt = match item {
+        crate::TransactItem::Insert { pk, sk, data } => Stmt {
+            sql: Some("INSERT INTO docs (pk, sk, data, version) VALUES (?, ?, ?, 0)".to_string()),
+            sql_id: None,
+            args: vec![
+                Value::Text {
+                    value: pk.clone().into(),
+                },
+                Value::Text {
+                    value: sk.clone().into(),
+                },
+                Value::Blob {
+                    value: data.clone().into(),
+                },
+            ],
+            named_args: vec![],
+            want_rows: Some(false),
             replication_index: None,
-        };
-
-        let response = self
-            .execute_in_tx(vec![
-                StreamRequest::Batch(BatchStreamReq { batch }),
-                StreamRequest::Close(CloseStreamReq {}),
-            ])
-            .await?;
-
-        self.baton = None;
-
-        let mut batch_result: Option<BatchResult> = None;
-        for stream_result in response.results {
-            match stream_result {
-                StreamResult::Ok {
-                    response: StreamResponse::Batch(batch_resp),
-                } => {
-                    batch_result = Some(batch_resp.result);
-                    break;
-                }
-                StreamResult::Ok { response: _ } => {}
-                StreamResult::Error { error } => {
-                    bail!("apply_writes_and_commit stream error: {}", error.message);
-                }
-                StreamResult::None => {}
-            }
+        },
+        crate::TransactItem::Update {
+            pk,
+            sk,
+            expected_version,
+            data,
+        } => Stmt {
+            sql: Some(
+                "UPDATE docs SET data = ?, version = version + 1 \
+                 WHERE pk = ? AND sk = ? AND version = ?"
+                    .to_string(),
+            ),
+            sql_id: None,
+            args: vec![
+                Value::Blob {
+                    value: data.clone().into(),
+                },
+                Value::Text {
+                    value: pk.clone().into(),
+                },
+                Value::Text {
+                    value: sk.clone().into(),
+                },
+                Value::Integer {
+                    value: *expected_version,
+                },
+            ],
+            named_args: vec![],
+            want_rows: Some(false),
+            replication_index: None,
+        },
+        crate::TransactItem::Delete {
+            pk,
+            sk,
+            expected_version,
+        } => Stmt {
+            sql: Some("DELETE FROM docs WHERE pk = ? AND sk = ? AND version = ?".to_string()),
+            sql_id: None,
+            args: vec![
+                Value::Text {
+                    value: pk.clone().into(),
+                },
+                Value::Text {
+                    value: sk.clone().into(),
+                },
+                Value::Integer {
+                    value: *expected_version,
+                },
+            ],
+            named_args: vec![],
+            want_rows: Some(false),
+            replication_index: None,
+        },
+        crate::TransactItem::CheckVersion { .. } | crate::TransactItem::CheckMissing { .. } => {
+            return None;
         }
+    };
+    Some(stmt)
+}
 
-        let batch_result = batch_result
-            .ok_or_else(|| anyhow::anyhow!("apply_writes_and_commit: batch response missing"))?;
-
-        let mut conflict: Option<crate::ConflictInfo> = None;
-        for (i, error_opt) in batch_result.step_errors.iter().enumerate() {
-            if let Some(error) = error_opt
-                && i < writes.len()
-            {
-                conflict = Some(crate::ConflictInfo {
-                    step_index: i,
-                    message: error.message.clone(),
-                });
-                break;
-            }
-        }
-
-        let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
-        for (i, stmt_result_opt) in batch_result.step_results.iter().enumerate() {
-            if i >= writes.len() {
-                break;
-            }
-            affected_counts.push(
-                stmt_result_opt
-                    .as_ref()
-                    .map(|r| r.affected_row_count)
-                    .unwrap_or(0),
-            );
-        }
-        while affected_counts.len() < writes.len() {
-            affected_counts.push(0);
-        }
-
-        Ok(crate::CommitOutcome {
-            affected_counts,
-            conflict,
-        })
+fn item_key(item: &crate::TransactItem) -> (&str, &str) {
+    match item {
+        crate::TransactItem::CheckVersion { pk, sk, .. }
+        | crate::TransactItem::CheckMissing { pk, sk }
+        | crate::TransactItem::Insert { pk, sk, .. }
+        | crate::TransactItem::Update { pk, sk, .. }
+        | crate::TransactItem::Delete { pk, sk, .. } => (pk, sk),
     }
 }
