@@ -1,6 +1,6 @@
 use super::*;
 use crate::runtime;
-use crate::{BatchOp, ObservedDocument};
+use crate::{BatchOp, ObservedDocument, TransactRequest, revision_from_backend};
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
@@ -238,10 +238,10 @@ impl TursoDatabase {
                             {
                                 return Ok(ObservedDocument::Present {
                                     data: data.clone(),
-                                    version: *version,
+                                    revision: revision_from_backend(*version)?,
                                 });
                             }
-                            return Ok(ObservedDocument::Missing);
+                            return Ok(ObservedDocument::Missing { revision: None });
                         }
                         StreamResponse::Close(_) => continue,
                         _ => {}
@@ -259,11 +259,11 @@ impl TursoDatabase {
             }
 
             if !should_retry {
-                return Ok(ObservedDocument::Missing);
+                return Ok(ObservedDocument::Missing { revision: None });
             }
         }
 
-        Ok(ObservedDocument::Missing)
+        Ok(ObservedDocument::Missing { revision: None })
     }
 
     pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
@@ -1020,13 +1020,13 @@ impl TursoDatabase {
 
     pub(crate) async fn transact(
         &self,
-        items: &[crate::TransactItem],
+        request: &TransactRequest,
     ) -> Result<crate::TransactOutcome> {
-        if items.is_empty() {
+        if request.conditions.is_empty() && request.mutations.is_empty() {
             return Ok(crate::TransactOutcome { conflict: None });
         }
         let tx = self.begin_immediate().await?;
-        tx.transact(items).await
+        tx.transact(request).await
     }
 
     #[tracing::instrument(skip_all)]

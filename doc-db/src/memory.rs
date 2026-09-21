@@ -1,4 +1,7 @@
-use crate::{BatchOp, DbOp, DbResult, ObservedDocument};
+use crate::{
+    BatchOp, DbOp, DbResult, ObservedDocument, TransactCondition, TransactConflict,
+    TransactMutation, TransactOutcome, TransactRequest, revision_from_backend,
+};
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
@@ -38,9 +41,9 @@ impl MemoryDatabase {
         Ok(match store.get(&(pk.to_string(), sk.to_string())) {
             Some(doc) => ObservedDocument::Present {
                 data: doc.data.clone().into(),
-                version: doc.version,
+                revision: revision_from_backend(doc.version)?,
             },
-            None => ObservedDocument::Missing,
+            None => ObservedDocument::Missing { revision: None },
         })
     }
 
@@ -153,85 +156,64 @@ impl MemoryDatabase {
         })
     }
 
-    pub(crate) async fn transact(
-        &self,
-        items: &[crate::TransactItem],
-    ) -> Result<crate::TransactOutcome> {
+    pub(crate) async fn transact(&self, request: &TransactRequest) -> Result<TransactOutcome> {
         let mut store = self.store.lock().unwrap();
 
-        for (step_index, item) in items.iter().enumerate() {
-            let conflict = match item {
-                crate::TransactItem::CheckVersion {
+        for (condition_index, condition) in request.conditions.iter().enumerate() {
+            let condition_holds = match condition {
+                TransactCondition::RevisionEquals {
                     pk,
                     sk,
-                    expected_version,
-                }
-                | crate::TransactItem::Update {
-                    pk,
-                    sk,
-                    expected_version,
-                    ..
-                }
-                | crate::TransactItem::Delete {
-                    pk,
-                    sk,
-                    expected_version,
+                    expected_revision,
                 } => store
                     .get(&(pk.clone(), sk.clone()))
-                    .is_none_or(|doc| doc.version != *expected_version),
-                crate::TransactItem::CheckMissing { pk, sk }
-                | crate::TransactItem::Insert { pk, sk, .. } => {
+                    .map(|doc| revision_from_backend(doc.version))
+                    .transpose()?
+                    .is_some_and(|revision| revision == *expected_revision),
+                TransactCondition::Exists { pk, sk } => {
                     store.contains_key(&(pk.clone(), sk.clone()))
+                }
+                TransactCondition::NotExists { pk, sk } => {
+                    !store.contains_key(&(pk.clone(), sk.clone()))
                 }
             };
 
-            if conflict {
-                return Ok(crate::TransactOutcome {
-                    conflict: Some(crate::TransactConflict { step_index }),
+            if !condition_holds {
+                return Ok(TransactOutcome {
+                    conflict: Some(TransactConflict { condition_index }),
                 });
             }
         }
 
-        if !items.iter().any(|item| {
-            matches!(
-                item,
-                crate::TransactItem::Insert { .. }
-                    | crate::TransactItem::Update { .. }
-                    | crate::TransactItem::Delete { .. }
-            )
-        }) {
-            return Ok(crate::TransactOutcome { conflict: None });
+        if request.mutations.is_empty() {
+            return Ok(TransactOutcome { conflict: None });
         }
 
         let mut staged = store.clone();
-        for item in items {
-            match item {
-                crate::TransactItem::CheckVersion { .. }
-                | crate::TransactItem::CheckMissing { .. } => {}
-                crate::TransactItem::Insert { pk, sk, data } => {
+        for mutation in &request.mutations {
+            match mutation {
+                TransactMutation::Put { pk, sk, data } => {
+                    let version = staged
+                        .get(&(pk.clone(), sk.clone()))
+                        .map(|doc| doc.version.checked_add(1))
+                        .unwrap_or(Some(0))
+                        .ok_or_else(|| anyhow::anyhow!("document revision overflow"))?;
                     staged.insert(
                         (pk.clone(), sk.clone()),
                         MemDoc {
                             data: data.clone(),
-                            version: 0,
+                            version,
                         },
                     );
                 }
-                crate::TransactItem::Update { pk, sk, data, .. } => {
-                    let doc = staged
-                        .get_mut(&(pk.clone(), sk.clone()))
-                        .expect("validated transaction update target disappeared");
-                    doc.data = data.clone();
-                    doc.version += 1;
-                }
-                crate::TransactItem::Delete { pk, sk, .. } => {
+                TransactMutation::Delete { pk, sk } => {
                     staged.remove(&(pk.clone(), sk.clone()));
                 }
             }
         }
 
         *store = staged;
-        Ok(crate::TransactOutcome { conflict: None })
+        Ok(TransactOutcome { conflict: None })
     }
 }
 
@@ -279,23 +261,29 @@ mod tests {
         db.put("pk", "b", b"b0").await.unwrap();
 
         let outcome = db
-            .transact(&[
-                crate::TransactItem::Update {
+            .transact(&TransactRequest {
+                conditions: vec![
+                    TransactCondition::RevisionEquals {
+                        pk: "pk".to_string(),
+                        sk: "a".to_string(),
+                        expected_revision: crate::DocDbRevision::new(0),
+                    },
+                    TransactCondition::RevisionEquals {
+                        pk: "pk".to_string(),
+                        sk: "b".to_string(),
+                        expected_revision: crate::DocDbRevision::new(1),
+                    },
+                ],
+                mutations: vec![TransactMutation::Put {
                     pk: "pk".to_string(),
                     sk: "a".to_string(),
-                    expected_version: 0,
                     data: b"a1".to_vec(),
-                },
-                crate::TransactItem::CheckVersion {
-                    pk: "pk".to_string(),
-                    sk: "b".to_string(),
-                    expected_version: 1,
-                },
-            ])
+                }],
+            })
             .await
             .unwrap();
 
-        assert_eq!(outcome.conflict.unwrap().step_index, 1);
+        assert_eq!(outcome.conflict.unwrap().condition_index, 1);
         assert_eq!(db.get("pk", "a").await.unwrap().unwrap().as_ref(), b"a0");
     }
 
@@ -303,23 +291,29 @@ mod tests {
     async fn transact_checks_missing_keys() {
         let db = MemoryDatabase::new();
         let outcome = db
-            .transact(&[crate::TransactItem::CheckMissing {
-                pk: "pk".to_string(),
-                sk: "missing".to_string(),
-            }])
+            .transact(&TransactRequest {
+                conditions: vec![TransactCondition::NotExists {
+                    pk: "pk".to_string(),
+                    sk: "missing".to_string(),
+                }],
+                mutations: vec![],
+            })
             .await
             .unwrap();
         assert!(outcome.conflict.is_none());
 
         db.put("pk", "missing", b"present").await.unwrap();
         let outcome = db
-            .transact(&[crate::TransactItem::CheckMissing {
-                pk: "pk".to_string(),
-                sk: "missing".to_string(),
-            }])
+            .transact(&TransactRequest {
+                conditions: vec![TransactCondition::NotExists {
+                    pk: "pk".to_string(),
+                    sk: "missing".to_string(),
+                }],
+                mutations: vec![],
+            })
             .await
             .unwrap();
-        assert_eq!(outcome.conflict.unwrap().step_index, 0);
+        assert_eq!(outcome.conflict.unwrap().condition_index, 0);
     }
 }
 

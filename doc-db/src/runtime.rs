@@ -13,7 +13,7 @@ pub(crate) async fn http_post_doc_db(url: &str, body: Vec<u8>) -> Result<(u16, V
         let request = Request::post(&uri)
             .header(
                 "Content-Type",
-                HeaderValue::from_static("application/vnd.fn0.doc-db+json"),
+                HeaderValue::from_static(doc_db_protocol::CONTENT_TYPE),
             )
             .body(body)
             .map_err(|e| anyhow::anyhow!("Failed to build request: {e}"))?;
@@ -41,7 +41,7 @@ pub(crate) async fn http_post_doc_db(url: &str, body: Vec<u8>) -> Result<(u16, V
         });
         let response = client
             .post(url)
-            .header("Content-Type", "application/vnd.fn0.doc-db+json")
+            .header("Content-Type", doc_db_protocol::CONTENT_TYPE)
             .body(body)
             .send()
             .await?;
