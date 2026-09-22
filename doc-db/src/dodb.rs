@@ -7,7 +7,6 @@ use dodb_core::{
     TransactionCondition, TransactionMutation, TransactionRequest,
 };
 use dodb_protocol::{ApplicationErrorKind, ProtocolLimits};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::env;
 use std::io::Cursor;
@@ -103,20 +102,47 @@ impl DodbConnection {
         self.inner.remote_addr()
     }
 
-    pub(crate) fn database(&self, project_id: &str) -> DodbDatabase {
-        DodbDatabase {
-            client: self.inner.for_tenant(project_tenant_id(project_id)),
+    pub(crate) fn database(&self, project_id: &str) -> Result<DodbDatabase> {
+        Ok(DodbDatabase {
+            client: self.inner.for_tenant(dodb_tenant_id(project_id)?),
             protocol_limits: self.protocol_limits,
-        }
+        })
     }
 }
 
-pub fn project_tenant_id(project_id: &str) -> TenantId {
-    let digest = Sha256::digest(project_id.as_bytes());
-    let mut bytes = [0; std::mem::size_of::<u64>()];
-    let byte_len = bytes.len();
-    bytes.copy_from_slice(&digest[..byte_len]);
-    TenantId::new(u64::from_be_bytes(bytes))
+/// The tenant outside the normal eight-character base36 project namespace
+/// that is reserved for the fn0 control plane.
+pub const FN0_CONTROL_DODB_TENANT_ID: u64 = u64::MAX;
+
+/// Converts fn0's existing string project identity to its dodb tenant.
+///
+/// Normal project IDs are fixed-width lowercase base36 strings. Keeping the
+/// fixed width is important: accepting arbitrary base36 text would make
+/// aliases such as `1`, `01`, and `00000001` possible. The positional base36
+/// representation is injective, so no hash or probabilistic mapping is needed.
+pub fn dodb_tenant_id(project_id: &str) -> Result<TenantId> {
+    if project_id == "fn0-control" {
+        return Ok(TenantId::new(FN0_CONTROL_DODB_TENANT_ID));
+    }
+    if project_id == "local" {
+        bail!("local project has no dodb tenant");
+    }
+    if project_id.len() != 8
+        || !project_id
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || byte.is_ascii_lowercase())
+    {
+        bail!("invalid project ID {project_id:?}: expected eight lowercase base36 characters");
+    }
+    let value = u64::from_str_radix(project_id, 36)
+        .map_err(|error| anyhow!("invalid project ID {project_id:?}: {error}"))?;
+    Ok(TenantId::new(value))
+}
+
+/// Compatibility name for callers that describe this boundary as a project
+/// tenant lookup rather than a dodb-specific conversion.
+pub fn project_tenant_id(project_id: &str) -> Result<TenantId> {
+    dodb_tenant_id(project_id)
 }
 
 #[derive(Clone)]
@@ -489,6 +515,65 @@ mod tests {
         }
     }
 
+    #[test]
+    fn normal_project_ids_use_exact_base36_values() {
+        let cases = [
+            ("00000000", 0),
+            ("00000001", 1),
+            ("0000000z", 35),
+            ("00000010", 36),
+            ("zzzzzzzz", 2_821_109_907_455),
+        ];
+        for (project_id, expected) in cases {
+            assert_eq!(dodb_tenant_id(project_id).unwrap(), TenantId::new(expected));
+        }
+    }
+
+    #[test]
+    fn control_uses_a_reserved_tenant_outside_the_project_namespace() {
+        assert_eq!(
+            dodb_tenant_id("fn0-control").unwrap(),
+            TenantId::new(FN0_CONTROL_DODB_TENANT_ID)
+        );
+        assert!(TenantId::new(2_821_109_907_455) < TenantId::new(u64::MAX));
+    }
+
+    #[test]
+    fn local_has_no_dodb_tenant() {
+        let error = dodb_tenant_id("local").unwrap_err().to_string();
+        assert!(error.contains("no dodb tenant"), "{error}");
+    }
+
+    #[test]
+    fn arbitrary_and_noncanonical_project_ids_are_rejected() {
+        for project_id in [
+            "1",
+            "01",
+            "000000001",
+            "ABCDEFGH",
+            "abc-defg",
+            "fn0-foo",
+            "",
+        ] {
+            assert!(
+                dodb_tenant_id(project_id).is_err(),
+                "{project_id:?} unexpectedly mapped to a dodb tenant"
+            );
+        }
+    }
+
+    #[test]
+    fn representative_canonical_ids_are_injective() {
+        let project_ids = ["00000000", "00000001", "0000000z", "00000010", "zzzzzzzz"];
+        let tenants = project_ids
+            .into_iter()
+            .map(|project_id| dodb_tenant_id(project_id).unwrap())
+            .collect::<Vec<_>>();
+        for (index, tenant) in tenants.iter().enumerate() {
+            assert!(tenants[index + 1..].iter().all(|other| other != tenant));
+        }
+    }
+
     async fn start_server(
         data_dir: PathBuf,
         tls: &TestTls,
@@ -559,12 +644,12 @@ mod tests {
         let tls = test_tls();
         let (server, task) = start_server(directory.path().to_owned(), &tls).await;
         let connection = test_connection(&server, &tls).await;
-        let database = dodb_with_connection(&connection, "backend-contract");
+        let database = dodb_with_connection(&connection, "00000000").unwrap();
         let new_connection = connection.clone();
 
         let result = crate::backend_contract::run_revisioned_missing_backend_contract(
             database,
-            move || dodb_with_connection(&new_connection, "backend-contract"),
+            move || dodb_with_connection(&new_connection, "00000000").unwrap(),
             "dodb",
         )
         .await;
@@ -580,7 +665,7 @@ mod tests {
         let tls = test_tls();
         let (server, task) = start_server(directory.path().to_owned(), &tls).await;
         let connection = test_connection(&server, &tls).await;
-        let database = dodb_with_connection(&connection, "missing-revision");
+        let database = dodb_with_connection(&connection, "00000001").unwrap();
         let pk = "missing-revision";
         let sk = "key";
 

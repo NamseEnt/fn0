@@ -19,7 +19,9 @@ use doc_db_protocol::{
     DocDbResult, DocDbTransactOutcome,
 };
 #[cfg(not(target_arch = "wasm32"))]
-pub use dodb::{DodbConfig, DodbConnection, project_tenant_id};
+pub use dodb::{
+    DodbConfig, DodbConnection, FN0_CONTROL_DODB_TENANT_ID, dodb_tenant_id, project_tenant_id,
+};
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
 use remote::RemoteDatabase;
@@ -150,11 +152,11 @@ pub fn semantic_with_config(url: String) -> Database {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn dodb_with_connection(connection: &DodbConnection, project_id: &str) -> Database {
-    Database {
-        inner: DatabaseInner::Dodb(connection.database(project_id)),
+pub fn dodb_with_connection(connection: &DodbConnection, project_id: &str) -> Result<Database> {
+    Ok(Database {
+        inner: DatabaseInner::Dodb(connection.database(project_id)?),
         mock_state: mock::MockState::default(),
-    }
+    })
 }
 
 #[derive(Clone)]

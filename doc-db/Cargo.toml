@@ -46,7 +46,6 @@ dodb-protocol = { git = "https://github.com/namse/dodb", rev = "1ff96e1b3d205074
 rand = { workspace = true }
 reqwest = { workspace = true }
 rustls-pemfile = { workspace = true }
-sha2 = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
