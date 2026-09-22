@@ -37,6 +37,11 @@ compatibility APIs. `doc_db::turso()` and `doc_db::turso_with_config()` remain
 the direct/legacy path for raw SQL, migrations, or explicit session
 transactions. Do not switch those users to `database()`.
 
+Standalone `fn0 local` uses the same semantic boundary with a process-local
+in-memory host backend. Its document state is lost when the local server
+restarts; this does not describe the persistent backends used by Forte or
+production workers.
+
 The semantic request payload contains document keys and operations, but no
 project or tenant identity. fn0 obtains the authoritative project identity
 from the invocation context before forwarding the request to the host service.

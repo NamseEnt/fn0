@@ -2186,6 +2186,8 @@ dependencies = [
  "dirs 6.0.0",
  "fn0",
  "fn0-deploy",
+ "fn0-doc-db",
+ "fn0-doc-db-protocol",
  "http-body-util",
  "hyper",
  "hyper-util",

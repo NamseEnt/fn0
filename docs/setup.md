@@ -59,6 +59,8 @@ The `doc-db` crate connects to Turso/libSQL.
 
 **Forte projects:** `forte dev` downloads and starts sqld automatically — no manual setup needed. The database file is stored in `.forte/data/` inside your project directory. Normal application code should use `doc_db::database()`, which is routed through the local semantic doc-db service. `TURSO_URL` and `TURSO_AUTH_TOKEN` remain injected for legacy/direct Turso users and do not need to be set for local development.
 
+**Raw fn0 projects:** `fn0 local` supports `doc_db::database()` through a semantic service backed by one in-memory database for the process lifetime. Restarting the local server loses that state. It does not configure legacy/direct Turso access.
+
 **Running `doc-db` tests directly** (outside of `forte dev`) requires a separately running libSQL server:
 
 ```sh

@@ -201,7 +201,8 @@ fn0 uses "hijack" components to inject platform services into the WASM execution
 
 | Hijack | Purpose |
 |---|---|
-| `turso_hijack` | Injects Turso/libSQL database connection |
+| `doc_db_hijack` | Routes semantic document database requests to the host document service |
+| `turso_hijack` | Injects the legacy/direct Turso/libSQL connection |
 | `object_storage_hijack` | Routes & SigV4-signs per-project private object storage requests |
 | `public_storage_hijack` | Routes public object storage requests (no SigV4 signing required) |
 | `otlp_hijack` | Injects OpenTelemetry OTLP endpoint |
@@ -216,6 +217,7 @@ These are configured on `ExecutionContext` via builder methods:
 
 ```rust
 let ctx = ExecutionContext::new(engine, linker, bundle_cache)
+    .with_doc_db_hijack(doc_db_hijack)
     .with_turso_hijack(turso_hijack)
     .with_otlp_hijack(otlp_hijack)
     .with_queue_hijack(queue_hijack)
