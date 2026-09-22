@@ -43,14 +43,14 @@ The runtime library every Forte application handler imports. Exposes:
 - `Body` — `Empty | Bytes(Bytes) | Stream(…)` plus `Body::channel()` for streaming responses
 - HTTP client (`forte_sdk::http::Client`)
 - WebSocket operations (`forte_sdk::websocket::send`, `disconnect`)
-- Document database (`forte_sdk::doc_db`)
-- Object storage (`forte_sdk::object_storage::private` and `::public`)
 - Static page cache (`forte_sdk::static_page_cache`)
 - Metrics (OTLP, delta temporality) and tracing
-- Cookie signing (`forte_sdk::cookie`)
-- UUID v7 (`forte_sdk::uuid`)
-- Async runtime (`forte_sdk::runtime::spawn_local`, `block_on`, `yield_async`)
+- Cookie signing (`forte_sdk::cookie_sign`)
+- UUID v7 (`forte_sdk::Uuid`)
+- Async runtime (`forte_sdk::runtime::spawn`, `block_on`, `yield_async`, `yield_blocking`, `backpressure_inc`, `backpressure_dec`)
 - Re-exports `forte_json`, `anyhow`, `serde`; `http` is exposed as `pub mod http` (not a direct re-export)
+
+`fn0-doc-db` and `fn0-object-storage` are **not** re-exported through forte-sdk. They are separate crates added as direct dependencies by `forte init` (as `doc-db` and `object-storage` in the project's `Cargo.toml`) and imported with `use doc_db::...` and `use object_storage::...` respectively.
 
 **Change when:** adding or changing any SDK API that handler code calls; changing serialization behavior; adding new platform capabilities.
 
@@ -211,7 +211,7 @@ A WinterCG-compatible JavaScript runtime built on V8 and `deno_core`. Runs serve
 
 Document-oriented database wrapper over Turso/libSQL. Supports `get`, `put`, `delete`, `query`, `scan`, batch operations, explicit ACID `transaction`s, and `trx` optimistic concurrency. Works in WASM (via the WIT HTTP interface to Turso) and natively (for tests with `doc_db::memory()`).
 
-Re-exported through `forte-sdk` as `forte_sdk::doc_db`.
+Added as a direct dependency by `forte init` (as `doc-db = { package = "fn0-doc-db", ... }` in `rs/Cargo.toml`). Import with `use doc_db::...` in handler code. Not re-exported through forte-sdk.
 
 **Change when:** adding document database operations; changing query semantics; fixing Turso protocol issues.
 
@@ -226,7 +226,7 @@ S3-compatible object storage client. Two namespaces:
 
 Supports `put`, `get`, `head` (metadata without body), `delete`, `list` (key-prefix scan with cursor pagination), presigned URL generation, and cache purge. In-memory implementations available for tests via `object_storage::private::memory()`.
 
-Re-exported through `forte-sdk`.
+Added as a direct dependency by `forte init` (as `object-storage = { package = "fn0-object-storage", ... }` in `rs/Cargo.toml`). Import with `use object_storage::...` in handler code. Not re-exported through forte-sdk.
 
 **Change when:** adding storage operations; changing presigned URL behavior; fixing S3 protocol issues.
 
