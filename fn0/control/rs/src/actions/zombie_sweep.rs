@@ -28,7 +28,7 @@ pub struct SweepStats {
 }
 
 pub async fn run_sweep() -> anyhow::Result<SweepStats> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let docs: Vec<WorkerHostStatusDoc> = WorkerHostStatusDocQuery {
         host_id: None,
         limit: None,

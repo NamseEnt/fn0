@@ -22,7 +22,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 
     let version = req.body.version.clone();
 
-    let result = doc_db::turso()
+    let result = doc_db::database()
         .trx(|trx| {
             let version = version.clone();
             async move {

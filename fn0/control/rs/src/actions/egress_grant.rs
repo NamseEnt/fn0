@@ -33,7 +33,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Error;
     }
     match grant_egress(
-        &doc_db::turso(),
+        &doc_db::database(),
         &req.body.project_id,
         req.body.requested_bytes,
         req.body.minimum_bytes,

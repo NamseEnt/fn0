@@ -130,6 +130,14 @@ pub fn semantic() -> Database {
     semantic_with_config(url)
 }
 
+/// Creates the backend-neutral document database used by normal fn0 guests.
+///
+/// The runtime supplies the endpoint and routes it through the semantic doc-db
+/// RPC boundary. The host backend is intentionally not part of this API.
+pub fn database() -> Database {
+    semantic()
+}
+
 pub fn semantic_with_config(url: String) -> Database {
     Database {
         inner: DatabaseInner::Remote(RemoteDatabase::new(url)),
@@ -638,8 +646,11 @@ mod semantic_tests {
         DocDbObservedDocument, DocDbOperation, DocDbRequest, DocDbResult, DocDbRevision,
         DocDbTransactOutcome,
     };
+    use std::sync::Mutex;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
+
+    static DATABASE_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[derive(serde::Deserialize, serde::Serialize)]
     struct TransactionTestDoc {
@@ -1157,6 +1168,38 @@ mod semantic_tests {
             operations.as_slice(),
             [DocDbOperation::Transact { conditions, mutations }]
                 if conditions.len() == 1 && mutations.len() == 1
+        ));
+    }
+
+    #[tokio::test]
+    async fn database_uses_the_semantic_rpc_endpoint() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let (url, server) = start_remote_server(vec![DocDbResponse::new(DocDbResult::Get {
+            data: Some(doc_db_protocol::BinaryDocument {
+                data: b"from-semantic-rpc".to_vec(),
+            }),
+        })])
+        .await;
+        let _environment_guard = DATABASE_ENV_LOCK.lock().unwrap();
+        let previous = std::env::var_os("FN0_DOC_DB_URL");
+        // Environment mutation is process-global; this test serializes it with
+        // the other constructor test state in this module.
+        unsafe { std::env::set_var("FN0_DOC_DB_URL", &url) };
+
+        let result = database().get("pk", "sk").await;
+
+        match previous {
+            Some(value) => unsafe { std::env::set_var("FN0_DOC_DB_URL", value) },
+            None => unsafe { std::env::remove_var("FN0_DOC_DB_URL") },
+        }
+        assert_eq!(
+            result.unwrap(),
+            Some(Bytes::from_static(b"from-semantic-rpc"))
+        );
+        let operations = server.await.unwrap();
+        assert!(matches!(
+            operations.as_slice(),
+            [DocDbOperation::Get { .. }]
         ));
     }
 }

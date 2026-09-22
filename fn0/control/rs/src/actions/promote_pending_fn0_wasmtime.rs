@@ -30,7 +30,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Unauthorized;
     }
 
-    let result = doc_db::turso()
+    let result = doc_db::database()
         .trx(|trx| async move {
             let mut handle = match trx.get(Fn0WasmtimeVersionDocGet {}).await? {
                 Some(h) => h,

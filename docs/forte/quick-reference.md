@@ -288,8 +288,9 @@ let value: Option<MyType> = unsign_cookie(req.jar, "session");
 | Variable | Used by | Notes |
 |---|---|---|
 | `COOKIE_SECRET` | `cookie_sign` | HMAC secret for signed cookies |
-| `TURSO_URL` | `doc-db` | Injected by `forte dev`; set in `env.yaml` for production |
-| `TURSO_AUTH_TOKEN` | `doc-db` | Injected by `forte dev`; set in `env.yaml` for production |
+| `FN0_DOC_DB_URL` | `doc_db::database()` | Semantic endpoint; injected automatically by fn0 |
+| `TURSO_URL` | legacy `doc_db::turso()` | Injected by `forte dev`; set in `env.yaml` for production |
+| `TURSO_AUTH_TOKEN` | legacy `doc_db::turso()` | Injected by `forte dev`; set in `env.yaml` for production |
 | `FN0_QUEUE_URL` | queue tasks | Injected by `forte dev`; required in production if using queue tasks |
 | `FN0_OBJECT_STORAGE_URL` | object-storage | Injected by `forte dev`; required in production |
 | `OTEL_SERVICE_NAME` | tracing/metrics | Service name in OTLP exports (default: `"forte-app"`) |

@@ -30,7 +30,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Unauthorized;
     }
     match resolve_singleton(
-        &doc_db::turso(),
+        &doc_db::database(),
         &req.body.project_id,
         &req.body.singleton_id,
         now(),

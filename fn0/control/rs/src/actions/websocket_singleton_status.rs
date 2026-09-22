@@ -38,7 +38,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     {
         return Output::Unauthorized;
     }
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let manifest = match (WorkerManifestDocGet {}).send_with(&db).await {
         Ok(Some(manifest)) => manifest,
         Ok(None) => return Output::Ignored,

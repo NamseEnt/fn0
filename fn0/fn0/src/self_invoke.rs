@@ -1247,7 +1247,8 @@ mod tests {
     use super::{ErrorCode, SelfInvokeHooks, SelfInvokeHooksOptions, WasiHttpHooks, guest_error};
     use crate::{MAX_REQUEST_BODY_SIZE, RequestBodyTooLarge};
     use bytes::Bytes;
-    use http_body_util::{BodyExt, Empty};
+    use doc_db_protocol::{DocDbKey, DocDbOperation, DocDbRequest, DocDbResponse, DocDbResult};
+    use http_body_util::{BodyExt, Empty, Full};
     use hyper::http;
     use std::sync::{
         Arc,
@@ -1339,5 +1340,72 @@ mod tests {
 
         assert_eq!(response.status(), 404);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn semantic_doc_db_requests_do_not_use_the_turso_hijack() {
+        struct SuccessDocDbService {
+            calls: Arc<AtomicUsize>,
+        }
+
+        impl crate::DocDbService for SuccessDocDbService {
+            fn execute<'a>(
+                &'a self,
+                _project_id: &'a str,
+                _request: DocDbRequest,
+            ) -> crate::DocDbServiceFuture<'a> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async { Ok(DocDbResponse::new(DocDbResult::Get { data: None })) })
+            }
+        }
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let doc_db_hijack = Arc::new(crate::DocDbHijack::new(
+            "fn0-doc-db.fn0.dev".to_string(),
+            Arc::new(SuccessDocDbService {
+                calls: calls.clone(),
+            }),
+        ));
+        let (self_invoke_sender, _receiver) = mpsc::unbounded_channel();
+        let mut hooks = SelfInvokeHooks::new(SelfInvokeHooksOptions {
+            project_id: "project".to_string(),
+            self_invoke_sender,
+            doc_db_hijack: Some(doc_db_hijack),
+            turso_hijack: Some(Arc::new(crate::TursoHijack {
+                placeholder_host: "fn0-db.fn0.dev".to_string(),
+                target_host_suffix: ".turso.example".to_string(),
+                group_token: "secret".to_string(),
+            })),
+            otlp_hijack: None,
+            queue_hijack: None,
+            cross_project_enqueue_hijack: None,
+            cross_project_invoke_hijack: None,
+            vault_hijack: None,
+            object_storage_hijack: None,
+            public_storage_hijack: None,
+            static_page_cache_hijack: None,
+            websocket_hijack: None,
+            guest_outbound_http: None,
+        });
+        let body = doc_db_protocol::encode_request(&DocDbRequest::new(DocDbOperation::Get {
+            key: DocDbKey::new("pk", "sk"),
+        }))
+        .unwrap();
+        let body = Full::new(Bytes::from(body))
+            .map_err(|never: std::convert::Infallible| match never {})
+            .boxed_unsync();
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri("http://fn0-doc-db.fn0.dev/rpc")
+            .header(hyper::header::CONTENT_TYPE, doc_db_protocol::CONTENT_TYPE)
+            .body(body)
+            .unwrap();
+
+        let request_future =
+            Box::into_pin(hooks.send_request(request, None, Box::new(async { Ok(()) })));
+        let (response, _io) = request_future.await.unwrap();
+
+        assert_eq!(response.status(), 200);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }

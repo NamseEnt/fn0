@@ -41,7 +41,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotLoggedIn;
     };
     authorize(
-        &doc_db::turso(),
+        &doc_db::database(),
         &req.body.operation,
         &req.body.account_id,
         req.body.project_id.as_deref(),

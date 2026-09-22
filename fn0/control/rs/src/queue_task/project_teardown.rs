@@ -28,7 +28,7 @@ pub struct Input {
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
     let project_id = input.project_id;
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let now = forte_sdk::now();
 
     let tombstone = ensure_revoke_pending(&db, &project_id, now).await?;

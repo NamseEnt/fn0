@@ -7,12 +7,12 @@ All documents are stored in a single table with a composite key: `pk` (partition
 ## Creating a Database Connection
 
 ```rust
-use doc_db::{Database, turso, memory};
+use doc_db::{Database, database, memory};
 
-// Production: reads TURSO_URL and TURSO_AUTH_TOKEN from environment
-let db: Database = turso();
+// Normal fn0 application code: uses the backend-neutral semantic RPC.
+let db: Database = database();
 
-// Explicit config
+// Legacy/direct Turso path for raw SQL, migrations, or explicit transactions.
 let db: Database = doc_db::turso_with_config(
     "https://my-db.turso.io".to_string(),
     "my-token".to_string(),
@@ -26,7 +26,20 @@ let db: Database = memory();
 
 ## Semantic RPC boundary
 
-`doc_db::semantic()` is the backend-neutral client used by a WASM fn0 guest. Its request payload contains document keys and operations, but no project or tenant identity. fn0 obtains the authoritative project identity from the invocation context before forwarding the request to the host service. The existing `doc_db::turso()` path remains available.
+Normal fn0 application code should use `doc_db::database()`. It is the
+backend-neutral client for the semantic document API. It reads
+`FN0_DOC_DB_URL`, and fn0 routes that endpoint through `DocDbHijack` to the
+host document service in both deployed workers and `forte dev`. The current
+host backend is an implementation detail and is not exposed to the guest.
+
+`doc_db::semantic()` and `doc_db::semantic_with_config()` remain available as
+compatibility APIs. `doc_db::turso()` and `doc_db::turso_with_config()` remain
+the direct/legacy path for raw SQL, migrations, or explicit session
+transactions. Do not switch those users to `database()`.
+
+The semantic request payload contains document keys and operations, but no
+project or tenant identity. fn0 obtains the authoritative project identity
+from the invocation context before forwarding the request to the host service.
 
 The semantic observed state uses an opaque `DocDbRevision`. A present document carries its revision. A missing document carries `Some(revision)` only when the backend has an exact revision for that missing state; `None` means that the backend knows only that the key is currently absent. Turso physically removes rows and therefore returns `None` for missing documents. A backend with persistent missing-state revisions must return the exact missing revision, including revision zero for a key that has never existed. The `trx` layer turns an exact missing revision into `RevisionEquals`, preserving insert-delete ABA detection, and uses `NotExists` when no exact revision is available.
 
@@ -94,10 +107,10 @@ let ops = vec![
 db.batch(&ops).await?;
 ```
 
-### `transaction` — explicit ACID transaction
+### `transaction` — explicit ACID transaction (legacy/direct Turso only)
 
 ```rust
-let mut tx = db.transaction().await?;
+let mut tx = doc_db::turso().transaction().await?;
 let data = tx.get("User/id=42", "profile").await?;
 tx.put("User/id=42", "profile", &new_data).await?;
 tx.commit().await?;
@@ -257,7 +270,7 @@ UserDelete { id: "alice".to_string(), version: 1 }
     .await?;
 ```
 
-## Raw SQL
+## Raw SQL (legacy/direct Turso only)
 
 ```rust
 use doc_db::Value;

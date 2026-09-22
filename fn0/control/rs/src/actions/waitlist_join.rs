@@ -43,7 +43,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     let now = forte_sdk::now();
-    let result = doc_db::turso()
+    let result = doc_db::database()
         .trx(|trx| {
             let email = email.clone();
             let tier = tier.clone();

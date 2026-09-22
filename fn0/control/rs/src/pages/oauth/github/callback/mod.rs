@@ -37,7 +37,7 @@ pub async fn handler(req: ForteRequest<'_>, search_params: SearchParams) -> anyh
         None => return Ok(Redirect::Login),
     };
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let user = match (UserDocGet {
         github_id: gh_user.id,
     })
