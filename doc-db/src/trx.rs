@@ -86,7 +86,7 @@ where
     ) -> Result<Self::Output> {
         let stored = results
             .next()
-            .ok_or_else(|| anyhow!("trx batch result missing for read"))?;
+            .ok_or_else(|| anyhow!("trx observed result missing for read"))?;
         let key = self.key();
         tx.inner
             .lock()
@@ -184,7 +184,7 @@ impl Trx {
 
         let key_pairs: Vec<(String, String)> =
             keys.iter().map(|k| (k.pk.clone(), k.sk.clone())).collect();
-        let stored = self.batch_load(&key_pairs).await?;
+        let stored = self.load_observed(&key_pairs).await?;
 
         let mut iter = stored.into_iter();
         request.finalize(self, &mut iter).await
@@ -209,10 +209,34 @@ impl Trx {
         })
     }
 
-    async fn batch_load(&self, keys: &[(String, String)]) -> Result<Vec<ObservedDocument>> {
+    async fn load_observed(&self, keys: &[(String, String)]) -> Result<Vec<ObservedDocument>> {
         let db = self.inner.lock().unwrap().db.clone();
-        db.batch_get_observed(keys).await
+        get_observed_many_concurrently(&db, keys).await
     }
+}
+
+async fn get_observed_many_concurrently(
+    db: &Database,
+    keys: &[(String, String)],
+) -> Result<Vec<ObservedDocument>> {
+    let results =
+        futures::future::join_all(keys.iter().map(|(pk, sk)| db.get_observed(pk, sk))).await;
+    let mut observations = Vec::with_capacity(results.len());
+    let mut first_error = None;
+    for result in results {
+        match result {
+            Ok(observation) => observations.push(observation),
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+        }
+    }
+    if let Some(error) = first_error {
+        return Err(error);
+    }
+    Ok(observations)
 }
 
 pub struct TrxControl<Out, Cancel> {
@@ -614,7 +638,7 @@ async fn commit_entries(
             .iter()
             .map(|c| (c.key.pk.clone(), c.key.sk.clone()))
             .collect();
-        if let Ok(observed) = db.batch_get_observed(&key_pairs).await {
+        if let Ok(observed) = get_observed_many_concurrently(&db, &key_pairs).await {
             for (conflict, observation) in conflicts.iter_mut().zip(observed.into_iter()) {
                 conflict.actual_revision = match observation {
                     ObservedDocument::Present { revision, .. } => Some(revision),

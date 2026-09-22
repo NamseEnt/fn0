@@ -1,6 +1,6 @@
 use crate::{
-    BatchOp, DbOp, DbResult, ObservedDocument, TransactCondition, TransactConflict,
-    TransactMutation, TransactOutcome, TransactRequest, revision_from_backend,
+    ObservedDocument, TransactCondition, TransactConflict, TransactMutation, TransactOutcome,
+    TransactRequest, revision_from_backend,
 };
 use anyhow::{Result, bail};
 use bytes::Bytes;
@@ -84,21 +84,6 @@ impl MemoryDatabase {
         Ok(scan_store(&store, after, limit))
     }
 
-    pub(crate) async fn batch(&self, ops: &[BatchOp<'_>]) -> Result<()> {
-        let mut store = self.store.lock().unwrap();
-        for op in ops {
-            match op {
-                BatchOp::Put { pk, sk, data } => {
-                    upsert(&mut store, pk, sk, data);
-                }
-                BatchOp::Delete { pk, sk } => {
-                    store.remove(&(pk.to_string(), sk.to_string()));
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub(crate) async fn execute_raw(
         &self,
         sql: &str,
@@ -111,42 +96,6 @@ impl MemoryDatabase {
         } else {
             Ok(vec![])
         }
-    }
-
-    pub(crate) async fn execute_ops(&self, ops: Vec<DbOp>) -> Result<Vec<DbResult>> {
-        let mut results = Vec::new();
-        for op in &ops {
-            match op {
-                DbOp::Get { pk, sk } => {
-                    let data = self
-                        .store
-                        .lock()
-                        .unwrap()
-                        .get(&(pk.clone(), sk.clone()))
-                        .map(|doc| Bytes::from(doc.data.clone()));
-                    results.push(DbResult::Single(data));
-                }
-                DbOp::Query {
-                    pk,
-                    after_sk,
-                    limit,
-                } => {
-                    let store = self.store.lock().unwrap();
-                    let items =
-                        query_store(&store, pk, after_sk.as_deref(), limit.unwrap_or(usize::MAX));
-                    results.push(DbResult::Multiple(items));
-                }
-                DbOp::Put { pk, sk, data } => {
-                    upsert(&mut self.store.lock().unwrap(), pk, sk, data);
-                    results.push(DbResult::Done);
-                }
-                DbOp::Delete { pk, sk } => {
-                    self.store.lock().unwrap().remove(&(pk.clone(), sk.clone()));
-                    results.push(DbResult::Done);
-                }
-            }
-        }
-        Ok(results)
     }
 
     pub(crate) async fn transaction(&self) -> Result<MemoryTransaction> {

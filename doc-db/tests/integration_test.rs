@@ -1,4 +1,6 @@
-use doc_db::{BatchOp, DbOp, DbResult, DocGet, DocKey, Document, TrxResult, turso_with_config};
+use doc_db::{
+    DbOp, DbRequest, DbResult, DocGet, DocKey, Document, Prepared, TrxResult, turso_with_config,
+};
 use serde::{Deserialize, Serialize};
 
 forte_sdk::test_main!();
@@ -37,6 +39,100 @@ impl DocGet for TrxDocGet {
 
 fn trx_get(id: &'static str) -> TrxDocGet {
     TrxDocGet { id }
+}
+
+struct RawGet {
+    pk: String,
+    sk: String,
+}
+
+impl DbRequest for RawGet {
+    type Output = Option<Vec<u8>>;
+
+    fn prepare(self) -> Prepared<Self::Output> {
+        Prepared {
+            ops: vec![DbOp::Get {
+                pk: self.pk,
+                sk: self.sk,
+            }],
+            parse: Box::new(|iter| match iter.next().unwrap() {
+                DbResult::Single(value) => Ok(value.map(|bytes| bytes.to_vec())),
+                _ => panic!("unexpected get result"),
+            }),
+        }
+    }
+}
+
+struct RawQuery {
+    pk: String,
+    limit: Option<usize>,
+}
+
+impl DbRequest for RawQuery {
+    type Output = Vec<(String, Vec<u8>)>;
+
+    fn prepare(self) -> Prepared<Self::Output> {
+        Prepared {
+            ops: vec![DbOp::Query {
+                pk: self.pk,
+                after_sk: None,
+                limit: self.limit,
+            }],
+            parse: Box::new(|iter| match iter.next().unwrap() {
+                DbResult::Multiple(items) => Ok(items
+                    .into_iter()
+                    .map(|(sk, bytes)| (sk, bytes.to_vec()))
+                    .collect()),
+                _ => panic!("unexpected query result"),
+            }),
+        }
+    }
+}
+
+struct RawPut {
+    pk: String,
+    sk: String,
+    data: Vec<u8>,
+}
+
+impl DbRequest for RawPut {
+    type Output = ();
+
+    fn prepare(self) -> Prepared<Self::Output> {
+        Prepared {
+            ops: vec![DbOp::Put {
+                pk: self.pk,
+                sk: self.sk,
+                data: self.data,
+            }],
+            parse: Box::new(|iter| match iter.next().unwrap() {
+                DbResult::Done => Ok(()),
+                _ => panic!("unexpected put result"),
+            }),
+        }
+    }
+}
+
+struct RawDelete {
+    pk: String,
+    sk: String,
+}
+
+impl DbRequest for RawDelete {
+    type Output = ();
+
+    fn prepare(self) -> Prepared<Self::Output> {
+        Prepared {
+            ops: vec![DbOp::Delete {
+                pk: self.pk,
+                sk: self.sk,
+            }],
+            parse: Box::new(|iter| match iter.next().unwrap() {
+                DbResult::Done => Ok(()),
+                _ => panic!("unexpected delete result"),
+            }),
+        }
+    }
 }
 
 async fn put_trx_doc(db: &doc_db::Database, id: &'static str, value: i32) {
@@ -257,114 +353,51 @@ async fn test_scan() {
 }
 
 #[forte_sdk::test]
-async fn test_batch_put() {
+async fn test_unconditional_transaction() {
     let db = create_test_db();
 
-    let pk = "batch_test_pk";
+    assert!(matches!(
+        db.trx(|trx| async move {
+            trx.create(TrxDoc {
+                id: "one".to_string(),
+                value: 1,
+            })?;
+            trx.create(TrxDoc {
+                id: "two".to_string(),
+                value: 2,
+            })?;
+            trx.create(TrxDoc {
+                id: "three".to_string(),
+                value: 3,
+            })?;
+            trx.commit::<(), ()>(())
+        })
+        .await,
+        TrxResult::Committed(())
+    ));
 
-    // Batch put multiple items
-    let ops = vec![
-        BatchOp::Put {
-            pk,
-            sk: "sk_1",
-            data: b"data_1",
-        },
-        BatchOp::Put {
-            pk,
-            sk: "sk_2",
-            data: b"data_2",
-        },
-        BatchOp::Put {
-            pk,
-            sk: "sk_3",
-            data: b"data_3",
-        },
-    ];
-
-    db.batch(&ops).await.expect("Batch put failed");
-
-    // Verify all items were inserted
-    let result = db.query(pk, None::<&str>, 10).await.expect("Query failed");
-    assert_eq!(result.len(), 3);
-    assert_eq!(result[0].0, "sk_1");
-    assert_eq!(result[1].0, "sk_2");
-    assert_eq!(result[2].0, "sk_3");
-
-    // Cleanup with batch delete
-    let delete_ops = vec![
-        BatchOp::Delete { pk, sk: "sk_1" },
-        BatchOp::Delete { pk, sk: "sk_2" },
-        BatchOp::Delete { pk, sk: "sk_3" },
-    ];
-    db.batch(&delete_ops).await.expect("Batch delete failed");
-
-    // Verify all items were deleted
-    let result = db.query(pk, None::<&str>, 10).await.expect("Query failed");
-    assert_eq!(result.len(), 0);
-}
-
-#[forte_sdk::test]
-async fn test_batch_mixed_operations() {
-    let db = create_test_db();
-
-    let pk = "batch_mixed_pk";
-
-    // First, put some initial data
-    db.put(pk, "sk_to_keep", b"keep this")
+    let rows = db
+        .query("TrxIntegrationDoc", None::<&str>, 10)
         .await
-        .expect("Put failed");
-    db.put(pk, "sk_to_delete", b"delete this")
+        .expect("Query failed");
+    assert_eq!(rows.len(), 3);
+
+    assert!(matches!(
+        db.trx(|trx| async move {
+            let doc = trx.get(trx_get("two")).await?.unwrap();
+            doc.delete();
+            trx.commit::<(), ()>(())
+        })
+        .await,
+        TrxResult::Committed(())
+    ));
+
+    let rows = db
+        .query("TrxIntegrationDoc", None::<&str>, 10)
         .await
-        .expect("Put failed");
-
-    // Batch: add new item, update existing, delete another
-    let ops = vec![
-        BatchOp::Put {
-            pk,
-            sk: "sk_new",
-            data: b"new data",
-        },
-        BatchOp::Put {
-            pk,
-            sk: "sk_to_keep",
-            data: b"updated data",
-        },
-        BatchOp::Delete {
-            pk,
-            sk: "sk_to_delete",
-        },
-    ];
-
-    db.batch(&ops).await.expect("Batch mixed failed");
-
-    // Verify results
-    let kept = db
-        .get(pk, "sk_to_keep")
-        .await
-        .expect("Get failed")
-        .expect("Should exist");
-    assert_eq!(kept.as_ref(), b"updated data");
-
-    let new_item = db
-        .get(pk, "sk_new")
-        .await
-        .expect("Get failed")
-        .expect("Should exist");
-    assert_eq!(new_item.as_ref(), b"new data");
-
-    let deleted = db.get(pk, "sk_to_delete").await.expect("Get failed");
-    assert!(deleted.is_none(), "Should be deleted");
-
-    // Cleanup
-    db.batch(&[
-        BatchOp::Delete {
-            pk,
-            sk: "sk_to_keep",
-        },
-        BatchOp::Delete { pk, sk: "sk_new" },
-    ])
-    .await
-    .expect("Cleanup failed");
+        .expect("Query failed");
+    assert_eq!(rows.len(), 2);
+    cleanup_trx_docs(&db, &["one", "three"]).await;
 }
 
 #[forte_sdk::test]
@@ -476,76 +509,61 @@ async fn test_transaction_delete() {
 }
 
 #[forte_sdk::test]
-async fn test_execute_ops_single_get() {
+async fn test_send_with_single_get() {
     let db = create_test_db();
     let pk = "exec_ops_get_pk";
     let sk = "sk_1";
 
     db.put(pk, sk, b"hello").await.expect("Put failed");
 
-    let results = db
-        .execute_ops(vec![DbOp::Get {
-            pk: pk.to_string(),
-            sk: sk.to_string(),
-        }])
-        .await
-        .expect("execute_ops failed");
-
-    assert_eq!(results.len(), 1);
-    match &results[0] {
-        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"hello"),
-        _ => panic!("Expected Single(Some(...))"),
-    }
+    let result = (RawGet {
+        pk: pk.to_string(),
+        sk: sk.to_string(),
+    })
+    .send_with(&db)
+    .await
+    .expect("send_with failed");
+    assert_eq!(result.as_deref(), Some(b"hello".as_slice()));
 
     db.delete(pk, sk).await.expect("Delete failed");
 }
 
 #[forte_sdk::test]
-async fn test_execute_ops_multiple() {
+async fn test_send_with_vec_gets() {
     let db = create_test_db();
     let pk = "exec_ops_multi_pk";
 
     db.put(pk, "sk_a", b"aaa").await.expect("Put failed");
     db.put(pk, "sk_b", b"bbb").await.expect("Put failed");
 
-    let results = db
-        .execute_ops(vec![
-            DbOp::Get {
-                pk: pk.to_string(),
-                sk: "sk_a".to_string(),
-            },
-            DbOp::Get {
-                pk: pk.to_string(),
-                sk: "sk_b".to_string(),
-            },
-            DbOp::Get {
-                pk: pk.to_string(),
-                sk: "sk_nonexistent".to_string(),
-            },
-        ])
-        .await
-        .expect("execute_ops failed");
+    let results = vec![
+        RawGet {
+            pk: pk.to_string(),
+            sk: "sk_a".to_string(),
+        },
+        RawGet {
+            pk: pk.to_string(),
+            sk: "sk_b".to_string(),
+        },
+        RawGet {
+            pk: pk.to_string(),
+            sk: "sk_nonexistent".to_string(),
+        },
+    ]
+    .send_with(&db)
+    .await
+    .expect("send_with failed");
 
-    assert_eq!(results.len(), 3);
-    match &results[0] {
-        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"aaa"),
-        _ => panic!("Expected Single(Some(...)) for sk_a"),
-    }
-    match &results[1] {
-        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"bbb"),
-        _ => panic!("Expected Single(Some(...)) for sk_b"),
-    }
-    match &results[2] {
-        DbResult::Single(None) => {}
-        _ => panic!("Expected Single(None) for nonexistent"),
-    }
+    assert_eq!(results[0].as_deref(), Some(b"aaa".as_slice()));
+    assert_eq!(results[1].as_deref(), Some(b"bbb".as_slice()));
+    assert!(results[2].is_none());
 
     db.delete(pk, "sk_a").await.expect("Delete failed");
     db.delete(pk, "sk_b").await.expect("Delete failed");
 }
 
 #[forte_sdk::test]
-async fn test_execute_ops_query() {
+async fn test_send_with_single_query() {
     let db = create_test_db();
     let pk = "exec_ops_query_pk";
 
@@ -556,25 +574,17 @@ async fn test_execute_ops_query() {
             .expect("Put failed");
     }
 
-    let results = db
-        .execute_ops(vec![DbOp::Query {
-            pk: pk.to_string(),
-            after_sk: None,
-            limit: Some(3),
-        }])
-        .await
-        .expect("execute_ops failed");
-
-    assert_eq!(results.len(), 1);
-    match &results[0] {
-        DbResult::Multiple(items) => {
-            assert_eq!(items.len(), 3);
-            assert_eq!(items[0].0, "sk_00");
-            assert_eq!(items[1].0, "sk_01");
-            assert_eq!(items[2].0, "sk_02");
-        }
-        _ => panic!("Expected Multiple"),
-    }
+    let results = (RawQuery {
+        pk: pk.to_string(),
+        limit: Some(3),
+    })
+    .send_with(&db)
+    .await
+    .expect("send_with failed");
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].0, "sk_00");
+    assert_eq!(results[1].0, "sk_01");
+    assert_eq!(results[2].0, "sk_02");
 
     for i in 0..5 {
         let sk = format!("sk_{:02}", i);
@@ -583,45 +593,38 @@ async fn test_execute_ops_query() {
 }
 
 #[forte_sdk::test]
-async fn test_execute_ops_put_and_delete() {
+async fn test_send_with_tuple_put_and_delete() {
     let db = create_test_db();
     let pk = "exec_ops_put_del_pk";
 
-    let results = db
-        .execute_ops(vec![
-            DbOp::Put {
-                pk: pk.to_string(),
-                sk: "sk_1".to_string(),
-                data: b"data_1".to_vec(),
-            },
-            DbOp::Put {
-                pk: pk.to_string(),
-                sk: "sk_2".to_string(),
-                data: b"data_2".to_vec(),
-            },
-        ])
+    (
+        RawPut {
+            pk: pk.to_string(),
+            sk: "sk_1".to_string(),
+            data: b"data_1".to_vec(),
+        },
+        RawPut {
+            pk: pk.to_string(),
+            sk: "sk_2".to_string(),
+            data: b"data_2".to_vec(),
+        },
+    )
+        .send_with(&db)
         .await
-        .expect("execute_ops put failed");
-
-    assert_eq!(results.len(), 2);
-    assert!(matches!(&results[0], DbResult::Done));
-    assert!(matches!(&results[1], DbResult::Done));
+        .expect("send_with put failed");
 
     let got = db.get(pk, "sk_1").await.expect("Get failed");
     assert_eq!(got.unwrap().as_ref(), b"data_1");
     let got = db.get(pk, "sk_2").await.expect("Get failed");
     assert_eq!(got.unwrap().as_ref(), b"data_2");
 
-    let results = db
-        .execute_ops(vec![DbOp::Delete {
-            pk: pk.to_string(),
-            sk: "sk_1".to_string(),
-        }])
-        .await
-        .expect("execute_ops delete failed");
-
-    assert_eq!(results.len(), 1);
-    assert!(matches!(&results[0], DbResult::Done));
+    (RawDelete {
+        pk: pk.to_string(),
+        sk: "sk_1".to_string(),
+    })
+    .send_with(&db)
+    .await
+    .expect("send_with delete failed");
 
     let got = db.get(pk, "sk_1").await.expect("Get failed");
     assert!(got.is_none());
@@ -630,7 +633,7 @@ async fn test_execute_ops_put_and_delete() {
 }
 
 #[forte_sdk::test]
-async fn test_execute_ops_mixed() {
+async fn test_send_with_heterogeneous_independent_operations() {
     let db = create_test_db();
     let pk = "exec_ops_mixed_pk";
 
@@ -638,39 +641,35 @@ async fn test_execute_ops_mixed() {
         .await
         .expect("Put failed");
 
-    let results = db
-        .execute_ops(vec![
-            DbOp::Get {
-                pk: pk.to_string(),
-                sk: "sk_existing".to_string(),
-            },
-            DbOp::Put {
-                pk: pk.to_string(),
-                sk: "sk_new".to_string(),
-                data: b"new_data".to_vec(),
-            },
-            DbOp::Query {
-                pk: pk.to_string(),
-                after_sk: None,
-                limit: None,
-            },
-        ])
+    let (existing, (), items) = (
+        RawGet {
+            pk: pk.to_string(),
+            sk: "sk_existing".to_string(),
+        },
+        RawPut {
+            pk: pk.to_string(),
+            sk: "sk_new".to_string(),
+            data: b"new_data".to_vec(),
+        },
+        RawQuery {
+            pk: pk.to_string(),
+            limit: None,
+        },
+    )
+        .send_with(&db)
         .await
-        .expect("execute_ops mixed failed");
+        .expect("send_with mixed failed");
 
-    assert_eq!(results.len(), 3);
-
-    match &results[0] {
-        DbResult::Single(Some(data)) => assert_eq!(data.as_ref(), b"old_data"),
-        _ => panic!("Expected Single(Some(...))"),
-    }
-    assert!(matches!(&results[1], DbResult::Done));
-    match &results[2] {
-        DbResult::Multiple(items) => {
-            assert_eq!(items.len(), 2);
-        }
-        _ => panic!("Expected Multiple"),
-    }
+    assert_eq!(existing.as_deref(), Some(b"old_data".as_slice()));
+    assert!(
+        items
+            .iter()
+            .any(|(sk, data)| sk == "sk_existing" && data.as_ref() == b"old_data")
+    );
+    assert_eq!(
+        db.get(pk, "sk_new").await.expect("Get failed").as_deref(),
+        Some(b"new_data".as_slice())
+    );
 
     db.delete(pk, "sk_existing").await.expect("Cleanup failed");
     db.delete(pk, "sk_new").await.expect("Cleanup failed");

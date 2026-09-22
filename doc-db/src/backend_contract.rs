@@ -1,5 +1,5 @@
 use crate::{
-    Database, DbOp, DbResult, DocDbRevision, ObservedDocument, TransactCondition, TransactMutation,
+    Database, DocDbRevision, ObservedDocument, TransactCondition, TransactMutation,
     TransactRequest, memory, turso_with_config,
 };
 use anyhow::Result;
@@ -55,7 +55,6 @@ where
     empty_transaction_contract(&db).await?;
     query_contract(&db, &prefix).await?;
     scan_contract(&new_database(), &prefix).await?;
-    execute_ops_order_contract(&db, &prefix).await?;
     cleanup_backend_contract_data(&db).await?;
 
     Ok(())
@@ -97,10 +96,6 @@ fn unique_prefix(backend_name: &str) -> String {
 
 fn key(prefix: &str, name: &str) -> (String, String) {
     (format!("{prefix}/{name}"), "doc".to_string())
-}
-
-fn transact_key(pk: &str, sk: &str) -> (String, String) {
-    (pk.to_string(), sk.to_string())
 }
 
 fn transact_request(
@@ -167,22 +162,23 @@ async fn observed_read_contract(
     let (observed_data, revision) = expect_present(db, &present_pk, &present_sk, data).await?;
     assert_eq!(observed_data.as_ref(), data);
 
-    let observations = db
-        .batch_get_observed(&[
-            transact_key(&present_pk, &present_sk),
-            transact_key(&missing_pk, &missing_sk),
-        ])
-        .await?;
+    let observations = futures::future::join_all([
+        db.get_observed(&present_pk, &present_sk),
+        db.get_observed(&missing_pk, &missing_sk),
+    ])
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>>>()?;
     assert_eq!(observations.len(), 2);
     match &observations[0] {
         ObservedDocument::Present {
-            data: batch_data,
-            revision: batch_revision,
+            data: observed_data,
+            revision: observed_revision,
         } => {
-            assert_eq!(batch_data.as_ref(), data);
-            assert_eq!(*batch_revision, revision);
+            assert_eq!(observed_data.as_ref(), data);
+            assert_eq!(*observed_revision, revision);
         }
-        ObservedDocument::Missing { .. } => panic!("present observation was missing in batch"),
+        ObservedDocument::Missing { .. } => panic!("present observation was missing"),
     }
     assert!(matches!(
         observations[1],
@@ -632,47 +628,6 @@ async fn scan_contract(db: &Database, prefix: &str) -> Result<()> {
         ]
     );
 
-    Ok(())
-}
-
-async fn execute_ops_order_contract(db: &Database, prefix: &str) -> Result<()> {
-    let (pk, sk) = key(prefix, "execute-ops-order");
-    let results = db
-        .execute_ops(vec![
-            DbOp::Put {
-                pk: pk.clone(),
-                sk: sk.clone(),
-                data: b"inserted".to_vec(),
-            },
-            DbOp::Get {
-                pk: pk.clone(),
-                sk: sk.clone(),
-            },
-        ])
-        .await?;
-    assert!(matches!(
-        results.as_slice(),
-        [DbResult::Done, DbResult::Single(Some(data))] if data.as_ref() == b"inserted"
-    ));
-
-    let results = db
-        .execute_ops(vec![
-            DbOp::Put {
-                pk: pk.clone(),
-                sk: sk.clone(),
-                data: b"deleted".to_vec(),
-            },
-            DbOp::Delete {
-                pk: pk.clone(),
-                sk: sk.clone(),
-            },
-            DbOp::Get { pk, sk },
-        ])
-        .await?;
-    assert!(matches!(
-        results.as_slice(),
-        [DbResult::Done, DbResult::Done, DbResult::Single(None)]
-    ));
     Ok(())
 }
 

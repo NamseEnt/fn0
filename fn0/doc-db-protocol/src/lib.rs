@@ -45,39 +45,12 @@ pub enum DocDbOperation {
         after: Option<DocDbKey>,
         limit: u64,
     },
-    Batch {
-        operations: Vec<DocDbBatchOperation>,
-    },
-    BatchGetObserved {
-        keys: Vec<DocDbKey>,
-    },
-    ExecuteOps {
-        operations: Vec<DocDbBasicOperation>,
+    GetObserved {
+        key: DocDbKey,
     },
     Transact {
         conditions: Vec<DocDbCondition>,
         mutations: Vec<DocDbMutation>,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "value", deny_unknown_fields)]
-pub enum DocDbBasicOperation {
-    Get {
-        key: DocDbKey,
-    },
-    Query {
-        pk: String,
-        after_sk: Option<String>,
-        limit: Option<u64>,
-    },
-    Put {
-        key: DocDbKey,
-        #[serde(with = "base64_bytes")]
-        data: Vec<u8>,
-    },
-    Delete {
-        key: DocDbKey,
     },
 }
 
@@ -95,19 +68,6 @@ impl DocDbKey {
             sk: sk.into(),
         }
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "value", deny_unknown_fields)]
-pub enum DocDbBatchOperation {
-    Put {
-        key: DocDbKey,
-        #[serde(with = "base64_bytes")]
-        data: Vec<u8>,
-    },
-    Delete {
-        key: DocDbKey,
-    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -175,30 +135,14 @@ impl DocDbResponse {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", deny_unknown_fields)]
 pub enum DocDbResult {
-    Get {
-        data: Option<BinaryDocument>,
-    },
+    Get { data: Option<BinaryDocument> },
     Put,
     Delete,
-    Query {
-        documents: Vec<DocDbDocument>,
-    },
-    Scan {
-        documents: Vec<DocDbDocument>,
-    },
-    Batch,
-    BatchGetObserved {
-        documents: Vec<DocDbObservedDocument>,
-    },
-    ExecuteOps {
-        results: Vec<DocDbBasicResult>,
-    },
-    Transact {
-        outcome: DocDbTransactOutcome,
-    },
-    Error {
-        error: DocDbError,
-    },
+    Query { documents: Vec<DocDbDocument> },
+    Scan { documents: Vec<DocDbDocument> },
+    GetObserved { document: DocDbObservedDocument },
+    Transact { outcome: DocDbTransactOutcome },
+    Error { error: DocDbError },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -214,15 +158,6 @@ pub struct DocDbDocument {
     pub key: DocDbKey,
     #[serde(with = "base64_bytes")]
     pub data: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "value", deny_unknown_fields)]
-pub enum DocDbBasicResult {
-    Get { data: Option<BinaryDocument> },
-    Query { documents: Vec<DocDbDocument> },
-    Put,
-    Delete,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -373,14 +308,8 @@ mod tests {
                 after: Some(DocDbKey::new("after-pk", "after-sk")),
                 limit: 19,
             },
-            DocDbOperation::Batch {
-                operations: vec![DocDbBatchOperation::Put {
-                    key: DocDbKey::new("pk", "batch"),
-                    data: data.clone(),
-                }],
-            },
-            DocDbOperation::BatchGetObserved {
-                keys: vec![DocDbKey::new("pk", "observed")],
+            DocDbOperation::GetObserved {
+                key: DocDbKey::new("pk", "observed"),
             },
             DocDbOperation::Transact {
                 conditions: vec![
@@ -405,25 +334,6 @@ mod tests {
                     },
                 ],
             },
-            DocDbOperation::ExecuteOps {
-                operations: vec![
-                    DocDbBasicOperation::Get {
-                        key: DocDbKey::new("pk", "get"),
-                    },
-                    DocDbBasicOperation::Query {
-                        pk: "pk".to_string(),
-                        after_sk: Some("after".to_string()),
-                        limit: None,
-                    },
-                    DocDbBasicOperation::Put {
-                        key: DocDbKey::new("pk", "put"),
-                        data: data.clone(),
-                    },
-                    DocDbBasicOperation::Delete {
-                        key: DocDbKey::new("pk", "delete"),
-                    },
-                ],
-            },
         ];
 
         for operation in requests {
@@ -434,14 +344,11 @@ mod tests {
         }
 
         let responses = vec![
-            DocDbResponse::new(DocDbResult::BatchGetObserved {
-                documents: vec![
-                    DocDbObservedDocument::Present {
-                        data: data.clone(),
-                        revision: DocDbRevision::new(9),
-                    },
-                    DocDbObservedDocument::Missing { revision: None },
-                ],
+            DocDbResponse::new(DocDbResult::GetObserved {
+                document: DocDbObservedDocument::Present {
+                    data: data.clone(),
+                    revision: DocDbRevision::new(9),
+                },
             }),
             DocDbResponse::new(DocDbResult::Transact {
                 outcome: DocDbTransactOutcome::Conflict { condition_index: 3 },
@@ -492,10 +399,10 @@ mod tests {
     #[test]
     fn round_trips_revisions_above_i64_max() {
         let revision = DocDbRevision::new(i64::MAX as u64 + 1);
-        let response = DocDbResponse::new(DocDbResult::BatchGetObserved {
-            documents: vec![DocDbObservedDocument::Missing {
+        let response = DocDbResponse::new(DocDbResult::GetObserved {
+            document: DocDbObservedDocument::Missing {
                 revision: Some(revision),
-            }],
+            },
         });
         let encoded = encode_response(&response).unwrap();
         assert_eq!(decode_response(&encoded).unwrap(), response);

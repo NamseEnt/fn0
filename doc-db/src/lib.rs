@@ -14,9 +14,8 @@ use anyhow::Result;
 use bytes::Bytes;
 pub use doc_db_protocol::DocDbRevision;
 use doc_db_protocol::{
-    DocDbBasicOperation, DocDbBasicResult, DocDbBatchOperation, DocDbCondition, DocDbDocument,
-    DocDbError, DocDbKey, DocDbMutation, DocDbObservedDocument, DocDbOperation, DocDbResponse,
-    DocDbResult, DocDbTransactOutcome,
+    DocDbCondition, DocDbDocument, DocDbError, DocDbKey, DocDbMutation, DocDbObservedDocument,
+    DocDbOperation, DocDbResponse, DocDbResult, DocDbTransactOutcome,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use dodb::{
@@ -44,18 +43,6 @@ pub fn text_value(s: impl Into<String>) -> Value {
 
 pub fn integer_value(i: i64) -> Value {
     Value::Integer { value: i }
-}
-
-pub enum BatchOp<'a> {
-    Put {
-        pk: &'a str,
-        sk: &'a str,
-        data: &'a [u8],
-    },
-    Delete {
-        pk: &'a str,
-        sk: &'a str,
-    },
 }
 
 pub enum WriteOp {
@@ -276,17 +263,6 @@ impl Database {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(ops = ops.len()))]
-    pub async fn batch(&self, ops: &[BatchOp<'_>]) -> Result<()> {
-        match &self.inner {
-            DatabaseInner::Turso(db) => db.batch(ops).await,
-            DatabaseInner::Memory(db) => db.batch(ops).await,
-            DatabaseInner::Remote(db) => db.batch(ops).await,
-            #[cfg(not(target_arch = "wasm32"))]
-            DatabaseInner::Dodb(db) => db.batch(ops).await,
-        }
-    }
-
     pub async fn execute_semantic(
         &self,
         request: doc_db_protocol::DocDbRequest,
@@ -353,51 +329,19 @@ impl Database {
                     .collect();
                 Ok(DocDbResponse::new(DocDbResult::Scan { documents }))
             }
-            DocDbOperation::Batch { operations } => {
-                let batch_operations: Vec<BatchOp<'_>> = operations
-                    .iter()
-                    .map(|operation| match operation {
-                        DocDbBatchOperation::Put { key, data } => BatchOp::Put {
-                            pk: &key.pk,
-                            sk: &key.sk,
-                            data,
-                        },
-                        DocDbBatchOperation::Delete { key } => BatchOp::Delete {
-                            pk: &key.pk,
-                            sk: &key.sk,
-                        },
-                    })
-                    .collect();
-                self.batch(&batch_operations).await?;
-                Ok(DocDbResponse::new(DocDbResult::Batch))
-            }
-            DocDbOperation::BatchGetObserved { keys } => {
-                let keys = keys
-                    .into_iter()
-                    .map(|key| (key.pk, key.sk))
-                    .collect::<Vec<_>>();
-                let documents = self
-                    .batch_get_observed(&keys)
-                    .await?
-                    .into_iter()
-                    .map(|document| match document {
-                        ObservedDocument::Present { data, revision } => {
-                            DocDbObservedDocument::Present {
-                                data: data.to_vec(),
-                                revision,
-                            }
+            DocDbOperation::GetObserved { key } => {
+                let document = match self.get_observed(&key.pk, &key.sk).await? {
+                    ObservedDocument::Present { data, revision } => {
+                        DocDbObservedDocument::Present {
+                            data: data.to_vec(),
+                            revision,
                         }
-                        ObservedDocument::Missing { revision } => {
-                            DocDbObservedDocument::Missing { revision }
-                        }
-                    })
-                    .collect();
-                Ok(DocDbResponse::new(DocDbResult::BatchGetObserved {
-                    documents,
-                }))
-            }
-            DocDbOperation::ExecuteOps { operations } => {
-                self.execute_semantic_ops(operations).await
+                    }
+                    ObservedDocument::Missing { revision } => {
+                        DocDbObservedDocument::Missing { revision }
+                    }
+                };
+                Ok(DocDbResponse::new(DocDbResult::GetObserved { document }))
             }
             DocDbOperation::Transact {
                 conditions,
@@ -457,38 +401,6 @@ impl Database {
                 Ok(DocDbResponse::new(DocDbResult::Transact { outcome }))
             }
         }
-    }
-
-    async fn execute_semantic_ops(
-        &self,
-        operations: Vec<DocDbBasicOperation>,
-    ) -> Result<DocDbResponse> {
-        let db_operations = match operations
-            .iter()
-            .map(basic_operation_to_db_op)
-            .collect::<Result<Vec<_>>>()
-        {
-            Ok(operations) => operations,
-            Err(error) => {
-                return Ok(DocDbResponse::error(DocDbError::InvalidRequest {
-                    message: error.to_string(),
-                }));
-            }
-        };
-        let db_results = self.execute_ops(db_operations).await?;
-        if db_results.len() != operations.len() {
-            anyhow::bail!(
-                "semantic execute_ops result count mismatch: expected {}, got {}",
-                operations.len(),
-                db_results.len()
-            );
-        }
-        let results = operations
-            .into_iter()
-            .zip(db_results)
-            .map(|(operation, result)| basic_result_from_db_result(operation, result))
-            .collect::<Result<Vec<_>>>()?;
-        Ok(DocDbResponse::new(DocDbResult::ExecuteOps { results }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -582,14 +494,26 @@ impl Database {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(ops = ops.len()))]
-    pub async fn execute_ops(&self, ops: Vec<DbOp>) -> Result<Vec<DbResult>> {
-        match &self.inner {
-            DatabaseInner::Turso(db) => db.execute_ops(ops).await,
-            DatabaseInner::Memory(db) => db.execute_ops(ops).await,
-            DatabaseInner::Remote(db) => db.execute_ops(ops).await,
-            #[cfg(not(target_arch = "wasm32"))]
-            DatabaseInner::Dodb(db) => db.execute_ops(ops).await,
+    #[tracing::instrument(skip_all)]
+    pub(crate) async fn execute_op(&self, op: DbOp) -> Result<DbResult> {
+        match op {
+            DbOp::Get { pk, sk } => self.get(&pk, &sk).await.map(DbResult::Single),
+            DbOp::Query {
+                pk,
+                after_sk,
+                limit,
+            } => self
+                .query(&pk, after_sk.as_deref(), limit.unwrap_or(usize::MAX))
+                .await
+                .map(DbResult::Multiple),
+            DbOp::Put { pk, sk, data } => {
+                self.put(&pk, &sk, &data).await?;
+                Ok(DbResult::Done)
+            }
+            DbOp::Delete { pk, sk } => {
+                self.delete(&pk, &sk).await?;
+                Ok(DbResult::Done)
+            }
         }
     }
 
@@ -603,86 +527,6 @@ impl Database {
             DatabaseInner::Dodb(db) => db.get_observed(pk, sk).await,
         }
     }
-
-    #[tracing::instrument(skip_all, fields(reads = keys.len()))]
-    pub(crate) async fn batch_get_observed(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<ObservedDocument>> {
-        if keys.is_empty() {
-            return Ok(vec![]);
-        }
-        if let DatabaseInner::Remote(db) = &self.inner {
-            return db.batch_get_observed(keys).await;
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        if let DatabaseInner::Dodb(db) = &self.inner {
-            return db.batch_get_observed(keys).await;
-        }
-        let mut out = Vec::with_capacity(keys.len());
-        for (pk, sk) in keys {
-            out.push(self.get_observed(pk, sk).await?);
-        }
-        Ok(out)
-    }
-}
-
-fn basic_operation_to_db_op(operation: &DocDbBasicOperation) -> Result<DbOp> {
-    Ok(match operation {
-        DocDbBasicOperation::Get { key } => DbOp::Get {
-            pk: key.pk.clone(),
-            sk: key.sk.clone(),
-        },
-        DocDbBasicOperation::Query {
-            pk,
-            after_sk,
-            limit,
-        } => DbOp::Query {
-            pk: pk.clone(),
-            after_sk: after_sk.clone(),
-            limit: limit
-                .map(|value| semantic_limit(value).map_err(anyhow::Error::msg))
-                .transpose()?,
-        },
-        DocDbBasicOperation::Put { key, data } => DbOp::Put {
-            pk: key.pk.clone(),
-            sk: key.sk.clone(),
-            data: data.clone(),
-        },
-        DocDbBasicOperation::Delete { key } => DbOp::Delete {
-            pk: key.pk.clone(),
-            sk: key.sk.clone(),
-        },
-    })
-}
-
-fn basic_result_from_db_result(
-    operation: DocDbBasicOperation,
-    result: DbResult,
-) -> Result<DocDbBasicResult> {
-    match (operation, result) {
-        (DocDbBasicOperation::Get { .. }, DbResult::Single(data)) => Ok(DocDbBasicResult::Get {
-            data: data.map(|value| doc_db_protocol::BinaryDocument {
-                data: value.to_vec(),
-            }),
-        }),
-        (DocDbBasicOperation::Query { pk, .. }, DbResult::Multiple(documents)) => {
-            Ok(DocDbBasicResult::Query {
-                documents: documents
-                    .into_iter()
-                    .map(|(sk, data)| DocDbDocument {
-                        key: DocDbKey::new(pk.clone(), sk),
-                        data: data.to_vec(),
-                    })
-                    .collect(),
-            })
-        }
-        (DocDbBasicOperation::Put { .. }, DbResult::Done) => Ok(DocDbBasicResult::Put),
-        (DocDbBasicOperation::Delete { .. }, DbResult::Done) => Ok(DocDbBasicResult::Delete),
-        (operation, result) => anyhow::bail!(
-            "semantic execute_ops result did not match operation: {operation:?} / {result:?}"
-        ),
-    }
 }
 
 fn semantic_limit(limit: u64) -> std::result::Result<usize, String> {
@@ -693,13 +537,14 @@ fn semantic_limit(limit: u64) -> std::result::Result<usize, String> {
 mod semantic_tests {
     use super::*;
     use doc_db_protocol::{
-        DocDbBasicOperation, DocDbBatchOperation, DocDbCondition, DocDbKey, DocDbMutation,
-        DocDbObservedDocument, DocDbOperation, DocDbRequest, DocDbResult, DocDbRevision,
-        DocDbTransactOutcome,
+        DocDbCondition, DocDbKey, DocDbMutation, DocDbObservedDocument, DocDbOperation,
+        DocDbRequest, DocDbResult, DocDbRevision, DocDbTransactOutcome,
     };
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
+    use tokio::sync::Barrier;
 
     static DATABASE_ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -768,6 +613,49 @@ mod semantic_tests {
                 stream.write_all(&response_body).await.unwrap();
             }
             operations
+        });
+        (format!("http://{address}/rpc"), handle)
+    }
+
+    async fn start_barrier_remote_server() -> (String, tokio::task::JoinHandle<Vec<DocDbOperation>>)
+    {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let operations = Arc::new(Mutex::new(Vec::new()));
+        let handle = tokio::spawn(async move {
+            let mut handlers = Vec::new();
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().await.unwrap();
+                let barrier = barrier.clone();
+                let operations = operations.clone();
+                handlers.push(tokio::spawn(async move {
+                    let mut stream = stream;
+                    let body = read_http_body(&mut stream).await;
+                    let request = doc_db_protocol::decode_request(&body).unwrap();
+                    let response = match &request.operation {
+                        DocDbOperation::Get { key } => DocDbResponse::new(DocDbResult::Get {
+                            data: Some(doc_db_protocol::BinaryDocument {
+                                data: key.sk.as_bytes().to_vec(),
+                            }),
+                        }),
+                        operation => panic!("unexpected operation: {operation:?}"),
+                    };
+                    operations.lock().unwrap().push(request.operation);
+                    barrier.wait().await;
+                    let response_body = doc_db_protocol::encode_response(&response).unwrap();
+                    let header = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        response_body.len()
+                    );
+                    stream.write_all(header.as_bytes()).await.unwrap();
+                    stream.write_all(&response_body).await.unwrap();
+                }));
+            }
+            for handler in handlers {
+                handler.await.unwrap();
+            }
+            operations.lock().unwrap().clone()
         });
         (format!("http://{address}/rpc"), handle)
     }
@@ -849,36 +737,17 @@ mod semantic_tests {
             }
         );
 
-        let batch = database
-            .execute_semantic(DocDbRequest::new(DocDbOperation::Batch {
-                operations: vec![DocDbBatchOperation::Put {
-                    key: DocDbKey::new("pk", "batch"),
-                    data: b"batch".to_vec(),
-                }],
-            }))
-            .await
-            .unwrap();
-        assert_eq!(batch.result, DocDbResult::Batch);
-
         let observed = database
-            .execute_semantic(DocDbRequest::new(DocDbOperation::BatchGetObserved {
-                keys: vec![DocDbKey::new("pk", "a"), DocDbKey::new("pk", "missing")],
+            .execute_semantic(DocDbRequest::new(DocDbOperation::GetObserved {
+                key: DocDbKey::new("pk", "a"),
             }))
             .await
             .unwrap();
-        let DocDbResult::BatchGetObserved { documents } = &observed.result else {
+        let DocDbResult::GetObserved { document } = &observed.result else {
             panic!("expected observed result");
         };
-        assert_eq!(documents.len(), 2);
-        assert!(matches!(
-            documents[0],
-            DocDbObservedDocument::Present { .. }
-        ));
-        assert!(matches!(
-            documents[1],
-            DocDbObservedDocument::Missing { revision: None }
-        ));
-        let DocDbObservedDocument::Present { revision, .. } = &documents[0] else {
+        assert!(matches!(document, DocDbObservedDocument::Present { .. }));
+        let DocDbObservedDocument::Present { revision, .. } = document else {
             panic!("expected present observation");
         };
         assert_eq!(*revision, DocDbRevision::new(0));
@@ -968,6 +837,100 @@ mod semantic_tests {
     }
 
     #[tokio::test]
+    async fn tuple_send_with_uses_concurrent_single_operation_requests() {
+        struct RawGet(&'static str);
+
+        impl DbRequest for RawGet {
+            type Output = Option<Vec<u8>>;
+
+            fn prepare(self) -> Prepared<Self::Output> {
+                Prepared {
+                    ops: vec![DbOp::Get {
+                        pk: "pk".to_string(),
+                        sk: self.0.to_string(),
+                    }],
+                    parse: Box::new(|iter| match iter.next().unwrap() {
+                        DbResult::Single(value) => Ok(value.map(|bytes| bytes.to_vec())),
+                        result => panic!("unexpected result: {result:?}"),
+                    }),
+                }
+            }
+        }
+
+        let (url, server) = start_barrier_remote_server().await;
+        let database = semantic_with_config(url);
+        let result = tokio::time::timeout(
+            Duration::from_secs(1),
+            (RawGet("first"), RawGet("second")).send_with(&database),
+        )
+        .await
+        .expect("tuple requests should be concurrent")
+        .unwrap();
+        assert_eq!(result, (Some(b"first".to_vec()), Some(b"second".to_vec())));
+
+        let operations = server.await.unwrap();
+        assert_eq!(operations.len(), 2);
+        assert!(
+            operations
+                .iter()
+                .all(|operation| matches!(operation, DocDbOperation::Get { .. }))
+        );
+    }
+
+    #[tokio::test]
+    async fn tuple_send_with_settles_other_operations_before_returning_error() {
+        struct FailingGet;
+
+        impl DbRequest for FailingGet {
+            type Output = Option<Vec<u8>>;
+
+            fn prepare(self) -> Prepared<Self::Output> {
+                Prepared {
+                    ops: vec![DbOp::Get {
+                        pk: "pk".to_string(),
+                        sk: "failure".to_string(),
+                    }],
+                    parse: Box::new(|iter| match iter.next().unwrap() {
+                        DbResult::Single(value) => Ok(value.map(|bytes| bytes.to_vec())),
+                        result => panic!("unexpected result: {result:?}"),
+                    }),
+                }
+            }
+        }
+
+        struct Put;
+
+        impl DbRequest for Put {
+            type Output = ();
+
+            fn prepare(self) -> Prepared<Self::Output> {
+                Prepared {
+                    ops: vec![DbOp::Put {
+                        pk: "pk".to_string(),
+                        sk: "completed".to_string(),
+                        data: b"done".to_vec(),
+                    }],
+                    parse: Box::new(|iter| match iter.next().unwrap() {
+                        DbResult::Done => Ok(()),
+                        result => panic!("unexpected result: {result:?}"),
+                    }),
+                }
+            }
+        }
+
+        let database = memory();
+        database
+            .mock_get("pk", "failure")
+            .returns_err("expected failure");
+        let error = (FailingGet, Put).send_with(&database).await.unwrap_err();
+        assert_eq!(error.to_string(), "expected failure");
+        assert_eq!(
+            database.get("pk", "completed").await.unwrap().as_deref(),
+            Some(b"done".as_slice())
+        );
+    }
+
+    #[tokio::test]
     async fn rejects_duplicate_transaction_keys_as_invalid_requests() {
         let database = memory();
 
@@ -1016,7 +979,7 @@ mod semantic_tests {
     }
 
     #[tokio::test]
-    async fn converts_remote_responses_to_database_results() {
+    async fn converts_single_remote_responses_to_database_results() {
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let responses = vec![
             DocDbResponse::new(DocDbResult::Get {
@@ -1038,31 +1001,11 @@ mod semantic_tests {
                     data: b"scan".to_vec(),
                 }],
             }),
-            DocDbResponse::new(DocDbResult::ExecuteOps {
-                results: vec![
-                    doc_db_protocol::DocDbBasicResult::Get {
-                        data: Some(doc_db_protocol::BinaryDocument {
-                            data: b"batched-get".to_vec(),
-                        }),
-                    },
-                    doc_db_protocol::DocDbBasicResult::Query {
-                        documents: vec![doc_db_protocol::DocDbDocument {
-                            key: DocDbKey::new("batched-pk", "batched-sk"),
-                            data: b"batched-query".to_vec(),
-                        }],
-                    },
-                    doc_db_protocol::DocDbBasicResult::Put,
-                    doc_db_protocol::DocDbBasicResult::Delete,
-                ],
-            }),
-            DocDbResponse::new(DocDbResult::BatchGetObserved {
-                documents: vec![
-                    DocDbObservedDocument::Present {
-                        data: b"observed".to_vec(),
-                        revision: DocDbRevision::new(7),
-                    },
-                    DocDbObservedDocument::Missing { revision: None },
-                ],
+            DocDbResponse::new(DocDbResult::GetObserved {
+                document: DocDbObservedDocument::Present {
+                    data: b"observed".to_vec(),
+                    revision: DocDbRevision::new(7),
+                },
             }),
             DocDbResponse::new(DocDbResult::Transact {
                 outcome: DocDbTransactOutcome::Conflict { condition_index: 4 },
@@ -1092,56 +1035,8 @@ mod semantic_tests {
                 Bytes::from_static(b"scan")
             )]
         );
-        let batched = database
-            .execute_ops(vec![
-                DbOp::Get {
-                    pk: "pk".to_string(),
-                    sk: "batched-get".to_string(),
-                },
-                DbOp::Query {
-                    pk: "batched-pk".to_string(),
-                    after_sk: Some("before".to_string()),
-                    limit: Some(4),
-                },
-                DbOp::Put {
-                    pk: "pk".to_string(),
-                    sk: "batched-put".to_string(),
-                    data: b"put".to_vec(),
-                },
-                DbOp::Delete {
-                    pk: "pk".to_string(),
-                    sk: "batched-delete".to_string(),
-                },
-            ])
-            .await
-            .unwrap();
-        assert_eq!(batched.len(), 4);
-        assert!(matches!(
-            batched[0],
-            DbResult::Single(Some(ref data)) if data.as_ref() == b"batched-get"
-        ));
-        assert!(matches!(
-            batched[1],
-            DbResult::Multiple(ref documents)
-                if documents == &[("batched-sk".to_string(), Bytes::from_static(b"batched-query"))]
-        ));
-        assert!(matches!(batched[2], DbResult::Done));
-        assert!(matches!(batched[3], DbResult::Done));
-        let observed = database
-            .batch_get_observed(&[
-                ("pk".to_string(), "present".to_string()),
-                ("pk".to_string(), "missing".to_string()),
-            ])
-            .await
-            .unwrap();
-        assert!(matches!(
-            observed.as_slice(),
-            [
-                ObservedDocument::Present { .. },
-                ObservedDocument::Missing { revision: None },
-            ]
-        ));
-        let ObservedDocument::Present { revision, .. } = &observed[0] else {
+        let observed = database.get_observed("pk", "present").await.unwrap();
+        let ObservedDocument::Present { revision, .. } = &observed else {
             panic!("expected present observation");
         };
         assert_eq!(*revision, DocDbRevision::new(7));
@@ -1169,23 +1064,8 @@ mod semantic_tests {
             operations[4],
             DocDbOperation::Scan { limit: 2, .. }
         ));
-        assert!(matches!(
-            operations[5],
-            DocDbOperation::ExecuteOps { ref operations }
-                if operations.len() == 4
-                    && matches!(operations[0], DocDbBasicOperation::Get { .. })
-                    && matches!(
-                        operations[1],
-                        DocDbBasicOperation::Query { limit: Some(4), .. }
-                    )
-                    && matches!(operations[2], DocDbBasicOperation::Put { .. })
-                    && matches!(operations[3], DocDbBasicOperation::Delete { .. })
-        ));
-        assert!(matches!(
-            operations[6],
-            DocDbOperation::BatchGetObserved { .. }
-        ));
-        assert!(matches!(operations[7], DocDbOperation::Transact { .. }));
+        assert!(matches!(operations[5], DocDbOperation::GetObserved { .. }));
+        assert!(matches!(operations[6], DocDbOperation::Transact { .. }));
     }
 
     #[tokio::test]
@@ -1315,6 +1195,7 @@ impl Transaction {
     }
 }
 
+#[doc(hidden)]
 #[derive(Debug)]
 pub enum DbOp {
     Get {
@@ -1337,6 +1218,7 @@ pub enum DbOp {
     },
 }
 
+#[doc(hidden)]
 #[derive(Debug)]
 pub enum DbResult {
     Single(Option<Bytes>),
@@ -1344,8 +1226,10 @@ pub enum DbResult {
     Done,
 }
 
+#[doc(hidden)]
 pub type DbResultParser<O> = Box<dyn FnOnce(&mut std::vec::IntoIter<DbResult>) -> Result<O> + Send>;
 
+#[doc(hidden)]
 pub struct Prepared<O> {
     pub ops: Vec<DbOp>,
     pub parse: DbResultParser<O>,
@@ -1356,10 +1240,37 @@ pub trait DbRequest: Sized {
     type Output;
     fn prepare(self) -> Prepared<Self::Output>;
 
+    /// Executes every prepared operation concurrently.
+    ///
+    /// These operations are independent and non-atomic: execution order is
+    /// unspecified, and a failure in one operation does not roll back the
+    /// others. All started operations settle before an error is returned; the
+    /// first error in input order wins when more than one operation fails.
     async fn send_with(self, db: &Database) -> Result<Self::Output> {
         let prepared = self.prepare();
-        let results = db.execute_ops(prepared.ops).await?;
-        let mut iter = results.into_iter();
+        let results = futures::future::join_all(
+            prepared
+                .ops
+                .into_iter()
+                .map(|operation| db.execute_op(operation)),
+        )
+        .await;
+        let mut settled = Vec::with_capacity(results.len());
+        let mut first_error = None;
+        for result in results {
+            match result {
+                Ok(result) => settled.push(result),
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            }
+        }
+        if let Some(error) = first_error {
+            return Err(error);
+        }
+        let mut iter = settled.into_iter();
         (prepared.parse)(&mut iter)
     }
 }

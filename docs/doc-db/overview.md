@@ -54,7 +54,10 @@ The semantic transaction request is a pair of condition and mutation lists. Upda
 
 Each transaction request allows at most one condition and at most one mutation for a key. A condition and a mutation for the same key are valid together; duplicate conditions or duplicate mutations are invalid requests and are rejected before backend execution. Condition-only transactions are valid and must still validate their conditions. A future dodb adapter must implement them with a consistent committed-point read such as `TransactGet` or an equivalent operation because dodb's write transaction primitive requires at least one mutation.
 
-`execute_ops` uses one ordered semantic RPC containing `Get`, `Query`, `Put`, and `Delete` operations. Operations execute in input order, and each later operation observes effects from earlier successful operations. This is a round-trip reduction and does not by itself provide atomic transaction semantics or rollback; existing partial-progress behavior is preserved if an operation fails. Use `batch` for the existing atomic write-batch contract or the transaction APIs for conditions plus mutations.
+The semantic protocol contains single-operation requests for `Get`, `Put`,
+`Delete`, `Query`, and `Scan`, plus the internal single-document
+`GetObserved` request used by optimistic transactions. `Transact` is the only
+multi-item request: it carries conditions and mutations atomically.
 
 The semantic RPC applies a 16 MiB fn0 platform frame limit to requests and responses. This limit is independent of any future dodb storage value limit. JSON and base64 encoding add overhead, so the largest usable binary document is smaller than 16 MiB.
 
@@ -100,18 +103,6 @@ let items: Vec<(String, String, Bytes)> = db.scan(None, 100).await?;
 let items = db.scan(Some(("User/id=42", "profile")), 100).await?;
 ```
 
-### `batch` — atomic multi-operation write
-
-```rust
-use doc_db::BatchOp;
-
-let ops = vec![
-    BatchOp::Put { pk: "User/id=1", sk: "profile", data: &user1_bytes },
-    BatchOp::Delete { pk: "User/id=2", sk: "profile" },
-];
-db.batch(&ops).await?;
-```
-
 ### `transaction` — explicit ACID transaction (legacy/direct Turso only)
 
 ```rust
@@ -125,7 +116,9 @@ Call `tx.rollback()` to abort.
 
 ## `trx` — Optimistic Concurrency Transaction
 
-Higher-level API with conflict detection. Reads are batched upfront; writes use optimistic locking with version checks.
+Higher-level API with conflict detection. Multiple requested documents are
+read with concurrent single-document observed requests; writes use optimistic
+locking with version checks.
 
 ```rust
 let result = db.trx(|trx| async move {
@@ -154,7 +147,7 @@ match result {
 ```
 
 Key points:
-- `trx.get(request)` — reads one or more documents; returns `Option<DocHandle<T>>`
+- `trx.get(request)` — reads one or more documents concurrently; returns `Option<DocHandle<T>>`
 - `trx.create(doc)` — inserts a new document; returns `Result<DocHandle<T>>`
 - Modify loaded documents by dereferencing the handle (`*handle = new_value` or field assignment)
 - `handle.delete()` — marks the document for deletion on commit
@@ -162,9 +155,26 @@ Key points:
 - `trx.cancel(reason)` — abort without retry; returns `TrxResult::Cancelled(reason)`
 - On conflict, the closure is retried automatically; `TrxResult::Conflict` is returned only when retries are exhausted
 
-## Batching Requests with `DbRequest`
+`trx` is the atomic API. It supports unconditional multi-write transactions,
+conditional optimistic transactions, and condition-only transactions. An
+empty transaction is a no-op.
 
-The `DbRequest` trait enables combining multiple reads into a single round-trip:
+## Aggregating Requests with `DbRequest`
+
+The `DbRequest` trait enables combining independent requests while preserving
+the convenient tuple/vector result shape. A single request produces one
+single-operation semantic RPC. Tuple and vector requests produce one
+single-operation RPC per prepared operation and await them concurrently.
+They are non-atomic, have no rollback, and operations may succeed or fail
+independently.
+
+One request:
+
+```rust
+let user = UserGet { id: "42" }.send_with(&db).await?;
+```
+
+Different request types:
 
 ```rust
 use doc_db::DbRequest;
@@ -175,7 +185,25 @@ let (user, settings) = (
 ).send_with(&db).await?;
 ```
 
-Tuples up to 12 elements and `Vec<impl DbRequest>` are supported.
+Same request type in bulk:
+
+```rust
+let users = vec![
+    UserGet { id: "41" },
+    UserGet { id: "42" },
+].send_with(&db).await?;
+```
+
+Tuples up to 12 elements and `Vec<impl DbRequest>` are supported. Results stay
+in input order, but execution order is not guaranteed. All started operations
+settle before an error is returned; if multiple operations fail, the first
+error in input order is returned. Tuple and vector `send_with` calls are not
+transactions.
+
+Do not use a tuple or vector to express ordering or atomicity. For example,
+two writes to the same key have no guaranteed last-writer order. Await them
+sequentially when order matters, or use `trx` when the writes must commit
+atomically.
 
 ## `#[forte_doc]` Macro
 

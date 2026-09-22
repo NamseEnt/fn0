@@ -1,4 +1,4 @@
-use doc_db::{BatchOp, DbOp, DbRequest, DbResult, DocGet, DocKey, Document, Prepared, TrxResult};
+use doc_db::{DbOp, DbRequest, DbResult, DocGet, DocKey, Document, Prepared, TrxResult};
 use serde::{Deserialize, Serialize};
 
 forte_sdk::test_main!();
@@ -131,39 +131,43 @@ async fn memory_scan() {
 }
 
 #[forte_sdk::test]
-async fn memory_batch() {
+async fn memory_unconditional_transaction() {
     let db = create_test_db();
-    db.batch(&[
-        BatchOp::Put {
-            pk: "pk",
-            sk: "a",
-            data: b"1",
-        },
-        BatchOp::Put {
-            pk: "pk",
-            sk: "b",
-            data: b"2",
-        },
-        BatchOp::Put {
-            pk: "pk",
-            sk: "c",
-            data: b"3",
-        },
-    ])
-    .await
-    .unwrap();
+    assert!(matches!(
+        db.trx(|trx| async move {
+            trx.create(TrxDoc {
+                id: "a".to_string(),
+                value: 1,
+            })?;
+            trx.create(TrxDoc {
+                id: "b".to_string(),
+                value: 2,
+            })?;
+            trx.create(TrxDoc {
+                id: "c".to_string(),
+                value: 3,
+            })?;
+            trx.commit::<(), ()>(())
+        })
+        .await,
+        TrxResult::Committed(())
+    ));
 
-    let items = db.query("pk", None::<&str>, 10).await.unwrap();
+    let items = db.query("TrxDoc", None::<&str>, 10).await.unwrap();
     assert_eq!(items.len(), 3);
 
-    db.batch(&[BatchOp::Delete { pk: "pk", sk: "b" }])
-        .await
-        .unwrap();
+    assert!(matches!(
+        db.trx(|trx| async move {
+            let doc = trx.get(trx_get("b")).await?.unwrap();
+            doc.delete();
+            trx.commit::<(), ()>(())
+        })
+        .await,
+        TrxResult::Committed(())
+    ));
 
-    let items = db.query("pk", None::<&str>, 10).await.unwrap();
+    let items = db.query("TrxDoc", None::<&str>, 10).await.unwrap();
     assert_eq!(items.len(), 2);
-    assert_eq!(items[0].0, "a");
-    assert_eq!(items[1].0, "c");
 }
 
 #[forte_sdk::test]
@@ -399,43 +403,82 @@ async fn memory_trx_read_only_commit_validates_without_writes() {
 }
 
 #[forte_sdk::test]
-async fn memory_execute_ops() {
+async fn memory_send_with_multiple_operations() {
     let db = create_test_db();
     db.put("pk", "a", b"aa").await.unwrap();
 
-    let results = db
-        .execute_ops(vec![
-            DbOp::Get {
-                pk: "pk".into(),
-                sk: "a".into(),
-            },
-            DbOp::Get {
-                pk: "pk".into(),
-                sk: "missing".into(),
-            },
-            DbOp::Put {
-                pk: "pk".into(),
-                sk: "b".into(),
-                data: b"bb".to_vec(),
-            },
-        ])
-        .await
-        .unwrap();
-
-    assert_eq!(results.len(), 3);
-    match &results[0] {
-        DbResult::Single(Some(d)) => assert_eq!(d.as_ref(), b"aa"),
-        _ => panic!("expected Single(Some)"),
+    struct Get(&'static str);
+    impl DbRequest for Get {
+        type Output = Option<Vec<u8>>;
+        fn prepare(self) -> Prepared<Self::Output> {
+            Prepared {
+                ops: vec![DbOp::Get {
+                    pk: "pk".to_string(),
+                    sk: self.0.to_string(),
+                }],
+                parse: Box::new(|iter| match iter.next().unwrap() {
+                    DbResult::Single(value) => Ok(value.map(|bytes| bytes.to_vec())),
+                    _ => panic!("unexpected result"),
+                }),
+            }
+        }
     }
-    match &results[1] {
-        DbResult::Single(None) => {}
-        _ => panic!("expected Single(None)"),
-    }
-    assert!(matches!(&results[2], DbResult::Done));
 
-    // Verify the put worked
-    let result = db.get("pk", "b").await.unwrap().unwrap();
-    assert_eq!(result.as_ref(), b"bb");
+    let (existing, missing) = (Get("a"), Get("missing")).send_with(&db).await.unwrap();
+    assert_eq!(existing.as_deref(), Some(b"aa".as_slice()));
+    assert!(missing.is_none());
+
+    assert!(db.get("pk", "b").await.unwrap().is_none());
+}
+
+#[forte_sdk::test]
+async fn memory_send_with_waits_for_all_started_operations_before_error() {
+    let db = create_test_db();
+    db.mock_get("pk", "error").returns_err("expected failure");
+
+    struct ErrorGet;
+    impl DbRequest for ErrorGet {
+        type Output = Option<Vec<u8>>;
+
+        fn prepare(self) -> Prepared<Self::Output> {
+            Prepared {
+                ops: vec![DbOp::Get {
+                    pk: "pk".to_string(),
+                    sk: "error".to_string(),
+                }],
+                parse: Box::new(|iter| match iter.next().unwrap() {
+                    DbResult::Single(value) => Ok(value.map(|bytes| bytes.to_vec())),
+                    _ => panic!("unexpected result"),
+                }),
+            }
+        }
+    }
+
+    struct Put;
+    impl DbRequest for Put {
+        type Output = ();
+
+        fn prepare(self) -> Prepared<Self::Output> {
+            Prepared {
+                ops: vec![DbOp::Put {
+                    pk: "pk".to_string(),
+                    sk: "completed".to_string(),
+                    data: b"done".to_vec(),
+                }],
+                parse: Box::new(|iter| match iter.next().unwrap() {
+                    DbResult::Done => Ok(()),
+                    _ => panic!("unexpected result"),
+                }),
+            }
+        }
+    }
+
+    let result = (ErrorGet, Put).send_with(&db).await;
+    assert!(result.is_err());
+    assert_eq!(
+        db.get("pk", "completed").await.unwrap().as_deref(),
+        Some(b"done".as_slice())
+    );
 }
 
 #[forte_sdk::test]

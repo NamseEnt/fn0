@@ -7,14 +7,13 @@ use dodb_core::{
     TransactionCondition, TransactionMutation, TransactionRequest,
 };
 use dodb_protocol::{ApplicationErrorKind, ProtocolLimits};
-use std::collections::BTreeMap;
 use std::env;
 use std::io::Cursor;
 use std::net::SocketAddr;
 
 use crate::{
-    BatchOp, DbOp, DbResult, ObservedDocument, TransactCondition, TransactConflict,
-    TransactMutation, TransactOutcome, TransactRequest,
+    ObservedDocument, TransactCondition, TransactConflict, TransactMutation, TransactOutcome,
+    TransactRequest,
 };
 
 #[derive(Clone, Debug)]
@@ -260,66 +259,6 @@ impl DodbDatabase {
         Ok(rows)
     }
 
-    pub(crate) async fn batch(&self, ops: &[BatchOp<'_>]) -> Result<()> {
-        let mut mutations = BTreeMap::new();
-        for op in ops {
-            match op {
-                BatchOp::Put { pk, sk, data } => {
-                    let key = document_key(pk, sk);
-                    mutations.insert(
-                        key.clone(),
-                        TransactionMutation::Put {
-                            key,
-                            value: data.to_vec(),
-                        },
-                    );
-                }
-                BatchOp::Delete { pk, sk } => {
-                    let key = document_key(pk, sk);
-                    mutations.insert(key.clone(), TransactionMutation::Delete { key });
-                }
-            }
-        }
-        if mutations.is_empty() {
-            return Ok(());
-        }
-        self.client
-            .batch(mutations.into_values().collect())
-            .await
-            .map(|_| ())
-            .map_err(client_error)
-    }
-
-    pub(crate) async fn execute_ops(&self, ops: Vec<DbOp>) -> Result<Vec<DbResult>> {
-        let mut results = Vec::with_capacity(ops.len());
-        for op in ops {
-            match op {
-                DbOp::Get { pk, sk } => {
-                    results.push(DbResult::Single(self.get(&pk, &sk).await?));
-                }
-                DbOp::Query {
-                    pk,
-                    after_sk,
-                    limit,
-                } => {
-                    results.push(DbResult::Multiple(
-                        self.query(&pk, after_sk.as_deref(), limit.unwrap_or(usize::MAX))
-                            .await?,
-                    ));
-                }
-                DbOp::Put { pk, sk, data } => {
-                    self.put(&pk, &sk, &data).await?;
-                    results.push(DbResult::Done);
-                }
-                DbOp::Delete { pk, sk } => {
-                    self.delete(&pk, &sk).await?;
-                    results.push(DbResult::Done);
-                }
-            }
-        }
-        Ok(results)
-    }
-
     pub(crate) async fn get_observed(&self, pk: &str, sk: &str) -> Result<ObservedDocument> {
         let state = self
             .client
@@ -327,25 +266,6 @@ impl DodbDatabase {
             .await
             .map_err(client_error)?;
         Ok(observed_document(state))
-    }
-
-    pub(crate) async fn batch_get_observed(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<ObservedDocument>> {
-        let states = self
-            .client
-            .transact_get(keys.iter().map(|(pk, sk)| document_key(pk, sk)).collect())
-            .await
-            .map_err(client_error)?;
-        if states.len() != keys.len() {
-            bail!(
-                "dodb observed response count mismatch: expected {}, got {}",
-                keys.len(),
-                states.len()
-            );
-        }
-        Ok(states.into_iter().map(observed_document).collect())
     }
 
     pub(crate) async fn transact(&self, request: &TransactRequest) -> Result<TransactOutcome> {
@@ -669,29 +589,21 @@ mod tests {
         let pk = "missing-revision";
         let sk = "key";
 
-        let initial = database
-            .batch_get_observed(&[(pk.to_owned(), sk.to_owned())])
-            .await
-            .unwrap();
+        let initial = database.get_observed(pk, sk).await.unwrap();
         assert!(matches!(
-            initial.as_slice(),
-            [ObservedDocument::Missing {
+            initial,
+            ObservedDocument::Missing {
                 revision: Some(revision)
-            }] if *revision == DocDbRevision::new(0)
+            } if revision == DocDbRevision::new(0)
         ));
 
         database.put(pk, sk, b"present").await.unwrap();
         database.delete(pk, sk).await.unwrap();
-        let deleted = database
-            .batch_get_observed(&[(pk.to_owned(), sk.to_owned())])
-            .await
-            .unwrap();
-        let deleted_revision = match deleted.as_slice() {
-            [
-                ObservedDocument::Missing {
-                    revision: Some(revision),
-                },
-            ] => *revision,
+        let deleted = database.get_observed(pk, sk).await.unwrap();
+        let deleted_revision = match deleted {
+            ObservedDocument::Missing {
+                revision: Some(revision),
+            } => revision,
             _ => panic!("expected an exact missing revision"),
         };
         assert_ne!(deleted_revision, DocDbRevision::new(0));
