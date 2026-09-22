@@ -1,5 +1,7 @@
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod backend_contract;
+#[cfg(not(target_arch = "wasm32"))]
+mod dodb;
 mod memory;
 pub mod mock;
 mod remote;
@@ -16,6 +18,8 @@ use doc_db_protocol::{
     DocDbError, DocDbKey, DocDbMutation, DocDbObservedDocument, DocDbOperation, DocDbResponse,
     DocDbResult, DocDbTransactOutcome,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use dodb::{DodbConfig, DodbConnection, project_tenant_id};
 pub use libsql_hrana::proto::Value;
 use memory::{MemoryDatabase, MemoryTransaction};
 use remote::RemoteDatabase;
@@ -145,6 +149,14 @@ pub fn semantic_with_config(url: String) -> Database {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub fn dodb_with_connection(connection: &DodbConnection, project_id: &str) -> Database {
+    Database {
+        inner: DatabaseInner::Dodb(connection.database(project_id)),
+        mock_state: mock::MockState::default(),
+    }
+}
+
 #[derive(Clone)]
 pub struct Database {
     inner: DatabaseInner,
@@ -164,6 +176,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.get(pk, sk).await,
             DatabaseInner::Memory(db) => db.get(pk, sk).await,
             DatabaseInner::Remote(db) => db.get(pk, sk).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.get(pk, sk).await,
         }
     }
 
@@ -179,6 +193,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.put(pk, sk, data).await,
             DatabaseInner::Memory(db) => db.put(pk, sk, data).await,
             DatabaseInner::Remote(db) => db.put(pk, sk, data).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.put(pk, sk, data).await,
         }
     }
 
@@ -194,6 +210,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.delete(pk, sk).await,
             DatabaseInner::Memory(db) => db.delete(pk, sk).await,
             DatabaseInner::Remote(db) => db.delete(pk, sk).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.delete(pk, sk).await,
         }
     }
 
@@ -233,6 +251,11 @@ impl Database {
                 db.query(pk.as_ref(), after_sk.as_ref().map(AsRef::as_ref), limit)
                     .await
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => {
+                db.query(pk.as_ref(), after_sk.as_ref().map(AsRef::as_ref), limit)
+                    .await
+            }
         }
     }
 
@@ -246,6 +269,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.scan(after, limit).await,
             DatabaseInner::Memory(db) => db.scan(after, limit).await,
             DatabaseInner::Remote(db) => db.scan(after, limit).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.scan(after, limit).await,
         }
     }
 
@@ -255,6 +280,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.batch(ops).await,
             DatabaseInner::Memory(db) => db.batch(ops).await,
             DatabaseInner::Remote(db) => db.batch(ops).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.batch(ops).await,
         }
     }
 
@@ -474,6 +501,10 @@ impl Database {
             DatabaseInner::Remote(_) => {
                 anyhow::bail!("explicit transactions are not supported by semantic doc-db RPC")
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(_) => {
+                anyhow::bail!("explicit transactions are not supported by the dodb backend")
+            }
         }
     }
 
@@ -487,6 +518,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.transact(request).await,
             DatabaseInner::Memory(db) => db.transact(request).await,
             DatabaseInner::Remote(db) => db.transact(request).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.transact(request).await,
         }
     }
 
@@ -513,6 +546,10 @@ impl Database {
             DatabaseInner::Remote(_) => {
                 anyhow::bail!("raw SQL is not supported by semantic doc-db RPC")
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(_) => {
+                anyhow::bail!("raw SQL is not supported by the dodb backend")
+            }
         }
     }
 
@@ -536,6 +573,10 @@ impl Database {
             DatabaseInner::Remote(_) => {
                 anyhow::bail!("raw SQL is not supported by semantic doc-db RPC")
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(_) => {
+                anyhow::bail!("raw SQL is not supported by the dodb backend")
+            }
         }
     }
 
@@ -545,6 +586,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.execute_ops(ops).await,
             DatabaseInner::Memory(db) => db.execute_ops(ops).await,
             DatabaseInner::Remote(db) => db.execute_ops(ops).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.execute_ops(ops).await,
         }
     }
 
@@ -554,6 +597,8 @@ impl Database {
             DatabaseInner::Turso(db) => db.get_observed(pk, sk).await,
             DatabaseInner::Memory(db) => db.get_observed(pk, sk).await,
             DatabaseInner::Remote(db) => db.get_observed(pk, sk).await,
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(db) => db.get_observed(pk, sk).await,
         }
     }
 
@@ -566,6 +611,10 @@ impl Database {
             return Ok(vec![]);
         }
         if let DatabaseInner::Remote(db) = &self.inner {
+            return db.batch_get_observed(keys).await;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let DatabaseInner::Dodb(db) = &self.inner {
             return db.batch_get_observed(keys).await;
         }
         let mut out = Vec::with_capacity(keys.len());
@@ -1209,6 +1258,8 @@ enum DatabaseInner {
     Turso(TursoDatabase),
     Memory(MemoryDatabase),
     Remote(RemoteDatabase),
+    #[cfg(not(target_arch = "wasm32"))]
+    Dodb(dodb::DodbDatabase),
 }
 
 pub struct Transaction {
