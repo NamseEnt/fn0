@@ -3,17 +3,18 @@ use doc_db_protocol::DocDbRevision;
 use std::collections::HashSet;
 
 pub enum ObservedDocument {
+    #[doc = "A present document and the revision of its current logical state."]
     Present {
         data: Bytes,
         revision: DocDbRevision,
     },
-    Missing {
-        revision: Option<DocDbRevision>,
-    },
+    #[doc = "A missing document and, when supported by the backend, the revision of its current logical state."]
+    Missing { revision: Option<DocDbRevision> },
 }
 
 #[derive(Clone)]
 pub(crate) enum TransactCondition {
+    #[doc = "Compares the current logical key-state revision, whether that state is present or missing."]
     RevisionEquals {
         pk: String,
         sk: String,

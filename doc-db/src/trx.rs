@@ -593,9 +593,14 @@ async fn commit_entries(
 
     let mut conflicts = Vec::new();
 
-    if let Some(info) = outcome.conflict
-        && let Some(condition) = request.conditions.get(info.condition_index)
-    {
+    if let Some(info) = outcome.conflict {
+        let condition = request.conditions.get(info.condition_index).ok_or_else(|| {
+            CommitFailure::Err(anyhow!(
+                "backend returned invalid transaction conflict condition_index {} for {} conditions",
+                info.condition_index,
+                request.conditions.len()
+            ))
+        })?;
         let (pk, sk, expected_revision) = condition_key_and_expected(condition);
         conflicts.push(ConflictKey {
             key: DocKey { pk, sk },

@@ -31,8 +31,13 @@ impl DocDbHijack {
         format!("http://{}/rpc", self.placeholder_host)
     }
 
-    pub(crate) fn matches(&self, uri: &hyper::Uri) -> bool {
-        uri.host() == Some(self.placeholder_host.as_str()) && uri.path() == "/rpc"
+    pub(crate) fn matches_host(&self, uri: &hyper::Uri) -> bool {
+        uri.host()
+            .is_some_and(|host| host.eq_ignore_ascii_case(&self.placeholder_host))
+    }
+
+    pub(crate) fn matches_path(&self, uri: &hyper::Uri) -> bool {
+        uri.path() == "/rpc"
     }
 
     pub async fn handle(&self, project_id: &str, body: &[u8]) -> DocDbResponse {
@@ -102,15 +107,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn matches_only_the_placeholder_host() {
+    async fn matches_only_the_placeholder_host_and_rpc_path() {
         let service = Arc::new(FakeService {
             calls: Mutex::new(Vec::new()),
             response: DocDbResponse::new(DocDbResult::Put),
         });
         let hijack = DocDbHijack::new("fn0-doc-db.fn0.dev".to_string(), service);
-        assert!(hijack.matches(&"http://fn0-doc-db.fn0.dev/rpc".parse().unwrap()));
-        assert!(!hijack.matches(&"http://example.com/rpc".parse().unwrap()));
-        assert!(!hijack.matches(&"http://fn0-doc-db.fn0.dev/other".parse().unwrap()));
+        let rpc_uri = "http://fn0-doc-db.fn0.dev/rpc".parse().unwrap();
+        let wrong_path_uri = "http://fn0-doc-db.fn0.dev/other".parse().unwrap();
+        let other_host_uri = "http://example.com/rpc".parse().unwrap();
+        assert!(hijack.matches_host(&rpc_uri));
+        assert!(hijack.matches_path(&rpc_uri));
+        assert!(!hijack.matches_host(&other_host_uri));
+        assert!(!hijack.matches_path(&wrong_path_uri));
+        assert!(hijack.matches_host(&wrong_path_uri));
     }
 
     #[tokio::test]

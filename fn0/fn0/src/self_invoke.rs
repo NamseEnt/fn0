@@ -184,8 +184,11 @@ impl WasiHttpHooks for SelfInvokeHooks {
         }
 
         if let Some(hijack) = self.doc_db_hijack.clone()
-            && hijack.matches(request.uri())
+            && hijack.matches_host(request.uri())
         {
+            if !hijack.matches_path(request.uri()) {
+                return doc_db_reserved_path_rejection();
+            }
             return doc_db_send(hijack, self.project_id.clone(), request);
         }
 
@@ -344,6 +347,15 @@ fn doc_db_send(
             .map_err(|error| ErrorCode::InternalError(Some(error.to_string())))?;
         drop(limited_body.permit);
         Ok((response, empty_io()))
+    })
+}
+
+fn doc_db_reserved_path_rejection() -> Box<dyn Future<Output = HookResult> + Send> {
+    Box::new(async {
+        Ok((
+            text_response(404, "doc-db RPC path not found".to_string())?,
+            empty_io(),
+        ))
     })
 }
 
@@ -1232,8 +1244,31 @@ pub(crate) fn classify_wasm_error(
 
 #[cfg(test)]
 mod tests {
-    use super::{ErrorCode, guest_error};
+    use super::{ErrorCode, SelfInvokeHooks, SelfInvokeHooksOptions, WasiHttpHooks, guest_error};
     use crate::{MAX_REQUEST_BODY_SIZE, RequestBodyTooLarge};
+    use bytes::Bytes;
+    use http_body_util::{BodyExt, Empty};
+    use hyper::http;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    use tokio::sync::mpsc;
+
+    struct TrackingDocDbService {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl crate::DocDbService for TrackingDocDbService {
+        fn execute<'a>(
+            &'a self,
+            _project_id: &'a str,
+            _request: doc_db_protocol::DocDbRequest,
+        ) -> crate::DocDbServiceFuture<'a> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async { Err("unexpected doc-db invocation".to_string()) })
+        }
+    }
 
     #[test]
     fn a_body_size_code_stays_downcastable_and_keeps_the_limit_the_guest_reported() {
@@ -1261,5 +1296,48 @@ mod tests {
         let error = guest_error(ErrorCode::ConnectionRefused);
         assert!(error.downcast_ref::<RequestBodyTooLarge>().is_none());
         assert!(error.to_string().contains("ConnectionRefused"));
+    }
+
+    #[tokio::test]
+    async fn reserved_doc_db_host_rejects_wrong_path_without_outbound_forwarding() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let doc_db_hijack = Arc::new(crate::DocDbHijack::new(
+            "fn0-doc-db.fn0.dev".to_string(),
+            Arc::new(TrackingDocDbService {
+                calls: calls.clone(),
+            }),
+        ));
+        let (self_invoke_sender, _receiver) = mpsc::unbounded_channel();
+        let mut hooks = SelfInvokeHooks::new(SelfInvokeHooksOptions {
+            project_id: "project".to_string(),
+            self_invoke_sender,
+            doc_db_hijack: Some(doc_db_hijack),
+            turso_hijack: None,
+            otlp_hijack: None,
+            queue_hijack: None,
+            cross_project_enqueue_hijack: None,
+            cross_project_invoke_hijack: None,
+            vault_hijack: None,
+            object_storage_hijack: None,
+            public_storage_hijack: None,
+            static_page_cache_hijack: None,
+            websocket_hijack: None,
+            guest_outbound_http: None,
+        });
+        let body = Empty::<Bytes>::new()
+            .map_err(|never: std::convert::Infallible| match never {})
+            .boxed_unsync();
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri("http://fn0-doc-db.fn0.dev/wrong")
+            .body(body)
+            .unwrap();
+
+        let request_future =
+            Box::into_pin(hooks.send_request(request, None, Box::new(async { Ok(()) })));
+        let (response, _io) = request_future.await.unwrap();
+
+        assert_eq!(response.status(), 404);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 }

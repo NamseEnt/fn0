@@ -641,6 +641,17 @@ mod semantic_tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
 
+    #[derive(serde::Deserialize, serde::Serialize)]
+    struct TransactionTestDoc {
+        id: String,
+    }
+
+    impl Document for TransactionTestDoc {
+        fn key(&self) -> DocKey {
+            DocKey::new("TransactionTestDoc", format!("id={}", self.id))
+        }
+    }
+
     async fn read_http_body(stream: &mut TcpStream) -> Vec<u8> {
         let mut bytes = Vec::new();
         let header_end;
@@ -1113,6 +1124,40 @@ mod semantic_tests {
             DocDbOperation::BatchGetObserved { .. }
         ));
         assert!(matches!(operations[7], DocDbOperation::Transact { .. }));
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_remote_transaction_conflict_index() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let (url, server) = start_remote_server(vec![DocDbResponse::new(DocDbResult::Transact {
+            outcome: DocDbTransactOutcome::Conflict { condition_index: 3 },
+        })])
+        .await;
+        let database = semantic_with_config(url);
+
+        let result = database
+            .trx(|trx| async move {
+                let handle = trx.create(TransactionTestDoc {
+                    id: "invalid-conflict-index".to_string(),
+                })?;
+                drop(handle);
+                trx.commit::<(), ()>(())
+            })
+            .await;
+
+        let is_invalid_conflict_error = match result {
+            TrxResult::Err(error) => error
+                .to_string()
+                .contains("backend returned invalid transaction conflict condition_index"),
+            _ => false,
+        };
+        assert!(is_invalid_conflict_error);
+        let operations = server.await.unwrap();
+        assert!(matches!(
+            operations.as_slice(),
+            [DocDbOperation::Transact { conditions, mutations }]
+                if conditions.len() == 1 && mutations.len() == 1
+        ));
     }
 }
 
