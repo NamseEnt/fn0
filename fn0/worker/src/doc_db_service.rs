@@ -1,27 +1,19 @@
 use doc_db_protocol::DocDbRequest;
-use fn0::{DocDbService, DocDbServiceFuture, TursoHijack};
-use std::sync::Arc;
+use fn0::{DocDbService, DocDbServiceFuture};
 
-pub struct TursoDocDbService {
-    turso_hijack: Arc<TursoHijack>,
+pub struct DodbDocDbService {
+    connection: doc_db::DodbConnection,
 }
 
-impl TursoDocDbService {
-    pub fn new(turso_hijack: Arc<TursoHijack>) -> Self {
-        Self { turso_hijack }
-    }
-
-    fn database_url(&self, project_id: &str) -> String {
-        format!("https://{}", self.turso_hijack.target_host(project_id))
+impl DodbDocDbService {
+    pub fn new(connection: doc_db::DodbConnection) -> Self {
+        Self { connection }
     }
 }
 
-impl DocDbService for TursoDocDbService {
+impl DocDbService for DodbDocDbService {
     fn execute<'a>(&'a self, project_id: &'a str, request: DocDbRequest) -> DocDbServiceFuture<'a> {
-        let database = doc_db::turso_with_config(
-            self.database_url(project_id),
-            self.turso_hijack.group_token.clone(),
-        );
+        let database = doc_db::dodb_with_connection(&self.connection, project_id);
         Box::pin(async move {
             database
                 .execute_semantic(request)
@@ -33,19 +25,15 @@ impl DocDbService for TursoDocDbService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
-    fn resolves_the_project_database_using_turso_hijack_configuration() {
-        let hijack = Arc::new(TursoHijack {
-            placeholder_host: "fn0-db.fn0.dev".to_string(),
-            target_host_suffix: ".turso.example".to_string(),
-            group_token: "secret".to_string(),
-        });
-        let service = TursoDocDbService::new(hijack);
+    fn project_tenant_mapping_is_stable_and_scoped() {
         assert_eq!(
-            service.database_url("project"),
-            "https://project.turso.example"
+            doc_db::project_tenant_id("project"),
+            doc_db::project_tenant_id("project")
+        );
+        assert_ne!(
+            doc_db::project_tenant_id("project-a"),
+            doc_db::project_tenant_id("project-b")
         );
     }
 }

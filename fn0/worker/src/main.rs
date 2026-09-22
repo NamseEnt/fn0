@@ -191,10 +191,10 @@ fn build_turso_hijack() -> Arc<TursoHijack> {
     })
 }
 
-fn build_doc_db_hijack(turso_hijack: Arc<TursoHijack>) -> Arc<DocDbHijack> {
+fn build_doc_db_hijack(connection: doc_db::DodbConnection) -> Arc<DocDbHijack> {
     let placeholder_host = std::env::var("FN0_DOC_DB_PLACEHOLDER_HOST")
         .unwrap_or_else(|_| "fn0-doc-db.fn0.dev".to_string());
-    let service = Arc::new(doc_db_service::TursoDocDbService::new(turso_hijack));
+    let service = Arc::new(doc_db_service::DodbDocDbService::new(connection));
     Arc::new(DocDbHijack::new(placeholder_host, service))
 }
 
@@ -333,7 +333,13 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     let storage_resolver = Arc::new(ManifestStorageResolver::new(vault_client.clone()));
     let direct_hijack = build_cross_project_invoke_hijack();
     let turso_hijack = build_turso_hijack();
-    let doc_db_hijack = build_doc_db_hijack(turso_hijack.clone());
+    let dodb_config = doc_db::DodbConfig::from_env()
+        .map_err(|error| color_eyre::eyre::eyre!("dodb config: {error}"))?;
+    let dodb_connection = doc_db::DodbConnection::connect(&dodb_config)
+        .await
+        .map_err(|error| color_eyre::eyre::eyre!("dodb connection: {error}"))?;
+    tracing::info!(remote = %dodb_connection.remote_addr(), "dodb connection established");
+    let doc_db_hijack = build_doc_db_hijack(dodb_connection);
     let presign_gate = Arc::new(PresignGate::new());
     let purge_gate = Arc::new(PurgeGate::new());
     let metric_gate = Arc::new(MetricCardinalityGate::new());
