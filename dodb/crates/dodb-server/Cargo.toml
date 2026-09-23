@@ -5,13 +5,14 @@ edition.workspace = true
 license = "MIT"
 
 [dependencies]
+clap = { workspace = true, features = ["derive"] }
 dodb-core = { path = "../dodb-core" }
 dodb-protocol = { path = "../dodb-protocol" }
 dodb-service = { path = "../dodb-service" }
 dodb-storage = { path = "../dodb-storage" }
 quinn = { workspace = true, default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
 rustls-pemfile.workspace = true
-tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt", "rt-multi-thread", "sync", "time"] }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 
 [dev-dependencies]
 dodb-client = { path = "../dodb-client" }

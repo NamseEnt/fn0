@@ -1869,6 +1869,7 @@ dependencies = [
 name = "dodb-server"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "dodb-client",
  "dodb-core",
  "dodb-protocol",
