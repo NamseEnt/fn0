@@ -106,8 +106,8 @@ if [[ ! "${local_port}" =~ ^[0-9]+$ ]] || [[ "${local_port}" -lt 1 ]] || [[ "${l
   exit 1
 fi
 
-mapfile -d '' -t session_ssh_args < <(
-  python3 -c '
+session_ssh_args_file="${temporary_dir}/bastion-ssh-args"
+python3 -c '
 import shlex
 import sys
 
@@ -116,8 +116,10 @@ for argument_index, argument in enumerate(arguments):
     arguments[argument_index] = argument.replace("<privateKey>", sys.argv[2]).replace("<localPort>", sys.argv[3])
 for argument in arguments:
     sys.stdout.buffer.write(argument.encode() + b"\0")
-' "${session_ssh_command}" "${private_key_file}" "${local_port}"
-)
+' "${session_ssh_command}" "${private_key_file}" "${local_port}" >"${session_ssh_args_file}"
+while IFS= read -r -d '' session_argument; do
+  session_ssh_args+=("${session_argument}")
+done <"${session_ssh_args_file}"
 if [[ "${#session_ssh_args[@]}" -lt 2 || "${session_ssh_args[0]}" != "ssh" ]]; then
   echo "OCI Bastion returned an unsupported port-forwarding command" >&2
   exit 1
