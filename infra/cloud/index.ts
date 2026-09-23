@@ -714,6 +714,13 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   },
 });
 
+const ociDodbNode = new fn0.OciDodbNode("oci-dodb-node", {
+  compartmentId: ociFn0WorkerSite.compartmentId,
+  subnetId: ociFn0WorkerSite.subnetId,
+  osImageId: ociFn0WorkerSite.osImageId,
+  sshPublicKey: ociFn0WorkerSite.sshPublicKey,
+});
+
 // fn0 cloud assumes bring-your-own-Cloudflare: every project runs behind the
 // owner's own zone, and that zone's DNS points here. This record is DNS-only
 // (grey cloud) on purpose — it is a CNAME target, not a proxied edge, so the
@@ -837,6 +844,10 @@ export const bundleStoreR2WorkerScriptName = bundleStoreR2Worker.scriptName;
 export const workerCompartmentId = ociFn0WorkerSite.compartmentId;
 export const workerBastionId = ociFn0WorkerSite.bastionId;
 export const workerInstancePoolId = ociFn0WorkerSite.instancePoolId;
+export const dodbInstanceId = ociDodbNode.instanceId;
+export const dodbPrivateIp = ociDodbNode.privateIp;
+export const dodbServerName = ociDodbNode.serverName;
+export const dodbRootCertPem = ociDodbNode.rootCertPem;
 // The operator's own Cloudflare account and zone. fn0-control is a connected
 // project like any other, and `bootstrap-fn0-control.sh` provisions it here
 // because it cannot call `forte cloudflare connect` against a control plane
