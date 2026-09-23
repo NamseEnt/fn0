@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["fn0/*", "forte/*", "doc-db", "object-storage"]
+members = ["fn0/*", "forte/*", "doc-db", "object-storage", "dodb/crates/*"]
 exclude = ["vendor", "forte/rs-to-ts", "fn0/control"]
 
 # deno_core is vendored because the upstream crate serializes the snapshot
@@ -22,6 +22,10 @@ fn0-deploy = { path = "fn0/deploy", version = "=0.3.5" }
 fn0-wasmtime = { path = "fn0/wasmtime", version = "=0.2.1" }
 ski = { package = "fn0-ski", path = "fn0/ski", version = "=0.1.13" }
 doc-db = { package = "fn0-doc-db", path = "doc-db", version = "=0.4.15" }
+dodb-client = { path = "dodb/crates/dodb-client" }
+dodb-core = { path = "dodb/crates/dodb-core" }
+dodb-protocol = { path = "dodb/crates/dodb-protocol" }
+dodb-server = { path = "dodb/crates/dodb-server" }
 object-storage = { package = "fn0-object-storage", path = "object-storage", version = "=0.5.9" }
 forte-json = { path = "forte/json", version = "=0.1.3" }
 forte-macros = { path = "forte/macros", version = "=0.6.0" }
@@ -40,6 +44,7 @@ chrono = "=0.4.42"
 clap = "=4.5.60"
 color-eyre = "=0.6.5"
 cookie = "=0.18.1"
+crc32c = "=0.6.8"
 crossbeam-channel = "=0.5.15"
 dashmap = "=6.1.0"
 deno_core = "=0.394.0"
@@ -80,6 +85,7 @@ opentelemetry_sdk = { version = "=0.31.0", default-features = false }
 prost = "=0.14.3"
 predicates = "=3.1.4"
 prettyplease = "=0.2.37"
+proptest = "=1.11.0"
 proc-macro2 = "=1.0.105"
 quote = "=1.0.45"
 quinn = { version = "=0.11.11", default-features = false }
