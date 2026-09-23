@@ -400,6 +400,18 @@ impl Database {
                 };
                 Ok(DocDbResponse::new(DocDbResult::Transact { outcome }))
             }
+            DocDbOperation::AdminPurgeProject { .. } => {
+                Ok(DocDbResponse::error(DocDbError::InvalidRequest {
+                    message: "admin purge must be handled by the trusted host service".to_string(),
+                }))
+            }
+        }
+    }
+
+    pub async fn admin_purge_project(&self, project_id: &str) -> Result<u64> {
+        match &self.inner {
+            DatabaseInner::Remote(db) => db.admin_purge_project(project_id).await,
+            _ => anyhow::bail!("admin project purge requires the semantic remote database"),
         }
     }
 
@@ -511,7 +523,9 @@ impl Database {
         match &self.inner {
             DatabaseInner::Turso(db) => db.execute_raw_transactional(statements, false).await,
             DatabaseInner::Memory(_) => {
-                anyhow::bail!("execute_raw_transactional_readonly is only supported on the Turso backend")
+                anyhow::bail!(
+                    "execute_raw_transactional_readonly is only supported on the Turso backend"
+                )
             }
             DatabaseInner::Remote(_) => {
                 anyhow::bail!("raw SQL is not supported by semantic doc-db RPC")

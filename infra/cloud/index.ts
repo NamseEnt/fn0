@@ -8,6 +8,26 @@ import * as crypto from "node:crypto";
 
 const config = new pulumi.Config();
 
+const dodbRuntimeAddr = config.get("dodbRuntimeAddr");
+const dodbRuntimeServerName = config.get("dodbRuntimeServerName");
+const dodbRuntimeRootCertPemBase64 = config.get("dodbRuntimeRootCertPemBase64");
+const configuredDodbRuntimeValues = [
+  dodbRuntimeAddr,
+  dodbRuntimeServerName,
+  dodbRuntimeRootCertPemBase64,
+];
+if (
+  configuredDodbRuntimeValues.some((value) => value !== undefined) &&
+  configuredDodbRuntimeValues.some((value) => value === undefined)
+) {
+  throw new Error(
+    "dodb runtime configuration must set address, server name, and root certificate together",
+  );
+}
+if (configuredDodbRuntimeValues.some((value) => value === undefined)) {
+  throw new Error("dodb runtime configuration is required for the worker site");
+}
+
 const accountId = config.require("cloudflareAccountId");
 const zoneId = config.require("cloudflareZoneId");
 const domain = config.require("domain");
@@ -126,7 +146,6 @@ const forteDb = new fn0.ForteDb(
   {},
 );
 
-const tursoApiToken = new pulumi.Config("turso").requireSecret("apiToken");
 
 new fn0.ControlProjectBootstrap(
   "control-project-bootstrap",
@@ -569,16 +588,6 @@ const controlLambdaSecretAccessKeyCt = pulumi
   .all([controlDek.plaintext, controlAwsAccessKey.secret])
   .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
 
-const controlTursoApiTokenCt = pulumi
-  .all([controlDek.plaintext, tursoApiToken])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
-// The doc_query action speaks hrana to any project's database on the owner's
-// behalf, so control needs the same group token workers hold.
-const controlForteDbGroupTokenCt = pulumi
-  .all([controlDek.plaintext, forteDb.groupToken])
-  .apply(([dek, value]) => aesGcmEncryptToBase64(dek, value));
-
 const controlEnvYamlBootstrap = pulumi
   .all([
     controlDek.ciphertext,
@@ -595,11 +604,6 @@ const controlEnvYamlBootstrap = pulumi
     pulumi.output(cwasmCompilerRegion),
     controlLambdaAccessKeyIdCt,
     controlLambdaSecretAccessKeyCt,
-    controlTursoApiTokenCt,
-    pulumi.output(config.require("tursoOrganizationSlug")),
-    forteDb.groupName,
-    controlForteDbGroupTokenCt,
-    forteDb.hostSuffix,
     controlSignyAccessClientIdCt,
     controlSignyAccessClientSecretCt,
   ])
@@ -619,11 +623,6 @@ const controlEnvYamlBootstrap = pulumi
       lambdaRegion,
       lambdaKeyCt,
       lambdaSecretCt,
-      tursoApiTokenCt,
-      tursoOrgSlug,
-      tursoGroupName,
-      forteDbGroupTokenCt,
-      forteDbHostSuffix,
       signyAccessClientIdCt,
       signyAccessClientSecretCt,
     ]) =>
@@ -647,18 +646,12 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${r2KeyCt}`,
         "FN0_BUNDLE_STORE_SECRET_ACCESS_KEY:",
         `  secret: ${r2SecretCt}`,
+        "FN0_DB_BACKEND: dodb",
         `FN0_LAMBDA_REGION: ${lambdaRegion}`,
         "FN0_LAMBDA_ACCESS_KEY_ID:",
         `  secret: ${lambdaKeyCt}`,
         "FN0_LAMBDA_SECRET_ACCESS_KEY:",
         `  secret: ${lambdaSecretCt}`,
-        "FN0_TURSO_API_TOKEN:",
-        `  secret: ${tursoApiTokenCt}`,
-        `FN0_TURSO_ORG_SLUG: ${tursoOrgSlug}`,
-        `FN0_TURSO_GROUP_NAME: ${tursoGroupName}`,
-        "FN0_TURSO_GROUP_TOKEN:",
-        `  secret: ${forteDbGroupTokenCt}`,
-        `FN0_TURSO_DB_HOST_SUFFIX: ${forteDbHostSuffix}`,
         `FN0_SIGNY_URL: https://${signyHostname}`,
         "FN0_SIGNY_ACCESS_CLIENT_ID:",
         `  secret: ${signyAccessClientIdCt}`,
@@ -675,9 +668,10 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
   ocpus: 1,
   memoryInGbs: 6,
   websocketBearer: websocketBearer.result,
-  workerAgentForteDb: {
-    groupToken: forteDb.groupToken,
-    hostSuffix: forteDb.hostSuffix,
+  dodbRuntime: {
+    address: dodbRuntimeAddr!,
+    serverName: dodbRuntimeServerName!,
+    rootCertPemBase64: dodbRuntimeRootCertPemBase64!,
   },
   worker: {
     tlsOrigin: {
@@ -685,10 +679,6 @@ const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
       keyPem: dns.privateKeyPem,
     },
     envEncryptionKeyBase64: envEncryptionKey.base64,
-    forteDb: {
-      groupToken: forteDb.groupToken,
-      hostSuffix: forteDb.hostSuffix,
-    },
     crossProjectEnqueueAllowedCallerProjectId: "fn0-control",
     crossProjectInvokeAllowedCallerProjectId: "fn0-control",
     vault: {

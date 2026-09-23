@@ -66,6 +66,7 @@ pub(crate) fn response_status(response: &DocDbResponse) -> u16 {
             DocDbError::InvalidRequest { .. } => 400,
             DocDbError::Backend { .. } => 500,
             DocDbError::UnsupportedVersion { .. } => 505,
+            DocDbError::Forbidden { .. } => 403,
         },
         DocDbResult::Transact {
             outcome: DocDbTransactOutcome::Conflict { .. },
@@ -218,6 +219,12 @@ mod tests {
                 message: "failed".to_string()
             })),
             500
+        );
+        assert_eq!(
+            response_status(&DocDbResponse::error(DocDbError::Forbidden {
+                message: "denied".to_string()
+            })),
+            403
         );
         assert_eq!(
             response_status(&DocDbResponse::new(DocDbResult::Transact {

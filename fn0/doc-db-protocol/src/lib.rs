@@ -52,6 +52,9 @@ pub enum DocDbOperation {
         conditions: Vec<DocDbCondition>,
         mutations: Vec<DocDbMutation>,
     },
+    AdminPurgeProject {
+        project_id: String,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -142,6 +145,7 @@ pub enum DocDbResult {
     Scan { documents: Vec<DocDbDocument> },
     GetObserved { document: DocDbObservedDocument },
     Transact { outcome: DocDbTransactOutcome },
+    AdminPurgeProject { deleted_rows: u64 },
     Error { error: DocDbError },
 }
 
@@ -186,6 +190,7 @@ pub enum DocDbError {
     InvalidRequest { message: String },
     Backend { message: String },
     UnsupportedVersion { version: u16 },
+    Forbidden { message: String },
 }
 
 impl fmt::Display for DocDbError {
@@ -196,6 +201,7 @@ impl fmt::Display for DocDbError {
             Self::UnsupportedVersion { version } => {
                 write!(formatter, "unsupported protocol version: {version}")
             }
+            Self::Forbidden { message } => write!(formatter, "forbidden: {message}"),
         }
     }
 }
@@ -333,6 +339,9 @@ mod tests {
                         key: DocDbKey::new("pk", "delete"),
                     },
                 ],
+            },
+            DocDbOperation::AdminPurgeProject {
+                project_id: "abcdefgh".to_string(),
             },
         ];
 

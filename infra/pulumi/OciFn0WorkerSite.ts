@@ -15,20 +15,20 @@ export interface OciFn0WorkerSiteArgs {
   shape: pulumi.Input<string>;
   ocpus: pulumi.Input<number>;
   memoryInGbs: pulumi.Input<number>;
-  workerAgentForteDb: WorkerAgentForteDbArgs;
+  dodbRuntime: DodbRuntimeArgs;
   worker: WorkerArgs;
   websocketBearer: pulumi.Input<string>;
 }
 
-export interface WorkerAgentForteDbArgs {
-  groupToken: pulumi.Input<string>;
-  hostSuffix: pulumi.Input<string>;
+export interface DodbRuntimeArgs {
+  address: pulumi.Input<string>;
+  serverName: pulumi.Input<string>;
+  rootCertPemBase64: pulumi.Input<string>;
 }
 
 export interface WorkerArgs {
   tlsOrigin: WorkerTlsOriginArgs;
   envEncryptionKeyBase64: pulumi.Input<string>;
-  forteDb: WorkerForteDbArgs;
   crossProjectEnqueueAllowedCallerProjectId: pulumi.Input<string>;
   crossProjectInvokeAllowedCallerProjectId: pulumi.Input<string>;
   vault: WorkerVaultArgs;
@@ -63,11 +63,6 @@ export interface WorkerHostObservabilityArgs {
 export interface WorkerTlsOriginArgs {
   certPem: pulumi.Input<string>;
   keyPem: pulumi.Input<string>;
-}
-
-export interface WorkerForteDbArgs {
-  groupToken: pulumi.Input<string>;
-  hostSuffix: pulumi.Input<string>;
 }
 
 export interface WorkerVaultArgs {
@@ -592,6 +587,7 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             sourceDetails: {
               sourceType: "image",
               imageId,
+              bootVolumeSizeInGbs: "50",
             },
             createVnicDetails: {
               subnetId: workerSubnet.id,
@@ -603,30 +599,6 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
               fn0_role: "worker",
             },
           },
-          // Sized so that two instances stay inside the 200 GB Always Free
-          // block storage allowance: a roll runs the pool at size 2, and each
-          // instance carries its own ~47 GB boot volume plus this volume.
-          blockVolumes: [
-            {
-              createDetails: {
-                availabilityDomain,
-                compartmentId: compartment.id,
-                sizeInGbs: `${TELEMETRY_QUEUE_VOLUME_SIZE_IN_GBS}`,
-                vpusPerGb: "10",
-                displayName: "fn0-worker-collecty-queue",
-                freeformTags: {
-                  managed_by: MANAGED_BY_TAG_VALUE,
-                  fn0_role: "worker",
-                  fn0_volume_role: "telemetry-queue",
-                },
-              },
-              attachDetails: {
-                type: "paravirtualized",
-                device: TELEMETRY_QUEUE_DEVICE,
-                displayName: "fn0-worker-collecty-queue",
-              },
-            },
-          ],
         },
       },
       { parent: this },
@@ -930,9 +902,10 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       return `${r.url}/${r.repository}-proxy:latest`;
     });
 
-    const agentEnv = buildWorkerAgentEnv(args.workerAgentForteDb);
+    const agentEnv = buildWorkerAgentEnv(args.dodbRuntime);
     const workerEnv = buildWorkerEnv(
       args.worker,
+      args.dodbRuntime,
       this.cwasmBucket,
       this.queue,
       websocketTransport,
@@ -1134,69 +1107,24 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    new oci.autoscaling.AutoScalingConfiguration(
-      "instance-pool-autoscaling",
-      {
-        compartmentId: compartment.id,
-        displayName: `${name}-autoscaling`,
-        coolDownInSeconds: 300,
-        isEnabled: true,
-        autoScalingResources: {
-          id: instancePool.id,
-          type: "instancePool",
-        },
-        policies: [
-          {
-            policyType: "threshold",
-            displayName: "cpu-threshold",
-            capacity: {
-              initial: args.count,
-              min: args.count,
-              // OCI rejects max == min ("Maximum capacity must be greater than
-              // the minimum"). Headroom of +1 keeps the policy schema valid
-              // while staying within the Always Free A1 quota for now.
-              max: args.count + 1,
-            },
-            rules: [
-              {
-                displayName: "scale-out-cpu-70",
-                action: { type: "CHANGE_COUNT_BY", value: 1 },
-                metric: {
-                  metricType: "CPU_UTILIZATION",
-                  threshold: { operator: "GT", value: 70 },
-                },
-              },
-              {
-                displayName: "scale-in-cpu-30",
-                action: { type: "CHANGE_COUNT_BY", value: -1 },
-                metric: {
-                  metricType: "CPU_UTILIZATION",
-                  threshold: { operator: "LT", value: 30 },
-                },
-              },
-            ],
-          },
-        ],
-      },
-      { parent: this, dependsOn: [instancePool], deleteBeforeReplace: true },
-    );
-
     return instancePool;
   }
 }
 
 function buildWorkerAgentEnv(
-  forteDb: WorkerAgentForteDbArgs,
+  dodbRuntime: DodbRuntimeArgs,
 ): pulumi.Output<{ [k: string]: string }> {
   const base: { [k: string]: pulumi.Input<string> } = {
-    TURSO_GROUP_TOKEN: forteDb.groupToken,
-    TURSO_DB_HOST_SUFFIX: forteDb.hostSuffix,
+    DODB_ADDR: dodbRuntime.address,
+    DODB_SERVER_NAME: dodbRuntime.serverName,
+    DODB_ROOT_CERT_PEM_BASE64: dodbRuntime.rootCertPemBase64,
   };
   return resolveEnvMap(base);
 }
 
 function buildWorkerEnv(
   worker: WorkerArgs,
+  dodbRuntime: DodbRuntimeArgs,
   cwasmBucket: OciCwasmBucketInfo,
   queue: OciQueueInfo,
   websocketTransport: {
@@ -1237,8 +1165,9 @@ function buildWorkerEnv(
 
     FN0_ENV_KEY_BASE64: worker.envEncryptionKeyBase64,
 
-    TURSO_GROUP_TOKEN: worker.forteDb.groupToken,
-    TURSO_DB_HOST_SUFFIX: worker.forteDb.hostSuffix,
+    DODB_ADDR: dodbRuntime.address,
+    DODB_SERVER_NAME: dodbRuntime.serverName,
+    DODB_ROOT_CERT_PEM_BASE64: dodbRuntime.rootCertPemBase64,
 
     FN0_QUEUE_OCID: queue.ocid,
     FN0_QUEUE_MESSAGES_ENDPOINT: queue.messagesEndpoint,
@@ -1301,8 +1230,6 @@ function resolveEnvMap(m: {
 }
 
 const COLLECTY_LISTEN_ADDRESS = "127.0.0.1:4318";
-const TELEMETRY_QUEUE_VOLUME_SIZE_IN_GBS = 50;
-const TELEMETRY_QUEUE_DEVICE = "/dev/oracleoci/oraclevdb";
 const COLLECTY_STORAGE_PATH = "/var/lib/collecty";
 
 function renderCloudInit(
@@ -1406,6 +1333,8 @@ if ! command -v podman >/dev/null 2>&1; then
   dnf install -y podman
 fi
 
+/usr/libexec/oci-growfs -y
+
 HOST_ID=$(curl -fsSH "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/id)
 if [ -z "$HOST_ID" ]; then
   echo "failed to fetch FN0_WORKER_AGENT_HOST_ID from OCI metadata" >&2
@@ -1445,23 +1374,8 @@ ${agentSystemdUnit}EOF_AGENT_UNIT
 cat > /etc/systemd/system/fn0-worker-proxy.service <<'EOF_PROXY_UNIT'
 ${proxySystemdUnit}EOF_PROXY_UNIT
 
-{
-  for _ in $(seq 1 60); do
-    if [ -b "${TELEMETRY_QUEUE_DEVICE}" ]; then break; fi
-    sleep 2
-  done
-  if ! blkid "${TELEMETRY_QUEUE_DEVICE}" >/dev/null 2>&1; then
-    mkfs.xfs "${TELEMETRY_QUEUE_DEVICE}"
-  fi
-  mkdir -p ${COLLECTY_STORAGE_PATH}
-  collecty_queue_uuid="$(blkid -s UUID -o value "${TELEMETRY_QUEUE_DEVICE}")"
-  if ! grep -q "$collecty_queue_uuid" /etc/fstab; then
-    echo "UUID=$collecty_queue_uuid ${COLLECTY_STORAGE_PATH} xfs defaults,nofail 0 2" >> /etc/fstab
-  fi
-  systemctl daemon-reload
-  mountpoint -q ${COLLECTY_STORAGE_PATH} || mount ${COLLECTY_STORAGE_PATH}
-  chown 10002:10002 ${COLLECTY_STORAGE_PATH}
-} || echo "collecty queue volume setup failed; collecty will not start" >&2
+mkdir -p ${COLLECTY_STORAGE_PATH}
+chown 10002:10002 ${COLLECTY_STORAGE_PATH}
 
 mkdir -p /etc/fn0-collecty
 cat > /etc/fn0-collecty/env <<'EOF_COLLECTY_ENV'

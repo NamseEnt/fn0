@@ -200,4 +200,16 @@ impl RemoteDatabase {
             other => bail!("unexpected semantic doc-db transaction response: {other:?}"),
         }
     }
+
+    pub(crate) async fn admin_purge_project(&self, project_id: &str) -> Result<u64> {
+        let response = self
+            .execute(DocDbOperation::AdminPurgeProject {
+                project_id: project_id.to_string(),
+            })
+            .await?;
+        match response.result {
+            DocDbResult::AdminPurgeProject { deleted_rows } => Ok(deleted_rows),
+            other => bail!("unexpected semantic doc-db project purge response: {other:?}"),
+        }
+    }
 }

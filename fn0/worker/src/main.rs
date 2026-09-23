@@ -10,6 +10,8 @@ mod project_tenant;
 mod queue_consumer;
 mod storage_resolver;
 mod telemetry;
+#[cfg(test)]
+mod test_support;
 mod vault_client;
 mod websocket;
 mod websocket_directory;
@@ -26,7 +28,7 @@ use fn0::{
     EgressBudget, EgressMeteredBody, ExecutionContext, GuestOutboundHttp, MAX_REQUEST_BODY_SIZE,
     MetricCardinalityGate, ObjectStorageHijack, OtlpHijack, OutboundDialer, PresignGate,
     PrivateDestinationAccess, PublicStorageHijack, PurgeGate, QueueHijack, RequestBodyTooLarge,
-    RequestCancellation, StaticPageCacheHijack, TursoHijack, VaultHijack, WebSocketHijack,
+    RequestCancellation, StaticPageCacheHijack, VaultHijack, WebSocketHijack,
 };
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
@@ -178,19 +180,6 @@ fn build_vault_hijack() -> Arc<VaultHijack> {
     Arc::new(VaultHijack::from_env().expect("vault hijack init failed"))
 }
 
-fn build_turso_hijack() -> Arc<TursoHijack> {
-    let group_token = std::env::var("TURSO_GROUP_TOKEN").expect("TURSO_GROUP_TOKEN must be set");
-    let target_host_suffix =
-        std::env::var("TURSO_DB_HOST_SUFFIX").expect("TURSO_DB_HOST_SUFFIX must be set");
-    let placeholder_host =
-        std::env::var("TURSO_PLACEHOLDER_HOST").unwrap_or_else(|_| "fn0-db.fn0.dev".to_string());
-    Arc::new(TursoHijack {
-        placeholder_host,
-        target_host_suffix,
-        group_token,
-    })
-}
-
 fn build_doc_db_hijack(connection: doc_db::DodbConnection) -> Arc<DocDbHijack> {
     let placeholder_host = std::env::var("FN0_DOC_DB_PLACEHOLDER_HOST")
         .unwrap_or_else(|_| "fn0-doc-db.fn0.dev".to_string());
@@ -332,7 +321,6 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     );
     let storage_resolver = Arc::new(ManifestStorageResolver::new(vault_client.clone()));
     let direct_hijack = build_cross_project_invoke_hijack();
-    let turso_hijack = build_turso_hijack();
     let dodb_config = doc_db::DodbConfig::from_env()
         .map_err(|error| color_eyre::eyre::eyre!("dodb config: {error}"))?;
     let dodb_connection = doc_db::DodbConnection::connect_lazy(&dodb_config)
@@ -341,7 +329,9 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
         remote = %dodb_connection.remote_addr(),
         "dodb connection manager initialized; dialing lazily"
     );
-    let doc_db_hijack = build_doc_db_hijack(dodb_connection);
+    let control_database = doc_db::dodb_with_connection(&dodb_connection, "fn0-control")
+        .map_err(|error| color_eyre::eyre::eyre!("control dodb database: {error}"))?;
+    let doc_db_hijack = build_doc_db_hijack(dodb_connection.clone());
     let presign_gate = Arc::new(PresignGate::new());
     let purge_gate = Arc::new(PurgeGate::new());
     let metric_gate = Arc::new(MetricCardinalityGate::new());
@@ -363,7 +353,6 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     let execution_context = Arc::new(
         ExecutionContext::new(engine, linker, cache.clone())
             .with_doc_db_hijack(doc_db_hijack)
-            .with_turso_hijack(turso_hijack)
             .with_queue_hijack(build_queue_hijack())
             .with_cross_project_enqueue_hijack(build_cross_project_enqueue_hijack())
             .with_cross_project_invoke_hijack(direct_hijack.clone())
@@ -428,13 +417,13 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
         worker_senders.clone(),
         outbound_dialer,
         egress_budget.clone(),
+        control_database.clone(),
     )
     .await
     .map_err(|error| color_eyre::eyre::eyre!("websocket service init: {error:#}"))?;
     websocket_hijack.set_dispatcher(websocket_service.clone());
 
-    let manifest_db =
-        manifest_poller::build_database_from_env().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+    let manifest_db = control_database.clone();
     let manifest_handle = tokio::spawn({
         let cache = cache.clone();
         let manifest_loaded = manifest_loaded.clone();
@@ -453,8 +442,7 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     });
 
     let cert_resolver = Arc::new(build_cert_resolver()?);
-    let cert_db =
-        manifest_poller::build_database_from_env().map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+    let cert_db = control_database;
     let cert_handle = tokio::spawn(cert_poller::run(
         cert_db,
         cert_resolver.clone(),

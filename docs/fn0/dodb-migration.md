@@ -20,6 +20,16 @@ fn0-db-migrate verify [--project-id ID ...] [--json]
 
 Migration is resumable. For every source row it first reads the destination: an equal row is skipped, while a missing or different row is written with `put`. If a put returns an error, the tool immediately reads the key again and accepts the uncertain result only if the destination bytes now exactly equal the source bytes. It never deletes destination rows. Destination-only rows are reported as `extra` and make exact verification fail.
 
+## Cutover readiness
+
+The production worker source uses one shared dodb connection for guest semantic doc-db requests, the manifest poller, the certificate poller, and the WebSocket connection directory. New worker execution contexts do not install the legacy `TursoHijack`; first-party guests that still call a direct Turso or Hrana placeholder will fail closed after replacement. Guest code using `doc_db::database()` continues through semantic doc-db RPC and is project-isolated by the worker.
+
+The control guest selects `FN0_DB_BACKEND=turso` or `FN0_DB_BACKEND=dodb`. In dodb mode, raw SQL `doc_query` is explicitly unavailable because dodb does not implement arbitrary SQL. Deploy does not provision a Turso database. Project deletion purges the dodb project tenant through a control-only semantic operation after access and routing cleanup, then removes control identity documents. Turso remains provisioned and untouched during the confidence window as the rollback/reference source.
+
+New worker and worker-agent instances receive `DODB_ADDR`, `DODB_SERVER_NAME`, and `DODB_ROOT_CERT_PEM_BASE64`. These values are materialized in production Pulumi stack configuration from the current dodb outputs to avoid a Pulumi dependency cycle. Resync all three runtime values whenever dodb is replaced or its certificate rotates. Only the public root certificate is distributed; the dodb private key is not sent to workers.
+
+The future worker instance configuration uses one `VM.Standard.A1.Flex` worker with 1 OCPU, 6 GB memory, and a 50 GB boot volume. Collecty stores its queue at `/var/lib/collecty` on the boot filesystem. It has no separate collecty block volume and no automatic CPU autoscaling. Existing live workers are not replaced by source or stack configuration changes alone.
+
 Exact verification separately rescans current Turso and dodb rows in `(pk, sk)` order, comparing every key and payload byte. It reports source/destination row and byte totals plus missing, extra, and different row counts. Mismatch output contains keys only, with a default sample limit of 20. Full migration discovers the active project set before copying and rediscovers it after all copies; a changed set stops migration before verification. The exact verification then rereads current source data, so source changes during copying are detected as mismatches.
 
 ## Remote runner
