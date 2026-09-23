@@ -480,9 +480,38 @@ impl Database {
         statements: &[RawStatement],
     ) -> Result<RawTransactionOutcome> {
         match &self.inner {
-            DatabaseInner::Turso(db) => db.execute_raw_transactional(statements).await,
+            DatabaseInner::Turso(db) => db.execute_raw_transactional(statements, true).await,
             DatabaseInner::Memory(_) => {
                 anyhow::bail!("execute_raw_transactional is only supported on the Turso backend")
+            }
+            DatabaseInner::Remote(_) => {
+                anyhow::bail!("raw SQL is not supported by semantic doc-db RPC")
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            DatabaseInner::Dodb(_) => {
+                anyhow::bail!("raw SQL is not supported by the dodb backend")
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all, fields(statements = statements.len()))]
+    pub async fn execute_raw_transactional_readonly(
+        &self,
+        statements: &[RawStatement],
+    ) -> Result<RawTransactionOutcome> {
+        if statements.iter().any(|statement| {
+            !statement
+                .sql
+                .trim_start()
+                .to_ascii_uppercase()
+                .starts_with("SELECT ")
+        }) {
+            anyhow::bail!("execute_raw_transactional_readonly accepts SELECT statements only")
+        }
+        match &self.inner {
+            DatabaseInner::Turso(db) => db.execute_raw_transactional(statements, false).await,
+            DatabaseInner::Memory(_) => {
+                anyhow::bail!("execute_raw_transactional_readonly is only supported on the Turso backend")
             }
             DatabaseInner::Remote(_) => {
                 anyhow::bail!("raw SQL is not supported by semantic doc-db RPC")

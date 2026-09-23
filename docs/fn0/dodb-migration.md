@@ -1,0 +1,56 @@
+# Turso to dodb migration
+
+`fn0-db-migrate` inventories, copies, and exactly verifies fn0 document rows from Turso to dodb. Its source is Turso `docs(pk, sk, data, version)`. Migration copies only `pk`, `sk`, and `data`; Turso `version` is intentionally not preserved. dodb creates its own native opaque revision for every destination write.
+
+The active project set is discovered by scanning `fn0-control` rows whose primary key starts with `ProjectDoc/`, decoding each payload, and validating its `project_id` with the existing `doc_db::dodb_tenant_id` mapping. The migration set is always `fn0-control` plus all discovered active projects. `fn0-control` maps to tenant `u64::MAX`; ordinary fixed-width lowercase base36 project IDs use the existing exact mapping. The special `local` project has no dodb tenant and is rejected.
+
+The source reader uses raw ordered SELECT statements and never creates the Turso `docs` table. A missing `docs` table is treated as an empty database. Other SQL errors and malformed rows fail the command. Pages are ordered by `(pk, sk)` and resume with a keyset cursor; OFFSET is not used.
+
+## Commands
+
+The CLI reads `TURSO_GROUP_TOKEN` and `TURSO_DB_HOST_SUFFIX` from its environment. It never accepts the Turso secret as a command-line argument.
+
+```sh
+fn0-db-migrate inventory [--page-size 256] [--json]
+fn0-db-migrate migrate --apply [--project-id ID ...] [--json]
+fn0-db-migrate verify [--project-id ID ...] [--json]
+```
+
+`inventory` reads Turso only and reports project IDs, tenant IDs, row counts, and payload byte totals. `migrate` requires `--apply`, copies data, and automatically performs a fresh exact verification. `verify` is read-only. The dodb client uses the existing `DodbConfig::new` / `DodbConnection` API, defaulting to `127.0.0.1:18445`, TLS server name `dodb.internal`, and `/etc/dodb/server.crt`.
+
+Migration is resumable. For every source row it first reads the destination: an equal row is skipped, while a missing or different row is written with `put`. If a put returns an error, the tool immediately reads the key again and accepts the uncertain result only if the destination bytes now exactly equal the source bytes. It never deletes destination rows. Destination-only rows are reported as `extra` and make exact verification fail.
+
+Exact verification separately rescans current Turso and dodb rows in `(pk, sk)` order, comparing every key and payload byte. It reports source/destination row and byte totals plus missing, extra, and different row counts. Mismatch output contains keys only, with a default sample limit of 20. Full migration discovers the active project set before copying and rediscovers it after all copies; a changed set stops migration before verification. The exact verification then rereads current source data, so source changes during copying are detected as mismatches.
+
+## Remote runner
+
+`scripts/run-dodb-migration.sh` builds a Linux ARM64 binary and runs it on the dodb VM. dodb uses QUIC/UDP, while the OCI Bastion connection is a TCP SSH tunnel, so the local machine does not tunnel the dodb protocol. The runner opens OCI Bastion Port Forwarding to dodb SSH, then the VM connects to `127.0.0.1:18445` over QUIC and to Turso over HTTPS through NAT.
+
+```sh
+scripts/run-dodb-migration.sh inventory
+scripts/run-dodb-migration.sh verify
+scripts/run-dodb-migration.sh migrate --apply
+```
+
+The runner reads the existing Pulumi outputs for the Turso group token, Turso host suffix, Bastion ID, worker SSH private key, and dodb private IP. It writes the Turso values to a shell-escaped temporary environment file with mode `0600`, copies that file and the binary to the VM, and removes remote temporary inputs after execution. The server certificate is copied to a private temporary path readable by `opc`. The runner fixes dodb to the VM's local endpoint and certificate. It uses a temporary known-hosts file and deletes its tunnel, Bastion session, SSH key, and local temporary directory on exit.
+
+This runner was added for the future maintenance operation. It must not be run against production until the cutover prerequisites below are met.
+
+## Future cutover procedure
+
+The following sequence is documentation only; implementation and tooling work does not execute it.
+
+1. Enter maintenance mode.
+2. Block external requests.
+3. Stop or background-disable every Turso writer.
+4. Confirm no database writer remains.
+5. Run `scripts/run-dodb-migration.sh inventory`.
+6. Run `scripts/run-dodb-migration.sh migrate --apply`; migration automatically performs exact verification.
+7. Run `scripts/run-dodb-migration.sh verify` separately.
+8. Only after exact verification, update worker and control dodb configuration.
+9. Deploy or restart the relevant services.
+10. Smoke test the intended application path.
+11. Reopen traffic.
+12. Keep Turso intact as the rollback source until the confidence window ends.
+
+Before traffic reopens, Turso remains authoritative and a rollback is straightforward because no post-cutover writes have made Turso stale. After traffic reopens and dodb accepts writes, Turso is stale and a simple rollback to Turso is unsafe. This tooling does not implement dual-write or change-data capture. Do not delete Turso immediately after cutover.

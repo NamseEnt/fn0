@@ -599,6 +599,7 @@ impl TursoDatabase {
     pub(crate) async fn execute_raw_transactional(
         &self,
         statements: &[crate::RawStatement],
+        create_schema_on_error: bool,
     ) -> Result<crate::RawTransactionOutcome> {
         use crate::{RawStatementResult, RawTransactionOutcome};
 
@@ -640,7 +641,10 @@ impl TursoDatabase {
                         _ => {}
                     },
                     StreamResult::Error { error } => {
-                        if retry == 0 && Self::is_schema_error(&error.message) {
+                        if create_schema_on_error
+                            && retry == 0
+                            && Self::is_schema_error(&error.message)
+                        {
                             self.create_table().await?;
                             continue 'attempts;
                         }
@@ -670,7 +674,10 @@ impl TursoDatabase {
                     .get(statement_index + 1)
                     .and_then(|e| e.as_ref())
                 {
-                    if retry == 0 && Self::is_schema_error(&error.message) {
+                    if create_schema_on_error
+                        && retry == 0
+                        && Self::is_schema_error(&error.message)
+                    {
                         self.create_table().await?;
                         continue 'attempts;
                     }

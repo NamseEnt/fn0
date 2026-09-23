@@ -2308,6 +2308,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "fn0-db-migrate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "clap",
+ "dodb-protocol",
+ "dodb-server",
+ "fn0-doc-db",
+ "rcgen",
+ "rustls",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "fn0-deno-crypto"
 version = "0.255.0"
 dependencies = [
