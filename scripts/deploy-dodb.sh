@@ -148,10 +148,12 @@ if [[ "${forwarding_destination}" != "${dodb_private_ip}:22" ]]; then
   echo "OCI Bastion command forwards to an unexpected destination: ${forwarding_destination:-missing}" >&2
   exit 1
 fi
-if [[ "${session_ssh_command}" == *"<privateKey>"* || "${session_ssh_command}" == *"<localPort>"* ]]; then
-  echo "OCI Bastion command placeholders were not fully replaced" >&2
-  exit 1
-fi
+for current_argument in "${session_ssh_args[@]}"; do
+  if [[ "${current_argument}" == *"<privateKey>"* || "${current_argument}" == *"<localPort>"* ]]; then
+    echo "OCI Bastion command placeholders were not fully replaced" >&2
+    exit 1
+  fi
+done
 session_ssh_args+=(-o ExitOnForwardFailure=yes)
 
 tunnel_log="${temporary_dir}/bastion-tunnel.log"
