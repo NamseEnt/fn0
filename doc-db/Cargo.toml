@@ -41,16 +41,16 @@ forte-sdk = { workspace = true, features = ["test-harness"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 base64 = { workspace = true }
-dodb-client = { git = "https://github.com/namse/dodb", rev = "1ff96e1b3d205074d4c1b820f5f2680bd3226a8b" }
-dodb-core = { git = "https://github.com/namse/dodb", rev = "1ff96e1b3d205074d4c1b820f5f2680bd3226a8b" }
-dodb-protocol = { git = "https://github.com/namse/dodb", rev = "1ff96e1b3d205074d4c1b820f5f2680bd3226a8b" }
+dodb-client = { git = "https://github.com/namse/dodb", rev = "d26dc1fa0e9ab0e16eee1477ebd06f140b306af5" }
+dodb-core = { git = "https://github.com/namse/dodb", rev = "d26dc1fa0e9ab0e16eee1477ebd06f140b306af5" }
+dodb-protocol = { git = "https://github.com/namse/dodb", rev = "d26dc1fa0e9ab0e16eee1477ebd06f140b306af5" }
 rand = { workspace = true }
 reqwest = { workspace = true }
 rustls-pemfile = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-dodb-server = { git = "https://github.com/namse/dodb", rev = "1ff96e1b3d205074d4c1b820f5f2680bd3226a8b" }
+dodb-server = { git = "https://github.com/namse/dodb", rev = "d26dc1fa0e9ab0e16eee1477ebd06f140b306af5" }
 rcgen = { workspace = true }
 rustls = { workspace = true }
 tempfile = { workspace = true }

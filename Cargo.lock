@@ -1854,7 +1854,7 @@ dependencies = [
 [[package]]
 name = "dodb-client"
 version = "0.1.0"
-source = "git+https://github.com/namse/dodb?rev=1ff96e1b3d205074d4c1b820f5f2680bd3226a8b#1ff96e1b3d205074d4c1b820f5f2680bd3226a8b"
+source = "git+https://github.com/namse/dodb?rev=d26dc1fa0e9ab0e16eee1477ebd06f140b306af5#d26dc1fa0e9ab0e16eee1477ebd06f140b306af5"
 dependencies = [
  "dodb-core",
  "dodb-protocol",
@@ -1867,12 +1867,12 @@ dependencies = [
 [[package]]
 name = "dodb-core"
 version = "0.1.0"
-source = "git+https://github.com/namse/dodb?rev=1ff96e1b3d205074d4c1b820f5f2680bd3226a8b#1ff96e1b3d205074d4c1b820f5f2680bd3226a8b"
+source = "git+https://github.com/namse/dodb?rev=d26dc1fa0e9ab0e16eee1477ebd06f140b306af5#d26dc1fa0e9ab0e16eee1477ebd06f140b306af5"
 
 [[package]]
 name = "dodb-protocol"
 version = "0.1.0"
-source = "git+https://github.com/namse/dodb?rev=1ff96e1b3d205074d4c1b820f5f2680bd3226a8b#1ff96e1b3d205074d4c1b820f5f2680bd3226a8b"
+source = "git+https://github.com/namse/dodb?rev=d26dc1fa0e9ab0e16eee1477ebd06f140b306af5#d26dc1fa0e9ab0e16eee1477ebd06f140b306af5"
 dependencies = [
  "dodb-core",
  "dodb-service",
@@ -1881,7 +1881,7 @@ dependencies = [
 [[package]]
 name = "dodb-server"
 version = "0.1.0"
-source = "git+https://github.com/namse/dodb?rev=1ff96e1b3d205074d4c1b820f5f2680bd3226a8b#1ff96e1b3d205074d4c1b820f5f2680bd3226a8b"
+source = "git+https://github.com/namse/dodb?rev=d26dc1fa0e9ab0e16eee1477ebd06f140b306af5#d26dc1fa0e9ab0e16eee1477ebd06f140b306af5"
 dependencies = [
  "dodb-core",
  "dodb-protocol",
@@ -1895,7 +1895,7 @@ dependencies = [
 [[package]]
 name = "dodb-service"
 version = "0.1.0"
-source = "git+https://github.com/namse/dodb?rev=1ff96e1b3d205074d4c1b820f5f2680bd3226a8b#1ff96e1b3d205074d4c1b820f5f2680bd3226a8b"
+source = "git+https://github.com/namse/dodb?rev=d26dc1fa0e9ab0e16eee1477ebd06f140b306af5#d26dc1fa0e9ab0e16eee1477ebd06f140b306af5"
 dependencies = [
  "dodb-core",
 ]
@@ -1903,7 +1903,7 @@ dependencies = [
 [[package]]
 name = "dodb-storage"
 version = "0.1.0"
-source = "git+https://github.com/namse/dodb?rev=1ff96e1b3d205074d4c1b820f5f2680bd3226a8b#1ff96e1b3d205074d4c1b820f5f2680bd3226a8b"
+source = "git+https://github.com/namse/dodb?rev=d26dc1fa0e9ab0e16eee1477ebd06f140b306af5#d26dc1fa0e9ab0e16eee1477ebd06f140b306af5"
 dependencies = [
  "crc32c",
  "dodb-core",

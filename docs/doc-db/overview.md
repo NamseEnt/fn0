@@ -52,7 +52,7 @@ The semantic observed state uses an opaque `DocDbRevision`. A present document c
 
 The semantic transaction request is a pair of condition and mutation lists. Updates and deletes use `RevisionEquals` with the observed revision, inserts use `NotExists`, and read-only observations contribute a condition without a mutation. Conditions are checked in order; a conflict reports the first failing condition index and publishes zero mutations.
 
-Each transaction request allows at most one condition and at most one mutation for a key. A condition and a mutation for the same key are valid together; duplicate conditions or duplicate mutations are invalid requests and are rejected before backend execution. Condition-only transactions are valid and must still validate their conditions. A future dodb adapter must implement them with a consistent committed-point read such as `TransactGet` or an equivalent operation because dodb's write transaction primitive requires at least one mutation.
+Each transaction request allows at most one condition and at most one mutation for a key. A condition and a mutation for the same key are valid together; duplicate conditions or duplicate mutations are invalid requests and are rejected before backend execution. Condition-only transactions are valid and must still validate their conditions. The dodb adapter sends conditions and mutations through dodb's atomic `Transact` operation, including condition-only requests.
 
 The semantic protocol contains single-operation requests for `Get`, `Put`,
 `Delete`, `Query`, and `Scan`, plus the internal single-document
@@ -157,7 +157,13 @@ Key points:
 
 `trx` is the atomic API. It supports unconditional multi-write transactions,
 conditional optimistic transactions, and condition-only transactions. An
-empty transaction is a no-op.
+empty transaction is a local no-op and is not sent to the dodb backend.
+
+The dodb transport is created lazily by production workers. Startup validates
+the configured endpoint and TLS roots but does not dial the server. The first
+request establishes the shared connection; after transport loss, a later
+independent request reconnects through that same manager. Uncertain mutations
+are returned as errors and are never replayed by fn0.
 
 ## Aggregating Requests with `DbRequest`
 

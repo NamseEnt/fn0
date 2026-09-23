@@ -76,8 +76,7 @@ pub struct DodbConnection {
 
 impl DodbConnection {
     pub async fn connect(config: &DodbConfig) -> Result<Self> {
-        let tls =
-            ClientTlsConfig::from_der(config.root_certificates.clone()).map_err(client_error)?;
+        let tls = client_tls(config)?;
         let inner = ClientConnection::connect(
             config.bind_addr,
             config.server_addr,
@@ -86,6 +85,22 @@ impl DodbConnection {
             config.protocol_limits,
         )
         .await
+        .map_err(client_error)?;
+        Ok(Self {
+            inner,
+            protocol_limits: config.protocol_limits,
+        })
+    }
+
+    pub fn connect_lazy(config: &DodbConfig) -> Result<Self> {
+        let tls = client_tls(config)?;
+        let inner = ClientConnection::connect_lazy(
+            config.bind_addr,
+            config.server_addr,
+            &config.server_name,
+            tls,
+            config.protocol_limits,
+        )
         .map_err(client_error)?;
         Ok(Self {
             inner,
@@ -306,6 +321,10 @@ fn required_env(name: &str) -> Result<String> {
     env::var(name).map_err(|_| anyhow!("{name} must be set"))
 }
 
+fn client_tls(config: &DodbConfig) -> Result<ClientTlsConfig> {
+    ClientTlsConfig::from_der(config.root_certificates.clone()).map_err(client_error)
+}
+
 fn root_certificates_from_env() -> Result<Vec<Vec<u8>>> {
     let pem = match env::var("DODB_ROOT_CERT_PEM") {
         Ok(value) => value.into_bytes(),
@@ -327,7 +346,7 @@ fn root_certificates_from_env() -> Result<Vec<Vec<u8>>> {
 }
 
 fn client_error(error: ClientError) -> anyhow::Error {
-    anyhow!(error.to_string())
+    anyhow::Error::new(error)
 }
 
 fn document_key(pk: &str, sk: &str) -> DocumentKey {
@@ -501,6 +520,17 @@ mod tests {
         Arc<DodbServer<LocalTenantService>>,
         JoinHandle<Result<(), ServerError>>,
     ) {
+        start_server_at(data_dir, tls, "127.0.0.1:0".parse().unwrap()).await
+    }
+
+    async fn start_server_at(
+        data_dir: PathBuf,
+        tls: &TestTls,
+        listen_addr: SocketAddr,
+    ) -> (
+        Arc<DodbServer<LocalTenantService>>,
+        JoinHandle<Result<(), ServerError>>,
+    ) {
         let service = Arc::new(
             LocalTenantService::new(LocalTenantServiceConfig {
                 data_dir,
@@ -512,7 +542,7 @@ mod tests {
             DodbServer::bind(
                 service,
                 DodbServerConfig {
-                    listen_addr: "127.0.0.1:0".parse().unwrap(),
+                    listen_addr,
                     tls: ServerTlsConfig::from_der(
                         vec![tls.certificate.clone()],
                         tls.private_key.clone(),
@@ -555,6 +585,43 @@ mod tests {
         connection.close();
         server.shutdown().await;
         task.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn lazy_connection_defers_dial_and_preserves_empty_transaction_noop() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let server_tls = test_tls();
+        let client_tls = test_tls();
+        let directory = tempfile::tempdir().unwrap();
+        let (server, task) = start_server(directory.path().to_owned(), &server_tls).await;
+        let connection = DodbConnection::connect_lazy(&DodbConfig::new(
+            server.local_addr().unwrap(),
+            "localhost",
+            vec![client_tls.certificate.clone()],
+        ))
+        .unwrap();
+        let database = dodb_with_connection(&connection, "00000000").unwrap();
+        assert_eq!(server.metrics().snapshot().connections_total, 0);
+
+        let empty = database
+            .transact(&TransactRequest {
+                conditions: vec![],
+                mutations: vec![],
+            })
+            .await
+            .unwrap();
+        assert!(empty.conflict.is_none());
+
+        let error = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            database.get("lazy", "first-request"),
+        )
+        .await
+        .expect("first lazy request did not finish promptly")
+        .unwrap_err();
+        assert!(error.downcast_ref::<ClientError>().is_some(), "{error:#}");
+
+        stop_server(&connection, server, task).await;
     }
 
     #[tokio::test]
@@ -627,5 +694,43 @@ mod tests {
         assert_eq!(database.get(pk, sk).await.unwrap(), None);
 
         stop_server(&connection, server, task).await;
+    }
+
+    #[tokio::test]
+    async fn existing_database_handle_reconnects_after_same_address_restart() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let directory = tempfile::tempdir().unwrap();
+        let tls = test_tls();
+        let (server, task) = start_server(directory.path().to_owned(), &tls).await;
+        let address = server.local_addr().unwrap();
+        let connection = test_connection(&server, &tls).await;
+        let database = dodb_with_connection(&connection, "00000002").unwrap();
+        let key = ("reconnect", "same-handle");
+
+        database.put(key.0, key.1, b"persisted").await.unwrap();
+
+        server.close();
+        let failure = database.get(key.0, key.1).await.unwrap_err();
+        assert!(
+            failure.downcast_ref::<ClientError>().is_some(),
+            "{failure:#}"
+        );
+        server.shutdown().await;
+        task.await.unwrap().unwrap();
+        drop(server);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+        let (restarted, restarted_task) =
+            start_server_at(directory.path().to_owned(), &tls, address).await;
+        let value = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            database.get(key.0, key.1),
+        )
+        .await
+        .expect("reconnect request did not finish promptly")
+        .unwrap();
+        assert_eq!(value.as_deref(), Some(b"persisted".as_slice()));
+
+        stop_server(&connection, restarted, restarted_task).await;
     }
 }

@@ -335,10 +335,12 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     let turso_hijack = build_turso_hijack();
     let dodb_config = doc_db::DodbConfig::from_env()
         .map_err(|error| color_eyre::eyre::eyre!("dodb config: {error}"))?;
-    let dodb_connection = doc_db::DodbConnection::connect(&dodb_config)
-        .await
+    let dodb_connection = doc_db::DodbConnection::connect_lazy(&dodb_config)
         .map_err(|error| color_eyre::eyre::eyre!("dodb connection: {error}"))?;
-    tracing::info!(remote = %dodb_connection.remote_addr(), "dodb connection established");
+    tracing::info!(
+        remote = %dodb_connection.remote_addr(),
+        "dodb connection manager initialized; dialing lazily"
+    );
     let doc_db_hijack = build_doc_db_hijack(dodb_connection);
     let presign_gate = Arc::new(PresignGate::new());
     let purge_gate = Arc::new(PurgeGate::new());
