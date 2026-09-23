@@ -2328,6 +2328,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "fn0-db-ops"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "clap",
+ "dodb-protocol",
+ "dodb-server",
+ "fn0-doc-db",
+ "fn0-doc-db-protocol",
+ "rcgen",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "fn0-deno-crypto"
 version = "0.255.0"
 dependencies = [

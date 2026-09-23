@@ -8,6 +8,11 @@ import * as crypto from "node:crypto";
 
 const config = new pulumi.Config();
 
+const dbBackend = config.require("dbBackend");
+if (dbBackend !== "turso" && dbBackend !== "dodb") {
+  throw new Error("fn0Cloud:dbBackend must be either turso or dodb");
+}
+
 const dodbRuntimeAddr = config.get("dodbRuntimeAddr");
 const dodbRuntimeServerName = config.get("dodbRuntimeServerName");
 const dodbRuntimeRootCertPemBase64 = config.get("dodbRuntimeRootCertPemBase64");
@@ -646,7 +651,7 @@ const controlEnvYamlBootstrap = pulumi
         `  secret: ${r2KeyCt}`,
         "FN0_BUNDLE_STORE_SECRET_ACCESS_KEY:",
         `  secret: ${r2SecretCt}`,
-        "FN0_DB_BACKEND: dodb",
+        `FN0_DB_BACKEND: ${dbBackend}`,
         `FN0_LAMBDA_REGION: ${lambdaRegion}`,
         "FN0_LAMBDA_ACCESS_KEY_ID:",
         `  secret: ${lambdaKeyCt}`,
