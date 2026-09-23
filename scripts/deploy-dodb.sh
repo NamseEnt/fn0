@@ -225,8 +225,8 @@ if ! sudo ss -lun | grep -E '(:18445)([[:space:]]|$)'; then
 fi
 test -d /var/lib/dodb
 test "$(stat -c '%U:%G' /var/lib/dodb)" = "dodb:dodb"
-test "$(stat -c '%a:%U:%G' /etc/dodb/server.crt)" = "644:root:dodb"
-test "$(stat -c '%a:%U:%G' /etc/dodb/server.key)" = "640:root:dodb"
+test "$(sudo stat -c '%a:%U:%G' /etc/dodb/server.crt)" = "644:root:dodb"
+test "$(sudo stat -c '%a:%U:%G' /etc/dodb/server.key)" = "640:root:dodb"
 sudo openssl x509 -in /etc/dodb/server.crt -noout -ext subjectAltName
 if sudo systemctl is-active --quiet firewalld; then
   if ! sudo firewall-cmd --query-port=18445/udp >/dev/null; then
