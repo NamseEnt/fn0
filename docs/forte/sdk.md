@@ -151,6 +151,7 @@ accepted. `IncomingMessage` is `Text(String)` or `Binary(Vec<u8>)`.
 | `DeadlineExceeded { delivery }` | inherited | Timeout before flush completed |
 | `Transport { delivery }` | inherited | Network failure during send |
 | `InvalidText { delivery }` | inherited | UTF-8 violation in a `Text` message |
+| `EgressQuotaExceeded { delivery }` | inherited | Monthly compute egress quota exhausted |
 | `Internal { delivery }` | inherited | Internal fn0 error |
 
 `delivery_state()` returns `NotSent` when the message was definitely not delivered, `Unknown` when

@@ -70,6 +70,7 @@ client. Use `forte_sdk::websocket::disconnect` for an application-requested grac
 | `Application` | `websocket::disconnect` was called |
 | `Deployment` | The deploy replaced the running instance |
 | `HeartbeatTimeout` | The connection missed a heartbeat |
+| `EgressQuotaExceeded` | Monthly compute egress quota exhausted; connection closed |
 | `ProtocolError` | WebSocket protocol violation |
 | `TransportError` | Network-level transport failure |
 | `InternalError` | Internal fn0 error |
