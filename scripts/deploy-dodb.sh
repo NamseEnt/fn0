@@ -65,7 +65,7 @@ if [[ -z "${work_request_id}" ]]; then
   echo "OCI Bastion did not return a port-forwarding session work request ID" >&2
   exit 1
 fi
-work_request_json="$(oci work-requests work-request get --work-request-id "${work_request_id}" --output json)"
+work_request_json="$(oci bastion work-request get --work-request-id "${work_request_id}" --output json)"
 session_id="$(jq -r '.data.resources[]? | select(."entity-type" == "SessionResource") | .identifier' <<<"${work_request_json}" | head -n 1)"
 if [[ -z "${session_id}" ]]; then
   echo "OCI Bastion work request did not return a session ID" >&2
