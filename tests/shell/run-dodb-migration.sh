@@ -10,11 +10,13 @@ state_dir="${temporary_dir}/state"
 mkdir -p "${mock_bin}" "${mock_repo}/scripts/lib" "${mock_repo}/infra/cloud" "${state_dir}"
 cp "${repo_root}/scripts/run-dodb-migration.sh" "${mock_repo}/scripts/run-dodb-migration.sh"
 cp "${repo_root}/scripts/lib/pulumi-outputs.sh" "${mock_repo}/scripts/lib/pulumi-outputs.sh"
+cp "${repo_root}/scripts/lib/bastion-port-forward.sh" "${mock_repo}/scripts/lib/bastion-port-forward.sh"
+cp "${repo_root}/scripts/lib/dodb-control-db.sh" "${mock_repo}/scripts/lib/dodb-control-db.sh"
 cat >"${mock_repo}/scripts/build-rust-linux-arm64-bin.sh" <<'BUILD'
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p "$2"
-printf 'fake-arm64-migration-binary' >"$2/fn0-db-migrate"
+printf 'fake-arm64-binary-%s' "$1" >"$2/$1"
 BUILD
 chmod +x "${mock_repo}/scripts/build-rust-linux-arm64-bin.sh"
 
@@ -51,13 +53,55 @@ cat >"${mock_bin}/oci" <<'OCI'
 set -euo pipefail
 printf '%s\n' "$*" >>"${MOCK_STATE}/oci-calls"
 case "$*" in
-  *"bastion session create-port-forwarding"*) printf '%s\n' '{"data":{"id":"work-1"}}' ;;
+  *"bastion session create-port-forwarding"*)
+    display_name=""
+    while [[ "$#" -gt 0 ]]; do
+      if [[ "$1" == --display-name ]]; then display_name="$2"; fi
+      shift
+    done
+    printf '%s' "$display_name" >"${MOCK_STATE}/display-name"
+    case "${MOCK_CREATE_MODE:-work-request}" in
+      work-request) printf '%s\n' '{"data":{"id":"work-1"}}' ;;
+      missing) printf '%s\n' '{"data":{}}' ;;
+      nonzero-created) printf '%s\n' '{"data":{}}'; exit 9 ;;
+      none|none-nonzero) printf '%s\n' '{"data":{}}'; if [[ "${MOCK_CREATE_MODE}" == none-nonzero ]]; then exit 9; fi ;;
+      delayed) printf '%s\n' '{"data":{}}' ;;
+      multiple) printf '%s\n' '{"data":{}}' ;;
+      *) printf '%s\n' '{"data":{}}' ;;
+    esac
+    ;;
   *"bastion work-request get"*) printf '%s\n' '{"data":{"resources":[{"entity-type":"SessionResource","identifier":"session-1"}]}}' ;;
-  *"bastion session get"*) printf '%s\n' '{"data":{"lifecycle-state":"ACTIVE","ssh-metadata":{"command":"ssh -N -L <localPort>:10.0.0.7:22 -i <privateKey> opc@bastion"}}}' ;;
+  *"bastion session list"*)
+    list_count=0
+    [[ ! -e "${MOCK_STATE}/list-count" ]] || list_count="$(cat "${MOCK_STATE}/list-count")"
+    list_count=$((list_count + 1))
+    printf '%s' "$list_count" >"${MOCK_STATE}/list-count"
+    case "${MOCK_CREATE_MODE:-work-request}" in
+      none|none-nonzero) printf '%s\n' '{"data":[]}' ;;
+      delayed)
+        if [[ "$list_count" -lt 3 ]]; then printf '%s\n' '{"data":[]}'; else
+          printf '{"data":[{"id":"session-1","display-name":"%s"}]}\n' "$(cat "${MOCK_STATE}/display-name")"
+        fi
+        ;;
+      multiple)
+        printf '{"data":[{"id":"session-1","display-name":"%s"},{"id":"session-2","display-name":"%s"}]}\n' "$(cat "${MOCK_STATE}/display-name")" "$(cat "${MOCK_STATE}/display-name")"
+        ;;
+      *) printf '{"data":[{"id":"session-1","display-name":"%s"}]}\n' "$(cat "${MOCK_STATE}/display-name")" ;;
+    esac
+    ;;
+  *"bastion session get"*)
+    display_name="$(cat "${MOCK_STATE}/display-name")"
+    state="${MOCK_SESSION_STATE:-ACTIVE}"
+    if [[ "${MOCK_NO_METADATA:-0}" == 1 ]]; then
+      printf '{"data":{"id":"session-1","display-name":"%s","lifecycle-state":"%s"}}\n' "$display_name" "$state"
+    else
+      printf '{"data":{"id":"session-1","display-name":"%s","lifecycle-state":"%s","ssh-metadata":{"command":"ssh -N -L <localPort>:10.0.0.7:22 -i <privateKey> opc@bastion"}}}\n' "$display_name" "$state"
+    fi
+    ;;
+  *"bastion session delete"*) printf '%s\n' "$*" >>"${MOCK_STATE}/session-deletes" ;;
   *) ;;
 esac
 OCI
-
 cat >"${mock_bin}/ssh-keygen" <<'SSH_KEYGEN'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -104,7 +148,10 @@ if remote[:2] == ["bash", "-s"]:
         cache_sha_path = os.path.join(state_dir, "cache.sha")
         cache_sha = open(cache_sha_path, encoding="utf-8").read().strip() if os.path.exists(cache_sha_path) else ""
         record("cache-checks", expected_sha)
-        print(f"HIT {cache_sha}" if cache_sha == expected_sha else "MISS")
+        if "/db-ops/" in remote[3]:
+            print(f"HIT {expected_sha}")
+        else:
+            print(f"HIT {cache_sha}" if cache_sha == expected_sha else "MISS")
         raise SystemExit(0)
     if remote[2:3] == ["--"] and 'remote_binary="$1"' in script:
         record("remote-runs", script)
@@ -156,6 +203,8 @@ SSH
 chmod +x "${mock_bin}/pulumi" "${mock_bin}/cargo" "${mock_bin}/oci" "${mock_bin}/ssh-keygen" "${mock_bin}/ssh"
 
 export MOCK_STATE="${state_dir}"
+export BASTION_DISCOVERY_SECONDS=3
+export BASTION_DISCOVERY_INTERVAL_SECONDS=0.01
 export PATH="${mock_bin}:${PATH}"
 inventory_output="$(bash "${mock_repo}/scripts/run-dodb-migration.sh" inventory --json --page-size 3)"
 [[ "${inventory_output}" == '{"projects":[],"rows":0,"bytes":0}' ]]
@@ -176,16 +225,50 @@ bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
 [[ -e "${state_dir}/help" ]]
 [[ -e "${state_dir}/stale-cleanup" ]]
 [[ ! -e "${state_dir}/remote-runs" ]]
+[[ "$(cat "${state_dir}/session-deletes")" == *"session-1"* ]]
 if rg -q 'test-turso-token|example.test' "${state_dir}/oci-calls"; then exit 1; fi
 
 bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
 [[ "$(wc -l <"${state_dir}/uploads" | tr -d '[:space:]')" == "1" ]]
+
+for create_mode in missing nonzero-created delayed; do
+  rm -f "${state_dir}/list-count"
+  MOCK_CREATE_MODE="$create_mode" bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
+  [[ "$(cat "${state_dir}/session-deletes")" == *"session-1"* ]]
+done
+first_display_name="$(cat "${state_dir}/display-name")"
+MOCK_CREATE_MODE=missing bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
+second_display_name="$(cat "${state_dir}/display-name")"
+[[ "$first_display_name" != "$second_display_name" ]]
+[[ "$first_display_name" =~ ^fn0-dodb-migration-[0-9a-f]{24}$ ]]
+[[ "$second_display_name" =~ ^fn0-dodb-migration-[0-9a-f]{24}$ ]]
+if MOCK_CREATE_MODE=none-nonzero bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then exit 1; fi
+if MOCK_CREATE_MODE=multiple bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then exit 1; fi
+rg -q -- "--session-id session-2" "${state_dir}/session-deletes"
+if MOCK_SESSION_STATE=FAILED bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then exit 1; fi
+if MOCK_NO_METADATA=1 bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then exit 1; fi
+
 echo wrong >"${state_dir}/cache.sha"
 bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
 [[ "$(wc -l <"${state_dir}/uploads" | tr -d '[:space:]')" == "2" ]]
 echo corrupt >"${state_dir}/cache.sha"
 if MOCK_FAIL_UPLOAD=1 bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then exit 1; fi
 [[ "$(cat "${state_dir}/cache.sha")" == "corrupt" ]]
+
+(
+  export REPO_ROOT="${mock_repo}"
+  source "${mock_repo}/scripts/lib/pulumi-outputs.sh"
+  source "${mock_repo}/scripts/lib/dodb-control-db.sh"
+  PULUMI_OUTPUTS_JSON='{"dodbPrivateIp":"10.0.0.7","workerBastionId":"bastion-test","workerSshPrivateKey":"test-private-key"}'
+  need() { command -v "$1" >/dev/null; }
+  dodb_control_db_open
+  [[ "${BASTION_SESSION_ID:-}" == session-1 ]]
+  [[ "${BASTION_DISPLAY_NAME:-}" =~ ^fn0-dodb-control-[0-9a-f]{24}$ ]]
+  dodb_control_db_close
+  [[ -z "${BASTION_SESSION_ID:-}" ]]
+)
+[[ "$(tail -n 1 "${state_dir}/session-deletes")" == *"session-1"* ]]
+[[ "$(cat "${state_dir}/display-name")" =~ ^fn0-dodb-control-[0-9a-f]{24}$ ]]
 
 bash "${mock_repo}/scripts/run-dodb-migration.sh" verify --project-id abc --json >/dev/null
 python3 - "${state_dir}" <<'PY'
