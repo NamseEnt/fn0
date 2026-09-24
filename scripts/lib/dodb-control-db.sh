@@ -15,13 +15,14 @@ dodb_control_db_open() {
   local session_response work_request_id work_request_json session_json
   local session_state attempt session_ssh_command local_port session_ssh_args_file
   local session_argument current_argument forwarding_destination tunnel_log
-  local tunnel_ready remote_nonce
+  local tunnel_ready remote_nonce local_binary local_binary_sha remote_cache_dir cache_status remote_sha
 
   need pulumi
   need jq
   need oci
   need ssh
-  need scp
+  need gzip
+  need sha256sum
   need ssh-keygen
   need python3
 
@@ -171,18 +172,67 @@ for argument in arguments:
   DODB_CONTROL_DB_SSH_OPTIONS=(
     -i "$private_key_file" -p "$local_port" -o IdentitiesOnly=yes
     -o BatchMode=yes -o ConnectTimeout=10
-    -o "UserKnownHostsFile=$DODB_CONTROL_DB_KNOWN_HOSTS"
-    -o StrictHostKeyChecking=accept-new
-  )
-  DODB_CONTROL_DB_SCP_OPTIONS=(
-    -i "$private_key_file" -P "$local_port" -o IdentitiesOnly=yes
-    -o BatchMode=yes -o ConnectTimeout=10
+    -o ServerAliveInterval=15 -o ServerAliveCountMax=3
     -o "UserKnownHostsFile=$DODB_CONTROL_DB_KNOWN_HOSTS"
     -o StrictHostKeyChecking=accept-new
   )
   remote_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(12))')"
-  DODB_CONTROL_DB_REMOTE_BINARY="/tmp/fn0-db-ops.${remote_nonce}"
-  scp "${DODB_CONTROL_DB_SCP_OPTIONS[@]}" "${binary_dir}/fn0-db-ops" "opc@127.0.0.1:${DODB_CONTROL_DB_REMOTE_BINARY}"
+  local_binary="${binary_dir}/fn0-db-ops"
+  local_binary_sha="$(sha256sum "${local_binary}" | awk '{print $1}')"
+  remote_cache_dir="/home/opc/.cache/fn0/db-ops/${local_binary_sha}"
+  DODB_CONTROL_DB_REMOTE_BINARY="${remote_cache_dir}/fn0-db-ops"
+  cache_status="$(ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 bash -s -- "${DODB_CONTROL_DB_REMOTE_BINARY}" "${local_binary_sha}" <<'REMOTE_CACHE_CHECK'
+set -euo pipefail
+binary_path="$1"
+expected_sha="$2"
+command -v gzip >/dev/null 2>&1 || { echo "remote gzip is required for fn0-db-ops transport" >&2; exit 1; }
+command -v sha256sum >/dev/null 2>&1 || { echo "remote sha256sum is required for fn0-db-ops verification" >&2; exit 1; }
+if [[ -f "$binary_path" ]]; then
+  actual_sha="$(sha256sum "$binary_path" | awk '{print $1}')"
+  if [[ "$actual_sha" == "$expected_sha" ]]; then
+    printf 'HIT %s\n' "$actual_sha"
+    exit 0
+  fi
+fi
+printf 'MISS\n'
+REMOTE_CACHE_CHECK
+)"
+  if [[ "${cache_status}" != "HIT ${local_binary_sha}" ]]; then
+    {
+      printf '%s\n%s\n' "${local_binary_sha}" "${remote_nonce}"
+      gzip -c "${local_binary}"
+    } | ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 'bash -c '\''
+set -euo pipefail
+IFS= read -r expected_sha
+IFS= read -r upload_nonce
+[[ "${expected_sha}" =~ ^[0-9a-f]{64}$ ]]
+[[ "${upload_nonce}" =~ ^[0-9a-f]{24}$ ]]
+cache_dir="/home/opc/.cache/fn0/db-ops/${expected_sha}"
+binary_path="${cache_dir}/fn0-db-ops"
+partial_path="${cache_dir}/fn0-db-ops.${upload_nonce}.partial"
+umask 077
+mkdir -p "${cache_dir}"
+trap "rm -f -- ${partial_path}" EXIT
+gzip -dc >"${partial_path}"
+printf "%s  %s\n" "${expected_sha}" "${partial_path}" | sha256sum -c -
+chmod 0700 "${partial_path}"
+mv -f -- "${partial_path}" "${binary_path}"
+trap - EXIT
+'\''' || {
+      echo "compressed SSH streaming upload of fn0-db-ops failed" >&2
+      return 1
+    }
+    remote_sha="$(printf '%s\n' "${local_binary_sha}" | ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 'bash -c '\''
+set -euo pipefail
+IFS= read -r expected_sha
+[[ "${expected_sha}" =~ ^[0-9a-f]{64}$ ]]
+sha256sum "/home/opc/.cache/fn0/db-ops/${expected_sha}/fn0-db-ops"
+'\''' | awk '{print $1}')"
+    if [[ "${remote_sha}" != "${local_binary_sha}" ]]; then
+      echo "remote fn0-db-ops cache SHA-256 mismatch" >&2
+      return 1
+    fi
+  fi
   __FN0_DODB_CONTROL_DB_OPEN=1
 }
 
@@ -196,9 +246,6 @@ dodb_control_db_call() {
 }
 
 dodb_control_db_close() {
-  if [[ -n "${DODB_CONTROL_DB_REMOTE_BINARY:-}" && -n "${DODB_CONTROL_DB_TUNNEL_PID:-}" ]]; then
-    ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 rm -f "$DODB_CONTROL_DB_REMOTE_BINARY" >/dev/null 2>&1 || true
-  fi
   if [[ -n "${DODB_CONTROL_DB_TUNNEL_PID:-}" ]]; then
     kill "$DODB_CONTROL_DB_TUNNEL_PID" >/dev/null 2>&1 || true
     wait "$DODB_CONTROL_DB_TUNNEL_PID" >/dev/null 2>&1 || true
@@ -211,6 +258,6 @@ dodb_control_db_close() {
   fi
   unset DODB_CONTROL_DB_REMOTE_BINARY DODB_CONTROL_DB_SESSION_ID DODB_CONTROL_DB_TUNNEL_PID
   unset DODB_CONTROL_DB_TEMP_DIR DODB_CONTROL_DB_KNOWN_HOSTS DODB_CONTROL_DB_SSH_ARGS
-  unset DODB_CONTROL_DB_SSH_OPTIONS DODB_CONTROL_DB_SCP_OPTIONS
+  unset DODB_CONTROL_DB_SSH_OPTIONS
   unset __FN0_DODB_CONTROL_DB_OPEN
 }

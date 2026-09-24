@@ -40,15 +40,20 @@ Exact verification separately rescans current Turso and dodb rows in `(pk, sk)` 
 
 ## Remote runner
 
-`scripts/run-dodb-migration.sh` builds a Linux ARM64 binary and runs it on the dodb VM. dodb uses QUIC/UDP, while the OCI Bastion connection is a TCP SSH tunnel, so the local machine does not tunnel the dodb protocol. The runner opens OCI Bastion Port Forwarding to dodb SSH, then the VM connects to `127.0.0.1:18445` over QUIC and to Turso over HTTPS through NAT.
+`scripts/run-dodb-migration.sh inventory` runs a native local `fn0-db-migrate` and reads only `forteDbGroupToken` and `forteDbHostSuffix` from Pulumi. It does not open Bastion, SSH, or a dodb connection. dodb uses QUIC/UDP, while OCI Bastion is a TCP SSH tunnel, so the local machine does not tunnel the dodb protocol. The remote commands open OCI Bastion Port Forwarding to dodb SSH, then the VM connects to `127.0.0.1:18445` over QUIC and to Turso over HTTPS through NAT.
 
 ```sh
 scripts/run-dodb-migration.sh inventory
+scripts/run-dodb-migration.sh transport-check
 scripts/run-dodb-migration.sh verify
 scripts/run-dodb-migration.sh migrate --apply
 ```
 
-The runner reads the existing Pulumi outputs for the Turso group token, Turso host suffix, Bastion ID, worker SSH private key, and dodb private IP. It writes the Turso values to a shell-escaped temporary environment file with mode `0600`, copies that file and the binary to the VM, and removes remote temporary inputs after execution. The server certificate is copied to a private temporary path readable by `opc`. The runner fixes dodb to the VM's local endpoint and certificate. It uses a temporary known-hosts file and deletes its tunnel, Bastion session, SSH key, and local temporary directory on exit.
+The remote runner builds a Linux ARM64 binary and uses the OCI-returned `ssh-metadata.command` for Bastion Port Forwarding. It streams a gzip-compressed binary through ordinary SSH stdin, verifies its SHA-256 on the VM, and atomically installs it at `/home/opc/.cache/fn0/db-migrate/<sha256>/fn0-db-migrate`. Matching cache entries skip upload and remain on the VM. No SCP or SFTP is used. Remote SSH commands use batch mode, a 10 second connect timeout, and keepalives every 15 seconds with three missed replies allowed.
+
+`transport-check` reads only the Bastion ID, worker SSH private key, and dodb private IP. It requires no Turso credentials and only checks or uploads the cached executable, runs `fn0-db-migrate --help`, and lists and removes only exact legacy runner temporary names. It performs no database operation. The normal remote `migrate` and `verify` commands send their arguments and shell-escaped Turso environment file through SSH stdin. The Turso token stays out of command arguments and process listings. The server certificate is copied to a unique temporary path readable by `opc`. Remote env, argument, and certificate files, the Bastion tunnel and session, and local temporary files are removed when the runner exits.
+
+The `fn0-db-ops` operator binary is also cached by SHA-256 under `/home/opc/.cache/fn0/db-ops/` and streamed with gzip over SSH stdin. The cache is retained when the operator session closes; no SCP or SFTP transfer is used for this binary.
 
 This runner was added for the future maintenance operation. It must not be run against production until the cutover prerequisites below are met.
 

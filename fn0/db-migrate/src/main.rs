@@ -83,6 +83,7 @@ async fn main() {
 }
 
 async fn run() -> Result<()> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let cli = Cli::parse();
     let report = match cli.command {
         Command::Inventory(args) => {
@@ -161,7 +162,6 @@ async fn connect_dodb(args: &DodbArgs) -> Result<doc_db::DodbConnection> {
         )
     })?;
     let config = dodb_config(&args.dodb_addr, &args.dodb_server_name, &root_cert)?;
-    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     doc_db::DodbConnection::connect(&config)
         .await
         .context("failed to connect to dodb")
