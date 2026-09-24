@@ -53,6 +53,34 @@ test_dodb_dispatch() {
   rm -f "$dodb_call_file"
 }
 
+test_dodb_scan_dispatch() {
+  unset CONTROL_DB_BACKEND __FN0_CONTROL_DB_INITIALIZED
+  TEST_DB_BACKEND=dodb
+  dodb_control_db_call() {
+    [[ "$1" == scan && "$2" == --limit && "$3" == 17 ]]
+    [[ "$4" == --after-pk && "$5" == ProjectDoc/a && "$6" == --after-sk && "$7" == "" ]]
+    printf '%s\n' '{"documents":[]}'
+  }
+  local result
+  result="$(control_db_scan ProjectDoc/a "" 17 true)"
+  [[ "$(jq -r '.documents | length' <<<"$result")" == 0 ]]
+}
+
+test_turso_scan_dispatch() {
+  unset CONTROL_DB_BACKEND __FN0_CONTROL_DB_INITIALIZED
+  TEST_DB_BACKEND=turso
+  turso_scan_sql=""
+  __control_db_turso_request() {
+    turso_scan_sql="$(jq -r '.requests[0].stmt.sql' <<<"$1")"
+    printf '%s\n' '{"results":[{"type":"ok","response":{"result":{"rows":[]}}}]}'
+  }
+  local result
+  result="$(control_db_scan ProjectDoc/a "" 17 true)"
+  [[ "$turso_scan_sql" == *"ORDER BY pk, sk LIMIT ?"* ]]
+  [[ "$turso_scan_sql" == *"pk > ? OR (pk = ? AND sk > ?)"* ]]
+  [[ "$(jq -r '.documents | length' <<<"$result")" == 0 ]]
+}
+
 test_invalid_backend() {
   unset CONTROL_DB_BACKEND __FN0_CONTROL_DB_INITIALIZED
   TEST_DB_BACKEND=""
@@ -175,6 +203,8 @@ test_worker_status_pagination() {
 
 test_turso_dispatch
 test_dodb_dispatch
+test_dodb_scan_dispatch
+test_turso_scan_dispatch
 test_invalid_backend
 test_manifest_cas_retry
 test_manifest_cas_bounded

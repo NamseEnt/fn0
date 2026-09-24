@@ -65,9 +65,7 @@ container_runtime_ensure_available
 
 load_pulumi_outputs
 control_db_init
-if [[ "$CONTROL_DB_BACKEND" == turso ]]; then
-  "${REPO_ROOT}/scripts/migrate-project-telemetry-policies.sh" --check-schema
-fi
+"${REPO_ROOT}/scripts/migrate-project-telemetry-policies.sh" --check-schema
 
 CONTROL_PROJECT_ID="${CONTROL_PROJECT_ID:-fn0-control}"
 CONTROL_CUSTOM_DOMAIN="${CONTROL_CUSTOM_DOMAIN:-}"

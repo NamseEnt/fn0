@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export REPO_ROOT
 
 source "${REPO_ROOT}/scripts/lib/pulumi-outputs.sh"
+source "${REPO_ROOT}/scripts/lib/control-db.sh"
 
 mode="plan"
 backup_dir=""
@@ -41,20 +42,25 @@ if [[ "$mode" == "apply" && -z "$backup_dir" ]]; then
   exit 1
 fi
 
-need curl
 need jq
-need base64
-
 load_pulumi_outputs
-require_pulumi_output controlDbUrl forteDbGroupToken signyUrl signyAccessClientId signyAccessClientSecret
+control_db_init
+if [[ "$CONTROL_DB_BACKEND" == dodb && "$mode" == apply ]]; then
+  echo "telemetry policy migration --apply must be completed before dodb cutover" >&2
+  exit 1
+fi
 
-control_db_url="$(pulumi_pick controlDbUrl)"
-control_db_token="$(pulumi_pick forteDbGroupToken)"
-signy_url="$(pulumi_pick signyUrl)"
-signy_access_client_id="$(pulumi_pick signyAccessClientId)"
-signy_access_client_secret="$(pulumi_pick signyAccessClientSecret)"
-control_db_url="${control_db_url%/}"
-signy_url="${signy_url%/}"
+if [[ "$mode" != check-schema || "$CONTROL_DB_BACKEND" == turso ]]; then
+  need curl
+  require_pulumi_output signyUrl signyAccessClientId signyAccessClientSecret
+  signy_url="$(pulumi_pick signyUrl)"
+  signy_access_client_id="$(pulumi_pick signyAccessClientId)"
+  signy_access_client_secret="$(pulumi_pick signyAccessClientSecret)"
+  signy_url="${signy_url%/}"
+fi
+if [[ "$CONTROL_DB_BACKEND" == turso && "$mode" == apply ]]; then
+  need base64
+fi
 
 work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
@@ -65,8 +71,8 @@ db_pipeline() {
   local response_file="$work_dir/db-response.json"
   local http_code
   http_code="$(curl "${curl_args[@]}" -sS -o "$response_file" -w '%{http_code}' \
-    -X POST "${control_db_url}/v2/pipeline" \
-    -H "Authorization: Bearer ${control_db_token}" \
+    -X POST "${CONTROL_DB_URL}/v2/pipeline" \
+    -H "Authorization: Bearer ${CONTROL_DB_TOKEN}" \
     -H "Content-Type: application/json" \
     --data-raw "$request")"
   if [[ "$http_code" != "200" ]]; then
@@ -87,6 +93,33 @@ db_query() {
   request="$(jq -nc --arg sql "$sql" '{requests:[{type:"execute",stmt:{sql:$sql}},{type:"close"}]}')"
   db_pipeline "$request"
 }
+
+scan_control_db() {
+  local has_cursor=false after_pk="" after_sk="" response page_count
+  local documents='[]'
+  while true; do
+    response="$(control_db_scan "$after_pk" "$after_sk" 500 "$has_cursor")"
+    local page
+    page="$(jq -c '.documents' <<<"$response")"
+    page_count="$(jq 'length' <<<"$page")"
+    documents="$(jq -nc --argjson previous "$documents" --argjson next "$page" '$previous + $next')"
+    if (( page_count < 500 )); then break; fi
+    after_pk="$(jq -r '.[-1].pk' <<<"$page")"
+    after_sk="$(jq -r '.[-1].sk' <<<"$page")"
+    has_cursor=true
+  done
+  printf '%s\n' "$documents"
+}
+
+if [[ "$CONTROL_DB_BACKEND" == dodb && "$mode" == check-schema ]]; then
+  documents="$(scan_control_db)"
+  project_rows="$(jq -c '[.[] | select(.pk | startswith("ProjectDoc/")) | {pk, data:(.data_base64 | @base64d | fromjson)}]' <<<"$documents")"
+  project_count="$(jq 'length' <<<"$project_rows")"
+  missing_count="$(jq '[.[] | select(.data.telemetry_policy == null)] | length' <<<"$project_rows")"
+  jq -nc --arg mode "$mode" --argjson projects "$project_count" --argjson missing "$missing_count" '{mode:$mode,projects:$projects,missing_policies:$missing,missing_outboxes:0,unsettled_outboxes:0,legacy_signy_policies:0}'
+  if (( missing_count > 0 )); then exit 1; fi
+  exit 0
+fi
 
 signy_request() {
   local method="$1"
@@ -137,25 +170,44 @@ policy_to_signy_body() {
   }'
 }
 
-table_response="$(db_query "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'docs'")"
-table_count="$(jq -r '.results[0].response.result.rows[0][0].value' <<<"$table_response")"
-if [[ "$table_count" == "0" ]]; then
-  jq -nc --arg mode "$mode" '{mode:$mode,projects:0,missing_policies:0,missing_outboxes:0,unsettled_outboxes:0,legacy_signy_policies:0}'
-  if [[ "$mode" == "apply" ]]; then
-    echo "control DB has no docs table" >&2
-    exit 1
-  fi
-  exit 0
-fi
-
-project_response="$(db_query "SELECT pk, CAST(data AS TEXT), version FROM docs WHERE pk LIKE 'ProjectDoc/%' ORDER BY pk")"
-outbox_response="$(db_query "SELECT pk, CAST(data AS TEXT), version FROM docs WHERE pk LIKE 'TelemetryPolicyOutboxDoc/%' ORDER BY pk")"
-
 project_rows=()
-while IFS= read -r project_row; do
-  project_rows[${#project_rows[@]}]="$project_row"
-done < <(jq -c '.results[0].response.result.rows[] | {pk:.[0].value,data:(.[1].value|fromjson),version:(.[2].value|tonumber)}' <<<"$project_response")
-outbox_rows="$(jq -c '[.results[0].response.result.rows[] | {pk:.[0].value,data:(.[1].value|fromjson),version:(.[2].value|tonumber)}]' <<<"$outbox_response")"
+if [[ "$CONTROL_DB_BACKEND" == turso ]]; then
+  table_response="$(db_query "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'docs'")"
+  table_count="$(jq -r '.results[0].response.result.rows[0][0].value' <<<"$table_response")"
+  if [[ "$table_count" == "0" ]]; then
+    jq -nc --arg mode "$mode" '{mode:$mode,projects:0,missing_policies:0,missing_outboxes:0,unsettled_outboxes:0,legacy_signy_policies:0}'
+    if [[ "$mode" == apply ]]; then
+      echo "control DB has no docs table" >&2
+      exit 1
+    fi
+    exit 0
+  fi
+  project_response="$(db_query "SELECT pk, CAST(data AS TEXT), version FROM docs WHERE pk LIKE 'ProjectDoc/%' ORDER BY pk")"
+  outbox_response="$(db_query "SELECT pk, CAST(data AS TEXT), version FROM docs WHERE pk LIKE 'TelemetryPolicyOutboxDoc/%' ORDER BY pk")"
+  while IFS= read -r project_row; do
+    project_rows[${#project_rows[@]}]="$project_row"
+  done < <(jq -c '.results[0].response.result.rows[] | {pk:.[0].value,data:(.[1].value|fromjson),version:(.[2].value|tonumber)}' <<<"$project_response")
+  outbox_rows="$(jq -c '[.results[0].response.result.rows[] | {pk:.[0].value,data:(.[1].value|fromjson),version:(.[2].value|tonumber)}]' <<<"$outbox_response")"
+else
+  project_response='[]'
+  outbox_response='[]'
+  documents="$(scan_control_db)"
+  outbox_rows="$(jq -c '[.[] | select(.pk | startswith("TelemetryPolicyOutboxDoc/")) | {pk,data:(.data_base64 | @base64d | fromjson),version:0}]' <<<"$documents")"
+  while IFS= read -r document; do
+    pk="$(jq -r '.pk' <<<"$document")"
+    document_sk="$(jq -r '.sk' <<<"$document")"
+    document_data_base64="$(jq -r '.data_base64' <<<"$document")"
+    data="$(jq -r '.data_base64 | @base64d' <<<"$document")"
+    observed="$(control_db_get_observed "$pk" "$document_sk")"
+    [[ "$(jq -r '.found' <<<"$observed")" == true ]] || { echo "ProjectDoc disappeared during scan: ${pk}" >&2; exit 1; }
+    if [[ "$(jq -r '.data_base64' <<<"$observed")" != "$document_data_base64" ]]; then
+      echo "ProjectDoc changed during scan: ${pk}" >&2
+      exit 1
+    fi
+    project_revision="$(jq -r '.revision' <<<"$observed")"
+    project_rows[${#project_rows[@]}]="$(jq -nc --arg pk "$pk" --argjson data "$data" --argjson version "$project_revision" '{pk:$pk,data:$data,version:$version}')"
+  done < <(jq -c '.[] | select(.pk | startswith("ProjectDoc/"))' <<<"$documents")
+fi
 
 inventory_file="$work_dir/inventory.jsonl"
 : > "$inventory_file"
@@ -224,7 +276,11 @@ if [[ "$mode" == "check" ]]; then
 fi
 
 if [[ "$mode" == "plan" ]]; then
-  jq -c '.[] | {project_id,project_version,policy,needs_project_update:(.project_data.telemetry_policy == null),needs_outbox:(.outbox == null)}' <<<"$inventory"
+  if [[ "$CONTROL_DB_BACKEND" == turso ]]; then
+    jq -c '.[] | {project_id,project_version,policy,needs_project_update:(.project_data.telemetry_policy == null),needs_outbox:(.outbox == null)}' <<<"$inventory"
+  else
+    jq -c '.[] | {project_id,revision:.project_version,policy,needs_project_update:(.project_data.telemetry_policy == null),needs_outbox:(.outbox == null)}' <<<"$inventory"
+  fi
   exit 0
 fi
 

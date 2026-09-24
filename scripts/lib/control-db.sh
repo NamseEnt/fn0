@@ -171,3 +171,30 @@ control_db_query() {
   rows="$(jq -c '[.results[0].response.result.rows[]? | {pk:.[0].value,sk:.[1].value,data_base64:.[2].base64}]' <<<"$response")"
   jq -nc --argjson documents "$rows" '{documents:$documents}'
 }
+
+control_db_scan() {
+  control_db_init
+  local after_pk="$1" after_sk="$2" limit="$3" has_cursor="${4:-false}" request response rows
+  if [[ ! "$limit" =~ ^[0-9]+$ ]] || (( limit < 1 || limit > 1000 )); then
+    echo "control_db_scan limit must be between 1 and 1000" >&2
+    return 2
+  fi
+  if [[ "$CONTROL_DB_BACKEND" == dodb ]]; then
+    local arguments=(scan --limit "$limit")
+    if [[ "$has_cursor" == true ]]; then
+      [[ -n "$after_pk" ]] || { echo "control_db_scan requires a primary-key cursor" >&2; return 2; }
+      arguments+=(--after-pk "$after_pk" --after-sk "$after_sk")
+    fi
+    dodb_control_db_call "${arguments[@]}"
+    return
+  fi
+  if [[ "$has_cursor" == true ]]; then
+    [[ -n "$after_pk" ]] || { echo "control_db_scan requires a primary-key cursor" >&2; return 2; }
+    request="$(jq -nc --arg pk "$after_pk" --arg sk "$after_sk" --arg limit "$limit" '{requests:[{type:"execute",stmt:{sql:"SELECT pk, sk, data FROM docs WHERE pk > ? OR (pk = ? AND sk > ?) ORDER BY pk, sk LIMIT ?",args:[{type:"text",value:$pk},{type:"text",value:$pk},{type:"text",value:$sk},{type:"integer",value:$limit}]}},{type:"close"}]}')"
+  else
+    request="$(jq -nc --arg limit "$limit" '{requests:[{type:"execute",stmt:{sql:"SELECT pk, sk, data FROM docs ORDER BY pk, sk LIMIT ?",args:[{type:"integer",value:$limit}]}},{type:"close"}]}')"
+  fi
+  response="$( __control_db_turso_request "$request" "scan")"
+  rows="$(jq -c '[.results[0].response.result.rows[]? | {pk:.[0].value,sk:.[1].value,data_base64:.[2].base64}]' <<<"$response")"
+  jq -nc --argjson documents "$rows" '{documents:$documents}'
+}

@@ -38,6 +38,7 @@ enum Command {
     PutIfMissing(KeyArgs),
     PutIfRevision(RevisionArgs),
     Query(QueryArgs),
+    Scan(ScanArgs),
 }
 
 #[derive(Args)]
@@ -60,6 +61,16 @@ struct RevisionArgs {
 struct QueryArgs {
     #[arg(long)]
     pk: String,
+    #[arg(long)]
+    after_sk: Option<String>,
+    #[arg(long)]
+    limit: u64,
+}
+
+#[derive(Args)]
+struct ScanArgs {
+    #[arg(long)]
+    after_pk: Option<String>,
     #[arg(long)]
     after_sk: Option<String>,
     #[arg(long)]
@@ -202,6 +213,29 @@ async fn run() -> Result<()> {
                         sk: document.key.sk,
                         data_base64: base64::engine::general_purpose::STANDARD
                             .encode(document.data),
+                    })
+                    .collect(),
+            })?;
+        }
+        Command::Scan(arguments) => {
+            validate_query_limit(arguments.limit)?;
+            if arguments.after_pk.is_some() != arguments.after_sk.is_some() {
+                bail!("--after-pk and --after-sk must be provided together")
+            }
+            let after = arguments.after_pk.zip(arguments.after_sk);
+            let documents = database
+                .scan(
+                    after.as_ref().map(|(pk, sk)| (pk.as_str(), sk.as_str())),
+                    arguments.limit as usize,
+                )
+                .await?;
+            print_json(&QueryOutput {
+                documents: documents
+                    .into_iter()
+                    .map(|(pk, sk, data)| QueryDocument {
+                        pk,
+                        sk,
+                        data_base64: base64::engine::general_purpose::STANDARD.encode(data),
                     })
                     .collect(),
             })?;
@@ -456,6 +490,44 @@ mod tests {
 
         let other_tenant = doc_db::dodb_with_connection(&connection, "00000001").unwrap();
         assert!(other_tenant.get("ordered", "a").await.unwrap().is_none());
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn scan_orders_paginates_preserves_bytes_and_stays_in_control_tenant() {
+        let (database, connection, _server, task, _directory) = test_database().await;
+        for (pk, sk, data) in [
+            ("ProjectDoc/a", "", vec![0, 255, 17]),
+            ("ProjectDoc/b", "", vec![128, 0]),
+            ("TelemetryPolicyOutboxDoc/a", "", vec![42]),
+        ] {
+            database.put(pk, sk, &data).await.unwrap();
+        }
+        let first = database.scan(None, 2).await.unwrap();
+        assert_eq!(
+            first
+                .iter()
+                .map(|(pk, sk, _)| (pk.as_str(), sk.as_str()))
+                .collect::<Vec<_>>(),
+            [("ProjectDoc/a", ""), ("ProjectDoc/b", "")]
+        );
+        assert_eq!(first[0].2.as_ref(), [0, 255, 17]);
+        let cursor = (first[1].0.as_str(), first[1].1.as_str());
+        let second = database.scan(Some(cursor), 2).await.unwrap();
+        assert_eq!(second.len(), 1);
+        assert_eq!(second[0].0, "TelemetryPolicyOutboxDoc/a");
+        let all = [first, second].concat();
+        assert_eq!(all.len(), 3);
+
+        let other_tenant = doc_db::dodb_with_connection(&connection, "00000001").unwrap();
+        assert!(other_tenant.scan(None, 10).await.unwrap().is_empty());
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn scan_empty_returns_no_documents() {
+        let (database, _connection, _server, task, _directory) = test_database().await;
+        assert!(database.scan(None, 10).await.unwrap().is_empty());
         task.abort();
     }
 }
