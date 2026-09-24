@@ -6,8 +6,8 @@ fi
 __FN0_BASTION_PORT_FORWARD_LOADED=1
 
 bastion_port_forward_open() {
-  if [[ "$#" -ne 6 ]]; then
-    echo "bastion_port_forward_open expects purpose, bastion ID, target IP, target port, Bastion session key file, and target SSH key file" >&2
+  if [[ "$#" -ne 4 ]]; then
+    echo "bastion_port_forward_open expects purpose, bastion ID, target IP, and target port" >&2
     return 2
   fi
 
@@ -15,12 +15,12 @@ bastion_port_forward_open() {
   local bastion_id="$2"
   local target_private_ip="$3"
   local target_port="$4"
-  local bastion_session_private_key_file="$5"
-  local target_ssh_private_key_file="$6"
   local public_key_file create_response create_status work_request_id work_request_json
   local session_list_json matching_sessions session_json session_display_name session_state
   local session_ssh_command ssh_args_file session_argument current_argument forwarding_destination
   local no_remote_command argument_index attempt discovery_seconds discovery_interval
+  local ssh_destination_index bastion_authenticated tunnel_tcp_ready
+  local -a first_hop_options=()
 
   if [[ -n "${BASTION_SESSION_ID:-}" || -n "${BASTION_TUNNEL_PID:-}" ]]; then
     echo "Bastion port forward is already open" >&2
@@ -36,12 +36,14 @@ bastion_port_forward_open() {
   BASTION_TUNNEL_PID=""
   BASTION_LOCAL_PORT=""
   BASTION_SSH_ARGS=()
-  BASTION_TARGET_PRIVATE_KEY_FILE="$target_ssh_private_key_file"
   BASTION_TEMP_DIR="$(mktemp -d)"
   chmod 700 "$BASTION_TEMP_DIR"
-  public_key_file="${BASTION_TEMP_DIR}/bastion-public-key"
-  ssh-keygen -y -f "$bastion_session_private_key_file" >"$public_key_file"
+  local bastion_session_private_key_file="${BASTION_TEMP_DIR}/bastion-session-key"
+  public_key_file="${bastion_session_private_key_file}.pub"
+  ssh-keygen -q -t rsa -b 3072 -N '' -f "$bastion_session_private_key_file"
+  chmod 600 "$bastion_session_private_key_file"
   chmod 600 "$public_key_file"
+  BASTION_SESSION_KEY_FINGERPRINT="$(ssh-keygen -lf "$public_key_file" | awk '{print $2}')"
 
   create_status=0
   if create_response="$(oci bastion session create-port-forwarding \
@@ -145,6 +147,9 @@ bastion_port_forward_open() {
     bastion_port_forward_close
     return 1
   fi
+  BASTION_ACTIVE_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  printf 'Bastion session active: id=%s display_name=%s at=%s ephemeral_key_fingerprint=%s\n' \
+    "$BASTION_SESSION_ID" "$BASTION_DISPLAY_NAME" "$BASTION_ACTIVE_AT" "$BASTION_SESSION_KEY_FINGERPRINT" >&2
   session_ssh_command="$(jq -r '.data."ssh-metadata".command // .data.sshMetadata.command // empty' <<<"$session_json")"
   if [[ -z "$session_ssh_command" ]]; then
     echo "OCI Bastion session has no ssh-metadata.command" >&2
@@ -202,43 +207,62 @@ for argument in arguments:
     fi
   done
 
-  BASTION_SSH_ARGS+=(-o ExitOnForwardFailure=yes)
+  ssh_destination_index=-1
+  for ((argument_index = 0; argument_index < ${#BASTION_SSH_ARGS[@]}; argument_index += 1)); do
+    if [[ "${BASTION_SSH_ARGS[argument_index]}" == *@* ]]; then ssh_destination_index="$argument_index"; fi
+  done
+  if [[ "$ssh_destination_index" -lt 1 ]]; then
+    echo "OCI Bastion SSH command has no session destination" >&2
+    bastion_port_forward_close
+    return 1
+  fi
+  first_hop_options=(
+    -v
+    -o HostKeyAlgorithms=+ssh-rsa
+    -o PubkeyAcceptedAlgorithms=+ssh-rsa
+    -o IdentitiesOnly=yes
+    -o BatchMode=yes
+    -o ConnectTimeout=10
+    -o ServerAliveInterval=15
+    -o ServerAliveCountMax=3
+    -o ExitOnForwardFailure=yes
+  )
+  BASTION_SSH_ARGS=(
+    "${BASTION_SSH_ARGS[@]:0:ssh_destination_index}"
+    "${first_hop_options[@]}"
+    "${BASTION_SSH_ARGS[@]:ssh_destination_index}"
+  )
   local known_hosts_file="${BASTION_TEMP_DIR}/known_hosts"
   local tunnel_log="${BASTION_TEMP_DIR}/bastion-tunnel.log"
   touch "$known_hosts_file"
   chmod 600 "$known_hosts_file"
-  BASTION_KNOWN_HOSTS_FILE="$known_hosts_file"
+  BASTION_SSH_ATTEMPT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  printf 'Bastion SSH attempt: session_id=%s at=%s\n' "$BASTION_SESSION_ID" "$BASTION_SSH_ATTEMPT_AT" >&2
   "${BASTION_SSH_ARGS[@]}" >"$tunnel_log" 2>&1 &
   BASTION_TUNNEL_PID=$!
+  bastion_authenticated=false
+  tunnel_tcp_ready=false
   for attempt in $(seq 1 60); do
     if ! kill -0 "$BASTION_TUNNEL_PID" >/dev/null 2>&1; then
-      cat "$tunnel_log" >&2
+      grep -E 'Offering public key:|Server accepts key:|Authentications that can continue:|sign_and_send_pubkey|Authenticated to |Permission denied|Local forwarding listening' "$tunnel_log" >&2 || true
       echo "Bastion port-forwarding tunnel exited before becoming ready" >&2
       bastion_port_forward_close
       return 1
     fi
+    if grep -q 'Authenticated to ' "$tunnel_log"; then bastion_authenticated=true; fi
     if python3 -c 'import socket, sys; connection = socket.socket(); connection.settimeout(1); result = connection.connect_ex(("127.0.0.1", int(sys.argv[1]))); connection.close(); raise SystemExit(0 if result == 0 else 1)' "$BASTION_LOCAL_PORT"; then
+      tunnel_tcp_ready=true
+    fi
+    if [[ "$bastion_authenticated" == true && "$tunnel_tcp_ready" == true ]]; then
+      printf 'Bastion first-hop authentication and local TCP forwarding passed for session %s\n' "$BASTION_SESSION_ID" >&2
       return 0
     fi
     sleep 1
   done
-  cat "$tunnel_log" >&2
+  grep -E 'Offering public key:|Server accepts key:|Authentications that can continue:|sign_and_send_pubkey|Authenticated to |Permission denied|Local forwarding listening' "$tunnel_log" >&2 || true
   echo "Bastion tunnel did not accept connections on 127.0.0.1:${BASTION_LOCAL_PORT}" >&2
   bastion_port_forward_close
   return 1
-}
-
-bastion_port_forward_ssh_options() {
-  printf '%s\0' \
-    -i "$BASTION_TARGET_PRIVATE_KEY_FILE" \
-    -p "$BASTION_LOCAL_PORT" \
-    -o IdentitiesOnly=yes \
-    -o BatchMode=yes \
-    -o ConnectTimeout=10 \
-    -o ServerAliveInterval=15 \
-    -o ServerAliveCountMax=3 \
-    -o "UserKnownHostsFile=$BASTION_KNOWN_HOSTS_FILE" \
-    -o StrictHostKeyChecking=accept-new
 }
 
 bastion_port_forward_close() {
@@ -252,6 +276,6 @@ bastion_port_forward_close() {
   if [[ -n "${BASTION_TEMP_DIR:-}" ]]; then rm -rf "$BASTION_TEMP_DIR"; fi
   unset BASTION_SESSION_ID BASTION_TUNNEL_PID BASTION_LOCAL_PORT
   unset BASTION_DISPLAY_NAME BASTION_TEMP_DIR BASTION_SSH_ARGS
-  unset BASTION_TARGET_PRIVATE_KEY_FILE
-  unset BASTION_KNOWN_HOSTS_FILE
+  unset BASTION_SESSION_KEY_FINGERPRINT
+  unset BASTION_ACTIVE_AT BASTION_SSH_ATTEMPT_AT
 }

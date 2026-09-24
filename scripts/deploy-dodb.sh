@@ -36,15 +36,18 @@ binary_dir="${temporary_dir}/bin"
 mkdir -p "${binary_dir}"
 "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" dodb-server "${binary_dir}"
 
-bastion_session_key_file="${temporary_dir}/bastion-session-key"
 target_ssh_key_file="${temporary_dir}/target-ssh-key"
-pulumi_pick workerSshPrivateKey >"${bastion_session_key_file}"
 pulumi_pick workerSshPrivateKey >"${target_ssh_key_file}"
-chmod 600 "${bastion_session_key_file}" "${target_ssh_key_file}"
+chmod 600 "${target_ssh_key_file}"
 
-bastion_port_forward_open deploy "$(pulumi_pick workerBastionId)" "${dodb_private_ip}" 22 "${bastion_session_key_file}" "${target_ssh_key_file}"
-ssh_options=()
-while IFS= read -r -d '' ssh_option; do ssh_options+=("${ssh_option}"); done < <(bastion_port_forward_ssh_options)
+bastion_port_forward_open deploy "$(pulumi_pick workerBastionId)" "${dodb_private_ip}" 22
+ssh_options=(
+  -i "${target_ssh_key_file}" -p "${BASTION_LOCAL_PORT}" -o IdentitiesOnly=yes
+  -o BatchMode=yes -o ConnectTimeout=10
+  -o ServerAliveInterval=15 -o ServerAliveCountMax=3
+  -o "UserKnownHostsFile=${BASTION_TEMP_DIR}/known_hosts"
+  -o StrictHostKeyChecking=accept-new
+)
 local_port="${BASTION_LOCAL_PORT}"
 scp_options=(
   -i "${target_ssh_key_file}" -P "${local_port}" -o IdentitiesOnly=yes

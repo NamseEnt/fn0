@@ -55,10 +55,18 @@ printf '%s\n' "$*" >>"${MOCK_STATE}/oci-calls"
 case "$*" in
   *"bastion session create-port-forwarding"*)
     display_name=""
+    public_key_file=""
     while [[ "$#" -gt 0 ]]; do
       if [[ "$1" == --display-name ]]; then display_name="$2"; fi
+      if [[ "$1" == --ssh-public-key-file ]]; then public_key_file="$2"; fi
       shift
     done
+    create_count=0
+    [[ ! -e "${MOCK_STATE}/create-count" ]] || create_count="$(cat "${MOCK_STATE}/create-count")"
+    create_count=$((create_count + 1))
+    printf '%s' "$create_count" >"${MOCK_STATE}/create-count"
+    printf '%s\n' "$public_key_file" >"${MOCK_STATE}/ephemeral-public-path-${create_count}"
+    cat "$public_key_file" >"${MOCK_STATE}/ephemeral-public-${create_count}"
     printf '%s' "$display_name" >"${MOCK_STATE}/display-name"
     case "${MOCK_CREATE_MODE:-work-request}" in
       work-request) printf '%s\n' '{"data":{"id":"work-1"}}' ;;
@@ -105,7 +113,33 @@ OCI
 cat >"${mock_bin}/ssh-keygen" <<'SSH_KEYGEN'
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' 'ssh-ed25519 test'
+case "$1" in
+  -q)
+    private_key_file=""
+    while [[ "$#" -gt 0 ]]; do
+      if [[ "$1" == -f ]]; then private_key_file="$2"; fi
+      shift
+    done
+    nonce="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
+    printf 'fake-rsa-private-%s\n' "$nonce" >"$private_key_file"
+    printf 'ssh-rsa fake-rsa-public-%s\n' "$nonce" >"${private_key_file}.pub"
+    chmod 600 "$private_key_file"
+    ;;
+  -y)
+    private_key_file="$3"
+    cat "${private_key_file}.pub"
+    ;;
+  -lf)
+    fingerprint="$(python3 - "$2" <<'PY'
+import hashlib
+import sys
+print("SHA256:" + hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())
+PY
+)"
+    printf '3072 %s fake\n' "$fingerprint"
+    ;;
+  *) exit 2 ;;
+esac
 SSH_KEYGEN
 
 cat >"${mock_bin}/ssh" <<'SSH'
@@ -122,6 +156,7 @@ state_dir = os.environ["MOCK_STATE"]
 with open(os.path.join(state_dir, "ssh-argv"), "a", encoding="utf-8") as output:
     output.write(" ".join(arguments) + "\n")
 if "-N" in arguments:
+    print("Authenticated to mock-bastion using publickey", file=sys.stderr)
     forward_index = arguments.index("-L")
     local_port = int(arguments[forward_index + 1].split(":", 1)[0])
     server = socket.socket()
@@ -225,13 +260,46 @@ bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
 [[ -e "${state_dir}/help" ]]
 [[ -e "${state_dir}/stale-cleanup" ]]
 [[ ! -e "${state_dir}/remote-runs" ]]
-rg -q -- '-N.*bastion-session-key' "${state_dir}/ssh-argv"
-rg -q -- 'target-ssh-key' "${state_dir}/ssh-argv"
 [[ "$(cat "${state_dir}/session-deletes")" == *"session-1"* ]]
 if rg -q 'test-turso-token|example.test' "${state_dir}/oci-calls"; then exit 1; fi
+python3 - "${state_dir}" <<'PY'
+import os
+import shlex
+import sys
+state_dir = sys.argv[1]
+ssh_lines = open(os.path.join(state_dir, "ssh-argv"), encoding="utf-8").read().splitlines()
+tunnel_arguments = next(shlex.split(line) for line in ssh_lines if "-N" in shlex.split(line))
+target_arguments = next(shlex.split(line) for line in ssh_lines if "opc@127.0.0.1" in shlex.split(line))
+assert "HostKeyAlgorithms=+ssh-rsa" in tunnel_arguments
+assert "PubkeyAcceptedAlgorithms=+ssh-rsa" in tunnel_arguments
+assert "IdentitiesOnly=yes" in tunnel_arguments
+assert "BatchMode=yes" in tunnel_arguments
+assert "ConnectTimeout=10" in tunnel_arguments
+assert "ServerAliveInterval=15" in tunnel_arguments
+assert "ServerAliveCountMax=3" in tunnel_arguments
+assert "ExitOnForwardFailure=yes" in tunnel_arguments
+assert "HostKeyAlgorithms=+ssh-rsa" not in target_arguments
+assert "PubkeyAcceptedAlgorithms=+ssh-rsa" not in target_arguments
+target_identity_index = target_arguments.index("-i") + 1
+assert "target-ssh-key" in target_arguments[target_identity_index]
+assert "bastion-session-key" not in target_arguments[target_identity_index]
+bastion_identity_index = tunnel_arguments.index("-i") + 1
+private_key_path = tunnel_arguments[bastion_identity_index]
+assert "bastion-session-key" in private_key_path
+assert not os.path.exists(private_key_path)
+assert not os.path.exists(private_key_path + ".pub")
+public_key_path = open(os.path.join(state_dir, "ephemeral-public-path-1"), encoding="utf-8").read().strip()
+assert "bastion-session-key" in public_key_path
+assert private_key_path == public_key_path[:-4]
+assert not os.path.exists(public_key_path)
+public_key = open(os.path.join(state_dir, "ephemeral-public-1"), encoding="utf-8").read()
+assert public_key.startswith("ssh-rsa fake-rsa-public-")
+assert "test-private-key" not in public_key
+PY
 
 bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
 [[ "$(wc -l <"${state_dir}/uploads" | tr -d '[:space:]')" == "1" ]]
+if cmp -s "${state_dir}/ephemeral-public-1" "${state_dir}/ephemeral-public-2"; then exit 1; fi
 
 for create_mode in missing nonzero-created delayed; do
   rm -f "${state_dir}/list-count"

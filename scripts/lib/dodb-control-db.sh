@@ -12,7 +12,7 @@ dodb_control_db_open() {
     return 0
   fi
 
-  local temporary_dir binary_dir bastion_session_key_file target_ssh_key_file
+  local temporary_dir binary_dir target_ssh_key_file
   local remote_nonce local_binary local_binary_sha remote_cache_dir cache_status remote_sha
 
   need pulumi
@@ -39,15 +39,18 @@ dodb_control_db_open() {
   mkdir -p "$binary_dir"
   "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-db-ops "$binary_dir" >&2
 
-  bastion_session_key_file="${temporary_dir}/bastion-session-key"
   target_ssh_key_file="${temporary_dir}/target-ssh-key"
-  pulumi_pick workerSshPrivateKey >"$bastion_session_key_file"
   pulumi_pick workerSshPrivateKey >"$target_ssh_key_file"
-  chmod 600 "$bastion_session_key_file" "$target_ssh_key_file"
+  chmod 600 "$target_ssh_key_file"
 
-  bastion_port_forward_open control "$bastion_id" "$dodb_private_ip" 22 "$bastion_session_key_file" "$target_ssh_key_file"
-  DODB_CONTROL_DB_SSH_OPTIONS=()
-  while IFS= read -r -d '' ssh_option; do DODB_CONTROL_DB_SSH_OPTIONS+=("$ssh_option"); done < <(bastion_port_forward_ssh_options)
+  bastion_port_forward_open control "$bastion_id" "$dodb_private_ip" 22
+  DODB_CONTROL_DB_SSH_OPTIONS=(
+    -i "$target_ssh_key_file" -p "$BASTION_LOCAL_PORT" -o IdentitiesOnly=yes
+    -o BatchMode=yes -o ConnectTimeout=10
+    -o ServerAliveInterval=15 -o ServerAliveCountMax=3
+    -o "UserKnownHostsFile=$BASTION_TEMP_DIR/known_hosts"
+    -o StrictHostKeyChecking=accept-new
+  )
   remote_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(12))')"
   local_binary="${binary_dir}/fn0-db-ops"
   local_binary_sha="$(sha256sum "${local_binary}" | awk '{print $1}')"

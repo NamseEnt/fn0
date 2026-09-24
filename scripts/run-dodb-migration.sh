@@ -134,15 +134,18 @@ raw_size="$(wc -c <"${local_binary}" | tr -d '[:space:]')"
 compressed_size="$(gzip -c "${local_binary}" | wc -c | tr -d '[:space:]')"
 RAW_SIZE="${raw_size}" COMPRESSED_SIZE="${compressed_size}" python3 -c 'import os; print("migration binary:\n  raw = {:.1f} MiB\n  compressed = {:.1f} MiB".format(int(os.environ["RAW_SIZE"]) / 1048576, int(os.environ["COMPRESSED_SIZE"]) / 1048576))' >&2
 
-bastion_session_key_file="${temporary_dir}/bastion-session-key"
 target_ssh_key_file="${temporary_dir}/target-ssh-key"
-pulumi_pick workerSshPrivateKey >"${bastion_session_key_file}"
 pulumi_pick workerSshPrivateKey >"${target_ssh_key_file}"
-chmod 600 "${bastion_session_key_file}" "${target_ssh_key_file}"
+chmod 600 "${target_ssh_key_file}"
 
-bastion_port_forward_open migration "$(pulumi_pick workerBastionId)" "${dodb_private_ip}" 22 "${bastion_session_key_file}" "${target_ssh_key_file}"
-ssh_options=()
-while IFS= read -r -d '' ssh_option; do ssh_options+=("${ssh_option}"); done < <(bastion_port_forward_ssh_options)
+bastion_port_forward_open migration "$(pulumi_pick workerBastionId)" "${dodb_private_ip}" 22
+ssh_options=(
+  -i "${target_ssh_key_file}" -p "${BASTION_LOCAL_PORT}" -o IdentitiesOnly=yes
+  -o BatchMode=yes -o ConnectTimeout=10
+  -o ServerAliveInterval=15 -o ServerAliveCountMax=3
+  -o "UserKnownHostsFile=${BASTION_TEMP_DIR}/known_hosts"
+  -o StrictHostKeyChecking=accept-new
+)
 remote_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(12))')"
 remote_cache_dir="/home/opc/.cache/fn0/db-migrate/${local_binary_sha}"
 remote_binary="${remote_cache_dir}/fn0-db-migrate"
