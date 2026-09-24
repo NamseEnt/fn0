@@ -100,6 +100,13 @@ case "$*" in
   *"bastion session get"*)
     display_name="$(cat "${MOCK_STATE}/display-name")"
     state="${MOCK_SESSION_STATE:-ACTIVE}"
+    get_count=0
+    [[ ! -e "${MOCK_STATE}/session-get-count" ]] || get_count="$(cat "${MOCK_STATE}/session-get-count")"
+    get_count=$((get_count + 1))
+    printf '%s' "$get_count" >"${MOCK_STATE}/session-get-count"
+    if [[ -n "${MOCK_SESSION_DELETED_AFTER:-}" && "$get_count" -gt "$MOCK_SESSION_DELETED_AFTER" ]]; then
+      state=DELETED
+    fi
     if [[ "${MOCK_NO_METADATA:-0}" == 1 ]]; then
       printf '{"data":{"id":"session-1","display-name":"%s","lifecycle-state":"%s"}}\n' "$display_name" "$state"
     else
@@ -156,7 +163,30 @@ state_dir = os.environ["MOCK_STATE"]
 with open(os.path.join(state_dir, "ssh-argv"), "a", encoding="utf-8") as output:
     output.write(" ".join(arguments) + "\n")
 if "-N" in arguments:
+    tunnel_count_path = os.path.join(state_dir, "tunnel-attempt-count")
+    tunnel_count = int(open(tunnel_count_path, encoding="utf-8").read()) if os.path.exists(tunnel_count_path) else 0
+    tunnel_count += 1
+    with open(tunnel_count_path, "w", encoding="utf-8") as output:
+        output.write(str(tunnel_count))
+    with open(os.path.join(state_dir, "tunnel-pids"), "a", encoding="utf-8") as output:
+        output.write(str(os.getpid()) + "\n")
+    tunnel_mode = os.environ.get("MOCK_TUNNEL_MODE", "success")
+    if tunnel_mode == "fail-first-two" and tunnel_count < 3:
+        print("Offering public key: fake RSA SHA256:ephemeral explicit", file=sys.stderr)
+        print("Permission denied (publickey).", file=sys.stderr)
+        raise SystemExit(255)
+    if tunnel_mode == "always-publickey":
+        print("Offering public key: fake RSA SHA256:ephemeral explicit", file=sys.stderr)
+        print("Permission denied (publickey).", file=sys.stderr)
+        raise SystemExit(255)
+    if tunnel_mode == "malformed":
+        print('Load key "/tmp/bastion-session-key": invalid format', file=sys.stderr)
+        raise SystemExit(255)
     print("Authenticated to mock-bastion using publickey", file=sys.stderr)
+    if tunnel_mode == "listener-unavailable":
+        import time
+        time.sleep(10)
+        raise SystemExit(0)
     forward_index = arguments.index("-L")
     local_port = int(arguments[forward_index + 1].split(":", 1)[0])
     server = socket.socket()
@@ -168,6 +198,15 @@ if "-N" in arguments:
         connection.close()
 
 destination_index = arguments.index("opc@127.0.0.1")
+if os.path.exists(os.path.join(state_dir, "tunnel-pids")):
+    tunnel_pid = int(open(os.path.join(state_dir, "tunnel-pids"), encoding="utf-8").read().splitlines()[-1])
+    try:
+        os.kill(tunnel_pid, 0)
+        tunnel_alive = "yes"
+    except ProcessLookupError:
+        tunnel_alive = "no"
+    with open(os.path.join(state_dir, "target-saw-tunnel"), "w", encoding="utf-8") as output:
+        output.write(tunnel_alive)
 remote = arguments[destination_index + 1:]
 if len(remote) == 1:
     remote = shlex.split(remote[0])
@@ -339,6 +378,78 @@ if MOCK_FAIL_UPLOAD=1 bash "${mock_repo}/scripts/run-dodb-migration.sh" transpor
 )
 [[ "$(tail -n 1 "${state_dir}/session-deletes")" == *"session-1"* ]]
 [[ "$(cat "${state_dir}/display-name")" =~ ^fn0-dodb-control-[0-9a-f]{24}$ ]]
+
+reset_readiness_state() {
+  printf '0' >"${state_dir}/tunnel-attempt-count"
+  printf '0' >"${state_dir}/session-get-count"
+  : >"${state_dir}/tunnel-pids"
+}
+
+assert_readiness_processes_reaped() {
+  python3 - "${state_dir}/tunnel-pids" <<'PY'
+import os
+import sys
+pids = [int(line) for line in open(sys.argv[1], encoding="utf-8") if line.strip()]
+for process_id in pids:
+    try:
+        os.kill(process_id, 0)
+    except ProcessLookupError:
+        continue
+    raise AssertionError(f"readiness SSH process {process_id} remains alive")
+PY
+}
+
+reset_readiness_state
+MOCK_TUNNEL_MODE=fail-first-two BASTION_READINESS_INTERVAL_SECONDS=0 \
+  bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
+[[ "$(cat "${state_dir}/tunnel-attempt-count")" == 3 ]]
+[[ "$(cat "${state_dir}/target-saw-tunnel")" == yes ]]
+python3 - "${state_dir}" <<'PY'
+import os
+import shlex
+import sys
+state_dir = sys.argv[1]
+tunnel_lines = [line for line in open(os.path.join(state_dir, "ssh-argv"), encoding="utf-8") if line.startswith("-N ")]
+retry_arguments = [shlex.split(line) for line in tunnel_lines[-3:]]
+retry_identity_paths = [arguments[arguments.index("-i") + 1] for arguments in retry_arguments]
+assert len(set(retry_identity_paths)) == 1
+create_count = open(os.path.join(state_dir, "create-count"), encoding="utf-8").read().strip()
+public_key_path = open(os.path.join(state_dir, f"ephemeral-public-path-{create_count}"), encoding="utf-8").read().strip()
+assert retry_identity_paths[0] == public_key_path[:-4]
+PY
+assert_readiness_processes_reaped
+
+reset_readiness_state
+if MOCK_TUNNEL_MODE=always-publickey BASTION_READINESS_ATTEMPTS=12 BASTION_READINESS_INTERVAL_SECONDS=0 \
+  BASTION_READINESS_PROBE_SECONDS=0.1 bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then
+  exit 1
+fi
+[[ "$(cat "${state_dir}/tunnel-attempt-count")" == 12 ]]
+assert_readiness_processes_reaped
+
+reset_readiness_state
+if MOCK_TUNNEL_MODE=always-publickey MOCK_SESSION_DELETED_AFTER=1 BASTION_READINESS_INTERVAL_SECONDS=0 \
+  bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then
+  exit 1
+fi
+[[ "$(cat "${state_dir}/tunnel-attempt-count")" == 1 ]]
+assert_readiness_processes_reaped
+
+reset_readiness_state
+if MOCK_TUNNEL_MODE=malformed BASTION_READINESS_INTERVAL_SECONDS=0 \
+  bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then
+  exit 1
+fi
+[[ "$(cat "${state_dir}/tunnel-attempt-count")" == 1 ]]
+assert_readiness_processes_reaped
+
+reset_readiness_state
+if MOCK_TUNNEL_MODE=listener-unavailable BASTION_READINESS_PROBE_SECONDS=0.1 \
+  bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null 2>&1; then
+  exit 1
+fi
+[[ "$(cat "${state_dir}/tunnel-attempt-count")" == 1 ]]
+assert_readiness_processes_reaped
 
 bash "${mock_repo}/scripts/run-dodb-migration.sh" verify --project-id abc --json >/dev/null
 python3 - "${state_dir}" <<'PY'

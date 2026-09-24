@@ -20,6 +20,9 @@ bastion_port_forward_open() {
   local session_ssh_command ssh_args_file session_argument current_argument forwarding_destination
   local no_remote_command argument_index attempt discovery_seconds discovery_interval
   local ssh_destination_index bastion_authenticated tunnel_tcp_ready
+  local readiness_attempts readiness_interval probe_seconds attempt_started_at attempt_elapsed
+  local attempt_number probe_deadline session_get_json retry_session_state
+  local attempt_log ready_monotonic now_monotonic readiness_deadline
   local -a first_hop_options=()
 
   if [[ -n "${BASTION_SESSION_ID:-}" || -n "${BASTION_TUNNEL_PID:-}" ]]; then
@@ -40,10 +43,18 @@ bastion_port_forward_open() {
   chmod 700 "$BASTION_TEMP_DIR"
   local bastion_session_private_key_file="${BASTION_TEMP_DIR}/bastion-session-key"
   public_key_file="${bastion_session_private_key_file}.pub"
-  ssh-keygen -q -t rsa -b 3072 -N '' -f "$bastion_session_private_key_file"
+  if ! ssh-keygen -q -t rsa -b 3072 -N '' -f "$bastion_session_private_key_file"; then
+    echo "could not generate an ephemeral Bastion session key" >&2
+    bastion_port_forward_close
+    return 1
+  fi
   chmod 600 "$bastion_session_private_key_file"
   chmod 600 "$public_key_file"
-  BASTION_SESSION_KEY_FINGERPRINT="$(ssh-keygen -lf "$public_key_file" | awk '{print $2}')"
+  if ! BASTION_SESSION_KEY_FINGERPRINT="$(ssh-keygen -lf "$public_key_file" | awk '{print $2}')" || [[ -z "$BASTION_SESSION_KEY_FINGERPRINT" ]]; then
+    echo "could not read the ephemeral Bastion session key fingerprint" >&2
+    bastion_port_forward_close
+    return 1
+  fi
 
   create_status=0
   if create_response="$(oci bastion session create-port-forwarding \
@@ -148,6 +159,7 @@ bastion_port_forward_open() {
     return 1
   fi
   BASTION_ACTIVE_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  BASTION_ACTIVE_MONOTONIC="$(python3 -c 'import time; print(time.monotonic())')"
   printf 'Bastion session active: id=%s display_name=%s at=%s ephemeral_key_fingerprint=%s\n' \
     "$BASTION_SESSION_ID" "$BASTION_DISPLAY_NAME" "$BASTION_ACTIVE_AT" "$BASTION_SESSION_KEY_FINGERPRINT" >&2
   session_ssh_command="$(jq -r '.data."ssh-metadata".command // .data.sshMetadata.command // empty' <<<"$session_json")"
@@ -233,34 +245,132 @@ for argument in arguments:
     "${BASTION_SSH_ARGS[@]:ssh_destination_index}"
   )
   local known_hosts_file="${BASTION_TEMP_DIR}/known_hosts"
-  local tunnel_log="${BASTION_TEMP_DIR}/bastion-tunnel.log"
   touch "$known_hosts_file"
   chmod 600 "$known_hosts_file"
+  readiness_attempts="${BASTION_READINESS_ATTEMPTS:-12}"
+  readiness_interval="${BASTION_READINESS_INTERVAL_SECONDS:-5}"
+  probe_seconds="${BASTION_READINESS_PROBE_SECONDS:-10}"
+  if [[ ! "$readiness_attempts" =~ ^[0-9]+$ || "$readiness_attempts" -lt 1 || "$readiness_attempts" -gt 12 ]]; then
+    echo "invalid Bastion readiness attempt bound" >&2
+    bastion_port_forward_close
+    return 2
+  fi
+  if [[ ! "$readiness_interval" =~ ^[0-9]+([.][0-9]+)?$ ]] || ! awk -v value="$readiness_interval" 'BEGIN { exit !(value >= 0 && value <= 5) }'; then
+    echo "invalid Bastion readiness interval" >&2
+    bastion_port_forward_close
+    return 2
+  fi
+  if [[ ! "$probe_seconds" =~ ^[0-9]+([.][0-9]+)?$ ]] || ! awk -v value="$probe_seconds" 'BEGIN { exit !(value > 0 && value <= 10) }'; then
+    echo "invalid Bastion readiness probe duration" >&2
+    bastion_port_forward_close
+    return 2
+  fi
+  BASTION_READY_AFTER_SECONDS=""
+  BASTION_READY_AT=""
+  BASTION_READINESS_ATTEMPTS_USED=0
   BASTION_SSH_ATTEMPT_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  printf 'Bastion SSH attempt: session_id=%s at=%s\n' "$BASTION_SESSION_ID" "$BASTION_SSH_ATTEMPT_AT" >&2
-  "${BASTION_SSH_ARGS[@]}" >"$tunnel_log" 2>&1 &
-  BASTION_TUNNEL_PID=$!
-  bastion_authenticated=false
-  tunnel_tcp_ready=false
-  for attempt in $(seq 1 60); do
-    if ! kill -0 "$BASTION_TUNNEL_PID" >/dev/null 2>&1; then
-      grep -E 'Offering public key:|Server accepts key:|Authentications that can continue:|sign_and_send_pubkey|Authenticated to |Permission denied|Local forwarding listening' "$tunnel_log" >&2 || true
-      echo "Bastion port-forwarding tunnel exited before becoming ready" >&2
+  readiness_deadline="$(python3 -c 'import sys; print(float(sys.argv[1]) + 60.0)' "$BASTION_ACTIVE_MONOTONIC")"
+  printf 'Bastion session ACTIVE; waiting for SSH readiness: id=%s display_name=%s active_at=%s first_ssh_attempt_at=%s ephemeral_key_fingerprint=%s\n' \
+    "$BASTION_SESSION_ID" "$BASTION_DISPLAY_NAME" "$BASTION_ACTIVE_AT" \
+    "$BASTION_SSH_ATTEMPT_AT" "$BASTION_SESSION_KEY_FINGERPRINT" >&2
+  attempt_number=1
+  while [[ "$attempt_number" -le "$readiness_attempts" ]]; do
+    now_monotonic="$(python3 -c 'import time; print(time.monotonic())')"
+    if ! awk -v now="$now_monotonic" -v deadline="$readiness_deadline" 'BEGIN { exit !(now < deadline) }'; then
+      echo "Bastion SSH readiness window exceeded 60 seconds" >&2
       bastion_port_forward_close
       return 1
     fi
-    if grep -q 'Authenticated to ' "$tunnel_log"; then bastion_authenticated=true; fi
-    if python3 -c 'import socket, sys; connection = socket.socket(); connection.settimeout(1); result = connection.connect_ex(("127.0.0.1", int(sys.argv[1]))); connection.close(); raise SystemExit(0 if result == 0 else 1)' "$BASTION_LOCAL_PORT"; then
-      tunnel_tcp_ready=true
+    if [[ "$attempt_number" -gt 1 ]]; then
+      if ! session_get_json="$(oci bastion session get --session-id "$BASTION_SESSION_ID" --output json 2>/dev/null)"; then
+        echo "could not re-check Bastion session before readiness retry" >&2
+        bastion_port_forward_close
+        return 1
+      fi
+      retry_session_state="$(jq -r '.data."lifecycle-state" // .data.lifecycleState // empty' <<<"$session_get_json")"
+      if [[ "$retry_session_state" != "ACTIVE" ]]; then
+        echo "Bastion readiness retry stopped because session state is ${retry_session_state:-unknown}" >&2
+        bastion_port_forward_close
+        return 1
+      fi
+      now_monotonic="$(python3 -c 'import time; print(time.monotonic())')"
+      if ! awk -v now="$now_monotonic" -v deadline="$readiness_deadline" 'BEGIN { exit !(now < deadline) }'; then
+        echo "Bastion SSH readiness window exceeded 60 seconds" >&2
+        bastion_port_forward_close
+        return 1
+      fi
     fi
-    if [[ "$bastion_authenticated" == true && "$tunnel_tcp_ready" == true ]]; then
-      printf 'Bastion first-hop authentication and local TCP forwarding passed for session %s\n' "$BASTION_SESSION_ID" >&2
-      return 0
+    attempt_started_at="$(python3 -c 'import time; print(time.monotonic())')"
+    attempt_log="${BASTION_TEMP_DIR}/bastion-tunnel-attempt-${attempt_number}.log"
+    printf 'Bastion SSH readiness attempt %s/%s: session_id=%s\n' \
+      "$attempt_number" "$readiness_attempts" "$BASTION_SESSION_ID" >&2
+    "${BASTION_SSH_ARGS[@]}" >"$attempt_log" 2>&1 &
+    BASTION_TUNNEL_PID=$!
+    probe_deadline="$(python3 -c 'import sys; print(min(float(sys.argv[1]) + float(sys.argv[2]), float(sys.argv[3])))' \
+      "$attempt_started_at" "$probe_seconds" "$readiness_deadline")"
+    bastion_authenticated=false
+    tunnel_tcp_ready=false
+    while true; do
+      if grep -q 'Authenticated to ' "$attempt_log"; then bastion_authenticated=true; fi
+      if python3 -c 'import socket, sys; connection = socket.socket(); connection.settimeout(0.25); result = connection.connect_ex(("127.0.0.1", int(sys.argv[1]))); connection.close(); raise SystemExit(0 if result == 0 else 1)' "$BASTION_LOCAL_PORT"; then
+        tunnel_tcp_ready=true
+      fi
+      if [[ "$bastion_authenticated" == true && "$tunnel_tcp_ready" == true ]]; then
+        BASTION_READY_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        ready_monotonic="$(python3 -c 'import time; print(time.monotonic())')"
+        BASTION_READY_AFTER_SECONDS="$(python3 -c 'import sys; print("%.3f" % (float(sys.argv[2]) - float(sys.argv[1])))' "$BASTION_ACTIVE_MONOTONIC" "$ready_monotonic")"
+        BASTION_READINESS_ATTEMPTS_USED="$attempt_number"
+        printf 'Bastion SSH readiness attempt %s/%s: tunnel ready\n' "$attempt_number" "$readiness_attempts" >&2
+        printf 'Bastion tunnel ready: id=%s display_name=%s ready_at=%s active_to_ready_seconds=%s attempts=%s ephemeral_key_fingerprint=%s\n' \
+          "$BASTION_SESSION_ID" "$BASTION_DISPLAY_NAME" "$BASTION_READY_AT" \
+          "$BASTION_READY_AFTER_SECONDS" "$BASTION_READINESS_ATTEMPTS_USED" "$BASTION_SESSION_KEY_FINGERPRINT" >&2
+        return 0
+      fi
+      now_monotonic="$(python3 -c 'import time; print(time.monotonic())')"
+      if ! kill -0 "$BASTION_TUNNEL_PID" >/dev/null 2>&1; then
+        if grep -Eiq 'Permission denied \(publickey\)|Connection closed by .*|Connection reset by peer|Connection timed out|Operation timed out|No route to host|Connection refused' "$attempt_log"; then
+          break
+        fi
+        grep -E 'Offering public key:|Server accepts key:|Authentications that can continue:|sign_and_send_pubkey|Authenticated to |Permission denied|Connection closed by|Connection reset by|Connection timed out|Operation timed out|No route to host|Connection refused|Could not resolve hostname|Load key:|Identity file' "$attempt_log" >&2 || true
+        echo "Bastion SSH readiness failed with a non-retryable error" >&2
+        wait "$BASTION_TUNNEL_PID" >/dev/null 2>&1 || true
+        BASTION_TUNNEL_PID=""
+        bastion_port_forward_close
+        return 1
+      fi
+      if ! awk -v now="$now_monotonic" -v deadline="$probe_deadline" 'BEGIN { exit !(now < deadline) }'; then
+        grep -E 'Offering public key:|Server accepts key:|Authentications that can continue:|sign_and_send_pubkey|Authenticated to |Permission denied|Connection closed by|Connection reset by|Connection timed out|Operation timed out|No route to host|Connection refused|Could not resolve hostname|Load key:|Identity file' "$attempt_log" >&2 || true
+        echo "Bastion SSH process remained alive without an authenticated tunnel and local forwarding port" >&2
+        kill "$BASTION_TUNNEL_PID" >/dev/null 2>&1 || true
+        wait "$BASTION_TUNNEL_PID" >/dev/null 2>&1 || true
+        BASTION_TUNNEL_PID=""
+        bastion_port_forward_close
+        return 1
+      fi
+      sleep 0.1
+    done
+    wait "$BASTION_TUNNEL_PID" >/dev/null 2>&1 || true
+    BASTION_TUNNEL_PID=""
+    grep -E 'Offering public key:|Server accepts key:|Authentications that can continue:|sign_and_send_pubkey|Authenticated to |Permission denied|Connection closed by|Connection reset by|Connection timed out|Operation timed out|No route to host|Connection refused' "$attempt_log" >&2 || true
+    if [[ "$attempt_number" -ge "$readiness_attempts" ]]; then
+      echo "Bastion SSH readiness failed after ${attempt_number} attempts" >&2
+      bastion_port_forward_close
+      return 1
     fi
-    sleep 1
+    if grep -Eiq 'Permission denied \(publickey\)' "$attempt_log"; then
+      printf 'Bastion SSH readiness attempt %s/%s: public-key auth not ready\n' \
+        "$attempt_number" "$readiness_attempts" >&2
+    else
+      printf 'Bastion SSH readiness attempt %s/%s: transient connection failure\n' \
+        "$attempt_number" "$readiness_attempts" >&2
+    fi
+    now_monotonic="$(python3 -c 'import time; print(time.monotonic())')"
+    attempt_elapsed="$(python3 -c 'import sys; print(max(0.0, float(sys.argv[2]) - (float(sys.argv[3]) - float(sys.argv[1]))))' \
+      "$attempt_started_at" "$readiness_interval" "$now_monotonic")"
+    if awk -v value="$attempt_elapsed" 'BEGIN { exit !(value > 0) }'; then sleep "$attempt_elapsed"; fi
+    attempt_number=$((attempt_number + 1))
   done
-  grep -E 'Offering public key:|Server accepts key:|Authentications that can continue:|sign_and_send_pubkey|Authenticated to |Permission denied|Local forwarding listening' "$tunnel_log" >&2 || true
-  echo "Bastion tunnel did not accept connections on 127.0.0.1:${BASTION_LOCAL_PORT}" >&2
+  echo "Bastion SSH readiness failed" >&2
   bastion_port_forward_close
   return 1
 }
@@ -277,5 +387,6 @@ bastion_port_forward_close() {
   unset BASTION_SESSION_ID BASTION_TUNNEL_PID BASTION_LOCAL_PORT
   unset BASTION_DISPLAY_NAME BASTION_TEMP_DIR BASTION_SSH_ARGS
   unset BASTION_SESSION_KEY_FINGERPRINT
-  unset BASTION_ACTIVE_AT BASTION_SSH_ATTEMPT_AT
+  unset BASTION_ACTIVE_AT BASTION_SSH_ATTEMPT_AT BASTION_READY_AT BASTION_READY_AFTER_SECONDS
+  unset BASTION_READINESS_ATTEMPTS_USED BASTION_ACTIVE_MONOTONIC
 }
