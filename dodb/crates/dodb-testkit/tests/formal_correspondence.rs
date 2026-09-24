@@ -290,7 +290,7 @@ async fn committed_read_view_never_exposes_half_of_a_grouped_publication() {
                 panic!("expected query response");
             };
             assert!(
-                rows.len() == 0 || rows.len() == 2,
+                rows.is_empty() || rows.len() == 2,
                 "partial committed view: {} rows",
                 rows.len()
             );
