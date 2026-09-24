@@ -272,6 +272,19 @@ if remote[:2] == ["bash", "-c"]:
             output.write(payload)
         raise SystemExit(0)
 
+if remote[:2] == ["sudo", "install"] and "/etc/dodb/server.crt" in remote:
+    record("control-cert-stage", remote[-1])
+    raise SystemExit(0)
+
+if remote[:2] == ["sudo", "rm"] and "--" in remote:
+    record("control-cert-cleanup", remote[-1])
+    raise SystemExit(0)
+
+if remote and remote[0].endswith("/fn0-db-ops"):
+    record("control-db-ops-argv", " ".join(remote))
+    print('{"documents":[]}')
+    raise SystemExit(0)
+
 raise SystemExit(6)
 SSH
 chmod +x "${mock_bin}/pulumi" "${mock_bin}/cargo" "${mock_bin}/oci" "${mock_bin}/ssh-keygen" "${mock_bin}/ssh"
@@ -373,11 +386,16 @@ if MOCK_FAIL_UPLOAD=1 bash "${mock_repo}/scripts/run-dodb-migration.sh" transpor
   dodb_control_db_open
   [[ "${BASTION_SESSION_ID:-}" == session-1 ]]
   [[ "${BASTION_DISPLAY_NAME:-}" =~ ^fn0-dodb-control-[0-9a-f]{24}$ ]]
+  control_scan="$(dodb_control_db_call scan --limit 1)"
+  [[ "$control_scan" == '{"documents":[]}' ]]
   dodb_control_db_close
   [[ -z "${BASTION_SESSION_ID:-}" ]]
 )
 [[ "$(tail -n 1 "${state_dir}/session-deletes")" == *"session-1"* ]]
 [[ "$(cat "${state_dir}/display-name")" =~ ^fn0-dodb-control-[0-9a-f]{24}$ ]]
+control_cert_path="$(cat "${state_dir}/control-cert-stage")"
+[[ "$control_cert_path" == "$(cat "${state_dir}/control-cert-cleanup")" ]]
+rg -q -- "--dodb-root-cert ${control_cert_path} scan --limit 1" "${state_dir}/control-db-ops-argv"
 
 reset_readiness_state() {
   printf '0' >"${state_dir}/tunnel-attempt-count"
