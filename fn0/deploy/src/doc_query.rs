@@ -17,6 +17,9 @@ pub enum DocQueryOutcome {
         failed_statement_index: usize,
         error_message: String,
     },
+    Unavailable {
+        reason: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -73,6 +76,9 @@ enum DocQueryResponse {
         reason: String,
     },
     InternalError {
+        reason: String,
+    },
+    Unavailable {
         reason: String,
     },
 }
@@ -149,6 +155,7 @@ pub async fn doc_query(
             failed_statement_index,
             error_message,
         }),
+        DocQueryResponse::Unavailable { reason } => Ok(DocQueryOutcome::Unavailable { reason }),
         DocQueryResponse::NotLoggedIn => {
             Err(anyhow!("control rejected token; run `forte login` again."))
         }

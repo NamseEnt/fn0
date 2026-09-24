@@ -27,7 +27,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let fn0_wasmtime_version = req.body.fn0_wasmtime_version.clone();
     let now = forte_sdk::now();
 
-    let result = doc_db::turso()
+    let result = doc_db::database()
         .trx(|trx| {
             let project_id = project_id.clone();
             let fn0_wasmtime_version = fn0_wasmtime_version.clone();

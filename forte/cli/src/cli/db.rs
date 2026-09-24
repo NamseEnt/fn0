@@ -71,6 +71,7 @@ async fn run(
             );
             Err(anyhow!("transaction rolled back; nothing was applied"))
         }
+        DocQueryOutcome::Unavailable { reason } => Err(anyhow!("doc query unavailable: {reason}")),
     }
 }
 

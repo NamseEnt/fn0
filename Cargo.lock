@@ -1305,6 +1305,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cty"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
+
+[[package]]
 name = "curve25519-dalek"
 version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1832,6 +1838,96 @@ dependencies = [
 ]
 
 [[package]]
+name = "dodb-client"
+version = "0.1.0"
+dependencies = [
+ "dodb-core",
+ "dodb-protocol",
+ "dodb-service",
+ "quinn",
+ "rustls-pemfile",
+ "tokio",
+]
+
+[[package]]
+name = "dodb-core"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+]
+
+[[package]]
+name = "dodb-protocol"
+version = "0.1.0"
+dependencies = [
+ "dodb-core",
+ "dodb-service",
+ "proptest",
+]
+
+[[package]]
+name = "dodb-server"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "dodb-client",
+ "dodb-core",
+ "dodb-protocol",
+ "dodb-service",
+ "dodb-storage",
+ "quinn",
+ "rcgen",
+ "rustls-pemfile",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "dodb-service"
+version = "0.1.0"
+dependencies = [
+ "dodb-core",
+]
+
+[[package]]
+name = "dodb-soak"
+version = "0.1.0"
+dependencies = [
+ "dodb-client",
+ "dodb-core",
+ "dodb-protocol",
+ "dodb-server",
+ "dodb-service",
+ "dodb-storage",
+ "mimalloc",
+ "rcgen",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "dodb-storage"
+version = "0.1.0"
+dependencies = [
+ "crc32c",
+ "dodb-core",
+ "proptest",
+ "tokio",
+]
+
+[[package]]
+name = "dodb-testkit"
+version = "0.1.0"
+dependencies = [
+ "dodb-core",
+ "dodb-storage",
+ "proptest",
+]
+
+[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2130,6 +2226,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "dashmap",
+ "fn0-doc-db-protocol",
  "fn0-ski",
  "fn0-wasmtime",
  "futures",
@@ -2185,6 +2282,8 @@ dependencies = [
  "dirs 6.0.0",
  "fn0",
  "fn0-deploy",
+ "fn0-doc-db",
+ "fn0-doc-db-protocol",
  "http-body-util",
  "hyper",
  "hyper-util",
@@ -2206,6 +2305,45 @@ dependencies = [
  "fn0",
  "tar",
  "wasmparser 0.252.0",
+]
+
+[[package]]
+name = "fn0-db-migrate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "clap",
+ "dodb-protocol",
+ "dodb-server",
+ "fn0-doc-db",
+ "rcgen",
+ "rustls",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "fn0-db-ops"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "clap",
+ "dodb-protocol",
+ "dodb-server",
+ "fn0-doc-db",
+ "fn0-doc-db-protocol",
+ "rcgen",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -2337,16 +2475,35 @@ name = "fn0-doc-db"
 version = "0.4.15"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "bytes",
+ "dodb-client",
+ "dodb-core",
+ "dodb-protocol",
+ "dodb-server",
+ "fn0-doc-db-protocol",
  "forte-sdk",
+ "futures",
  "libsql-hrana",
  "rand 0.8.5",
+ "rcgen",
  "reqwest",
  "rustls",
+ "rustls-pemfile",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "fn0-doc-db-protocol"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2418,9 +2575,12 @@ dependencies = [
  "chrono",
  "color-eyre",
  "dashmap",
+ "dodb-protocol",
+ "dodb-server",
  "fastwebsockets",
  "fn0",
  "fn0-doc-db",
+ "fn0-doc-db-protocol",
  "fn0-shared-schema",
  "futures",
  "hmac",
@@ -2451,6 +2611,7 @@ dependencies = [
  "sha1",
  "sha2",
  "tar",
+ "tempfile",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -2532,6 +2693,8 @@ dependencies = [
  "fastwebsockets",
  "fn0",
  "fn0-deploy",
+ "fn0-doc-db",
+ "fn0-doc-db-protocol",
  "futures",
  "http",
  "http-body-util",
@@ -2847,11 +3010,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "r-efi 5.3.0",
  "wasip2",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -2861,11 +3022,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de51e6874e94e7bf76d726fc5d13ba782deca734ff60d5bb2fb2607c7406555"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi 6.0.0",
  "rand_core 0.10.1",
  "wasip2",
  "wasip3",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -3811,6 +3974,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a45a52f43e1c16f667ccfe4dd8c85b7f7c204fd5e3bf46c5b0db9a5c3c0b8e9"
 dependencies = [
  "cc",
+ "cty",
 ]
 
 [[package]]
@@ -4847,6 +5011,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "proptest"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b45fcc2344c680f5025fe57779faef368840d0bd1f42f216291f0dc4ace4744"
+dependencies = [
+ "bit-set",
+ "bit-vec",
+ "bitflags 2.13.1",
+ "num-traits",
+ "rand 0.9.2",
+ "rand_chacha 0.9.0",
+ "rand_xorshift",
+ "regex-syntax",
+ "rusty-fork",
+ "tempfile",
+ "unarray",
+]
+
+[[package]]
 name = "prost"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4936,6 +5119,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-error"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
 name = "quick-xml"
 version = "0.37.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4957,9 +5146,9 @@ dependencies = [
 
 [[package]]
 name = "quinn"
-version = "0.11.9"
+version = "0.11.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9e20a958963c291dc322d98411f541009df2ced7b5a4f2bd52337638cfccf20"
+checksum = "0c1a41e437b6bbd489372cd4971de128e85c855f56c57f283d20ff016cf7c0a8"
 dependencies = [
  "bytes",
  "cfg_aliases",
@@ -4977,15 +5166,16 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.11.14"
+version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098"
+checksum = "a9746dbde176634f4f2f1faf2404e30a31b2bc1e9cafb5329c95d8177a18c9fc"
 dependencies = [
  "aws-lc-rs",
  "bytes",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "lru-slab",
- "rand 0.9.2",
+ "rand 0.10.2",
+ "rand_pcg",
  "ring",
  "rustc-hash",
  "rustls",
@@ -5122,6 +5312,24 @@ name = "rand_core"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
+
+[[package]]
+name = "rand_pcg"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caa0f4137e1c0a72f4c651489402276c8e8e1cf081f3b0ba156d2cbeef09e86a"
+dependencies = [
+ "rand_core 0.10.1",
+]
+
+[[package]]
+name = "rand_xorshift"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
+dependencies = [
+ "rand_core 0.9.5",
+]
 
 [[package]]
 name = "rayon"
@@ -5594,6 +5802,18 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "rusty-fork"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc6bf79ff24e648f6da1f8d1f011e9cac26491b619e6b9280f2b47f1774e6ee2"
+dependencies = [
+ "fnv",
+ "quick-error",
+ "tempfile",
+ "wait-timeout",
+]
 
 [[package]]
 name = "ryu"
@@ -6812,6 +7032,12 @@ name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
+
+[[package]]
+name = "unarray"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
 [[package]]
 name = "unic-char-property"

@@ -1,11 +1,12 @@
 use bytes::Bytes;
 use color_eyre::Result;
+use doc_db_protocol::DocDbRequest;
 use fn0::cache::{Bundle, BundleCache, Error as CacheError};
 use fn0::execute::ClientState;
 use fn0::measure_cpu_time::SystemClock;
 use fn0::wasmtime::Engine;
 use fn0::wasmtime::component::Linker;
-use fn0::{CodeExecutor, ExecutionContext};
+use fn0::{CodeExecutor, DocDbHijack, DocDbService, DocDbServiceFuture, ExecutionContext};
 use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -18,6 +19,7 @@ use tokio::net::TcpListener;
 use tokio::sync::OnceCell;
 
 const LOCAL_CODE_VERSION: u64 = 1;
+const DOC_DB_PLACEHOLDER_HOST: &str = "fn0-doc-db.fn0.dev";
 
 pub async fn execute(port: Option<u16>) -> Result<()> {
     println!("Starting local fn0 server...\n");
@@ -36,7 +38,13 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     let linker = fn0::build_linker(&engine);
 
     let cache = LocalCache::new(wasm_path, engine.clone(), linker.clone());
-    let ctx = Arc::new(ExecutionContext::new(engine, linker, cache));
+    let doc_db_service = Arc::new(LocalDocDbService::new());
+    let doc_db_hijack = Arc::new(DocDbHijack::new(
+        DOC_DB_PLACEHOLDER_HOST.to_string(),
+        doc_db_service,
+    ));
+    let ctx =
+        Arc::new(ExecutionContext::new(engine, linker, cache).with_doc_db_hijack(doc_db_hijack));
     let executor = Rc::new(CodeExecutor::new(ctx));
 
     let port = port.unwrap_or(3000);
@@ -96,6 +104,33 @@ pub async fn execute(port: Option<u16>) -> Result<()> {
     }
 }
 
+struct LocalDocDbService {
+    db: doc_db::Database,
+}
+
+impl LocalDocDbService {
+    fn new() -> Self {
+        Self {
+            db: doc_db::memory(),
+        }
+    }
+}
+
+impl DocDbService for LocalDocDbService {
+    fn execute<'a>(
+        &'a self,
+        _project_id: &'a str,
+        request: DocDbRequest,
+    ) -> DocDbServiceFuture<'a> {
+        Box::pin(async move {
+            self.db
+                .execute_semantic(request)
+                .await
+                .map_err(|error| error.to_string())
+        })
+    }
+}
+
 struct LocalCache {
     wasm_path: PathBuf,
     engine: Engine,
@@ -147,5 +182,74 @@ impl BundleCache for LocalCache {
 
     async fn registered_project_ids(&self) -> std::collections::HashSet<String> {
         std::collections::HashSet::from(["local".to_string()])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use doc_db_protocol::{BinaryDocument, DocDbKey, DocDbOperation, DocDbResult, encode_request};
+
+    fn put_request(data: &[u8]) -> DocDbRequest {
+        DocDbRequest::new(DocDbOperation::Put {
+            key: DocDbKey::new("pk", "sk"),
+            data: data.to_vec(),
+        })
+    }
+
+    fn get_request() -> DocDbRequest {
+        DocDbRequest::new(DocDbOperation::Get {
+            key: DocDbKey::new("pk", "sk"),
+        })
+    }
+
+    #[tokio::test]
+    async fn keeps_one_memory_database_for_the_service_lifetime() {
+        let service = LocalDocDbService::new();
+
+        assert_eq!(
+            service
+                .execute("local", put_request(b"value"))
+                .await
+                .unwrap()
+                .result,
+            DocDbResult::Put
+        );
+        assert_eq!(
+            service
+                .execute("local", get_request())
+                .await
+                .unwrap()
+                .result,
+            DocDbResult::Get {
+                data: Some(BinaryDocument {
+                    data: b"value".to_vec(),
+                })
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn routes_semantic_requests_through_the_hijack_to_memory() {
+        let hijack = DocDbHijack::new(
+            DOC_DB_PLACEHOLDER_HOST.to_string(),
+            Arc::new(LocalDocDbService::new()),
+        );
+
+        let put_body = encode_request(&put_request(b"value")).unwrap();
+        assert_eq!(
+            hijack.handle("local", &put_body).await.result,
+            DocDbResult::Put
+        );
+
+        let get_body = encode_request(&get_request()).unwrap();
+        assert_eq!(
+            hijack.handle("local", &get_body).await.result,
+            DocDbResult::Get {
+                data: Some(BinaryDocument {
+                    data: b"value".to_vec(),
+                })
+            }
+        );
     }
 }

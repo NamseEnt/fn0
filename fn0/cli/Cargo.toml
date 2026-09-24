@@ -21,6 +21,8 @@ bytes = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 color-eyre = { workspace = true }
+doc-db = { workspace = true }
+fn0-doc-db-protocol = { path = "../doc-db-protocol", version = "=0.1.0" }
 dirs = { workspace = true }
 fn0 = { workspace = true }
 fn0-deploy = { workspace = true }

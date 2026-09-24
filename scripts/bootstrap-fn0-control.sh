@@ -13,45 +13,43 @@
 #   4. Upload original/fn0-control.tar to the bundle-store R2 bucket.
 #   5. Invoke cwasm-compiler lambda to produce
 #      compiled/<wasmtime>/fn0-control/<code_version>.tar.zst.
-#   6. Seed the fn0-control turso database with:
+#   6. Seed the selected fn0-control database with:
 #        - Fn0WasmtimeVersionDoc (active=<wasmtime>)
 #        - CompiledBundleDoc (project_id=fn0-control, code_version=<cv>)
 #        - WorkerManifestDoc (fn0-control mapped to its registered domain, and its
 #          storage target so workers can reach the buckets)
 #        - ProjectCloudflareConfigDoc (the buckets and credentials step 3a made)
-#   7. Seed the worker-agent turso database (fn0-doc-db) with
-#      TargetFn0WorkerConfigDoc.image_ref = <new fn0-worker image_ref>.
+#   7. Seed TargetFn0WorkerConfigDoc.image_ref in the selected control database.
 #
 # Re-running picks up where it stopped — same image_refs and same code_version
 # input means same R2 keys and same doc PKs.
 #
 # Required tools: pulumi, jq, cargo, a container runtime (docker, or
 # apple/container on macOS), aws, oci, curl, forte, tar.
-# Required env (used to address the control turso DB, which is not on the
-# stack output by default):
-#   - none directly; the script pulls forteDbGroupToken / forteDbHostSuffix
-#     from the pulumi stack output. Make sure index.ts exports them.
+# The fn0Cloud:dbBackend Pulumi config selects the operator database.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export REPO_ROOT
 
-# shellcheck source=lib/pulumi-outputs.sh
+# shellcheck source=scripts/lib/pulumi-outputs.sh
 source "${REPO_ROOT}/scripts/lib/pulumi-outputs.sh"
-# shellcheck source=lib/cwasm-compiler.sh
+# shellcheck source=scripts/lib/cwasm-compiler.sh
 source "${REPO_ROOT}/scripts/lib/cwasm-compiler.sh"
-# shellcheck source=lib/worker-image.sh
+# shellcheck source=scripts/lib/worker-image.sh
 source "${REPO_ROOT}/scripts/lib/worker-image.sh"
-# shellcheck source=lib/control-bundle.sh
+# shellcheck source=scripts/lib/control-bundle.sh
 source "${REPO_ROOT}/scripts/lib/control-bundle.sh"
-# shellcheck source=lib/control-deploy.sh
+# shellcheck source=scripts/lib/control-deploy.sh
 source "${REPO_ROOT}/scripts/lib/control-deploy.sh"
-# shellcheck source=lib/control-cloudflare.sh
+# shellcheck source=scripts/lib/control-cloudflare.sh
 source "${REPO_ROOT}/scripts/lib/control-cloudflare.sh"
-# shellcheck source=lib/control-seed.sh
+# shellcheck source=scripts/lib/control-seed.sh
 source "${REPO_ROOT}/scripts/lib/control-seed.sh"
-# shellcheck source=lib/control-static-upload.sh
+# shellcheck source=scripts/lib/control-db.sh
+source "${REPO_ROOT}/scripts/lib/control-db.sh"
+# shellcheck source=scripts/lib/control-static-upload.sh
 source "${REPO_ROOT}/scripts/lib/control-static-upload.sh"
 
 need pulumi
@@ -66,6 +64,7 @@ need python3
 container_runtime_ensure_available
 
 load_pulumi_outputs
+control_db_init
 "${REPO_ROOT}/scripts/migrate-project-telemetry-policies.sh" --check-schema
 
 CONTROL_PROJECT_ID="${CONTROL_PROJECT_ID:-fn0-control}"
@@ -103,7 +102,7 @@ fi
 
 # Step 3 — build control raw bundle.
 work_dir="$(mktemp -d)"
-trap 'rm -rf "$work_dir"' EXIT
+trap 'control_db_close; rm -rf "$work_dir"' EXIT
 
 control_env_yaml="$(pulumi_pick controlBootstrapEnvYaml)"
 if [[ -z "$control_env_yaml" ]]; then
@@ -143,7 +142,7 @@ if [[ -z "${provisioning_token_id:-}" || -z "${provisioning_token:-}" ]]; then
   echo "could not mint a provisioning token; check that cloudflareUserApiToken has User -> API Tokens -> Edit" >&2
   exit 1
 fi
-trap 'revoke_provisioning_token "$cf_user_token" "$provisioning_token_id"; rm -rf "$work_dir"' EXIT
+trap 'control_db_close; revoke_provisioning_token "$cf_user_token" "$provisioning_token_id"; rm -rf "$work_dir"' EXIT
 
 provision_control_cloudflare \
   "$cf_account_id" "$provisioning_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID" "$CONTROL_CUSTOM_DOMAIN"
@@ -154,17 +153,11 @@ provision_control_cloudflare \
 # value out once, at creation, so the stored ciphertext is the only copy; a run
 # that could not read it back had to replace all three, and each replacement is
 # a window where a consumer still holding the old one is locked out.
-forte_group_token="$(pulumi_pick forteDbGroupToken)"
-forte_host_suffix="$(pulumi_pick forteDbHostSuffix)"
-if [[ -z "$forte_group_token" || -z "$forte_host_suffix" ]]; then
-  echo "missing pulumi output: forteDbGroupToken / forteDbHostSuffix (add them to index.ts exports)" >&2
-  exit 1
-fi
-control_db_url="https://${CONTROL_PROJECT_ID}${forte_host_suffix}"
-ensure_docs_table "$control_db_url" "$forte_group_token"
-
-stored_config="$(select_doc_data "$control_db_url" "$forte_group_token" \
+control_db_open
+control_db_ensure_ready
+stored_config_observed="$(control_db_get_observed \
   "ProjectCloudflareConfigDoc/project_id=${CONTROL_PROJECT_ID}" "")"
+stored_config="$(jq -r 'if .found then (.data_base64 | @base64d) else "" end' <<<"$stored_config_observed")"
 stored_pick() {
   [[ -z "$stored_config" ]] && return 0
   jq -r "(.${1} // empty)" <<<"$stored_config"
@@ -244,7 +237,7 @@ if [[ -z "$purge_token" ]]; then
 fi
 
 static_bucket="fn0-${CONTROL_PROJECT_ID}-frontend-asset"
-build_id="$(uuidgen | tr 'A-Z' 'a-z')"
+build_id="$(uuidgen | tr '[:upper:]' '[:lower:]')"
 export VITE_PUBLIC_URL="https://${static_bucket}.${cf_zone_name}/${build_id}/"
 echo ">> build_id=${build_id} VITE_PUBLIC_URL=${VITE_PUBLIC_URL}"
 
@@ -265,29 +258,23 @@ code_version="$(python3 -c 'import time; print(int(time.time() * 1000))')"
 upload_r2_original "$CONTROL_PROJECT_ID" "$code_version" "$bundle_path"
 compile_via_cwasm "$CONTROL_PROJECT_ID" "$code_version" "$target_wasmtime" "$CWASM_LAMBDA_FUNCTION_NAME"
 
-# Step 6 — seed the fn0-control turso DB. The DB handle and the docs table are
-# already in hand: the credential step above reads this same document to decide
-# whether it has to mint anything.
+# Step 6 — seed the selected control database.
 owner_github_id="$(pulumi_pick controlOwnerGithubId)"
 if [[ -z "$owner_github_id" ]]; then
   echo "missing pulumi output: controlOwnerGithubId" >&2
   exit 1
 fi
-seed_project_doc "$control_db_url" "$forte_group_token" \
-  "$CONTROL_PROJECT_ID" "$owner_github_id" "$CONTROL_PROJECT_ID"
-seed_fn0_wasmtime_version "$control_db_url" "$forte_group_token" "$target_wasmtime"
-seed_compiled_bundle "$control_db_url" "$forte_group_token" \
-  "$CONTROL_PROJECT_ID" "$code_version" "$target_wasmtime"
-seed_worker_manifest "$control_db_url" "$forte_group_token" \
-  "$CONTROL_PROJECT_ID" "$code_version" "$CONTROL_CUSTOM_DOMAIN"
-seed_cloudflare_config "$control_db_url" "$forte_group_token" \
-  "$CONTROL_PROJECT_ID" "$cf_account_id" "$cf_zone_id" "$cf_zone_name" \
+seed_project_doc "$CONTROL_PROJECT_ID" "$owner_github_id" "$CONTROL_PROJECT_ID"
+seed_fn0_wasmtime_version "$target_wasmtime"
+seed_compiled_bundle "$CONTROL_PROJECT_ID" "$code_version" "$target_wasmtime"
+seed_worker_manifest "$CONTROL_PROJECT_ID" "$code_version" "$CONTROL_CUSTOM_DOMAIN"
+seed_cloudflare_config "$CONTROL_PROJECT_ID" "$cf_account_id" "$cf_zone_id" "$cf_zone_name" \
   "$worker_key_id" "$worker_secret_ct" \
   "$asset_key_id" "$asset_secret_ct" "$purge_token_ct"
-seed_manifest_storage "$control_db_url" "$forte_group_token" "$CONTROL_PROJECT_ID"
+seed_manifest_storage "$CONTROL_PROJECT_ID"
 
 # Step 7 — seed the worker-agent's rollout target into the same control DB.
-seed_target_fn0_worker_config "$control_db_url" "$forte_group_token" "$worker_image_ref"
+seed_target_fn0_worker_config "$worker_image_ref"
 
 # Step 8 — retire the credentials this run replaced, and only those: a reused
 # credential is the one every consumer is already holding, so sweeping tokens by

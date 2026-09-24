@@ -32,7 +32,7 @@ struct OauthState {
 
 pub async fn current_user(jar: &CookieJar) -> Option<UserDoc> {
     let cookie: SessionCookie = cookie_sign::unsign_cookie(jar, SESSION_COOKIE)?;
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let user = (UserDocGet {
         github_id: cookie.github_id,
     })
@@ -54,7 +54,7 @@ pub async fn create_session(jar: &mut CookieJar, mut user: UserDoc) -> anyhow::R
         token: token.clone(),
         created_at: forte_sdk::now(),
     });
-    let db = doc_db::turso();
+    let db = doc_db::database();
     UserDocPut(user).send_with(&db).await?;
     cookie_sign::sign_cookie(
         jar,
@@ -69,7 +69,7 @@ pub async fn clear_session(jar: &mut CookieJar) -> anyhow::Result<()> {
     let cookie: Option<SessionCookie> = cookie_sign::unsign_cookie(jar, SESSION_COOKIE);
     clear_session_cookie(jar);
     let Some(cookie) = cookie else { return Ok(()) };
-    let db = doc_db::turso();
+    let db = doc_db::database();
     if let Some(mut user) = (UserDocGet {
         github_id: cookie.github_id,
     })
@@ -164,7 +164,7 @@ pub async fn verify_cli_token(token: &str) -> Option<UserDoc> {
     let token_uuid_bytes: [u8; 16] = payload[8..].try_into().ok()?;
     let token_id = Uuid::from_bytes(token_uuid_bytes).to_string();
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let user = (UserDocGet { github_id }).send_with(&db).await.ok()??;
     if user.cli_tokens.iter().any(|t| t.id == token_id) {
         Some(user)

@@ -29,7 +29,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let project = match (ProjectDocGet {
         project_id: &req.body.project_id,
     })
-    .send_with(&doc_db::turso())
+    .send_with(&doc_db::database())
     .await
     {
         Ok(Some(project)) => project,
@@ -43,7 +43,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotFound;
     }
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let deletion = match (ProjectDeletionDocGet {
         project_id: &req.body.project_id,
     })

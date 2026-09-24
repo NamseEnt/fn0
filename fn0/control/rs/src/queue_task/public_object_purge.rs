@@ -21,7 +21,7 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let manifest = (WorkerManifestDocGet {}).send_with(&db).await?;
     let files = expand_purge_files(
         &requested_urls(&input.urls),

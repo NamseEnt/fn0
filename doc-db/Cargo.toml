@@ -26,6 +26,8 @@ harness = false
 [dependencies]
 anyhow = { workspace = true }
 bytes = { workspace = true }
+futures = { workspace = true }
+fn0-doc-db-protocol = { path = "../fn0/doc-db-protocol", version = "=0.1.0" }
 libsql-hrana = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -38,10 +40,18 @@ forte-sdk = { workspace = true }
 forte-sdk = { workspace = true, features = ["test-harness"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+base64 = { workspace = true }
+dodb-client = { workspace = true }
+dodb-core = { workspace = true }
+dodb-protocol = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
+rustls-pemfile = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+dodb-server = { workspace = true }
+rcgen = { workspace = true }
 rustls = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt", "net", "time"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "net", "sync", "time"] }

@@ -7,12 +7,12 @@ All documents are stored in a single table with a composite key: `pk` (partition
 ## Creating a Database Connection
 
 ```rust
-use doc_db::{Database, turso, memory};
+use doc_db::{Database, database, memory};
 
-// Production: reads TURSO_URL and TURSO_AUTH_TOKEN from environment
-let db: Database = turso();
+// Normal fn0 application code: uses the backend-neutral semantic RPC.
+let db: Database = database();
 
-// Explicit config
+// Legacy/direct Turso path for raw SQL, migrations, or explicit transactions.
 let db: Database = doc_db::turso_with_config(
     "https://my-db.turso.io".to_string(),
     "my-token".to_string(),
@@ -23,6 +23,43 @@ let db: Database = memory();
 ```
 
 `Database` is `Clone`. Share it across your handler by cloning.
+
+## Semantic RPC boundary
+
+Normal fn0 application code should use `doc_db::database()`. It is the
+backend-neutral client for the semantic document API. It reads
+`FN0_DOC_DB_URL`, and fn0 routes that endpoint through `DocDbHijack` to the
+host document service in both deployed workers and `forte dev`. The current
+host backend is an implementation detail and is not exposed to the guest.
+
+`doc_db::semantic()` and `doc_db::semantic_with_config()` remain available as
+compatibility APIs. `doc_db::turso()` and `doc_db::turso_with_config()` remain
+the direct/legacy path for raw SQL, migrations, or explicit session
+transactions. Do not switch those users to `database()`.
+
+Standalone `fn0 local` uses the same semantic boundary with a process-local
+in-memory host backend. Its document state is lost when the local server
+restarts; this does not describe the persistent backends used by Forte or
+production workers.
+
+The semantic request payload contains document keys and operations, but no
+project or tenant identity. fn0 obtains the authoritative project identity
+from the invocation context before forwarding the request to the host service.
+
+The semantic observed state uses an opaque `DocDbRevision`. A present document carries its revision. A missing document carries `Some(revision)` only when the backend has an exact revision for that missing state; `None` means that the backend knows only that the key is currently absent. Turso physically removes rows and therefore returns `None` for missing documents. A backend with persistent missing-state revisions must return the exact missing revision, including revision zero for a key that has never existed. The `trx` layer turns an exact missing revision into `RevisionEquals`, preserving insert-delete ABA detection, and uses `NotExists` when no exact revision is available.
+
+`RevisionEquals(key, revision)` compares the current logical state revision of the key. It is not limited to an existing row: a backend that returns `Missing { revision: Some(revision) }` must allow the same equality condition to succeed while the key is missing. The current Turso and Memory backends expose `Missing { revision: None }` only and do not provide persistent missing-state revisions. The numeric representation of `DocDbRevision` exists for serialization and backend adaptation; ordering, arithmetic, and global monotonicity are not semantic contracts.
+
+The semantic transaction request is a pair of condition and mutation lists. Updates and deletes use `RevisionEquals` with the observed revision, inserts use `NotExists`, and read-only observations contribute a condition without a mutation. Conditions are checked in order; a conflict reports the first failing condition index and publishes zero mutations.
+
+Each transaction request allows at most one condition and at most one mutation for a key. A condition and a mutation for the same key are valid together; duplicate conditions or duplicate mutations are invalid requests and are rejected before backend execution. Condition-only transactions are valid and must still validate their conditions. The dodb adapter sends conditions and mutations through dodb's atomic `Transact` operation, including condition-only requests.
+
+The semantic protocol contains single-operation requests for `Get`, `Put`,
+`Delete`, `Query`, and `Scan`, plus the internal single-document
+`GetObserved` request used by optimistic transactions. `Transact` is the only
+multi-item request: it carries conditions and mutations atomically.
+
+The semantic RPC applies a 16 MiB fn0 platform frame limit to requests and responses. This limit is independent of any future dodb storage value limit. JSON and base64 encoding add overhead, so the largest usable binary document is smaller than 16 MiB.
 
 ## Basic Operations
 
@@ -66,22 +103,10 @@ let items: Vec<(String, String, Bytes)> = db.scan(None, 100).await?;
 let items = db.scan(Some(("User/id=42", "profile")), 100).await?;
 ```
 
-### `batch` — atomic multi-operation write
+### `transaction` — explicit ACID transaction (legacy/direct Turso only)
 
 ```rust
-use doc_db::BatchOp;
-
-let ops = vec![
-    BatchOp::Put { pk: "User/id=1", sk: "profile", data: &user1_bytes },
-    BatchOp::Delete { pk: "User/id=2", sk: "profile" },
-];
-db.batch(&ops).await?;
-```
-
-### `transaction` — explicit ACID transaction
-
-```rust
-let mut tx = db.transaction().await?;
+let mut tx = doc_db::turso().transaction().await?;
 let data = tx.get("User/id=42", "profile").await?;
 tx.put("User/id=42", "profile", &new_data).await?;
 tx.commit().await?;
@@ -91,7 +116,9 @@ Call `tx.rollback()` to abort.
 
 ## `trx` — Optimistic Concurrency Transaction
 
-Higher-level API with conflict detection. Reads are batched upfront; writes use optimistic locking with version checks.
+Higher-level API with conflict detection. Multiple requested documents are
+read with concurrent single-document observed requests; writes use optimistic
+locking with version checks.
 
 ```rust
 let result = db.trx(|trx| async move {
@@ -120,7 +147,7 @@ match result {
 ```
 
 Key points:
-- `trx.get(request)` — reads one or more documents; returns `Option<DocHandle<T>>`
+- `trx.get(request)` — reads one or more documents concurrently; returns `Option<DocHandle<T>>`
 - `trx.create(doc)` — inserts a new document; returns `Result<DocHandle<T>>`
 - Modify loaded documents by dereferencing the handle (`*handle = new_value` or field assignment)
 - `handle.delete()` — marks the document for deletion on commit
@@ -128,9 +155,32 @@ Key points:
 - `trx.cancel(reason)` — abort without retry; returns `TrxResult::Cancelled(reason)`
 - On conflict, the closure is retried automatically; `TrxResult::Conflict` is returned only when retries are exhausted
 
-## Batching Requests with `DbRequest`
+`trx` is the atomic API. It supports unconditional multi-write transactions,
+conditional optimistic transactions, and condition-only transactions. An
+empty transaction is a local no-op and is not sent to the dodb backend.
 
-The `DbRequest` trait enables combining multiple reads into a single round-trip:
+The dodb transport is created lazily by production workers. Startup validates
+the configured endpoint and TLS roots but does not dial the server. The first
+request establishes the shared connection; after transport loss, a later
+independent request reconnects through that same manager. Uncertain mutations
+are returned as errors and are never replayed by fn0.
+
+## Aggregating Requests with `DbRequest`
+
+The `DbRequest` trait enables combining independent requests while preserving
+the convenient tuple/vector result shape. A single request produces one
+single-operation semantic RPC. Tuple and vector requests produce one
+single-operation RPC per prepared operation and await them concurrently.
+They are non-atomic, have no rollback, and operations may succeed or fail
+independently.
+
+One request:
+
+```rust
+let user = UserGet { id: "42" }.send_with(&db).await?;
+```
+
+Different request types:
 
 ```rust
 use doc_db::DbRequest;
@@ -141,7 +191,25 @@ let (user, settings) = (
 ).send_with(&db).await?;
 ```
 
-Tuples up to 12 elements and `Vec<impl DbRequest>` are supported.
+Same request type in bulk:
+
+```rust
+let users = vec![
+    UserGet { id: "41" },
+    UserGet { id: "42" },
+].send_with(&db).await?;
+```
+
+Tuples up to 12 elements and `Vec<impl DbRequest>` are supported. Results stay
+in input order, but execution order is not guaranteed. All started operations
+settle before an error is returned; if multiple operations fail, the first
+error in input order is returned. Tuple and vector `send_with` calls are not
+transactions.
+
+Do not use a tuple or vector to express ordering or atomicity. For example,
+two writes to the same key have no guaranteed last-writer order. Await them
+sequentially when order matters, or use `trx` when the writes must commit
+atomically.
 
 ## `#[forte_doc]` Macro
 
@@ -241,7 +309,7 @@ UserDelete { id: "alice".to_string(), version: 1 }
     .await?;
 ```
 
-## Raw SQL
+## Raw SQL (legacy/direct Turso only)
 
 ```rust
 use doc_db::Value;

@@ -57,7 +57,9 @@ You can wait until you need it — `forte dev` does not require it. See [forte/t
 
 The `doc-db` crate connects to Turso/libSQL.
 
-**Forte projects:** `forte dev` downloads and starts sqld automatically — no manual setup needed. The database file is stored in `.forte/data/` inside your project directory. `TURSO_URL` and `TURSO_AUTH_TOKEN` are injected automatically and do not need to be set for local development.
+**Forte projects:** `forte dev` downloads and starts sqld automatically — no manual setup needed. The database file is stored in `.forte/data/` inside your project directory. Normal application code should use `doc_db::database()`, which is routed through the local semantic doc-db service. `TURSO_URL` and `TURSO_AUTH_TOKEN` remain injected for legacy/direct Turso users and do not need to be set for local development.
+
+**Raw fn0 projects:** `fn0 local` supports `doc_db::database()` through a semantic service backed by one in-memory database for the process lifetime. Restarting the local server loses that state. It does not configure legacy/direct Turso access.
 
 **Running `doc-db` tests directly** (outside of `forte dev`) requires a separately running libSQL server:
 
@@ -72,13 +74,14 @@ Environment variables for direct `doc-db` test usage:
 |---|---|---|
 | `DOC_DB_TEST_URL` | `http://127.0.0.1:18123` | libSQL URL for tests (overrides default) |
 
-For production, `TURSO_URL` and `TURSO_AUTH_TOKEN` are set by fn0 Cloud and injected into the WASM environment by the worker.
+For production, fn0 injects the semantic `FN0_DOC_DB_URL` endpoint and routes it through `DocDbHijack`. `TURSO_URL` and `TURSO_AUTH_TOKEN` are also injected for legacy/direct Turso users.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
 | `COOKIE_SECRET` | Yes (if using `cookie_sign`) | HMAC secret for signed cookies |
+| `FN0_DOC_DB_URL` | No | Semantic document DB endpoint; injected automatically by fn0 |
 | `TURSO_URL` | No | Database URL; injected automatically by `forte dev` |
 | `TURSO_AUTH_TOKEN` | No | Database auth token; injected automatically by `forte dev` |
 | `FN0_QUEUE_URL` | No | Queue endpoint; injected automatically by `forte dev`; required in production if using queue tasks |

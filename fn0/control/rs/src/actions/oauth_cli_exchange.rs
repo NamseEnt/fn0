@@ -24,7 +24,7 @@ pub enum Output {
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     exchange_code(
-        &doc_db::turso(),
+        &doc_db::database(),
         req.body.code.trim(),
         req.body.code_verifier.trim(),
         req.body.redirect_uri.clone(),

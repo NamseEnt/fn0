@@ -139,7 +139,7 @@ enum ClaimedFailure {
 }
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     reconcile_with(
         &db,
         input,

@@ -24,7 +24,7 @@ pub struct Input {
 }
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let Some(manifest) = (WorkerManifestDocGet {}).send_with(&db).await? else {
         return Ok(());
     };

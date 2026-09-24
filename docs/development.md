@@ -181,7 +181,7 @@ Infrastructure is managed in `infra/`:
 - `infra/cloud/` — Cloud provider configurations (AWS, OCI)
 - `infra/r2-worker/` — Cloudflare R2 worker for blob storage
 
-Scaling configuration: `scripts/scale-config.sh`
+Worker pool size is fixed at one instance and automatic CPU autoscaling has been removed. The former `scripts/scale-config.sh` helper had no active consumer and has been deleted.
 
 ### Static page caching prerequisites
 

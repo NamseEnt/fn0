@@ -2,6 +2,7 @@ mod body_limit;
 pub mod cache;
 pub mod cross_project_enqueue_hijack;
 pub mod cross_project_invoke_hijack;
+pub mod doc_db_hijack;
 pub mod egress;
 pub mod execute;
 mod js;
@@ -32,6 +33,7 @@ use crate::measure_cpu_time::SystemClock;
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
 pub use cache::{Bundle, BundleCache, build_service_pre};
+pub use doc_db_hijack::{DocDbHijack, DocDbService, DocDbServiceFuture};
 use execute::ClientState;
 pub use execute::{build_linker, spawn_epoch_ticker};
 use futures::FutureExt;
@@ -155,6 +157,7 @@ pub struct ExecutionContext<C: BundleCache> {
     pub(crate) engine: Engine,
     pub(crate) linker: Linker<ClientState<SystemClock>>,
     pub(crate) bundle_cache: C,
+    pub(crate) doc_db_hijack: Option<Arc<DocDbHijack>>,
     pub(crate) turso_hijack: Option<Arc<TursoHijack>>,
     pub(crate) otlp_hijack: Option<Arc<OtlpHijack>>,
     pub(crate) queue_hijack: Option<Arc<QueueHijack>>,
@@ -174,6 +177,7 @@ impl<C: BundleCache> ExecutionContext<C> {
             engine,
             linker,
             bundle_cache,
+            doc_db_hijack: None,
             turso_hijack: None,
             otlp_hijack: None,
             queue_hijack: None,
@@ -186,6 +190,11 @@ impl<C: BundleCache> ExecutionContext<C> {
             websocket_hijack: None,
             guest_outbound_http: None,
         }
+    }
+
+    pub fn with_doc_db_hijack(mut self, doc_db_hijack: Arc<DocDbHijack>) -> Self {
+        self.doc_db_hijack = Some(doc_db_hijack);
+        self
     }
 
     pub fn with_turso_hijack(mut self, turso_hijack: Arc<TursoHijack>) -> Self {
@@ -909,6 +918,7 @@ impl<C: BundleCache> CodeExecutor<C> {
         let slot_bundle = bundle.clone();
         let bundle = bundle.clone();
         let project_id_owned = project_id.to_string();
+        let doc_db_hijack = ctx.doc_db_hijack.clone();
         let turso_hijack = ctx.turso_hijack.clone();
         let otlp_hijack = ctx.otlp_hijack.clone();
         let queue_hijack = ctx.queue_hijack.clone();
@@ -930,6 +940,7 @@ impl<C: BundleCache> CodeExecutor<C> {
                     project_id: project_id_owned,
                     self_invoke_sender,
                     rx,
+                    doc_db_hijack,
                     turso_hijack,
                     otlp_hijack,
                     queue_hijack,

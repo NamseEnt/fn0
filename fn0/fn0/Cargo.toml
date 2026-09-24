@@ -13,6 +13,7 @@ bytes = { workspace = true }
 chrono = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+fn0-doc-db-protocol = { path = "../doc-db-protocol", version = "=0.1.0" }
 fn0-wasmtime = { workspace = true }
 futures = { workspace = true }
 hmac = { workspace = true }

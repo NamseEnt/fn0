@@ -5,8 +5,9 @@ pub mod websocket;
 use anyhow::Result;
 pub use cache::SimpleCache;
 use fn0::{
-    CodeExecutor, ExecutionContext, ObjectStorageHijack, PublicStorageHijack, QueueHijack,
-    RequestBodyTooLarge, StaticPageCacheHijack,
+    CodeExecutor, DocDbHijack, DocDbService, DocDbServiceFuture, ExecutionContext,
+    ObjectStorageHijack, PublicStorageHijack, QueueHijack, RequestBodyTooLarge,
+    StaticPageCacheHijack,
 };
 use http_body_util::{BodyExt, Full, combinators::UnsyncBoxBody};
 use hyper::server::conn::http1;
@@ -28,6 +29,7 @@ pub struct ServerConfig {
     pub public_dir: PathBuf,
     pub vite_socket_path: Option<PathBuf>,
     pub env_vars: Vec<(String, String)>,
+    pub doc_db_hijack: Option<Arc<DocDbHijack>>,
     pub queue_hijack: Option<Arc<QueueHijack>>,
     pub object_storage_hijack: Option<Arc<ObjectStorageHijack>>,
     pub public_storage_hijack: Option<Arc<PublicStorageHijack>>,
@@ -42,6 +44,33 @@ pub struct ServerHandle {
 }
 
 pub const DEV_CODE_ID: &str = "app";
+
+struct LocalDocDbService {
+    database: doc_db::Database,
+}
+
+impl DocDbService for LocalDocDbService {
+    fn execute<'a>(
+        &'a self,
+        _project_id: &'a str,
+        request: doc_db_protocol::DocDbRequest,
+    ) -> DocDbServiceFuture<'a> {
+        let database = self.database.clone();
+        Box::pin(async move {
+            database
+                .execute_semantic(request)
+                .await
+                .map_err(|error| error.to_string())
+        })
+    }
+}
+
+pub fn local_doc_db_hijack(url: String) -> Arc<DocDbHijack> {
+    let service = Arc::new(LocalDocDbService {
+        database: doc_db::turso_with_config(url, String::new()),
+    });
+    Arc::new(DocDbHijack::new("fn0-doc-db.fn0.dev".to_string(), service))
+}
 
 pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let engine = fn0::build_engine()?;
@@ -60,6 +89,9 @@ pub async fn run(config: ServerConfig) -> Result<ServerHandle> {
     let websocket_hijack = config.websocket_hijack.clone();
 
     let mut ctx = ExecutionContext::new(engine, linker, cache);
+    if let Some(hijack) = config.doc_db_hijack {
+        ctx = ctx.with_doc_db_hijack(hijack);
+    }
     if let Some(hijack) = config.queue_hijack {
         ctx = ctx.with_queue_hijack(hijack);
     }

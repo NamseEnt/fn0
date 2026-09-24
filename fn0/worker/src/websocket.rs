@@ -1,5 +1,5 @@
 use crate::websocket_directory::{
-    ConnectionDirectory, ConnectionOwner, WorkerIdentity, directory_from_env,
+    ConnectionDirectory, ConnectionOwner, WorkerIdentity, directory_with_database,
     worker_identity_from_env,
 };
 use crate::websocket_quic::{QuicSendRequest, QuicTransport};
@@ -749,9 +749,10 @@ impl WebSocketService {
         worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
         outbound_dialer: OutboundDialer,
         egress_budget: Arc<dyn EgressBudget>,
+        control_database: doc_db::Database,
     ) -> anyhow::Result<Arc<Self>> {
         let identity = worker_identity_from_env();
-        let directory = directory_from_env(&identity)?;
+        let directory = directory_with_database(&identity, control_database)?;
         let singleton_resolver = Arc::new(ControlSingletonConnectionResolver {
             worker_senders: worker_senders.clone(),
         });

@@ -1,4 +1,6 @@
-use crate::{Database, Transaction};
+use crate::{
+    Database, DocDbRevision, ObservedDocument, TransactCondition, TransactMutation, TransactRequest,
+};
 use anyhow::{Result, anyhow, bail};
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -63,7 +65,7 @@ pub trait TrxRead: Sized {
     async fn finalize(
         self,
         tx: &Trx,
-        results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+        results: &mut std::vec::IntoIter<ObservedDocument>,
     ) -> Result<Self::Output>;
 }
 
@@ -80,11 +82,11 @@ where
     async fn finalize(
         self,
         tx: &Trx,
-        results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+        results: &mut std::vec::IntoIter<ObservedDocument>,
     ) -> Result<Self::Output> {
         let stored = results
             .next()
-            .ok_or_else(|| anyhow!("trx batch result missing for read"))?;
+            .ok_or_else(|| anyhow!("trx observed result missing for read"))?;
         let key = self.key();
         tx.inner
             .lock()
@@ -107,7 +109,7 @@ macro_rules! impl_trx_read_tuple {
             async fn finalize(
                 self,
                 tx: &Trx,
-                results: &mut std::vec::IntoIter<Option<crate::turso::StoredDoc>>,
+                results: &mut std::vec::IntoIter<ObservedDocument>,
             ) -> Result<Self::Output> {
                 let ($($T,)+) = self;
                 Ok(($($T.finalize(tx, results).await?,)+))
@@ -182,7 +184,7 @@ impl Trx {
 
         let key_pairs: Vec<(String, String)> =
             keys.iter().map(|k| (k.pk.clone(), k.sk.clone())).collect();
-        let stored = self.batch_load(&key_pairs).await?;
+        let stored = self.load_observed(&key_pairs).await?;
 
         let mut iter = stored.into_iter();
         request.finalize(self, &mut iter).await
@@ -207,30 +209,34 @@ impl Trx {
         })
     }
 
-    async fn batch_load(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<crate::turso::StoredDoc>>> {
-        if keys.is_empty() {
-            return Ok(vec![]);
-        }
-        let mut tx_opt = self.inner.lock().unwrap().tx.take();
-        let result = match &mut tx_opt {
-            Some(tx) => tx.batch_get_with_version(keys).await,
-            None => {
-                let db = self.inner.lock().unwrap().db.clone();
-                match db.begin_immediate_with_reads(keys).await {
-                    Ok((tx, docs)) => {
-                        tx_opt = Some(tx);
-                        Ok(docs)
-                    }
-                    Err(e) => Err(e),
+    async fn load_observed(&self, keys: &[(String, String)]) -> Result<Vec<ObservedDocument>> {
+        let db = self.inner.lock().unwrap().db.clone();
+        get_observed_many_concurrently(&db, keys).await
+    }
+}
+
+async fn get_observed_many_concurrently(
+    db: &Database,
+    keys: &[(String, String)],
+) -> Result<Vec<ObservedDocument>> {
+    let results =
+        futures::future::join_all(keys.iter().map(|(pk, sk)| db.get_observed(pk, sk))).await;
+    let mut observations = Vec::with_capacity(results.len());
+    let mut first_error = None;
+    for result in results {
+        match result {
+            Ok(observation) => observations.push(observation),
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
                 }
             }
-        };
-        self.inner.lock().unwrap().tx = tx_opt;
-        result
+        }
     }
+    if let Some(error) = first_error {
+        return Err(error);
+    }
+    Ok(observations)
 }
 
 pub struct TrxControl<Out, Cancel> {
@@ -258,8 +264,8 @@ pub struct ConflictDetails {
 #[derive(Clone, Debug)]
 pub struct ConflictKey {
     pub key: DocKey,
-    pub expected_version: Option<i64>,
-    pub actual_version: Option<i64>,
+    pub expected_revision: Option<DocDbRevision>,
+    pub actual_revision: Option<DocDbRevision>,
 }
 
 const MAX_ATTEMPTS: u32 = 5;
@@ -322,30 +328,19 @@ where
 
     match control.inner {
         TrxControlInner::Commit(out) => {
-            let (commit_db, tx, entries_result) = take_entries_and_tx(state);
+            let (commit_db, entries_result) = take_entries(state);
             let entries = match entries_result {
                 Ok(e) => e,
-                Err(err) => {
-                    if let Some(tx) = tx {
-                        let _ = tx.rollback().await;
-                    }
-                    return AttemptOutcome::Done(TrxResult::Err(E::from(err)));
-                }
+                Err(err) => return AttemptOutcome::Done(TrxResult::Err(E::from(err))),
             };
 
-            match commit_entries(commit_db, tx, entries).await {
+            match commit_entries(commit_db, entries).await {
                 Ok(()) => AttemptOutcome::Done(TrxResult::Committed(out)),
                 Err(CommitFailure::Conflict(details)) => AttemptOutcome::Conflict(details),
                 Err(CommitFailure::Err(err)) => AttemptOutcome::Done(TrxResult::Err(E::from(err))),
             }
         }
-        TrxControlInner::Cancel(reason) => {
-            let tx_to_rollback = state.lock().unwrap().tx.take();
-            if let Some(tx) = tx_to_rollback {
-                let _ = tx.rollback().await;
-            }
-            AttemptOutcome::Done(TrxResult::Cancelled(reason))
-        }
+        TrxControlInner::Cancel(reason) => AttemptOutcome::Done(TrxResult::Cancelled(reason)),
     }
 }
 
@@ -365,7 +360,6 @@ struct TrxState {
     db: Database,
     entries: Vec<TrackedEntry>,
     index: HashMap<DocKey, usize>,
-    tx: Option<Transaction>,
 }
 
 impl TrxState {
@@ -374,14 +368,13 @@ impl TrxState {
             db,
             entries: Vec::new(),
             index: HashMap::new(),
-            tx: None,
         }
     }
 
     fn register_loaded<T>(
         &mut self,
         key: DocKey,
-        stored: Option<crate::turso::StoredDoc>,
+        observed: ObservedDocument,
     ) -> Result<Option<DocHandle<T>>>
     where
         T: Document,
@@ -393,9 +386,9 @@ impl TrxState {
         let idx = self.entries.len();
         self.index.insert(key.clone(), idx);
 
-        match stored {
-            Some(stored) => {
-                let doc = serde_json::from_slice::<T>(&stored.data).map_err(|err| {
+        match observed {
+            ObservedDocument::Present { data, revision } => {
+                let doc = serde_json::from_slice::<T>(&data).map_err(|err| {
                     anyhow!(
                         "failed to deserialize {} at {}/{}: {}",
                         type_name::<T>(),
@@ -407,7 +400,8 @@ impl TrxState {
                 let (shared, handle) = new_shared_doc(doc);
                 self.entries.push(TrackedEntry {
                     key,
-                    expected_version: Some(stored.version),
+                    expected_revision: Some(revision),
+                    observed: true,
                     state: TrackedState::Managed {
                         shared,
                         created: false,
@@ -415,10 +409,11 @@ impl TrxState {
                 });
                 Ok(Some(handle))
             }
-            None => {
+            ObservedDocument::Missing { revision } => {
                 self.entries.push(TrackedEntry {
                     key,
-                    expected_version: None,
+                    expected_revision: revision,
+                    observed: true,
                     state: TrackedState::Missing,
                 });
                 Ok(None)
@@ -439,7 +434,8 @@ impl TrxState {
                 self.index.insert(key.clone(), idx);
                 self.entries.push(TrackedEntry {
                     key,
-                    expected_version: None,
+                    expected_revision: None,
+                    observed: false,
                     state: TrackedState::Managed {
                         shared,
                         created: true,
@@ -449,7 +445,7 @@ impl TrxState {
             }
             Some(idx) => match self.entries.get_mut(idx) {
                 Some(TrackedEntry {
-                    expected_version: None,
+                    expected_revision: _,
                     state: TrackedState::Missing,
                     ..
                 }) => {
@@ -464,10 +460,7 @@ impl TrxState {
         }
     }
 
-    fn take_entries_and_tx(
-        &mut self,
-    ) -> (Database, Option<Transaction>, Result<Vec<TrackedEntry>>) {
-        let tx = self.tx.take();
+    fn take_entries(&mut self) -> (Database, Result<Vec<TrackedEntry>>) {
         let db = self.db.clone();
         for entry in &self.entries {
             if let TrackedState::Managed { shared, .. } = &entry.state
@@ -479,51 +472,68 @@ impl TrxState {
                     entry.key.sk
                 );
                 self.entries.clear();
-                return (db, tx, Err(err));
+                return (db, Err(err));
             }
         }
-        (db, tx, Ok(std::mem::take(&mut self.entries)))
+        (db, Ok(std::mem::take(&mut self.entries)))
     }
 }
 
 struct TrackedEntry {
     key: DocKey,
-    expected_version: Option<i64>,
+    expected_revision: Option<DocDbRevision>,
+    observed: bool,
     state: TrackedState,
 }
 
 impl TrackedEntry {
-    fn write(&self) -> Result<PendingWrite> {
-        match &self.state {
-            TrackedState::Missing => Ok(PendingWrite::None),
-            TrackedState::Managed { shared, created } => {
-                if shared.deleted.load(Ordering::Acquire) {
-                    if *created {
-                        return Ok(PendingWrite::None);
-                    }
-                    let expected_version = self.expected_version.ok_or_else(|| {
-                        anyhow!("existing tracked doc missing expected version for delete")
-                    })?;
-                    return Ok(PendingWrite::Delete(expected_version));
-                }
-
-                if *created {
-                    return Ok(PendingWrite::Insert((shared.serialize)()?));
-                }
-
-                if shared.dirty.load(Ordering::Acquire) {
-                    let expected_version = self.expected_version.ok_or_else(|| {
-                        anyhow!("existing tracked doc missing expected version for update")
-                    })?;
-                    return Ok(PendingWrite::Update {
-                        expected_version,
-                        data: (shared.serialize)()?,
-                    });
-                }
-
-                Ok(PendingWrite::None)
+    fn condition(&self) -> Option<TransactCondition> {
+        if !self.observed {
+            let is_live_created = matches!(
+                &self.state,
+                TrackedState::Managed {
+                    shared,
+                    created: true,
+                } if !shared.deleted.load(Ordering::Acquire)
+            );
+            if !is_live_created {
+                return None;
             }
         }
+        match self.expected_revision {
+            Some(expected_revision) => Some(TransactCondition::RevisionEquals {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+                expected_revision,
+            }),
+            None => Some(TransactCondition::NotExists {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+            }),
+        }
+    }
+
+    fn mutation(&self) -> Result<Option<TransactMutation>> {
+        let TrackedState::Managed { shared, created } = &self.state else {
+            return Ok(None);
+        };
+        if shared.deleted.load(Ordering::Acquire) {
+            if *created {
+                return Ok(None);
+            }
+            return Ok(Some(TransactMutation::Delete {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+            }));
+        }
+        if *created || shared.dirty.load(Ordering::Acquire) {
+            return Ok(Some(TransactMutation::Put {
+                pk: self.key.pk.clone(),
+                sk: self.key.sk.clone(),
+                data: (shared.serialize)()?,
+            }));
+        }
+        Ok(None)
     }
 }
 
@@ -570,20 +580,8 @@ where
     (shared, handle)
 }
 
-fn take_entries_and_tx(
-    state: Arc<Mutex<TrxState>>,
-) -> (Database, Option<Transaction>, Result<Vec<TrackedEntry>>) {
-    state.lock().unwrap().take_entries_and_tx()
-}
-
-enum PendingWrite {
-    None,
-    Insert(Vec<u8>),
-    Update {
-        expected_version: i64,
-        data: Vec<u8>,
-    },
-    Delete(i64),
+fn take_entries(state: Arc<Mutex<TrxState>>) -> (Database, Result<Vec<TrackedEntry>>) {
+    state.lock().unwrap().take_entries()
 }
 
 enum CommitFailure {
@@ -591,84 +589,47 @@ enum CommitFailure {
     Err(anyhow::Error),
 }
 
-#[tracing::instrument(skip_all, fields(entries = entries.len(), reused_tx = tx.is_some()))]
+#[tracing::instrument(skip_all, fields(entries = entries.len()))]
 async fn commit_entries(
     db: Database,
-    tx: Option<Transaction>,
     entries: Vec<TrackedEntry>,
 ) -> std::result::Result<(), CommitFailure> {
-    let mut writes: Vec<crate::WriteOp> = Vec::new();
+    let mut conditions = Vec::new();
+    let mut mutations = Vec::new();
     for entry in &entries {
-        match entry.write().map_err(CommitFailure::Err)? {
-            PendingWrite::None => {}
-            PendingWrite::Insert(data) => writes.push(crate::WriteOp::Insert {
-                pk: entry.key.pk.clone(),
-                sk: entry.key.sk.clone(),
-                data,
-            }),
-            PendingWrite::Update {
-                expected_version,
-                data,
-            } => writes.push(crate::WriteOp::Update {
-                pk: entry.key.pk.clone(),
-                sk: entry.key.sk.clone(),
-                expected_version,
-                data,
-            }),
-            PendingWrite::Delete(expected_version) => writes.push(crate::WriteOp::Delete {
-                pk: entry.key.pk.clone(),
-                sk: entry.key.sk.clone(),
-                expected_version,
-            }),
+        if let Some(condition) = entry.condition() {
+            conditions.push(condition);
+        }
+        if let Some(mutation) = entry.mutation().map_err(CommitFailure::Err)? {
+            mutations.push(mutation);
         }
     }
 
-    if writes.is_empty() && tx.is_none() {
+    if conditions.is_empty() && mutations.is_empty() {
         return Ok(());
     }
 
-    let mut tx = match tx {
-        Some(t) => t,
-        None => {
-            let begin_span = tracing::info_span!("commit_begin_tx");
-            async { db.transaction().await.map_err(CommitFailure::Err) }
-                .instrument(begin_span)
-                .await?
-        }
+    let request = TransactRequest {
+        conditions,
+        mutations,
     };
-
-    let outcome = tx
-        .apply_writes_and_commit(&writes)
-        .await
-        .map_err(CommitFailure::Err)?;
+    let outcome = db.transact(&request).await.map_err(CommitFailure::Err)?;
 
     let mut conflicts = Vec::new();
 
-    if let Some(info) = outcome.conflict
-        && let Some(op) = writes.get(info.step_index)
-    {
-        let (pk, sk, expected) = write_key_and_expected(op);
+    if let Some(info) = outcome.conflict {
+        let condition = request.conditions.get(info.condition_index).ok_or_else(|| {
+            CommitFailure::Err(anyhow!(
+                "backend returned invalid transaction conflict condition_index {} for {} conditions",
+                info.condition_index,
+                request.conditions.len()
+            ))
+        })?;
+        let (pk, sk, expected_revision) = condition_key_and_expected(condition);
         conflicts.push(ConflictKey {
             key: DocKey { pk, sk },
-            expected_version: expected,
-            actual_version: None,
-        });
-    }
-
-    for (i, count) in outcome.affected_counts.iter().enumerate() {
-        if *count == 1 {
-            continue;
-        }
-        let Some(op) = writes.get(i) else { continue };
-        let (pk, sk, expected) = write_key_and_expected(op);
-        let key = DocKey { pk, sk };
-        if conflicts.iter().any(|c| c.key == key) {
-            continue;
-        }
-        conflicts.push(ConflictKey {
-            key,
-            expected_version: expected,
-            actual_version: None,
+            expected_revision,
+            actual_revision: None,
         });
     }
 
@@ -677,9 +638,12 @@ async fn commit_entries(
             .iter()
             .map(|c| (c.key.pk.clone(), c.key.sk.clone()))
             .collect();
-        if let Ok(stored) = db.batch_get_with_version(&key_pairs).await {
-            for (c, slot) in conflicts.iter_mut().zip(stored.into_iter()) {
-                c.actual_version = slot.map(|d| d.version);
+        if let Ok(observed) = get_observed_many_concurrently(&db, &key_pairs).await {
+            for (conflict, observation) in conflicts.iter_mut().zip(observed.into_iter()) {
+                conflict.actual_revision = match observation {
+                    ObservedDocument::Present { revision, .. } => Some(revision),
+                    ObservedDocument::Missing { revision } => revision,
+                };
             }
         }
         return Err(CommitFailure::Conflict(ConflictDetails { keys: conflicts }));
@@ -688,27 +652,24 @@ async fn commit_entries(
     Ok(())
 }
 
-fn write_key_and_expected(op: &crate::WriteOp) -> (String, String, Option<i64>) {
-    match op {
-        crate::WriteOp::Insert { pk, sk, .. } => (pk.clone(), sk.clone(), None),
-        crate::WriteOp::Update {
-            pk,
-            sk,
-            expected_version,
-            ..
+fn condition_key_and_expected(
+    condition: &TransactCondition,
+) -> (String, String, Option<DocDbRevision>) {
+    match condition {
+        TransactCondition::Exists { pk, sk } | TransactCondition::NotExists { pk, sk } => {
+            (pk.clone(), sk.clone(), None)
         }
-        | crate::WriteOp::Delete {
+        TransactCondition::RevisionEquals {
             pk,
             sk,
-            expected_version,
-        } => (pk.clone(), sk.clone(), Some(*expected_version)),
+            expected_revision,
+        } => (pk.clone(), sk.clone(), Some(*expected_revision)),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::turso_with_config;
 
     #[derive(Clone, serde::Serialize, serde::Deserialize)]
     struct TestDoc {
@@ -735,10 +696,7 @@ mod tests {
     }
 
     fn test_state() -> TrxState {
-        TrxState::new(turso_with_config(
-            "http://127.0.0.1:0".to_string(),
-            String::new(),
-        ))
+        TrxState::new(crate::memory())
     }
 
     #[test]
@@ -751,9 +709,12 @@ mod tests {
             })
             .expect("create should succeed");
 
-        let write = state.entries[0].write().expect("write plan");
+        let write = state.entries[0]
+            .mutation()
+            .expect("transaction mutation")
+            .expect("transaction mutation should exist");
         match write {
-            PendingWrite::Insert(data) => {
+            TransactMutation::Put { data, .. } => {
                 let doc: TestDoc = serde_json::from_slice(&data).expect("deserialize insert");
                 assert_eq!(doc.id, "a");
                 assert_eq!(doc.value, 1);
@@ -773,27 +734,34 @@ mod tests {
         let mut handle = state
             .register_loaded::<TestDoc>(
                 key,
-                Some(crate::turso::StoredDoc {
+                ObservedDocument::Present {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
-                    version: 7,
-                }),
+                    revision: DocDbRevision::new(7),
+                },
             )
             .expect("load should succeed")
             .expect("doc should exist");
 
         handle.value = 5;
 
-        match state.entries[0].write().expect("write plan") {
-            PendingWrite::Update {
-                expected_version,
-                data,
-            } => {
-                assert_eq!(expected_version, 7);
+        match state.entries[0]
+            .mutation()
+            .expect("transaction mutation")
+            .expect("transaction mutation should exist")
+        {
+            TransactMutation::Put { data, .. } => {
                 let doc: TestDoc = serde_json::from_slice(&data).expect("deserialize update");
                 assert_eq!(doc.value, 5);
             }
             _ => panic!("expected update"),
         }
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
+                ..
+            }) if expected_revision == DocDbRevision::new(7)
+        ));
     }
 
     #[test]
@@ -807,20 +775,31 @@ mod tests {
         let handle = state
             .register_loaded::<TestDoc>(
                 key,
-                Some(crate::turso::StoredDoc {
+                ObservedDocument::Present {
                     data: serde_json::to_vec(&doc).expect("serialize").into(),
-                    version: 7,
-                }),
+                    revision: DocDbRevision::new(7),
+                },
             )
             .expect("load should succeed")
             .expect("doc should exist");
 
         handle.delete();
 
-        match state.entries[0].write().expect("write plan") {
-            PendingWrite::Delete(expected_version) => assert_eq!(expected_version, 7),
+        match state.entries[0]
+            .mutation()
+            .expect("transaction mutation")
+            .expect("transaction mutation should exist")
+        {
+            TransactMutation::Delete { .. } => {}
             _ => panic!("expected delete"),
         }
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
+                ..
+            }) if expected_revision == DocDbRevision::new(7)
+        ));
     }
 
     #[test]
@@ -828,7 +807,7 @@ mod tests {
         let mut state = test_state();
         let key = TestDocGet { id: "a".into() }.key();
         let loaded = state
-            .register_loaded::<TestDoc>(key, None)
+            .register_loaded::<TestDoc>(key, ObservedDocument::Missing { revision: None })
             .expect("register missing should succeed");
         assert!(loaded.is_none());
 
@@ -841,18 +820,137 @@ mod tests {
         assert_eq!(handle.value, 3);
 
         assert!(matches!(
-            state.entries[0].write().expect("write plan"),
-            PendingWrite::Insert(_)
+            state.entries[0].mutation().expect("transaction mutation"),
+            Some(TransactMutation::Put { .. })
+        ));
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::NotExists { .. })
+        ));
+    }
+
+    #[test]
+    fn exact_missing_revision_becomes_revision_condition() {
+        let mut state = test_state();
+        let key = TestDocGet { id: "a".into() }.key();
+        assert!(
+            state
+                .register_loaded::<TestDoc>(
+                    key,
+                    ObservedDocument::Missing {
+                        revision: Some(DocDbRevision::new(11)),
+                    },
+                )
+                .expect("register missing should succeed")
+                .is_none()
+        );
+
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
+                ..
+            }) if expected_revision == DocDbRevision::new(11)
+        ));
+        assert!(state.entries[0].mutation().unwrap().is_none());
+    }
+
+    #[test]
+    fn missing_read_then_create_then_delete_keeps_missing_dependency() {
+        let mut state = test_state();
+        let key = TestDocGet { id: "a".into() }.key();
+        assert!(
+            state
+                .register_loaded::<TestDoc>(key, ObservedDocument::Missing { revision: None })
+                .expect("register missing should succeed")
+                .is_none()
+        );
+
+        let handle = state
+            .create(TestDoc {
+                id: "a".into(),
+                value: 3,
+            })
+            .expect("create after missing get should succeed");
+        handle.delete();
+        drop(handle);
+
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::NotExists { .. })
+        ));
+        assert!(
+            state.entries[0]
+                .mutation()
+                .expect("transaction mutation")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn create_then_delete_without_read_is_a_noop() {
+        let mut state = test_state();
+        let handle = state
+            .create(TestDoc {
+                id: "a".into(),
+                value: 3,
+            })
+            .expect("create should succeed");
+        handle.delete();
+        drop(handle);
+
+        assert!(
+            state.entries[0].condition().is_none()
+                && state.entries[0]
+                    .mutation()
+                    .expect("transaction mutation")
+                    .is_none()
+        );
+    }
+
+    #[test]
+    fn loaded_doc_without_mutation_produces_version_check() {
+        let mut state = test_state();
+        let key = TestDocGet { id: "a".into() }.key();
+        let handle = state
+            .register_loaded::<TestDoc>(
+                key,
+                ObservedDocument::Present {
+                    data: serde_json::to_vec(&TestDoc {
+                        id: "a".into(),
+                        value: 1,
+                    })
+                    .expect("serialize")
+                    .into(),
+                    revision: DocDbRevision::new(7),
+                },
+            )
+            .expect("load should succeed")
+            .expect("doc should exist");
+        drop(handle);
+
+        assert!(matches!(
+            state.entries[0].condition(),
+            Some(TransactCondition::RevisionEquals {
+                expected_revision,
+                ..
+            }) if expected_revision == DocDbRevision::new(7)
         ));
     }
 
     #[test]
     fn duplicate_key_access_is_rejected() {
         let mut state = test_state();
-        let first = state.register_loaded::<TestDoc>(TestDocGet { id: "a".into() }.key(), None);
+        let first = state.register_loaded::<TestDoc>(
+            TestDocGet { id: "a".into() }.key(),
+            ObservedDocument::Missing { revision: None },
+        );
         assert!(first.is_ok());
 
-        let second = state.register_loaded::<TestDoc>(TestDocGet { id: "a".into() }.key(), None);
+        let second = state.register_loaded::<TestDoc>(
+            TestDocGet { id: "a".into() }.key(),
+            ObservedDocument::Missing { revision: None },
+        );
         assert!(second.is_err());
     }
 
@@ -866,7 +964,7 @@ mod tests {
             })
             .expect("create should succeed");
 
-        let (_, _, result) = state.take_entries_and_tx();
+        let (_, result) = state.take_entries();
         match result {
             Ok(_) => panic!("live handle should fail"),
             Err(err) => assert!(err.to_string().contains("live doc handle escaped trx")),
