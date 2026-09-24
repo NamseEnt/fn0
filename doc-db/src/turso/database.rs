@@ -674,9 +674,7 @@ impl TursoDatabase {
                     .get(statement_index + 1)
                     .and_then(|e| e.as_ref())
                 {
-                    if create_schema_on_error
-                        && retry == 0
-                        && Self::is_schema_error(&error.message)
+                    if create_schema_on_error && retry == 0 && Self::is_schema_error(&error.message)
                     {
                         self.create_table().await?;
                         continue 'attempts;
