@@ -50,14 +50,12 @@ if [[ "$CONTROL_DB_BACKEND" == dodb && "$mode" == apply ]]; then
   exit 1
 fi
 
-if [[ "$mode" != check-schema || "$CONTROL_DB_BACKEND" == turso ]]; then
-  need curl
-  require_pulumi_output signyUrl signyAccessClientId signyAccessClientSecret
-  signy_url="$(pulumi_pick signyUrl)"
-  signy_access_client_id="$(pulumi_pick signyAccessClientId)"
-  signy_access_client_secret="$(pulumi_pick signyAccessClientSecret)"
-  signy_url="${signy_url%/}"
-fi
+need curl
+require_pulumi_output signyUrl signyAccessClientId signyAccessClientSecret
+signy_url="$(pulumi_pick signyUrl)"
+signy_access_client_id="$(pulumi_pick signyAccessClientId)"
+signy_access_client_secret="$(pulumi_pick signyAccessClientSecret)"
+signy_url="${signy_url%/}"
 if [[ "$CONTROL_DB_BACKEND" == turso && "$mode" == apply ]]; then
   need base64
 fi
@@ -110,16 +108,6 @@ scan_control_db() {
   done
   printf '%s\n' "$documents"
 }
-
-if [[ "$CONTROL_DB_BACKEND" == dodb && "$mode" == check-schema ]]; then
-  documents="$(scan_control_db)"
-  project_rows="$(jq -c '[.[] | select(.pk | startswith("ProjectDoc/")) | {pk, data:(.data_base64 | @base64d | fromjson)}]' <<<"$documents")"
-  project_count="$(jq 'length' <<<"$project_rows")"
-  missing_count="$(jq '[.[] | select(.data.telemetry_policy == null)] | length' <<<"$project_rows")"
-  jq -nc --arg mode "$mode" --argjson projects "$project_count" --argjson missing "$missing_count" '{mode:$mode,projects:$projects,missing_policies:$missing,missing_outboxes:0,unsettled_outboxes:0,legacy_signy_policies:0}'
-  if (( missing_count > 0 )); then exit 1; fi
-  exit 0
-fi
 
 signy_request() {
   local method="$1"
