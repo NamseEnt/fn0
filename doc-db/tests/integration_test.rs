@@ -664,7 +664,7 @@ async fn test_send_with_heterogeneous_independent_operations() {
     assert!(
         items
             .iter()
-            .any(|(sk, data)| sk == "sk_existing" && data.as_ref() == b"old_data")
+            .any(|(sk, data)| sk == "sk_existing" && data.as_slice() == b"old_data")
     );
     assert_eq!(
         db.get(pk, "sk_new").await.expect("Get failed").as_deref(),
