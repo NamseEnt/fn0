@@ -6,14 +6,25 @@ export REPO_ROOT
 
 source "${REPO_ROOT}/scripts/lib/pulumi-outputs.sh"
 
+load_selected_pulumi_outputs() {
+  local pulumi_dir="${PULUMI_DIR:-${REPO_ROOT}/infra/cloud}"
+  local output_name output_value
+  PULUMI_OUTPUTS_JSON='{}'
+  for output_name in "$@"; do
+    output_value="$(cd "${pulumi_dir}" && pulumi stack output "${output_name}" --show-secrets)"
+    PULUMI_OUTPUTS_JSON="$(PULUMI_OUTPUTS_JSON="${PULUMI_OUTPUTS_JSON}" OUTPUT_NAME="${output_name}" OUTPUT_VALUE="${output_value}" python3 -c 'import json, os; values = json.loads(os.environ["PULUMI_OUTPUTS_JSON"]); values[os.environ["OUTPUT_NAME"]] = os.environ["OUTPUT_VALUE"]; print(json.dumps(values))')"
+  done
+}
+
 usage() {
   cat <<'USAGE'
 Usage:
   scripts/run-dodb-migration.sh inventory [migration options]
+  scripts/run-dodb-migration.sh transport-check
   scripts/run-dodb-migration.sh verify [migration options]
   scripts/run-dodb-migration.sh migrate --apply [migration options]
 
-The migration binary runs on the dodb VM. The migrate command requires --apply.
+Inventory runs locally and reads Turso only. transport-check verifies Bastion/SSH binary transport and runs --help only. Other commands run on the dodb VM. The migrate command requires --apply.
 USAGE
 }
 
@@ -22,7 +33,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
   exit 0
 fi
 if [[ "$#" -eq 2 && "${2}" == "--help" ]]; then
-  case "${1}" in inventory|verify|migrate) usage; exit 0 ;; esac
+  case "${1}" in inventory|transport-check|verify|migrate) usage; exit 0 ;; esac
 fi
 if [[ "$#" -lt 1 ]]; then
   usage >&2
@@ -32,7 +43,7 @@ fi
 command_name="$1"
 shift
 case "${command_name}" in
-  inventory|verify|migrate) ;;
+  inventory|transport-check|verify|migrate) ;;
   *) echo "unsupported migration command: ${command_name}" >&2; usage >&2; exit 2 ;;
 esac
 if [[ "${command_name}" == "migrate" ]]; then
@@ -45,7 +56,11 @@ if [[ "${command_name}" == "migrate" ]]; then
     exit 2
   fi
 fi
-if [[ "${command_name}" != "inventory" ]]; then
+if [[ "${command_name}" == "transport-check" && "$#" -ne 0 ]]; then
+  echo "transport-check does not accept arguments" >&2
+  exit 2
+fi
+if [[ "${command_name}" != "inventory" && "${command_name}" != "transport-check" ]]; then
   for argument in "$@"; do
     case "${argument}" in
       --dodb-addr|--dodb-addr=*|--dodb-server-name|--dodb-server-name=*|--dodb-root-cert|--dodb-root-cert=*)
@@ -56,13 +71,27 @@ if [[ "${command_name}" != "inventory" ]]; then
   done
 fi
 
+if [[ "${command_name}" == "inventory" ]]; then
+  need pulumi
+  need jq
+  need cargo
+  load_selected_pulumi_outputs forteDbGroupToken forteDbHostSuffix
+  require_pulumi_output forteDbGroupToken forteDbHostSuffix
+  turso_group_token="$(pulumi_pick forteDbGroupToken)"
+  turso_db_host_suffix="$(pulumi_pick forteDbHostSuffix)"
+  TURSO_GROUP_TOKEN="${turso_group_token}" TURSO_DB_HOST_SUFFIX="${turso_db_host_suffix}" \
+    cargo run --quiet --locked -p fn0-db-migrate -- inventory "$@"
+  exit $?
+fi
+
 need pulumi
 need jq
 need oci
 need ssh
-need scp
 need ssh-keygen
 need python3
+need gzip
+need sha256sum
 
 temporary_dir="$(mktemp -d)"
 chmod 700 "${temporary_dir}"
@@ -73,11 +102,11 @@ remote_cleanup_needed=false
 cleanup() {
   if [[ "${remote_cleanup_needed}" == "true" && "${tunnel_pid}" != "" ]]; then
     ssh "${ssh_options[@]}" opc@127.0.0.1 bash -s -- \
-      "${remote_binary}" "${remote_env_file}" "${remote_argument_file}" "${remote_temp_dir}" >/dev/null 2>&1 <<'REMOTE_CLEANUP' || true
+      "${remote_env_file}" "${remote_argument_file}" "${remote_temp_dir}" >/dev/null 2>&1 <<'REMOTE_CLEANUP' || true
 set -euo pipefail
-rm -f "$1" "$2" "$3"
-sudo rm -f "$4/server.crt" 2>/dev/null || true
-rmdir "$4" 2>/dev/null || true
+rm -f -- "$1" "$2"
+sudo rm -f -- "$3/server.crt" 2>/dev/null || true
+rmdir -- "$3" 2>/dev/null || true
 REMOTE_CLEANUP
     echo ">> Remote migration temporary files cleanup attempted" >&2
   fi
@@ -94,20 +123,25 @@ REMOTE_CLEANUP
 }
 trap cleanup EXIT
 
-load_pulumi_outputs >&2
-require_pulumi_output \
-  forteDbGroupToken \
-  forteDbHostSuffix \
-  workerBastionId \
-  workerSshPrivateKey \
-  dodbPrivateIp
-turso_group_token="$(pulumi_pick forteDbGroupToken)"
-turso_db_host_suffix="$(pulumi_pick forteDbHostSuffix)"
+if [[ "${command_name}" == "transport-check" ]]; then
+  load_selected_pulumi_outputs workerBastionId workerSshPrivateKey dodbPrivateIp
+  require_pulumi_output workerBastionId workerSshPrivateKey dodbPrivateIp
+else
+  load_selected_pulumi_outputs forteDbGroupToken forteDbHostSuffix workerBastionId workerSshPrivateKey dodbPrivateIp
+  require_pulumi_output forteDbGroupToken forteDbHostSuffix workerBastionId workerSshPrivateKey dodbPrivateIp
+  turso_group_token="$(pulumi_pick forteDbGroupToken)"
+  turso_db_host_suffix="$(pulumi_pick forteDbHostSuffix)"
+fi
 dodb_private_ip="$(pulumi_pick dodbPrivateIp)"
 
 binary_dir="${temporary_dir}/bin"
 mkdir -p "${binary_dir}"
 "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-db-migrate "${binary_dir}" >&2
+local_binary="${binary_dir}/fn0-db-migrate"
+local_binary_sha="$(sha256sum "${local_binary}" | awk '{print $1}')"
+raw_size="$(wc -c <"${local_binary}" | tr -d '[:space:]')"
+compressed_size="$(gzip -c "${local_binary}" | wc -c | tr -d '[:space:]')"
+RAW_SIZE="${raw_size}" COMPRESSED_SIZE="${compressed_size}" python3 -c 'import os; print("migration binary:\n  raw = {:.1f} MiB\n  compressed = {:.1f} MiB".format(int(os.environ["RAW_SIZE"]) / 1048576, int(os.environ["COMPRESSED_SIZE"]) / 1048576))' >&2
 
 private_key_file="${temporary_dir}/worker-ssh-key"
 public_key_file="${temporary_dir}/worker-ssh-key.pub"
@@ -240,30 +274,106 @@ ssh_options=(
   -o IdentitiesOnly=yes
   -o BatchMode=yes
   -o ConnectTimeout=10
+  -o ServerAliveInterval=15
+  -o ServerAliveCountMax=3
   -o "UserKnownHostsFile=${temporary_known_hosts}"
   -o StrictHostKeyChecking=accept-new
 )
-scp_options=(
-  -i "${private_key_file}"
-  -P "${local_port}"
-  -o IdentitiesOnly=yes
-  -o BatchMode=yes
-  -o ConnectTimeout=10
-  -o "UserKnownHostsFile=${temporary_known_hosts}"
-  -o StrictHostKeyChecking=accept-new
-)
-
 remote_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(12))')"
-remote_binary="/tmp/fn0-db-migrate"
+remote_cache_dir="/home/opc/.cache/fn0/db-migrate/${local_binary_sha}"
+remote_binary="${remote_cache_dir}/fn0-db-migrate"
 remote_env_file="/tmp/fn0-db-migrate.env.${remote_nonce}"
 remote_argument_file="/tmp/fn0-db-migrate.args.${remote_nonce}"
 remote_temp_dir="/tmp/fn0-db-migrate.${remote_nonce}"
 env_file="${temporary_dir}/migration.env"
+argument_file="${temporary_dir}/migration-args.json"
+
+cache_status="$(ssh "${ssh_options[@]}" opc@127.0.0.1 bash -s -- "${remote_binary}" "${local_binary_sha}" <<'REMOTE_CACHE_CHECK'
+set -euo pipefail
+binary_path="$1"
+expected_sha="$2"
+command -v gzip >/dev/null 2>&1 || { echo "remote gzip is required for migration binary transport" >&2; exit 1; }
+command -v sha256sum >/dev/null 2>&1 || { echo "remote sha256sum is required for migration binary verification" >&2; exit 1; }
+if [[ -f "$binary_path" ]]; then
+  actual_sha="$(sha256sum "$binary_path" | awk '{print $1}')"
+  if [[ "$actual_sha" == "$expected_sha" ]]; then
+    printf 'HIT %s\n' "$actual_sha"
+    exit 0
+  fi
+fi
+printf 'MISS\n'
+REMOTE_CACHE_CHECK
+)"
+if [[ "${cache_status}" != "HIT ${local_binary_sha}" ]]; then
+  {
+    printf '%s\n%s\n' "${local_binary_sha}" "${remote_nonce}"
+    gzip -c "${local_binary}"
+  } | ssh "${ssh_options[@]}" opc@127.0.0.1 'bash -c '\''
+set -euo pipefail
+IFS= read -r expected_sha
+IFS= read -r upload_nonce
+[[ "${expected_sha}" =~ ^[0-9a-f]{64}$ ]]
+[[ "${upload_nonce}" =~ ^[0-9a-f]{24}$ ]]
+cache_dir="/home/opc/.cache/fn0/db-migrate/${expected_sha}"
+binary_path="${cache_dir}/fn0-db-migrate"
+partial_path="${cache_dir}/fn0-db-migrate.${upload_nonce}.partial"
+umask 077
+mkdir -p "${cache_dir}"
+trap "rm -f -- ${partial_path}" EXIT
+gzip -dc >"${partial_path}"
+printf "%s  %s\n" "${expected_sha}" "${partial_path}" | sha256sum -c -
+chmod 0700 "${partial_path}"
+mv -f -- "${partial_path}" "${binary_path}"
+trap - EXIT
+'\''' || {
+    echo "compressed SSH streaming upload of fn0-db-migrate failed" >&2
+    exit 1
+  }
+  remote_sha="$(printf '%s\n' "${local_binary_sha}" | ssh "${ssh_options[@]}" opc@127.0.0.1 'bash -c '\''
+set -euo pipefail
+IFS= read -r expected_sha
+[[ "${expected_sha}" =~ ^[0-9a-f]{64}$ ]]
+sha256sum "/home/opc/.cache/fn0/db-migrate/${expected_sha}/fn0-db-migrate"
+'\''' | awk '{print $1}')"
+  if [[ "${remote_sha}" != "${local_binary_sha}" ]]; then
+    echo "remote migration cache SHA-256 mismatch: expected ${local_binary_sha}, got ${remote_sha:-empty}" >&2
+    exit 1
+  fi
+  echo ">> Uploaded and verified migration binary in remote content-addressed cache" >&2
+else
+  remote_sha="${local_binary_sha}"
+  echo ">> Reusing matching migration binary in remote content-addressed cache" >&2
+fi
+
+if [[ "${command_name}" == "transport-check" ]]; then
+  printf '%s\n' "${local_binary_sha}" | ssh "${ssh_options[@]}" opc@127.0.0.1 'bash -c '\''
+set -euo pipefail
+IFS= read -r expected_sha
+[[ "${expected_sha}" =~ ^[0-9a-f]{64}$ ]]
+exec "/home/opc/.cache/fn0/db-migrate/${expected_sha}/fn0-db-migrate" --help
+'\'''
+  ssh "${ssh_options[@]}" opc@127.0.0.1 bash -s <<'REMOTE_STALE_CLEANUP'
+set -euo pipefail
+shopt -s nullglob
+echo '>> Previous migration runner temporary paths:' >&2
+for path in /tmp/fn0-db-migrate /tmp/fn0-db-migrate.env.* /tmp/fn0-db-migrate.args.* /tmp/fn0-db-migrate.*; do
+  [[ -e "$path" ]] || continue
+  printf '%s\n' "$path" >&2
+done
+for path in /tmp/fn0-db-migrate.env.* /tmp/fn0-db-migrate.args.* /tmp/fn0-db-migrate.*; do
+  [[ -e "$path" ]] || continue
+  name="${path##*/}"
+  if [[ "$name" =~ ^fn0-db-migrate\.(env\.|args\.)?[0-9a-f]{24}$ ]]; then rm -rf -- "$path"; fi
+done
+if [[ -e /tmp/fn0-db-migrate ]]; then rm -f -- /tmp/fn0-db-migrate; fi
+REMOTE_STALE_CLEANUP
+  exit 0
+fi
+
 TURSO_GROUP_TOKEN="${turso_group_token}" TURSO_DB_HOST_SUFFIX="${turso_db_host_suffix}" \
   python3 -c 'import os, shlex; print("export TURSO_GROUP_TOKEN=" + shlex.quote(os.environ["TURSO_GROUP_TOKEN"])); print("export TURSO_DB_HOST_SUFFIX=" + shlex.quote(os.environ["TURSO_DB_HOST_SUFFIX"]))' \
   >"${env_file}"
 chmod 600 "${env_file}"
-argument_file="${temporary_dir}/migration-args.json"
 python3 - "${argument_file}" "${command_name}" "$@" <<'PY'
 import json
 import sys
@@ -273,11 +383,28 @@ with open(sys.argv[1], "w", encoding="utf-8") as argument_file:
 PY
 chmod 600 "${argument_file}"
 
-echo ">> Bastion Port Forwarding is ACTIVE; transferring migration runner inputs"
+echo ">> Bastion Port Forwarding is ACTIVE; sending migration inputs over SSH stdin"
 remote_cleanup_needed=true
-scp "${scp_options[@]}" "${binary_dir}/fn0-db-migrate" "opc@127.0.0.1:${remote_binary}"
-scp "${scp_options[@]}" "${env_file}" "opc@127.0.0.1:${remote_env_file}"
-scp "${scp_options[@]}" "${argument_file}" "opc@127.0.0.1:${remote_argument_file}"
+{
+  printf '%s\n' "${remote_nonce}"
+  cat "${env_file}"
+} | ssh "${ssh_options[@]}" opc@127.0.0.1 'bash -c '\''
+set -euo pipefail
+IFS= read -r upload_nonce
+[[ "${upload_nonce}" =~ ^[0-9a-f]{24}$ ]]
+umask 077
+cat >"/tmp/fn0-db-migrate.env.${upload_nonce}"
+'\'''
+{
+  printf '%s\n' "${remote_nonce}"
+  cat "${argument_file}"
+} | ssh "${ssh_options[@]}" opc@127.0.0.1 'bash -c '\''
+set -euo pipefail
+IFS= read -r upload_nonce
+[[ "${upload_nonce}" =~ ^[0-9a-f]{24}$ ]]
+umask 077
+cat >"/tmp/fn0-db-migrate.args.${upload_nonce}"
+'\'''
 
 ssh "${ssh_options[@]}" opc@127.0.0.1 bash -s -- "${remote_binary}" "${remote_env_file}" "${remote_argument_file}" "${remote_temp_dir}" <<'REMOTE_RUNNER'
 set -euo pipefail
@@ -286,12 +413,11 @@ remote_env_file="$2"
 remote_argument_file="$3"
 remote_temp_dir="$4"
 cleanup_remote() {
-  rm -f "$remote_binary" "$remote_env_file" "$remote_argument_file"
+  rm -f -- "$remote_env_file" "$remote_argument_file"
   sudo rm -f "$remote_temp_dir/server.crt" 2>/dev/null || true
   rmdir "$remote_temp_dir" 2>/dev/null || true
 }
 trap cleanup_remote EXIT
-chmod 700 "$remote_binary"
 chmod 600 "$remote_env_file" "$remote_argument_file"
 umask 077
 mkdir -m 700 "$remote_temp_dir"
