@@ -2,7 +2,15 @@ use bytes::Bytes;
 use fn0_ski::{FetchHandler, FetchHandlerFuture, Request};
 use http_body_util::{BodyExt, Empty};
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
+
+fn install_crypto_provider() {
+    static INSTALLED: OnceLock<()> = OnceLock::new();
+    INSTALLED.get_or_init(|| {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    });
+}
 
 struct PassThroughHandler {
     allows_native_network_fetch: bool,
@@ -55,6 +63,7 @@ fn empty_request() -> Request {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn refused_native_fetch_never_reaches_the_network() {
+    install_crypto_provider();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let response = fn0_ski::run(
@@ -78,6 +87,7 @@ async fn refused_native_fetch_never_reaches_the_network() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn allowed_native_fetch_reaches_the_network() {
+    install_crypto_provider();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let server_task = tokio::spawn(async move {
