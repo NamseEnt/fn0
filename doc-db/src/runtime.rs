@@ -24,7 +24,7 @@ pub(crate) async fn http_post_doc_db(url: &str, body: Vec<u8>) -> Result<(u16, V
             .into_body()
             .bytes_limited(doc_db_protocol::MAX_FRAME_SIZE)
             .await?;
-        return Ok((status, bytes.to_vec()));
+        Ok((status, bytes.to_vec()))
     }
 
     #[cfg(not(target_arch = "wasm32"))]
