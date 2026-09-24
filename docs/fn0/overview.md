@@ -61,7 +61,7 @@ that require it. Request and response streaming is implemented end to end; see
 |---|---|---|
 | `fn0` | 0.7.1 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
 | `fn0-cli` | 0.1.23 | Local development CLI |
-| `fn0-worker` | 0.4.17 | Worker binary (distributed execution node) |
+| `fn0-worker` | 0.4.18 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.9 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.1 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
 | `fn0-deploy` | 0.3.5 | fn0 Cloud deployment client |
