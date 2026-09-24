@@ -6,8 +6,8 @@ fi
 __FN0_BASTION_PORT_FORWARD_LOADED=1
 
 bastion_port_forward_open() {
-  if [[ "$#" -ne 5 ]]; then
-    echo "bastion_port_forward_open expects purpose, bastion ID, target IP, target port, and private key file" >&2
+  if [[ "$#" -ne 6 ]]; then
+    echo "bastion_port_forward_open expects purpose, bastion ID, target IP, target port, Bastion session key file, and target SSH key file" >&2
     return 2
   fi
 
@@ -15,7 +15,8 @@ bastion_port_forward_open() {
   local bastion_id="$2"
   local target_private_ip="$3"
   local target_port="$4"
-  local private_key_file="$5"
+  local bastion_session_private_key_file="$5"
+  local target_ssh_private_key_file="$6"
   local public_key_file create_response create_status work_request_id work_request_json
   local session_list_json matching_sessions session_json session_display_name session_state
   local session_ssh_command ssh_args_file session_argument current_argument forwarding_destination
@@ -35,11 +36,11 @@ bastion_port_forward_open() {
   BASTION_TUNNEL_PID=""
   BASTION_LOCAL_PORT=""
   BASTION_SSH_ARGS=()
-  BASTION_PRIVATE_KEY_FILE="$private_key_file"
+  BASTION_TARGET_PRIVATE_KEY_FILE="$target_ssh_private_key_file"
   BASTION_TEMP_DIR="$(mktemp -d)"
   chmod 700 "$BASTION_TEMP_DIR"
   public_key_file="${BASTION_TEMP_DIR}/bastion-public-key"
-  ssh-keygen -y -f "$private_key_file" >"$public_key_file"
+  ssh-keygen -y -f "$bastion_session_private_key_file" >"$public_key_file"
   chmod 600 "$public_key_file"
 
   create_status=0
@@ -166,7 +167,7 @@ for argument_index, argument in enumerate(arguments):
     arguments[argument_index] = argument.replace("<privateKey>", sys.argv[2]).replace("<localPort>", sys.argv[3])
 for argument in arguments:
     sys.stdout.buffer.write(argument.encode() + b"\0")
-' "$session_ssh_command" "$private_key_file" "$BASTION_LOCAL_PORT" >"$ssh_args_file"
+' "$session_ssh_command" "$bastion_session_private_key_file" "$BASTION_LOCAL_PORT" >"$ssh_args_file"
   while IFS= read -r -d '' session_argument; do BASTION_SSH_ARGS+=("$session_argument"); done <"$ssh_args_file"
   if [[ "${#BASTION_SSH_ARGS[@]}" -lt 2 || "${BASTION_SSH_ARGS[0]}" != ssh ]]; then
     echo "OCI Bastion returned an unsupported port-forwarding command" >&2
@@ -229,7 +230,7 @@ for argument in arguments:
 
 bastion_port_forward_ssh_options() {
   printf '%s\0' \
-    -i "$BASTION_PRIVATE_KEY_FILE" \
+    -i "$BASTION_TARGET_PRIVATE_KEY_FILE" \
     -p "$BASTION_LOCAL_PORT" \
     -o IdentitiesOnly=yes \
     -o BatchMode=yes \
@@ -251,5 +252,6 @@ bastion_port_forward_close() {
   if [[ -n "${BASTION_TEMP_DIR:-}" ]]; then rm -rf "$BASTION_TEMP_DIR"; fi
   unset BASTION_SESSION_ID BASTION_TUNNEL_PID BASTION_LOCAL_PORT
   unset BASTION_DISPLAY_NAME BASTION_TEMP_DIR BASTION_SSH_ARGS
-  unset BASTION_PRIVATE_KEY_FILE BASTION_KNOWN_HOSTS_FILE
+  unset BASTION_TARGET_PRIVATE_KEY_FILE
+  unset BASTION_KNOWN_HOSTS_FILE
 }

@@ -225,6 +225,8 @@ bash "${mock_repo}/scripts/run-dodb-migration.sh" transport-check >/dev/null
 [[ -e "${state_dir}/help" ]]
 [[ -e "${state_dir}/stale-cleanup" ]]
 [[ ! -e "${state_dir}/remote-runs" ]]
+rg -q -- '-N.*bastion-session-key' "${state_dir}/ssh-argv"
+rg -q -- 'target-ssh-key' "${state_dir}/ssh-argv"
 [[ "$(cat "${state_dir}/session-deletes")" == *"session-1"* ]]
 if rg -q 'test-turso-token|example.test' "${state_dir}/oci-calls"; then exit 1; fi
 

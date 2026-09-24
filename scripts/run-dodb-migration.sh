@@ -134,11 +134,13 @@ raw_size="$(wc -c <"${local_binary}" | tr -d '[:space:]')"
 compressed_size="$(gzip -c "${local_binary}" | wc -c | tr -d '[:space:]')"
 RAW_SIZE="${raw_size}" COMPRESSED_SIZE="${compressed_size}" python3 -c 'import os; print("migration binary:\n  raw = {:.1f} MiB\n  compressed = {:.1f} MiB".format(int(os.environ["RAW_SIZE"]) / 1048576, int(os.environ["COMPRESSED_SIZE"]) / 1048576))' >&2
 
-private_key_file="${temporary_dir}/worker-ssh-key"
-pulumi_pick workerSshPrivateKey >"${private_key_file}"
-chmod 600 "${private_key_file}"
+bastion_session_key_file="${temporary_dir}/bastion-session-key"
+target_ssh_key_file="${temporary_dir}/target-ssh-key"
+pulumi_pick workerSshPrivateKey >"${bastion_session_key_file}"
+pulumi_pick workerSshPrivateKey >"${target_ssh_key_file}"
+chmod 600 "${bastion_session_key_file}" "${target_ssh_key_file}"
 
-bastion_port_forward_open migration "$(pulumi_pick workerBastionId)" "${dodb_private_ip}" 22 "${private_key_file}"
+bastion_port_forward_open migration "$(pulumi_pick workerBastionId)" "${dodb_private_ip}" 22 "${bastion_session_key_file}" "${target_ssh_key_file}"
 ssh_options=()
 while IFS= read -r -d '' ssh_option; do ssh_options+=("${ssh_option}"); done < <(bastion_port_forward_ssh_options)
 remote_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(12))')"
