@@ -12,6 +12,7 @@ pub(crate) const STATIC_PAGE_CACHE_BODY_LIMIT: usize = 256 * 1024;
 pub(crate) const SINGLETON_CONNECT_BODY_LIMIT: usize = 256 * 1024;
 pub(crate) const SINGLETON_ACTIVATION_BODY_LIMIT: usize = 16 * 1024;
 pub(crate) const OTLP_BODY_LIMIT: usize = 8 * 1024 * 1024;
+pub(crate) const DOC_DB_RPC_BODY_LIMIT: usize = doc_db_protocol::MAX_FRAME_SIZE;
 const AGGREGATE_BODY_BUDGET_CHUNK_SIZE: usize = 64 * 1024;
 const AGGREGATE_BODY_BUDGET_SIZE: usize = 32 * 1024 * 1024;
 

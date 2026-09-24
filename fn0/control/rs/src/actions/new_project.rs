@@ -42,7 +42,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let project_id_for_trx = project_id.clone();
     let name_for_trx = name.clone();
 
-    let result = doc_db::turso()
+    let result = doc_db::database()
         .trx(|trx| {
             let project_id = project_id_for_trx.clone();
             let name = name_for_trx.clone();

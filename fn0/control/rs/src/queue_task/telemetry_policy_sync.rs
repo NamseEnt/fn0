@@ -16,7 +16,7 @@ pub struct Input {
 }
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let project_id = input.project_id;
     let Some(policy) = begin_attempt(&db, &project_id).await? else {
         return Ok(());

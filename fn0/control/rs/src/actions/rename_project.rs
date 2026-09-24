@@ -36,7 +36,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let project_id = req.body.project_id.clone();
     let github_id = user.github_id;
 
-    let result = doc_db::turso()
+    let result = doc_db::database()
         .trx(|trx| {
             let project_id = project_id.clone();
             let new_name = new_name.clone();

@@ -21,7 +21,7 @@ pub struct Output {
 }
 
 pub async fn handle(_input: Input) -> anyhow::Result<Output> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let mut entries: Vec<Entry> = Vec::new();
     let mut after: Option<String> = None;
 

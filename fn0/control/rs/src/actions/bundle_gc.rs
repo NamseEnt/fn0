@@ -61,7 +61,7 @@ pub struct GcStats {
 }
 
 pub async fn run_gc() -> anyhow::Result<GcStats> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let bundle_store = BundleStore::from_env()?;
     let now = forte_sdk::now();
 

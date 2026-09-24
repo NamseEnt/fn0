@@ -6,6 +6,9 @@ if [[ -n "${__FN0_CONTROL_ADMIN_LOADED:-}" ]]; then
 fi
 __FN0_CONTROL_ADMIN_LOADED=1
 
+# shellcheck source=scripts/lib/control-db.sh
+source "${REPO_ROOT}/scripts/lib/control-db.sh"
+
 # Calls a control __forte_action endpoint. Echoes the response body to stdout.
 # Args: <action_name> <json_body>
 # Returns: zero exit when HTTP 200, nonzero otherwise (HTTP code emitted on stderr).
@@ -36,41 +39,9 @@ control_admin_invoke() {
 # Reads Fn0WasmtimeVersionDoc directly from the control DB (control-independent).
 # Echoes JSON: {"active": "...", "pending": "..."|null} or empty if not present.
 get_fn0_wasmtime_version_doc() {
-  local control_db_url control_db_token resp_file http_code req
-  control_db_url="$(pulumi_pick controlDbUrl)"
-  control_db_token="$(pulumi_pick forteDbGroupToken)"
-  if [[ -z "$control_db_url" || -z "$control_db_token" ]]; then
-    echo "controlDbUrl / forteDbGroupToken missing" >&2
-    return 1
-  fi
-  control_db_url="${control_db_url%/}"
-  req="$(jq -nc \
-    --arg sql "SELECT data FROM docs WHERE pk = ? AND sk = ''" \
-    --arg pk "Fn0WasmtimeVersionDoc" \
-    '{requests: [
-      {type: "execute", stmt: {sql: $sql, args: [{type: "text", value: $pk}]}},
-      {type: "close"}
-    ]}')"
-  resp_file="$(mktemp)"
-  http_code="$(curl -sS -o "$resp_file" -w '%{http_code}' \
-    -X POST "${control_db_url}/v2/pipeline" \
-    -H "Authorization: Bearer ${control_db_token}" \
-    -H "Content-Type: application/json" \
-    --data-raw "$req")"
-  if [[ "$http_code" != "200" ]]; then
-    cat "$resp_file" >&2
-    rm -f "$resp_file"
-    echo "doc-db read failed (HTTP ${http_code})" >&2
-    return 1
-  fi
-  jq -r '
-    .results[0].response.result.rows[0][0]
-    | if . == null then ""
-      elif .type == "blob" then (.base64 | @base64d)
-      else (.value // "")
-      end
-  ' <"$resp_file"
-  rm -f "$resp_file"
+  local observed
+  observed="$(control_db_get_observed "Fn0WasmtimeVersionDoc" "")"
+  jq -r 'if .found then (.data_base64 | @base64d) else "" end' <<<"$observed"
 }
 
 # An action's Output enum comes back in forte-json's shape: the variant name is a

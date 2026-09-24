@@ -60,7 +60,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     // The manifest entry is written only for a connected project: the worker
     // needs the storage target the moment it starts routing a domain, and this
     // read is what refuses a project that connected nothing.
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let storage = match (ProjectCloudflareConfigDocGet {
         project_id: &project_id,
     })
@@ -81,7 +81,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    let result = doc_db::turso()
+    let result = doc_db::database()
         .trx(|trx| {
             let project_id = project_id.clone();
             let domain = domain.clone();

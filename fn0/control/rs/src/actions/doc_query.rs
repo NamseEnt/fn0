@@ -49,6 +49,9 @@ pub enum Output {
     InternalError {
         reason: String,
     },
+    Unavailable {
+        reason: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -72,11 +75,18 @@ pub enum CellValue {
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
+    match crate::common::db_backend::configured() {
+        Ok(crate::common::db_backend::DbBackend::Dodb) => {
+            return unavailable_output();
+        }
+        Ok(crate::common::db_backend::DbBackend::Turso) => {}
+        Err(reason) => return Output::InternalError { reason },
+    }
     let Some(user) = auth::bearer_user(req.headers).await else {
         return Output::NotLoggedIn;
     };
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
 
     let project = match (ProjectDocGet {
         project_id: &req.body.project_id,
@@ -184,6 +194,12 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 }
 
+fn unavailable_output() -> Output {
+    Output::Unavailable {
+        reason: "raw SQL is unavailable on the dodb backend".to_string(),
+    }
+}
+
 fn json_argument_to_hrana_value(argument: &serde_json::Value) -> Result<doc_db::Value, String> {
     match argument {
         serde_json::Value::Null => Ok(doc_db::Value::Null),
@@ -257,5 +273,19 @@ fn hrana_value_to_cell(value: doc_db::Value) -> CellValue {
         doc_db::Value::Blob { value } => CellValue::Blob {
             base64: STANDARD.encode(&value),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Output, unavailable_output};
+
+    #[test]
+    fn raw_sql_unavailable_response_names_the_dodb_backend() {
+        assert!(matches!(
+            unavailable_output(),
+            Output::Unavailable { reason }
+                if reason == "raw SQL is unavailable on the dodb backend"
+        ));
     }
 }

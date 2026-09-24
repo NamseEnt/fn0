@@ -81,7 +81,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotLoggedIn;
     };
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let project = match (ProjectDocGet {
         project_id: &req.body.project_id,
     })
@@ -386,7 +386,21 @@ impl BundleEnv {
 /// configuration whose buckets it cannot reach — so by the time a deploy runs,
 /// they exist.
 async fn ensure_all_resources(project_id: &str) -> anyhow::Result<()> {
-    ensure_turso_database(project_id).await
+    ensure_resources_for_backend(
+        project_id,
+        crate::common::db_backend::configured().map_err(anyhow::Error::msg)?,
+    )
+    .await
+}
+
+async fn ensure_resources_for_backend(
+    project_id: &str,
+    backend: crate::common::db_backend::DbBackend,
+) -> anyhow::Result<()> {
+    match backend {
+        crate::common::db_backend::DbBackend::Turso => ensure_turso_database(project_id).await,
+        crate::common::db_backend::DbBackend::Dodb => Ok(()),
+    }
 }
 
 async fn ensure_turso_database(project_id: &str) -> anyhow::Result<()> {
@@ -464,5 +478,17 @@ mod websocket_singleton_validation_tests {
             declarations(fn0_shared_schema::MAX_WEBSOCKET_SINGLETONS_PER_PROJECT + 1);
         let error = validate_websocket_singletons(&declarations).unwrap_err();
         assert!(error.contains("exceeds limit"));
+    }
+}
+
+#[cfg(test)]
+mod db_backend_tests {
+    use super::ensure_resources_for_backend;
+    use crate::common::db_backend::DbBackend;
+
+    #[test]
+    fn dodb_deploy_does_not_require_or_create_a_turso_database() {
+        futures::executor::block_on(ensure_resources_for_backend("abcdefgh", DbBackend::Dodb))
+            .unwrap();
     }
 }

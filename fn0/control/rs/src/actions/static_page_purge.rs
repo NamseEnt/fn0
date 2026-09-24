@@ -41,7 +41,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::UnusablePath { path, reason };
     }
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let project = match (ProjectDocGet {
         project_id: &req.body.project_id,
     })

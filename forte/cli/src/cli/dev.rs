@@ -391,6 +391,8 @@ pub async fn run(options: DevOptions) -> Result<()> {
         ),
     ];
 
+    let doc_db_hijack = server::local_doc_db_hijack(format!("http://127.0.0.1:{sqld_port}"));
+
     let env_vars = resolve_dev_env(&project_dir, &local_service_env)?;
 
     let config = ServerConfig {
@@ -400,6 +402,7 @@ pub async fn run(options: DevOptions) -> Result<()> {
         public_dir,
         vite_socket_path: Some(vite.socket_path.clone()),
         env_vars,
+        doc_db_hijack: Some(doc_db_hijack),
         queue_hijack: Some(queue_hijack),
         object_storage_hijack: Some(object_storage_hijack),
         public_storage_hijack: Some(public_storage_hijack),

@@ -1,5 +1,6 @@
 export { EventBridgeCronTrigger } from "./EventBridgeCronTrigger";
 export { OciFn0WorkerSite } from "./OciFn0WorkerSite";
+export { OciDodbNode } from "./OciDodbNode";
 export { OciGlobalVault } from "./OciGlobalVault";
 export { B2CloudflareStaticCdn } from "./B2CloudflareStaticCdn";
 export * as docDb from "./docDb";

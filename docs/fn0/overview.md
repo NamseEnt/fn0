@@ -61,7 +61,7 @@ that require it. Request and response streaming is implemented end to end; see
 |---|---|---|
 | `fn0` | 0.7.1 | Core FaaS runtime (`ExecutionContext`, `Bundle`, `build_engine`) |
 | `fn0-cli` | 0.1.23 | Local development CLI |
-| `fn0-worker` | 0.4.17 | Worker binary (distributed execution node) |
+| `fn0-worker` | 0.4.18 | Worker binary (distributed execution node) |
 | `fn0-worker-agent` | 0.1.9 | Per-instance container supervisor (blue-green deploys, in-host TCP proxy) |
 | `fn0-worker-proxy` | 0.1.1 | Tiny TCP forwarder fronting fn0-worker containers; polls a target file written by worker-agent |
 | `fn0-deploy` | 0.3.5 | fn0 Cloud deployment client |
@@ -201,7 +201,8 @@ fn0 uses "hijack" components to inject platform services into the WASM execution
 
 | Hijack | Purpose |
 |---|---|
-| `turso_hijack` | Injects Turso/libSQL database connection |
+| `doc_db_hijack` | Routes semantic document database requests to the host document service |
+| `turso_hijack` | Injects the legacy/direct Turso/libSQL connection |
 | `object_storage_hijack` | Routes & SigV4-signs per-project private object storage requests |
 | `public_storage_hijack` | Routes public object storage requests (no SigV4 signing required) |
 | `otlp_hijack` | Injects OpenTelemetry OTLP endpoint |
@@ -216,6 +217,7 @@ These are configured on `ExecutionContext` via builder methods:
 
 ```rust
 let ctx = ExecutionContext::new(engine, linker, bundle_cache)
+    .with_doc_db_hijack(doc_db_hijack)
     .with_turso_hijack(turso_hijack)
     .with_otlp_hijack(otlp_hijack)
     .with_queue_hijack(queue_hijack)

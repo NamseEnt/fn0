@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub struct Input;
 
 pub async fn handle(Input: Input) -> anyhow::Result<()> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let mut after: Option<(String, String)> = None;
     let mut migrated = 0_u64;
     let mut exceptions = 0_u64;

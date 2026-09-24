@@ -32,7 +32,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::Unauthorized;
     }
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let fn0_wasmtime_version_doc = match (Fn0WasmtimeVersionDocGet {}).send_with(&db).await {
         Ok(Some(v)) => v,
         Ok(None) => {

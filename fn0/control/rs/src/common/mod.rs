@@ -4,6 +4,7 @@ pub mod aws_sign;
 pub mod byoc;
 pub mod cert_manifest;
 pub mod cloudflare;
+pub mod db_backend;
 pub mod docs_site;
 pub mod github;
 pub mod project_name;

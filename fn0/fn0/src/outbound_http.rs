@@ -491,7 +491,10 @@ mod tests {
         let resolved = with_default_timeouts(None).unwrap();
         assert_eq!(resolved.connect_timeout, Some(Duration::from_secs(30)));
         assert_eq!(resolved.first_byte_timeout, Some(Duration::from_secs(30)));
-        assert_eq!(resolved.between_bytes_timeout, Some(Duration::from_secs(30)));
+        assert_eq!(
+            resolved.between_bytes_timeout,
+            Some(Duration::from_secs(30))
+        );
     }
 
     #[test]

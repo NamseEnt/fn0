@@ -44,6 +44,11 @@ for `TypescriptBunHono`, it just runs `bun build`.
 
 This runs the fn0 server using fn0 crate, passing dist/component.wasm as the wasm file path.
 
+`fn0 local` supports normal semantic document access through `doc_db::database()`.
+Its host service uses one in-memory database for the lifetime of the process, so
+document state is lost when the local server restarts. Legacy/direct Turso access
+is not configured by this command.
+
 params
 
 ```

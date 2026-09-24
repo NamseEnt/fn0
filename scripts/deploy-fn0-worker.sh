@@ -26,16 +26,19 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export REPO_ROOT
 
-# shellcheck source=lib/pulumi-outputs.sh
+# shellcheck source=scripts/lib/pulumi-outputs.sh
 source "${REPO_ROOT}/scripts/lib/pulumi-outputs.sh"
-# shellcheck source=lib/control-admin.sh
+# shellcheck source=scripts/lib/control-admin.sh
 source "${REPO_ROOT}/scripts/lib/control-admin.sh"
-# shellcheck source=lib/cwasm-compiler.sh
+# shellcheck source=scripts/lib/cwasm-compiler.sh
 source "${REPO_ROOT}/scripts/lib/cwasm-compiler.sh"
-# shellcheck source=lib/worker-image.sh
+# shellcheck source=scripts/lib/worker-image.sh
 source "${REPO_ROOT}/scripts/lib/worker-image.sh"
-# shellcheck source=lib/worker-target.sh
+# shellcheck source=scripts/lib/worker-target.sh
 source "${REPO_ROOT}/scripts/lib/worker-target.sh"
+source "${REPO_ROOT}/scripts/lib/control-db.sh"
+
+trap 'control_db_close' EXIT
 
 need pulumi
 need jq
@@ -46,6 +49,7 @@ need curl
 container_runtime_ensure_available
 
 load_pulumi_outputs
+control_db_init
 
 target_wasmtime="$(cd "$REPO_ROOT" && cargo pkgid -p fn0-wasmtime | sed -E 's/.*[#@]([^:]+)$/\1/')"
 target_worker="$(cd "$REPO_ROOT" && cargo pkgid -p fn0-worker | sed -E 's/.*[#@]([^:]+)$/\1/')"
@@ -55,6 +59,7 @@ if [[ -z "$target_wasmtime" || -z "$target_worker" ]]; then
 fi
 echo ">> target fn0-wasmtime=${target_wasmtime} fn0-worker=${target_worker}"
 
+control_db_open
 version_doc_json="$(get_fn0_wasmtime_version_doc)"
 active=""
 pending=""

@@ -27,6 +27,9 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true }
 
+[dev-dependencies]
+rustls = { workspace = true }
+
 [build-dependencies]
 deno_core = { workspace = true }
 deno_crypto = { package = "fn0-deno-crypto", version = "=0.255.0", path = "../../vendor/deno/ext/crypto" }

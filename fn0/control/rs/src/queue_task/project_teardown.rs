@@ -28,7 +28,8 @@ pub struct Input {
 
 pub async fn handle(input: Input) -> anyhow::Result<()> {
     let project_id = input.project_id;
-    let db = doc_db::turso();
+    let backend = crate::common::db_backend::configured().map_err(anyhow::Error::msg)?;
+    let db = doc_db::database();
     let now = forte_sdk::now();
 
     let tombstone = ensure_revoke_pending(&db, &project_id, now).await?;
@@ -61,7 +62,12 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
         empty_project_buckets(&project_id, storage, now).await?;
     }
     delete_cloudflare_config(&db, &project_id).await?;
-    delete_turso_database(&project_id).await?;
+    if should_delete_turso_database(backend) {
+        delete_turso_database(&project_id).await?;
+    } else {
+        let deleted_rows = db.admin_purge_project(&project_id).await?;
+        tracing::info!(%project_id, deleted_rows, "project_teardown: dodb tenant purged");
+    }
     delete_compiled_bundle_docs(&db, &project_id).await?;
     delete_identity_docs(&db, &project_id).await?;
 
@@ -78,6 +84,10 @@ pub async fn handle(input: Input) -> anyhow::Result<()> {
 
     tracing::info!(%project_id, "project_teardown complete");
     Ok(())
+}
+
+fn should_delete_turso_database(backend: crate::common::db_backend::DbBackend) -> bool {
+    backend == crate::common::db_backend::DbBackend::Turso
 }
 
 async fn ensure_revoke_pending(
@@ -334,5 +344,17 @@ async fn delete_identity_docs(db: &doc_db::Database, project_id: &str) -> anyhow
             anyhow::bail!("delete_identity_docs trx conflict: {d:?}")
         }
         doc_db::TrxResult::Err(e) => Err(e),
+    }
+}
+
+#[cfg(test)]
+mod db_backend_tests {
+    use super::should_delete_turso_database;
+    use crate::common::db_backend::DbBackend;
+
+    #[test]
+    fn dodb_teardown_preserves_turso_and_turso_mode_deletes_it() {
+        assert!(!should_delete_turso_database(DbBackend::Dodb));
+        assert!(should_delete_turso_database(DbBackend::Turso));
     }
 }

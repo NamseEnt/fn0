@@ -1,5 +1,7 @@
-use crate::turso::StoredDoc;
-use crate::{BatchOp, DbOp, DbResult};
+use crate::{
+    ObservedDocument, TransactCondition, TransactConflict, TransactMutation, TransactOutcome,
+    TransactRequest, revision_from_backend,
+};
 use anyhow::{Result, bail};
 use bytes::Bytes;
 use libsql_hrana::proto::*;
@@ -34,14 +36,15 @@ impl MemoryDatabase {
             .map(|doc| doc.data.clone().into()))
     }
 
-    pub(crate) async fn get_with_version(&self, pk: &str, sk: &str) -> Result<Option<StoredDoc>> {
+    pub(crate) async fn get_observed(&self, pk: &str, sk: &str) -> Result<ObservedDocument> {
         let store = self.store.lock().unwrap();
-        Ok(store
-            .get(&(pk.to_string(), sk.to_string()))
-            .map(|doc| StoredDoc {
+        Ok(match store.get(&(pk.to_string(), sk.to_string())) {
+            Some(doc) => ObservedDocument::Present {
                 data: doc.data.clone().into(),
-                version: doc.version,
-            }))
+                revision: revision_from_backend(doc.version)?,
+            },
+            None => ObservedDocument::Missing { revision: None },
+        })
     }
 
     pub(crate) async fn put(&self, pk: &str, sk: &str, data: &[u8]) -> Result<()> {
@@ -81,21 +84,6 @@ impl MemoryDatabase {
         Ok(scan_store(&store, after, limit))
     }
 
-    pub(crate) async fn batch(&self, ops: &[BatchOp<'_>]) -> Result<()> {
-        let mut store = self.store.lock().unwrap();
-        for op in ops {
-            match op {
-                BatchOp::Put { pk, sk, data } => {
-                    upsert(&mut store, pk, sk, data);
-                }
-                BatchOp::Delete { pk, sk } => {
-                    store.remove(&(pk.to_string(), sk.to_string()));
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub(crate) async fn execute_raw(
         &self,
         sql: &str,
@@ -110,42 +98,6 @@ impl MemoryDatabase {
         }
     }
 
-    pub(crate) async fn execute_ops(&self, ops: Vec<DbOp>) -> Result<Vec<DbResult>> {
-        let mut results = Vec::new();
-        for op in &ops {
-            match op {
-                DbOp::Get { pk, sk } => {
-                    let data = self
-                        .store
-                        .lock()
-                        .unwrap()
-                        .get(&(pk.clone(), sk.clone()))
-                        .map(|doc| Bytes::from(doc.data.clone()));
-                    results.push(DbResult::Single(data));
-                }
-                DbOp::Query {
-                    pk,
-                    after_sk,
-                    limit,
-                } => {
-                    let store = self.store.lock().unwrap();
-                    let items =
-                        query_store(&store, pk, after_sk.as_deref(), limit.unwrap_or(usize::MAX));
-                    results.push(DbResult::Multiple(items));
-                }
-                DbOp::Put { pk, sk, data } => {
-                    upsert(&mut self.store.lock().unwrap(), pk, sk, data);
-                    results.push(DbResult::Done);
-                }
-                DbOp::Delete { pk, sk } => {
-                    self.store.lock().unwrap().remove(&(pk.clone(), sk.clone()));
-                    results.push(DbResult::Done);
-                }
-            }
-        }
-        Ok(results)
-    }
-
     pub(crate) async fn transaction(&self) -> Result<MemoryTransaction> {
         Ok(MemoryTransaction {
             db: self.clone(),
@@ -153,27 +105,64 @@ impl MemoryDatabase {
         })
     }
 
-    pub(crate) async fn begin_immediate_with_reads(
-        &self,
-        keys: &[(String, String)],
-    ) -> Result<(MemoryTransaction, Vec<Option<StoredDoc>>)> {
-        let working = self.store.lock().unwrap().clone();
-        let docs = keys
-            .iter()
-            .map(|(pk, sk)| {
-                working.get(&(pk.clone(), sk.clone())).map(|doc| StoredDoc {
-                    data: doc.data.clone().into(),
-                    version: doc.version,
-                })
-            })
-            .collect();
-        Ok((
-            MemoryTransaction {
-                db: self.clone(),
-                working,
-            },
-            docs,
-        ))
+    pub(crate) async fn transact(&self, request: &TransactRequest) -> Result<TransactOutcome> {
+        let mut store = self.store.lock().unwrap();
+
+        for (condition_index, condition) in request.conditions.iter().enumerate() {
+            let condition_holds = match condition {
+                TransactCondition::RevisionEquals {
+                    pk,
+                    sk,
+                    expected_revision,
+                } => store
+                    .get(&(pk.clone(), sk.clone()))
+                    .map(|doc| revision_from_backend(doc.version))
+                    .transpose()?
+                    .is_some_and(|revision| revision == *expected_revision),
+                TransactCondition::Exists { pk, sk } => {
+                    store.contains_key(&(pk.clone(), sk.clone()))
+                }
+                TransactCondition::NotExists { pk, sk } => {
+                    !store.contains_key(&(pk.clone(), sk.clone()))
+                }
+            };
+
+            if !condition_holds {
+                return Ok(TransactOutcome {
+                    conflict: Some(TransactConflict { condition_index }),
+                });
+            }
+        }
+
+        if request.mutations.is_empty() {
+            return Ok(TransactOutcome { conflict: None });
+        }
+
+        let mut staged = store.clone();
+        for mutation in &request.mutations {
+            match mutation {
+                TransactMutation::Put { pk, sk, data } => {
+                    let version = staged
+                        .get(&(pk.clone(), sk.clone()))
+                        .map(|doc| doc.version.checked_add(1))
+                        .unwrap_or(Some(0))
+                        .ok_or_else(|| anyhow::anyhow!("document revision overflow"))?;
+                    staged.insert(
+                        (pk.clone(), sk.clone()),
+                        MemDoc {
+                            data: data.clone(),
+                            version,
+                        },
+                    );
+                }
+                TransactMutation::Delete { pk, sk } => {
+                    staged.remove(&(pk.clone(), sk.clone()));
+                }
+            }
+        }
+
+        *store = staged;
+        Ok(TransactOutcome { conflict: None })
     }
 }
 
@@ -208,104 +197,72 @@ impl MemoryTransaction {
     pub(crate) async fn rollback(self) -> Result<()> {
         Ok(())
     }
+}
 
-    pub(crate) async fn batch_get_with_version(
-        &mut self,
-        keys: &[(String, String)],
-    ) -> Result<Vec<Option<StoredDoc>>> {
-        let docs = keys
-            .iter()
-            .map(|(pk, sk)| {
-                self.working
-                    .get(&(pk.clone(), sk.clone()))
-                    .map(|doc| StoredDoc {
-                        data: doc.data.clone().into(),
-                        version: doc.version,
-                    })
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn transact_validates_all_items_before_mutating() {
+        let db = MemoryDatabase::new();
+        db.put("pk", "a", b"a0").await.unwrap();
+        db.put("pk", "b", b"b0").await.unwrap();
+
+        let outcome = db
+            .transact(&TransactRequest {
+                conditions: vec![
+                    TransactCondition::RevisionEquals {
+                        pk: "pk".to_string(),
+                        sk: "a".to_string(),
+                        expected_revision: crate::DocDbRevision::new(0),
+                    },
+                    TransactCondition::RevisionEquals {
+                        pk: "pk".to_string(),
+                        sk: "b".to_string(),
+                        expected_revision: crate::DocDbRevision::new(1),
+                    },
+                ],
+                mutations: vec![TransactMutation::Put {
+                    pk: "pk".to_string(),
+                    sk: "a".to_string(),
+                    data: b"a1".to_vec(),
+                }],
             })
-            .collect();
-        Ok(docs)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.conflict.unwrap().condition_index, 1);
+        assert_eq!(db.get("pk", "a").await.unwrap().unwrap().as_ref(), b"a0");
     }
 
-    pub(crate) async fn apply_writes_and_commit(
-        &mut self,
-        writes: &[crate::WriteOp],
-    ) -> Result<crate::CommitOutcome> {
-        use crate::WriteOp;
+    #[tokio::test]
+    async fn transact_checks_missing_keys() {
+        let db = MemoryDatabase::new();
+        let outcome = db
+            .transact(&TransactRequest {
+                conditions: vec![TransactCondition::NotExists {
+                    pk: "pk".to_string(),
+                    sk: "missing".to_string(),
+                }],
+                mutations: vec![],
+            })
+            .await
+            .unwrap();
+        assert!(outcome.conflict.is_none());
 
-        let mut staged = self.working.clone();
-        let mut affected_counts: Vec<u64> = Vec::with_capacity(writes.len());
-        let mut conflict: Option<crate::ConflictInfo> = None;
-
-        for (i, op) in writes.iter().enumerate() {
-            match op {
-                WriteOp::Insert { pk, sk, data } => {
-                    let key = (pk.clone(), sk.clone());
-                    if staged.contains_key(&key) {
-                        conflict = Some(crate::ConflictInfo {
-                            step_index: i,
-                            message: format!(
-                                "UNIQUE constraint failed: docs.pk, docs.sk ({pk}/{sk})"
-                            ),
-                        });
-                        affected_counts.push(0);
-                        break;
-                    }
-                    staged.insert(
-                        key,
-                        MemDoc {
-                            data: data.clone(),
-                            version: 0,
-                        },
-                    );
-                    affected_counts.push(1);
-                }
-                WriteOp::Update {
-                    pk,
-                    sk,
-                    expected_version,
-                    data,
-                } => {
-                    let key = (pk.clone(), sk.clone());
-                    match staged.get_mut(&key) {
-                        Some(doc) if doc.version == *expected_version => {
-                            doc.data = data.clone();
-                            doc.version += 1;
-                            affected_counts.push(1);
-                        }
-                        _ => affected_counts.push(0),
-                    }
-                }
-                WriteOp::Delete {
-                    pk,
-                    sk,
-                    expected_version,
-                } => {
-                    let key = (pk.clone(), sk.clone());
-                    match staged.get(&key) {
-                        Some(doc) if doc.version == *expected_version => {
-                            staged.remove(&key);
-                            affected_counts.push(1);
-                        }
-                        _ => affected_counts.push(0),
-                    }
-                }
-            }
-        }
-
-        while affected_counts.len() < writes.len() {
-            affected_counts.push(0);
-        }
-
-        if conflict.is_none() {
-            *self.db.store.lock().unwrap() = staged;
-            self.working.clear();
-        }
-
-        Ok(crate::CommitOutcome {
-            affected_counts,
-            conflict,
-        })
+        db.put("pk", "missing", b"present").await.unwrap();
+        let outcome = db
+            .transact(&TransactRequest {
+                conditions: vec![TransactCondition::NotExists {
+                    pk: "pk".to_string(),
+                    sk: "missing".to_string(),
+                }],
+                mutations: vec![],
+            })
+            .await
+            .unwrap();
+        assert_eq!(outcome.conflict.unwrap().condition_index, 0);
     }
 }
 

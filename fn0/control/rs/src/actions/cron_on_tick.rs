@@ -52,7 +52,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         }
     };
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let client = http::Client::new();
 
     let mut after: Option<String> = None;
@@ -202,7 +202,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
 /// the window where ProjectDoc committed but the first queue request failed.
 /// It never reconstructs a policy from Signy or from a platform default.
 async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStats> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let mut after: Option<(String, String)> = None;
     let mut requeued_records = 0;
     let mut pending = 0_u64;
@@ -314,7 +314,7 @@ async fn reconcile_signy_tenants() -> anyhow::Result<signy_tenant::ReconcileStat
 }
 
 async fn recover_expired_websocket_singletons() -> anyhow::Result<()> {
-    let db = doc_db::turso();
+    let db = doc_db::database();
     recover_expired_websocket_singletons_with(&db, now()).await
 }
 

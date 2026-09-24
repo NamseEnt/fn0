@@ -30,7 +30,7 @@ pub struct GcStats {
 }
 
 pub async fn run_gc() -> anyhow::Result<GcStats> {
-    let database = doc_db::turso();
+    let database = doc_db::database();
     let cursor = (WebSocketDirectoryGcCursorDocGet {})
         .send_with(&database)
         .await?

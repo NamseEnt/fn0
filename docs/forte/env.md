@@ -108,12 +108,13 @@ fn0 injects these automatically in both `forte dev` and deployed apps. You do no
 
 | Variable | Injected when |
 |---|---|
+| `FN0_DOC_DB_URL` | Always (semantic document DB endpoint) |
 | `TURSO_URL` | Always (database endpoint) |
 | `TURSO_AUTH_TOKEN` | Always (database auth) |
 | `FN0_QUEUE_URL` | Always (queue endpoint; always present even if queue tasks are not used) |
 | `FN0_OBJECT_STORAGE_URL` | Always (object storage endpoint) |
 
-If you call `generate_env()` and declare these keys in `env.yaml`, `forte dev` will set them to the injected values automatically. You do not need entries in `env.yaml` for them; refer to the platform clients (`doc_db::turso()`, `object_storage::private::bucket()`, etc.) which read these variables internally.
+If you call `generate_env()` and declare these keys in `env.yaml`, `forte dev` will set them to the injected values automatically. You do not need entries in `env.yaml` for them. Normal document access uses `doc_db::database()`; `doc_db::turso()` remains for legacy/direct Turso features such as raw SQL and explicit transactions.
 
 ## Variables you set yourself
 

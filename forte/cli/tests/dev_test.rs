@@ -162,6 +162,21 @@ pub async fn on_disconnect(_event: DisconnectEvent) -> Result<()> {
 }
 "#;
 
+const DOC_DB_SEMANTIC_API: &str = r#"
+use anyhow::Result;
+use forte_sdk::http::{Body, Response};
+use forte_sdk::{ForteRequest, ForteResponse};
+
+pub type Props = ForteResponse;
+
+pub async fn handler(_req: ForteRequest<'_>) -> Result<Props> {
+    let db = doc_db::database();
+    db.put("Smoke", "key", b"semantic").await?;
+    let value = db.get("Smoke", "key").await?.unwrap_or_default();
+    Ok(Response::builder().status(200).body(Body::from(value))?)
+}
+"#;
+
 #[test]
 fn test_dev_websocket_accepts_frames_and_echoes() {
     let _dev_server_slot = take_the_only_dev_server_slot();
@@ -293,6 +308,24 @@ fn test_dev_server_starts_and_responds() {
             panic!("Failed to connect to dev server: {}", e);
         }
     }
+}
+
+#[test]
+fn test_dev_generic_database_uses_local_semantic_service() {
+    let _dev_server_slot = take_the_only_dev_server_slot();
+    let temp = tempfile::tempdir().unwrap();
+    let project_dir = init_dev_project(temp.path(), "test-app-semantic-db");
+
+    install_npm_deps(&project_dir);
+    let apis_dir = project_dir.join("rs/src/apis");
+    std::fs::create_dir_all(&apis_dir).unwrap();
+    std::fs::write(apis_dir.join("semantic_db.rs"), DOC_DB_SEMANTIC_API).unwrap();
+
+    let server = DevServer::start(&project_dir);
+    let response = reqwest::blocking::get(format!("{}/api/semantic_db", server.url())).unwrap();
+
+    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(response.bytes().unwrap(), "semantic".as_bytes());
 }
 
 #[test]

@@ -94,7 +94,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let now = forte_sdk::now();
     let expires_at = now + forte_sdk::chrono::Duration::seconds(CODE_TTL_SECS);
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     let put_result = CliAuthorizationCodeDocPut(CliAuthorizationCodeDoc {
         code: code.clone(),
         github_id: user.github_id,

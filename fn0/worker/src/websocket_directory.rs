@@ -33,22 +33,14 @@ pub trait ConnectionDirectory: Send + Sync {
     async fn delete_connection(&self, connection_id: &str, worker_id: &str) -> anyhow::Result<()>;
 }
 
-pub fn directory_from_env(
+pub fn directory_with_database(
     identity: &WorkerIdentity,
+    database: doc_db::Database,
 ) -> anyhow::Result<Arc<dyn ConnectionDirectory>> {
     if identity.endpoint.is_empty() {
         return Ok(Arc::new(MemoryDirectory::default()));
     }
-    let group_token = std::env::var("TURSO_GROUP_TOKEN")
-        .map_err(|_| anyhow::anyhow!("TURSO_GROUP_TOKEN not set"))?;
-    let host_suffix = std::env::var("TURSO_DB_HOST_SUFFIX")
-        .map_err(|_| anyhow::anyhow!("TURSO_DB_HOST_SUFFIX not set"))?;
-    let control_project_id = std::env::var("FN0_CONTROL_PROJECT_ID")
-        .map_err(|_| anyhow::anyhow!("FN0_CONTROL_PROJECT_ID not set"))?;
-    let url = format!("https://{control_project_id}{host_suffix}");
-    Ok(Arc::new(TursoDirectory {
-        database: doc_db::turso_with_config(url, group_token),
-    }))
+    Ok(Arc::new(DatabaseDirectory { database }))
 }
 
 pub fn worker_identity_from_env() -> WorkerIdentity {
@@ -65,12 +57,12 @@ fn random_identifier(prefix: &str) -> String {
     )
 }
 
-struct TursoDirectory {
+struct DatabaseDirectory {
     database: doc_db::Database,
 }
 
 #[async_trait]
-impl ConnectionDirectory for TursoDirectory {
+impl ConnectionDirectory for DatabaseDirectory {
     async fn put_connection(
         &self,
         connection_id: &str,
@@ -197,8 +189,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn turso_directory_round_trip_uses_document_store() {
-        let directory = TursoDirectory {
+    async fn directory_round_trip_uses_document_store() {
+        let directory = DatabaseDirectory {
             database: doc_db::memory(),
         };
         let owner = ConnectionOwner {

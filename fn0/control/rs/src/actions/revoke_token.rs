@@ -27,7 +27,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         return Output::NotFound;
     }
 
-    let db = doc_db::turso();
+    let db = doc_db::database();
     if let Err(e) = UserDocPut(user).send_with(&db).await {
         return Output::Error {
             message: e.to_string(),
