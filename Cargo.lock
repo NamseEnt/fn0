@@ -2695,7 +2695,6 @@ dependencies = [
  "fn0",
  "fn0-deploy",
  "fn0-doc-db",
- "fn0-doc-db-protocol",
  "futures",
  "http",
  "http-body-util",

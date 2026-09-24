@@ -53,7 +53,7 @@ impl DocDbService for LocalDocDbService {
     fn execute<'a>(
         &'a self,
         _project_id: &'a str,
-        request: doc_db_protocol::DocDbRequest,
+        request: doc_db::DocDbRequest,
     ) -> DocDbServiceFuture<'a> {
         let database = self.database.clone();
         Box::pin(async move {

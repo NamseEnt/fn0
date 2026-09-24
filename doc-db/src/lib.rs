@@ -12,6 +12,7 @@ mod turso;
 
 use anyhow::Result;
 use bytes::Bytes;
+pub use doc_db_protocol::DocDbRequest;
 pub use doc_db_protocol::DocDbRevision;
 use doc_db_protocol::{
     DocDbCondition, DocDbDocument, DocDbError, DocDbKey, DocDbMutation, DocDbObservedDocument,

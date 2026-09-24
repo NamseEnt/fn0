@@ -22,7 +22,6 @@ bytes = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 doc-db = { workspace = true }
 fn0 = { workspace = true }
-fn0-doc-db-protocol = { workspace = true }
 fn0-deploy = { workspace = true }
 futures = { workspace = true }
 fastwebsockets = { workspace = true, features = ["upgrade", "unstable-split"] }
