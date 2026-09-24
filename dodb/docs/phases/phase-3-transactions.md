@@ -17,9 +17,11 @@ The request is validated completely before its B+Tree overlay is accepted.
 `RevisionEquals` compares the exact current revision for either a present or a
 missing key. `NotExists` checks logical absence only, so `Missing(120)` can
 satisfy `NotExists` while failing `RevisionEquals(0)`. A successful request
-receives one commit LSN and every changed key receives that LSN as its new
-revision. A failed condition produces a structured conflict and applies no
-mutation.
+with mutations receives one commit LSN and every changed key receives that LSN
+as its new revision. A successful request with conditions but no mutations
+returns no commit LSN and changes no state or revision. A request with neither
+conditions nor mutations is invalid. A failed condition produces a structured
+conflict and applies no mutation.
 
 All point reads that influence a transaction must be carried into the request
 as conditions, including reads of keys that are not written and reads that

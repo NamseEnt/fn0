@@ -15,9 +15,25 @@ pub enum FileOperation {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FaultAction {
-    ShortWrite { max_bytes: usize },
-    ShortRead { max_bytes: usize },
-    Io { kind: ErrorKind, message: String },
+    ShortWrite {
+        max_bytes: usize,
+    },
+    ShortRead {
+        max_bytes: usize,
+    },
+    Io {
+        kind: ErrorKind,
+        message: String,
+    },
+    SyncPersistAllThenIo {
+        kind: ErrorKind,
+        message: String,
+    },
+    SyncPersistPrefixThenIo {
+        length: usize,
+        kind: ErrorKind,
+        message: String,
+    },
 }
 
 impl FaultAction {
@@ -177,6 +193,10 @@ impl CrashableFile {
     fn io_error(action: FaultAction) -> Result<Option<FaultAction>> {
         match action {
             FaultAction::Io { kind, message } => Err(Error::Io(std::io::Error::new(kind, message))),
+            FaultAction::SyncPersistAllThenIo { .. }
+            | FaultAction::SyncPersistPrefixThenIo { .. } => Err(Error::invalid_input(
+                "sync persistence fault used for a non-sync operation",
+            )),
             other => Ok(Some(other)),
         }
     }
@@ -211,7 +231,11 @@ impl DurableFile for CrashableFile {
             Some(FaultAction::ShortRead { max_bytes }) => available.min(max_bytes),
             Some(FaultAction::ShortWrite { .. }) => available,
             None => available,
-            Some(FaultAction::Io { .. }) => unreachable!("I/O faults are returned above"),
+            Some(FaultAction::Io { .. })
+            | Some(FaultAction::SyncPersistAllThenIo { .. })
+            | Some(FaultAction::SyncPersistPrefixThenIo { .. }) => {
+                unreachable!("I/O faults are returned above")
+            }
         };
         buffer[..count].copy_from_slice(&self.volatile[start..start + count]);
         Ok(count)
@@ -223,7 +247,11 @@ impl DurableFile for CrashableFile {
         let count = match action {
             Some(FaultAction::ShortWrite { max_bytes }) => bytes.len().min(max_bytes),
             Some(FaultAction::ShortRead { .. }) | None => bytes.len(),
-            Some(FaultAction::Io { .. }) => unreachable!("I/O faults are returned above"),
+            Some(FaultAction::Io { .. })
+            | Some(FaultAction::SyncPersistAllThenIo { .. })
+            | Some(FaultAction::SyncPersistPrefixThenIo { .. }) => {
+                unreachable!("I/O faults are returned above")
+            }
         };
         let range = Self::checked_range(offset, count)?;
         if self.volatile.len() < range.end {
@@ -243,6 +271,17 @@ impl DurableFile for CrashableFile {
         if let Some(FaultAction::Io { kind, message }) = action {
             return Err(Error::Io(std::io::Error::new(kind, message)));
         }
+        if matches!(
+            action,
+            Some(
+                FaultAction::SyncPersistAllThenIo { .. }
+                    | FaultAction::SyncPersistPrefixThenIo { .. }
+            )
+        ) {
+            return Err(Error::invalid_input(
+                "sync persistence fault used for set_len",
+            ));
+        }
         let length = usize::try_from(length)
             .map_err(|_| Error::invalid_input("file length does not fit platform usize"))?;
         self.volatile.resize(length, 0);
@@ -251,8 +290,29 @@ impl DurableFile for CrashableFile {
 
     fn sync_data(&mut self) -> Result<()> {
         let action = self.fault(FileOperation::SyncData)?;
-        if let Some(FaultAction::Io { kind, message }) = action {
-            return Err(Error::Io(std::io::Error::new(kind, message)));
+        match action {
+            Some(FaultAction::Io { kind, message }) => {
+                return Err(Error::Io(std::io::Error::new(kind, message)));
+            }
+            Some(FaultAction::SyncPersistAllThenIo { kind, message }) => {
+                self.durable = self.volatile.clone();
+                return Err(Error::Io(std::io::Error::new(kind, message)));
+            }
+            Some(FaultAction::SyncPersistPrefixThenIo {
+                length,
+                kind,
+                message,
+            }) => {
+                if length > self.volatile.len() {
+                    return Err(Error::invalid_input(format!(
+                        "sync persistence prefix {length} exceeds volatile file length {}",
+                        self.volatile.len()
+                    )));
+                }
+                self.durable = self.volatile[..length].to_vec();
+                return Err(Error::Io(std::io::Error::new(kind, message)));
+            }
+            Some(FaultAction::ShortRead { .. } | FaultAction::ShortWrite { .. }) | None => {}
         }
         self.durable = self.volatile.clone();
         Ok(())
@@ -260,8 +320,29 @@ impl DurableFile for CrashableFile {
 
     fn sync_all(&mut self) -> Result<()> {
         let action = self.fault(FileOperation::SyncAll)?;
-        if let Some(FaultAction::Io { kind, message }) = action {
-            return Err(Error::Io(std::io::Error::new(kind, message)));
+        match action {
+            Some(FaultAction::Io { kind, message }) => {
+                return Err(Error::Io(std::io::Error::new(kind, message)));
+            }
+            Some(FaultAction::SyncPersistAllThenIo { kind, message }) => {
+                self.durable = self.volatile.clone();
+                return Err(Error::Io(std::io::Error::new(kind, message)));
+            }
+            Some(FaultAction::SyncPersistPrefixThenIo {
+                length,
+                kind,
+                message,
+            }) => {
+                if length > self.volatile.len() {
+                    return Err(Error::invalid_input(format!(
+                        "sync persistence prefix {length} exceeds volatile file length {}",
+                        self.volatile.len()
+                    )));
+                }
+                self.durable = self.volatile[..length].to_vec();
+                return Err(Error::Io(std::io::Error::new(kind, message)));
+            }
+            Some(FaultAction::ShortRead { .. } | FaultAction::ShortWrite { .. }) | None => {}
         }
         self.durable = self.volatile.clone();
         Ok(())
@@ -338,5 +419,65 @@ mod tests {
         assert_eq!(main.durable_bytes(), b"old");
         assert!(wal.durable_bytes().is_empty());
         assert_eq!(shadow.durable_bytes(), b"new");
+    }
+
+    #[test]
+    fn sync_error_can_persist_all_bytes() {
+        let plan = FaultPlan::default().on_next(
+            FileOperation::SyncData,
+            FaultAction::SyncPersistAllThenIo {
+                kind: ErrorKind::Other,
+                message: "fsync after persistence".into(),
+            },
+        );
+        let mut file = CrashableFile::new().with_fault_plan(plan);
+        file.write_at(0, b"whole image").unwrap();
+        assert!(file.sync_data().is_err());
+        assert_eq!(file.durable_bytes(), b"whole image");
+    }
+
+    #[test]
+    fn sync_error_can_persist_a_prefix() {
+        let plan = FaultPlan::default().on_next(
+            FileOperation::SyncData,
+            FaultAction::SyncPersistPrefixThenIo {
+                length: 4,
+                kind: ErrorKind::Other,
+                message: "fsync after prefix persistence".into(),
+            },
+        );
+        let mut file = CrashableFile::new().with_fault_plan(plan);
+        file.write_at(0, b"whole image").unwrap();
+        assert!(file.sync_data().is_err());
+        assert_eq!(file.durable_bytes(), b"whol");
+    }
+
+    #[test]
+    fn sync_persistence_faults_reject_invalid_targets_and_lengths() {
+        let invalid_write_fault = FaultPlan::default().on_next(
+            FileOperation::WriteAt,
+            FaultAction::SyncPersistAllThenIo {
+                kind: ErrorKind::Other,
+                message: "misconfigured target".into(),
+            },
+        );
+        let mut write_file = CrashableFile::new().with_fault_plan(invalid_write_fault);
+        assert!(matches!(
+            write_file.write_at(0, b"bytes"),
+            Err(Error::InvalidInput(_))
+        ));
+
+        let oversized_prefix_fault = FaultPlan::default().on_next(
+            FileOperation::SyncData,
+            FaultAction::SyncPersistPrefixThenIo {
+                length: 6,
+                kind: ErrorKind::Other,
+                message: "prefix exceeds image".into(),
+            },
+        );
+        let mut sync_file = CrashableFile::new().with_fault_plan(oversized_prefix_fault);
+        sync_file.write_at(0, b"short").unwrap();
+        assert!(matches!(sync_file.sync_data(), Err(Error::InvalidInput(_))));
+        assert!(sync_file.durable_bytes().is_empty());
     }
 }

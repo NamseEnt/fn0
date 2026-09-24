@@ -563,10 +563,8 @@ fn can_add(
     request_bytes: usize,
     config: CoordinatorConfig,
 ) -> bool {
-    request_count == 0
-        || (request_count < config.max_group_requests
-            && (current_bytes == 0
-                || current_bytes.saturating_add(request_bytes) <= config.max_group_bytes))
+    request_count < config.max_group_requests
+        && current_bytes.saturating_add(request_bytes) <= config.max_group_bytes
 }
 
 fn process_segment<F: DurableFile, W: DurableFile>(
@@ -1246,6 +1244,77 @@ mod tests {
         assert!(pending.is_none());
         assert!(!close_requested);
         assert!(request_rx.try_recv().is_ok());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn zero_byte_first_request_keeps_oversized_request_pending() {
+        let (request_tx, mut request_rx) = tokio::sync::mpsc::channel(8);
+        request_tx
+            .send(test_request(test_operation(1)))
+            .await
+            .unwrap();
+        request_tx
+            .send(test_request(test_operation(2)))
+            .await
+            .unwrap();
+        let (_close_tx, mut close_rx) = tokio::sync::oneshot::channel();
+        let first = test_request(CoordinatorOperation::Checkpoint);
+        let config = CoordinatorConfig {
+            max_group_requests: 8,
+            max_group_bytes: 1,
+            max_collection_delay: Duration::ZERO,
+            ..CoordinatorConfig::default()
+        };
+
+        let (group, pending, close_requested, _) =
+            collect_group(first, &mut request_rx, &mut close_rx, config).await;
+
+        assert_eq!(group.len(), 1);
+        assert!(matches!(
+            &group[0].operation,
+            CoordinatorOperation::Checkpoint
+        ));
+        let pending = pending.expect("oversized request should remain pending");
+        let CoordinatorOperation::Transaction(request) = pending.operation else {
+            panic!("pending request should be a transaction");
+        };
+        let TransactionMutation::Delete { key } = &request.mutations[0] else {
+            panic!("pending transaction should preserve the first queued request");
+        };
+        assert_eq!(key.sk.as_bytes(), 1usize.to_le_bytes());
+        let queued_after_pending = request_rx.try_recv().unwrap();
+        let CoordinatorOperation::Transaction(request) = queued_after_pending.operation else {
+            panic!("next queued request should be a transaction");
+        };
+        let TransactionMutation::Delete { key } = &request.mutations[0] else {
+            panic!("next transaction should preserve queue order");
+        };
+        assert_eq!(key.sk.as_bytes(), 2usize.to_le_bytes());
+        assert!(!close_requested);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn oversized_first_request_is_allowed_as_its_own_group() {
+        let (request_tx, mut request_rx) = tokio::sync::mpsc::channel(8);
+        request_tx
+            .send(test_request(test_operation(1)))
+            .await
+            .unwrap();
+        let (_close_tx, mut close_rx) = tokio::sync::oneshot::channel();
+        let first = test_request(test_operation(0));
+        let config = CoordinatorConfig {
+            max_group_requests: 8,
+            max_group_bytes: 1,
+            max_collection_delay: Duration::ZERO,
+            ..CoordinatorConfig::default()
+        };
+
+        let (group, pending, close_requested, _) =
+            collect_group(first, &mut request_rx, &mut close_rx, config).await;
+
+        assert_eq!(group.len(), 1);
+        assert!(pending.is_some());
+        assert!(!close_requested);
     }
 
     #[tokio::test(flavor = "current_thread")]

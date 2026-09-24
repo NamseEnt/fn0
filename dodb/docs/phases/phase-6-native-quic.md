@@ -152,13 +152,16 @@ condition-free or conditional mutations as one atomic transaction and preserves
 `RevisionEquals`, `Exists`, and `NotExists`, including the revision of a
 missing key and the missing-revision ABA check.
 
-The storage transaction primitive requires at least one mutation. A
-condition-only Transact is therefore handled by the service boundary: it
-rejects duplicate condition keys, gathers the unique keys with one
-coordinator-serialized internal point-read operation, evaluates conditions in input order, and
-returns the first deterministic structured Conflict. On success it returns an
-outcome with no commit LSN and performs no mutation. It never implements this
-operation as independently observed ordinary Gets.
+The transaction primitive accepts a request with conditions and no mutations.
+It rejects duplicate condition keys, gathers the unique keys with one
+coordinator-serialized internal point-read operation, evaluates conditions in
+input order, and returns the first deterministic structured Conflict. On
+success it returns an outcome with no commit LSN and performs no mutation,
+revision, WAL, or superblock-generation change. A request with neither
+conditions nor mutations remains invalid. For a tenant with no database file,
+the service supplies the logical `Missing(0)` state for this read-only path
+without creating files. It never implements this operation as independently
+observed ordinary Gets.
 
 Ordinary Query and Scan retain ordered results and exclusive cursors. The
 storage coordinator may use an internal point-read grouping while evaluating a

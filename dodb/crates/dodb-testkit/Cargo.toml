@@ -10,4 +10,4 @@ dodb-storage = { path = "../dodb-storage" }
 
 [dev-dependencies]
 proptest.workspace = true
-
+tokio.workspace = true

@@ -97,24 +97,22 @@ impl ReferenceDb {
             })
             .collect();
         self.transact(TransactionRequest::new(conditions, mutations))
-            .map(Some)
     }
 
     /// Applies one validated request atomically at the reference model's
     /// serialization point.
-    pub fn transact(&mut self, request: TransactionRequest) -> Result<Lsn> {
+    pub fn transact(&mut self, request: TransactionRequest) -> Result<Option<Lsn>> {
         self.transact_at(request, self.next_lsn)
     }
 
     /// Applies a request using a commit LSN supplied by a physical engine.
     /// This lets differential tests replay real WAL commit identities while
     /// the ordinary reference path continues to use synthetic LSNs.
-    pub fn transact_at(&mut self, request: TransactionRequest, commit_lsn: Lsn) -> Result<Lsn> {
-        if commit_lsn == Lsn::ZERO {
-            return Err(Error::invalid_request(
-                "a committed transaction LSN must be non-zero",
-            ));
-        }
+    pub fn transact_at(
+        &mut self,
+        request: TransactionRequest,
+        commit_lsn: Lsn,
+    ) -> Result<Option<Lsn>> {
         request.validate()?;
         for condition in &request.conditions {
             let actual = self.get(condition.key());
@@ -132,6 +130,15 @@ impl ReferenceDb {
                     actual: actual.observed(),
                 }));
             }
+        }
+
+        if request.mutations.is_empty() {
+            return Ok(None);
+        }
+        if commit_lsn == Lsn::ZERO {
+            return Err(Error::invalid_request(
+                "a committed transaction LSN must be non-zero",
+            ));
         }
 
         let revision = Revision::from(commit_lsn);
@@ -153,7 +160,7 @@ impl ReferenceDb {
         if next_lsn > self.next_lsn {
             self.next_lsn = next_lsn;
         }
-        Ok(commit_lsn)
+        Ok(Some(commit_lsn))
     }
 
     pub fn transact_get(&self, keys: &[DocumentKey]) -> Vec<RevisionState> {
@@ -437,6 +444,21 @@ mod tests {
             vec![TransactionMutation::Delete { key }],
         );
         db.transact(exists).unwrap();
+    }
+
+    #[test]
+    fn condition_only_transaction_has_no_logical_commit() {
+        let mut db = ReferenceDb::new();
+        let key = key(7, 1);
+        let before_lsn = db.next_lsn;
+        let request = TransactionRequest::new(
+            vec![TransactionCondition::NotExists { key: key.clone() }],
+            Vec::new(),
+        );
+
+        assert_eq!(db.transact(request).unwrap(), None);
+        assert_eq!(db.get(&key), RevisionState::missing(Revision::ZERO));
+        assert_eq!(db.next_lsn, before_lsn);
     }
 
     #[test]
