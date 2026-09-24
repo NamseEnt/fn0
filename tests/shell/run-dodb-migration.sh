@@ -230,6 +230,13 @@ if remote[:2] == ["bash", "-s"]:
     if remote[2:3] == ["--"] and 'remote_binary="$1"' in script:
         record("remote-runs", script)
         raise SystemExit(0)
+    if remote[2:3] == ["--"] and "openssl x509 -in" in script:
+        if "sudo install -o opc -g opc -m 0600 /etc/dodb/server.crt" not in script:
+            raise SystemExit(7)
+        if "-outform DER" not in script or "rm -f -- \"$pem_path\"" not in script:
+            raise SystemExit(8)
+        record("control-cert-stage", remote[-1])
+        raise SystemExit(0)
     if "Previous migration runner temporary paths" in script:
         record("stale-cleanup", "listed")
         raise SystemExit(0)
@@ -272,11 +279,7 @@ if remote[:2] == ["bash", "-c"]:
             output.write(payload)
         raise SystemExit(0)
 
-if remote[:2] == ["sudo", "install"] and "/etc/dodb/server.crt" in remote:
-    record("control-cert-stage", remote[-1])
-    raise SystemExit(0)
-
-if remote[:2] == ["sudo", "rm"] and "--" in remote:
+if remote[:2] == ["rm", "-rf"] and "--" in remote:
     record("control-cert-cleanup", remote[-1])
     raise SystemExit(0)
 
@@ -394,7 +397,8 @@ if MOCK_FAIL_UPLOAD=1 bash "${mock_repo}/scripts/run-dodb-migration.sh" transpor
 [[ "$(tail -n 1 "${state_dir}/session-deletes")" == *"session-1"* ]]
 [[ "$(cat "${state_dir}/display-name")" =~ ^fn0-dodb-control-[0-9a-f]{24}$ ]]
 control_cert_path="$(cat "${state_dir}/control-cert-stage")"
-[[ "$control_cert_path" == "$(cat "${state_dir}/control-cert-cleanup")" ]]
+[[ "$control_cert_path" == */server.der ]]
+[[ "${control_cert_path%/*}" == "$(cat "${state_dir}/control-cert-cleanup")" ]]
 rg -q -- "--dodb-root-cert ${control_cert_path} scan --limit 1" "${state_dir}/control-db-ops-argv"
 
 reset_readiness_state() {

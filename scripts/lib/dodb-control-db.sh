@@ -13,7 +13,8 @@ dodb_control_db_open() {
   fi
 
   local temporary_dir binary_dir target_ssh_key_file
-  local remote_nonce local_binary local_binary_sha remote_cache_dir cache_status remote_sha remote_cert_path
+  local remote_nonce local_binary local_binary_sha remote_cache_dir cache_status remote_sha
+  local remote_cert_dir remote_cert_pem_path remote_cert_der_path
 
   need pulumi
   need jq
@@ -52,10 +53,23 @@ dodb_control_db_open() {
     -o StrictHostKeyChecking=accept-new
   )
   remote_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(12))')"
-  remote_cert_path="/tmp/fn0-db-ops.${remote_nonce}.server.crt"
-  ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 \
-    sudo install -o opc -g opc -m 0600 /etc/dodb/server.crt "$remote_cert_path"
-  DODB_CONTROL_DB_REMOTE_CERT_PATH="$remote_cert_path"
+  remote_cert_dir="/tmp/fn0-db-ops.${remote_nonce}"
+  remote_cert_pem_path="${remote_cert_dir}/server.pem"
+  remote_cert_der_path="${remote_cert_dir}/server.der"
+  DODB_CONTROL_DB_REMOTE_CERT_DIR="$remote_cert_dir"
+  DODB_CONTROL_DB_REMOTE_CERT_PATH="$remote_cert_der_path"
+  ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 bash -s -- \
+    "$remote_cert_pem_path" "$remote_cert_der_path" <<'REMOTE_CERT'
+set -euo pipefail
+pem_path="$1"
+der_path="$2"
+cert_dir="$(dirname "$pem_path")"
+mkdir -m 0700 "$cert_dir"
+sudo install -o opc -g opc -m 0600 /etc/dodb/server.crt "$pem_path"
+openssl x509 -in "$pem_path" -outform DER -out "$der_path"
+chmod 0600 "$der_path"
+rm -f -- "$pem_path"
+REMOTE_CERT
   local_binary="${binary_dir}/fn0-db-ops"
   local_binary_sha="$(sha256sum "${local_binary}" | awk '{print $1}')"
   remote_cache_dir="/home/opc/.cache/fn0/db-ops/${local_binary_sha}"
@@ -125,15 +139,15 @@ dodb_control_db_call() {
 }
 
 dodb_control_db_close() {
-  if [[ -n "${DODB_CONTROL_DB_REMOTE_CERT_PATH:-}" && -n "${DODB_CONTROL_DB_REMOTE_BINARY:-}" ]]; then
+  if [[ -n "${DODB_CONTROL_DB_REMOTE_CERT_DIR:-}" && -n "${DODB_CONTROL_DB_REMOTE_BINARY:-}" ]]; then
     ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 \
-      sudo rm -f -- "$DODB_CONTROL_DB_REMOTE_CERT_PATH" >/dev/null 2>&1 || true
+      rm -rf -- "$DODB_CONTROL_DB_REMOTE_CERT_DIR" >/dev/null 2>&1 || true
   fi
   bastion_port_forward_close
   if [[ -n "${DODB_CONTROL_DB_TEMP_DIR:-}" ]]; then
     rm -rf "$DODB_CONTROL_DB_TEMP_DIR"
   fi
-  unset DODB_CONTROL_DB_REMOTE_BINARY DODB_CONTROL_DB_REMOTE_CERT_PATH
+  unset DODB_CONTROL_DB_REMOTE_BINARY DODB_CONTROL_DB_REMOTE_CERT_PATH DODB_CONTROL_DB_REMOTE_CERT_DIR
   unset DODB_CONTROL_DB_TEMP_DIR
   unset DODB_CONTROL_DB_SSH_OPTIONS
   unset __FN0_DODB_CONTROL_DB_OPEN
