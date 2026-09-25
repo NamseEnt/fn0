@@ -10,8 +10,11 @@ jobs:
     # The repo is public, so the default token is enough for the checkout
     # and for the tag pushes below. The old RELEASE_PAT lost its repo scope
     # when the repository path changed case and is no longer set.
+    # Tags pushed with the default token do not trigger other workflows, so
+    # each release workflow is dispatched explicitly, which needs actions: write.
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -43,6 +46,8 @@ jobs:
           fi
 
       - name: Create release tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -50,6 +55,7 @@ jobs:
           tag_if_needed() {
             local dir="$1"
             local tag_prefix="$2"
+            local release_workflow="$3"
 
             local local_ver=$(grep '^version' "$dir/Cargo.toml" | head -1 | sed 's/version = "\(.*\)"/\1/')
             local tag="${tag_prefix}-v${local_ver}"
@@ -63,8 +69,9 @@ jobs:
             echo "Creating tag $tag"
             git tag "$tag"
             git push origin "$tag"
+            gh workflow run "$release_workflow" --ref "$tag" -f tag="$tag"
           }
 
-          tag_if_needed "forte/cli" "release/forte-cli"
-          tag_if_needed "forte/rs-to-ts" "forte-rs-to-ts"
-          tag_if_needed "fn0/cli" "release/fn0-cli"
+          tag_if_needed "forte/cli" "release/forte-cli" "release-release.yml"
+          tag_if_needed "forte/rs-to-ts" "forte-rs-to-ts" "release-forte-rs-to-ts.yml"
+          tag_if_needed "fn0/cli" "release/fn0-cli" "release-release.yml"
