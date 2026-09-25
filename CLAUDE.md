@@ -1,4 +1,5 @@
 - This project uses English everywhere (code, comments, docs, commit messages).
+- Commit messages are a single short subject line, `scope: lowercase imperative summary` (e.g. `ci: dispatch release after tagging`, `doc-db: add native dodb backend`). No body — the why lives in the diff, the PR, or the conversation, not in a multi-paragraph commit message. Check `git log --oneline` and match it before committing.
 - Do not modify `spec.md` without explicit user authorization.
 - Comments: write only what code and history tools cannot carry. Run every comment through 3 filters, drop it if it fails any:
   1. Can it be expressed in code? (renaming, types, structure) → fix the code, not add a comment.
