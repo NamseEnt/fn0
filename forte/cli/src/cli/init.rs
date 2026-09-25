@@ -5,8 +5,8 @@ use std::process::Command;
 
 const INIT_FORTE_JSON_VERSION: &str = "0.1.3";
 const INIT_FORTE_SDK_VERSION: &str = "0.11.0";
-const INIT_FORTE_CODEGEN_VERSION: &str = "0.5.0";
-const INIT_FN0_DOC_DB_VERSION: &str = "0.4.15";
+const INIT_FORTE_CODEGEN_VERSION: &str = "0.5.1";
+const INIT_FN0_DOC_DB_VERSION: &str = "0.4.16";
 const INIT_FN0_OBJECT_STORAGE_VERSION: &str = "0.5.9";
 
 const DEV_WORKSPACE_MANIFESTS: &[&str] = &[
