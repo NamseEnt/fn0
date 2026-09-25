@@ -320,9 +320,9 @@ mod tests {
 
         assert!(manifest.contains("forte-json = \"=0.1.3\""));
         assert!(manifest.contains("forte-sdk = \"=0.11.0\""));
-        assert!(manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.15\""));
+        assert!(manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.16\""));
         assert!(manifest.contains("package = \"fn0-object-storage\", version = \"=0.5.9\""));
-        assert!(manifest.contains("forte-codegen = \"=0.5.0\""));
+        assert!(manifest.contains("forte-codegen = \"=0.5.1\""));
         assert!(!manifest.contains("path = "));
     }
 }

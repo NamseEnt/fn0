@@ -33,9 +33,9 @@ fn test_init_creates_project_structure() {
     let rust_manifest = std::fs::read_to_string(project_dir.join("rs/Cargo.toml")).unwrap();
     assert!(rust_manifest.contains("forte-json = \"=0.1.3\""));
     assert!(rust_manifest.contains("forte-sdk = \"=0.11.0\""));
-    assert!(rust_manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.15\""));
+    assert!(rust_manifest.contains("package = \"fn0-doc-db\", version = \"=0.4.16\""));
     assert!(rust_manifest.contains("package = \"fn0-object-storage\", version = \"=0.5.9\""));
-    assert!(rust_manifest.contains("forte-codegen = \"=0.5.0\""));
+    assert!(rust_manifest.contains("forte-codegen = \"=0.5.1\""));
     assert!(!rust_manifest.contains("path = "));
 
     let app_tsx = std::fs::read_to_string(project_dir.join("fe/src/app.tsx")).unwrap();
