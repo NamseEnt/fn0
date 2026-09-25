@@ -77,6 +77,10 @@ const OutputSchema = z.discriminatedUnion("t", [
     z.object({
     t: z.literal("InternalError"),
     reason: z.string(),
+  }),
+    z.object({
+    t: z.literal("Unavailable"),
+    reason: z.string(),
   })
   ]);
 
