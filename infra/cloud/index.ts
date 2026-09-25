@@ -666,48 +666,59 @@ const controlEnvYamlBootstrap = pulumi
       ].join("\n"),
   );
 
-const ociFn0WorkerSite = new fn0.OciFn0WorkerSite("oci-fn0-worker-site", {
-  region: config.require("ociComputeWorkerRegion"),
-  count: 1,
-  shape: "VM.Standard.A1.Flex",
-  ocpus: 1,
-  memoryInGbs: 6,
-  websocketBearer: websocketBearer.result,
-  dodbRuntime: {
-    address: dodbRuntimeAddr!,
-    serverName: dodbRuntimeServerName!,
-    rootCertPemBase64: dodbRuntimeRootCertPemBase64!,
+const ociFn0WorkerSite = new fn0.OciFn0WorkerSite(
+  "oci-fn0-worker-site",
+  {
+    region: config.require("ociComputeWorkerRegion"),
+    count: 1,
+    shape: "VM.Standard.A1.Flex",
+    ocpus: 1,
+    memoryInGbs: 6,
+    websocketBearer: websocketBearer.result,
+    dodbRuntime: {
+      address: dodbRuntimeAddr!,
+      serverName: dodbRuntimeServerName!,
+      rootCertPemBase64: dodbRuntimeRootCertPemBase64!,
+    },
+    worker: {
+      tlsOrigin: {
+        certPem: dns.certificate,
+        keyPem: dns.privateKeyPem,
+      },
+      envEncryptionKeyBase64: envEncryptionKey.base64,
+      crossProjectEnqueueAllowedCallerProjectId: "fn0-control",
+      crossProjectInvokeAllowedCallerProjectId: "fn0-control",
+      vault: {
+        cryptoEndpoint: ociGlobalVault.cryptoEndpoint,
+        keyOcid: ociGlobalVault.keyOcid,
+        region: ociGlobalVault.region,
+        allowedSubdomain: ociGlobalVault.allowedSubdomain,
+        workerCredentials: ociGlobalVault.workerCredentials,
+      },
+      hostObservability: workerHostObservability,
+      bundleStorage: {
+        bucketName: bundleStoreR2.bucketName,
+        endpoint: bundleStoreR2.endpoint,
+        region: "auto",
+        accessKeyId: bundleStoreR2.accessKeyId,
+        secretAccessKey: bundleStoreR2.secretAccessKey,
+      },
+      controlProjectId: "fn0-control",
+      apex: {
+        domain,
+        projectId: "fn0-control",
+      },
+      forteDb: {
+        groupToken: pulumi.secret(forteDb.groupToken),
+        hostSuffix: forteDb.hostSuffix,
+      },
+    },
+    workerAgentForteDb: {
+      groupToken: pulumi.secret(forteDb.groupToken),
+      hostSuffix: forteDb.hostSuffix,
+    },
   },
-  worker: {
-    tlsOrigin: {
-      certPem: dns.certificate,
-      keyPem: dns.privateKeyPem,
-    },
-    envEncryptionKeyBase64: envEncryptionKey.base64,
-    crossProjectEnqueueAllowedCallerProjectId: "fn0-control",
-    crossProjectInvokeAllowedCallerProjectId: "fn0-control",
-    vault: {
-      cryptoEndpoint: ociGlobalVault.cryptoEndpoint,
-      keyOcid: ociGlobalVault.keyOcid,
-      region: ociGlobalVault.region,
-      allowedSubdomain: ociGlobalVault.allowedSubdomain,
-      workerCredentials: ociGlobalVault.workerCredentials,
-    },
-    hostObservability: workerHostObservability,
-    bundleStorage: {
-      bucketName: bundleStoreR2.bucketName,
-      endpoint: bundleStoreR2.endpoint,
-      region: "auto",
-      accessKeyId: bundleStoreR2.accessKeyId,
-      secretAccessKey: bundleStoreR2.secretAccessKey,
-    },
-    controlProjectId: "fn0-control",
-    apex: {
-      domain,
-      projectId: "fn0-control",
-    },
-  },
-});
+);
 
 const ociDodbNode = new fn0.OciDodbNode("oci-dodb-node", {
   compartmentId: ociFn0WorkerSite.compartmentId,

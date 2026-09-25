@@ -26,6 +26,7 @@ const EXHAUSTED_RECHECK_INTERVAL: Duration = Duration::from_secs(60);
 const GRANT_DEADLINE: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize)]
+#[serde(tag = "t")]
 pub enum EgressGrantResponse {
     Granted { month: String, granted_bytes: u64 },
     QuotaExhausted { month: String },
@@ -151,6 +152,15 @@ impl EgressBudget for ControlEgressBudget {
                 grant_source.request_grant(&project_id, requested_bytes, minimum_bytes),
             )
             .await;
+            if let Err(timeout_error) = &response {
+                tracing::error!(
+                    %project_id,
+                    byte_count,
+                    timeout_ms = GRANT_DEADLINE.as_millis(),
+                    %timeout_error,
+                    "egress grant request timed out"
+                );
+            }
             let denied = match response {
                 Ok(Ok(EgressGrantResponse::Granted {
                     month,
@@ -164,8 +174,18 @@ impl EgressBudget for ControlEgressBudget {
                     credit.last_grant_at = Some(tokio::time::Instant::now());
                     return Ok(());
                 }
-                Ok(Ok(EgressGrantResponse::Granted { .. })) => EgressDenied::BudgetUnavailable,
+                Ok(Ok(EgressGrantResponse::Granted { granted_bytes, .. })) => {
+                    tracing::error!(
+                        %project_id,
+                        byte_count,
+                        minimum_bytes,
+                        granted_bytes,
+                        "egress grant was smaller than the requested minimum"
+                    );
+                    EgressDenied::BudgetUnavailable
+                }
                 Ok(Ok(EgressGrantResponse::QuotaExhausted { month })) => {
+                    tracing::warn!(%project_id, %month, "egress grant quota exhausted");
                     *state
                         .exhausted
                         .lock()
@@ -183,11 +203,20 @@ impl EgressBudget for ControlEgressBudget {
                         month: credit.month.clone(),
                         recheck_at: tokio::time::Instant::now() + EXHAUSTED_RECHECK_INTERVAL,
                     });
+                    tracing::error!(%project_id, "egress grant quota is not configured");
                     EgressDenied::QuotaNotConfigured
                 }
-                Ok(Ok(EgressGrantResponse::Unauthorized | EgressGrantResponse::Error))
-                | Ok(Err(_))
-                | Err(_) => EgressDenied::BudgetUnavailable,
+                Ok(Ok(
+                    response @ (EgressGrantResponse::Unauthorized | EgressGrantResponse::Error),
+                )) => {
+                    tracing::error!(%project_id, ?response, "egress grant control response refused request");
+                    EgressDenied::BudgetUnavailable
+                }
+                Ok(Err(error)) => {
+                    tracing::error!(%project_id, error = %format_args!("{error:#}"), "egress grant internal invocation failed");
+                    EgressDenied::BudgetUnavailable
+                }
+                Err(_) => EgressDenied::BudgetUnavailable,
             };
             tracing::warn!(%project_id, byte_count, ?denied, "egress charge refused");
             Err(denied)
@@ -217,6 +246,14 @@ pub struct ControlEgressGrantSource {
     worker_senders: OnceLock<Arc<Vec<mpsc::Sender<RequestEnvelope>>>>,
 }
 
+fn decode_grant_response(
+    status: hyper::StatusCode,
+    body: &[u8],
+) -> anyhow::Result<EgressGrantResponse> {
+    anyhow::ensure!(status.is_success(), "egress grant returned status {status}");
+    Ok(forte_json::from_slice(body)?)
+}
+
 impl ControlEgressGrantSource {
     pub fn new(control_project_id: String) -> Self {
         Self {
@@ -244,13 +281,18 @@ impl EgressGrantSource for ControlEgressGrantSource {
         let project_id = project_id.to_string();
         Box::pin(async move {
             let Some(worker_senders) = worker_senders else {
+                tracing::error!(%project_id, "egress grant internal invocation has no worker senders");
                 anyhow::bail!("egress grant source is not connected to worker threads");
             };
             let body = serde_json::to_vec(&serde_json::json!({
                 "project_id": project_id,
                 "requested_bytes": requested_bytes,
                 "minimum_bytes": minimum_bytes,
-            }))?;
+            }))
+            .map_err(|error| {
+                tracing::error!(%project_id, %error, "egress grant request encoding failed");
+                error
+            })?;
             let request = hyper::Request::builder()
                 .method(hyper::Method::POST)
                 .uri("https://fn0-control.internal/__forte_action/egress_grant")
@@ -260,7 +302,11 @@ impl EgressGrantSource for ControlEgressGrantSource {
                     Full::new(Bytes::from(body))
                         .map_err(|never: std::convert::Infallible| match never {})
                         .boxed_unsync(),
-                )?;
+                )
+                .map_err(|error| {
+                    tracing::error!(%project_id, %error, "egress grant request construction failed");
+                    error
+                })?;
             let response = worker_pool::invoke_and_wait(
                 &worker_senders,
                 |response_sender| {
@@ -269,12 +315,45 @@ impl EgressGrantSource for ControlEgressGrantSource {
                 GRANT_DEADLINE,
                 GRANT_DEADLINE,
             )
-            .await?;
-            if !response.status().is_success() {
-                anyhow::bail!("egress grant returned status {}", response.status());
+            .await
+            .map_err(|error| {
+                tracing::error!(
+                    %project_id,
+                    error = %format_args!("{error:#}"),
+                    "egress grant internal invocation failed"
+                );
+                error
+            })?;
+            let status = response.status();
+            let body = response
+                .into_body()
+                .collect()
+                .await
+                .map_err(|error| {
+                    tracing::error!(%project_id, %error, "egress grant response body read failed");
+                    error
+                })?
+                .to_bytes();
+            if !status.is_success() {
+                tracing::error!(
+                    %project_id,
+                    %status,
+                    response_body_bytes = body.len(),
+                    "egress grant control returned non-success status"
+                );
+                anyhow::bail!("egress grant returned status {status}");
             }
-            let body = response.into_body().collect().await?.to_bytes();
-            Ok(serde_json::from_slice(&body)?)
+            let grant_response = decode_grant_response(status, &body).map_err(|error| {
+                tracing::error!(
+                    %project_id,
+                    %error,
+                    response_body_bytes = body.len(),
+                    "egress grant response JSON decode failed"
+                );
+                error
+            })?;
+            tracing::info!(%project_id, ?grant_response, "egress grant response received");
+            Ok(grant_response)
         })
     }
 }
@@ -338,6 +417,24 @@ mod tests {
             month: "2026-09".to_string(),
             granted_bytes,
         })
+    }
+
+    #[test]
+    fn decodes_control_grant_outcome_and_rejects_invalid_response() {
+        let granted_response = decode_grant_response(
+            hyper::StatusCode::OK,
+            br#"{"t":"Granted","month":"2026-09","grantedBytes":262144}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            granted_response,
+            EgressGrantResponse::Granted {
+                month: "2026-09".to_string(),
+                granted_bytes: MINIMUM_GRANT_BYTES,
+            }
+        );
+        assert!(decode_grant_response(hyper::StatusCode::NOT_FOUND, b"Not Found").is_err());
+        assert!(decode_grant_response(hyper::StatusCode::OK, b"not-json").is_err());
     }
 
     #[tokio::test(start_paused = true)]

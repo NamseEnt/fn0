@@ -211,23 +211,10 @@ build_and_push_fn0_worker() {
     return 0
   fi
 
-  local publish_log build_log bin_dir
-  publish_log="$(mktemp)"
+  local build_log bin_dir
   build_log="$(mktemp)"
   bin_dir="$(mktemp -d)"
-  trap 'rm -f "$publish_log" "$build_log"; rm -rf "$bin_dir"' RETURN
-
-  echo ">> cargo publish fn0-worker"
-  if (cd "$REPO_ROOT" && cargo publish -p fn0-worker) 2>&1 | tee "$publish_log"; then
-    echo "   published."
-  else
-    if grep -qE "already (uploaded|exists)" "$publish_log"; then
-      echo "   already published, continuing."
-    else
-      echo "cargo publish failed" >&2
-      return 1
-    fi
-  fi
+  trap 'rm -f "$build_log"; rm -rf "$bin_dir"' RETURN
 
   "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" fn0-worker "$bin_dir"
 

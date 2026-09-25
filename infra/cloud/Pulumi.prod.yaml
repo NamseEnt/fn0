@@ -2,7 +2,7 @@ config:
   fn0Cloud:cloudflareAccountId: b62235f721637e4dcfb89754c44e3486
   fn0Cloud:cloudflareZoneId: 35b3cf9096f0074cf95bb2d1a5b2f8ae
   fn0Cloud:domain: fn0.dev
-  fn0Cloud:dbBackend: turso
+  fn0Cloud:dbBackend: dodb
   fn0Cloud:ociComputeWorkerRegion: ap-osaka-1
   fn0Cloud:tursoOrganizationSlug: namse
   fn0Cloud:tursoLocation: aws-ap-northeast-1

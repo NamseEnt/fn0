@@ -16,15 +16,19 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 doc-db = { workspace = true }
+dodb-client = { workspace = true }
+dodb-core = { workspace = true }
+dodb-protocol = { workspace = true }
+dodb-service = { path = "../../dodb/crates/dodb-service" }
+libsql = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 rustls = { workspace = true }
 rustls-pemfile = { workspace = true }
 
 [dev-dependencies]
-bytes = { workspace = true }
-dodb-protocol = { workspace = true }
 dodb-server = { workspace = true }
 rcgen = { workspace = true }
 tempfile = { workspace = true }

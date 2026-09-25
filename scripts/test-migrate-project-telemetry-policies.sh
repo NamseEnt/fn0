@@ -147,7 +147,9 @@ if run_telemetry dodb --check >/dev/null 2>&1; then exit 1; fi
 if run_telemetry dodb --apply --backup-dir "${temporary_dir}/backup" >/dev/null 2>&1; then exit 1; fi
 [[ ! -s "$call_log" ]]
 
-jq -nc --arg encoded "$project_b64" '[range(0;501) as $index | {pk:("ProjectDoc/" + (("0000" + ($index|tostring))[-4:])),sk:"",data_base64:$encoded}]' >"$documents_file"
+large_project_data="$(jq -c --arg padding "$(python3 -c 'print("x" * 1200)')" '. + {padding:$padding}' <<<"$project_data")"
+large_project_b64="$(printf '%s' "$large_project_data" | base64 | tr -d '\n')"
+jq -nc --arg encoded "$large_project_b64" '[range(0;501) as $index | {pk:("ProjectDoc/" + (("0000" + ($index|tostring))[-4:])),sk:"",data_base64:$encoded}]' >"$documents_file"
 : >"$call_log"
 result="$(run_telemetry dodb --check-schema)"
 [[ "$(jq -r '.projects' <<<"$result")" == 501 ]]

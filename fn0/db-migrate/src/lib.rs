@@ -1,10 +1,19 @@
 use anyhow::{Context, Result, anyhow, bail};
 use async_trait::async_trait;
 use doc_db::{DodbConfig, DodbConnection, RawStatement, RawTransactionOutcome, Value};
+use serde::Deserialize;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+
+const MAX_SNAPSHOT_PAGE_DATA_BYTES: usize = 8 * 1024 * 1024;
+use dodb_client::DodbConnection as NativeDodbConnection;
+use dodb_core::{DocumentKey, TenantId, TransactionMutation, TransactionRequest};
+use dodb_protocol::ProtocolLimits;
+use dodb_service::Request as DodbRequest;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Row {
@@ -35,10 +44,323 @@ pub trait MigrationSource: Send + Sync {
     ) -> Result<SourcePage>;
 }
 
+#[async_trait]
+trait BatchDestination: Send + Sync {
+    async fn transact(&self, request: TransactionRequest) -> Result<()>;
+    async fn get(&self, row: &Row) -> Result<Option<Vec<u8>>>;
+}
+
+#[async_trait]
+impl BatchDestination for dodb_client::DodbClient {
+    async fn transact(&self, request: TransactionRequest) -> Result<()> {
+        dodb_client::DodbClient::transact(self, request)
+            .await
+            .map(|_| ())
+            .map_err(anyhow::Error::new)
+    }
+
+    async fn get(&self, row: &Row) -> Result<Option<Vec<u8>>> {
+        match dodb_client::DodbClient::get(
+            self,
+            DocumentKey::new(row.pk.as_bytes().to_vec(), row.sk.as_bytes().to_vec()),
+        )
+        .await?
+        {
+            dodb_core::RevisionState::Present { value, .. } => Ok(Some(value)),
+            dodb_core::RevisionState::Missing { .. } => Ok(None),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct TursoSource {
     group_token: String,
     host_suffix: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SnapshotManifest {
+    pub format_version: u32,
+    pub captured_at: String,
+    pub project_ids: Vec<String>,
+    pub active_project_ids: Vec<String>,
+    pub databases: Vec<SnapshotDatabase>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SnapshotDatabase {
+    pub project_id: String,
+    pub filename: String,
+    pub source_state: String,
+    pub row_count: u64,
+    pub data_bytes: u64,
+    pub sha256: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct SnapshotSource {
+    directory: PathBuf,
+    manifest: SnapshotManifest,
+}
+
+impl SnapshotSource {
+    pub async fn open(directory: impl AsRef<Path>) -> Result<Self> {
+        let directory = directory.as_ref().to_owned();
+        let manifest_path = directory.join("manifest.json");
+        let manifest: SnapshotManifest = serde_json::from_slice(
+            &std::fs::read(&manifest_path)
+                .with_context(|| format!("failed to read {}", manifest_path.display()))?,
+        )
+        .context("invalid snapshot manifest")?;
+        if manifest.format_version != 1 || manifest.captured_at.is_empty() {
+            bail!("unsupported or malformed snapshot manifest")
+        }
+        if manifest_path.is_symlink() || !manifest_path.is_file() {
+            bail!("snapshot manifest must be a regular file")
+        }
+        if manifest.project_ids.first().map(String::as_str) != Some("fn0-control") {
+            bail!("snapshot manifest project list must start with fn0-control")
+        }
+        let mut expected_projects = vec!["fn0-control".to_owned()];
+        let mut canonical = BTreeSet::new();
+        for project_id in &manifest.active_project_ids {
+            tenant_id(project_id)
+                .with_context(|| format!("invalid snapshot project ID {project_id:?}"))?;
+            if project_id == "fn0-control" || !canonical.insert(project_id.clone()) {
+                bail!("duplicate or noncanonical active project ID {project_id:?}")
+            }
+        }
+        expected_projects.extend(canonical);
+        if manifest.project_ids != expected_projects {
+            bail!("snapshot manifest project IDs do not match its active project list")
+        }
+        if manifest.databases.len() != manifest.project_ids.len() {
+            bail!("snapshot manifest database count does not match project IDs")
+        }
+        for (project_id, database) in manifest.project_ids.iter().zip(&manifest.databases) {
+            if database.project_id != *project_id
+                || database.filename != format!("{project_id}.sqlite")
+            {
+                bail!("snapshot manifest database entry is not canonical for {project_id}")
+            }
+            if !matches!(
+                database.source_state.as_str(),
+                "present" | "missing_database"
+            ) || (database.source_state == "missing_database"
+                && (database.row_count != 0 || database.data_bytes != 0))
+            {
+                bail!("snapshot source state or counts are invalid for {project_id}")
+            }
+            tenant_id(project_id)?;
+            let path = directory.join(&database.filename);
+            if path.is_symlink() || !path.is_file() {
+                bail!("snapshot database must be a regular file for {project_id}")
+            }
+            let actual_hash = file_sha256(&path)?;
+            if actual_hash != database.sha256 {
+                bail!("snapshot checksum mismatch for {project_id}")
+            }
+            let db = libsql::Builder::new_local(&path)
+                .flags(libsql::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .build()
+                .await?;
+            let connection = db.connect()?;
+            let mut integrity = connection.query("PRAGMA integrity_check", ()).await?;
+            let integrity = integrity
+                .next()
+                .await?
+                .ok_or_else(|| anyhow!("missing integrity result for {project_id}"))?
+                .get::<String>(0)?;
+            if integrity != "ok" {
+                bail!("snapshot SQLite integrity check failed for {project_id}: {integrity}")
+            }
+            let columns = connection.query("PRAGMA table_info(docs)", ()).await?;
+            let mut found = BTreeSet::new();
+            let mut columns = columns;
+            while let Some(column) = columns.next().await? {
+                found.insert(column.get::<String>(1)?);
+            }
+            if !found.is_empty()
+                && !["pk", "sk", "data", "version"]
+                    .iter()
+                    .all(|name| found.contains(*name))
+            {
+                bail!("snapshot docs table has invalid columns for {project_id}")
+            }
+            let counts = connection
+                .query(
+                    "SELECT COUNT(*), COALESCE(SUM(length(data)), 0) FROM docs",
+                    (),
+                )
+                .await;
+            match counts {
+                Ok(mut counts) => {
+                    let row = counts
+                        .next()
+                        .await?
+                        .ok_or_else(|| anyhow!("missing count row for {project_id}"))?;
+                    if row.get::<i64>(0)? as u64 != database.row_count
+                        || row.get::<i64>(1)? as u64 != database.data_bytes
+                    {
+                        bail!("snapshot manifest row or byte count mismatch for {project_id}")
+                    }
+                }
+                Err(error)
+                    if is_missing_docs_table_error(&error.to_string())
+                        && database.row_count == 0
+                        && database.data_bytes == 0 => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        let control_db = libsql::Builder::new_local(directory.join("fn0-control.sqlite"))
+            .flags(libsql::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .build()
+            .await?;
+        let control_connection = control_db.connect()?;
+        let mut discovered = BTreeSet::new();
+        match control_connection
+            .query("SELECT pk, sk, data FROM docs ORDER BY pk, sk", ())
+            .await
+        {
+            Ok(mut rows) => {
+                while let Some(row) = rows.next().await? {
+                    let pk = row.get::<String>(0)?;
+                    if !pk.starts_with("ProjectDoc/") {
+                        continue;
+                    }
+                    let sk = row.get::<String>(1)?;
+                    let data = row.get::<Vec<u8>>(2)?;
+                    let document: serde_json::Value = serde_json::from_slice(&data)
+                        .with_context(|| format!("malformed ProjectDoc at ({pk:?}, {sk:?})"))?;
+                    let project_id = document
+                        .get("project_id")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| {
+                            anyhow!("ProjectDoc at ({pk:?}, {sk:?}) has no string project_id")
+                        })?;
+                    if project_id == "fn0-control" {
+                        continue;
+                    }
+                    tenant_id(project_id).with_context(|| {
+                        format!("ProjectDoc at ({pk:?}, {sk:?}) has invalid project_id")
+                    })?;
+                    if !discovered.insert(project_id.to_owned()) {
+                        bail!("duplicate project_id {project_id:?} in fn0-control snapshot")
+                    }
+                }
+            }
+            Err(error)
+                if is_missing_docs_table_error(&error.to_string())
+                    && manifest.databases[0].row_count == 0 => {}
+            Err(error) => return Err(error.into()),
+        }
+        if discovered.into_iter().collect::<Vec<_>>() != manifest.active_project_ids {
+            bail!(
+                "snapshot manifest active project list does not match fn0-control ProjectDoc rows"
+            )
+        }
+        Ok(Self {
+            directory,
+            manifest,
+        })
+    }
+
+    pub fn manifest(&self) -> &SnapshotManifest {
+        &self.manifest
+    }
+}
+
+fn file_sha256(path: &Path) -> Result<String> {
+    let file = std::fs::File::open(path)
+        .with_context(|| format!("failed to read snapshot {}", path.display()))?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut digest = Sha256::new();
+    std::io::copy(&mut reader, &mut digest)
+        .with_context(|| format!("failed to hash snapshot {}", path.display()))?;
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+#[async_trait]
+impl MigrationSource for SnapshotSource {
+    async fn page(
+        &self,
+        project_id: &str,
+        after: Option<(&str, &str)>,
+        limit: usize,
+    ) -> Result<SourcePage> {
+        validate_page_size(limit)?;
+        if !self
+            .manifest
+            .project_ids
+            .iter()
+            .any(|item| item == project_id)
+        {
+            bail!("project {project_id} is not present in the snapshot manifest")
+        }
+        let path = self.directory.join(format!("{project_id}.sqlite"));
+        let database = libsql::Builder::new_local(&path)
+            .flags(libsql::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .build()
+            .await?;
+        let connection = database.connect()?;
+        let query = match after {
+            Some(_) => {
+                "SELECT pk, sk, data FROM docs WHERE pk > ?1 OR (pk = ?1 AND sk > ?2) ORDER BY pk, sk LIMIT ?3"
+            }
+            None => "SELECT pk, sk, data FROM docs ORDER BY pk, sk LIMIT ?1",
+        };
+        let statement = match connection.prepare(query).await {
+            Ok(statement) => statement,
+            Err(error)
+                if is_missing_docs_table_error(&error.to_string())
+                    && after.is_none()
+                    && self
+                        .manifest
+                        .databases
+                        .iter()
+                        .find(|item| item.project_id == project_id)
+                        .is_some_and(|item| item.row_count == 0) =>
+            {
+                return Ok(SourcePage::MissingTable);
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let mut rows = match after {
+            Some((pk, sk)) => {
+                statement
+                    .query(libsql::params![pk, sk, limit as i64])
+                    .await?
+            }
+            None => statement.query([limit as i64]).await?,
+        };
+        let mut result = Vec::new();
+        let mut data_bytes = 0usize;
+        while let Some(row) = rows.next().await? {
+            let data = row.get::<Vec<u8>>(2)?;
+            if !result.is_empty()
+                && data_bytes.saturating_add(data.len()) > MAX_SNAPSHOT_PAGE_DATA_BYTES
+            {
+                break;
+            }
+            data_bytes = data_bytes.saturating_add(data.len());
+            result.push(Row {
+                pk: row.get(0)?,
+                sk: row.get(1)?,
+                data,
+            });
+        }
+        if result.is_empty()
+            && self
+                .manifest
+                .databases
+                .iter()
+                .find(|item| item.project_id == project_id)
+                .is_some_and(|item| item.row_count == 0)
+        {
+            return Ok(SourcePage::Rows(result));
+        }
+        Ok(SourcePage::Rows(result))
+    }
 }
 
 impl TursoSource {
@@ -255,6 +577,9 @@ pub struct MigrationReport {
     pub totals: ProjectStats,
     pub mismatch_samples: Vec<MismatchSample>,
     pub verified: bool,
+    pub transaction_requests: u64,
+    pub maximum_batch_size: usize,
+    pub elapsed_ms: u128,
 }
 
 fn tenant_id(project_id: &str) -> Result<u64> {
@@ -450,6 +775,166 @@ pub async fn migrate(
     Ok(report)
 }
 
+pub async fn migrate_snapshot_batched(
+    source: &SnapshotSource,
+    connection: &DodbConnection,
+    native_connection: &NativeDodbConnection,
+    project_ids: Vec<String>,
+    mismatch_limit: usize,
+) -> Result<MigrationReport> {
+    let projects = if project_ids.is_empty() {
+        source.manifest.project_ids.clone()
+    } else {
+        normalize_project_subset(&project_ids)?.unwrap_or_default()
+    };
+    if projects.is_empty() {
+        bail!("migration project set is empty")
+    }
+    let limits = ProtocolLimits::default();
+    let started = std::time::Instant::now();
+    let mut request_count = 0u64;
+    let mut maximum_batch = 0usize;
+    let mut results = Vec::with_capacity(projects.len());
+    let mut mismatch_samples = Vec::new();
+    for project_id in &projects {
+        let tenant = doc_db::dodb_tenant_id(project_id)?;
+        let client = native_connection.for_tenant(tenant);
+        let database = doc_db::dodb_with_connection(connection, project_id)?;
+        let mut stats = ProjectStats::new(project_id, tenant.get());
+        let mut pager = SourcePager::new(source, project_id, 256);
+        let mut batch = Vec::with_capacity(256);
+        while let Some(row) = pager.next().await? {
+            if batch.len() == limits.max_mutations {
+                request_count += 1;
+                maximum_batch = maximum_batch.max(batch.len());
+                apply_snapshot_batch(&client, tenant, &batch, limits).await?;
+                stats.migrated_rows += batch.len() as u64;
+                batch.clear();
+            }
+            batch.push(row);
+            if encoded_batch_size(tenant, &batch, limits)?.is_none() {
+                let overflow_row = batch.pop().expect("batch has the new source row");
+                if batch.is_empty() {
+                    bail!("one source row exceeds the dodb transaction request frame limit")
+                }
+                request_count += 1;
+                maximum_batch = maximum_batch.max(batch.len());
+                apply_snapshot_batch(&client, tenant, &batch, limits).await?;
+                stats.migrated_rows += batch.len() as u64;
+                batch.clear();
+                batch.push(overflow_row);
+                if encoded_batch_size(tenant, &batch, limits)?.is_none() {
+                    bail!("one source row exceeds the dodb transaction request frame limit")
+                }
+            }
+        }
+        if !batch.is_empty() {
+            request_count += 1;
+            maximum_batch = maximum_batch.max(batch.len());
+            apply_snapshot_batch(&client, tenant, &batch, limits).await?;
+            stats.migrated_rows += batch.len() as u64;
+        }
+        compare_project(
+            source,
+            &database,
+            &mut stats,
+            256,
+            mismatch_limit,
+            &mut mismatch_samples,
+        )
+        .await?;
+        results.push(stats);
+    }
+    let mut report = make_report("migrate", results, mismatch_samples);
+    report.transaction_requests = request_count;
+    report.maximum_batch_size = maximum_batch;
+    report.elapsed_ms = started.elapsed().as_millis();
+    eprintln!(
+        "snapshot import: rows={} maximum_batch={} transaction_requests={} elapsed_ms={}",
+        report.totals.migrated_rows,
+        report.maximum_batch_size,
+        report.transaction_requests,
+        report.elapsed_ms
+    );
+    Ok(report)
+}
+
+fn encoded_batch_size(
+    tenant: TenantId,
+    rows: &[Row],
+    limits: ProtocolLimits,
+) -> Result<Option<usize>> {
+    if rows
+        .iter()
+        .any(|row| row.data.len() > limits.max_value_size)
+    {
+        bail!("source value exceeds the dodb protocol value limit")
+    }
+    let mutations = rows
+        .iter()
+        .map(|row| TransactionMutation::Put {
+            key: DocumentKey::new(row.pk.as_bytes().to_vec(), row.sk.as_bytes().to_vec()),
+            value: row.data.clone(),
+        })
+        .collect();
+    let request = DodbRequest::Transact {
+        request: TransactionRequest::new(Vec::new(), mutations),
+    };
+    match dodb_protocol::encode_request(tenant, &request, limits) {
+        Ok(encoded) => Ok(Some(encoded.len())),
+        Err(dodb_protocol::ProtocolError::PayloadTooLarge { maximum, .. })
+            if maximum == limits.max_request_frame_size =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+async fn apply_snapshot_batch<D: BatchDestination>(
+    client: &D,
+    tenant: TenantId,
+    rows: &[Row],
+    limits: ProtocolLimits,
+) -> Result<()> {
+    let mutations = rows
+        .iter()
+        .map(|row| TransactionMutation::Put {
+            key: DocumentKey::new(row.pk.as_bytes().to_vec(), row.sk.as_bytes().to_vec()),
+            value: row.data.clone(),
+        })
+        .collect();
+    let request = TransactionRequest::new(Vec::new(), mutations);
+    match client.transact(request.clone()).await {
+        Ok(_) => Ok(()),
+        Err(write_error) => {
+            let mut equal_rows = 0usize;
+            for row in rows {
+                if client
+                    .get(row)
+                    .await?
+                    .is_some_and(|value| value == row.data)
+                {
+                    equal_rows += 1;
+                }
+            }
+            if equal_rows == rows.len() {
+                return Ok(());
+            }
+            if equal_rows != 0 {
+                bail!(
+                    "uncertain dodb batch has mixed destination state; batch was not retried: {write_error}"
+                )
+            }
+            if encoded_batch_size(tenant, rows, limits)?.is_none() {
+                bail!("batch no longer fits dodb protocol limits")
+            }
+            client.transact(request).await.map_err(|retry_error| anyhow!("dodb batch failed and atomic retry did not succeed; original={write_error}; retry={retry_error}"))?;
+            Ok(())
+        }
+    }
+}
+
 pub async fn verify(
     source: &dyn MigrationSource,
     connection: &DodbConnection,
@@ -626,6 +1111,9 @@ fn make_report(
         projects,
         totals,
         mismatch_samples,
+        transaction_requests: 0,
+        maximum_batch_size: 0,
+        elapsed_ms: 0,
     }
 }
 
@@ -673,11 +1161,12 @@ impl<'a> SourcePager<'a> {
                 return Ok(None);
             };
             validate_source_page(self.project_id, self.cursor.as_ref(), &page)?;
+            if page.is_empty() {
+                self.finished = true;
+                return Ok(None);
+            }
             if let Some(last) = page.last() {
                 self.cursor = Some((last.pk.clone(), last.sk.clone()));
-            }
-            if page.len() < self.page_size {
-                self.finished = true;
             }
             self.rows.extend(page);
         }
@@ -823,11 +1312,239 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct FakeBatchDestination {
+        values: std::sync::Mutex<BTreeMap<(String, String), Vec<u8>>>,
+        transaction_count: std::sync::atomic::AtomicUsize,
+        get_count: std::sync::atomic::AtomicUsize,
+        fail_first: std::sync::atomic::AtomicBool,
+        commit_before_error: bool,
+    }
+
+    #[async_trait]
+    impl BatchDestination for FakeBatchDestination {
+        async fn transact(&self, request: TransactionRequest) -> Result<()> {
+            self.transaction_count
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let first_error = self
+                .fail_first
+                .swap(false, std::sync::atomic::Ordering::SeqCst);
+            if !first_error || self.commit_before_error {
+                let mut values = self.values.lock().unwrap();
+                for mutation in request.mutations {
+                    let TransactionMutation::Put { key, value } = mutation else {
+                        bail!("expected put mutation")
+                    };
+                    values.insert(
+                        (
+                            String::from_utf8(key.pk.into_bytes())?,
+                            String::from_utf8(key.sk.into_bytes())?,
+                        ),
+                        value,
+                    );
+                }
+            }
+            if first_error {
+                bail!("simulated unknown mutation outcome")
+            }
+            Ok(())
+        }
+
+        async fn get(&self, row: &Row) -> Result<Option<Vec<u8>>> {
+            self.get_count
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(self
+                .values
+                .lock()
+                .unwrap()
+                .get(&(row.pk.clone(), row.sk.clone()))
+                .cloned())
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_import_uses_one_transaction_and_no_normal_path_gets() {
+        let destination = FakeBatchDestination::default();
+        let source_rows = vec![row("a", "1", b"one"), row("a", "2", b"two")];
+        apply_snapshot_batch(
+            &destination,
+            TenantId::new(1),
+            &source_rows,
+            ProtocolLimits::default(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            destination
+                .transaction_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        assert_eq!(
+            destination
+                .get_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            0
+        );
+        assert_eq!(destination.values.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn uncertain_atomic_batch_accepts_all_equal_and_retries_all_missing() {
+        let committed = FakeBatchDestination {
+            fail_first: std::sync::atomic::AtomicBool::new(true),
+            commit_before_error: true,
+            ..FakeBatchDestination::default()
+        };
+        let source_rows = vec![row("a", "1", b"one"), row("a", "2", b"two")];
+        apply_snapshot_batch(
+            &committed,
+            TenantId::new(1),
+            &source_rows,
+            ProtocolLimits::default(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            committed
+                .transaction_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        assert_eq!(
+            committed
+                .get_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+
+        let not_committed = FakeBatchDestination {
+            fail_first: std::sync::atomic::AtomicBool::new(true),
+            commit_before_error: false,
+            ..FakeBatchDestination::default()
+        };
+        apply_snapshot_batch(
+            &not_committed,
+            TenantId::new(1),
+            &source_rows,
+            ProtocolLimits::default(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            not_committed
+                .transaction_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+        assert_eq!(
+            not_committed
+                .get_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+        assert_eq!(not_committed.values.lock().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn uncertain_batch_with_mixed_state_fails_closed_without_assuming_partial_commit() {
+        let destination = FakeBatchDestination {
+            values: std::sync::Mutex::new(BTreeMap::from([(
+                ("a".to_owned(), "1".to_owned()),
+                b"one".to_vec(),
+            )])),
+            fail_first: std::sync::atomic::AtomicBool::new(true),
+            commit_before_error: false,
+            ..FakeBatchDestination::default()
+        };
+        let source_rows = vec![row("a", "1", b"one"), row("a", "2", b"two")];
+        let error = apply_snapshot_batch(
+            &destination,
+            TenantId::new(1),
+            &source_rows,
+            ProtocolLimits::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.to_string().contains("mixed destination state"));
+        assert_eq!(
+            destination
+                .transaction_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        assert_eq!(
+            destination
+                .get_count
+                .load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+    }
+
+    async fn write_snapshot_database(path: &Path, rows: &[Row]) -> Result<()> {
+        let database = libsql::Builder::new_local(path).build().await?;
+        let connection = database.connect()?;
+        connection.execute("CREATE TABLE docs (pk TEXT NOT NULL, sk TEXT NOT NULL, data BLOB NOT NULL, version INTEGER NOT NULL, PRIMARY KEY (pk, sk))", ()).await?;
+        for row in rows {
+            connection
+                .execute(
+                    "INSERT INTO docs (pk, sk, data, version) VALUES (?1, ?2, ?3, 1)",
+                    libsql::params![row.pk.as_str(), row.sk.as_str(), row.data.as_slice()],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn write_snapshot_manifest(
+        directory: &Path,
+        project_ids: Vec<String>,
+        active_project_ids: Vec<String>,
+    ) -> Result<()> {
+        let mut databases = Vec::new();
+        for project_id in &project_ids {
+            let path = directory.join(format!("{project_id}.sqlite"));
+            let db = libsql::Builder::new_local(&path)
+                .flags(libsql::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .build()
+                .await?;
+            let connection = db.connect()?;
+            let mut counts = connection
+                .query(
+                    "SELECT COUNT(*), COALESCE(SUM(length(data)), 0) FROM docs",
+                    (),
+                )
+                .await?;
+            let count_row = counts.next().await?.unwrap();
+            databases.push(SnapshotDatabase {
+                project_id: project_id.clone(),
+                filename: format!("{project_id}.sqlite"),
+                source_state: "present".to_owned(),
+                row_count: count_row.get::<i64>(0)? as u64,
+                data_bytes: count_row.get::<i64>(1)? as u64,
+                sha256: file_sha256(&path)?,
+            });
+        }
+        let manifest = SnapshotManifest {
+            format_version: 1,
+            captured_at: "2026-09-25T00:00:00Z".to_owned(),
+            project_ids,
+            active_project_ids,
+            databases,
+        };
+        std::fs::write(
+            directory.join("manifest.json"),
+            serde_json::to_vec(&manifest)?,
+        )?;
+        Ok(())
+    }
+
     async fn test_connection() -> (
         DodbConnection,
         Arc<DodbServer<LocalTenantService>>,
         tokio::task::JoinHandle<Result<(), dodb_server::ServerError>>,
         tempfile::TempDir,
+        NativeDodbConnection,
     ) {
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let directory = tempfile::tempdir().unwrap();
@@ -860,11 +1577,377 @@ mod tests {
         let connection = DodbConnection::connect(&DodbConfig::new(
             server.local_addr().unwrap(),
             "localhost",
-            vec![certificate],
+            vec![certificate.clone()],
         ))
         .await
         .unwrap();
-        (connection, server, task, directory)
+        let native_connection = NativeDodbConnection::connect(
+            "0.0.0.0:0".parse().unwrap(),
+            server.local_addr().unwrap(),
+            "localhost",
+            dodb_client::ClientTlsConfig::from_der(vec![certificate]).unwrap(),
+            ProtocolLimits::default(),
+        )
+        .await
+        .unwrap();
+        (connection, server, task, directory, native_connection)
+    }
+
+    #[tokio::test]
+    async fn sqlite_snapshot_reads_ordered_blob_rows_and_validates_manifest() {
+        let directory = tempfile::tempdir().unwrap();
+        let control_rows = vec![
+            row(
+                "ProjectDoc/fn0-control",
+                "",
+                br#"{"project_id":"fn0-control"}"#,
+            ),
+            row(
+                "ProjectDoc/00000001",
+                "doc",
+                br#"{"project_id":"00000001"}"#,
+            ),
+            row("Settings", "main", b"control"),
+        ];
+        let project_rows = vec![row("a", "one", &[0, 255, 1]), row("a", "two", b"second")];
+        write_snapshot_database(&directory.path().join("fn0-control.sqlite"), &control_rows)
+            .await
+            .unwrap();
+        write_snapshot_database(&directory.path().join("00000001.sqlite"), &project_rows)
+            .await
+            .unwrap();
+        write_snapshot_manifest(
+            directory.path(),
+            vec!["fn0-control".into(), "00000001".into()],
+            vec!["00000001".into()],
+        )
+        .await
+        .unwrap();
+        let source = SnapshotSource::open(directory.path()).await.unwrap();
+        let first_page = source.page("00000001", None, 1).await.unwrap();
+        let SourcePage::Rows(first_page) = first_page else {
+            panic!("expected snapshot rows")
+        };
+        assert_eq!(first_page, vec![row("a", "one", &[0, 255, 1])]);
+        let next_page = source
+            .page("00000001", Some(("a", "one")), 1)
+            .await
+            .unwrap();
+        let SourcePage::Rows(next_page) = next_page else {
+            panic!("expected snapshot rows")
+        };
+        assert_eq!(next_page, vec![row("a", "two", b"second")]);
+    }
+
+    #[tokio::test]
+    async fn sqlite_snapshot_rejects_checksum_counts_schema_and_active_project_mismatches() {
+        let directory = tempfile::tempdir().unwrap();
+        let control_rows = vec![row(
+            "ProjectDoc/00000001",
+            "doc",
+            br#"{"project_id":"00000001"}"#,
+        )];
+        write_snapshot_database(&directory.path().join("fn0-control.sqlite"), &control_rows)
+            .await
+            .unwrap();
+        write_snapshot_database(
+            &directory.path().join("00000001.sqlite"),
+            &[row("pk", "sk", b"value")],
+        )
+        .await
+        .unwrap();
+        write_snapshot_manifest(
+            directory.path(),
+            vec!["fn0-control".into(), "00000001".into()],
+            vec!["00000001".into()],
+        )
+        .await
+        .unwrap();
+        let original = std::fs::read(directory.path().join("00000001.sqlite")).unwrap();
+        std::fs::write(directory.path().join("00000001.sqlite"), b"not sqlite").unwrap();
+        assert!(
+            format!(
+                "{:#}",
+                SnapshotSource::open(directory.path()).await.unwrap_err()
+            )
+            .contains("checksum mismatch")
+        );
+        std::fs::write(directory.path().join("00000001.sqlite"), original).unwrap();
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(directory.path().join("manifest.json")).unwrap())
+                .unwrap();
+        manifest["databases"][1]["row_count"] = serde_json::json!(2);
+        std::fs::write(
+            directory.path().join("manifest.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            format!(
+                "{:#}",
+                SnapshotSource::open(directory.path()).await.unwrap_err()
+            )
+            .contains("count mismatch")
+        );
+        manifest["databases"][1]["row_count"] = serde_json::json!(1);
+        manifest["active_project_ids"] = serde_json::json!(["00000002"]);
+        std::fs::write(
+            directory.path().join("manifest.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            format!(
+                "{:#}",
+                SnapshotSource::open(directory.path()).await.unwrap_err()
+            )
+            .contains("project IDs")
+        );
+        let malformed_directory = tempfile::tempdir().unwrap();
+        write_snapshot_database(
+            &malformed_directory.path().join("fn0-control.sqlite"),
+            &control_rows,
+        )
+        .await
+        .unwrap();
+        let malformed_path = malformed_directory.path().join("00000001.sqlite");
+        let malformed_db = libsql::Builder::new_local(&malformed_path)
+            .build()
+            .await
+            .unwrap();
+        malformed_db
+            .connect()
+            .unwrap()
+            .execute("CREATE TABLE docs (wrong TEXT)", ())
+            .await
+            .unwrap();
+        drop(malformed_db);
+        let mut malformed_manifest = serde_json::json!({"format_version":1,"captured_at":"test","project_ids":["fn0-control","00000001"],"active_project_ids":["00000001"],"databases":[
+            {"project_id":"fn0-control","filename":"fn0-control.sqlite","row_count":1,"data_bytes":control_rows[0].data.len(),"sha256":file_sha256(&malformed_directory.path().join("fn0-control.sqlite")).unwrap()},
+            {"project_id":"00000001","filename":"00000001.sqlite","row_count":0,"data_bytes":0,"sha256":file_sha256(&malformed_path).unwrap()}
+        ]});
+        std::fs::write(
+            malformed_directory.path().join("manifest.json"),
+            serde_json::to_vec(&malformed_manifest).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            format!(
+                "{:#}",
+                SnapshotSource::open(malformed_directory.path())
+                    .await
+                    .unwrap_err()
+            )
+            .contains("invalid columns")
+        );
+        malformed_manifest["databases"][1]["sha256"] = serde_json::json!("0".repeat(64));
+        std::fs::write(
+            malformed_directory.path().join("manifest.json"),
+            serde_json::to_vec(&malformed_manifest).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            format!(
+                "{:#}",
+                SnapshotSource::open(malformed_directory.path())
+                    .await
+                    .unwrap_err()
+            )
+            .contains("checksum mismatch")
+        );
+    }
+
+    #[tokio::test]
+    async fn snapshot_missing_docs_table_is_an_empty_source() {
+        let directory = tempfile::tempdir().unwrap();
+        let control_path = directory.path().join("fn0-control.sqlite");
+        let control_database = libsql::Builder::new_local(&control_path)
+            .build()
+            .await
+            .unwrap();
+        let control_connection = control_database.connect().unwrap();
+        drop(control_connection);
+        drop(control_database);
+        let manifest = SnapshotManifest {
+            format_version: 1,
+            captured_at: "test".into(),
+            project_ids: vec!["fn0-control".into()],
+            active_project_ids: vec![],
+            databases: vec![SnapshotDatabase {
+                project_id: "fn0-control".into(),
+                filename: "fn0-control.sqlite".into(),
+                source_state: "present".into(),
+                row_count: 0,
+                data_bytes: 0,
+                sha256: file_sha256(&control_path).unwrap(),
+            }],
+        };
+        std::fs::write(
+            directory.path().join("manifest.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        let source = SnapshotSource::open(directory.path()).await.unwrap();
+        assert_eq!(
+            source.page("fn0-control", None, 1).await.unwrap(),
+            SourcePage::MissingTable
+        );
+    }
+
+    #[tokio::test]
+    async fn snapshot_batch_migration_resumes_and_preserves_destination_only_rows() {
+        let directory = tempfile::tempdir().unwrap();
+        let control_rows = vec![row(
+            "ProjectDoc/00000001",
+            "doc",
+            br#"{"project_id":"00000001"}"#,
+        )];
+        let source_rows = vec![row("pk", "a", &[0, 255]), row("pk", "b", b"expected")];
+        write_snapshot_database(&directory.path().join("fn0-control.sqlite"), &control_rows)
+            .await
+            .unwrap();
+        write_snapshot_database(&directory.path().join("00000001.sqlite"), &source_rows)
+            .await
+            .unwrap();
+        write_snapshot_manifest(
+            directory.path(),
+            vec!["fn0-control".into(), "00000001".into()],
+            vec!["00000001".into()],
+        )
+        .await
+        .unwrap();
+        let source = SnapshotSource::open(directory.path()).await.unwrap();
+        let (connection, server, task, _dodb_directory, native_connection) =
+            test_connection().await;
+        let database = destination(&connection, "00000001").await;
+        database.put("extra", "row", b"retain").await.unwrap();
+        let first = migrate_snapshot_batched(&source, &connection, &native_connection, vec![], 20)
+            .await
+            .unwrap();
+        assert!(!first.verified);
+        assert_eq!(first.projects[1].extra_rows, 1);
+        assert_eq!(
+            database
+                .get("extra", "row")
+                .await
+                .unwrap()
+                .unwrap()
+                .as_ref(),
+            b"retain"
+        );
+        let second = migrate_snapshot_batched(&source, &connection, &native_connection, vec![], 20)
+            .await
+            .unwrap();
+        assert!(!second.verified);
+        assert_eq!(second.projects[1].source_rows, 2);
+        assert_eq!(second.projects[1].different_rows, 0);
+        assert_eq!(second.projects[1].missing_rows, 0);
+        assert_eq!(second.projects[1].extra_rows, 1);
+        native_connection.close();
+        connection.close();
+        server.shutdown().await;
+        task.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn snapshot_project_discovery_rejects_invalid_ids() {
+        let directory = tempfile::tempdir().unwrap();
+        write_snapshot_database(
+            &directory.path().join("fn0-control.sqlite"),
+            &[row("ProjectDoc/x", "doc", br#"{"project_id":"INVALID"}"#)],
+        )
+        .await
+        .unwrap();
+        write_snapshot_database(&directory.path().join("00000001.sqlite"), &[])
+            .await
+            .unwrap();
+        write_snapshot_manifest(
+            directory.path(),
+            vec!["fn0-control".into(), "00000001".into()],
+            vec!["00000001".into()],
+        )
+        .await
+        .unwrap();
+        assert!(
+            format!(
+                "{:#}",
+                SnapshotSource::open(directory.path()).await.unwrap_err()
+            )
+            .contains("invalid project_id")
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "synthetic batch performance sanity test"]
+    async fn synthetic_snapshot_import_uses_bounded_transaction_batches() {
+        let row_count = 18_795usize;
+        let directory = tempfile::tempdir().unwrap();
+        let control_rows = vec![row(
+            "ProjectDoc/00000001",
+            "doc",
+            br#"{"project_id":"00000001"}"#,
+        )];
+        write_snapshot_database(&directory.path().join("fn0-control.sqlite"), &control_rows)
+            .await
+            .unwrap();
+        let project_path = directory.path().join("00000001.sqlite");
+        let project = libsql::Builder::new_local(&project_path)
+            .build()
+            .await
+            .unwrap();
+        let project_connection = project.connect().unwrap();
+        project_connection.execute("CREATE TABLE docs (pk TEXT NOT NULL, sk TEXT NOT NULL, data BLOB NOT NULL, version INTEGER NOT NULL, PRIMARY KEY (pk, sk))", ()).await.unwrap();
+        project_connection.execute("BEGIN", ()).await.unwrap();
+        for row_index in 0..row_count {
+            let sk = format!("{row_index:08}");
+            let data = format!("synthetic-payload-{row_index:08}");
+            project_connection
+                .execute(
+                    "INSERT INTO docs VALUES ('synthetic', ?1, ?2, 1)",
+                    libsql::params![sk, data.as_bytes()],
+                )
+                .await
+                .unwrap();
+        }
+        project_connection.execute("COMMIT", ()).await.unwrap();
+        drop(project_connection);
+        drop(project);
+        write_snapshot_manifest(
+            directory.path(),
+            vec!["fn0-control".into(), "00000001".into()],
+            vec!["00000001".into()],
+        )
+        .await
+        .unwrap();
+        let source = SnapshotSource::open(directory.path()).await.unwrap();
+        let (connection, server, task, _dodb_directory, native_connection) =
+            test_connection().await;
+        let started = std::time::Instant::now();
+        let report = migrate_snapshot_batched(
+            &source,
+            &connection,
+            &native_connection,
+            vec!["00000001".into()],
+            0,
+        )
+        .await
+        .unwrap();
+        let elapsed = started.elapsed();
+        assert!(report.verified);
+        assert_eq!(report.totals.source_rows, row_count as u64);
+        assert_eq!(report.transaction_requests, 74);
+        assert_eq!(report.maximum_batch_size, 256);
+        println!(
+            "synthetic rows={} batch_size={} transactions={} elapsed_ms={}",
+            row_count,
+            report.maximum_batch_size,
+            report.transaction_requests,
+            elapsed.as_millis()
+        );
+        native_connection.close();
+        connection.close();
+        server.shutdown().await;
+        task.await.unwrap().unwrap();
     }
 
     async fn destination(connection: &DodbConnection, project_id: &str) -> doc_db::Database {
@@ -883,7 +1966,7 @@ mod tests {
                 ],
             )]),
         };
-        let (connection, server, task, _directory) = test_connection().await;
+        let (connection, server, task, _directory, _native_connection) = test_connection().await;
         let database = destination(&connection, "00000001").await;
         database.put("p", "b", b"two").await.unwrap();
         let report = migrate(&source, &connection, vec!["00000001".into()], 1, false, 20)
@@ -920,7 +2003,7 @@ mod tests {
                 ],
             )]),
         };
-        let (connection, server, task, _directory) = test_connection().await;
+        let (connection, server, task, _directory, _native_connection) = test_connection().await;
         let database = destination(&connection, "00000002").await;
         database
             .put("p", "different", b"destination")
@@ -948,7 +2031,7 @@ mod tests {
                 vec![row("pk", "sk", b"source-value")],
             )]),
         };
-        let (connection, server, task, _directory) = test_connection().await;
+        let (connection, server, task, _directory, _native_connection) = test_connection().await;
         let database = destination(&connection, "00000004").await;
         database.put("pk", "sk", b"old-value").await.unwrap();
         let report = migrate(
@@ -975,7 +2058,7 @@ mod tests {
     #[tokio::test]
     async fn empty_source_verifies_against_empty_destination() {
         let source = FakeSource::default();
-        let (connection, server, task, _directory) = test_connection().await;
+        let (connection, server, task, _directory, _native_connection) = test_connection().await;
         let report = verify(
             &source,
             &connection,

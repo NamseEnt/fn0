@@ -1,8 +1,8 @@
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand};
 use fn0_db_migrate::{
-    TursoSource, dodb_config, inventory, migrate, normalize_project_subset, validate_page_size,
-    verify,
+    SnapshotSource, dodb_config, inventory, migrate_snapshot_batched, normalize_project_subset,
+    validate_page_size, verify,
 };
 use std::path::PathBuf;
 
@@ -37,12 +37,16 @@ enum Command {
 
 #[derive(Args)]
 struct InventoryArgs {
+    #[arg(long)]
+    snapshot: PathBuf,
     #[arg(long, default_value_t = DEFAULT_PAGE_SIZE)]
     page_size: usize,
 }
 
 #[derive(Args)]
 struct DodbArgs {
+    #[arg(long)]
+    snapshot: PathBuf,
     #[arg(long, default_value = DEFAULT_DODB_ADDRESS)]
     dodb_addr: String,
     #[arg(long, default_value = DEFAULT_DODB_SERVER_NAME)]
@@ -88,31 +92,32 @@ async fn run() -> Result<()> {
     let report = match cli.command {
         Command::Inventory(args) => {
             validate_page_size(args.page_size)?;
-            let source = TursoSource::from_env()?;
+            let source = SnapshotSource::open(&args.snapshot).await?;
             inventory(&source, args.page_size).await?
         }
         Command::Migrate(args) => {
             require_apply(args.apply)?;
             validate_dodb_args(&args.dodb)?;
             let subset = normalize_project_subset(&args.dodb.project_ids)?;
-            let source = TursoSource::from_env()?;
+            let source = SnapshotSource::open(&args.dodb.snapshot).await?;
             let connection = connect_dodb(&args.dodb).await?;
-            let report = migrate(
+            let native_connection = connect_native_dodb(&args.dodb).await?;
+            let report = migrate_snapshot_batched(
                 &source,
                 &connection,
+                &native_connection,
                 subset.unwrap_or_default(),
-                args.dodb.page_size,
-                args.dodb.project_ids.is_empty(),
                 args.dodb.mismatch_limit,
             )
             .await?;
+            native_connection.close();
             connection.close();
             report
         }
         Command::Verify(args) => {
             validate_dodb_args(&args.dodb)?;
             let subset = normalize_project_subset(&args.dodb.project_ids)?;
-            let source = TursoSource::from_env()?;
+            let source = SnapshotSource::open(&args.dodb.snapshot).await?;
             let connection = connect_dodb(&args.dodb).await?;
             let report = verify(
                 &source,
@@ -167,6 +172,26 @@ async fn connect_dodb(args: &DodbArgs) -> Result<doc_db::DodbConnection> {
         .context("failed to connect to dodb")
 }
 
+async fn connect_native_dodb(args: &DodbArgs) -> Result<dodb_client::DodbConnection> {
+    let root_cert = std::fs::read(&args.dodb_root_cert).with_context(|| {
+        format!(
+            "failed to read dodb root certificate {}",
+            args.dodb_root_cert.display()
+        )
+    })?;
+    let address = args.dodb_addr.parse()?;
+    let tls = dodb_client::ClientTlsConfig::from_pem(&root_cert)?;
+    dodb_client::DodbConnection::connect(
+        "0.0.0.0:0".parse()?,
+        address,
+        &args.dodb_server_name,
+        tls,
+        dodb_protocol::ProtocolLimits::default(),
+    )
+    .await
+    .context("failed to connect native migration client")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,16 +199,20 @@ mod tests {
 
     #[test]
     fn inventory_has_no_dodb_configuration_requirements() {
-        let parsed = Cli::try_parse_from(["fn0-db-migrate", "inventory"]).unwrap();
+        let parsed =
+            Cli::try_parse_from(["fn0-db-migrate", "inventory", "--snapshot", "."]).unwrap();
         assert!(matches!(parsed.command, Command::Inventory(_)));
     }
 
     #[test]
     fn migration_requires_explicit_apply_at_execution_boundary() {
-        let without_apply = Cli::try_parse_from(["fn0-db-migrate", "migrate"]).unwrap();
+        let without_apply =
+            Cli::try_parse_from(["fn0-db-migrate", "migrate", "--snapshot", "."]).unwrap();
         assert!(matches!(&without_apply.command, Command::Migrate(_)));
         assert!(require_apply(false).is_err());
-        let with_apply = Cli::try_parse_from(["fn0-db-migrate", "migrate", "--apply"]).unwrap();
+        let with_apply =
+            Cli::try_parse_from(["fn0-db-migrate", "migrate", "--snapshot", ".", "--apply"])
+                .unwrap();
         assert!(matches!(with_apply.command, Command::Migrate(_)));
         assert!(require_apply(true).is_ok());
     }

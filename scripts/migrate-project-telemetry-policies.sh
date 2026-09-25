@@ -93,20 +93,20 @@ db_query() {
 }
 
 scan_control_db() {
-  local has_cursor=false after_pk="" after_sk="" response page_count
-  local documents='[]'
+  local has_cursor=false after_pk="" after_sk="" response page_count page
+  local pages_file="$work_dir/control-scan-pages.jsonl"
+  : > "$pages_file"
   while true; do
     response="$(control_db_scan "$after_pk" "$after_sk" 500 "$has_cursor")"
-    local page
     page="$(jq -c '.documents' <<<"$response")"
     page_count="$(jq 'length' <<<"$page")"
-    documents="$(jq -nc --argjson previous "$documents" --argjson next "$page" '$previous + $next')"
+    printf '%s\n' "$page" >> "$pages_file"
     if (( page_count < 500 )); then break; fi
     after_pk="$(jq -r '.[-1].pk' <<<"$page")"
     after_sk="$(jq -r '.[-1].sk' <<<"$page")"
     has_cursor=true
   done
-  printf '%s\n' "$documents"
+  jq -s 'add // []' "$pages_file"
 }
 
 signy_request() {
