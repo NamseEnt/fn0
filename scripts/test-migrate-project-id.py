@@ -143,6 +143,18 @@ class ProjectIdMigrationTests(unittest.TestCase):
         self.assertEqual(migration.classify_row(row, OLD_ID)["classification"], "DELETE_TRANSIENT")
         self.assertIsNone(migration.transformed_row(row, OLD_ID, NEW_ID, "DELETE_TRANSIENT"))
 
+    def test_websocket_singleton_config_identity_is_rekeyed(self):
+        row = record(
+            f"WebSocketSingletonConfigDoc/project_id={OLD_ID}",
+            {"project_id": OLD_ID, "code_version": 7, "declarations": []},
+            "code_version=7",
+        )
+        classification = migration.classify_row(row, OLD_ID)["classification"]
+        moved = migration.transformed_row(row, OLD_ID, NEW_ID, classification)
+        self.assertEqual(classification, "REKEY")
+        self.assertEqual(moved["pk"], f"WebSocketSingletonConfigDoc/project_id={NEW_ID}")
+        self.assertEqual(migration.data_json(moved["data"])["project_id"], NEW_ID)
+
     def test_apply_requires_explicit_flag(self):
         with self.assertRaises(migration.MigrationError):
             migration.main(["apply", "--old-id", OLD_ID, "--new-id", NEW_ID])

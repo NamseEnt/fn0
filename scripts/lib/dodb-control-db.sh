@@ -139,7 +139,7 @@ dodb_control_db_call() {
 }
 
 dodb_control_db_close() {
-  if [[ -n "${DODB_CONTROL_DB_REMOTE_CERT_DIR:-}" && -n "${DODB_CONTROL_DB_REMOTE_BINARY:-}" ]]; then
+  if [[ -n "${DODB_CONTROL_DB_REMOTE_CERT_DIR:-}" ]]; then
     ssh "${DODB_CONTROL_DB_SSH_OPTIONS[@]}" opc@127.0.0.1 \
       rm -rf -- "$DODB_CONTROL_DB_REMOTE_CERT_DIR" >/dev/null 2>&1 || true
   fi

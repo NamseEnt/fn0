@@ -45,6 +45,7 @@ IDENTITY_FIELD_DOCS = {
     "CompiledBundleDoc",
     "CronConfigDoc",
     "ProjectCloudflareConfigDoc",
+    "WebSocketSingletonConfigDoc",
     "WebSocketConnectionDoc",
 }
 REKEY_DOCS = {
