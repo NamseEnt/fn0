@@ -13,11 +13,18 @@ export class TursoGroupToken extends pulumi.dynamic.Resource {
     args: TursoGroupTokenArgs,
     opts?: pulumi.CustomResourceOptions
   ) {
+    const additionalSecretOutputs = new Set([
+      ...(opts?.additionalSecretOutputs ?? []),
+      "jwt",
+    ]);
     super(
       new TursoGroupTokenProvider(),
       name,
       { ...args, jwt: undefined },
-      opts
+      {
+        ...opts,
+        additionalSecretOutputs: [...additionalSecretOutputs],
+      }
     );
   }
 }

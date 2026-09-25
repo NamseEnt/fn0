@@ -2,8 +2,11 @@ import * as pulumi from "@pulumi/pulumi";
 import * as oci from "@pulumi/oci";
 import * as tls from "@pulumi/tls";
 import * as random from "@pulumi/random";
-import { gzipSync } from "node:zlib";
 import { CustomWorkerImage } from "./CustomWorkerImage";
+import {
+  buildWorkerInstanceMetadata,
+  buildWorkerUserData,
+} from "./WorkerMetadata";
 import {
   CLOUDFLARE_IPV4_RANGES,
   CLOUDFLARE_IPV6_RANGES,
@@ -18,6 +21,7 @@ export interface OciFn0WorkerSiteArgs {
   dodbRuntime: DodbRuntimeArgs;
   worker: WorkerArgs;
   websocketBearer: pulumi.Input<string>;
+  workerAgentForteDb?: WorkerForteDbArgs;
 }
 
 export interface DodbRuntimeArgs {
@@ -36,6 +40,12 @@ export interface WorkerArgs {
   bundleStorage: WorkerBundleStorageArgs;
   controlProjectId: pulumi.Input<string>;
   apex: WorkerApexArgs;
+  forteDb?: WorkerForteDbArgs;
+}
+
+export interface WorkerForteDbArgs {
+  groupToken: pulumi.Input<string>;
+  hostSuffix: pulumi.Input<string>;
 }
 
 export interface WorkerApexArgs {
@@ -974,17 +984,9 @@ export class OciFn0WorkerSite extends pulumi.ComponentResource {
             collectyEnvFile,
           ),
       );
-    const userData = cloudInit.apply((s) =>
-      gzipSync(Buffer.from(s, "utf8")).toString("base64"),
-    );
+    const userData = buildWorkerUserData(cloudInit);
 
-    return pulumi
-      .all([userData, this.sshPublicKey])
-      .apply(([ud, ssh]) => {
-        const m: { [k: string]: string } = { user_data: ud };
-        if (ssh) m["ssh_authorized_keys"] = ssh;
-        return m;
-      });
+    return buildWorkerInstanceMetadata(userData, this.sshPublicKey);
   }
 
   private setupNetworkLoadBalancer(

@@ -48,7 +48,7 @@ export class ForteDb extends pulumi.ComponentResource {
     );
 
     this.groupName = pulumi.output(groupName);
-    this.groupToken = token.jwt;
+    this.groupToken = pulumi.secret(token.jwt);
     this.hostSuffix = pulumi.interpolate`-${organizationSlug}.${location}.turso.io`;
 
     this.registerOutputs({
