@@ -6,6 +6,9 @@ license.workspace = true
 repository.workspace = true
 description = "Narrow fn0-control dodb operator"
 
+[package.metadata.release]
+release = false
+
 [[bin]]
 name = "fn0-db-ops"
 path = "src/main.rs"

@@ -3,6 +3,8 @@ name = "dodb-service"
 version = "0.1.0"
 edition.workspace = true
 license = "MIT"
+description = "Service layer for dodb, the fn0 document database"
+repository.workspace = true
 
 [dependencies]
-dodb-core = { path = "../dodb-core" }
+dodb-core.workspace = true

@@ -22,10 +22,12 @@ fn0-deploy = { path = "fn0/deploy", version = "=0.3.5" }
 fn0-wasmtime = { path = "fn0/wasmtime", version = "=0.2.1" }
 ski = { package = "fn0-ski", path = "fn0/ski", version = "=0.1.13" }
 doc-db = { package = "fn0-doc-db", path = "doc-db", version = "=0.4.15" }
-dodb-client = { path = "dodb/crates/dodb-client" }
-dodb-core = { path = "dodb/crates/dodb-core" }
-dodb-protocol = { path = "dodb/crates/dodb-protocol" }
-dodb-server = { path = "dodb/crates/dodb-server" }
+dodb-client = { path = "dodb/crates/dodb-client", version = "=0.1.0" }
+dodb-core = { path = "dodb/crates/dodb-core", version = "=0.1.0" }
+dodb-protocol = { path = "dodb/crates/dodb-protocol", version = "=0.1.0" }
+dodb-server = { path = "dodb/crates/dodb-server", version = "=0.1.0" }
+dodb-service = { path = "dodb/crates/dodb-service", version = "=0.1.0" }
+dodb-storage = { path = "dodb/crates/dodb-storage", version = "=0.1.0" }
 object-storage = { package = "fn0-object-storage", path = "object-storage", version = "=0.5.9" }
 forte-json = { path = "forte/json", version = "=0.1.3" }
 forte-macros = { path = "forte/macros", version = "=0.6.0" }

@@ -3,10 +3,12 @@ name = "dodb-protocol"
 version = "0.1.0"
 edition.workspace = true
 license = "MIT"
+description = "Wire protocol for dodb, the fn0 document database"
+repository.workspace = true
 
 [dependencies]
-dodb-core = { path = "../dodb-core" }
-dodb-service = { path = "../dodb-service" }
+dodb-core.workspace = true
+dodb-service.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

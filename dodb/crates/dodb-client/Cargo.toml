@@ -3,11 +3,13 @@ name = "dodb-client"
 version = "0.1.0"
 edition.workspace = true
 license = "MIT"
+description = "Client for dodb, the fn0 document database"
+repository.workspace = true
 
 [dependencies]
-dodb-core = { path = "../dodb-core" }
-dodb-protocol = { path = "../dodb-protocol" }
-dodb-service = { path = "../dodb-service" }
+dodb-core.workspace = true
+dodb-protocol.workspace = true
+dodb-service.workspace = true
 quinn = { workspace = true, default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
 rustls-pemfile.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt", "rt-multi-thread", "sync", "time"] }
