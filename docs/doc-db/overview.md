@@ -1,6 +1,6 @@
 # doc-db
 
-`doc-db` is a document-oriented database library backed by Turso/libSQL (or an in-memory store for tests). It works in both WASI components (Forte backends) and native Rust binaries.
+`doc-db` is a document-oriented database library. It works in both WASI components (Forte backends) and native Rust binaries. Application code uses `doc_db::database()`, which routes through the platform's backend-neutral semantic RPC (dodb in production). An in-memory store is available for tests.
 
 All documents are stored in a single table with a composite key: `pk` (partition key) and `sk` (sort key), both strings. The value is an opaque byte blob (usually JSON).
 

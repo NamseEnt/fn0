@@ -4,7 +4,7 @@ All Rust crates in this monorepo in one place: what each does, where it lives, a
 
 ## Workspace layout
 
-The root `Cargo.toml` defines a workspace with `resolver = "3"` and Rust edition 2024. `vendor/` and `forte/rs-to-ts/` are excluded from the workspace. Control lives in `fn0/control/` and is also excluded.
+The root `Cargo.toml` defines a workspace with `resolver = "3"` and Rust edition 2024. `vendor/` and `forte/rs-to-ts/` are excluded from the workspace. Control lives in `fn0/control/` and is also excluded. `dodb/crates/*` contains the dodb database server crates.
 
 ```
 fn0/
@@ -18,18 +18,29 @@ fn0/
 │   ├── test-runner/   forte-test-runner    Binary test runner for wasm32-wasip2 targets
 │   └── rs-to-ts/      forte-rs-to-ts       Standalone binary: Rust → TypeScript type generation
 ├── fn0/
-│   ├── fn0/           fn0                  Core FaaS runtime: ExecutionContext, hijack architecture
-│   ├── cli/           fn0-cli              CLI for raw fn0 projects (non-Forte)
-│   ├── deploy/        fn0-deploy           fn0 Cloud deployment client
-│   ├── wasmtime/      fn0-wasmtime         Wasmtime wrapper with fn0-specific config
-│   ├── compiler/      fn0-compiler         CLI: compiles .wasm → .cwasm (Wasmtime native format)
-│   ├── shared-schema/ fn0-shared-schema    Shared type schemas between worker and control
-│   ├── ski/           fn0-ski              WinterCG JS runtime (V8/deno_core) for SSR
-│   ├── worker/        fn0-worker           Worker process binary
-│   ├── worker-agent/  fn0-worker-agent     Per-instance supervisor for blue-green deploys
-│   └── worker-proxy/  fn0-worker-proxy     TCP forwarder fronting fn0-worker containers
-├── doc-db/            fn0-doc-db           Document-oriented Turso/libSQL wrapper (WASM + native)
+│   ├── fn0/              fn0                    Core FaaS runtime: ExecutionContext, hijack architecture
+│   ├── cli/              fn0-cli                CLI for raw fn0 projects (non-Forte)
+│   ├── deploy/           fn0-deploy             fn0 Cloud deployment client
+│   ├── wasmtime/         fn0-wasmtime           Wasmtime wrapper with fn0-specific config
+│   ├── compiler/         fn0-compiler           CLI: compiles .wasm → .cwasm (Wasmtime native format)
+│   ├── shared-schema/    fn0-shared-schema      Shared type schemas between worker and control
+│   ├── ski/              fn0-ski                WinterCG JS runtime (V8/deno_core) for SSR
+│   ├── doc-db-protocol/  fn0-doc-db-protocol    Versioned semantic doc-db protocol shared by guests and hosts
+│   ├── db-ops/           fn0-db-ops             Narrow operator interface for the dodb control tenant
+│   ├── worker/           fn0-worker             Worker process binary
+│   ├── worker-agent/     fn0-worker-agent       Per-instance supervisor for blue-green deploys
+│   └── worker-proxy/     fn0-worker-proxy       TCP forwarder fronting fn0-worker containers
+├── doc-db/            fn0-doc-db           Document-oriented database wrapper (WASM + native)
 ├── object-storage/    fn0-object-storage   S3-compatible object storage client
+├── dodb/crates/
+│   ├── dodb-client/   dodb-client          Client for dodb, the fn0 document database
+│   ├── dodb-core/     dodb-core            Core types for dodb, the fn0 document database
+│   ├── dodb-protocol/ dodb-protocol        Wire protocol for dodb, the fn0 document database
+│   ├── dodb-server/   dodb-server          Server for dodb, the fn0 document database
+│   ├── dodb-service/  dodb-service         Service layer for dodb, the fn0 document database
+│   ├── dodb-soak/     dodb-soak            Soak tests for dodb
+│   ├── dodb-storage/  dodb-storage         Storage engine for dodb, the fn0 document database
+│   └── dodb-testkit/  dodb-testkit         Test helpers for dodb crates
 └── vendor/            deno_core            Vendored and patched for deterministic module map serialization
 ```
 
@@ -209,11 +220,11 @@ A WinterCG-compatible JavaScript runtime built on V8 and `deno_core`. Runs serve
 
 **Crate:** `fn0-doc-db` · **Target:** `wasm32-wasip2` + native
 
-Document-oriented database wrapper over Turso/libSQL. Supports `get`, `put`, `delete`, `query`, `scan`, batch operations, explicit ACID `transaction`s, and `trx` optimistic concurrency. Works in WASM (via the WIT HTTP interface to Turso) and natively (for tests with `doc_db::memory()`).
+Document-oriented database wrapper. Supports `get`, `put`, `delete`, `query`, `scan`, batch operations, explicit ACID `transaction`s, and `trx` optimistic concurrency. Works in WASM (via the semantic RPC boundary to the platform's dodb backend) and natively (for tests with `doc_db::memory()`). The legacy `doc_db::turso_with_config` interface remains for raw SQL and direct Turso access; new code uses `doc_db::database()`.
 
 Added as a direct dependency by `forte init` (as `doc-db = { package = "fn0-doc-db", ... }` in `rs/Cargo.toml`). Import with `use doc_db::...` in handler code. Not re-exported through forte-sdk.
 
-**Change when:** adding document database operations; changing query semantics; fixing Turso protocol issues.
+**Change when:** adding document database operations; changing query semantics; changing the semantic RPC protocol.
 
 ## fn0-object-storage
 

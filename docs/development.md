@@ -123,8 +123,8 @@ The Cargo workspace root (`/Cargo.toml`) includes:
 
 ```toml
 [workspace]
-members = ["fn0/*", "forte/*", "doc-db", "object-storage"]
-exclude = ["vendor/*", "forte/rs-to-ts", "fn0/control"]
+members = ["fn0/*", "forte/*", "doc-db", "object-storage", "dodb/crates/*"]
+exclude = ["vendor", "forte/rs-to-ts", "fn0/control"]
 ```
 
 `forte/rs-to-ts` and `fn0/control` are excluded from the workspace and must be built separately.
