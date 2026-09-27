@@ -297,7 +297,12 @@ impl Consumer {
 
         if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
             return match err {
-                DispatchError::Full => Err(anyhow!("worker queue full for {}", wrapped.project_id)),
+                DispatchError::QueueFull => {
+                    Err(anyhow!("worker queue full for {}", wrapped.project_id))
+                }
+                DispatchError::ProjectAdmissionFull => {
+                    Err(anyhow!("project admission full for {}", wrapped.project_id))
+                }
                 DispatchError::Closed => Err(anyhow!("worker pool closed")),
             };
         }

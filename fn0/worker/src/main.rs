@@ -17,6 +17,7 @@ mod websocket;
 mod websocket_directory;
 mod websocket_quic;
 mod worker_pool;
+mod worker_state_metrics;
 
 use base64::Engine;
 use bytes::Bytes;
@@ -153,7 +154,8 @@ impl CrossProjectInvokeDispatcher for WorkerCrossProjectInvokeDispatcher {
                 let envelope = RequestEnvelope::new(target_project_id, req, inner_sender);
                 if let Err(error) = worker_pool::dispatch(&senders, envelope) {
                     let message = match error {
-                        DispatchError::Full => "worker pool full",
+                        DispatchError::QueueFull => "worker pool full",
+                        DispatchError::ProjectAdmissionFull => "project admission full",
                         DispatchError::Closed => "worker pool closed",
                     };
                     let _ = response_sender.send(Err(anyhow::anyhow!(message)));
@@ -169,7 +171,8 @@ impl CrossProjectInvokeDispatcher for WorkerCrossProjectInvokeDispatcher {
         let (resp_tx, resp_rx) = oneshot::channel();
         let envelope = RequestEnvelope::new(target_project_id, req, resp_tx);
         worker_pool::dispatch(&self.senders, envelope).map_err(|e| match e {
-            DispatchError::Full => anyhow::anyhow!("worker pool full"),
+            DispatchError::QueueFull => anyhow::anyhow!("worker pool full"),
+            DispatchError::ProjectAdmissionFull => anyhow::anyhow!("project admission full"),
             DispatchError::Closed => anyhow::anyhow!("worker pool closed"),
         })?;
         Ok(resp_rx)
@@ -235,6 +238,9 @@ fn main() -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
     let telemetry_providers = telemetry::setup(&otlp_endpoint, &platform_telemetry_tenant_id)?;
+    let service_instance_id = worker_state_metrics::generate_service_instance_id();
+    tracing::info!(%service_instance_id, "worker telemetry instance");
+    fn0::telemetry::install_service_instance_id(service_instance_id);
     install_panic_hook();
 
     let result = rt.block_on(run(&otlp_endpoint));
@@ -422,6 +428,19 @@ async fn run(otlp_endpoint: &str) -> Result<()> {
     .await
     .map_err(|error| color_eyre::eyre::eyre!("websocket service init: {error:#}"))?;
     websocket_hijack.set_dispatcher(websocket_service.clone());
+    let _worker_state_gauges = worker_state_metrics::register(
+        &opentelemetry::global::meter("fn0-worker"),
+        fn0::telemetry::service_instance_id().expect("service instance id installed in main"),
+        worker_state_metrics::WorkerStateSources {
+            manifest_loaded: manifest_loaded.clone(),
+            draining: drain_flag.clone(),
+            in_flight_requests: instance_count.clone(),
+            websocket_connections: {
+                let websocket_service = websocket_service.clone();
+                Arc::new(move || websocket_service.connection_count() as u64)
+            },
+        },
+    );
 
     let manifest_db = control_database.clone();
     let manifest_handle = tokio::spawn({
@@ -1431,9 +1450,10 @@ async fn handle_user_request(
         .with_execution_deadline(selected_request_deadline);
 
     if let Err(err) = worker_pool::dispatch(&worker_senders, envelope) {
+        worker_state_metrics::dispatch_rejection(&err);
         match err {
-            DispatchError::Full => {
-                tracing::warn!(%project_id, "worker queue full");
+            DispatchError::QueueFull | DispatchError::ProjectAdmissionFull => {
+                tracing::warn!(%project_id, reason = err.as_str(), "request dispatch rejected");
                 return Ok(hyper::Response::builder()
                     .status(503)
                     .body(full_body(Bytes::from("Service Unavailable")))

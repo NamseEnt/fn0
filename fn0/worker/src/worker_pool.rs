@@ -75,8 +75,19 @@ impl RequestEnvelope {
 
 #[derive(Debug)]
 pub enum DispatchError {
-    Full,
+    QueueFull,
+    ProjectAdmissionFull,
     Closed,
+}
+
+impl DispatchError {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::QueueFull => "queue_full",
+            Self::ProjectAdmissionFull => "project_admission_full",
+            Self::Closed => "closed",
+        }
+    }
 }
 
 const QUEUE_CAPACITY: usize = 256;
@@ -128,7 +139,7 @@ fn reserve_project(project_id: &str) -> Result<ProjectAdmissionGuard, DispatchEr
         .fetch_update(Ordering::AcqRel, Ordering::Acquire, |outstanding| {
             (outstanding < PROJECT_ACTIVE_LIMIT + PROJECT_WAITING_LIMIT).then_some(outstanding + 1)
         })
-        .map_err(|_| DispatchError::Full)?;
+        .map_err(|_| DispatchError::ProjectAdmissionFull)?;
     Ok(ProjectAdmissionGuard {
         project_id: project_id.to_string(),
         admission,
@@ -166,7 +177,7 @@ pub fn dispatch(
     let idx = pick_worker(&env.project_id, senders.len());
     match senders[idx].try_send(env) {
         Ok(()) => Ok(()),
-        Err(mpsc::error::TrySendError::Full(_)) => Err(DispatchError::Full),
+        Err(mpsc::error::TrySendError::Full(_)) => Err(DispatchError::QueueFull),
         Err(mpsc::error::TrySendError::Closed(_)) => Err(DispatchError::Closed),
     }
 }
@@ -180,7 +191,8 @@ pub async fn invoke_and_wait(
     let (response_sender, response_receiver) = oneshot::channel();
     let (envelope, started_receiver) = envelope_for(response_sender).with_start_signal();
     dispatch(senders, envelope).map_err(|error| match error {
-        DispatchError::Full => anyhow::anyhow!("worker queue full"),
+        DispatchError::QueueFull => anyhow::anyhow!("worker queue full"),
+        DispatchError::ProjectAdmissionFull => anyhow::anyhow!("project admission full"),
         DispatchError::Closed => anyhow::anyhow!("worker queue closed"),
     })?;
     let mut response_receiver = response_receiver;
@@ -363,7 +375,7 @@ mod tests {
             .collect();
         assert!(matches!(
             reserve_project(project_id),
-            Err(DispatchError::Full)
+            Err(DispatchError::ProjectAdmissionFull)
         ));
         drop(reservations);
         assert!(reserve_project(project_id).is_ok());

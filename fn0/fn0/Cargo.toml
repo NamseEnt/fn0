@@ -68,6 +68,7 @@ zstd = { workspace = true }
 
 [dev-dependencies]
 h2 = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
 rcgen = { workspace = true }
 rustls-pki-types = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync", "test-util"] }

@@ -1,3 +1,4 @@
+use opentelemetry::metrics::Meter;
 use opentelemetry::{KeyValue, global};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
@@ -23,11 +24,41 @@ pub const PROJECT_TENANT_ATTRIBUTE: &str = "fn0.project_tenant";
 pub const REQUEST_DURATION_METRIC: &str = "fn0.http.server.request.duration";
 pub const CPU_TIME_METRIC: &str = "fn0.guest.cpu.duration";
 pub const MAX_ROUTES_PER_PROJECT: usize = 40;
+/// Platform aggregates: every request and guest CPU sample on the worker,
+/// with no project, route or hostname, so the operations console can read the
+/// whole platform from the platform tenant alone. They carry only bounded
+/// labels — `outcome` and [`SERVICE_INSTANCE_ID_ATTRIBUTE`].
+pub const PLATFORM_REQUEST_DURATION_METRIC: &str = "fn0.platform.request.duration";
+pub const PLATFORM_CPU_TIME_METRIC: &str = "fn0.platform.guest.cpu.duration";
+pub const PLATFORM_CPU_TIMEOUTS_METRIC: &str = "fn0.platform.cpu_timeouts";
+/// Set on platform metric data points, never on the resource: the resource
+/// is copied into every project tenant, and a per-process label there would
+/// split each project's series on every deploy. Without it, two worker
+/// processes exporting the same cumulative series — a blue-green overlap, or
+/// two hosts — would interleave into one series.
+pub const SERVICE_INSTANCE_ID_ATTRIBUTE: &str = "service.instance.id";
 
 const SECONDS_BUCKETS: [f64; 7] = [0.005, 0.025, 0.1, 0.5, 1.0, 5.0, 30.0];
+const PLATFORM_REQUEST_SECONDS_BUCKETS: [f64; 13] = [
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0,
+];
+const PLATFORM_CPU_SECONDS_BUCKETS: [f64; 11] = [
+    0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5,
+];
 const UNKNOWN_ROUTE: &str = "unknown";
 
 static PROJECT_ROUTES: OnceLock<Mutex<HashMap<String, HashSet<String>>>> = OnceLock::new();
+static SERVICE_INSTANCE_ID: OnceLock<String> = OnceLock::new();
+
+/// Turns on the platform metrics for this process. Until it is called — as
+/// in `fn0 local` — only project metrics are recorded. The first id wins.
+pub fn install_service_instance_id(service_instance_id: String) {
+    let _ = SERVICE_INSTANCE_ID.set(service_instance_id);
+}
+
+pub fn service_instance_id() -> Option<&'static str> {
+    SERVICE_INSTANCE_ID.get().map(String::as_str)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FailureComponent {
@@ -161,7 +192,21 @@ pub fn error_code_error_type(error_code: &ErrorCode) -> &'static str {
 }
 
 pub fn cpu_time(project_id: &str, cpu_time: Duration) {
-    global::meter("fn0")
+    record_cpu_time(
+        &global::meter("fn0"),
+        service_instance_id(),
+        project_id,
+        cpu_time,
+    );
+}
+
+fn record_cpu_time(
+    meter: &Meter,
+    service_instance_id: Option<&str>,
+    project_id: &str,
+    cpu_time: Duration,
+) {
+    meter
         .f64_histogram(CPU_TIME_METRIC)
         .with_unit("s")
         .with_boundaries(SECONDS_BUCKETS.to_vec())
@@ -173,19 +218,37 @@ pub fn cpu_time(project_id: &str, cpu_time: Duration) {
                 project_id.to_string(),
             )],
         );
+    if let Some(service_instance_id) = service_instance_id {
+        meter
+            .f64_histogram(PLATFORM_CPU_TIME_METRIC)
+            .with_unit("s")
+            .with_boundaries(PLATFORM_CPU_SECONDS_BUCKETS.to_vec())
+            .build()
+            .record(
+                cpu_time.as_secs_f64(),
+                &[service_instance_attribute(service_instance_id)],
+            );
+    }
 }
 
 pub fn cpu_timeout(project_id: &str) {
-    global::meter("fn0")
-        .u64_counter("fn0.cpu_timeouts")
-        .build()
-        .add(
-            1,
-            &[KeyValue::new(
-                PROJECT_TENANT_ATTRIBUTE,
-                project_id.to_string(),
-            )],
-        );
+    record_cpu_timeout(&global::meter("fn0"), service_instance_id(), project_id);
+}
+
+fn record_cpu_timeout(meter: &Meter, service_instance_id: Option<&str>, project_id: &str) {
+    meter.u64_counter("fn0.cpu_timeouts").build().add(
+        1,
+        &[KeyValue::new(
+            PROJECT_TENANT_ATTRIBUTE,
+            project_id.to_string(),
+        )],
+    );
+    if let Some(service_instance_id) = service_instance_id {
+        meter
+            .u64_counter(PLATFORM_CPU_TIMEOUTS_METRIC)
+            .build()
+            .add(1, &[service_instance_attribute(service_instance_id)]);
+    }
 }
 
 pub fn create_instance() {
@@ -201,7 +264,25 @@ pub fn request_duration(
     outcome: RequestOutcome,
     duration: Duration,
 ) {
-    global::meter("fn0")
+    record_request_duration(
+        &global::meter("fn0"),
+        service_instance_id(),
+        project_id,
+        route,
+        outcome,
+        duration,
+    );
+}
+
+fn record_request_duration(
+    meter: &Meter,
+    service_instance_id: Option<&str>,
+    project_id: &str,
+    route: &str,
+    outcome: RequestOutcome,
+    duration: Duration,
+) {
+    meter
         .f64_histogram(REQUEST_DURATION_METRIC)
         .with_unit("s")
         .with_boundaries(SECONDS_BUCKETS.to_vec())
@@ -214,6 +295,27 @@ pub fn request_duration(
                 KeyValue::new("outcome", outcome.as_str()),
             ],
         );
+    if let Some(service_instance_id) = service_instance_id {
+        meter
+            .f64_histogram(PLATFORM_REQUEST_DURATION_METRIC)
+            .with_unit("s")
+            .with_boundaries(PLATFORM_REQUEST_SECONDS_BUCKETS.to_vec())
+            .build()
+            .record(
+                duration.as_secs_f64(),
+                &[
+                    KeyValue::new("outcome", outcome.as_str()),
+                    service_instance_attribute(service_instance_id),
+                ],
+            );
+    }
+}
+
+fn service_instance_attribute(service_instance_id: &str) -> KeyValue {
+    KeyValue::new(
+        SERVICE_INSTANCE_ID_ATTRIBUTE,
+        service_instance_id.to_string(),
+    )
 }
 
 pub fn stage_duration(stage: &'static str, duration: Duration) {
@@ -248,7 +350,131 @@ pub fn bounded_route(project_id: &str, route: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_ROUTES_PER_PROJECT, RequestOutcome, bounded_route};
+    use super::{
+        CPU_TIME_METRIC, MAX_ROUTES_PER_PROJECT, PLATFORM_CPU_TIME_METRIC,
+        PLATFORM_CPU_TIMEOUTS_METRIC, PLATFORM_REQUEST_DURATION_METRIC, PROJECT_TENANT_ATTRIBUTE,
+        REQUEST_DURATION_METRIC, RequestOutcome, SERVICE_INSTANCE_ID_ATTRIBUTE, bounded_route,
+        record_cpu_time, record_cpu_timeout, record_request_duration,
+    };
+    use opentelemetry::KeyValue;
+    use opentelemetry::metrics::MeterProvider;
+    use opentelemetry_sdk::metrics::data::{AggregatedMetrics, MetricData, ResourceMetrics};
+    use opentelemetry_sdk::metrics::{InMemoryMetricExporter, SdkMeterProvider};
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::time::Duration;
+
+    type AttributeKeysByMetric = BTreeMap<String, Vec<BTreeSet<String>>>;
+
+    fn attribute_keys<'a>(attributes: impl Iterator<Item = &'a KeyValue>) -> BTreeSet<String> {
+        attributes
+            .map(|attribute| attribute.key.as_str().to_string())
+            .collect()
+    }
+
+    fn attribute_keys_by_metric(resource_metrics: &[ResourceMetrics]) -> AttributeKeysByMetric {
+        let mut keys_by_metric = AttributeKeysByMetric::new();
+        for metric in resource_metrics
+            .iter()
+            .flat_map(|resource| resource.scope_metrics())
+            .flat_map(|scope| scope.metrics())
+        {
+            let point_keys: Vec<BTreeSet<String>> = match metric.data() {
+                AggregatedMetrics::F64(MetricData::Histogram(histogram)) => histogram
+                    .data_points()
+                    .map(|point| attribute_keys(point.attributes()))
+                    .collect(),
+                AggregatedMetrics::U64(MetricData::Sum(sum)) => sum
+                    .data_points()
+                    .map(|point| attribute_keys(point.attributes()))
+                    .collect(),
+                other => panic!("unexpected aggregation for {}: {other:?}", metric.name()),
+            };
+            keys_by_metric
+                .entry(metric.name().to_string())
+                .or_default()
+                .extend(point_keys);
+        }
+        keys_by_metric
+    }
+
+    fn record_one_of_each(service_instance_id: Option<&str>) -> AttributeKeysByMetric {
+        let exporter = InMemoryMetricExporter::default();
+        let provider = SdkMeterProvider::builder()
+            .with_periodic_exporter(exporter.clone())
+            .build();
+        let meter = provider.meter("fn0");
+        let project_id = "telemetry-platform-metric-test";
+        record_request_duration(
+            &meter,
+            service_instance_id,
+            project_id,
+            "/items/[id]",
+            RequestOutcome::ServerError,
+            Duration::from_millis(40),
+        );
+        record_cpu_time(
+            &meter,
+            service_instance_id,
+            project_id,
+            Duration::from_millis(3),
+        );
+        record_cpu_timeout(&meter, service_instance_id, project_id);
+        provider.force_flush().expect("flush");
+        attribute_keys_by_metric(&exporter.get_finished_metrics().expect("metrics"))
+    }
+
+    fn keys(names: &[&str]) -> BTreeSet<String> {
+        names.iter().map(|name| name.to_string()).collect()
+    }
+
+    #[test]
+    fn platform_metrics_carry_only_outcome_and_instance() {
+        let keys_by_metric = record_one_of_each(Some("instance-a"));
+
+        assert_eq!(
+            keys_by_metric[PLATFORM_REQUEST_DURATION_METRIC],
+            vec![keys(&["outcome", SERVICE_INSTANCE_ID_ATTRIBUTE])]
+        );
+        assert_eq!(
+            keys_by_metric[PLATFORM_CPU_TIME_METRIC],
+            vec![keys(&[SERVICE_INSTANCE_ID_ATTRIBUTE])]
+        );
+        assert_eq!(
+            keys_by_metric[PLATFORM_CPU_TIMEOUTS_METRIC],
+            vec![keys(&[SERVICE_INSTANCE_ID_ATTRIBUTE])]
+        );
+    }
+
+    #[test]
+    fn project_metrics_keep_their_labels_and_gain_no_instance() {
+        let keys_by_metric = record_one_of_each(Some("instance-a"));
+
+        assert_eq!(
+            keys_by_metric[REQUEST_DURATION_METRIC],
+            vec![keys(&[PROJECT_TENANT_ATTRIBUTE, "route", "outcome"])]
+        );
+        assert_eq!(
+            keys_by_metric[CPU_TIME_METRIC],
+            vec![keys(&[PROJECT_TENANT_ATTRIBUTE])]
+        );
+        assert_eq!(
+            keys_by_metric["fn0.cpu_timeouts"],
+            vec![keys(&[PROJECT_TENANT_ATTRIBUTE])]
+        );
+    }
+
+    #[test]
+    fn platform_metrics_are_off_without_an_instance_id() {
+        let keys_by_metric = record_one_of_each(None);
+
+        assert_eq!(
+            keys_by_metric
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec!["fn0.cpu_timeouts", CPU_TIME_METRIC, REQUEST_DURATION_METRIC]
+        );
+    }
 
     #[test]
     fn bounds_routes_per_project() {

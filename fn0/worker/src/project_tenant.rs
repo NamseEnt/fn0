@@ -536,6 +536,92 @@ mod tests {
     }
 
     #[test]
+    fn platform_aggregates_stay_in_the_platform_tenant_beside_project_metrics() {
+        let histogram = |name: &str, attributes: Vec<ProtoKeyValue>| Metric {
+            name: name.to_string(),
+            unit: "s".to_string(),
+            data: Some(metric::Data::Histogram(Histogram {
+                data_points: vec![HistogramDataPoint {
+                    attributes,
+                    count: 1,
+                    ..Default::default()
+                }],
+                aggregation_temporality: 2,
+            })),
+            ..Default::default()
+        };
+        let platform_attributes = vec![
+            string_attribute("outcome", "server_error"),
+            string_attribute(fn0::telemetry::SERVICE_INSTANCE_ID_ATTRIBUTE, "instance-a"),
+        ];
+        let request = ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: platform_resource(),
+                scope_metrics: vec![ScopeMetrics {
+                    metrics: vec![
+                        histogram(
+                            fn0::telemetry::REQUEST_DURATION_METRIC,
+                            vec![
+                                string_attribute(PROJECT_TENANT_ATTRIBUTE, "project-a"),
+                                string_attribute("route", "/items/[id]"),
+                                string_attribute("outcome", "server_error"),
+                            ],
+                        ),
+                        histogram(
+                            fn0::telemetry::PLATFORM_REQUEST_DURATION_METRIC,
+                            platform_attributes.clone(),
+                        ),
+                    ],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+
+        let routed = route_metrics(request, "fn0");
+
+        let mut metrics_per_tenant: Vec<(&str, &str, Vec<ProtoKeyValue>)> = routed
+            .resource_metrics
+            .iter()
+            .flat_map(|resource_metrics| {
+                let tenant_id = tenant_of(&resource_metrics.resource);
+                resource_metrics.scope_metrics[0]
+                    .metrics
+                    .iter()
+                    .map(move |metric| {
+                        let Some(metric::Data::Histogram(histogram)) = &metric.data else {
+                            panic!("expected a histogram");
+                        };
+                        (
+                            tenant_id,
+                            metric.name.as_str(),
+                            histogram.data_points[0].attributes.clone(),
+                        )
+                    })
+            })
+            .collect();
+        metrics_per_tenant.sort_by_key(|(tenant_id, name, _)| (*tenant_id, *name));
+        assert_eq!(
+            metrics_per_tenant,
+            vec![
+                (
+                    "fn0",
+                    fn0::telemetry::PLATFORM_REQUEST_DURATION_METRIC,
+                    platform_attributes,
+                ),
+                (
+                    "project-a",
+                    fn0::telemetry::REQUEST_DURATION_METRIC,
+                    vec![
+                        string_attribute("route", "/items/[id]"),
+                        string_attribute("outcome", "server_error"),
+                    ],
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn children_of_a_request_span_inherit_its_project() {
         let exporter = InMemorySpanExporter::default();
         let provider = SdkTracerProvider::builder()
