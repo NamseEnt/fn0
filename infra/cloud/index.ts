@@ -508,6 +508,14 @@ new cloudflare.Record(
   cloudflareOperatedResource,
 );
 
+const opsCanaryHostname =
+  config.get("opsCanaryHostname") ?? `canary.${domain}`;
+const opsCanaryAccess = new fn0.OpsCanaryAccess(
+  "ops-canary-access",
+  { zoneId, hostname: opsCanaryHostname, suffix },
+  cloudflareOperatedComponent,
+);
+
 const collectyImageRef = config.require("collectyImageRef");
 const signyImageRef = config.require("signyImageRef");
 const telemetryConfigVersion = config.require("telemetryConfigVersion");
@@ -872,6 +880,9 @@ export const signyR2StoragePrefix = signyR2.storagePrefix;
 export const signyR2Endpoint = signyR2.endpoint;
 export const signyR2AccessKeyId = pulumi.secret(signyR2.accessKeyId);
 export const signyR2SecretAccessKey = pulumi.secret(signyR2.secretAccessKey);
+export const opsCanaryHostnameOutput = opsCanaryAccess.hostname;
+export const opsCanaryAccessClientId = opsCanaryAccess.accessClientId;
+export const opsCanaryAccessClientSecret = opsCanaryAccess.accessClientSecret;
 export const signyAccessClientId = pulumi.secret(
   signyAccessServiceToken.clientId,
 );
