@@ -168,15 +168,26 @@ impl CrossProjectInvokeDispatcher for WorkerCrossProjectInvokeDispatcher {
             });
             return Ok(response_receiver);
         }
-        let (resp_tx, resp_rx) = oneshot::channel();
-        let envelope = RequestEnvelope::new(target_project_id, req, resp_tx);
-        worker_pool::dispatch(&self.senders, envelope).map_err(|e| match e {
-            DispatchError::QueueFull => anyhow::anyhow!("worker pool full"),
-            DispatchError::ProjectAdmissionFull => anyhow::anyhow!("project admission full"),
-            DispatchError::Closed => anyhow::anyhow!("worker pool closed"),
-        })?;
-        Ok(resp_rx)
+        dispatch_cross_project_request(&self.senders, target_project_id, req)
     }
+}
+
+/// Hands a platform-originated request to the target project as it is: the
+/// reserved headers the ingress strips from visitors, such as the
+/// `x-fn0-admin` that control's `admin_run` sets, must survive this path.
+fn dispatch_cross_project_request(
+    senders: &[mpsc::Sender<RequestEnvelope>],
+    target_project_id: String,
+    req: fn0::Request,
+) -> anyhow::Result<oneshot::Receiver<anyhow::Result<fn0::Response>>> {
+    let (resp_tx, resp_rx) = oneshot::channel();
+    let envelope = RequestEnvelope::new(target_project_id, req, resp_tx);
+    worker_pool::dispatch(senders, envelope).map_err(|e| match e {
+        DispatchError::QueueFull => anyhow::anyhow!("worker pool full"),
+        DispatchError::ProjectAdmissionFull => anyhow::anyhow!("project admission full"),
+        DispatchError::Closed => anyhow::anyhow!("worker pool closed"),
+    })?;
+    Ok(resp_rx)
 }
 
 fn build_vault_hijack() -> Arc<VaultHijack> {
@@ -1332,6 +1343,36 @@ fn egress_quota_exhausted_response() -> HyperResponse {
         .unwrap()
 }
 
+const RESERVED_INTERNAL_HEADER_PREFIX: &str = "x-fn0-internal-";
+/// Forte's generated admin handler runs a task when `x-fn0-admin: true` is
+/// present; `forte dev` sets the other two beside it as the caller and task.
+/// Only control's `admin_run`, through cross-project invoke, may reach an
+/// admin task in production.
+const RESERVED_ADMIN_HEADERS: [&str; 3] = [
+    "x-fn0-admin",
+    "x-fn0-admin-github-login",
+    "x-fn0-admin-task",
+];
+
+/// Removes every header a visitor must not be able to set because fn0 or the
+/// guest trusts it as coming from the platform. `HeaderMap` names are already
+/// lowercase, and `remove` drops every value of a repeated header.
+fn strip_reserved_ingress_headers(headers: &mut hyper::HeaderMap) {
+    let reserved_headers: Vec<hyper::header::HeaderName> = headers
+        .keys()
+        .filter(|header_name| {
+            header_name
+                .as_str()
+                .starts_with(RESERVED_INTERNAL_HEADER_PREFIX)
+                || RESERVED_ADMIN_HEADERS.contains(&header_name.as_str())
+        })
+        .cloned()
+        .collect();
+    for header_name in reserved_headers {
+        headers.remove(header_name);
+    }
+}
+
 struct UserRequestOptions {
     req: hyper::Request<hyper::body::Incoming>,
     worker_senders: Arc<Vec<mpsc::Sender<RequestEnvelope>>>,
@@ -1390,15 +1431,7 @@ async fn handle_user_request(
     req.extensions_mut()
         .insert(RequestCancellation(cancellation.clone()));
 
-    let internal_headers: Vec<hyper::header::HeaderName> = req
-        .headers()
-        .keys()
-        .filter(|header_name| header_name.as_str().starts_with("x-fn0-internal-"))
-        .cloned()
-        .collect();
-    for header_name in internal_headers {
-        req.headers_mut().remove(header_name);
-    }
+    strip_reserved_ingress_headers(req.headers_mut());
 
     let host = req
         .headers()
@@ -1537,8 +1570,9 @@ mod tests {
         FailedRequest, HyperResponse, InFlightGuard, LimitedRequestBody,
         MAX_CONNECTION_BUFFER_SIZE, MAX_REQUEST_BODY_SIZE, REQUEST_BODY_BUFFER_PERMITS,
         REQUEST_BODY_CHUNK_SIZE, REQUEST_DEADLINE, RequestBodyTooLarge, TokioIo, UnsyncBoxBody,
-        classify_failed_request, declared_request_body_exceeds_limit, full_body, http1,
-        payload_too_large_response, select_request_deadline, service_fn,
+        classify_failed_request, declared_request_body_exceeds_limit,
+        dispatch_cross_project_request, full_body, http1, payload_too_large_response,
+        select_request_deadline, service_fn, strip_reserved_ingress_headers,
     };
     use bytes::Bytes;
     use futures::{StreamExt, stream};
@@ -1549,7 +1583,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::time::Duration;
-    use tokio::sync::{Notify, Semaphore};
+    use tokio::sync::{Notify, Semaphore, mpsc};
     use tokio_util::sync::CancellationToken;
 
     #[derive(Clone)]
@@ -1692,6 +1726,63 @@ mod tests {
             .map_err(|never| match never {})
             .boxed_unsync();
         (sender, body)
+    }
+
+    #[test]
+    fn ingress_strips_reserved_headers_in_any_casing_and_every_repeat() {
+        let mut headers = hyper::HeaderMap::new();
+        for (name, value) in [
+            ("X-Fn0-Admin", "true"),
+            ("x-fn0-admin", "true"),
+            ("X-FN0-ADMIN-GITHUB-LOGIN", "someone"),
+            ("x-fn0-admin-task", "waitlist_list"),
+            ("X-Fn0-Internal-Websocket-Event", "connect"),
+            ("x-fn0-cache-path", "/docs"),
+            ("x-fn0-administrator", "not-reserved"),
+            ("cookie", "session=1"),
+        ] {
+            headers.append(
+                hyper::header::HeaderName::from_bytes(name.as_bytes()).expect("header name"),
+                value.parse().expect("header value"),
+            );
+        }
+
+        strip_reserved_ingress_headers(&mut headers);
+
+        let mut remaining: Vec<&str> = headers.keys().map(|name| name.as_str()).collect();
+        remaining.sort();
+        assert_eq!(
+            remaining,
+            vec!["cookie", "x-fn0-administrator", "x-fn0-cache-path"]
+        );
+    }
+
+    #[tokio::test]
+    async fn cross_project_invoke_keeps_the_admin_header_control_set() {
+        let (sender, mut receiver) = mpsc::channel(1);
+        let request = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("http://target.internal/__forte_admin/seed_known_values")
+            .header("x-fn0-admin", "true")
+            .body(full_body(Bytes::from_static(b"{}")))
+            .expect("request");
+
+        let _response = dispatch_cross_project_request(
+            &[sender],
+            "cross-project-admin-header-test".to_string(),
+            request,
+        )
+        .expect("dispatch");
+
+        let envelope = receiver.recv().await.expect("envelope");
+        assert_eq!(
+            envelope
+                .req
+                .headers()
+                .get("x-fn0-admin")
+                .and_then(|value| value.to_str().ok()),
+            Some("true")
+        );
     }
 
     #[test]
