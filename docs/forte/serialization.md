@@ -100,18 +100,27 @@ Admin task output (printed to the terminal by the CLI) is also serialized with `
 | Rust | TypeScript |
 |---|---|
 | `String`, `&str` | `string` |
+| `char` | `string` |
 | `u8`, `u16`, `u32`, `u64`, `i8`, `i16`, `i32`, `i64`, `usize`, `isize`, `f32`, `f64` | `number` |
 | `bool` | `boolean` |
 | `Option<T>` | `T \| undefined` (optional in structs) |
-| `Vec<T>` | `T[]` |
-| `HashMap<String, V>` | `Record<string, V>` |
+| `Vec<T>`, `&[T]`, `[T; N]` | `T[]` |
+| `HashSet<T>`, `BTreeSet<T>` | `T[]` |
+| `(T1, T2, ...)` | `[T1, T2, ...]` (TypeScript tuple) |
+| `HashMap<String, V>`, `BTreeMap<String, V>` | `Record<string, V>` |
+| `Box<T>`, `Rc<T>`, `Arc<T>` | `T` (transparent wrapper) |
 | `chrono::DateTime<_>` | `Date` (Zod: `z.coerce.date()`) |
 | `serde_json::Value` | `unknown` (Zod: `z.json()`) |
 | unit enum variant | `{ t: "VariantName" }` |
-| tuple/newtype variant | `{ t: "VariantName"; v: T }` |
+| newtype variant (one field) | `{ t: "VariantName"; v: T }` |
+| multi-field tuple variant | `{ t: "VariantName"; v: [T1, T2, ...] }` |
 | struct variant | `{ t: "VariantName"; fieldName: T; ... }` |
 
 Enums become TypeScript discriminated unions on `t`.
+
+### Cyclic types
+
+`forte-rs-to-ts` detects mutually recursive type references and generates `z.lazy(() => TypeSchema)` Zod schemas for them. Self-referential types (e.g. tree nodes) are supported and will work correctly at runtime; the generated schema uses lazy evaluation to break the cycle.
 
 ## Cookies
 

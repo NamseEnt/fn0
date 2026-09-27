@@ -110,11 +110,33 @@ forte_sdk::websocket::send(
 .await?;
 ```
 
+`connect(url)` returns `Result<ConnectionId, WebSocketConnectError>`. Variants:
+
+| Variant | When |
+| --- | --- |
+| `InvalidUrl` | URL is not `ws://` or `wss://`, or is otherwise malformed |
+| `DestinationForbidden` | URL resolves to a non-public address (loopback, private, link-local, etc.) |
+| `EgressQuotaExceeded` | Monthly compute egress quota exhausted |
+| `DeadlineExceeded` | Connection handshake timed out |
+| `Transport` | Network failure during the handshake |
+| `Internal` | Internal fn0 error |
+
 ## Connect decisions
 
 `ConnectEvent` exposes the connection ID, URI, headers, client address, and requested WebSocket
 subprotocols. Return `ConnectDecision::Accept` with an optional selected protocol and response
 headers, or `ConnectDecision::Reject` with any non-101 status and response headers.
+
+```rust
+// Accept without selecting a subprotocol:
+Ok(ConnectDecision::accept())
+
+// Accept and select a subprotocol (must be one the client offered):
+Ok(ConnectDecision::accept_with_protocol("chat.v1"))
+
+// Reject:
+Ok(ConnectDecision::reject(forte_sdk::http::StatusCode::UNAUTHORIZED))
+```
 
 The selected protocol must be one the client requested. Forte controls the WebSocket handshake,
 transport, and every `x-fn0-*` header, so those response headers cannot be overridden.

@@ -72,7 +72,7 @@ Each handler type is discovered by statically parsing the Rust source:
 
 Flat `.rs` files are also supported for pages and APIs. `pages/about.rs` is equivalent to `pages/about/mod.rs` and maps to `/about`.
 
-The return type check for pages and APIs matches on the string representation of the return type: the type must contain both `"Result"` and `"Props"`, or both `"Result"` and `"Redirect"`. Name your return type `Props` (or any type alias that includes the word `Props`) to be discovered.
+The return type check for pages and APIs matches on the string representation of the return type: the type must contain both `"Result"` and `"Props"`, or both `"Result"` and `"Redirect"`. Name your return type `Props` (or any type alias that includes the word `Props`) to be discovered. Under `src/apis/`, a return type containing `"ForteResponse"` (or a `pub type Props = ForteResponse` alias) is discovered as a raw-response handler — see [apis.md: Raw Responses](apis.md#raw-responses-forteresponse). Raw-response handlers are not allowed in `src/pages/` and cause a build panic if present there.
 
 ### Route Mapping
 
@@ -194,8 +194,9 @@ pub mod actions;      // present only when src/actions/ has handlers
 pub mod admin;        // present only when src/admin/ has handlers
 pub mod queue_task;   // present only when src/queue_task/ has handlers
 mod route_generated;
-pub use route_generated::enqueue; // present only when queue tasks exist
-pub use route_generated::ws_out;  // present only when src/ws_out/ has routes
+pub use route_generated::enqueue;      // present only when queue tasks exist
+pub use route_generated::ws_out;       // present only when src/ws_out/ has routes
+pub use route_generated::ws_singleton; // present only when src/ws_singleton/ has routes
 // === FORTE-MANAGED END ===
 ```
 

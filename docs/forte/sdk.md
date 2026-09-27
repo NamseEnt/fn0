@@ -38,6 +38,9 @@ pub enum Body {
     Empty,
     Bytes(Vec<u8>),
     Stream(StreamReader<u8>),
+    // Incoming is returned as the response body by Client::send(); treat it
+    // the same as Stream — use read_chunk(), bytes(), etc. to consume it.
+    Incoming { .. },
 }
 
 impl Body {
@@ -55,9 +58,16 @@ impl Body {
 }
 ```
 
-The runtime also uses an incoming-stream form for request and client-response
-bodies; its transport fields are managed by the runtime. `BodyError` reports
-buffer-limit overflow, WASI transport errors, cancellation, and invalid UTF-8.
+`BodyError` reports buffer-limit overflow, WASI transport errors, cancellation, and invalid UTF-8. Two helper methods are available:
+
+```rust
+// Returns true when the body was refused because it exceeded a size limit.
+pub fn is_too_large(&self) -> bool;
+
+// Returns Some(Some(limit)) when the SDK's own buffering refused it (limit known),
+// Some(None) when the host transport limit triggered it, or None for non-size errors.
+pub fn exceeded_limit(&self) -> Option<Option<u64>>;
+```
 
 `read_chunk` is single-consumer and backpressured. Each request chunk is at most 64 KiB;
 dropped or unread bodies cancel delivery. `bytes_limited`, `text_limited`, `json_limited`, and
@@ -123,6 +133,44 @@ let data: MyType = resp.into_body().json::<MyType>().await?;
 ```
 
 Outbound requests are subject to the fn0 Cloud subrequest limit (50 per request). Streaming request bodies use `Body::channel()` — see the [Body section](#body) above.
+
+`Client::send()` returns `Result<Response<Body>, http::Error>`. The `http::Error` enum covers invalid request construction, WASI transport failures, and response build errors:
+
+```rust
+pub enum http::Error {
+    Headers(_),         // invalid header name or value
+    InvalidScheme,      // URL scheme is not http/https
+    InvalidAuthority,   // URL authority is malformed
+    InvalidPathWithQuery, // path or query is invalid
+    InvalidMethod,      // method string is invalid
+    Wasi(_),            // WASI HTTP transport error
+    RequestTimeout(_),  // timeout option could not be applied
+    BuildResponse(_),   // error assembling the response value
+    Json(_),            // JSON decode error (Body::json)
+    Body(_),            // BodyError from reading the body
+}
+```
+
+### Per-request timeouts
+
+By default `Client` has no timeout. Set per-phase deadlines with `with_timeouts`:
+
+```rust
+use forte_sdk::http::{Client, RequestTimeouts};
+use std::time::Duration;
+
+// Apply the same timeout to connect, first byte, and between-bytes phases:
+let client = Client::new().with_timeouts(RequestTimeouts::all(Duration::from_secs(30)));
+
+// Or set phases individually:
+let client = Client::new().with_timeouts(RequestTimeouts {
+    connect: Some(Duration::from_secs(5)),
+    first_byte: Some(Duration::from_secs(10)),
+    between_bytes: Some(Duration::from_secs(5)),
+});
+```
+
+A phase that exceeds its deadline returns `http::Error::Wasi` with a timeout error code.
 
 ## WebSockets
 
