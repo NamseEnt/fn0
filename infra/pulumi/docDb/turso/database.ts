@@ -18,7 +18,7 @@ export class TursoDatabase extends pulumi.dynamic.Resource {
   }
 }
 
-interface TursoDatabaseInputs {
+export interface TursoDatabaseInputs {
   organizationSlug: string;
   name: string;
   group: string;
@@ -28,10 +28,23 @@ type TursoDatabaseOutputs = TursoDatabaseInputs & {
   name: string;
 };
 
-class TursoDatabaseProvider
+export class TursoDatabaseProvider
   implements
     pulumi.dynamic.ResourceProvider<TursoDatabaseInputs, TursoDatabaseOutputs>
 {
+  async diff(
+    id: string,
+    olds: TursoDatabaseOutputs,
+    news: TursoDatabaseInputs
+  ): Promise<pulumi.dynamic.DiffResult> {
+    return {
+      changes:
+        olds.organizationSlug !== news.organizationSlug ||
+        olds.name !== news.name ||
+        olds.group !== news.group,
+    };
+  }
+
   async create(
     inputs: TursoDatabaseInputs
   ): Promise<pulumi.dynamic.CreateResult<TursoDatabaseOutputs>> {
@@ -65,6 +78,57 @@ class TursoDatabaseProvider
       outs: {
         ...inputs,
         name: data.database.Name,
+      },
+    };
+  }
+
+  async update(
+    id: string,
+    olds: TursoDatabaseOutputs,
+    news: TursoDatabaseInputs
+  ): Promise<pulumi.dynamic.UpdateResult<TursoDatabaseOutputs>> {
+    const oldInputs = olds as TursoDatabaseOutputs & { __provider?: string };
+    const newInputs = news as TursoDatabaseInputs & { __provider?: string };
+    const oldBusinessInputsAvailable = [
+      oldInputs.organizationSlug,
+      oldInputs.name,
+      oldInputs.group,
+    ].every((value) => typeof value === "string");
+
+    if (
+      !oldBusinessInputsAvailable &&
+      oldInputs.organizationSlug === undefined &&
+      oldInputs.name === undefined &&
+      oldInputs.group === undefined &&
+      typeof oldInputs.__provider === "string" &&
+      typeof newInputs.__provider === "string" &&
+      oldInputs.__provider !== newInputs.__provider
+    ) {
+      return {
+        outs: {
+          organizationSlug: news.organizationSlug,
+          name: news.name,
+          group: news.group,
+        },
+      };
+    }
+
+    const changedProperties = [
+      oldInputs.organizationSlug !== news.organizationSlug && "organizationSlug",
+      oldInputs.name !== news.name && "name",
+      oldInputs.group !== news.group && "group",
+    ].filter((property): property is string => property !== false);
+    if (changedProperties.length > 0) {
+      throw new Error(
+        `Turso database update is unsupported until migration semantics are defined; changed inputs: ${changedProperties.join(", ")}. No Turso API request was made.`
+      );
+    }
+
+    return {
+      outs: {
+        organizationSlug: news.organizationSlug,
+        name: news.name,
+        group: news.group,
       },
     };
   }

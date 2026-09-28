@@ -17,16 +17,29 @@ export class TursoGroup extends pulumi.dynamic.Resource {
   }
 }
 
-interface TursoGroupInputs {
+export interface TursoGroupInputs {
   organizationSlug: string;
   name: string;
   location: string;
 }
 
-class TursoGroupProvider
+export class TursoGroupProvider
   implements
     pulumi.dynamic.ResourceProvider<TursoGroupInputs, TursoGroupInputs>
 {
+  async diff(
+    id: string,
+    olds: TursoGroupInputs,
+    news: TursoGroupInputs
+  ): Promise<pulumi.dynamic.DiffResult> {
+    return {
+      changes:
+        olds.organizationSlug !== news.organizationSlug ||
+        olds.name !== news.name ||
+        olds.location !== news.location,
+    };
+  }
+
   async create(
     inputs: TursoGroupInputs
   ): Promise<pulumi.dynamic.CreateResult<TursoGroupInputs>> {
@@ -59,6 +72,57 @@ class TursoGroupProvider
     return {
       id: group.uuid,
       outs: inputs,
+    };
+  }
+
+  async update(
+    id: string,
+    olds: TursoGroupInputs,
+    news: TursoGroupInputs
+  ): Promise<pulumi.dynamic.UpdateResult<TursoGroupInputs>> {
+    const oldInputs = olds as TursoGroupInputs & { __provider?: string };
+    const newInputs = news as TursoGroupInputs & { __provider?: string };
+    const oldBusinessInputsAvailable = [
+      oldInputs.organizationSlug,
+      oldInputs.name,
+      oldInputs.location,
+    ].every((value) => typeof value === "string");
+
+    if (
+      !oldBusinessInputsAvailable &&
+      oldInputs.organizationSlug === undefined &&
+      oldInputs.name === undefined &&
+      oldInputs.location === undefined &&
+      typeof oldInputs.__provider === "string" &&
+      typeof newInputs.__provider === "string" &&
+      oldInputs.__provider !== newInputs.__provider
+    ) {
+      return {
+        outs: {
+          organizationSlug: news.organizationSlug,
+          name: news.name,
+          location: news.location,
+        },
+      };
+    }
+
+    const changedProperties = [
+      oldInputs.organizationSlug !== news.organizationSlug && "organizationSlug",
+      oldInputs.name !== news.name && "name",
+      oldInputs.location !== news.location && "location",
+    ].filter((property): property is string => property !== false);
+    if (changedProperties.length > 0) {
+      throw new Error(
+        `Turso group update is unsupported until migration semantics are defined; changed inputs: ${changedProperties.join(", ")}. No Turso API request was made.`
+      );
+    }
+
+    return {
+      outs: {
+        organizationSlug: news.organizationSlug,
+        name: news.name,
+        location: news.location,
+      },
     };
   }
 
