@@ -135,18 +135,25 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    // One-time PIN is no longer added to new accounts automatically, and this
-    // account has no identity provider at all.
-    const oneTimePin = new cloudflare.ZeroTrustAccessIdentityProvider(
-      "one-time-pin",
-      {
-        accountId: args.accountId,
-        name: "One-time PIN",
-        type: "onetimepin",
-        config: {},
-      },
-      { parent: this, provider: accessAdministrationProvider },
-    );
+    // The account's one-time PIN login is shared by every Access application
+    // on it, so it is looked up rather than owned: destroying this component
+    // must not take the login method away from the rest of the account.
+    const oneTimePinId = cloudflare
+      .getZeroTrustAccessIdentityProvidersOutput(
+        { accountId: args.accountId, maxItems: 100 },
+        { parent: this, provider: accessAdministrationProvider },
+      )
+      .apply((list) => {
+        const oneTimePin = list.results.find(
+          (identityProvider) => identityProvider.type === "onetimepin",
+        );
+        if (!oneTimePin) {
+          throw new Error(
+            "the Cloudflare account has no one-time PIN identity provider; add one under Zero Trust > Settings > Authentication",
+          );
+        }
+        return oneTimePin.id;
+      });
     const organization = cloudflare.getZeroTrustOrganizationOutput(
       { accountId: args.accountId },
       { parent: this, provider: accessAdministrationProvider },
@@ -161,7 +168,7 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
         domain: args.hostname,
         type: "self_hosted",
         sessionDuration: "24h",
-        allowedIdps: [oneTimePin.id],
+        allowedIdps: [oneTimePinId],
         autoRedirectToIdentity: true,
         policies: [
           {
