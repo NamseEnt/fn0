@@ -106,6 +106,7 @@ export class FakeUpstream {
   canary: Record<string, Answer> = {
     runtime: { status: 200, body: '{"ok":true}' },
     dodb: { status: 200, body: '{"ok":true}' },
+    "dodb-write": { status: 200, body: '{"ok":true}' },
     storage: { status: 200, body: '{"ok":true}' },
   };
   signyDown: Answer | null = null;

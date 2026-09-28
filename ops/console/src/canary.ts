@@ -2,9 +2,15 @@ import { accessHeaders } from "./config.ts";
 import type { ProbeResult } from "./schema.ts";
 import type { Dependencies } from "./runtime.ts";
 
-export type CanaryProbeName = "runtime" | "dodb" | "storage";
+export type CanaryProbeName = "runtime" | "dodb" | "dodb-write" | "storage";
 
-const KNOWN_FAILURES = new Set(["missing", "mismatch", "unavailable"]);
+const KNOWN_FAILURES = new Set([
+  "missing",
+  "mismatch",
+  "unavailable",
+  "write_failed",
+  "read_failed",
+]);
 
 export async function probeCanary(
   dependencies: Dependencies,

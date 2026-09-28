@@ -12,7 +12,15 @@ dodb-core.workspace = true
 dodb-protocol.workspace = true
 dodb-service.workspace = true
 dodb-storage.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+http.workspace = true
+opentelemetry = { workspace = true, features = ["metrics"] }
+opentelemetry-http = { workspace = true, features = ["reqwest"] }
+opentelemetry-otlp = { workspace = true, features = ["http-proto", "reqwest-client", "metrics"] }
+opentelemetry_sdk = { workspace = true, features = ["metrics", "rt-tokio", "spec_unstable_metrics_views"] }
 quinn = { workspace = true, default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
+reqwest.workspace = true
 rustls-pemfile.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 

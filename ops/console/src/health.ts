@@ -11,7 +11,12 @@ import type {
 export const STALE_AFTER_SECONDS = 180;
 
 export interface HealthInputs {
-  canary: { runtime: ProbeResult; doc_db: ProbeResult; storage: ProbeResult };
+  canary: {
+    runtime: ProbeResult;
+    doc_db: ProbeResult;
+    doc_db_write: ProbeResult;
+    storage: ProbeResult;
+  };
   signyQuery: TelemetryQueryStatus;
   signyReady: ProbeResult;
   signyRemoteHealthy: boolean | null;
@@ -27,6 +32,7 @@ export interface HealthAssessment {
   components: {
     runtime: ComponentHealth;
     doc_db: ComponentHealth;
+    doc_db_write: ComponentHealth;
     storage: ComponentHealth;
     telemetry: ComponentHealth;
     worker: ComponentHealth;
@@ -173,6 +179,7 @@ export function assessHealth(inputs: HealthInputs): HealthAssessment {
   const components = {
     runtime,
     doc_db: assessDependency(inputs.canary.doc_db, runtime),
+    doc_db_write: assessDependency(inputs.canary.doc_db_write, runtime),
     storage: assessDependency(inputs.canary.storage, runtime),
     telemetry,
     worker: assessWorker(inputs, trustworthy),

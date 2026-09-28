@@ -12,7 +12,12 @@ const probe = (status: ProbeStatus, failure: string | null = null): ProbeResult 
 });
 
 const healthy = (): HealthInputs => ({
-  canary: { runtime: probe("ok"), doc_db: probe("ok"), storage: probe("ok") },
+  canary: {
+    runtime: probe("ok"),
+    doc_db: probe("ok"),
+    doc_db_write: probe("ok"),
+    storage: probe("ok"),
+  },
   signyQuery: "ok",
   signyReady: probe("ok"),
   signyRemoteHealthy: true,

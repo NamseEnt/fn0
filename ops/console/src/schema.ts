@@ -48,6 +48,40 @@ export interface WorkerInstance {
   websocket_connections: number | null;
 }
 
+export type DodbOperation = "get" | "put" | "delete" | "query" | "scan" | "transact";
+
+export interface DodbObservability {
+  telemetry: TelemetryQueryStatus;
+  service_instance_id: string | null;
+  telemetry_age_seconds: number | null;
+  operations_per_minute: Record<DodbOperation, number | null>;
+  request_latency_seconds: LatencySeconds;
+  request_bytes_per_minute: number | null;
+  response_bytes_per_minute: number | null;
+  active_connections: number | null;
+  active_streams: number | null;
+  protocol_errors: number | null;
+  transport_errors: number | null;
+  application_errors: number | null;
+  overloaded_responses: number | null;
+  database_file_bytes: number | null;
+  wal_file_bytes: number | null;
+  persisted_shards: number | null;
+  open_shards: number | null;
+  filesystem: {
+    mountpoint: string;
+    total_bytes: number;
+    used_bytes: number;
+    available_bytes: number;
+  } | null;
+  cpu_busy_percent: number | null;
+  memory: { used_bytes: number; available_bytes: number } | null;
+  disk_read_bytes_per_minute: number | null;
+  disk_write_bytes_per_minute: number | null;
+  network_received_bytes_per_minute: number | null;
+  network_sent_bytes_per_minute: number | null;
+}
+
 export type TelemetryQueryStatus = "ok" | "unavailable";
 
 export interface LiveResponse {
@@ -56,12 +90,18 @@ export interface LiveResponse {
   components: {
     runtime: ComponentHealth;
     doc_db: ComponentHealth;
+    doc_db_write: ComponentHealth;
     storage: ComponentHealth;
     telemetry: ComponentHealth;
     worker: ComponentHealth;
     capacity: ComponentHealth;
   };
-  canary: { runtime: ProbeResult; doc_db: ProbeResult; storage: ProbeResult };
+  canary: {
+    runtime: ProbeResult;
+    doc_db: ProbeResult;
+    doc_db_write: ProbeResult;
+    storage: ProbeResult;
+  };
   signy: {
     query: TelemetryQueryStatus;
     ready: ProbeResult;
@@ -75,6 +115,7 @@ export interface LiveResponse {
     collecty_lost_segments_recent: number | null;
   };
   worker: { instances: WorkerInstance[] };
+  dodb: DodbObservability;
   capacity: {
     window_seconds: number;
     dispatch_rejections: DispatchRejections | null;

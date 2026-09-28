@@ -1869,14 +1869,22 @@ dependencies = [
 name = "dodb-server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "bytes",
  "clap",
  "dodb-client",
  "dodb-core",
  "dodb-protocol",
  "dodb-service",
  "dodb-storage",
+ "http",
+ "opentelemetry",
+ "opentelemetry-http",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
  "quinn",
  "rcgen",
+ "reqwest",
  "rustls-pemfile",
  "tempfile",
  "tokio",

@@ -209,6 +209,29 @@ test("a canary dependency failure is DEGRADED with the canary's reason", async (
   assert.equal(liveResponse.health.state, "degraded");
 });
 
+test("dodb write/read canary failures stay separate from the read-only canary", async () => {
+  for (const failure of ["write_failed", "read_failed", "mismatch"] as const) {
+    const upstream = new FakeUpstream();
+    upstream.canary["dodb-write"] = {
+      status: 503,
+      body: JSON.stringify({ ok: false, failure }),
+    };
+    const response = await handleRequest(
+      new Request("https://ops.test/api/live", {
+        headers: { "Cf-Access-Jwt-Assertion": VALID_TOKEN },
+      }),
+      () => upstream.dependencies(),
+    );
+    const liveResponse = (await response.json()) as LiveResponse;
+    assert.equal(liveResponse.canary.doc_db.status, "ok");
+    assert.equal(liveResponse.canary.doc_db_write.status, "failed");
+    assert.equal(liveResponse.canary.doc_db_write.failure, failure);
+    assert.equal(liveResponse.components.doc_db.state, "healthy");
+    assert.equal(liveResponse.components.doc_db_write.state, "down");
+    assert.equal(liveResponse.health.state, "degraded");
+  }
+});
+
 test("Access refusing the ops credential is UNKNOWN, not DOWN", async () => {
   const upstream = new FakeUpstream();
   for (const probe of ["runtime", "dodb", "storage"]) {

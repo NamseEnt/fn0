@@ -1,10 +1,26 @@
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::fmt;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
+
+pub const REQUEST_LATENCY_BUCKETS_SECONDS: [f64; 18] = [
+    0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
+    0.5, 1.0, 2.5, 5.0, 10.0,
+];
+pub const REQUEST_OPERATIONS: [(&str, usize); 6] = [
+    ("get", 0),
+    ("put", 1),
+    ("delete", 2),
+    ("query", 3),
+    ("scan", 4),
+    ("transact", 7),
+];
+
+const REQUEST_LATENCY_BUCKET_COUNT: usize = REQUEST_LATENCY_BUCKETS_SECONDS.len() + 1;
 
 use dodb_core::{
     Error, ObservedState, RevisionState, ShardId, TenantId, TransactionCondition,
@@ -162,6 +178,7 @@ struct ServerMetricsInner {
     overloaded_responses: AtomicU64,
     request_latency_nanos: AtomicU64,
     operations: [AtomicU64; 8],
+    request_latency_buckets: [[AtomicU64; REQUEST_LATENCY_BUCKET_COUNT]; 8],
 }
 
 impl Default for ServerMetricsInner {
@@ -179,6 +196,9 @@ impl Default for ServerMetricsInner {
             overloaded_responses: AtomicU64::new(0),
             request_latency_nanos: AtomicU64::new(0),
             operations: std::array::from_fn(|_| AtomicU64::new(0)),
+            request_latency_buckets: std::array::from_fn(|_| {
+                std::array::from_fn(|_| AtomicU64::new(0))
+            }),
         }
     }
 }
@@ -197,6 +217,7 @@ pub struct ServerMetricsSnapshot {
     pub overloaded_responses: u64,
     pub request_latency_nanos: u64,
     pub operations: [u64; 8],
+    pub request_latency_buckets: [[u64; REQUEST_LATENCY_BUCKET_COUNT]; 8],
 }
 
 impl ServerMetrics {
@@ -217,7 +238,27 @@ impl ServerMetrics {
             operations: std::array::from_fn(|operation_index| {
                 inner.operations[operation_index].load(Ordering::Relaxed)
             }),
+            request_latency_buckets: std::array::from_fn(|operation_index| {
+                std::array::from_fn(|bucket_index| {
+                    inner.request_latency_buckets[operation_index][bucket_index]
+                        .load(Ordering::Relaxed)
+                })
+            }),
         }
+    }
+
+    fn record_request_latency(&self, operation_index: usize, elapsed_nanos: u64) {
+        let Some(operation_buckets) = self.inner.request_latency_buckets.get(operation_index)
+        else {
+            return;
+        };
+        let elapsed_seconds = elapsed_nanos as f64 / 1_000_000_000.0;
+        for (bucket_index, upper_bound) in REQUEST_LATENCY_BUCKETS_SECONDS.iter().enumerate() {
+            if elapsed_seconds <= *upper_bound {
+                operation_buckets[bucket_index].fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        operation_buckets[REQUEST_LATENCY_BUCKETS_SECONDS.len()].fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -495,10 +536,12 @@ async fn serve_stream<S: DodbService + 'static>(
         .inner
         .response_bytes
         .fetch_add(encoded.len() as u64, Ordering::Relaxed);
+    let elapsed_nanos = started.elapsed().as_nanos() as u64;
     metrics
         .inner
         .request_latency_nanos
-        .fetch_add(started.elapsed().as_nanos() as u64, Ordering::Relaxed);
+        .fetch_add(elapsed_nanos, Ordering::Relaxed);
+    metrics.record_request_latency(operation_index, elapsed_nanos);
 }
 
 async fn send_protocol_error(
@@ -556,6 +599,14 @@ pub struct LocalTenantService {
     resolver: Arc<dyn TenantShardResolver>,
     shards: Mutex<BTreeMap<TenantId, Arc<AsyncShard<ProductionFile, ProductionFile>>>>,
     fault_injector_factory: Mutex<Option<FaultInjectorFactory>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StorageMetricsSnapshot {
+    pub database_file_bytes: u64,
+    pub wal_file_bytes: u64,
+    pub persisted_shards: u64,
+    pub open_shards: u64,
 }
 
 pub type FaultInjectorFactory =
@@ -629,6 +680,14 @@ impl LocalTenantService {
             reports.push((tenant, shard.check_invariants().await?));
         }
         Ok(reports)
+    }
+
+    pub async fn storage_metrics_snapshot(&self) -> std::io::Result<StorageMetricsSnapshot> {
+        let data_dir = self.data_dir.clone();
+        let open_shards = self.shards.lock().await.len() as u64;
+        tokio::task::spawn_blocking(move || collect_storage_metrics(&data_dir, open_shards))
+            .await
+            .map_err(std::io::Error::other)?
     }
 
     async fn open_shard_handles(
@@ -861,6 +920,52 @@ impl LocalTenantService {
     }
 }
 
+fn collect_storage_metrics(
+    data_dir: &std::path::Path,
+    open_shards: u64,
+) -> std::io::Result<StorageMetricsSnapshot> {
+    let mut metrics = StorageMetricsSnapshot {
+        open_shards,
+        ..StorageMetricsSnapshot::default()
+    };
+    let mut persisted_shards = HashSet::new();
+    for entry in std::fs::read_dir(data_dir)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let path = entry.path();
+        let Some(extension) = path.extension().and_then(std::ffi::OsStr::to_str) else {
+            continue;
+        };
+        let Some(file_name) = path.file_name().and_then(std::ffi::OsStr::to_str) else {
+            continue;
+        };
+        if !file_name.starts_with("tenant-") {
+            continue;
+        }
+        let file_bytes = entry.metadata()?.len();
+        match extension {
+            "db" => {
+                metrics.database_file_bytes =
+                    metrics.database_file_bytes.saturating_add(file_bytes);
+                if let Some(stem) = path.file_stem() {
+                    persisted_shards.insert(stem.to_os_string());
+                }
+            }
+            "wal" => {
+                metrics.wal_file_bytes = metrics.wal_file_bytes.saturating_add(file_bytes);
+                if let Some(stem) = path.file_stem() {
+                    persisted_shards.insert(stem.to_os_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    metrics.persisted_shards = persisted_shards.len() as u64;
+    Ok(metrics)
+}
+
 impl DodbService for LocalTenantService {
     fn execute<'service>(
         &'service self,
@@ -955,5 +1060,35 @@ mod tests {
         let reopened = database_uuid(TenantId::new(41), ShardId::new(41));
         assert_eq!(first, reopened);
         assert_ne!(first, database_uuid(TenantId::new(42), ShardId::new(41)));
+    }
+
+    #[test]
+    fn request_latency_histogram_records_cumulative_operation_buckets() {
+        let metrics = ServerMetrics::default();
+        metrics.record_request_latency(1, 40_000);
+
+        let snapshot = metrics.snapshot();
+        assert_eq!(snapshot.request_latency_buckets[1][0], 0);
+        assert_eq!(snapshot.request_latency_buckets[1][1], 1);
+        assert_eq!(
+            snapshot.request_latency_buckets[1][REQUEST_LATENCY_BUCKETS_SECONDS.len()],
+            1
+        );
+        assert_eq!(snapshot.request_latency_buckets[0][1], 0);
+    }
+
+    #[test]
+    fn storage_metrics_count_database_wal_and_persisted_files_separately_from_open_shards() {
+        let data_dir = tempfile::tempdir().unwrap();
+        std::fs::write(data_dir.path().join("tenant-1-shard-1.db"), [1_u8; 19]).unwrap();
+        std::fs::write(data_dir.path().join("tenant-1-shard-1.wal"), [2_u8; 5]).unwrap();
+        std::fs::write(data_dir.path().join("tenant-2-shard-2.wal"), [3_u8; 7]).unwrap();
+        std::fs::write(data_dir.path().join("unrelated.db"), [4_u8; 101]).unwrap();
+
+        let snapshot = collect_storage_metrics(data_dir.path(), 1).unwrap();
+        assert_eq!(snapshot.database_file_bytes, 19);
+        assert_eq!(snapshot.wal_file_bytes, 12);
+        assert_eq!(snapshot.persisted_shards, 2);
+        assert_eq!(snapshot.open_shards, 1);
     }
 }

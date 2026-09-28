@@ -5,4 +5,5 @@ export const paths = {
   "/api/runtime": () => "/api/runtime",
   "/api/dodb": () => "/api/dodb",
   "/api/storage": () => "/api/storage",
+  "/api/dodb_write": () => "/api/dodb_write",
 } as const;

@@ -1,12 +1,17 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::time::Duration;
 
 use clap::Parser;
 use dodb_protocol::ProtocolLimits;
 use dodb_server::{
     DodbServer, DodbServerConfig, LocalTenantService, LocalTenantServiceConfig, ServerTlsConfig,
+    StorageMetricsSnapshot,
 };
+
+mod telemetry;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -63,18 +68,44 @@ impl Args {
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
     let args = Args::parse();
-    let server = Arc::new(build_server(&args)?);
+    let service = Arc::new(build_service(&args)?);
+    let server = Arc::new(build_server(&args, Arc::clone(&service))?);
+    let storage_metrics = Arc::new(Mutex::new(StorageMetricsSnapshot::default()));
+    let instance_id = std::fs::read_to_string("/etc/hostname")
+        .unwrap_or_else(|_| "dodb-node".to_owned())
+        .trim()
+        .to_owned();
+    let telemetry = telemetry::DodbTelemetry::start(
+        server.metrics(),
+        Arc::clone(&storage_metrics),
+        instance_id,
+    )?;
+    let storage_sampling = tokio::spawn(sample_storage_metrics(service, storage_metrics));
     let listen_addr = server.local_addr()?;
     println!(
         "dodb-server listening on {listen_addr}; data-dir={}",
         args.data_dir.display()
     );
-    run_until_shutdown(server).await
+    let result = run_until_shutdown(server).await;
+    storage_sampling.abort();
+    telemetry.shutdown()?;
+    result
 }
 
-fn build_server(args: &Args) -> Result<DodbServer<LocalTenantService>, BoxError> {
+fn build_service(args: &Args) -> Result<LocalTenantService, BoxError> {
     args.validate()?;
 
+    Ok(LocalTenantService::new(LocalTenantServiceConfig {
+        data_dir: args.data_dir.clone(),
+        max_open_shards: args.max_open_shards,
+        ..LocalTenantServiceConfig::default()
+    })?)
+}
+
+fn build_server(
+    args: &Args,
+    service: Arc<LocalTenantService>,
+) -> Result<DodbServer<LocalTenantService>, BoxError> {
     let certificate_pem = std::fs::read(&args.tls_cert).map_err(|error| {
         std::io::Error::other(format!(
             "failed to read TLS certificate {}: {error}",
@@ -94,12 +125,6 @@ fn build_server(args: &Args) -> Result<DodbServer<LocalTenantService>, BoxError>
             args.tls_key.display()
         ))
     })?;
-    let service = Arc::new(LocalTenantService::new(LocalTenantServiceConfig {
-        data_dir: args.data_dir.clone(),
-        max_open_shards: args.max_open_shards,
-        ..LocalTenantServiceConfig::default()
-    })?);
-
     Ok(DodbServer::bind(
         service,
         DodbServerConfig {
@@ -111,6 +136,24 @@ fn build_server(args: &Args) -> Result<DodbServer<LocalTenantService>, BoxError>
             max_concurrent_requests: args.max_concurrent_requests,
         },
     )?)
+}
+
+async fn sample_storage_metrics(
+    service: Arc<LocalTenantService>,
+    metrics: Arc<Mutex<StorageMetricsSnapshot>>,
+) {
+    let mut interval = tokio::time::interval(Duration::from_secs(60));
+    loop {
+        interval.tick().await;
+        match service.storage_metrics_snapshot().await {
+            Ok(snapshot) => {
+                if let Ok(mut current) = metrics.lock() {
+                    *current = snapshot;
+                }
+            }
+            Err(error) => eprintln!("dodb storage metrics collection failed: {error}"),
+        }
+    }
 }
 
 enum ServerEvent {
@@ -275,7 +318,8 @@ mod tests {
             private_key_path.to_string_lossy().into_owned(),
         ];
         let args = Args::try_parse_from(cli_args).unwrap();
-        let server = Arc::new(build_server(&args).unwrap());
+        let service = Arc::new(build_service(&args).unwrap());
+        let server = Arc::new(build_server(&args, service).unwrap());
         assert_ne!(server.local_addr().unwrap().port(), 0);
 
         let server_task = tokio::spawn({

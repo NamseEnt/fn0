@@ -1,4 +1,5 @@
 import { probeCanary } from "./canary.ts";
+import { dodbObservability } from "./dodb.ts";
 import { STALE_AFTER_SECONDS, assessHealth } from "./health.ts";
 import {
   COLLECTY_DROPPED_SEGMENTS,
@@ -100,6 +101,7 @@ export async function live(dependencies: Dependencies): Promise<LiveResponse> {
   const [
     runtime,
     docDb,
+    docDbWrite,
     storage,
     ready,
     exposition,
@@ -111,9 +113,11 @@ export async function live(dependencies: Dependencies): Promise<LiveResponse> {
     droppedSegments,
     refusedSegments,
     rejections,
+    dodb,
   ] = await Promise.all([
     probeCanary(dependencies, "runtime"),
     probeCanary(dependencies, "dodb"),
+    probeCanary(dependencies, "dodb-write"),
     probeCanary(dependencies, "storage"),
     signy.ready(),
     signy.exposition(),
@@ -131,6 +135,7 @@ export async function live(dependencies: Dependencies): Promise<LiveResponse> {
       agg: "sum",
       by: ["reason"],
     }),
+    dodbObservability(dependencies),
   ]);
 
   const nowMs = dependencies.nowMs();
@@ -162,7 +167,7 @@ export async function live(dependencies: Dependencies): Promise<LiveResponse> {
   const recentDispatchRejections = rejections.ok ? rejectionsByReason(rejections.value) : null;
   const remoteHealthyValue = exposition.ok ? exposition.value.get(SIGNY_REMOTE_HEALTHY) : undefined;
   const signyRemoteHealthy = remoteHealthyValue === undefined ? null : remoteHealthyValue === 1;
-  const canary = { runtime, doc_db: docDb, storage };
+  const canary = { runtime, doc_db: docDb, doc_db_write: docDbWrite, storage };
 
   const assessment = assessHealth({
     canary,
@@ -193,6 +198,7 @@ export async function live(dependencies: Dependencies): Promise<LiveResponse> {
       collecty_lost_segments_recent: collectyLostSegmentsRecent,
     },
     worker: { instances },
+    dodb,
     capacity: {
       window_seconds: RECENT_REJECTIONS_SECONDS,
       dispatch_rejections: recentDispatchRejections,
