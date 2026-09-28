@@ -116,3 +116,6 @@ If an outage test is repeated, stop only the `signy` container on
 `192.168.0.10`, issue a small number of normal `fn0.dev` requests, observe
 `/var/lib/collecty` growth and collecty's retry logs, start Signy, then wait
 for the queue to drain before declaring recovery.
+
+The operator console's telemetry health signals and production checks are
+documented in [operations-dashboard.md](operations-dashboard.md).

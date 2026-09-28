@@ -158,5 +158,6 @@ Provision the permanent node from the Pulumi stack with
 only root-readable secret files, replaces obsolete metrics tunnel units, and
 verifies Signy readiness and R2 health before returning.
 
-The production verification record and recovery evidence are in
-[signy-production.md](signy-production.md).
+The [Signy production record](signy-production.md) covers telemetry recovery.
+The [operations dashboard guide](operations-dashboard.md) covers its
+read-only health signals and targeted Worker deployment.

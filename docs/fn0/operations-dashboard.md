@@ -31,9 +31,13 @@ limit and make the console report a false outage.
 
 | Probe | Path through fn0 | Success |
 |---|---|---|
-| `/api/runtime` | Cloudflare → NLB → worker-proxy → worker → routing → bundle → wasm | always `{"ok":true}` |
+| `/api/runtime` | Cloudflare → NLB → worker-proxy → worker → routing → bundle → wasm | `{"ok":true}` |
 | `/api/dodb` | the runtime path + `DocDbHijack` → dodb | reads pk `fn0-ops-canary/known-value`, sk `health`, expects `fn0-canary-v1` |
 | `/api/storage` | the runtime path + `ObjectStorageHijack` → project private R2 bucket | reads `canary/known-object-v1.txt`, expects `fn0-canary-v1\n` |
+
+The runtime probe has no dependency on the known dodb or storage values. A
+non-success runtime response means the fn0 serving path is down; dodb and
+storage are then unknown because their probes use that same path.
 
 A probe that finds a problem answers 503 `{"ok":false,"failure":"missing" |
 "mismatch" | "unavailable"}` and changes nothing. Only the admin task
@@ -127,6 +131,79 @@ components are `unknown` rather than trusted. None of this can make fn0
 
 Capacity is `degraded` when the last five minutes saw a `queue_full` or
 `closed` rejection. A `project_admission_full` rejection does not change it.
+
+## Deployment
+
+The console is the `fn0-ops-console-u35twkcf` Cloudflare Worker. Build and
+check it locally, then preview and deploy only its script from `infra/cloud`:
+
+```sh
+cd ops/console
+npm ci
+npm test
+npx tsc --noEmit
+npm run build
+cd ../../infra/cloud
+pulumi preview --diff --target 'urn:pulumi:prod::fn0Cloud::pkg:index:fn0-ops-console$cloudflare:index/workersScript:WorkersScript::script'
+pulumi up --yes --target 'urn:pulumi:prod::fn0Cloud::pkg:index:fn0-ops-console$cloudflare:index/workersScript:WorkersScript::script'
+```
+
+Review the targeted preview and confirm that it contains only the Worker
+script before applying it. Production has unrelated Pulumi drift; do not run
+an untargeted `pulumi up` or use `--target-dependents`. The Worker serves the
+static UI and API behind the same Cloudflare Access and JWT checks. Its
+Signy and canary service credentials stay in Worker bindings and never go to
+the browser.
+
+The canary source and its known dodb/storage values are deployed or restored
+with `scripts/bootstrap-fn0-ops-canary.sh`. The script is idempotent and
+checks all three probes through the protected hostname.
+
+## Production verification record
+
+The Phase 5 console was deployed to `ops.fn0.dev` on 2026-09-28. An operator
+session showed `HEALTHY` with runtime, dodb, storage, telemetry and worker
+healthy. Live data refreshed about every 12 seconds and history refreshed
+about every 60 seconds. A 390 px viewport had no horizontal overflow. The
+browser console had no errors during the check. Hidden-tab polling was not
+confirmed in the available browser session.
+
+Phase 6 failure checks on 2026-09-28:
+
+1. The known canary dodb value was temporarily changed. The console reported
+   `DEGRADED` with the canary mismatch; runtime stayed healthy. The original
+   value was restored through the bootstrap script, and the console returned
+   to `HEALTHY`.
+2. Starting from canary source commit `97eb08c94`, only
+   `ops/canary/rs/src/apis/runtime.rs` was temporarily changed to return a
+   deterministic HTTP 500. The direct protected `/api/runtime` request
+   returned HTTP 500. The console then reported overall `DOWN`, runtime
+   `DOWN` with `unexpected answer (HTTP 500)`, dodb and storage `UNKNOWN`, and
+   telemetry and worker `HEALTHY`. No browser console warnings or errors were
+   observed during this check.
+3. The original runtime source was restored immediately. The bootstrap
+   script redeployed the canary and seeded the known values; it reported
+   matching dodb and storage values, refused an unauthenticated probe with
+   HTTP 401, and verified runtime, dodb and storage each returned HTTP 200.
+   The console returned to `HEALTHY` without a console error.
+
+Signy was not stopped for this console failure check. Its unavailable state
+is covered by `ops/console/tests/health.test.ts`; the production Signy outage
+and queue recovery procedure is documented in
+[signy-production.md](signy-production.md). Production 503 capacity
+rejections were not induced.
+
+## Known limitations
+
+- Signy `increase` can undercount the first minute of a newly created series.
+- Request-level guest CPU is unavailable; the displayed CPU timeout count is
+  an instance cumulative budget signal.
+- A Signy outage degrades telemetry, but the console can remain healthy or
+  degraded based on runtime and other components; Signy being unavailable
+  does not by itself mean fn0 is down.
+- Production Pulumi drift remains outside this console deployment. Apply
+  future console updates only through the targeted Worker script procedure
+  above.
 
 ## API
 
