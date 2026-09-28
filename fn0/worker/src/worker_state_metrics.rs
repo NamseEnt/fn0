@@ -8,14 +8,23 @@ use crate::worker_pool::DispatchError;
 use fn0::telemetry::SERVICE_INSTANCE_ID_ATTRIBUTE;
 use opentelemetry::KeyValue;
 use opentelemetry::metrics::{Meter, ObservableGauge};
+use opentelemetry_sdk::error::OTelSdkError;
+use opentelemetry_sdk::metrics::SdkMeterProvider;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::RecvTimeoutError;
+use std::time::Duration;
 
 pub const MANIFEST_LOADED_METRIC: &str = "fn0.worker.manifest_loaded";
 pub const DRAINING_METRIC: &str = "fn0.worker.draining";
 pub const IN_FLIGHT_REQUESTS_METRIC: &str = "fn0.worker.requests.in_flight";
 pub const WEBSOCKET_CONNECTIONS_METRIC: &str = "fn0.worker.websocket.connections";
 pub const DISPATCH_REJECTIONS_METRIC: &str = "fn0.worker.dispatch.rejections";
+const DISPATCH_REJECTION_REASONS: [DispatchError; 3] = [
+    DispatchError::QueueFull,
+    DispatchError::ProjectAdmissionFull,
+    DispatchError::Closed,
+];
 
 pub fn generate_service_instance_id() -> String {
     format!("{:016x}", rand::random::<u64>())
@@ -100,6 +109,65 @@ fn record_dispatch_rejection(meter: &Meter, service_instance_id: &str, error: &D
     );
 }
 
+#[derive(Debug)]
+pub enum BaselineExportError {
+    Export(OTelSdkError),
+    DeadlinePassed,
+    FlushThreadStopped,
+}
+
+impl std::fmt::Display for BaselineExportError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Export(error) => write!(formatter, "export failed: {error}"),
+            Self::DeadlinePassed => write!(formatter, "export did not finish before its deadline"),
+            Self::FlushThreadStopped => {
+                write!(formatter, "the flush thread stopped without a result")
+            }
+        }
+    }
+}
+
+/// Exports every dispatch rejection reason at zero, and waits for the export.
+///
+/// Signy's `increase` counts a counter's growth from its previous sample, so
+/// the first sample of a series is never counted. Without a zero exported
+/// first, the rejections a worker counts before its first periodic export
+/// would vanish from every window. Call this before the worker accepts
+/// traffic.
+///
+/// The SDK's flush has no deadline of its own and neither does the exporter's
+/// HTTP client, so it runs on its own thread and is abandoned after
+/// `deadline`: telemetry must never keep the worker from serving.
+pub fn export_dispatch_rejection_baseline(
+    meter_provider: &SdkMeterProvider,
+    meter: &Meter,
+    service_instance_id: &str,
+    deadline: Duration,
+) -> Result<(), BaselineExportError> {
+    let counter = meter.u64_counter(DISPATCH_REJECTIONS_METRIC).build();
+    for reason in &DISPATCH_REJECTION_REASONS {
+        counter.add(
+            0,
+            &[
+                KeyValue::new("reason", reason.as_str()),
+                service_instance_attribute(service_instance_id),
+            ],
+        );
+    }
+    let (result_sender, result_receiver) = std::sync::mpsc::channel();
+    let flushing_provider = meter_provider.clone();
+    std::thread::spawn(move || {
+        let _ = result_sender.send(flushing_provider.force_flush());
+    });
+    match result_receiver.recv_timeout(deadline) {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(BaselineExportError::Export(error)),
+        Err(RecvTimeoutError::Timeout) => Err(BaselineExportError::DeadlinePassed),
+        Err(RecvTimeoutError::Disconnected) => Err(BaselineExportError::FlushThreadStopped),
+    }
+}
+
 fn service_instance_attribute(service_instance_id: &str) -> KeyValue {
     KeyValue::new(
         SERVICE_INSTANCE_ID_ATTRIBUTE,
@@ -157,6 +225,82 @@ mod tests {
             metric_points.sort();
         }
         points
+    }
+
+    struct NeverFinishingExporter;
+
+    impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for NeverFinishingExporter {
+        async fn export(
+            &self,
+            _metrics: &ResourceMetrics,
+        ) -> opentelemetry_sdk::error::OTelSdkResult {
+            std::future::pending().await
+        }
+
+        fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
+            Ok(())
+        }
+
+        fn shutdown_with_timeout(
+            &self,
+            _timeout: Duration,
+        ) -> opentelemetry_sdk::error::OTelSdkResult {
+            Ok(())
+        }
+
+        fn temporality(&self) -> opentelemetry_sdk::metrics::Temporality {
+            opentelemetry_sdk::metrics::Temporality::Cumulative
+        }
+    }
+
+    #[test]
+    fn the_baseline_exports_every_rejection_reason_at_zero() {
+        let exporter = InMemoryMetricExporter::default();
+        let provider = SdkMeterProvider::builder()
+            .with_periodic_exporter(exporter.clone())
+            .build();
+        let meter = provider.meter("fn0-worker");
+
+        export_dispatch_rejection_baseline(&provider, &meter, "instance-a", Duration::from_secs(5))
+            .expect("baseline export");
+
+        let points = points_by_metric(&exporter.get_finished_metrics().expect("metrics"));
+        let with_reason = |reason: &str| {
+            let mut attributes = instance_only();
+            attributes.push(("reason".to_string(), reason.to_string()));
+            attributes.sort();
+            attributes
+        };
+        assert_eq!(
+            points[DISPATCH_REJECTIONS_METRIC],
+            vec![
+                (with_reason("closed"), 0),
+                (with_reason("project_admission_full"), 0),
+                (with_reason("queue_full"), 0),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_hanging_export_gives_up_at_the_deadline_instead_of_blocking_startup() {
+        let provider = SdkMeterProvider::builder()
+            .with_periodic_exporter(NeverFinishingExporter)
+            .build();
+        let meter = provider.meter("fn0-worker");
+        let started = std::time::Instant::now();
+
+        let result = export_dispatch_rejection_baseline(
+            &provider,
+            &meter,
+            "instance-a",
+            Duration::from_millis(200),
+        );
+
+        assert!(matches!(result, Err(BaselineExportError::DeadlinePassed)));
+        assert!(started.elapsed() < Duration::from_secs(2));
+        // Dropping the provider would wait on the reader thread the hanging
+        // export holds.
+        std::mem::forget(provider);
     }
 
     fn instance_only() -> Vec<(String, String)> {

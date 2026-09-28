@@ -252,12 +252,36 @@ fn main() -> Result<()> {
     let service_instance_id = worker_state_metrics::generate_service_instance_id();
     tracing::info!(%service_instance_id, "worker telemetry instance");
     fn0::telemetry::install_service_instance_id(service_instance_id);
+    export_telemetry_baseline_before_serving(&telemetry_providers.1);
     install_panic_hook();
 
     let result = rt.block_on(run(&otlp_endpoint));
 
     telemetry::shutdown(telemetry_providers)?;
     result
+}
+
+const TELEMETRY_BASELINE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Runs before `run` starts the user server, so the zero baseline is exported
+/// before any request can be rejected. A failure is logged and ignored.
+fn export_telemetry_baseline_before_serving(
+    meter_provider: &opentelemetry_sdk::metrics::SdkMeterProvider,
+) {
+    let service_instance_id =
+        fn0::telemetry::service_instance_id().expect("service instance id installed in main");
+    match worker_state_metrics::export_dispatch_rejection_baseline(
+        meter_provider,
+        &opentelemetry::global::meter("fn0-worker"),
+        service_instance_id,
+        TELEMETRY_BASELINE_DEADLINE,
+    ) {
+        Ok(()) => tracing::info!("dispatch rejection baseline exported"),
+        Err(error) => tracing::warn!(
+            %error,
+            "dispatch rejection baseline not exported; serving without it"
+        ),
+    }
 }
 
 fn install_panic_hook() {
