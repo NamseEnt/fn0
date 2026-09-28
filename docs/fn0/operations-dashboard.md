@@ -205,6 +205,24 @@ rejections were not induced.
   future console updates only through the targeted Worker script procedure
   above.
 
+## Known Pulumi drift
+
+The production stack has one accepted preview update for the Bundle Store R2
+event notification (`cloudflare:index/r2BucketEventNotification:R2BucketEventNotification::events`).
+The live Cloudflare rule exists with a valid rule ID, and its bucket, queue,
+actions, description, prefix, and suffix match the program. Pulumi state has
+the ID `missing ID`. The result is treated as a provider/state identity drift;
+the rule is not applied, deleted, recreated, or removed from state. The drift
+also remained with `@pulumi/cloudflare` 6.21.
+
+The worker-site and operations-console component state was synchronized with
+targeted updates after confirming that each targeted preview contained only
+its component update and no child CustomResource operations. The expected full
+`pulumi preview --refresh --diff` result is one update for the R2 notification
+and zero creates, deletes, replacements, or other CustomResource mutations.
+Review any additional planned CustomResource operation before applying a
+stack update.
+
 ## API
 
 All routes are `GET`, answer JSON with `Cache-Control: no-store`, and refuse
