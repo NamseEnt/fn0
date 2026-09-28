@@ -65,6 +65,37 @@ test("unknown paths are 404 and other methods 405", async () => {
   assert.equal((await get(upstream, "/api/live", "POST")).status, 405);
 });
 
+test("R2 analytics is an authenticated usage endpoint separate from live health", async () => {
+  const upstream = new FakeUpstream();
+  upstream.graphqlAnswer = { status: 500, body: "Cloudflare Analytics unavailable" };
+  const live = await get(upstream, "/api/live");
+  assert.equal(live.status, 200);
+  assert.equal((live.body as { health: { state: string } }).health.state, "healthy");
+  assert.equal(upstream.requests.filter((item) => item.url.origin === "https://api.cloudflare.com").length, 0);
+  upstream.graphqlAnswer = {
+    status: 200,
+    body: JSON.stringify({ data: { viewer: { accounts: [{ storage: [], operations: [], bandwidth: [] }] } } }),
+  };
+
+  const response = await handleRequest(
+    new Request("https://ops.test/api/r2", { headers: { cookie: "" } }),
+    () => upstream.dependencies(),
+  );
+  assert.equal(response.status, 403);
+
+  const authorized = await handleRequest(
+    new Request("https://ops.test/api/r2", {
+      headers: { "cf-access-jwt-assertion": await accessToken() },
+    }),
+    () => upstream.dependencies(),
+  );
+  assert.equal(authorized.status, 200);
+  const body = await authorized.json() as { status: string; buckets: unknown[] };
+  assert.equal(body.status, "ok");
+  assert.deepEqual(body.buckets, []);
+  assert.equal(upstream.requests.filter((item) => item.url.origin === "https://api.cloudflare.com").length, 1);
+});
+
 test("the authenticated worker serves the console document and browser bundle", async () => {
   const upstream = new FakeUpstream();
   const html = await getText(upstream, "/");
@@ -306,7 +337,7 @@ test("no response ever carries a credential", async () => {
   for (const scenario of scenarios) {
     const upstream = new FakeUpstream();
     scenario(upstream);
-    for (const path of ["/api/live", "/api/overview", "/api/series", "/api/errors"]) {
+    for (const path of ["/api/live", "/api/r2", "/api/overview", "/api/series", "/api/errors"]) {
       const { text } = await get(upstream, path);
       for (const secret of SECRET_VALUES) {
         assert.ok(!text.includes(secret), `${path} leaked a credential`);

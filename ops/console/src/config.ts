@@ -11,6 +11,8 @@ export interface Env {
   ACCESS_ISSUER?: string;
   ACCESS_AUD?: string;
   OPS_ADMIN_EMAIL?: string;
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_ANALYTICS_API_TOKEN?: string;
 }
 
 export interface AccessCredential {
@@ -24,6 +26,8 @@ export interface ConsoleConfig {
   platformTelemetryTenant: string;
   canaryUrl: string;
   canaryAccess: AccessCredential;
+  cloudflareAccountId: string | null;
+  cloudflareAnalyticsApiToken: string | null;
   accessPolicy: AccessPolicy;
 }
 
@@ -57,6 +61,8 @@ export function readConfig(env: Env): ConsoleConfig {
       clientId: required(env, "CANARY_ACCESS_CLIENT_ID"),
       clientSecret: required(env, "CANARY_ACCESS_CLIENT_SECRET"),
     },
+    cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID || null,
+    cloudflareAnalyticsApiToken: env.CLOUDFLARE_ANALYTICS_API_TOKEN || null,
     accessPolicy: {
       issuer: required(env, "ACCESS_ISSUER").replace(/\/+$/, ""),
       audience: required(env, "ACCESS_AUD"),

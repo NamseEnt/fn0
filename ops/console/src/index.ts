@@ -3,6 +3,7 @@ import { type Env, MissingBindingError, readConfig } from "./config.ts";
 import { recentErrors } from "./errors.ts";
 import { live } from "./live.ts";
 import { overview } from "./overview.ts";
+import { r2Analytics } from "./r2.ts";
 import { DEFAULT_DEADLINES, type Dependencies } from "./runtime.ts";
 import { series } from "./series.ts";
 import { APP_HTML, APP_SCRIPT } from "./ui.ts";
@@ -41,6 +42,7 @@ type Route =
 
 const ROUTES: Record<string, Route> = {
   "/api/live": { windowed: false, handle: live },
+  "/api/r2": { windowed: false, handle: r2Analytics },
   "/api/overview": { windowed: true, handle: overview },
   "/api/series": { windowed: true, handle: series },
   "/api/errors": { windowed: true, handle: recentErrors },

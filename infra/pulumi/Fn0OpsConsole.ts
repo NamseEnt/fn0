@@ -84,7 +84,6 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
     opts: pulumi.ComponentResourceOptions,
   ) {
     super("pkg:index:fn0-ops-console", name, args, opts);
-
     // Identity providers and the Access organization need a permission the
     // stack's operator token does not hold. It gets a token of its own with
     // only that permission, rather than widening the credential every other
@@ -181,6 +180,60 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
       { parent: this },
     );
     this.accessAudience = application.aud;
+    const bindings = [
+      { name: "SIGNY_URL", type: "plain_text", text: args.signyUrl },
+      {
+        name: "SIGNY_ACCESS_CLIENT_ID",
+        type: "secret_text",
+        text: args.signyAccessClientId,
+      },
+      {
+        name: "SIGNY_ACCESS_CLIENT_SECRET",
+        type: "secret_text",
+        text: args.signyAccessClientSecret,
+      },
+      {
+        name: "PLATFORM_TELEMETRY_TENANT",
+        type: "plain_text",
+        text: args.platformTelemetryTenant,
+      },
+      { name: "CLOUDFLARE_ACCOUNT_ID", type: "plain_text", text: args.accountId },
+      { name: "CANARY_URL", type: "plain_text", text: args.canaryUrl },
+      {
+        name: "CANARY_ACCESS_CLIENT_ID",
+        type: "secret_text",
+        text: args.canaryAccessClientId,
+      },
+      {
+        name: "CANARY_ACCESS_CLIENT_SECRET",
+        type: "secret_text",
+        text: args.canaryAccessClientSecret,
+      },
+      { name: "ACCESS_ISSUER", type: "plain_text", text: this.accessIssuer },
+      { name: "ACCESS_AUD", type: "plain_text", text: application.aud },
+      {
+        name: "OPS_ADMIN_EMAIL",
+        type: "secret_text",
+        text: args.operatorEmail,
+      },
+    ];
+    const analyticsToken = new pulumi.Config().getSecret(
+      "cloudflareAnalyticsApiToken",
+    );
+    const workerBindings = analyticsToken === undefined
+      ? bindings
+      : pulumi.all([pulumi.output(bindings), analyticsToken]).apply(
+          ([currentBindings, token]) => token
+            ? [
+                ...currentBindings,
+                {
+                  name: "CLOUDFLARE_ANALYTICS_API_TOKEN",
+                  type: "secret_text",
+                  text: token,
+                },
+              ]
+            : currentBindings,
+        );
 
     const script = new cloudflare.WorkersScript(
       "script",
@@ -190,42 +243,7 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
         compatibilityDate: COMPATIBILITY_DATE,
         mainModule: "worker.mjs",
         content: bundleWorker(),
-        bindings: [
-          { name: "SIGNY_URL", type: "plain_text", text: args.signyUrl },
-          {
-            name: "SIGNY_ACCESS_CLIENT_ID",
-            type: "secret_text",
-            text: args.signyAccessClientId,
-          },
-          {
-            name: "SIGNY_ACCESS_CLIENT_SECRET",
-            type: "secret_text",
-            text: args.signyAccessClientSecret,
-          },
-          {
-            name: "PLATFORM_TELEMETRY_TENANT",
-            type: "plain_text",
-            text: args.platformTelemetryTenant,
-          },
-          { name: "CANARY_URL", type: "plain_text", text: args.canaryUrl },
-          {
-            name: "CANARY_ACCESS_CLIENT_ID",
-            type: "secret_text",
-            text: args.canaryAccessClientId,
-          },
-          {
-            name: "CANARY_ACCESS_CLIENT_SECRET",
-            type: "secret_text",
-            text: args.canaryAccessClientSecret,
-          },
-          { name: "ACCESS_ISSUER", type: "plain_text", text: this.accessIssuer },
-          { name: "ACCESS_AUD", type: "plain_text", text: application.aud },
-          {
-            name: "OPS_ADMIN_EMAIL",
-            type: "secret_text",
-            text: args.operatorEmail,
-          },
-        ],
+        bindings: workerBindings,
       },
       { parent: this },
     );

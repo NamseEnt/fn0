@@ -9,6 +9,8 @@ export const CONFIG: ConsoleConfig = {
   platformTelemetryTenant: "fn0",
   canaryUrl: "https://canary.test",
   canaryAccess: { clientId: "canary-client-id-XYZ", clientSecret: "canary-client-secret-XYZ" },
+  cloudflareAccountId: "account-id-test",
+  cloudflareAnalyticsApiToken: "analytics-api-token-XYZ",
   accessPolicy: {
     issuer: "https://team.test",
     audience: "ops-console-audience",
@@ -76,7 +78,8 @@ export const SECRET_VALUES = [
   CONFIG.signyAccess.clientSecret,
   CONFIG.canaryAccess.clientId,
   CONFIG.canaryAccess.clientSecret,
-];
+  CONFIG.cloudflareAnalyticsApiToken,
+].filter((secret): secret is string => secret !== null);
 
 export type Answer =
   | { status: number; body: string }
@@ -86,6 +89,7 @@ export type Answer =
 export interface RecordedRequest {
   url: URL;
   headers: Record<string, string>;
+  body: string | null;
 }
 
 const nanoseconds = (ms: number) => `${BigInt(ms) * 1_000_000n}`;
@@ -115,6 +119,10 @@ export class FakeUpstream {
   range: Record<string, string[]> = {};
   logs: string[] = [];
   signingKeysAnswer: Answer | null = null;
+  graphqlAnswer: Answer = {
+    status: 200,
+    body: JSON.stringify({ data: { viewer: { accounts: [{ storage: [], operations: [], bandwidth: [] }] } } }),
+  };
   requests: RecordedRequest[] = [];
 
   dependencies(): Dependencies {
@@ -129,7 +137,7 @@ export class FakeUpstream {
   private async fetch(input: string, init?: RequestInit): Promise<Response> {
     const url = new URL(input);
     const headers = Object.fromEntries(new Headers(init?.headers).entries());
-    this.requests.push({ url, headers });
+    this.requests.push({ url, headers, body: typeof init?.body === "string" ? init.body : null });
     const answer = this.answerFor(url);
     if (answer === "timeout") {
       // Node does not keep the process alive for AbortSignal.timeout, so a
@@ -159,6 +167,9 @@ export class FakeUpstream {
     }
     if (url.origin === CONFIG.canaryUrl) {
       return this.canary[url.pathname.replace("/api/", "")] ?? { status: 404, body: "" };
+    }
+    if (url.origin === "https://api.cloudflare.com") {
+      return this.graphqlAnswer;
     }
     if (url.origin !== CONFIG.signyUrl) {
       return { status: 599, body: "unexpected host" };
