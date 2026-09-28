@@ -27,6 +27,16 @@ async function get(upstream: FakeUpstream, path: string, method = "GET") {
   return { status: response.status, text, body: JSON.parse(text) as unknown };
 }
 
+async function getText(upstream: FakeUpstream, path: string) {
+  const response = await handleRequest(
+    new Request(`https://ops.test${path}`, {
+      headers: { "Cf-Access-Jwt-Assertion": VALID_TOKEN },
+    }),
+    () => upstream.dependencies(),
+  );
+  return { response, text: await response.text() };
+}
+
 test("an invalid, repeated or extra parameter is a 400", async () => {
   const upstream = new FakeUpstream();
   for (const path of [
@@ -53,6 +63,22 @@ test("unknown paths are 404 and other methods 405", async () => {
   assert.equal((await get(upstream, "/api/query")).status, 404);
   assert.equal((await get(upstream, "/signy/api/v1/logs")).status, 404);
   assert.equal((await get(upstream, "/api/live", "POST")).status, 405);
+});
+
+test("the authenticated worker serves the console document and browser bundle", async () => {
+  const upstream = new FakeUpstream();
+  const html = await getText(upstream, "/");
+  assert.equal(html.response.status, 200);
+  assert.match(html.text, /fn0 Operations/);
+  assert.match(html.text, /src="\/app\.js"/);
+  const script = await getText(upstream, "/app.js");
+  assert.equal(script.response.status, 200);
+  assert.match(script.text, /\/api\/live/);
+  assert.match(script.text, /visibilitychange/);
+  assert.doesNotThrow(() => new Function(script.text));
+  assert.match(script.response.headers.get("content-type") ?? "", /javascript/);
+  assert.equal(script.response.headers.get("cache-control"), "no-store");
+  assert.match(script.response.headers.get("content-security-policy") ?? "", /script-src 'self'/);
 });
 
 test("a valid window answers a bounded, aligned series", async () => {

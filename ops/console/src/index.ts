@@ -5,6 +5,7 @@ import { live } from "./live.ts";
 import { overview } from "./overview.ts";
 import { DEFAULT_DEADLINES, type Dependencies } from "./runtime.ts";
 import { series } from "./series.ts";
+import { APP_HTML, APP_SCRIPT } from "./ui.ts";
 import { type TimeWindow, WINDOW_NAMES, parseWindow } from "./windows.ts";
 
 function json(status: number, body: unknown): Response {
@@ -14,6 +15,19 @@ function json(status: number, body: unknown): Response {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+function staticAsset(contentType: string, body: string): Response {
+  return new Response(body, {
+    headers: {
+      "content-type": contentType,
+      "cache-control": "no-store",
+      "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; frame-ancestors 'none'",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "referrer-policy": "no-referrer",
     },
   });
 }
@@ -60,6 +74,14 @@ export async function handleRequest(
   }
 
   const url = new URL(request.url);
+  if (url.pathname === "/" || url.pathname === "/app.js") {
+    if (request.method !== "GET") {
+      return json(405, { error: "only GET is served" });
+    }
+    return url.pathname === "/"
+      ? staticAsset("text/html; charset=utf-8", APP_HTML)
+      : staticAsset("text/javascript; charset=utf-8", APP_SCRIPT);
+  }
   const route = ROUTES[url.pathname];
   if (route === undefined) {
     return json(404, { error: "not found" });

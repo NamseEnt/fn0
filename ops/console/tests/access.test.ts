@@ -47,7 +47,7 @@ for (const [name, token, reason] of refusals) {
   test(`a request with ${name} is refused before any data is read`, async () => {
     forgetSigningKeys();
     const upstream = new FakeUpstream();
-    for (const path of ["/api/overview", "/api/live", "/", "/anything"]) {
+    for (const path of ["/api/overview", "/api/live", "/", "/app.js", "/anything"]) {
       const response = await requestWith(upstream, await token(), path);
       assert.equal(response.status, 403, path);
       assert.equal(response.reason, reason, path);
