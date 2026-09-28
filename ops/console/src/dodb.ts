@@ -224,7 +224,7 @@ export async function dodbObservability(dependencies: Dependencies): Promise<Dod
   const networkRows = hostRows(network);
   const ratesPerMinute = (rows: readonly InstantRow[], direction: string) => {
     const total = sum(rows, (row) => row.labels.direction === direction);
-    return total === null ? null : total / 5 * 60;
+    return total === null ? null : total / METRIC_WINDOW_SECONDS * 60;
   };
   const nowMs = dependencies.nowMs();
   const ageRows = [

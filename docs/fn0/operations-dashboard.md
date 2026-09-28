@@ -217,11 +217,15 @@ also remained with `@pulumi/cloudflare` 6.21.
 
 The worker-site and operations-console component state was synchronized with
 targeted updates after confirming that each targeted preview contained only
-its component update and no child CustomResource operations. The expected full
-`pulumi preview --refresh --diff` result is one update for the R2 notification
-and zero creates, deletes, replacements, or other CustomResource mutations.
-Review any additional planned CustomResource operation before applying a
-stack update.
+its component update and no child CustomResource operations. The current
+`pulumi preview --refresh --diff` also plans an intentional account token
+create for the Operations Console's account-scoped `Account Analytics Read`
+permission and a Worker script update to bind that token and the current
+console bundle. The R2 notification update remains the accepted identity drift
+above. The expected plan is those two intentional changes plus the one known
+R2 notification update, with zero creates, deletes, replacements, or updates
+to other CustomResources. Review any additional planned CustomResource
+operation before applying a stack update.
 
 ## API
 

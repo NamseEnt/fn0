@@ -5,7 +5,9 @@ import { FakeUpstream } from "./fake_upstream.ts";
 
 test("R2 analytics returns storage, operation outcomes, bandwidth and source age by bucket", async () => {
   const upstream = new FakeUpstream();
-  const sampleTime = new Date(upstream.dependencies().nowMs() - 5 * 60_000).toISOString();
+  const nowMs = upstream.dependencies().nowMs();
+  const storageSampleTime = new Date(nowMs - 60 * 60_000).toISOString();
+  const activitySampleTime = new Date(nowMs - 10_000).toISOString();
   upstream.graphqlAnswer = {
     status: 200,
     body: JSON.stringify({
@@ -15,16 +17,16 @@ test("R2 analytics returns storage, operation outcomes, bandwidth and source age
             storage: [
               {
                 max: { payloadSize: 12000, metadataSize: 700, objectCount: 12 },
-                dimensions: { bucketName: "fn0-signy-test", datetime: sampleTime },
+                dimensions: { bucketName: "fn0-signy-test", datetime: storageSampleTime },
               },
             ],
             operations: [
-              { sum: { requests: 20 }, dimensions: { bucketName: "fn0-signy-test", actionStatus: "success", datetime: sampleTime } },
-              { sum: { requests: 3 }, dimensions: { bucketName: "fn0-signy-test", actionStatus: "userError", datetime: sampleTime } },
-              { sum: { requests: 1 }, dimensions: { bucketName: "fn0-signy-test", actionStatus: "internalError", datetime: sampleTime } },
+              { sum: { requests: 20 }, dimensions: { bucketName: "fn0-signy-test", actionStatus: "success", datetime: activitySampleTime } },
+              { sum: { requests: 3 }, dimensions: { bucketName: "fn0-signy-test", actionStatus: "userError", datetime: activitySampleTime } },
+              { sum: { requests: 1 }, dimensions: { bucketName: "fn0-signy-test", actionStatus: "internalError", datetime: activitySampleTime } },
             ],
             bandwidth: [
-              { sum: { bytesUpload: 4096, bytesDownload: 8192 }, dimensions: { bucketName: "fn0-signy-test", datetimeFiveMinutes: sampleTime } },
+              { sum: { bytesUpload: 4096, bytesDownload: 8192 }, dimensions: { bucketName: "fn0-signy-test", datetimeFiveMinutes: activitySampleTime } },
             ],
           }],
         },
@@ -47,7 +49,7 @@ test("R2 analytics returns storage, operation outcomes, bandwidth and source age
     internal_error_operations: 1,
     upload_bytes: 4096,
     download_bytes: 8192,
-    analytics_freshness_seconds: 300,
+    storage_sample_age_seconds: 3600,
   }]);
   const request = upstream.requests.find((item) => item.url.origin === "https://api.cloudflare.com");
   assert.ok(request);
@@ -56,6 +58,9 @@ test("R2 analytics returns storage, operation outcomes, bandwidth and source age
   const body = JSON.parse(request.body ?? "{}");
   assert.equal(body.variables.accountTag, "account-id-test");
   assert.doesNotMatch(body.query, /objectName/);
+  assert.match(body.query, /dimensions \{ bucketName actionStatus \}/);
+  assert.match(body.query, /dimensions \{ bucketName \}/);
+  assert.doesNotMatch(body.query, /dimensions \{ bucketName actionStatus datetime \}/);
 });
 
 test("R2 analytics stays outside platform health when its account token is not configured", async () => {

@@ -9,7 +9,6 @@ pub const DOC_DB_PARTITION_KEY: &str = "fn0-ops-canary/known-value";
 pub const DOC_DB_SORT_KEY: &str = "health";
 pub const DOC_DB_VALUE: &[u8] = b"fn0-canary-v1";
 pub const DOC_DB_WRITE_PARTITION_KEY: &str = "fn0-ops-canary/write-probe";
-pub const DOC_DB_WRITE_SORT_KEY: &str = "current";
 
 pub const PRIVATE_OBJECT_KEY: &str = "canary/known-object-v1.txt";
 pub const PRIVATE_OBJECT_CONTENT_TYPE: &str = "text/plain";

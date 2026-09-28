@@ -80,6 +80,12 @@ async fn main() -> Result<(), BoxError> {
         Arc::clone(&storage_metrics),
         instance_id,
     )?;
+    if let Err(error) = telemetry
+        .force_flush_before_accept(Duration::from_secs(2))
+        .await
+    {
+        eprintln!("dodb telemetry baseline flush failed; starting server anyway: {error}");
+    }
     let storage_sampling = tokio::spawn(sample_storage_metrics(service, storage_metrics));
     let listen_addr = server.local_addr()?;
     println!(

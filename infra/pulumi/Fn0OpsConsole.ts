@@ -35,6 +35,7 @@ const COMPATIBILITY_DATE = "2026-09-01";
 const OPS_CONSOLE_DIR = path.resolve(__dirname, "../../ops/console");
 const ACCESS_ADMINISTRATION_PERMISSION =
   "Access: Organizations, Identity Providers, and Groups Write";
+const ANALYTICS_READ_PERMISSION = "Account Analytics Read";
 
 interface EsbuildOutputFile {
   text: string;
@@ -133,6 +134,36 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
       { apiToken: accessAdministrationToken.value },
       { parent: this },
     );
+    const analyticsReadPermission = permissionGroups.apply((list) => {
+      const group = (list.results ?? []).find(
+        (candidate) =>
+          candidate.name === ANALYTICS_READ_PERMISSION &&
+          (candidate.scopes ?? []).includes("com.cloudflare.api.account"),
+      );
+      if (!group) {
+        throw new Error(
+          `Cloudflare has no account-scoped permission group named "${ANALYTICS_READ_PERMISSION}"`,
+        );
+      }
+      return [{ id: group.id }];
+    });
+    const analyticsToken = new cloudflare.AccountToken(
+      "analytics-read-token",
+      {
+        accountId: args.accountId,
+        name: pulumi.interpolate`fn0-ops-console-analytics-${args.suffix}`,
+        policies: [
+          {
+            effect: "allow",
+            resources: pulumi.output(args.accountId).apply((accountId) =>
+              JSON.stringify({ [`com.cloudflare.api.account.${accountId}`]: "*" }),
+            ),
+            permissionGroups: analyticsReadPermission,
+          },
+        ],
+      },
+      { parent: this, provider: tokenMintingProvider },
+    );
 
     // The account's one-time PIN login is shared by every Access application
     // on it, so it is looked up rather than owned: destroying this component
@@ -217,23 +248,16 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
         text: args.operatorEmail,
       },
     ];
-    const analyticsToken = new pulumi.Config().getSecret(
-      "cloudflareAnalyticsApiToken",
+    const workerBindings = pulumi.all([pulumi.output(bindings), analyticsToken.value]).apply(
+      ([currentBindings, token]) => [
+        ...currentBindings,
+        {
+          name: "CLOUDFLARE_ANALYTICS_API_TOKEN",
+          type: "secret_text",
+          text: token,
+        },
+      ],
     );
-    const workerBindings = analyticsToken === undefined
-      ? bindings
-      : pulumi.all([pulumi.output(bindings), analyticsToken]).apply(
-          ([currentBindings, token]) => token
-            ? [
-                ...currentBindings,
-                {
-                  name: "CLOUDFLARE_ANALYTICS_API_TOKEN",
-                  type: "secret_text",
-                  text: token,
-                },
-              ]
-            : currentBindings,
-        );
 
     const script = new cloudflare.WorkersScript(
       "script",

@@ -20,14 +20,14 @@ const QUERY = `query Fn0R2Analytics($accountTag: string!, $startDate: Time!, $en
         filter: { datetime_geq: $startDate, datetime_leq: $endDate }
       ) {
         sum { requests }
-        dimensions { bucketName actionStatus datetime }
+        dimensions { bucketName actionStatus }
       }
       bandwidth: r2BandwidthUsageAdaptiveGroups(
         limit: 10000
         filter: { datetime_geq: $startDate, datetime_lt: $endDate }
       ) {
         sum { bytesUpload bytesDownload }
-        dimensions { bucketName datetimeFiveMinutes }
+        dimensions { bucketName }
       }
     }
   }
@@ -44,7 +44,7 @@ export interface R2AnalyticsBucket {
   internal_error_operations: number | null;
   upload_bytes: number | null;
   download_bytes: number | null;
-  analytics_freshness_seconds: number | null;
+  storage_sample_age_seconds: number | null;
 }
 
 export interface R2AnalyticsResponse {
@@ -61,12 +61,12 @@ interface StorageGroup {
 
 interface OperationsGroup {
   sum?: { requests?: unknown };
-  dimensions?: { bucketName?: unknown; actionStatus?: unknown; datetime?: unknown };
+  dimensions?: { bucketName?: unknown; actionStatus?: unknown };
 }
 
 interface BandwidthGroup {
   sum?: { bytesUpload?: unknown; bytesDownload?: unknown };
-  dimensions?: { bucketName?: unknown; datetimeFiveMinutes?: unknown };
+  dimensions?: { bucketName?: unknown };
 }
 
 interface GraphqlResponse {
@@ -93,7 +93,7 @@ interface BucketAccumulator {
   internal_error_operations: number;
   upload_bytes: number;
   download_bytes: number;
-  newest_sample_ms: number | null;
+  storage_sample_ms: number | null;
   storage_datetime_ms: number;
 }
 
@@ -130,17 +130,17 @@ function accumulator(buckets: Map<string, BucketAccumulator>, name: string): Buc
     internal_error_operations: 0,
     upload_bytes: 0,
     download_bytes: 0,
-    newest_sample_ms: null,
+    storage_sample_ms: null,
     storage_datetime_ms: 0,
   };
   buckets.set(name, created);
   return created;
 }
 
-function recordNewestSample(bucket: BucketAccumulator, value: unknown): void {
+function recordStorageSample(bucket: BucketAccumulator, value: unknown): void {
   const sampledAt = timestamp(value);
   if (sampledAt !== null) {
-    bucket.newest_sample_ms = Math.max(bucket.newest_sample_ms ?? 0, sampledAt);
+    bucket.storage_sample_ms = Math.max(bucket.storage_sample_ms ?? 0, sampledAt);
   }
 }
 
@@ -216,7 +216,7 @@ export async function r2Analytics(dependencies: Dependencies): Promise<R2Analyti
       bucket.metadata_bytes = numeric(group.max?.metadataSize);
       bucket.object_count = numeric(group.max?.objectCount);
     }
-    recordNewestSample(bucket, group.dimensions?.datetime);
+    recordStorageSample(bucket, group.dimensions?.datetime);
   }
 
   for (const group of account.operations ?? []) {
@@ -232,7 +232,6 @@ export async function r2Analytics(dependencies: Dependencies): Promise<R2Analyti
         case "internalError": bucket.internal_error_operations += count; break;
       }
     }
-    recordNewestSample(bucket, group.dimensions?.datetime);
   }
 
   for (const group of account.bandwidth ?? []) {
@@ -241,7 +240,6 @@ export async function r2Analytics(dependencies: Dependencies): Promise<R2Analyti
     const bucket = accumulator(buckets, name);
     bucket.upload_bytes += numeric(group.sum?.bytesUpload) ?? 0;
     bucket.download_bytes += numeric(group.sum?.bytesDownload) ?? 0;
-    recordNewestSample(bucket, group.dimensions?.datetimeFiveMinutes);
   }
 
   const result = [...buckets.values()]
@@ -257,9 +255,9 @@ export async function r2Analytics(dependencies: Dependencies): Promise<R2Analyti
       internal_error_operations: bucket.internal_error_operations,
       upload_bytes: bucket.upload_bytes,
       download_bytes: bucket.download_bytes,
-      analytics_freshness_seconds: bucket.newest_sample_ms === null
+      storage_sample_age_seconds: bucket.storage_sample_ms === null
         ? null
-        : Math.max(0, (nowMs - bucket.newest_sample_ms) / 1000),
+        : Math.max(0, (nowMs - bucket.storage_sample_ms) / 1000),
     }));
   return {
     status: "ok",

@@ -96,6 +96,27 @@ impl DodbTelemetry {
     pub fn shutdown(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
         self.provider.shutdown()
     }
+
+    pub async fn force_flush_before_accept(&self, timeout: Duration) -> Result<(), String> {
+        force_flush_with_timeout(self.provider.clone(), timeout).await
+    }
+}
+
+async fn force_flush_with_timeout(
+    provider: SdkMeterProvider,
+    timeout: Duration,
+) -> Result<(), String> {
+    match tokio::time::timeout(
+        timeout,
+        tokio::task::spawn_blocking(move || provider.force_flush()),
+    )
+    .await
+    {
+        Ok(Ok(Ok(()))) => Ok(()),
+        Ok(Ok(Err(error))) => Err(error.to_string()),
+        Ok(Err(error)) => Err(error.to_string()),
+        Err(_) => Err(format!("force flush timed out after {timeout:?}")),
+    }
 }
 
 fn register_counters(meter: &Meter, metrics: ServerMetrics) -> Vec<ObservableCounter<u64>> {
@@ -279,7 +300,7 @@ mod tests {
 
     #[derive(Clone, Default)]
     struct SchemaExporter {
-        points: Arc<Mutex<BTreeMap<String, Vec<Vec<(String, String)>>>>>,
+        points: Arc<Mutex<BTreeMap<String, Vec<(Vec<(String, String)>, u64)>>>>,
     }
 
     impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for SchemaExporter {
@@ -293,33 +314,39 @@ mod tests {
                 match metric.data() {
                     AggregatedMetrics::U64(MetricData::Gauge(gauge)) => {
                         metric_points.extend(gauge.data_points().map(|point| {
-                            point
-                                .attributes()
-                                .map(|attribute| {
-                                    (
-                                        attribute.key.as_str().to_owned(),
-                                        attribute.value.as_str().into_owned(),
-                                    )
-                                })
-                                .collect::<Vec<_>>()
+                            (
+                                point
+                                    .attributes()
+                                    .map(|attribute| {
+                                        (
+                                            attribute.key.as_str().to_owned(),
+                                            attribute.value.as_str().into_owned(),
+                                        )
+                                    })
+                                    .collect::<Vec<_>>(),
+                                point.value(),
+                            )
                         }));
                     }
                     AggregatedMetrics::U64(MetricData::Sum(sum)) => {
                         metric_points.extend(sum.data_points().map(|point| {
-                            point
-                                .attributes()
-                                .map(|attribute| {
-                                    (
-                                        attribute.key.as_str().to_owned(),
-                                        attribute.value.as_str().into_owned(),
-                                    )
-                                })
-                                .collect::<Vec<_>>()
+                            (
+                                point
+                                    .attributes()
+                                    .map(|attribute| {
+                                        (
+                                            attribute.key.as_str().to_owned(),
+                                            attribute.value.as_str().into_owned(),
+                                        )
+                                    })
+                                    .collect::<Vec<_>>(),
+                                point.value(),
+                            )
                         }));
                     }
                     other => panic!("unexpected metric aggregation: {other:?}"),
                 }
-                for attributes in &mut metric_points {
+                for (attributes, _) in &mut metric_points {
                     attributes.sort();
                 }
                 points.insert(metric.name().to_owned(), metric_points);
@@ -344,8 +371,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn metric_schema_uses_bounded_operations_and_cumulative_latency_buckets() {
+    #[tokio::test]
+    async fn baseline_flush_exports_zero_request_and_latency_series_before_requests() {
         let exporter = SchemaExporter::default();
         let provider = SdkMeterProvider::builder()
             .with_reader(PeriodicReader::builder(exporter.clone()).build())
@@ -359,17 +386,20 @@ mod tests {
             Arc::new(Mutex::new(StorageMetricsSnapshot::default())),
         );
 
-        provider.force_flush().expect("flush metrics");
+        force_flush_with_timeout(provider.clone(), Duration::from_secs(1))
+            .await
+            .expect("flush baseline metrics");
         let points = exporter.points.lock().expect("exported metric schema");
 
         let operations = points.get("dodb.server.requests").expect("request counter");
         assert_eq!(operations.len(), REQUEST_OPERATIONS.len());
-        assert!(operations.iter().all(|attributes| {
+        assert!(operations.iter().all(|(attributes, value)| {
             attributes.len() == 1
                 && attributes[0].0 == "operation"
                 && REQUEST_OPERATIONS
                     .iter()
                     .any(|(operation, _)| operation == &attributes[0].1)
+                && *value == 0
         }));
 
         let buckets = points
@@ -379,12 +409,15 @@ mod tests {
             buckets.len(),
             REQUEST_OPERATIONS.len() * (REQUEST_LATENCY_BUCKETS_SECONDS.len() + 1)
         );
-        assert!(buckets.iter().all(|attributes| {
+        assert!(buckets.iter().all(|(attributes, value)| {
             attributes.len() == 2
                 && attributes.iter().any(|(key, _)| key == "operation")
                 && attributes.iter().any(|(key, _)| key == "le")
+                && *value == 0
         }));
         assert!(points.contains_key("dodb.storage.shards.persisted"));
         assert!(points.contains_key("dodb.storage.shards.open"));
+        drop(points);
+        provider.shutdown().expect("shutdown test meter provider");
     }
 }

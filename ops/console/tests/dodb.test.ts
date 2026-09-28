@@ -58,12 +58,12 @@ test("dodb telemetry separates operation rates, request histogram and persisted 
     counter(700, { host_name: instance, cpu_mode: "idle" }),
   ];
   upstream.instant["system.disk.io"] = [
-    counter(1000, { host_name: instance, direction: "read" }),
-    counter(2000, { host_name: instance, direction: "write" }),
+    counter(3000, { host_name: instance, direction: "read" }),
+    counter(6000, { host_name: instance, direction: "write" }),
   ];
   upstream.instant["system.network.io"] = [
-    counter(3000, { host_name: instance, direction: "receive" }),
-    counter(4000, { host_name: instance, direction: "transmit" }),
+    counter(9000, { host_name: instance, direction: "receive" }),
+    counter(12000, { host_name: instance, direction: "transmit" }),
   ];
 
   const result = await dodbObservability(upstream.dependencies());
@@ -81,6 +81,10 @@ test("dodb telemetry separates operation rates, request histogram and persisted 
   assert.equal(result.wal_file_bytes, 3_000);
   assert.equal(result.persisted_shards, 4);
   assert.equal(result.open_shards, 2);
+  assert.equal(result.disk_read_bytes_per_minute, 600);
+  assert.equal(result.disk_write_bytes_per_minute, 1200);
+  assert.equal(result.network_received_bytes_per_minute, 1800);
+  assert.equal(result.network_sent_bytes_per_minute, 2400);
   assert.deepEqual(result.filesystem, {
     mountpoint: "/var/lib/dodb",
     total_bytes: 1_000,
@@ -89,6 +93,4 @@ test("dodb telemetry separates operation rates, request histogram and persisted 
   });
   assert.deepEqual(result.memory, { used_bytes: 400, available_bytes: 600 });
   assert.equal(result.cpu_busy_percent, 30);
-  assert.equal(result.disk_read_bytes_per_minute, 12_000);
-  assert.equal(result.network_sent_bytes_per_minute, 48_000);
 });
