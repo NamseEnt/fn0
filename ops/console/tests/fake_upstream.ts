@@ -9,6 +9,66 @@ export const CONFIG: ConsoleConfig = {
   platformTelemetryTenant: "fn0",
   canaryUrl: "https://canary.test",
   canaryAccess: { clientId: "canary-client-id-XYZ", clientSecret: "canary-client-secret-XYZ" },
+  accessPolicy: {
+    issuer: "https://team.test",
+    audience: "ops-console-audience",
+    operatorEmail: "operator@example.com",
+  },
+};
+
+const SIGNING_KEY_ID = "signing-key-1";
+
+async function generateSigningKey(): Promise<CryptoKeyPair> {
+  return (await crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["sign", "verify"],
+  )) as CryptoKeyPair;
+}
+
+export const ACCESS_SIGNING_KEY = await generateSigningKey();
+export const FOREIGN_SIGNING_KEY = await generateSigningKey();
+
+function base64Url(bytes: Uint8Array | string): string {
+  const raw = typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes;
+  return Buffer.from(raw).toString("base64url");
+}
+
+export async function accessToken(
+  claims: Record<string, unknown> = {},
+  options: { signingKey?: CryptoKey; keyId?: string } = {},
+): Promise<string> {
+  const header = base64Url(
+    JSON.stringify({ alg: "RS256", kid: options.keyId ?? SIGNING_KEY_ID, typ: "JWT" }),
+  );
+  const payload = base64Url(
+    JSON.stringify({
+      iss: CONFIG.accessPolicy.issuer,
+      aud: [CONFIG.accessPolicy.audience],
+      email: CONFIG.accessPolicy.operatorEmail,
+      iat: NOW_MS / 1000 - 60,
+      nbf: NOW_MS / 1000 - 60,
+      exp: NOW_MS / 1000 + 3600,
+      type: "app",
+      ...claims,
+    }),
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    options.signingKey ?? ACCESS_SIGNING_KEY.privateKey,
+    new TextEncoder().encode(`${header}.${payload}`),
+  );
+  return `${header}.${payload}.${base64Url(new Uint8Array(signature))}`;
+}
+
+const signingJwk = {
+  ...(await crypto.subtle.exportKey("jwk", ACCESS_SIGNING_KEY.publicKey)),
+  kid: SIGNING_KEY_ID,
 };
 
 export const SECRET_VALUES = [
@@ -53,6 +113,7 @@ export class FakeUpstream {
   instant: Record<string, string[]> = {};
   range: Record<string, string[]> = {};
   logs: string[] = [];
+  signingKeysAnswer: Answer | null = null;
   requests: RecordedRequest[] = [];
 
   dependencies(): Dependencies {
@@ -87,6 +148,14 @@ export class FakeUpstream {
   }
 
   private answerFor(url: URL): Answer {
+    if (url.origin === CONFIG.accessPolicy.issuer) {
+      return (
+        this.signingKeysAnswer ??
+        (url.pathname === "/cdn-cgi/access/certs"
+          ? { status: 200, body: JSON.stringify({ keys: [signingJwk] }) }
+          : { status: 404, body: "" })
+      );
+    }
     if (url.origin === CONFIG.canaryUrl) {
       return this.canary[url.pathname.replace("/api/", "")] ?? { status: 404, body: "" };
     }

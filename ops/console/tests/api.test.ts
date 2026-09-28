@@ -3,11 +3,24 @@ import { test } from "node:test";
 import { handleRequest } from "../src/index.ts";
 import type { LiveResponse, OverviewResponse, SeriesResponse } from "../src/schema.ts";
 import { MissingBindingError } from "../src/config.ts";
-import { CONFIG, FakeUpstream, NOW_MS, SECRET_VALUES, counter } from "./fake_upstream.ts";
+import { forgetSigningKeys } from "../src/access.ts";
+import {
+  CONFIG,
+  FakeUpstream,
+  NOW_MS,
+  SECRET_VALUES,
+  accessToken,
+  counter,
+} from "./fake_upstream.ts";
+
+const VALID_TOKEN = await accessToken();
 
 async function get(upstream: FakeUpstream, path: string, method = "GET") {
   const response = await handleRequest(
-    new Request(`https://ops.test${path}`, { method }),
+    new Request(`https://ops.test${path}`, {
+      method,
+      headers: { "Cf-Access-Jwt-Assertion": VALID_TOKEN },
+    }),
     () => upstream.dependencies(),
   );
   const text = await response.text();
@@ -28,7 +41,11 @@ test("an invalid, repeated or extra parameter is a 400", async () => {
     const response = await get(upstream, path);
     assert.equal(response.status, 400, path);
   }
-  assert.equal(upstream.requests.length, 0, "a refused request reached no upstream");
+  assert.equal(
+    upstream.requests.filter((request) => request.url.origin !== CONFIG.accessPolicy.issuer).length,
+    0,
+    "a refused request reached no data upstream",
+  );
 });
 
 test("unknown paths are 404 and other methods 405", async () => {
@@ -202,6 +219,11 @@ test("each upstream gets only its own credential, and Signy only the platform te
   await get(upstream, "/api/errors?window=15m");
   assert.ok(upstream.requests.length > 0);
   for (const request of upstream.requests) {
+    if (request.url.origin === CONFIG.accessPolicy.issuer) {
+      assert.equal(request.url.pathname, "/cdn-cgi/access/certs");
+      assert.equal(request.headers["cf-access-client-id"], undefined);
+      continue;
+    }
     if (request.url.origin === CONFIG.canaryUrl) {
       assert.equal(request.headers["cf-access-client-id"], CONFIG.canaryAccess.clientId);
       assert.equal(request.headers["x-tenant-id"], undefined);
@@ -271,6 +293,7 @@ test("errors come back as bounded, normalized rows", async () => {
 });
 
 test("a missing binding is a 500 that names the binding and nothing else", async () => {
+  forgetSigningKeys();
   const response = await handleRequest(new Request("https://ops.test/api/live"), () => {
     throw new MissingBindingError("CANARY_ACCESS_CLIENT_SECRET");
   });

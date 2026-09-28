@@ -1,3 +1,5 @@
+import type { AccessPolicy } from "./access.ts";
+
 export interface Env {
   SIGNY_URL?: string;
   SIGNY_ACCESS_CLIENT_ID?: string;
@@ -6,6 +8,9 @@ export interface Env {
   CANARY_URL?: string;
   CANARY_ACCESS_CLIENT_ID?: string;
   CANARY_ACCESS_CLIENT_SECRET?: string;
+  ACCESS_ISSUER?: string;
+  ACCESS_AUD?: string;
+  OPS_ADMIN_EMAIL?: string;
 }
 
 export interface AccessCredential {
@@ -19,6 +24,7 @@ export interface ConsoleConfig {
   platformTelemetryTenant: string;
   canaryUrl: string;
   canaryAccess: AccessCredential;
+  accessPolicy: AccessPolicy;
 }
 
 export class MissingBindingError extends Error {
@@ -50,6 +56,11 @@ export function readConfig(env: Env): ConsoleConfig {
     canaryAccess: {
       clientId: required(env, "CANARY_ACCESS_CLIENT_ID"),
       clientSecret: required(env, "CANARY_ACCESS_CLIENT_SECRET"),
+    },
+    accessPolicy: {
+      issuer: required(env, "ACCESS_ISSUER").replace(/\/+$/, ""),
+      audience: required(env, "ACCESS_AUD"),
+      operatorEmail: required(env, "OPS_ADMIN_EMAIL"),
     },
   };
 }

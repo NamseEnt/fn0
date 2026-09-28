@@ -13,3 +13,4 @@ export { BundleStoreR2Worker } from "./BundleStoreR2Worker";
 export * as dns from "./dns";
 export { Suffix } from "./Suffix";
 export { OpsCanaryAccess } from "./OpsCanaryAccess";
+export { Fn0OpsConsole } from "./Fn0OpsConsole";

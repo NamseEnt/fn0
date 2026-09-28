@@ -1,3 +1,4 @@
+import { verifyAccessRequest } from "./access.ts";
 import { type Env, MissingBindingError, readConfig } from "./config.ts";
 import { recentErrors } from "./errors.ts";
 import { live } from "./live.ts";
@@ -32,13 +33,32 @@ const ROUTES: Record<string, Route> = {
 };
 
 /**
- * Every answer is built from fixed queries: a route accepts `window` from the
+ * Every request must first pass the Access JWT check. Every answer is built from fixed queries: a route accepts `window` from the
  * whitelist and nothing else, so no browser input reaches Signy or the canary.
  */
 export async function handleRequest(
   request: Request,
   dependencies: () => Dependencies,
 ): Promise<Response> {
+  let resolved: Dependencies;
+  try {
+    resolved = dependencies();
+  } catch (error) {
+    if (error instanceof MissingBindingError) {
+      return json(500, { error: `console misconfigured: ${error.binding} is not bound` });
+    }
+    throw error;
+  }
+  const refusal = await verifyAccessRequest(
+    request,
+    resolved.config.accessPolicy,
+    resolved.fetch,
+    resolved.nowMs(),
+  );
+  if (refusal !== null) {
+    return json(403, { error: "forbidden", reason: refusal });
+  }
+
   const url = new URL(request.url);
   const route = ROUTES[url.pathname];
   if (route === undefined) {
@@ -53,15 +73,6 @@ export async function handleRequest(
   );
   if (unexpected.length > 0) {
     return json(400, { error: `unknown parameter: ${unexpected.join(", ")}` });
-  }
-  let resolved: Dependencies;
-  try {
-    resolved = dependencies();
-  } catch (error) {
-    if (error instanceof MissingBindingError) {
-      return json(500, { error: `console misconfigured: ${error.binding} is not bound` });
-    }
-    throw error;
   }
   if (!route.windowed) {
     return json(200, await route.handle(resolved));

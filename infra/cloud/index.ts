@@ -434,6 +434,18 @@ const signyControlAccessServiceToken = new cloudflare.AccessServiceToken(
   cloudflareOperatedResource,
 );
 
+// The operations console reads the platform tenant. A token of its own, so
+// it can be revoked without touching ingest or tenant administration.
+const signyOpsAccessServiceToken = new cloudflare.AccessServiceToken(
+  "signy-ops-service-token",
+  {
+    zoneId,
+    name: pulumi.interpolate`fn0-signy-ops-${suffix}`,
+    duration: "8760h",
+  },
+  cloudflareOperatedResource,
+);
+
 new cloudflare.AccessApplication(
   "signy-access-application",
   {
@@ -459,6 +471,15 @@ new cloudflare.AccessApplication(
         includes: [
           {
             serviceToken: { tokenId: signyControlAccessServiceToken.id },
+          },
+        ],
+      },
+      {
+        name: "ops console service token",
+        decision: "non_identity",
+        includes: [
+          {
+            serviceToken: { tokenId: signyOpsAccessServiceToken.id },
           },
         ],
       },
@@ -513,6 +534,26 @@ const opsCanaryHostname =
 const opsCanaryAccess = new fn0.OpsCanaryAccess(
   "ops-canary-access",
   { zoneId, hostname: opsCanaryHostname, suffix },
+  cloudflareOperatedComponent,
+);
+
+const opsConsole = new fn0.Fn0OpsConsole(
+  "ops-console",
+  {
+    tokenMintingApiToken: bootstrapApiToken,
+    accountId,
+    zoneId,
+    suffix,
+    hostname: config.get("opsHostname") ?? `ops.${domain}`,
+    operatorEmail: config.requireSecret("opsAdminEmail"),
+    signyUrl: `https://${signyHostname}`,
+    signyAccessClientId: signyOpsAccessServiceToken.clientId,
+    signyAccessClientSecret: signyOpsAccessServiceToken.clientSecret,
+    platformTelemetryTenant: "fn0",
+    canaryUrl: pulumi.interpolate`https://${opsCanaryAccess.hostname}`,
+    canaryAccessClientId: opsCanaryAccess.accessClientId,
+    canaryAccessClientSecret: opsCanaryAccess.accessClientSecret,
+  },
   cloudflareOperatedComponent,
 );
 
@@ -880,6 +921,8 @@ export const signyR2StoragePrefix = signyR2.storagePrefix;
 export const signyR2Endpoint = signyR2.endpoint;
 export const signyR2AccessKeyId = pulumi.secret(signyR2.accessKeyId);
 export const signyR2SecretAccessKey = pulumi.secret(signyR2.secretAccessKey);
+export const opsConsoleHostname = opsConsole.hostname;
+export const opsConsoleScriptName = opsConsole.scriptName;
 export const opsCanaryHostnameOutput = opsCanaryAccess.hostname;
 export const opsCanaryAccessClientId = opsCanaryAccess.accessClientId;
 export const opsCanaryAccessClientSecret = opsCanaryAccess.accessClientSecret;
