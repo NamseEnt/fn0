@@ -1,0 +1,7 @@
+project_id = "1lmlydc3"
+project_name = "canary"
+zone = "fn0.dev"
+domain = "canary.fn0.dev"
+cloudflare_account_id = "b62235f721637e4dcfb89754c44e3486"
+cloudflare_broker_url = "https://fn0-broker.skatpgusskat.workers.dev"
+origin_hostname = "oci-ap-osaka-1-nlb.fn0.dev"
