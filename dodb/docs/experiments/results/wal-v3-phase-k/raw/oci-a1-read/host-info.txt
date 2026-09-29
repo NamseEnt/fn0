@@ -1,0 +1,8 @@
+Host: OCI VM.Standard.A1.Flex instance-20260923-1013
+SSH endpoint: opc@217.142.246.204
+Architecture: aarch64, 2 OCPU, Neoverse-N1
+OS: Oracle Linux Server 9.8
+Kernel: Linux 6.12.0-206.104.4.4.el9uek.aarch64
+Rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+Fixture: MemoryFile, read microbenchmark only
+Source: NamseEnt/fn0 monorepo `dodb/` at 08e82ec484bd62aeb659471a39f317b86cfb488f

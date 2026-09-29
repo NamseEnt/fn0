@@ -1,0 +1,5 @@
+phase0-bench engine=background-overlay-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=10s warmup=2s repetitions=1
+raw output: /home/opc/phase-k-primary-08e82ec484bd62aeb659471a39f317b86cfb488f/05-phase-k-64w-width16-uniform-rep2.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=     5498 mut/s=    87974 read/s=        0 agg/s=     5498 p50= 11667.8us p95= 21065.4us p99= 24731.7us groups= 1419 avg_group=38.82
+completed 1 scenarios x 1 repetitions

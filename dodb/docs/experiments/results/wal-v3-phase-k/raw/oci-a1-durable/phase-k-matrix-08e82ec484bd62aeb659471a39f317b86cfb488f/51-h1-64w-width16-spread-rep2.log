@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=10s warmup=2s repetitions=1
+raw output: /home/opc/phase-k-matrix-08e82ec484bd62aeb659471a39f317b86cfb488f/51-h1-64w-width16-spread-rep2.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-different-leaf-heavy             rep=0 tx/s=    14736 mut/s=   235778 read/s=        0 agg/s=    14736 p50=  5004.2us p95=  6251.9us p99=  8209.6us groups= 3562 avg_group=41.40
+completed 1 scenarios x 1 repetitions

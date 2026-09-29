@@ -1,0 +1,137 @@
+ Downloading crates ...
+  Downloaded autocfg v1.5.0
+  Downloaded cfg-if v1.0.4
+  Downloaded bitflags v2.13.1
+  Downloaded rand v0.9.2
+  Downloaded regex-syntax v0.8.8
+  Downloaded zerocopy v0.8.31
+  Downloaded rustix v1.1.4
+   Compiling libc v0.2.185
+   Compiling proc-macro2 v1.0.105
+   Compiling shlex v1.3.0
+   Compiling quote v1.0.45
+   Compiling unicode-ident v1.0.24
+   Compiling find-msvc-tools v0.1.6
+   Compiling cc v1.2.51
+   Compiling semver v1.0.27
+   Compiling rustc_version v0.4.1
+   Compiling libmimalloc-sys v0.1.49
+   Compiling cfg-if v1.0.4
+   Compiling syn v3.0.3
+   Compiling crc32c v0.6.8
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling tokio-macros v2.7.2
+   Compiling mio v1.2.2
+   Compiling socket2 v0.6.5
+   Compiling bytes v1.11.1
+   Compiling getrandom v0.3.4
+   Compiling pin-project-lite v0.2.16
+   Compiling tokio v1.53.1
+   Compiling mimalloc v0.1.52
+   Compiling dodb-core v0.1.0 (/home/opc/fn0-phase-k-08e82ec484bd62aeb659471a39f317b86cfb488f/dodb/crates/dodb-core)
+   Compiling zerocopy v0.8.31
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.4.2
+   Compiling rand_core v0.9.5
+   Compiling autocfg v1.5.0
+   Compiling bitflags v2.13.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling dodb-storage v0.1.0 (/home/opc/fn0-phase-k-08e82ec484bd62aeb659471a39f317b86cfb488f/dodb/crates/dodb-storage)
+   Compiling num-traits v0.2.19
+   Compiling once_cell v1.21.3
+   Compiling fastrand v2.3.0
+   Compiling tempfile v3.27.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling wait-timeout v0.2.1
+   Compiling bit-vec v0.8.0
+   Compiling fnv v1.0.7
+   Compiling quick-error v1.2.3
+   Compiling rusty-fork v0.3.1
+   Compiling bit-set v0.8.0
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.9.2
+   Compiling rand_xorshift v0.4.0
+   Compiling unarray v0.1.4
+   Compiling regex-syntax v0.8.8
+   Compiling proptest v1.11.0
+    Finished `release` profile [optimized + debuginfo] target(s) in 2m 17s
+     Running unittests src/lib.rs (target/release/deps/dodb_storage-205549958a04dcac)
+
+running 1 test
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":0,"case":"base_hit","j0_ns":447,"h1_ns":441,"ratio":1.0136,"j0_allocations_per_op":4.000,"h1_allocations_per_op":4.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":0,"case":"miss","j0_ns":447,"h1_ns":440,"ratio":1.0159,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":0,"operation":"query","limit":8,"j0_ns":2231,"h1_ns":2213,"ratio":1.0081,"j0_allocations_per_op":38.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":0,"operation":"query","limit":128,"j0_ns":35979,"h1_ns":35912,"ratio":1.0019,"j0_allocations_per_op":523.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":0,"operation":"scan","limit":8,"j0_ns":1849,"h1_ns":1848,"ratio":1.0005,"j0_allocations_per_op":35.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":0,"operation":"scan","limit":128,"j0_ns":34437,"h1_ns":34404,"ratio":1.0010,"j0_allocations_per_op":520.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":0,"operation":"scan","limit":4096,"j0_ns":1116009,"h1_ns":1118150,"ratio":0.9981,"j0_allocations_per_op":16402.000,"h1_allocations_per_op":16402.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"case":"newest_hit","j0_ns":264,"h1_ns":429,"ratio":0.6154,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"case":"oldest_hit","j0_ns":266,"h1_ns":428,"ratio":0.6215,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"case":"tombstone","j0_ns":246,"h1_ns":497,"ratio":0.4950,"j0_allocations_per_op":2.000,"h1_allocations_per_op":4.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"case":"base_hit","j0_ns":454,"h1_ns":428,"ratio":1.0607,"j0_allocations_per_op":4.000,"h1_allocations_per_op":4.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"case":"miss","j0_ns":456,"h1_ns":428,"ratio":1.0654,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"operation":"query","limit":8,"j0_ns":3216,"h1_ns":2201,"ratio":1.4612,"j0_allocations_per_op":44.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"operation":"query","limit":128,"j0_ns":48607,"h1_ns":36097,"ratio":1.3466,"j0_allocations_per_op":556.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"operation":"scan","limit":8,"j0_ns":2731,"h1_ns":1843,"ratio":1.4818,"j0_allocations_per_op":41.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"operation":"scan","limit":128,"j0_ns":47283,"h1_ns":34449,"ratio":1.3726,"j0_allocations_per_op":553.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":1,"operation":"scan","limit":4096,"j0_ns":1462153,"h1_ns":1118846,"ratio":1.3068,"j0_allocations_per_op":16627.000,"h1_allocations_per_op":16402.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"case":"newest_hit","j0_ns":266,"h1_ns":428,"ratio":0.6215,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"case":"oldest_hit","j0_ns":388,"h1_ns":428,"ratio":0.9065,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"case":"tombstone","j0_ns":246,"h1_ns":495,"ratio":0.4970,"j0_allocations_per_op":2.000,"h1_allocations_per_op":4.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"case":"base_hit","j0_ns":482,"h1_ns":428,"ratio":1.1262,"j0_allocations_per_op":4.000,"h1_allocations_per_op":4.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"case":"miss","j0_ns":474,"h1_ns":428,"ratio":1.1075,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"operation":"query","limit":8,"j0_ns":3418,"h1_ns":2203,"ratio":1.5515,"j0_allocations_per_op":44.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"operation":"query","limit":128,"j0_ns":51020,"h1_ns":36269,"ratio":1.4067,"j0_allocations_per_op":556.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"operation":"scan","limit":8,"j0_ns":2905,"h1_ns":1840,"ratio":1.5788,"j0_allocations_per_op":41.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"operation":"scan","limit":128,"j0_ns":49972,"h1_ns":34506,"ratio":1.4482,"j0_allocations_per_op":553.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":2,"operation":"scan","limit":4096,"j0_ns":1504228,"h1_ns":1118639,"ratio":1.3447,"j0_allocations_per_op":16627.000,"h1_allocations_per_op":16402.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"case":"newest_hit","j0_ns":266,"h1_ns":428,"ratio":0.6215,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"case":"oldest_hit","j0_ns":602,"h1_ns":428,"ratio":1.4065,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"case":"tombstone","j0_ns":245,"h1_ns":495,"ratio":0.4949,"j0_allocations_per_op":2.000,"h1_allocations_per_op":4.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"case":"base_hit","j0_ns":535,"h1_ns":428,"ratio":1.2500,"j0_allocations_per_op":4.000,"h1_allocations_per_op":4.000}
+{"record_type":"get","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"case":"miss","j0_ns":513,"h1_ns":428,"ratio":1.1986,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"operation":"query","limit":8,"j0_ns":3863,"h1_ns":2208,"ratio":1.7495,"j0_allocations_per_op":44.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"operation":"query","limit":128,"j0_ns":56195,"h1_ns":36216,"ratio":1.5517,"j0_allocations_per_op":556.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"operation":"scan","limit":8,"j0_ns":3155,"h1_ns":1850,"ratio":1.7054,"j0_allocations_per_op":41.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"operation":"scan","limit":128,"j0_ns":54871,"h1_ns":34561,"ratio":1.5877,"j0_allocations_per_op":553.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"08e82ec484bd62aeb659471a39f317b86cfb488f","segments":4,"operation":"scan","limit":4096,"j0_ns":1624453,"h1_ns":1114161,"ratio":1.4580,"j0_allocations_per_op":16627.000,"h1_allocations_per_op":16402.000}
+test blink::tests::measure_bounded_overlay_read_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 177 filtered out; finished in 3.95s
+
+     Running unittests src/bin/phase0-bench.rs (target/release/deps/phase0_bench-22c66f8ac4640058)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase1-bench.rs (target/release/deps/phase1_bench-585305ecee163a8a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase2-crash-child.rs (target/release/deps/phase2_crash_child-d0090497e7f98743)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase4-bench.rs (target/release/deps/phase4_bench-909da1769ea5773e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase5-bench.rs (target/release/deps/phase5_bench-602677859b471718)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/phase2_recovery.rs (target/release/deps/phase2_recovery-45b9c578b0537b4f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
