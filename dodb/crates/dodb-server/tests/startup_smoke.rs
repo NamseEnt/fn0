@@ -110,8 +110,10 @@ fn binary_starts_without_an_otlp_receiver_in_a_fresh_process() {
         "missing OTLP receiver did not exercise the best-effort baseline flush path: {output:?}"
     );
     assert!(
-        shutdown_status.code().is_some(),
-        "server shutdown was not observed"
+        shutdown_status.success()
+            || (shutdown_status.code() == Some(1)
+                && output.iter().any(|line| line.contains("Failed to flush"))),
+        "server shutdown failed for a reason other than the absent OTLP receiver: {output:?}"
     );
 }
 
