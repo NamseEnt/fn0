@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::ErrorKind;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle, ThreadId};
@@ -45,7 +45,8 @@ use leaf::{BlinkValueRef, LeafEntries, LeafEntryRef, LeafRange, StoredValue};
 
 const FIRST_DATA_PAGE: u64 = 2;
 const PAGE_CATALOG_CHUNK_SIZE: usize = 64;
-const MAX_OVERLAY_SEGMENTS: usize = 4;
+const MATERIALIZER_SOFT_LIMIT: usize = 4;
+const MAX_OVERLAY_SEGMENTS: usize = 8;
 const NULL_PAGE_ID: u64 = u64::MAX;
 const BLINK_SUPERBLOCK_MAGIC: [u8; 4] = *b"DBLK";
 const BLINK_SUPERBLOCK_VERSION: u16 = 3;
@@ -303,6 +304,27 @@ pub struct BlinkCheckpointMetrics {
     pub bytes_written: u64,
     pub wal_bytes_reclaimed: u64,
     pub max_materialization_lag_transactions: u64,
+    pub requests: u64,
+    pub started: u64,
+    pub completed: u64,
+    pub failed: u64,
+    pub stale: u64,
+    pub total_nanos: u64,
+    pub cpu_nanos: u64,
+    pub data_write_nanos: u64,
+    pub data_sync_nanos: u64,
+    pub checkpoint_nanos: u64,
+    pub checkpoint_sync_nanos: u64,
+    pub publish_pause_nanos: u64,
+    pub writer_blocked_nanos: u64,
+    pub backpressure_events: u64,
+    pub backpressure_nanos: u64,
+    pub overlay_segments_current: u64,
+    pub overlay_segments_peak: u64,
+    pub overlay_bytes_current: u64,
+    pub overlay_bytes_peak: u64,
+    pub wal_bytes_retained: u64,
+    pub wal_bytes_reclaimed_total: u64,
 }
 
 impl BlinkCheckpointMetrics {
@@ -328,6 +350,81 @@ impl BlinkCheckpointMetrics {
         self.max_materialization_lag_transactions = self
             .max_materialization_lag_transactions
             .max(report.materialization_lag_transactions);
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum MaterializerState {
+    Idle,
+    Requested,
+    Building {
+        base_generation: u64,
+        covered_segments: usize,
+        covered_lsn: Lsn,
+        covered_sequence: u64,
+    },
+    ReadyToPublish {
+        base_generation: u64,
+        covered_segments: usize,
+        covered_lsn: Lsn,
+        covered_sequence: u64,
+    },
+    Failed(String),
+}
+
+struct MaterializationRequest {
+    base_generation: u64,
+    base_catalog: Arc<PageCatalog>,
+    base_state: BlinkState,
+    base_superblock: BlinkSuperblock,
+    base_slot: SuperblockSlot,
+    overlays: Arc<[Arc<ImmutableOverlaySegment>]>,
+    covered_segments: usize,
+    checkpoint_lsn: Lsn,
+    checkpoint_sequence: u64,
+    file: Box<dyn DurableFile + Send>,
+    checkpoint_may_be_durable: Arc<AtomicBool>,
+}
+
+struct MaterializationResult {
+    base_generation: u64,
+    base_catalog: Arc<PageCatalog>,
+    overlays: Arc<[Arc<ImmutableOverlaySegment>]>,
+    covered_segments: usize,
+    checkpoint_lsn: Lsn,
+    checkpoint_sequence: u64,
+    state: BlinkState,
+    dirty: BTreeSet<PageId>,
+    retired_pages: BTreeSet<PageId>,
+    superblock: BlinkSuperblock,
+    slot: SuperblockSlot,
+    bytes_written: u64,
+    data_write_nanos: u64,
+    data_sync_nanos: u64,
+    checkpoint_nanos: u64,
+    checkpoint_sync_nanos: u64,
+    total_nanos: u64,
+    cpu_nanos: u64,
+}
+
+struct MaterializationFailure {
+    message: String,
+    checkpoint_may_be_durable: bool,
+}
+
+struct BackgroundMaterializer {
+    result_rx: Receiver<std::result::Result<MaterializationResult, MaterializationFailure>>,
+    worker: Option<JoinHandle<()>>,
+    state: MaterializerState,
+    checkpoint_may_be_durable: Arc<AtomicBool>,
+}
+
+impl Drop for BackgroundMaterializer {
+    fn drop(&mut self) {
+        self.state = MaterializerState::Idle;
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
     }
 }
 
@@ -1634,6 +1731,8 @@ pub struct BlinkStore<F: DurableFile, W: DurableFile = crate::btree::NoWal> {
     split_metrics: BlinkSplitMetrics,
     batch_metrics: BlinkBatchMetrics,
     checkpoint_metrics: BlinkCheckpointMetrics,
+    materializer: Option<BackgroundMaterializer>,
+    background_materialization_enabled: bool,
     planned_execution: bool,
     parallel_workers: usize,
     parallel_min_group_mutations: usize,
@@ -1700,6 +1799,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         store.next_lsn = wal.next_lsn();
         store.next_batch_id = wal.next_batch_id();
         store.logical_wal = Some(wal);
+        store.background_materialization_enabled = true;
         Ok(store)
     }
 
@@ -1820,6 +1920,8 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             split_metrics: BlinkSplitMetrics::default(),
             batch_metrics: BlinkBatchMetrics::default(),
             checkpoint_metrics: BlinkCheckpointMetrics::default(),
+            materializer: None,
+            background_materialization_enabled: false,
             planned_execution: false,
             parallel_workers: 1,
             parallel_min_group_mutations: 0,
@@ -1902,6 +2004,8 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             split_metrics: BlinkSplitMetrics::default(),
             batch_metrics: BlinkBatchMetrics::default(),
             checkpoint_metrics: BlinkCheckpointMetrics::default(),
+            materializer: None,
+            background_materialization_enabled: false,
             planned_execution: false,
             parallel_workers: 1,
             parallel_min_group_mutations: 0,
@@ -1953,6 +2057,10 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
 
     pub fn reset_checkpoint_metrics(&mut self) {
         self.checkpoint_metrics = BlinkCheckpointMetrics::default();
+    }
+
+    pub fn set_background_materialization(&mut self, enabled: bool) {
+        self.background_materialization_enabled = enabled;
     }
 
     pub fn dirty_page_count(&self) -> usize {
@@ -2219,8 +2327,54 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         if requests.is_empty() {
             return Ok(Vec::new());
         }
-        if self.publisher.pin().generation.overlays.len() >= MAX_OVERLAY_SEGMENTS {
-            self.checkpoint_logical_inner()?;
+        self.poll_background_materialization()?;
+        if self.materializer.is_none()
+            && self.publisher.pin().generation.overlays.len() >= MATERIALIZER_SOFT_LIMIT
+            && !self.request_background_materialization()?
+        {
+            let blocked_at = Instant::now();
+            let report = self.checkpoint_logical_impl()?;
+            self.checkpoint_metrics.record(&report);
+            self.checkpoint_metrics.writer_blocked_nanos = self
+                .checkpoint_metrics
+                .writer_blocked_nanos
+                .saturating_add(elapsed_nanos(blocked_at));
+        }
+        let backpressure_started =
+            if self.publisher.pin().generation.overlays.len() >= MAX_OVERLAY_SEGMENTS {
+                self.checkpoint_metrics.backpressure_events = self
+                    .checkpoint_metrics
+                    .backpressure_events
+                    .saturating_add(1);
+                Some(Instant::now())
+            } else {
+                None
+            };
+        while self.publisher.pin().generation.overlays.len() >= MAX_OVERLAY_SEGMENTS {
+            if self.materializer.is_some() {
+                let failures_before = self.checkpoint_metrics.failed;
+                self.wait_background_once()?;
+                self.poll_background_materialization()?;
+                if self.checkpoint_metrics.failed > failures_before {
+                    return Err(Error::overloaded(
+                        "background materialization failed at the overlay hard limit",
+                    ));
+                }
+            } else if !self.request_background_materialization()? {
+                let blocked_at = Instant::now();
+                self.checkpoint_logical_impl()?;
+                self.checkpoint_metrics.writer_blocked_nanos = self
+                    .checkpoint_metrics
+                    .writer_blocked_nanos
+                    .saturating_add(elapsed_nanos(blocked_at));
+            }
+        }
+        if let Some(backpressure_started) = backpressure_started {
+            let blocked_nanos = elapsed_nanos(backpressure_started);
+            self.checkpoint_metrics.backpressure_nanos = self
+                .checkpoint_metrics
+                .backpressure_nanos
+                .saturating_add(blocked_nanos);
         }
         if self.broken.is_some() {
             return Err(Error::durability(
@@ -2361,6 +2515,31 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 .sum::<u64>(),
         );
         self.publisher.publish(published);
+        let overlay_view = self.publisher.pin();
+        self.checkpoint_metrics.overlay_segments_current =
+            overlay_view.generation.overlays.len() as u64;
+        self.checkpoint_metrics.overlay_segments_peak = self
+            .checkpoint_metrics
+            .overlay_segments_peak
+            .max(self.checkpoint_metrics.overlay_segments_current);
+        self.checkpoint_metrics.overlay_bytes_current = overlay_view
+            .generation
+            .overlays
+            .iter()
+            .map(|segment| segment.bytes.len() as u64)
+            .sum();
+        self.checkpoint_metrics.overlay_bytes_peak = self
+            .checkpoint_metrics
+            .overlay_bytes_peak
+            .max(self.checkpoint_metrics.overlay_bytes_current);
+        self.checkpoint_metrics.wal_bytes_retained =
+            self.logical_wal.as_ref().unwrap().wal_bytes()?;
+        drop(overlay_view);
+        if self.publisher.pin().generation.overlays.len() >= MATERIALIZER_SOFT_LIMIT
+            && self.materializer.is_none()
+        {
+            let _ = self.request_background_materialization()?;
+        }
         Ok(results)
     }
 
@@ -3296,11 +3475,427 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     }
 
     fn checkpoint_logical_inner(&mut self) -> Result<BlinkCheckpointReport> {
-        let result = self.checkpoint_logical_impl();
-        if let Ok(report) = &result {
-            self.checkpoint_metrics.record(report);
+        let metrics_before = self.checkpoint_metrics.clone();
+        loop {
+            self.poll_background_materialization()?;
+            if self.materializer.is_some() {
+                let failures_before = self.checkpoint_metrics.failed;
+                self.wait_background_once()?;
+                if self.checkpoint_metrics.failed > failures_before {
+                    return Err(Error::checkpoint(
+                        "background materialization failed before checkpoint completion",
+                    ));
+                }
+                continue;
+            }
+            let overlay_count = self.publisher.pin().generation.overlays.len();
+            if overlay_count == 0 {
+                let result = self.checkpoint_logical_impl()?;
+                self.checkpoint_metrics.record(&result);
+                let completed = self
+                    .checkpoint_metrics
+                    .completed
+                    .saturating_sub(metrics_before.completed);
+                if completed > 0 {
+                    let bytes_written = self
+                        .checkpoint_metrics
+                        .bytes_written
+                        .saturating_sub(metrics_before.bytes_written);
+                    return Ok(BlinkCheckpointReport {
+                        checkpoint_lsn: self.current_superblock.checkpoint_lsn,
+                        checkpoint_sequence: self.current_superblock.checkpoint_sequence,
+                        pages_flushed: (bytes_written / PAGE_SIZE as u64) as usize,
+                        bytes_written,
+                        wal_bytes_reclaimed: self
+                            .checkpoint_metrics
+                            .wal_bytes_reclaimed_total
+                            .saturating_sub(metrics_before.wal_bytes_reclaimed_total),
+                        segments_materialized: self
+                            .checkpoint_metrics
+                            .segments_materialized
+                            .saturating_sub(metrics_before.segments_materialized)
+                            as usize,
+                        overlay_bytes_materialized: self
+                            .checkpoint_metrics
+                            .overlay_bytes_materialized
+                            .saturating_sub(metrics_before.overlay_bytes_materialized),
+                        materialization_lag_transactions: self
+                            .checkpoint_metrics
+                            .max_materialization_lag_transactions,
+                        duration_nanos: self
+                            .checkpoint_metrics
+                            .total_nanos
+                            .saturating_sub(metrics_before.total_nanos),
+                    });
+                }
+                return Ok(result);
+            }
+            if self.request_background_materialization()? {
+                self.wait_background_once()?;
+                continue;
+            }
+            let result = self.checkpoint_logical_impl()?;
+            self.checkpoint_metrics.record(&result);
+            return Ok(result);
         }
-        result
+    }
+
+    fn request_background_materialization(&mut self) -> Result<bool> {
+        if !self.background_materialization_enabled {
+            return Ok(false);
+        }
+        if self.materializer.is_some() {
+            return Ok(true);
+        }
+        let Some(file) = self.file.try_clone_for_background() else {
+            return Ok(false);
+        };
+        let pinned = self.publisher.pin();
+        let covered_segments = pinned
+            .generation
+            .overlays
+            .len()
+            .min(MATERIALIZER_SOFT_LIMIT);
+        if covered_segments == 0 {
+            return Ok(false);
+        }
+        let Some(logical_wal) = self.logical_wal.as_ref() else {
+            return Err(Error::invariant(
+                "logical WAL disappeared during materializer request",
+            ));
+        };
+        let Some(checkpoint_lsn) = logical_wal.last_commit_lsn() else {
+            return Ok(false);
+        };
+        let checkpoint_sequence = logical_wal.checkpoint_sequence();
+        let checkpoint_may_be_durable = Arc::new(AtomicBool::new(false));
+        let worker_checkpoint_state = Arc::clone(&checkpoint_may_be_durable);
+        let (request_tx, request_rx) = mpsc::channel::<MaterializationRequest>();
+        let (result_tx, result_rx) = mpsc::sync_channel(1);
+        let worker = thread::Builder::new()
+            .name("dodb-blink-materializer".to_owned())
+            .spawn(move || {
+                if let Ok(request) = request_rx.recv() {
+                    let result = build_background_materialization(request).map_err(|error| {
+                        MaterializationFailure {
+                            message: error.to_string(),
+                            checkpoint_may_be_durable: worker_checkpoint_state
+                                .load(Ordering::Acquire),
+                        }
+                    });
+                    let _ = result_tx.send(result);
+                }
+            })
+            .map_err(|error| {
+                Error::durability(format!("materializer thread spawn failed: {error}"))
+            })?;
+        let request = MaterializationRequest {
+            base_generation: pinned.generation.epoch,
+            base_catalog: Arc::clone(&pinned.generation.catalog),
+            base_state: self.state.clone(),
+            base_superblock: self.current_superblock.clone(),
+            base_slot: self.active_slot,
+            overlays: Arc::clone(&pinned.generation.overlays),
+            covered_segments,
+            checkpoint_lsn,
+            checkpoint_sequence,
+            file,
+            checkpoint_may_be_durable: Arc::clone(&checkpoint_may_be_durable),
+        };
+        drop(pinned);
+        request_tx
+            .send(request)
+            .map_err(|_| Error::durability("materializer request channel closed"))?;
+        drop(request_tx);
+        self.checkpoint_metrics.requests = self.checkpoint_metrics.requests.saturating_add(1);
+        self.checkpoint_metrics.started = self.checkpoint_metrics.started.saturating_add(1);
+        self.materializer = Some(BackgroundMaterializer {
+            result_rx,
+            worker: Some(worker),
+            state: MaterializerState::Requested,
+            checkpoint_may_be_durable,
+        });
+        if let Some(materializer) = self.materializer.as_mut() {
+            materializer.state = MaterializerState::Building {
+                base_generation: self.current_superblock.generation,
+                covered_segments,
+                covered_lsn: checkpoint_lsn,
+                covered_sequence: checkpoint_sequence,
+            };
+        }
+        Ok(true)
+    }
+
+    fn wait_background_once(&mut self) -> Result<()> {
+        let Some(materializer) = self.materializer.as_ref() else {
+            return Ok(());
+        };
+        let started = Instant::now();
+        let result = materializer
+            .result_rx
+            .recv()
+            .map_err(|_| Error::durability("materializer result channel closed"))?;
+        let blocked_nanos = elapsed_nanos(started);
+        self.checkpoint_metrics.writer_blocked_nanos = self
+            .checkpoint_metrics
+            .writer_blocked_nanos
+            .saturating_add(blocked_nanos);
+        match result {
+            Ok(result) => {
+                self.mark_materializer_ready(&result);
+                self.publish_background_result(result)
+            }
+            Err(failure) => {
+                self.checkpoint_metrics.failed = self.checkpoint_metrics.failed.saturating_add(1);
+                if let Some(materializer) = self.materializer.as_mut() {
+                    materializer.state = MaterializerState::Failed(failure.message.clone());
+                    if let MaterializerState::Failed(failure) = &materializer.state {
+                        if materializer
+                            .checkpoint_may_be_durable
+                            .load(Ordering::Acquire)
+                        {
+                            self.broken = Some(failure.clone());
+                        }
+                    }
+                }
+                self.materializer = None;
+                if failure.checkpoint_may_be_durable {
+                    Err(Error::checkpoint(format!(
+                        "background materialization failed after checkpoint write began: {}",
+                        failure.message
+                    )))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn poll_background_materialization(&mut self) -> Result<()> {
+        let result = self.materializer.as_ref().and_then(|materializer| {
+            match materializer.result_rx.try_recv() {
+                Ok(result) => Some(result),
+                Err(mpsc::TryRecvError::Empty) => None,
+                Err(mpsc::TryRecvError::Disconnected) => Some(Err(MaterializationFailure {
+                    message: "materializer result channel disconnected".to_owned(),
+                    checkpoint_may_be_durable: materializer
+                        .checkpoint_may_be_durable
+                        .load(Ordering::Acquire),
+                })),
+            }
+        });
+        match result {
+            Some(Ok(result)) => {
+                self.mark_materializer_ready(&result);
+                self.publish_background_result(result)
+            }
+            Some(Err(failure)) => {
+                self.checkpoint_metrics.failed = self.checkpoint_metrics.failed.saturating_add(1);
+                if let Some(materializer) = self.materializer.as_mut() {
+                    materializer.state = MaterializerState::Failed(failure.message.clone());
+                    if let MaterializerState::Failed(failure) = &materializer.state {
+                        if materializer
+                            .checkpoint_may_be_durable
+                            .load(Ordering::Acquire)
+                        {
+                            self.broken = Some(failure.clone());
+                        }
+                    }
+                }
+                self.materializer = None;
+                if failure.checkpoint_may_be_durable {
+                    Err(Error::checkpoint(format!(
+                        "background materialization failed after checkpoint write began: {}",
+                        failure.message
+                    )))
+                } else {
+                    Ok(())
+                }
+            }
+            None => Ok(()),
+        }
+    }
+
+    fn mark_materializer_ready(&mut self, result: &MaterializationResult) {
+        if let Some(materializer) = self.materializer.as_mut() {
+            materializer.state = MaterializerState::ReadyToPublish {
+                base_generation: result.base_generation,
+                covered_segments: result.covered_segments,
+                covered_lsn: result.checkpoint_lsn,
+                covered_sequence: result.checkpoint_sequence,
+            };
+        }
+    }
+
+    fn publish_background_result(&mut self, result: MaterializationResult) -> Result<()> {
+        let publish_started = Instant::now();
+        let ready_state = self
+            .materializer
+            .as_ref()
+            .map(|materializer| &materializer.state);
+        if !matches!(
+            ready_state,
+            Some(MaterializerState::ReadyToPublish {
+                base_generation,
+                covered_segments,
+                covered_lsn,
+                covered_sequence,
+            }) if *base_generation == result.base_generation
+                && *covered_segments == result.covered_segments
+                && *covered_lsn == result.checkpoint_lsn
+                && *covered_sequence == result.checkpoint_sequence
+        ) {
+            self.materializer = None;
+            self.broken = Some("materializer completed outside the ready state".to_owned());
+            return Err(Error::checkpoint(
+                "materializer completed outside the ready state",
+            ));
+        }
+        let current = self.publisher.pin();
+        let prefix_matches = current.generation.overlays.len() >= result.covered_segments
+            && current
+                .generation
+                .overlays
+                .iter()
+                .take(result.covered_segments)
+                .zip(result.overlays.iter().take(result.covered_segments))
+                .all(|(current_segment, input_segment)| {
+                    Arc::ptr_eq(current_segment, input_segment)
+                });
+        if current.generation.epoch != result.base_generation
+            || !Arc::ptr_eq(&current.generation.catalog, &result.base_catalog)
+            || !prefix_matches
+        {
+            self.checkpoint_metrics.stale = self.checkpoint_metrics.stale.saturating_add(1);
+            self.materializer = None;
+            self.broken = Some("background materialization result is stale".to_owned());
+            return Err(Error::checkpoint(
+                "background materialization result is stale",
+            ));
+        }
+        let suffix: Arc<[Arc<ImmutableOverlaySegment>]> = Arc::from(
+            current
+                .generation
+                .overlays
+                .iter()
+                .skip(result.covered_segments)
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
+        let mut catalog_dirty = result.dirty.clone();
+        catalog_dirty.extend(result.retired_pages.iter().copied());
+        let published = match self.publisher.prepare_materialized(
+            &result.state,
+            &result.superblock,
+            &catalog_dirty,
+            Arc::clone(&suffix),
+        ) {
+            Ok(published) => published,
+            Err(error) => {
+                self.broken = Some(error.to_string());
+                return Err(error);
+            }
+        };
+        self.state = result.state;
+        self.current_superblock = result.superblock;
+        self.active_slot = result.slot;
+        self.publisher.publish(published);
+        let before_reset = self.logical_wal.as_ref().unwrap().wal_bytes()?;
+        let latest_lsn = self.logical_wal.as_ref().unwrap().last_commit_lsn();
+        let latest_sequence = self.logical_wal.as_ref().unwrap().checkpoint_sequence();
+        let mut reclaimed = 0;
+        if latest_lsn == Some(result.checkpoint_lsn)
+            && latest_sequence == result.checkpoint_sequence
+        {
+            if let Err(error) = self.logical_wal.as_mut().unwrap().reset(
+                result.checkpoint_lsn,
+                result.checkpoint_sequence,
+                self.fault_injector.as_deref_mut(),
+            ) {
+                self.broken = Some(error.to_string());
+                return Err(error);
+            }
+            reclaimed =
+                before_reset.saturating_sub(self.logical_wal.as_ref().unwrap().wal_bytes()?);
+            self.next_lsn = self.logical_wal.as_ref().unwrap().next_lsn();
+            self.next_batch_id = self.logical_wal.as_ref().unwrap().next_batch_id();
+        }
+        self.checkpoint_metrics.materializations =
+            self.checkpoint_metrics.materializations.saturating_add(1);
+        self.checkpoint_metrics.completed = self.checkpoint_metrics.completed.saturating_add(1);
+        self.checkpoint_metrics.segments_materialized = self
+            .checkpoint_metrics
+            .segments_materialized
+            .saturating_add(result.covered_segments as u64);
+        self.checkpoint_metrics.bytes_written = self
+            .checkpoint_metrics
+            .bytes_written
+            .saturating_add(result.bytes_written);
+        self.checkpoint_metrics.overlay_bytes_materialized = self
+            .checkpoint_metrics
+            .overlay_bytes_materialized
+            .saturating_add(
+                result
+                    .overlays
+                    .iter()
+                    .take(result.covered_segments)
+                    .map(|segment| segment.bytes.len() as u64)
+                    .sum::<u64>(),
+            );
+        self.checkpoint_metrics.total_nanos = self
+            .checkpoint_metrics
+            .total_nanos
+            .saturating_add(result.total_nanos);
+        self.checkpoint_metrics.cpu_nanos = self
+            .checkpoint_metrics
+            .cpu_nanos
+            .saturating_add(result.cpu_nanos);
+        self.checkpoint_metrics.total_duration_nanos = self
+            .checkpoint_metrics
+            .total_duration_nanos
+            .saturating_add(result.total_nanos);
+        self.checkpoint_metrics.max_duration_nanos = self
+            .checkpoint_metrics
+            .max_duration_nanos
+            .max(result.total_nanos);
+        self.checkpoint_metrics.data_write_nanos = self
+            .checkpoint_metrics
+            .data_write_nanos
+            .saturating_add(result.data_write_nanos);
+        self.checkpoint_metrics.data_sync_nanos = self
+            .checkpoint_metrics
+            .data_sync_nanos
+            .saturating_add(result.data_sync_nanos);
+        self.checkpoint_metrics.checkpoint_nanos = self
+            .checkpoint_metrics
+            .checkpoint_nanos
+            .saturating_add(result.checkpoint_nanos);
+        self.checkpoint_metrics.checkpoint_sync_nanos = self
+            .checkpoint_metrics
+            .checkpoint_sync_nanos
+            .saturating_add(result.checkpoint_sync_nanos);
+        self.checkpoint_metrics.publish_pause_nanos = self
+            .checkpoint_metrics
+            .publish_pause_nanos
+            .saturating_add(elapsed_nanos(publish_started));
+        self.checkpoint_metrics.writer_blocked_nanos = self
+            .checkpoint_metrics
+            .writer_blocked_nanos
+            .saturating_add(elapsed_nanos(publish_started));
+        self.checkpoint_metrics.wal_bytes_reclaimed_total = self
+            .checkpoint_metrics
+            .wal_bytes_reclaimed_total
+            .saturating_add(reclaimed);
+        self.checkpoint_metrics.wal_bytes_retained =
+            self.logical_wal.as_ref().unwrap().wal_bytes()?;
+        self.checkpoint_metrics.overlay_segments_current = suffix.len() as u64;
+        self.checkpoint_metrics.overlay_bytes_current = suffix
+            .iter()
+            .map(|segment| segment.bytes.len() as u64)
+            .sum();
+        self.materializer = None;
+        self.check_invariants()?;
+        Ok(())
     }
 
     fn checkpoint_logical_impl(&mut self) -> Result<BlinkCheckpointReport> {
@@ -6238,6 +6833,127 @@ fn collect_materialization_pages(state: &BlinkState) -> Result<BTreeSet<PageId>>
     Ok(pages)
 }
 
+fn build_background_materialization(
+    mut request: MaterializationRequest,
+) -> Result<MaterializationResult> {
+    let started = Instant::now();
+    let cpu_started = current_thread_cpu_nanos();
+    let (mut state, mut dirty, retired_pages) =
+        clone_state_for_materialization(&request.base_state)?;
+    let mut split_metrics = BlinkSplitMetrics::default();
+    for segment in request.overlays.iter().take(request.covered_segments) {
+        for slot in &segment.slots {
+            let encoded_key = segment.key(slot).to_vec();
+            let key = DocumentKey::decode(&encoded_key).map_err(|error| {
+                Error::corruption(format!("overlay key decode failed: {error}"))
+            })?;
+            let mutation = if slot.tombstone {
+                TransactionMutation::Delete { key }
+            } else {
+                TransactionMutation::Put {
+                    key,
+                    value: segment.value(slot).to_vec(),
+                }
+            };
+            apply_mutation(
+                &mut state,
+                &mut dirty,
+                &mut split_metrics,
+                &mutation,
+                slot.revision,
+            )?;
+        }
+    }
+    let active_page_count = collect_materialization_pages(&state)?.len();
+    ensure_materialization_spare_capacity(&mut state, &mut dirty, active_page_count)?;
+    for retired_page_id in &retired_pages {
+        state.insert_page(
+            *retired_page_id,
+            BlinkPage::Free {
+                lsn: Lsn::ZERO,
+                next: state.free_list_head,
+            },
+        );
+        state.free_list_head = Some(*retired_page_id);
+    }
+    check_state(&state)?;
+    let superblock = BlinkSuperblock {
+        generation: request.base_superblock.generation.saturating_add(1),
+        root_page_id: state.root_page_id,
+        free_list_head: state.free_list_head,
+        high_water_page_id: state.high_water_page_id,
+        checkpoint_lsn: request.checkpoint_lsn,
+        checkpoint_sequence: request.checkpoint_sequence,
+        ..request.base_superblock.clone()
+    };
+    let slot = match request.base_slot {
+        SuperblockSlot::A => SuperblockSlot::B,
+        SuperblockSlot::B => SuperblockSlot::A,
+    };
+    let data_write_started = Instant::now();
+    let mut bytes_written = 0u64;
+    for page_id in &dirty {
+        let page = state
+            .page_ref(*page_id)
+            .ok_or_else(|| Error::invariant("materialized page is missing"))?;
+        let image = encode_blink_page(*page_id, page)?;
+        write_all_at(&mut *request.file, page_id.get() * PAGE_SIZE as u64, &image)?;
+        bytes_written = bytes_written.saturating_add(PAGE_SIZE as u64);
+    }
+    let data_write_nanos = elapsed_nanos(data_write_started);
+    let data_sync_started = Instant::now();
+    request.file.sync_data()?;
+    let data_sync_nanos = elapsed_nanos(data_sync_started);
+    let checkpoint_started = Instant::now();
+    let image = encode_blink_superblock(&superblock)?;
+    request
+        .checkpoint_may_be_durable
+        .store(true, Ordering::Release);
+    write_all_at(
+        &mut *request.file,
+        match slot {
+            SuperblockSlot::A => 0,
+            SuperblockSlot::B => PAGE_SIZE as u64,
+        },
+        &image,
+    )?;
+    let checkpoint_nanos = elapsed_nanos(checkpoint_started);
+    let checkpoint_sync_started = Instant::now();
+    request.file.sync_data()?;
+    let checkpoint_sync_nanos = elapsed_nanos(checkpoint_sync_started);
+    for page_id in &retired_pages {
+        let page = state
+            .page_ref(*page_id)
+            .ok_or_else(|| Error::invariant("retired page is missing"))?;
+        let image = encode_blink_page(*page_id, page)?;
+        write_all_at(&mut *request.file, page_id.get() * PAGE_SIZE as u64, &image)?;
+        bytes_written = bytes_written.saturating_add(PAGE_SIZE as u64);
+    }
+    if !retired_pages.is_empty() {
+        request.file.sync_data()?;
+    }
+    Ok(MaterializationResult {
+        base_generation: request.base_generation,
+        base_catalog: request.base_catalog,
+        overlays: request.overlays,
+        covered_segments: request.covered_segments,
+        checkpoint_lsn: request.checkpoint_lsn,
+        checkpoint_sequence: request.checkpoint_sequence,
+        state,
+        dirty,
+        retired_pages,
+        superblock,
+        slot,
+        bytes_written: bytes_written.saturating_add(PAGE_SIZE as u64),
+        data_write_nanos,
+        data_sync_nanos,
+        checkpoint_nanos,
+        checkpoint_sync_nanos,
+        total_nanos: elapsed_nanos(started),
+        cpu_nanos: current_thread_cpu_nanos().saturating_sub(cpu_started),
+    })
+}
+
 fn rebuild_logical_free_list(state: &mut BlinkState) -> Result<()> {
     let active_pages = collect_materialization_pages(state)?;
     let mut free_list_head = None;
@@ -8026,6 +8742,26 @@ fn elapsed_nanos(started: Instant) -> u64 {
     started.elapsed().as_nanos().try_into().unwrap_or(u64::MAX)
 }
 
+#[cfg(target_os = "linux")]
+fn current_thread_cpu_nanos() -> u64 {
+    let mut time = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    let result = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut time) };
+    if result != 0 {
+        return 0;
+    }
+    (time.tv_sec as u64)
+        .saturating_mul(1_000_000_000)
+        .saturating_add(time.tv_nsec as u64)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn current_thread_cpu_nanos() -> u64 {
+    0
+}
+
 fn read_exact_at<F: DurableFile>(file: &mut F, offset: u64, length: usize) -> Result<Vec<u8>> {
     let mut bytes = vec![0u8; length];
     let mut position = 0usize;
@@ -8047,7 +8783,7 @@ fn read_exact_at<F: DurableFile>(file: &mut F, offset: u64, length: usize) -> Re
     Ok(bytes)
 }
 
-fn write_all_at<F: DurableFile>(file: &mut F, offset: u64, bytes: &[u8]) -> Result<()> {
+fn write_all_at<F: DurableFile + ?Sized>(file: &mut F, offset: u64, bytes: &[u8]) -> Result<()> {
     let mut position = 0usize;
     while position < bytes.len() {
         let count = file.write_at(
@@ -8860,7 +9596,7 @@ mod tests {
             );
         }
         let mut overlay_sets = Vec::new();
-        for segment_index in 0..MAX_OVERLAY_SEGMENTS {
+        for segment_index in 0..MATERIALIZER_SOFT_LIMIT {
             let mut entries = BTreeMap::new();
             for row_index in 0..512u64 {
                 let key = key_for_row(row_index * 2);
@@ -8895,7 +9631,7 @@ mod tests {
             ));
         }
         let mut corrections = 0;
-        for overlay_count in [0, 1, 2, MAX_OVERLAY_SEGMENTS] {
+        for overlay_count in [0, 1, 2, MATERIALIZER_SOFT_LIMIT] {
             let generation = store
                 .publisher
                 .prepare_with_overlays(
@@ -10117,6 +10853,83 @@ mod tests {
         }
         fn sync_all(&mut self) -> Result<()> {
             Ok(())
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct BackgroundMemoryFile {
+        bytes: Arc<Mutex<Vec<u8>>>,
+        gate: Option<Arc<BackgroundWriteGate>>,
+    }
+
+    struct BackgroundWriteGate {
+        armed: AtomicBool,
+        fail_after_resume: AtomicBool,
+        started: Sender<()>,
+        resume: Mutex<Receiver<()>>,
+    }
+
+    impl DurableFile for BackgroundMemoryFile {
+        fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize> {
+            let bytes = self.bytes.lock().unwrap();
+            let start =
+                usize::try_from(offset).map_err(|_| Error::invalid_input("offset overflow"))?;
+            if start >= bytes.len() {
+                return Ok(0);
+            }
+            let count = buffer.len().min(bytes.len() - start);
+            buffer[..count].copy_from_slice(&bytes[start..start + count]);
+            Ok(count)
+        }
+
+        fn write_at(&mut self, offset: u64, input: &[u8]) -> Result<usize> {
+            if let Some(gate) = &self.gate
+                && gate.armed.swap(false, Ordering::SeqCst)
+            {
+                let _ = gate.started.send(());
+                gate.resume
+                    .lock()
+                    .unwrap()
+                    .recv()
+                    .map_err(|error| Error::durability(error.to_string()))?;
+                if gate.fail_after_resume.swap(false, Ordering::SeqCst) {
+                    return Err(Error::durability("injected background page write failure"));
+                }
+            }
+            let mut bytes = self.bytes.lock().unwrap();
+            let start =
+                usize::try_from(offset).map_err(|_| Error::invalid_input("offset overflow"))?;
+            let end = start
+                .checked_add(input.len())
+                .ok_or_else(|| Error::invalid_input("write range overflow"))?;
+            if bytes.len() < end {
+                bytes.resize(end, 0);
+            }
+            bytes[start..end].copy_from_slice(input);
+            Ok(input.len())
+        }
+
+        fn len(&self) -> Result<u64> {
+            Ok(self.bytes.lock().unwrap().len() as u64)
+        }
+
+        fn set_len(&mut self, length: u64) -> Result<()> {
+            let length =
+                usize::try_from(length).map_err(|_| Error::invalid_input("length overflow"))?;
+            self.bytes.lock().unwrap().resize(length, 0);
+            Ok(())
+        }
+
+        fn sync_data(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn sync_all(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn try_clone_for_background(&self) -> Option<Box<dyn DurableFile + Send>> {
+            Some(Box::new(self.clone()))
         }
     }
 
@@ -11363,7 +12176,7 @@ mod tests {
     #[test]
     fn logical_wal_materializes_before_publishing_a_fifth_overlay() {
         let mut store = logical_store();
-        for segment_index in 0..MAX_OVERLAY_SEGMENTS {
+        for segment_index in 0..MATERIALIZER_SOFT_LIMIT {
             store
                 .put(
                     DocumentKey::new(
@@ -11385,7 +12198,7 @@ mod tests {
         assert_eq!(store.current_superblock.checkpoint_sequence, 4);
         assert_eq!(store.current_superblock.checkpoint_lsn.get(), 8);
         assert_eq!(store.checkpoint_metrics().materializations, 1);
-        for segment_index in 0..MAX_OVERLAY_SEGMENTS {
+        for segment_index in 0..MATERIALIZER_SOFT_LIMIT {
             let key = DocumentKey::new(
                 b"logical-bound".to_vec(),
                 (segment_index as u64).to_be_bytes().to_vec(),
@@ -11405,7 +12218,7 @@ mod tests {
     fn logical_materialization_preserves_pins_reopen_and_reuses_page_capacity() {
         let mut store = logical_store();
         let mut expected_values = BTreeMap::<DocumentKey, (Vec<u8>, Revision)>::new();
-        for group_index in 0..MAX_OVERLAY_SEGMENTS {
+        for group_index in 0..MATERIALIZER_SOFT_LIMIT {
             let mutations = (0..24u64)
                 .map(|key_index| {
                     let key = DocumentKey::new(
@@ -11450,7 +12263,7 @@ mod tests {
             assert_eq!(document.revision(), *revision);
         }
         let first_materialized_length = store.file.0.len();
-        for group_index in 0..MAX_OVERLAY_SEGMENTS {
+        for group_index in 0..MATERIALIZER_SOFT_LIMIT {
             let mutations = (0..24u64)
                 .map(|key_index| TransactionMutation::Put {
                     key: DocumentKey::new(
@@ -11463,13 +12276,13 @@ mod tests {
             store
                 .transact(TransactionRequest::new(Vec::new(), mutations))
                 .unwrap();
-            if group_index == MAX_OVERLAY_SEGMENTS - 1 {
+            if group_index == MATERIALIZER_SOFT_LIMIT - 1 {
                 store.checkpoint().unwrap();
             }
         }
         assert!(store.file.0.len() <= first_materialized_length + PAGE_SIZE);
         let second_materialized_length = store.file.0.len();
-        for group_index in 0..MAX_OVERLAY_SEGMENTS {
+        for group_index in 0..MATERIALIZER_SOFT_LIMIT {
             let mutations = (0..24u64)
                 .map(|key_index| TransactionMutation::Put {
                     key: DocumentKey::new(
@@ -11482,7 +12295,7 @@ mod tests {
             store
                 .transact(TransactionRequest::new(Vec::new(), mutations))
                 .unwrap();
-            if group_index == MAX_OVERLAY_SEGMENTS - 1 {
+            if group_index == MATERIALIZER_SOFT_LIMIT - 1 {
                 store.checkpoint().unwrap();
             }
         }
@@ -11541,6 +12354,85 @@ mod tests {
             assert_eq!(reopened.get(&key).unwrap().revision(), Revision::new(1));
             reopened.check_invariants().unwrap();
         }
+    }
+
+    #[test]
+    fn background_materialization_keeps_committing_and_preserves_newer_suffix() {
+        let (started_sender, started_receiver) = mpsc::channel();
+        let (resume_sender, resume_receiver) = mpsc::channel();
+        let data_file = BackgroundMemoryFile::default();
+        let mut store = BlinkStore::open_with_logical_wal(
+            data_file,
+            BackgroundMemoryFile::default(),
+            DatabaseConfig::default(),
+        )
+        .unwrap();
+        store.file.gate = Some(Arc::new(BackgroundWriteGate {
+            armed: AtomicBool::new(false),
+            fail_after_resume: AtomicBool::new(false),
+            started: started_sender,
+            resume: Mutex::new(resume_receiver),
+        }));
+        let first_key = DocumentKey::new(b"background".to_vec(), b"first".to_vec());
+        let fourth_key = DocumentKey::new(b"background".to_vec(), b"fourth".to_vec());
+        for index in 0..3u64 {
+            store
+                .put(
+                    DocumentKey::new(b"background".to_vec(), index.to_be_bytes().to_vec()),
+                    vec![index as u8],
+                )
+                .unwrap();
+        }
+        store.put(first_key.clone(), b"old".to_vec()).unwrap();
+        let old_pin = store.publisher.pin();
+        let gate = store.file.gate.as_ref().unwrap();
+        gate.armed.store(true, Ordering::SeqCst);
+        store.put(fourth_key.clone(), b"fourth".to_vec()).unwrap();
+        assert!(
+            started_receiver
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .is_ok()
+        );
+        assert_eq!(
+            store.put(first_key.clone(), b"new".to_vec()).unwrap(),
+            Revision::new(6)
+        );
+        assert_eq!(store.get(&first_key).unwrap().value(), Some(&b"new"[..]));
+        resume_sender.send(()).unwrap();
+        store.wait_background_once().unwrap();
+        assert_eq!(store.publisher.pin().generation.overlays.len(), 2);
+        assert_eq!(store.current_superblock.checkpoint_sequence, 4);
+        assert_eq!(store.get(&first_key).unwrap().value(), Some(&b"new"[..]));
+        assert_eq!(
+            store.get(&fourth_key).unwrap().value(),
+            Some(&b"fourth"[..])
+        );
+        assert_eq!(
+            read_published_state(&old_pin, &first_key, &mut 0)
+                .unwrap()
+                .value(),
+            Some(&b"old"[..])
+        );
+        assert!(
+            read_published_state(&old_pin, &fourth_key, &mut 0)
+                .unwrap()
+                .is_missing()
+        );
+        assert!(
+            store.logical_wal.as_ref().unwrap().wal_bytes().unwrap()
+                > LOGICAL_INIT_FRAME_SIZE as u64
+        );
+        let checkpoint_report = store.checkpoint().unwrap();
+        assert_eq!(checkpoint_report.segments_materialized, 2);
+        let (data, wal) = store.into_files();
+        let mut reopened =
+            BlinkStore::open_with_logical_wal(data, wal.unwrap(), DatabaseConfig::default())
+                .unwrap();
+        assert_eq!(reopened.get(&first_key).unwrap().value(), Some(&b"new"[..]));
+        assert_eq!(
+            reopened.get(&fourth_key).unwrap().value(),
+            Some(&b"fourth"[..])
+        );
     }
 
     #[test]
@@ -13294,6 +14186,60 @@ mod tests {
                 return Err(Error::recovery(format!("injected failure at {point}")));
             }
             Ok(())
+        }
+    }
+
+    #[test]
+    fn background_materializer_write_failure_keeps_overlay_and_wal_authoritative() {
+        let (started_sender, started_receiver) = mpsc::channel();
+        let (resume_sender, resume_receiver) = mpsc::channel();
+        let mut store = BlinkStore::open_with_logical_wal(
+            BackgroundMemoryFile::default(),
+            BackgroundMemoryFile::default(),
+            DatabaseConfig::default(),
+        )
+        .unwrap();
+        store.file.gate = Some(Arc::new(BackgroundWriteGate {
+            armed: AtomicBool::new(false),
+            fail_after_resume: AtomicBool::new(true),
+            started: started_sender,
+            resume: Mutex::new(resume_receiver),
+        }));
+        let keys = (0..MATERIALIZER_SOFT_LIMIT)
+            .map(|index| {
+                DocumentKey::new(b"background-failure".to_vec(), index.to_be_bytes().to_vec())
+            })
+            .collect::<Vec<_>>();
+        for (index, key) in keys.iter().enumerate() {
+            if index + 1 == MATERIALIZER_SOFT_LIMIT {
+                store
+                    .file
+                    .gate
+                    .as_ref()
+                    .unwrap()
+                    .armed
+                    .store(true, Ordering::SeqCst);
+            }
+            store.put(key.clone(), vec![index as u8]).unwrap();
+        }
+        assert!(
+            started_receiver
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .is_ok()
+        );
+        resume_sender.send(()).unwrap();
+        store.wait_background_once().unwrap();
+        assert!(store.broken.is_none());
+        assert_eq!(store.checkpoint_metrics().failed, 1);
+        for (index, key) in keys.iter().enumerate() {
+            assert_eq!(store.get(key).unwrap().value(), Some(&[index as u8][..]));
+        }
+        let (data, wal) = store.into_files();
+        let mut reopened =
+            BlinkStore::open_with_logical_wal(data, wal.unwrap(), DatabaseConfig::default())
+                .unwrap();
+        for (index, key) in keys.iter().enumerate() {
+            assert_eq!(reopened.get(key).unwrap().value(), Some(&[index as u8][..]));
         }
     }
 

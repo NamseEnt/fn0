@@ -287,6 +287,7 @@ enum EngineKind {
     PlannedBlink,
     ParallelBlink,
     LogicalOverlayBlink,
+    BackgroundOverlayBlink,
 }
 
 impl EngineKind {
@@ -297,7 +298,10 @@ impl EngineKind {
             "versioned-blink" | "blink-versioned" | "phase2" => Self::VersionedBlink,
             "planned-blink" | "blink-planned" | "phase3" => Self::PlannedBlink,
             "parallel-blink" | "blink-parallel" | "phase4" => Self::ParallelBlink,
-            "logical-overlay-blink" | "blink-logical" | "phase-j" => Self::LogicalOverlayBlink,
+            "logical-overlay-blink" | "blink-logical" | "phase-j" | "synchronous-overlay-blink" => {
+                Self::LogicalOverlayBlink
+            }
+            "background-overlay-blink" | "phase-k" => Self::BackgroundOverlayBlink,
             other => panic!("unknown engine {other:?}"),
         }
     }
@@ -310,6 +314,7 @@ impl EngineKind {
             Self::PlannedBlink => "planned-blink",
             Self::ParallelBlink => "parallel-blink",
             Self::LogicalOverlayBlink => "logical-overlay-blink",
+            Self::BackgroundOverlayBlink => "background-overlay-blink",
         }
     }
 }
@@ -1131,6 +1136,16 @@ impl DurableFile for BenchFile {
         let delay = self.sync_delay;
         perform_benchmark_sync(mode, delay, || self.inner.sync_all())
     }
+
+    fn try_clone_for_background(&self) -> Option<Box<dyn DurableFile + Send>> {
+        self.inner.try_clone().ok().map(|inner| {
+            Box::new(BenchFile {
+                inner,
+                sync_mode: self.sync_mode,
+                sync_delay: self.sync_delay,
+            }) as Box<dyn DurableFile + Send>
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -1580,10 +1595,29 @@ struct MetricDelta {
     wal_syncs: u64,
     materializations: u64,
     materialization_total_nanos: u64,
+    materialization_cpu_nanos: u64,
     materialization_max_nanos: u64,
     materialized_segments: u64,
     materialized_overlay_bytes: u64,
     materialized_data_bytes: u64,
+    materialization_data_write_nanos: u64,
+    materialization_data_sync_nanos: u64,
+    materialization_checkpoint_nanos: u64,
+    materialization_checkpoint_sync_nanos: u64,
+    publish_pause_nanos: u64,
+    writer_blocked_nanos: u64,
+    backpressure_events: u64,
+    backpressure_nanos: u64,
+    materializer_requests: u64,
+    materializer_completed: u64,
+    materializer_failed: u64,
+    materializer_stale: u64,
+    overlay_segments_current: u64,
+    overlay_segments_peak: u64,
+    overlay_bytes_current: u64,
+    overlay_bytes_peak: u64,
+    wal_bytes_retained: u64,
+    wal_bytes_reclaimed: u64,
     materialization_wal_bytes_reclaimed: u64,
     materialization_max_lag_transactions: u64,
     wal_committed_batches: u64,
@@ -1782,6 +1816,10 @@ impl MetricDelta {
                 checkpoint_after.total_duration_nanos,
                 checkpoint_before.total_duration_nanos,
             ),
+            materialization_cpu_nanos: subtraction(
+                checkpoint_after.cpu_nanos,
+                checkpoint_before.cpu_nanos,
+            ),
             materialization_max_nanos: checkpoint_after.max_duration_nanos,
             materialized_segments: subtraction(
                 checkpoint_after.segments_materialized,
@@ -1794,6 +1832,57 @@ impl MetricDelta {
             materialized_data_bytes: subtraction(
                 checkpoint_after.bytes_written,
                 checkpoint_before.bytes_written,
+            ),
+            materialization_data_write_nanos: subtraction(
+                checkpoint_after.data_write_nanos,
+                checkpoint_before.data_write_nanos,
+            ),
+            materialization_data_sync_nanos: subtraction(
+                checkpoint_after.data_sync_nanos,
+                checkpoint_before.data_sync_nanos,
+            ),
+            materialization_checkpoint_nanos: subtraction(
+                checkpoint_after.checkpoint_nanos,
+                checkpoint_before.checkpoint_nanos,
+            ),
+            materialization_checkpoint_sync_nanos: subtraction(
+                checkpoint_after.checkpoint_sync_nanos,
+                checkpoint_before.checkpoint_sync_nanos,
+            ),
+            publish_pause_nanos: subtraction(
+                checkpoint_after.publish_pause_nanos,
+                checkpoint_before.publish_pause_nanos,
+            ),
+            writer_blocked_nanos: subtraction(
+                checkpoint_after.writer_blocked_nanos,
+                checkpoint_before.writer_blocked_nanos,
+            ),
+            backpressure_events: subtraction(
+                checkpoint_after.backpressure_events,
+                checkpoint_before.backpressure_events,
+            ),
+            backpressure_nanos: subtraction(
+                checkpoint_after.backpressure_nanos,
+                checkpoint_before.backpressure_nanos,
+            ),
+            materializer_requests: subtraction(
+                checkpoint_after.requests,
+                checkpoint_before.requests,
+            ),
+            materializer_completed: subtraction(
+                checkpoint_after.completed,
+                checkpoint_before.completed,
+            ),
+            materializer_failed: subtraction(checkpoint_after.failed, checkpoint_before.failed),
+            materializer_stale: subtraction(checkpoint_after.stale, checkpoint_before.stale),
+            overlay_segments_current: checkpoint_after.overlay_segments_current,
+            overlay_segments_peak: checkpoint_after.overlay_segments_peak,
+            overlay_bytes_current: checkpoint_after.overlay_bytes_current,
+            overlay_bytes_peak: checkpoint_after.overlay_bytes_peak,
+            wal_bytes_retained: checkpoint_after.wal_bytes_retained,
+            wal_bytes_reclaimed: subtraction(
+                checkpoint_after.wal_bytes_reclaimed_total,
+                checkpoint_before.wal_bytes_reclaimed_total,
             ),
             materialization_wal_bytes_reclaimed: subtraction(
                 checkpoint_after.wal_bytes_reclaimed,
@@ -3023,12 +3112,13 @@ async fn open_adapter(
             let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
             Ok((Arc::new(adapter), data_path, seeded))
         }
-        EngineKind::LogicalOverlayBlink => {
+        EngineKind::LogicalOverlayBlink | EngineKind::BackgroundOverlayBlink => {
             let mut store = BlinkStore::open_with_logical_wal(
                 BenchFile::open(&data_path, sync_mode, sync_delay)?,
                 BenchFile::open(&wal_path, sync_mode, sync_delay)?,
                 config,
             )?;
+            store.set_background_materialization(args.engine == EngineKind::BackgroundOverlayBlink);
             let requests = seed_requests(args, scenario);
             let seeded = requests.iter().map(|request| request.mutations.len()).sum();
             for chunk in requests.chunks(64) {
@@ -3286,6 +3376,10 @@ fn build_record(
         "materialization_total_nanos_delta",
         delta.materialization_total_nanos,
     );
+    json.u64(
+        "materialization_cpu_nanos_delta",
+        delta.materialization_cpu_nanos,
+    );
     json.u64("materialization_max_nanos", delta.materialization_max_nanos);
     json.u64("materialized_segments_delta", delta.materialized_segments);
     json.u64(
@@ -3296,6 +3390,36 @@ fn build_record(
         "materialized_data_bytes_delta",
         delta.materialized_data_bytes,
     );
+    json.u64(
+        "materialization_data_write_nanos_delta",
+        delta.materialization_data_write_nanos,
+    );
+    json.u64(
+        "materialization_data_sync_nanos_delta",
+        delta.materialization_data_sync_nanos,
+    );
+    json.u64(
+        "materialization_checkpoint_nanos_delta",
+        delta.materialization_checkpoint_nanos,
+    );
+    json.u64(
+        "materialization_checkpoint_sync_nanos_delta",
+        delta.materialization_checkpoint_sync_nanos,
+    );
+    json.u64("publish_pause_nanos_delta", delta.publish_pause_nanos);
+    json.u64("writer_blocked_nanos_delta", delta.writer_blocked_nanos);
+    json.u64("backpressure_events_delta", delta.backpressure_events);
+    json.u64("backpressure_nanos_delta", delta.backpressure_nanos);
+    json.u64("materializer_requests_delta", delta.materializer_requests);
+    json.u64("materializer_completed_delta", delta.materializer_completed);
+    json.u64("materializer_failed_delta", delta.materializer_failed);
+    json.u64("materializer_stale_delta", delta.materializer_stale);
+    json.u64("overlay_segments_current", delta.overlay_segments_current);
+    json.u64("overlay_segments_peak", delta.overlay_segments_peak);
+    json.u64("overlay_bytes_current", delta.overlay_bytes_current);
+    json.u64("overlay_bytes_peak", delta.overlay_bytes_peak);
+    json.u64("wal_bytes_retained", delta.wal_bytes_retained);
+    json.u64("wal_bytes_reclaimed_delta", delta.wal_bytes_reclaimed);
     json.u64(
         "materialization_wal_bytes_reclaimed_delta",
         delta.materialization_wal_bytes_reclaimed,
@@ -4042,6 +4166,14 @@ mod tests {
         );
         assert_eq!(EngineKind::parse("phase4"), EngineKind::ParallelBlink);
         assert_eq!(EngineKind::ParallelBlink.as_str(), "parallel-blink");
+        assert_eq!(
+            EngineKind::parse("phase-j"),
+            EngineKind::LogicalOverlayBlink
+        );
+        assert_eq!(
+            EngineKind::parse("phase-k"),
+            EngineKind::BackgroundOverlayBlink
+        );
         assert_eq!(Args::default().blink_workers, 2);
     }
 

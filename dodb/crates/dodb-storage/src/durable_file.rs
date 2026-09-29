@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::FileExt;
 use std::path::Path;
 
 use dodb_core::Result;
@@ -19,6 +19,9 @@ pub trait DurableFile {
     fn set_len(&mut self, length: u64) -> Result<()>;
     fn sync_data(&mut self) -> Result<()>;
     fn sync_all(&mut self) -> Result<()>;
+    fn try_clone_for_background(&self) -> Option<Box<dyn DurableFile + Send>> {
+        None
+    }
 }
 
 /// Thin production adapter. Database layout and higher-level I/O are
@@ -45,17 +48,21 @@ impl ProductionFile {
     pub fn into_file(self) -> File {
         self.file
     }
+
+    pub fn try_clone(&self) -> Result<Self> {
+        Ok(Self {
+            file: self.file.try_clone()?,
+        })
+    }
 }
 
 impl DurableFile for ProductionFile {
     fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize> {
-        self.file.seek(SeekFrom::Start(offset))?;
-        Ok(self.file.read(buffer)?)
+        Ok(self.file.read_at(buffer, offset)?)
     }
 
     fn write_at(&mut self, offset: u64, bytes: &[u8]) -> Result<usize> {
-        self.file.seek(SeekFrom::Start(offset))?;
-        Ok(self.file.write(bytes)?)
+        Ok(self.file.write_at(bytes, offset)?)
     }
 
     fn len(&self) -> Result<u64> {
@@ -75,5 +82,11 @@ impl DurableFile for ProductionFile {
     fn sync_all(&mut self) -> Result<()> {
         self.file.sync_all()?;
         Ok(())
+    }
+
+    fn try_clone_for_background(&self) -> Option<Box<dyn DurableFile + Send>> {
+        self.try_clone()
+            .ok()
+            .map(|file| Box::new(file) as Box<dyn DurableFile + Send>)
     }
 }
