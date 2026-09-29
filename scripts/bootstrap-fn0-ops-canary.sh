@@ -36,7 +36,7 @@ need npm
 need pulumi
 
 CANARY_DIR="${REPO_ROOT}/ops/canary"
-PROBES=(runtime dodb storage)
+PROBES=(runtime dodb dodb-write storage)
 PROBE_ATTEMPTS=30
 PROBE_RETRY_SECONDS=5
 
